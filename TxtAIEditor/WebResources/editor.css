@@ -13,6 +13,7 @@
     --wrap: pre;
     --csv-grid-template: var(--gutter-width) repeat(8, 128px);
     --csv-table-width: 1080px;
+    --csv-grid-line: color-mix(in srgb, var(--fg) 11%, transparent);
 }
 
 * {
@@ -300,13 +301,27 @@ body.csv-table-mode #virtual-spacer {
 
 body.csv-table-mode .line-row {
     contain: layout style paint;
+    height: var(--line-height);
 }
 
 .csv-row {
     grid-template-columns: var(--csv-grid-template);
     width: var(--csv-table-width);
+    height: var(--line-height);
     min-height: var(--line-height);
     line-height: var(--line-height);
+}
+
+.line-row.csv-row::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--csv-grid-line);
+    pointer-events: none;
+    z-index: 3;
 }
 
 .csv-row .line-number {
@@ -322,7 +337,8 @@ body.csv-table-mode .line-row {
 
 .csv-cell {
     min-width: 0;
-    min-height: var(--line-height);
+    height: var(--line-height);
+    min-height: 0;
     padding: 0 7px;
     overflow: hidden;
     white-space: pre;
@@ -330,16 +346,15 @@ body.csv-table-mode .line-row {
     color: var(--fg);
     background: var(--bg);
     border-right: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--fg) 11%, transparent);
     outline: none;
     caret-color: var(--fg);
 }
 
 .csv-cell-spacer {
-    min-height: var(--line-height);
+    height: var(--line-height);
+    min-height: 0;
     background: var(--bg);
     border-right: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--fg) 11%, transparent);
     pointer-events: none;
 }
 

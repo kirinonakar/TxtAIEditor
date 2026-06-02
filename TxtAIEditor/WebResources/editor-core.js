@@ -222,13 +222,20 @@ function resolveReadableColor(backgroundValue, foregroundValue, fallbackForegrou
     return readableForegroundFor(background);
 }
 
+function snapCssPixelsToDevicePixels(value) {
+    const dpr = Number(window.devicePixelRatio || 1);
+    if (!Number.isFinite(dpr) || dpr <= 0) return value;
+    return Math.ceil(value * dpr) / dpr;
+}
+
 function applyOptions(msg) {
     const theme = msg.theme || 'Dark';
     const bg = msg.customBackgroundColor || (theme === 'Light' ? '#ffffff' : '#1e1e1e');
     const preferredFg = msg.customForegroundColor || (theme === 'Light' ? '#111111' : '#d4d4d4');
     const fg = resolveReadableColor(bg, preferredFg, theme === 'Light' ? '#111111' : '#d4d4d4');
     const fontSize = Number(msg.fontSize || 14);
-    state.lineHeight = Math.max(18, Math.ceil(fontSize + 8));
+    const baseLineHeight = Math.max(18, Math.ceil(fontSize + 8));
+    state.lineHeight = snapCssPixelsToDevicePixels(baseLineHeight);
     state.tabSize = Number(msg.tabSize || 4);
     state.readOnly = !!msg.readOnly;
     state.wordWrap = !!msg.wordWrap;
