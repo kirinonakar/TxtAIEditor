@@ -1343,4 +1343,172 @@
   <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
     <value>[{0}] 프리셋 적용됨. 추가 지시사항 입력...</value>
   </data>
+  <data name="AgentErrorTitle" xml:space="preserve">
+    <value>Agent 오류</value>
+  </data>
+  <data name="AgentEmptyPrompt" xml:space="preserve">
+    <value>Agent에게 맡길 작업을 입력해 주세요.</value>
+  </data>
+  <data name="AgentActivityStarting" xml:space="preserve">
+    <value>시작 중</value>
+  </data>
+  <data name="AgentActivityCollectingContext" xml:space="preserve">
+    <value>맥락 수집 중</value>
+  </data>
+  <data name="AgentActivityThinking" xml:space="preserve">
+    <value>생각중</value>
+  </data>
+  <data name="AgentOutputPreparingTool" xml:space="preserve">
+    <value>도구 호출 준비 중</value>
+  </data>
+  <data name="AgentToolCallParseFailed" xml:space="preserve">
+    <value>도구 호출을 해석하지 못해 원문을 표시합니다.</value>
+  </data>
+  <data name="AgentActivityFinalAnswer" xml:space="preserve">
+    <value>최종 응답 작성 완료</value>
+  </data>
+  <data name="AgentToolRunning" xml:space="preserve">
+    <value>도구 실행 중</value>
+  </data>
+  <data name="AgentActivityToolDoneFormat" xml:space="preserve">
+    <value>도구 완료: {0}</value>
+  </data>
+  <data name="AgentActivityToolCancelled" xml:space="preserve">
+    <value>도구 실행 중단됨</value>
+  </data>
+  <data name="AgentActivityToolFailedFormat" xml:space="preserve">
+    <value>도구 실패: {0}</value>
+  </data>
+  <data name="AgentActivityStopRequested" xml:space="preserve">
+    <value>중단 요청됨</value>
+  </data>
+  <data name="AgentOutputStopping" xml:space="preserve">
+    <value>Agent 실행을 중단하는 중...</value>
+  </data>
+  <data name="AgentActivityStopped" xml:space="preserve">
+    <value>중단됨</value>
+  </data>
+  <data name="AgentOutputStopped" xml:space="preserve">
+    <value>Agent 실행이 중단되었습니다.</value>
+  </data>
+  <data name="AgentExceptionFormat" xml:space="preserve">
+    <value>Agent 실행 도중 예외가 발생했습니다: {0}</value>
+  </data>
+  <data name="AgentModeRun" xml:space="preserve">
+    <value>실행</value>
+  </data>
+  <data name="AgentActivityListFilesFormat" xml:space="preserve">
+    <value>파일 목록 조회 중: {0}</value>
+  </data>
+  <data name="AgentActivitySearchTextFormat" xml:space="preserve">
+    <value>텍스트 검색 중: {0}</value>
+  </data>
+  <data name="AgentActivityRunRgFormat" xml:space="preserve">
+    <value>rg 실행 중: {0}</value>
+  </data>
+  <data name="AgentActivityRunPowerShellFormat" xml:space="preserve">
+    <value>PowerShell 실행 중: {0}</value>
+  </data>
+  <data name="AgentActivityReadFileFormat" xml:space="preserve">
+    <value>파일 읽는 중: {0} ({1}줄부터 {2}줄)</value>
+  </data>
+  <data name="AgentActivityCreateFileFormat" xml:space="preserve">
+    <value>파일 만드는 중: {0}</value>
+  </data>
+  <data name="AgentActivityReplaceFileFormat" xml:space="preserve">
+    <value>파일 수정 중: {0}</value>
+  </data>
+  <data name="AgentActivityOverwriteFileFormat" xml:space="preserve">
+    <value>파일 덮어쓰는 중: {0}</value>
+  </data>
+  <data name="AgentActivityInsertText" xml:space="preserve">
+    <value>현재 편집기에 입력 중</value>
+  </data>
+  <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
+    <value>도구 실행 중: {0}</value>
+  </data>
+  <data name="AgentActivityDiffReviewFormat" xml:space="preserve">
+    <value>파일 변경 승인 대기 중: {0}</value>
+  </data>
+  <data name="AgentDiffDialogTitleFormat" xml:space="preserve">
+    <value>Agent 파일 변경 확인: {0}</value>
+  </data>
+  <data name="AgentDiffApplyButton" xml:space="preserve">
+    <value>승인</value>
+  </data>
+  <data name="AgentDiffCancelButton" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="AgentActivityDiffAppliedFormat" xml:space="preserve">
+    <value>변경 적용 승인: {0}</value>
+  </data>
+  <data name="AgentActivityDiffCancelledFormat" xml:space="preserve">
+    <value>변경 적용 취소: {0}</value>
+  </data>
+  <data name="AgentInsertTitle" xml:space="preserve">
+    <value>Agent 응답 입력</value>
+  </data>
+  <data name="AgentNoOutputToInsert" xml:space="preserve">
+    <value>입력할 Agent 응답이 없습니다.</value>
+  </data>
+  <data name="AgentNoActiveTab" xml:space="preserve">
+    <value>활성 탭 없음</value>
+  </data>
+  <data name="AgentNoSelection" xml:space="preserve">
+    <value>선택 없음</value>
+  </data>
+  <data name="AgentSelectionStats" xml:space="preserve">
+    <value>선택 {0:N0}자</value>
+  </data>
+  <data name="AgentContextStatsFormat" xml:space="preserve">
+    <value>맥락: {0} · {1}</value>
+  </data>
+  <data name="AgentGitWarning" xml:space="preserve">
+    <value>경고: Git 저장소가 아님</value>
+  </data>
+  <data name="AgentGitRequired" xml:space="preserve">
+    <value>Agent는 Git 저장소로 지정된 폴더 내에서만 실행할 수 있습니다.</value>
+  </data>
+  <data name="AgentNewSessionButton" xml:space="preserve">
+    <value>새 세션</value>
+  </data>
+  <data name="AgentCreateDialogTitle" xml:space="preserve">
+    <value>Agent 파일 생성 확인: {0}</value>
+  </data>
+  <data name="AgentEditDialogTitle" xml:space="preserve">
+    <value>Agent 파일 수정 확인: {0}</value>
+  </data>
+  <data name="AgentCreateSummaryFormat" xml:space="preserve">
+    <value>파일을 생성하시겠습니까? 경로: {0}</value>
+  </data>
+  <data name="AgentEditSummaryFormat" xml:space="preserve">
+    <value>파일을 수정하시겠습니까? 경로: {0}</value>
+  </data>
+  <data name="AgentOutputPlaceholder" xml:space="preserve">
+    <value>대기 중... Agent에게 작업을 지시해 보세요.</value>
+  </data>
+  <data name="AgentContextStatsDefault" xml:space="preserve">
+    <value>현재 탭과 선택 영역을 맥락으로 사용</value>
+  </data>
+  <data name="AgentIncludeActiveFile" xml:space="preserve">
+    <value>현재 탭 포함</value>
+  </data>
+  <data name="AgentPromptPlaceholder" xml:space="preserve">
+    <value>Agent에게 맡길 작업 입력...</value>
+  </data>
+  <data name="AgentRunButton" xml:space="preserve">
+    <value>실행</value>
+  </data>
+  <data name="AgentStopButton" xml:space="preserve">
+    <value>중단</value>
+  </data>
+  <data name="AgentActivityHeader" xml:space="preserve">
+    <value>진행 상황</value>
+  </data>
+  <data name="AgentActivityIdle" xml:space="preserve">
+    <value>대기 중</value>
+  </data>
+  <data name="AgentInsertOutputTooltip" xml:space="preserve">
+    <value>Agent 응답을 현재 커서에 입력</value>
+  </data>
 </root>

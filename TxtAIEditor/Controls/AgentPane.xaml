@@ -123,22 +123,11 @@
                     Style="{StaticResource AccentButtonStyle}"/>
         </Grid>
 
-        <Grid Grid.Row="4" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Button x:Name="AgentPlanButton"
-                    Grid.Column="0"
-                    Content="계획"
+        <Grid Grid.Row="4">
+            <Button x:Name="AgentNewSessionButton"
+                    Content="새 세션"
                     HorizontalAlignment="Stretch"
-                    Click="OnPlanClick"
-                    Style="{StaticResource AgentButtonStyle}"/>
-            <Button x:Name="AgentEditButton"
-                    Grid.Column="1"
-                    Content="수정안"
-                    HorizontalAlignment="Stretch"
-                    Click="OnEditClick"
+                    Click="OnNewSessionClick"
                     Style="{StaticResource AgentButtonStyle}"/>
         </Grid>
 

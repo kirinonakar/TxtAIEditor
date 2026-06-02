@@ -404,6 +404,7 @@ namespace TxtAIEditor
                 ShowErrorMessage,
                 GetLocalizedString,
                 new AgentFileToolService(GetAgentWorkspaceRoot),
+                path => _gitService.FindRepositoryRoot(path) != null,
                 OnAgentFileModifiedAsync);
             _tocController = new TocController(
                 _viewModel,

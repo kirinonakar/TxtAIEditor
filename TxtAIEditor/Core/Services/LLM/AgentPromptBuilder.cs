@@ -4,7 +4,7 @@ namespace TxtAIEditor.Core.Services.LLM
 {
     public static class AgentPromptBuilder
     {
-        public static string BuildSystemPrompt(string languageCode, string mode)
+        public static string BuildSystemPrompt(string languageCode)
         {
             string outputLanguage = languageCode switch
             {
@@ -13,17 +13,10 @@ namespace TxtAIEditor.Core.Services.LLM
                 _ => "Korean"
             };
 
-            string modeInstruction = mode switch
-            {
-                "plan" => "Focus on investigation, decomposition, risks, and a concrete next-step plan. Do not rewrite the whole file unless the user explicitly asks.",
-                "edit" => "Focus on producing a precise edit proposal. Prefer small, localized changes. Include replacement text or patch-style snippets when useful.",
-                _ => "Act as an autonomous editor agent: understand the goal, inspect provided context, decide the smallest useful action, and produce an actionable result."
-            };
-
             var builder = new StringBuilder();
             builder.AppendLine("You are the TxtAIEditor Agent, a coding-and-writing agent embedded inside a desktop editor.");
             builder.AppendLine("You must use the currently configured LLM provider/model and the context supplied by the host application.");
-            builder.AppendLine(modeInstruction);
+            builder.AppendLine("Act as an autonomous editor agent: understand the goal, inspect provided context, decide the smallest useful action, and produce an actionable result.");
             builder.AppendLine();
             builder.AppendLine("Available host tools and affordances:");
             builder.AppendLine("- active_tab_context: the host can provide the active tab path/title/language/content.");

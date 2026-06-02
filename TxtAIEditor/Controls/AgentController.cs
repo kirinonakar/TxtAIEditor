@@ -27,11 +27,13 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
+        private readonly Func<string, bool> _isGitRepoProvider;
         private readonly Func<string, Task>? _fileModifiedAsync;
 
         private string _lastSelectionText = string.Empty;
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
+        private readonly StringBuilder _sessionHistory = new();
 
         public AgentController(
             ILLMService llmService,
@@ -43,6 +45,7 @@ namespace TxtAIEditor.Controls
             Action<string, string> showError,
             Func<string, string, string> getString,
             AgentFileToolService fileTools,
+            Func<string, bool> isGitRepoProvider,
             Func<string, Task>? fileModifiedAsync = null)
         {
             _llmService = llmService;
@@ -54,6 +57,7 @@ namespace TxtAIEditor.Controls
             _showError = showError;
             _getString = getString;
             _fileTools = fileTools;
+            _isGitRepoProvider = isGitRepoProvider;
             _fileModifiedAsync = fileModifiedAsync;
             _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
             if (_fileModifiedAsync != null)
@@ -79,31 +83,29 @@ namespace TxtAIEditor.Controls
 
         private void WireEvents()
         {
-            _agentPane.RunRequested += async (_, _) => await RunAgentAsync("run");
+            _agentPane.RunRequested += async (_, _) => await RunAgentAsync();
             _agentPane.StopRequested += (_, _) => StopAgent();
-            _agentPane.PlanRequested += async (_, _) => await RunAgentAsync("plan");
-            _agentPane.EditRequested += async (_, _) => await RunAgentAsync("edit");
+            _agentPane.NewSessionRequested += (_, _) => ClearSession();
             _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
         }
-
-        private async Task RunAgentAsync(string mode)
+ 
+        private async Task RunAgentAsync()
         {
             if (_isRunning)
             {
                 return;
             }
-
-            string instruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(instruction))
+ 
+            string root = _fileTools.WorkspaceRoot;
+            if (!_isGitRepoProvider(root))
             {
-                instruction = mode switch
-                {
-                    "plan" => _getString("AgentDefaultPlanInstruction", "현재 맥락을 분석하고 실행 계획을 세워줘."),
-                    "edit" => _getString("AgentDefaultEditInstruction", "현재 맥락을 바탕으로 적용 가능한 수정안을 만들어줘."),
-                    _ => string.Empty
-                };
+                _showError(
+                    _getString("AgentErrorTitle", "Agent 오류"),
+                    _getString("AgentGitRequired", "Agent는 Git 저장소로 지정된 폴더 내에서만 실행할 수 있습니다."));
+                return;
             }
-
+ 
+            string instruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(instruction))
             {
                 _showError(
@@ -111,21 +113,33 @@ namespace TxtAIEditor.Controls
                     _getString("AgentEmptyPrompt", "Agent에게 맡길 작업을 입력해 주세요."));
                 return;
             }
-
+ 
             _isRunning = true;
             var cancellationSource = new CancellationTokenSource();
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
             _agentPane.SetBusy(true);
             _agentPane.ClearActivity(_getString("AgentActivityStarting", "시작 중"));
-            _agentPane.BeginOutputBlock(BuildRunHeader(mode, instruction));
+            _agentPane.BeginOutputBlock(BuildRunHeader(instruction));
             AppendActivity(_getString("AgentActivityCollectingContext", "맥락 수집 중"));
 
             try
             {
                 string workspaceContext = BuildWorkspaceContext();
                 string selectedText = _lastSelectionText;
-                string transcript = workspaceContext;
+
+                var initialTranscriptBuilder = new StringBuilder();
+                if (_sessionHistory.Length > 0)
+                {
+                    initialTranscriptBuilder.AppendLine("[Session History]");
+                    initialTranscriptBuilder.AppendLine(_sessionHistory.ToString());
+                    initialTranscriptBuilder.AppendLine("=================================");
+                    initialTranscriptBuilder.AppendLine();
+                }
+                initialTranscriptBuilder.AppendLine(workspaceContext);
+                string initialTranscript = initialTranscriptBuilder.ToString();
+
+                string transcript = initialTranscript;
                 string response = string.Empty;
 
                 for (int step = 0; step < 8; step++)
@@ -140,7 +154,7 @@ namespace TxtAIEditor.Controls
                         instruction,
                         transcript,
                         selectedText,
-                        mode,
+                        "run",
                         async chunk =>
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -152,7 +166,7 @@ namespace TxtAIEditor.Controls
                                 {
                                     toolCallPlaceholderShown = true;
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                        _agentPane.AppendOutputLine(_getString("AgentOutputPreparingTool", "도구 호출 준비 중...")));
+                                        _agentPane.BeginThinkingActivity(_getString("AgentOutputPreparingTool", "도구 호출 준비 중")));
                                 }
 
                                 return;
@@ -164,7 +178,7 @@ namespace TxtAIEditor.Controls
                                 {
                                     toolCallPlaceholderShown = true;
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                        _agentPane.AppendOutputLine(_getString("AgentOutputPreparingTool", "도구 호출 준비 중...")));
+                                        _agentPane.BeginThinkingActivity(_getString("AgentOutputPreparingTool", "도구 호출 준비 중")));
                                 }
 
                                 return;
@@ -176,7 +190,12 @@ namespace TxtAIEditor.Controls
                             await Task.CompletedTask;
                         },
                         cancellationToken);
-                    _agentPane.StopThinkingActivity();
+
+                    await RunOnUIThreadAsync(() =>
+                    {
+                        _agentPane.StopThinkingActivity();
+                    });
+
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
 
@@ -184,31 +203,57 @@ namespace TxtAIEditor.Controls
                     {
                         if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
-                            _agentPane.AppendOutputLine(_getString("AgentToolCallParseFailed", "도구 호출을 해석하지 못해 원문을 표시합니다."));
-                            _agentPane.AppendOutputText(response);
+                            await RunOnUIThreadAsync(() =>
+                            {
+                                _agentPane.AppendOutputLine(_getString("AgentToolCallParseFailed", "도구 호출을 해석하지 못해 원문을 표시합니다."));
+                                _agentPane.AppendOutputText(response);
+                            });
                         }
 
-                        AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
+                        await RunOnUIThreadAsync(() =>
+                        {
+                            AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
+                        });
+
+                        _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                        string runTranscript = transcript.Substring(initialTranscript.Length);
+                        if (!string.IsNullOrWhiteSpace(runTranscript))
+                        {
+                            _sessionHistory.AppendLine(runTranscript.Trim());
+                        }
+                        _sessionHistory.AppendLine($"[Agent Response]: {response.Trim()}");
+                        _sessionHistory.AppendLine();
+
                         break;
                     }
 
                     string toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                     transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResult}";
-                    _agentPane.AppendOutputLine($"{_getString("AgentToolRunning", "도구 실행 중")}: {toolName}");
-                    _agentPane.AppendOutputText(toolResult.TrimEnd() + Environment.NewLine);
+                    
+                    await RunOnUIThreadAsync(() =>
+                    {
+                        _agentPane.AppendOutputLine($"{_getString("AgentToolRunning", "도구 실행 중")}: {toolName}");
+                        _agentPane.AppendOutputText(toolResult.TrimEnd() + Environment.NewLine);
+                    });
                 }
             }
             catch (OperationCanceledException)
             {
-                AppendActivity(_getString("AgentActivityStopped", "중단됨"));
-                _agentPane.AppendOutputLine(_getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
+                await RunOnUIThreadAsync(() =>
+                {
+                    AppendActivity(_getString("AgentActivityStopped", "중단됨"));
+                    _agentPane.AppendOutputLine(_getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
+                });
             }
             catch (Exception ex)
             {
-                _agentPane.AppendOutputLine(string.Format(
-                    _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
-                    ex.Message));
+                await RunOnUIThreadAsync(() =>
+                {
+                    _agentPane.AppendOutputLine(string.Format(
+                        _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
+                        ex.Message));
+                });
             }
             finally
             {
@@ -222,6 +267,34 @@ namespace TxtAIEditor.Controls
                 _agentPane.SetBusy(false);
                 UpdateContextStats();
             }
+        }
+
+        private void ClearSession()
+        {
+            _sessionHistory.Clear();
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                _agentPane.Output.Text = _getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
+                _agentPane.ClearActivity(_getString("AgentActivityIdle", "대기 중"));
+            });
+        }
+
+        private Task RunOnUIThreadAsync(Action action)
+        {
+            var tcs = new TaskCompletionSource();
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    action();
+                    tcs.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+            return tcs.Task;
         }
 
         private void StopAgent()
@@ -245,15 +318,9 @@ namespace TxtAIEditor.Controls
             _runCancellation?.Cancel();
         }
 
-        private string BuildRunHeader(string mode, string instruction)
+        private string BuildRunHeader(string instruction)
         {
-            string modeText = mode switch
-            {
-                "plan" => _getString("AgentModePlan", "계획"),
-                "edit" => _getString("AgentModeEdit", "수정안"),
-                _ => _getString("AgentModeRun", "실행")
-            };
-
+            string modeText = _getString("AgentModeRun", "실행");
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             return $"===== {timestamp}  Agent {modeText}: {TruncateForActivity(instruction)} =====";
         }
@@ -812,56 +879,46 @@ namespace TxtAIEditor.Controls
         private async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)
         {
             AppendActivity(string.Format(
-                _getString("AgentActivityDiffReviewFormat", "diff 확인 대기 중: {0}"),
+                _getString("AgentActivityDiffReviewFormat", "파일 변경 승인 대기 중: {0}"),
                 preview.RelativePath));
 
             double rootWidth = _agentPane.XamlRoot?.Size.Width ?? 900;
-            double rootHeight = _agentPane.XamlRoot?.Size.Height ?? 700;
-            double dialogWidth = Math.Clamp(rootWidth - 96, 560, 980);
-            double diffHeight = Math.Clamp(rootHeight - 260, 320, 620);
+            double dialogWidth = Math.Clamp(rootWidth - 96, 480, 720);
 
-            var diffBox = new TextBox
-            {
-                Text = BuildDiffPreview(preview),
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.NoWrap,
-                IsReadOnly = true,
-                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Cascadia Mono"),
-                FontSize = 12,
-                Width = dialogWidth,
-                Height = diffHeight,
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            ScrollViewer.SetVerticalScrollBarVisibility(diffBox, ScrollBarVisibility.Auto);
-            ScrollViewer.SetHorizontalScrollBarVisibility(diffBox, ScrollBarVisibility.Auto);
-
-            var content = new Grid
+            var content = new StackPanel
             {
                 Width = dialogWidth,
-                RowSpacing = 8
+                Spacing = 12
             };
-            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
             var summary = new TextBlock
             {
                 Text = BuildDiffSummary(preview),
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 12,
+                FontSize = 14,
                 Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
             };
-            Grid.SetRow(summary, 0);
-            Grid.SetRow(diffBox, 1);
             content.Children.Add(summary);
-            content.Children.Add(diffBox);
+
+            string titleKey = preview.ActionName switch
+            {
+                "create_file" => "AgentCreateDialogTitle",
+                _ => "AgentEditDialogTitle"
+            };
+
+            string defaultTitle = preview.ActionName switch
+            {
+                "create_file" => "Agent 파일 생성 확인: {0}",
+                _ => "Agent 파일 수정 확인: {0}"
+            };
 
             var dialog = new ContentDialog
             {
                 Title = string.Format(
-                    _getString("AgentDiffDialogTitleFormat", "Agent 파일 수정 확인: {0}"),
+                    _getString(titleKey, defaultTitle),
                     preview.RelativePath),
                 Content = content,
-                PrimaryButtonText = _getString("AgentDiffApplyButton", "적용"),
+                PrimaryButtonText = _getString("AgentDiffApplyButton", "승인"),
                 CloseButtonText = _getString("AgentDiffCancelButton", "취소"),
                 XamlRoot = _agentPane.XamlRoot,
                 RequestedTheme = _agentPane.ActualTheme
@@ -870,225 +927,18 @@ namespace TxtAIEditor.Controls
             var result = await dialog.ShowAsync();
             bool approved = result == ContentDialogResult.Primary;
             AppendActivity(approved
-                ? string.Format(_getString("AgentActivityDiffAppliedFormat", "diff 적용 승인: {0}"), preview.RelativePath)
-                : string.Format(_getString("AgentActivityDiffCancelledFormat", "diff 적용 취소: {0}"), preview.RelativePath));
+                ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
+                : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
             return approved;
         }
 
-        private static string BuildDiffPreview(AgentFileEditPreview preview)
+        private string BuildDiffSummary(AgentFileEditPreview preview)
         {
-            var builder = new StringBuilder();
-            string displayPath = preview.RelativePath.Replace('\\', '/');
-            builder.AppendLine($"diff --git a/{displayPath} b/{displayPath}");
-
-            string[] oldLines = preview.OldContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-            string[] newLines = preview.NewContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-
             if (preview.IsNewFile)
             {
-                builder.AppendLine("new file mode 100644");
-                builder.AppendLine("index 0000000..0000000");
-                builder.AppendLine("--- /dev/null");
-                builder.AppendLine($"+++ b/{displayPath}");
-                builder.AppendLine($"@@ -0,0 +1,{FormatDiffCount(newLines.Length)} @@");
-                foreach (string line in newLines)
-                {
-                    builder.Append('+');
-                    builder.AppendLine(line);
-                }
-
-                return TruncateDiff(builder.ToString());
+                return string.Format(_getString("AgentCreateSummaryFormat", "파일을 생성하시겠습니까? 경로: {0}"), preview.RelativePath);
             }
-
-            builder.AppendLine("index 0000000..0000000 100644");
-            builder.AppendLine($"--- a/{displayPath}");
-            builder.AppendLine($"+++ b/{displayPath}");
-
-            foreach (var hunk in BuildUnifiedDiffHunks(BuildLineDiff(oldLines, newLines), 3))
-            {
-                builder.AppendLine($"@@ -{hunk.OldStart},{FormatDiffCount(hunk.OldCount)} +{hunk.NewStart},{FormatDiffCount(hunk.NewCount)} @@");
-                for (int i = hunk.StartIndex; i <= hunk.EndIndex; i++)
-                {
-                    var line = hunk.Lines[i];
-                    builder.Append(line.Prefix);
-                    builder.AppendLine(line.Text);
-                }
-            }
-
-            return TruncateDiff(builder.ToString());
-        }
-
-        private static string BuildDiffSummary(AgentFileEditPreview preview)
-        {
-            string[] oldLines = preview.OldContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-            string[] newLines = preview.NewContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-            int added = Math.Max(0, newLines.Length - oldLines.Length);
-            int removed = Math.Max(0, oldLines.Length - newLines.Length);
-            return preview.IsNewFile
-                ? $"New file: {preview.RelativePath} ({newLines.Length:N0} lines)"
-                : $"Review changes for {preview.RelativePath}  (+{added:N0} / -{removed:N0}, {oldLines.Length:N0} -> {newLines.Length:N0} lines)";
-        }
-
-        private static List<(char Prefix, string Text, int OldLine, int NewLine)> BuildLineDiff(string[] oldLines, string[] newLines)
-        {
-            if ((long)oldLines.Length * newLines.Length > 400_000)
-            {
-                return BuildPositionalDiff(oldLines, newLines);
-            }
-
-            int[,] lcs = new int[oldLines.Length + 1, newLines.Length + 1];
-            for (int i = oldLines.Length - 1; i >= 0; i--)
-            {
-                for (int j = newLines.Length - 1; j >= 0; j--)
-                {
-                    lcs[i, j] = oldLines[i] == newLines[j]
-                        ? lcs[i + 1, j + 1] + 1
-                        : Math.Max(lcs[i + 1, j], lcs[i, j + 1]);
-                }
-            }
-
-            var result = new List<(char Prefix, string Text, int OldLine, int NewLine)>();
-            int oldIndex = 0;
-            int newIndex = 0;
-            while (oldIndex < oldLines.Length && newIndex < newLines.Length)
-            {
-                if (oldLines[oldIndex] == newLines[newIndex])
-                {
-                    result.Add((' ', oldLines[oldIndex], oldIndex + 1, newIndex + 1));
-                    oldIndex++;
-                    newIndex++;
-                }
-                else if (lcs[oldIndex + 1, newIndex] >= lcs[oldIndex, newIndex + 1])
-                {
-                    result.Add(('-', oldLines[oldIndex], oldIndex + 1, 0));
-                    oldIndex++;
-                }
-                else
-                {
-                    result.Add(('+', newLines[newIndex], 0, newIndex + 1));
-                    newIndex++;
-                }
-            }
-
-            while (oldIndex < oldLines.Length)
-            {
-                result.Add(('-', oldLines[oldIndex], oldIndex + 1, 0));
-                oldIndex++;
-            }
-
-            while (newIndex < newLines.Length)
-            {
-                result.Add(('+', newLines[newIndex], 0, newIndex + 1));
-                newIndex++;
-            }
-
-            return result;
-        }
-
-        private static List<(char Prefix, string Text, int OldLine, int NewLine)> BuildPositionalDiff(string[] oldLines, string[] newLines)
-        {
-            var result = new List<(char Prefix, string Text, int OldLine, int NewLine)>();
-            int max = Math.Max(oldLines.Length, newLines.Length);
-            for (int i = 0; i < max; i++)
-            {
-                string? oldLine = i < oldLines.Length ? oldLines[i] : null;
-                string? newLine = i < newLines.Length ? newLines[i] : null;
-
-                if (oldLine == newLine)
-                {
-                    result.Add((' ', oldLine ?? string.Empty, i + 1, i + 1));
-                    continue;
-                }
-
-                if (oldLine != null)
-                {
-                    result.Add(('-', oldLine, i + 1, 0));
-                }
-
-                if (newLine != null)
-                {
-                    result.Add(('+', newLine, 0, i + 1));
-                }
-            }
-
-            return result;
-        }
-
-        private static List<(List<(char Prefix, string Text, int OldLine, int NewLine)> Lines, int StartIndex, int EndIndex, int OldStart, int OldCount, int NewStart, int NewCount)> BuildUnifiedDiffHunks(
-            List<(char Prefix, string Text, int OldLine, int NewLine)> lines,
-            int contextLines)
-        {
-            var hunks = new List<(List<(char Prefix, string Text, int OldLine, int NewLine)> Lines, int StartIndex, int EndIndex, int OldStart, int OldCount, int NewStart, int NewCount)>();
-            var changedIndexes = lines
-                .Select((line, index) => (line, index))
-                .Where(item => item.line.Prefix != ' ')
-                .Select(item => item.index)
-                .ToList();
-
-            if (changedIndexes.Count == 0)
-            {
-                return hunks;
-            }
-
-            int hunkStart = Math.Max(0, changedIndexes[0] - contextLines);
-            int hunkEnd = Math.Min(lines.Count - 1, changedIndexes[0] + contextLines);
-            for (int i = 1; i < changedIndexes.Count; i++)
-            {
-                int nextStart = Math.Max(0, changedIndexes[i] - contextLines);
-                int nextEnd = Math.Min(lines.Count - 1, changedIndexes[i] + contextLines);
-                if (nextStart <= hunkEnd + 1)
-                {
-                    hunkEnd = Math.Max(hunkEnd, nextEnd);
-                    continue;
-                }
-
-                hunks.Add(BuildHunk(lines, hunkStart, hunkEnd));
-                hunkStart = nextStart;
-                hunkEnd = nextEnd;
-            }
-
-            hunks.Add(BuildHunk(lines, hunkStart, hunkEnd));
-            return hunks;
-        }
-
-        private static (List<(char Prefix, string Text, int OldLine, int NewLine)> Lines, int StartIndex, int EndIndex, int OldStart, int OldCount, int NewStart, int NewCount) BuildHunk(
-            List<(char Prefix, string Text, int OldLine, int NewLine)> lines,
-            int startIndex,
-            int endIndex)
-        {
-            int oldStart = lines.Skip(startIndex).Take(endIndex - startIndex + 1).FirstOrDefault(line => line.Prefix != '+' && line.OldLine > 0).OldLine;
-            int newStart = lines.Skip(startIndex).Take(endIndex - startIndex + 1).FirstOrDefault(line => line.Prefix != '-' && line.NewLine > 0).NewLine;
-            oldStart = oldStart == 0 ? 1 : oldStart;
-            newStart = newStart == 0 ? 1 : newStart;
-            int oldCount = 0;
-            int newCount = 0;
-            for (int i = startIndex; i <= endIndex; i++)
-            {
-                if (lines[i].Prefix != '+')
-                {
-                    oldCount++;
-                }
-
-                if (lines[i].Prefix != '-')
-                {
-                    newCount++;
-                }
-            }
-
-            return (lines, startIndex, endIndex, oldStart, oldCount, newStart, newCount);
-        }
-
-        private static string FormatDiffCount(int count)
-        {
-            return count.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        private static string TruncateDiff(string diff)
-        {
-            const int maxChars = 60_000;
-            return diff.Length <= maxChars
-                ? diff
-                : diff.Substring(0, maxChars) + Environment.NewLine + "[diff truncated]";
+            return string.Format(_getString("AgentEditSummaryFormat", "파일을 수정하시겠습니까? 경로: {0}"), preview.RelativePath);
         }
 
         private async Task InsertOutputAsync()

@@ -179,7 +179,7 @@ namespace TxtAIEditor.Core.Services
         public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
             string langCode = GetActiveLanguage();
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, mode);
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty);
             return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }

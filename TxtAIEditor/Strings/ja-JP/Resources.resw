@@ -1344,4 +1344,172 @@
   <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
     <value>[{0}] プリセット適用。追加の指示事項を入力...</value>
   </data>
+  <data name="AgentErrorTitle" xml:space="preserve">
+    <value>Agent エラー</value>
+  </data>
+  <data name="AgentEmptyPrompt" xml:space="preserve">
+    <value>Agentに指示する作業を入力してください。</value>
+  </data>
+  <data name="AgentActivityStarting" xml:space="preserve">
+    <value>開始中</value>
+  </data>
+  <data name="AgentActivityCollectingContext" xml:space="preserve">
+    <value>コンテキスト収集中</value>
+  </data>
+  <data name="AgentActivityThinking" xml:space="preserve">
+    <value>思考中</value>
+  </data>
+  <data name="AgentOutputPreparingTool" xml:space="preserve">
+    <value>ツール呼び出し準備中</value>
+  </data>
+  <data name="AgentToolCallParseFailed" xml:space="preserve">
+    <value>ツールの呼び出しを解析できませんでした。原文を表示します。</value>
+  </data>
+  <data name="AgentActivityFinalAnswer" xml:space="preserve">
+    <value>最終回答の作成完了</value>
+  </data>
+  <data name="AgentToolRunning" xml:space="preserve">
+    <value>ツール実行中</value>
+  </data>
+  <data name="AgentActivityToolDoneFormat" xml:space="preserve">
+    <value>ツール完了: {0}</value>
+  </data>
+  <data name="AgentActivityToolCancelled" xml:space="preserve">
+    <value>ツールの実行がキャンセルされました</value>
+  </data>
+  <data name="AgentActivityToolFailedFormat" xml:space="preserve">
+    <value>ツール失敗: {0}</value>
+  </data>
+  <data name="AgentActivityStopRequested" xml:space="preserve">
+    <value>中止が要求されました</value>
+  </data>
+  <data name="AgentOutputStopping" xml:space="preserve">
+    <value>Agentの実行を停止しています...</value>
+  </data>
+  <data name="AgentActivityStopped" xml:space="preserve">
+    <value>停止</value>
+  </data>
+  <data name="AgentOutputStopped" xml:space="preserve">
+    <value>Agentの実行が停止されました。</value>
+  </data>
+  <data name="AgentExceptionFormat" xml:space="preserve">
+    <value>Agent実行中に例外が発生しました: {0}</value>
+  </data>
+  <data name="AgentModeRun" xml:space="preserve">
+    <value>実行</value>
+  </data>
+  <data name="AgentActivityListFilesFormat" xml:space="preserve">
+    <value>ファイル一覧の取得中: {0}</value>
+  </data>
+  <data name="AgentActivitySearchTextFormat" xml:space="preserve">
+    <value>テキスト検索中: {0}</value>
+  </data>
+  <data name="AgentActivityRunRgFormat" xml:space="preserve">
+    <value>rg実行中: {0}</value>
+  </data>
+  <data name="AgentActivityRunPowerShellFormat" xml:space="preserve">
+    <value>PowerShell実行중: {0}</value>
+  </data>
+  <data name="AgentActivityReadFileFormat" xml:space="preserve">
+    <value>ファイルの読み込み中: {0} ({1}行目から{2}行目)</value>
+  </data>
+  <data name="AgentActivityCreateFileFormat" xml:space="preserve">
+    <value>ファイルの作成中: {0}</value>
+  </data>
+  <data name="AgentActivityReplaceFileFormat" xml:space="preserve">
+    <value>ファイルの修正中: {0}</value>
+  </data>
+  <data name="AgentActivityOverwriteFileFormat" xml:space="preserve">
+    <value>ファイルの上書き中: {0}</value>
+  </data>
+  <data name="AgentActivityInsertText" xml:space="preserve">
+    <value>現在のエディタに入力中</value>
+  </data>
+  <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
+    <value>ツール実行中: {0}</value>
+  </data>
+  <data name="AgentActivityDiffReviewFormat" xml:space="preserve">
+    <value>ファイル変更の承認待ち: {0}</value>
+  </data>
+  <data name="AgentDiffDialogTitleFormat" xml:space="preserve">
+    <value>Agent ファイル変更の確認: {0}</value>
+  </data>
+  <data name="AgentDiffApplyButton" xml:space="preserve">
+    <value>承認</value>
+  </data>
+  <data name="AgentDiffCancelButton" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="AgentActivityDiffAppliedFormat" xml:space="preserve">
+    <value>変更適用の承認: {0}</value>
+  </data>
+  <data name="AgentActivityDiffCancelledFormat" xml:space="preserve">
+    <value>変更適用のキャンセル: {0}</value>
+  </data>
+  <data name="AgentInsertTitle" xml:space="preserve">
+    <value>Agentの応答を入力</value>
+  </data>
+  <data name="AgentNoOutputToInsert" xml:space="preserve">
+    <value>入力するAgentの応答がありません。</value>
+  </data>
+  <data name="AgentNoActiveTab" xml:space="preserve">
+    <value>アクティブなタブなし</value>
+  </data>
+  <data name="AgentNoSelection" xml:space="preserve">
+    <value>選択なし</value>
+  </data>
+  <data name="AgentSelectionStats" xml:space="preserve">
+    <value>選択 {0:N0}文字</value>
+  </data>
+  <data name="AgentContextStatsFormat" xml:space="preserve">
+    <value>コンテキスト: {0} · {1}</value>
+  </data>
+  <data name="AgentGitWarning" xml:space="preserve">
+    <value>警告: Gitリポジトリではありません</value>
+  </data>
+  <data name="AgentGitRequired" xml:space="preserve">
+    <value>AgentはGitリポジトリとして指定されたフォルダ内でのみ実行できます。</value>
+  </data>
+  <data name="AgentNewSessionButton" xml:space="preserve">
+    <value>新規セッション</value>
+  </data>
+  <data name="AgentCreateDialogTitle" xml:space="preserve">
+    <value>Agent ファイル新規作成確認: {0}</value>
+  </data>
+  <data name="AgentEditDialogTitle" xml:space="preserve">
+    <value>Agent ファイル編集確認: {0}</value>
+  </data>
+  <data name="AgentCreateSummaryFormat" xml:space="preserve">
+    <value>ファイルを新規作成しますか？ パス: {0}</value>
+  </data>
+  <data name="AgentEditSummaryFormat" xml:space="preserve">
+    <value>ファイルを編集しますか？ パス: {0}</value>
+  </data>
+  <data name="AgentOutputPlaceholder" xml:space="preserve">
+    <value>待機中... Agentに指示する作業を入力してください。</value>
+  </data>
+  <data name="AgentContextStatsDefault" xml:space="preserve">
+    <value>現在のアクティブなタブと選択範囲をコンテキストとして使用します</value>
+  </data>
+  <data name="AgentIncludeActiveFile" xml:space="preserve">
+    <value>アクティブなタブを含める</value>
+  </data>
+  <data name="AgentPromptPlaceholder" xml:space="preserve">
+    <value>Agentに指示する作業を入力...</value>
+  </data>
+  <data name="AgentRunButton" xml:space="preserve">
+    <value>実行</value>
+  </data>
+  <data name="AgentStopButton" xml:space="preserve">
+    <value>中断</value>
+  </data>
+  <data name="AgentActivityHeader" xml:space="preserve">
+    <value>進行状況</value>
+  </data>
+  <data name="AgentActivityIdle" xml:space="preserve">
+    <value>待機中</value>
+  </data>
+  <data name="AgentInsertOutputTooltip" xml:space="preserve">
+    <value>Agentの応答を現在のカーソル位置に入力します</value>
+  </data>
 </root>

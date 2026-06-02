@@ -15,8 +15,7 @@ namespace TxtAIEditor.Controls
 
         public event RoutedEventHandler? RunRequested;
         public event RoutedEventHandler? StopRequested;
-        public event RoutedEventHandler? PlanRequested;
-        public event RoutedEventHandler? EditRequested;
+        public event RoutedEventHandler? NewSessionRequested;
         public event RoutedEventHandler? InsertOutputRequested;
 
         public TextBox Output => AgentOutputText;
@@ -40,7 +39,7 @@ namespace TxtAIEditor.Controls
             string outputText = AgentOutputText.Text.TrimStart();
             if (outputText.StartsWith("대기 중...", StringComparison.Ordinal) ||
                 outputText.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                outputText.StartsWith("待機中...", StringComparison.Ordinal))
+                outputText.StartsWith("待機중...", StringComparison.Ordinal))
             {
                 AgentOutputText.Text = getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
             }
@@ -51,8 +50,7 @@ namespace TxtAIEditor.Controls
             _runButtonText = getString("AgentRunButton", "실행");
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
-            AgentPlanButton.Content = getString("AgentPlanButton", "계획");
-            AgentEditButton.Content = getString("AgentEditButton", "수정안");
+            AgentNewSessionButton.Content = getString("AgentNewSessionButton", "새 세션");
             AgentInsertOutputButton.Content = getString("LlmInsertOutputButtonText", "입력");
             AgentActivityHeaderText.Text = getString("AgentActivityHeader", "진행 상황");
             if (AgentActivityText.Text == "대기 중" || AgentActivityText.Text == "Idle")
@@ -67,8 +65,7 @@ namespace TxtAIEditor.Controls
             _isBusy = isBusy;
             AgentRunButton.IsEnabled = true;
             AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
-            AgentPlanButton.IsEnabled = !isBusy;
-            AgentEditButton.IsEnabled = !isBusy;
+            AgentNewSessionButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
             AgentIncludeActiveFileCheckBox.IsEnabled = !isBusy;
         }
@@ -283,14 +280,9 @@ namespace TxtAIEditor.Controls
             RunRequested?.Invoke(sender, e);
         }
 
-        private void OnPlanClick(object sender, RoutedEventArgs e)
+        private void OnNewSessionClick(object sender, RoutedEventArgs e)
         {
-            PlanRequested?.Invoke(sender, e);
-        }
-
-        private void OnEditClick(object sender, RoutedEventArgs e)
-        {
-            EditRequested?.Invoke(sender, e);
+            NewSessionRequested?.Invoke(sender, e);
         }
 
         private void OnInsertOutputClick(object sender, RoutedEventArgs e)

@@ -105,7 +105,7 @@ namespace TxtAIEditor.Controls
 
         public async Task<string> ReadFileAsync(string path, int startLine, int lineCount)
         {
-            string fullPath = ResolveInsideWorkspace(path);
+            string fullPath = ResolveInsideWorkspace(path, allowOutside: true);
             if (!File.Exists(fullPath))
             {
                 return $"read_file failed: file not found: {path}";
@@ -273,6 +273,7 @@ namespace TxtAIEditor.Controls
             return $"overwritten: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
 
+
         private async Task<bool> ConfirmEditAsync(AgentFileEditPreview preview)
         {
             if (ConfirmFileEditAsync == null)
@@ -390,7 +391,7 @@ namespace TxtAIEditor.Controls
             return Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         }
 
-        private string ResolveInsideWorkspace(string path)
+        private string ResolveInsideWorkspace(string path, bool allowOutside = false)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -407,7 +408,7 @@ namespace TxtAIEditor.Controls
                 return candidate;
             }
 
-            if (Path.IsPathRooted(path) && File.Exists(candidate))
+            if (allowOutside && Path.IsPathRooted(path) && File.Exists(candidate))
             {
                 return candidate;
             }
