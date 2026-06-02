@@ -8,9 +8,12 @@ namespace TxtAIEditor.Controls
 {
     public sealed partial class AgentPane : UserControl
     {
+        private int _outputLength;
+
         public AgentPane()
         {
             InitializeComponent();
+            _outputLength = AgentOutputText.Text?.Length ?? 0;
         }
 
         public event RoutedEventHandler? RunRequested;
@@ -34,14 +37,22 @@ namespace TxtAIEditor.Controls
         private int _thinkingDotCount;
         private string _thinkingLinePrefix = string.Empty;
 
+        private void AppendText(string text)
+        {
+            AgentOutputText.Select(_outputLength, 0);
+            AgentOutputText.SelectedText = text;
+            _outputLength += text.Length;
+        }
+
         public void Localize(Func<string, string, string> getString)
         {
             string outputText = AgentOutputText.Text.TrimStart();
             if (outputText.StartsWith("대기 중...", StringComparison.Ordinal) ||
                 outputText.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                outputText.StartsWith("待機중...", StringComparison.Ordinal))
+                outputText.StartsWith("待機中...", StringComparison.Ordinal))
             {
                 AgentOutputText.Text = getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
+                _outputLength = AgentOutputText.Text.Length;
             }
 
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
@@ -103,7 +114,7 @@ namespace TxtAIEditor.Controls
 
             CompleteThinkingLine();
             ClearOutputPlaceholder();
-            AgentOutputText.Text += text;
+            AppendText(text);
             ScrollOutputToEnd();
         }
 
@@ -111,13 +122,15 @@ namespace TxtAIEditor.Controls
         {
             CompleteThinkingLine();
             ClearOutputPlaceholder();
-            if (!string.IsNullOrEmpty(AgentOutputText.Text) &&
-                !EndsWithLineBreak(AgentOutputText.Text))
+
+            string currentText = AgentOutputText.Text;
+            if (!string.IsNullOrEmpty(currentText) &&
+                !EndsWithLineBreak(currentText))
             {
-                AgentOutputText.Text += OutputLineBreak;
+                AppendText(OutputLineBreak);
             }
 
-            AgentOutputText.Text += line + OutputLineBreak;
+            AppendText(line + OutputLineBreak);
             ScrollOutputToEnd();
         }
 
@@ -125,17 +138,19 @@ namespace TxtAIEditor.Controls
         {
             CompleteThinkingLine();
             ClearOutputPlaceholder();
-            if (!string.IsNullOrWhiteSpace(AgentOutputText.Text))
+
+            string currentText = AgentOutputText.Text;
+            if (!string.IsNullOrWhiteSpace(currentText))
             {
-                if (!EndsWithBlankLine(AgentOutputText.Text))
+                if (!EndsWithBlankLine(currentText))
                 {
-                    AgentOutputText.Text += EndsWithLineBreak(AgentOutputText.Text)
+                    AppendText(EndsWithLineBreak(currentText)
                         ? OutputLineBreak
-                        : OutputLineBreak + OutputLineBreak;
+                        : OutputLineBreak + OutputLineBreak);
                 }
             }
 
-            AgentOutputText.Text += title + OutputLineBreak;
+            AppendText(title + OutputLineBreak);
             ScrollOutputToEnd();
         }
 
@@ -144,18 +159,21 @@ namespace TxtAIEditor.Controls
             CompleteThinkingLine();
             ClearOutputPlaceholder();
 
-            if (!string.IsNullOrEmpty(AgentOutputText.Text) &&
-                !EndsWithLineBreak(AgentOutputText.Text))
+            string currentText = AgentOutputText.Text;
+            int lineBreakLength = 0;
+            if (!string.IsNullOrEmpty(currentText) &&
+                !EndsWithLineBreak(currentText))
             {
-                AgentOutputText.Text += OutputLineBreak;
+                AppendText(OutputLineBreak);
+                lineBreakLength = OutputLineBreak.Length;
             }
 
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             _thinkingLinePrefix = $"{timestamp}  {label}";
-            _thinkingLineStart = AgentOutputText.Text.Length;
+            _thinkingLineStart = currentText.Length + lineBreakLength;
             _thinkingDotCount = 0;
             _thinkingLineActive = true;
-            AgentOutputText.Text += _thinkingLinePrefix;
+            AppendText(_thinkingLinePrefix);
             ScrollOutputToEnd();
 
             _thinkingTimer ??= CreateThinkingTimer();
@@ -169,10 +187,16 @@ namespace TxtAIEditor.Controls
 
         private void ClearOutputPlaceholder()
         {
-            string text = AgentOutputText.Text.TrimStart();
-            if (text.StartsWith("대기 중...", StringComparison.Ordinal) ||
-                text.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                text.StartsWith("待機中...", StringComparison.Ordinal))
+            string text = AgentOutputText.Text;
+            if (text.Length > 100)
+            {
+                return;
+            }
+
+            string trimmed = text.TrimStart();
+            if (trimmed.StartsWith("대기 중...", StringComparison.Ordinal) ||
+                trimmed.StartsWith("Waiting...", StringComparison.Ordinal) ||
+                trimmed.StartsWith("待機中...", StringComparison.Ordinal))
             {
                 AgentOutputText.Text = string.Empty;
             }
@@ -213,9 +237,10 @@ namespace TxtAIEditor.Controls
 
             _thinkingTimer?.Stop();
             ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
-            if (!EndsWithLineBreak(AgentOutputText.Text))
+            string currentText = AgentOutputText.Text;
+            if (!EndsWithLineBreak(currentText))
             {
-                AgentOutputText.Text += OutputLineBreak;
+                AppendText(OutputLineBreak);
             }
 
             _thinkingLineActive = false;
@@ -224,12 +249,14 @@ namespace TxtAIEditor.Controls
 
         private void ReplaceThinkingLine(string text)
         {
-            if (_thinkingLineStart < 0 || _thinkingLineStart > AgentOutputText.Text.Length)
+            int currentLength = AgentOutputText.Text.Length;
+            if (_thinkingLineStart < 0 || _thinkingLineStart > currentLength)
             {
                 return;
             }
 
             AgentOutputText.Text = AgentOutputText.Text.Substring(0, _thinkingLineStart) + text;
+            _outputLength = _thinkingLineStart + text.Length;
             ScrollOutputToEnd();
         }
 

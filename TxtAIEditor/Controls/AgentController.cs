@@ -152,6 +152,9 @@ namespace TxtAIEditor.Controls
                     int printedLength = 0;
                     bool toolCallPlaceholderShown = false;
                     bool visibleTextFlushed = false;
+                    bool? isJsonToolCall = null;
+                    bool hasToolCall = false;
+
                     response = await _llmService.RunAgentAsync(
                         instruction,
                         transcript,
@@ -163,21 +166,36 @@ namespace TxtAIEditor.Controls
                             responseBuilder.Append(chunk);
                             string streamedText = responseBuilder.ToString();
 
-                            string trimmed = streamedText.TrimStart();
-                            if (trimmed.StartsWith("{", StringComparison.Ordinal))
+                            if (isJsonToolCall == null)
                             {
-                                if (!toolCallPlaceholderShown)
+                                string trimmed = streamedText.TrimStart();
+                                if (!string.IsNullOrEmpty(trimmed))
                                 {
-                                    toolCallPlaceholderShown = true;
-                                    _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                        _agentPane.BeginThinkingActivity(_getString("AgentOutputPreparingTool", "도구 호출 준비 중")));
+                                    isJsonToolCall = trimmed.StartsWith("{", StringComparison.Ordinal);
+                                    if (isJsonToolCall.Value)
+                                    {
+                                        toolCallPlaceholderShown = true;
+                                        _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                            _agentPane.BeginThinkingActivity(_getString("AgentOutputPreparingTool", "도구 호출 준비 중")));
+                                    }
                                 }
+                            }
+
+                            if (isJsonToolCall == true)
+                            {
                                 return;
                             }
 
-                            int toolCallIndex = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                            if (hasToolCall)
+                            {
+                                return;
+                            }
+
+                            int checkStart = Math.Max(0, streamedText.Length - chunk.Length - 11);
+                            int toolCallIndex = streamedText.IndexOf("<tool_call>", checkStart, StringComparison.OrdinalIgnoreCase);
                             if (toolCallIndex >= 0)
                             {
+                                hasToolCall = true;
                                 if (printedLength < toolCallIndex)
                                 {
                                     string textToPrint = streamedText.Substring(printedLength, toolCallIndex - printedLength);
