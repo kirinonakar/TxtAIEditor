@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -459,8 +460,133 @@ namespace TxtAIEditor.Controls
             }
             catch
             {
+                return TryParseToolCallLenient(json, out toolName, out arguments);
+            }
+        }
+
+        private static bool TryParseToolCallLenient(string json, out string toolName, out JsonElement arguments)
+        {
+            toolName = string.Empty;
+            arguments = default;
+
+            string? name = ExtractLenientStringProperty(json, "name");
+            if (string.IsNullOrWhiteSpace(name))
+            {
                 return false;
             }
+
+            string argumentsText = ExtractLenientObjectProperty(json, "arguments") ?? "{}";
+            var argumentValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var stringMatches = Regex.Matches(
+                argumentsText,
+                "\"(?<key>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"\\s*:\\s*\"(?<value>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"",
+                RegexOptions.Singleline);
+
+            foreach (Match match in stringMatches)
+            {
+                string key = DecodeLenientJsonString(match.Groups["key"].Value);
+                string value = DecodeLenientJsonString(match.Groups["value"].Value);
+                argumentValues[key] = value;
+            }
+
+            var numberMatches = Regex.Matches(
+                argumentsText,
+                "\"(?<key>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"\\s*:\\s*(?<value>-?\\d+)",
+                RegexOptions.Singleline);
+
+            foreach (Match match in numberMatches)
+            {
+                string key = DecodeLenientJsonString(match.Groups["key"].Value);
+                if (!argumentValues.ContainsKey(key))
+                {
+                    argumentValues[key] = match.Groups["value"].Value;
+                }
+            }
+
+            string repairedJson = JsonSerializer.Serialize(argumentValues);
+            using var argumentsDocument = JsonDocument.Parse(repairedJson);
+            toolName = DecodeLenientJsonString(name);
+            arguments = argumentsDocument.RootElement.Clone();
+            return !string.IsNullOrWhiteSpace(toolName);
+        }
+
+        private static string? ExtractLenientStringProperty(string text, string propertyName)
+        {
+            var match = Regex.Match(
+                text,
+                $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*\"(?<value>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
+            return match.Success ? match.Groups["value"].Value : null;
+        }
+
+        private static string? ExtractLenientObjectProperty(string text, string propertyName)
+        {
+            var match = Regex.Match(
+                text,
+                $"\"{Regex.Escape(propertyName)}\"\\s*:",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                return null;
+            }
+
+            int objectStart = text.IndexOf('{', match.Index + match.Length);
+            if (objectStart < 0)
+            {
+                return null;
+            }
+
+            return TryExtractBalancedJsonObject(text, objectStart, out string objectText)
+                ? objectText
+                : null;
+        }
+
+        private static string DecodeLenientJsonString(string value)
+        {
+            var builder = new StringBuilder(value.Length);
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if (ch != '\\' || i + 1 >= value.Length)
+                {
+                    builder.Append(ch);
+                    continue;
+                }
+
+                char next = value[++i];
+                switch (next)
+                {
+                    case '"':
+                    case '\\':
+                    case '/':
+                        builder.Append(next);
+                        break;
+                    case 'n':
+                        builder.Append('\n');
+                        break;
+                    case 'r':
+                        builder.Append('\r');
+                        break;
+                    case 'u' when i + 4 < value.Length:
+                        string hex = value.Substring(i + 1, 4);
+                        if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out int codePoint))
+                        {
+                            builder.Append((char)codePoint);
+                            i += 4;
+                        }
+                        else
+                        {
+                            builder.Append('\\').Append(next);
+                        }
+                        break;
+                    default:
+                        builder.Append('\\').Append(next);
+                        break;
+                }
+            }
+
+            return builder.ToString();
         }
 
         private static bool IsToolCallLike(string response)
@@ -503,6 +629,12 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
+            return TryExtractBalancedJsonObject(text, jsonStart, out json);
+        }
+
+        private static bool TryExtractBalancedJsonObject(string text, int jsonStart, out string json)
+        {
+            json = string.Empty;
             int depth = 0;
             bool inString = false;
             bool escaped = false;

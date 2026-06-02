@@ -402,14 +402,17 @@ namespace TxtAIEditor.Controls
                 ? Path.GetFullPath(path)
                 : Path.GetFullPath(Path.Combine(root, path));
 
-            string rootWithSlash = root + Path.DirectorySeparatorChar;
-            if (!candidate.Equals(root, StringComparison.OrdinalIgnoreCase) &&
-                !candidate.StartsWith(rootWithSlash, StringComparison.OrdinalIgnoreCase))
+            if (IsInsideRoot(root, candidate))
             {
-                throw new InvalidOperationException($"Path escapes workspace root: {path}");
+                return candidate;
             }
 
-            return candidate;
+            if (Path.IsPathRooted(path) && File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            throw new InvalidOperationException($"Path escapes workspace root: {path}");
         }
 
         private static IEnumerable<string> EnumerateWorkspaceFiles(string root)
@@ -481,7 +484,18 @@ namespace TxtAIEditor.Controls
 
         private static string RelativePath(string root, string path)
         {
-            return Path.GetRelativePath(root, path).Replace('\\', '/');
+            return IsInsideRoot(root, path)
+                ? Path.GetRelativePath(root, path).Replace('\\', '/')
+                : path;
+        }
+
+        private static bool IsInsideRoot(string root, string path)
+        {
+            string normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string normalizedPath = Path.GetFullPath(path);
+            string rootWithSlash = normalizedRoot + Path.DirectorySeparatorChar;
+            return normalizedPath.Equals(normalizedRoot, StringComparison.OrdinalIgnoreCase) ||
+                   normalizedPath.StartsWith(rootWithSlash, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string NormalizeNewlines(string? content)
