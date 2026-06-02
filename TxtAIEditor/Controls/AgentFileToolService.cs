@@ -176,7 +176,8 @@ namespace TxtAIEditor.Controls
                 return "run_powershell blocked: destructive commands are not executed automatically by Agent.";
             }
 
-            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
+            string utf8Command = $"$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {command}";
+            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(utf8Command));
             var profile = TerminalShellProfile.Resolve("PowerShell");
             string shellPath = profile.ExecutablePath;
             return await RunProcessAsync(shellPath, $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}", ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
