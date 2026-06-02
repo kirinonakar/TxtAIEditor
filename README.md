@@ -158,6 +158,8 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 ### 📥 Download
 You can download the latest installer (built using **Inno Setup**) from the [Releases Page](https://github.com/kirinonakar/TxtAIEditor/releases).
 
+- [Microsoft Store](https://apps.microsoft.com/detail/9NTZR1TNHXR7?hl=ko-kr&gl=KR&ocid=pdpshare)
+
 ### Manual build Prerequisites
 
 To build and run TxtAIEditor locally, make sure you have:
