@@ -2,6 +2,7 @@ using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TxtAIEditor.Core.Services.LLM
@@ -29,8 +30,9 @@ namespace TxtAIEditor.Core.Services.LLM
             return url;
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException("API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.");
 
@@ -69,9 +71,9 @@ namespace TxtAIEditor.Core.Services.LLM
                 string jsonPayload = JsonSerializer.Serialize(payload);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-                using (var response = await _httpClient.SendAsync(request))
+                using (var response = await _httpClient.SendAsync(request, cancellationToken))
                 {
-                    string responseBody = await response.Content.ReadAsStringAsync();
+                    string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
                         throw new HttpRequestException($"Google Gemini API 호출 실패 ({response.StatusCode}): {responseBody}");
@@ -101,8 +103,9 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException("API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.");
 
@@ -141,20 +144,21 @@ namespace TxtAIEditor.Core.Services.LLM
                 string jsonPayload = JsonSerializer.Serialize(payload);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                 {
                     if (!response.IsSuccessStatusCode)
                     {
-                        string errorBody = await response.Content.ReadAsStringAsync();
+                        string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                         throw new HttpRequestException($"Google Gemini API 스트리밍 호출 실패 ({response.StatusCode}): {errorBody}");
                     }
 
-                    using (var stream = await response.Content.ReadAsStreamAsync())
+                    using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     using (var reader = new System.IO.StreamReader(stream))
                     {
                         while (true)
                         {
-                            string? line = await reader.ReadLineAsync();
+                            cancellationToken.ThrowIfCancellationRequested();
+                            string? line = await reader.ReadLineAsync(cancellationToken);
                             if (line == null) break;
                             if (string.IsNullOrEmpty(line)) continue;
                             if (!line.StartsWith("data: ")) continue;
@@ -178,6 +182,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                                 string? chunk = text.GetString();
                                                 if (!string.IsNullOrEmpty(chunk))
                                                 {
+                                                    cancellationToken.ThrowIfCancellationRequested();
                                                     await onChunk(chunk);
                                                 }
                                             }

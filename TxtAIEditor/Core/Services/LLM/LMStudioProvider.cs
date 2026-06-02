@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TxtAIEditor.Core.Services.LLM
@@ -11,8 +12,9 @@ namespace TxtAIEditor.Core.Services.LLM
     {
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
                 throw new ArgumentException("LM Studio 모델을 먼저 선택해 주십시오.");
 
@@ -40,9 +42,9 @@ namespace TxtAIEditor.Core.Services.LLM
 
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-                using (var response = await _httpClient.SendAsync(request))
+                using (var response = await _httpClient.SendAsync(request, cancellationToken))
                 {
-                    string responseBody = await response.Content.ReadAsStringAsync();
+                    string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
                         throw new HttpRequestException($"LM Studio API 호출 실패 ({response.StatusCode}): {responseBody}");
@@ -67,8 +69,9 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
                 throw new ArgumentException("LM Studio 모델을 먼저 선택해 주십시오.");
 
@@ -97,20 +100,21 @@ namespace TxtAIEditor.Core.Services.LLM
 
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                 {
                     if (!response.IsSuccessStatusCode)
                     {
-                        string errorBody = await response.Content.ReadAsStringAsync();
+                        string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                         throw new HttpRequestException($"LM Studio API 스트리밍 호출 실패 ({response.StatusCode}): {errorBody}");
                     }
 
-                    using (var stream = await response.Content.ReadAsStreamAsync())
+                    using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     using (var reader = new System.IO.StreamReader(stream))
                     {
                         while (true)
                         {
-                            string? line = await reader.ReadLineAsync();
+                            cancellationToken.ThrowIfCancellationRequested();
+                            string? line = await reader.ReadLineAsync(cancellationToken);
                             if (line == null) break;
                             if (string.IsNullOrEmpty(line)) continue;
                             if (!line.StartsWith("data: ")) continue;
@@ -132,6 +136,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                             string? text = content.GetString();
                                             if (!string.IsNullOrEmpty(text))
                                             {
+                                                cancellationToken.ThrowIfCancellationRequested();
                                                 await onChunk(text);
                                             }
                                         }

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Services;
 
@@ -131,18 +132,20 @@ namespace TxtAIEditor.Controls
             return builder.ToString();
         }
 
-        public async Task<string> RunRgAsync(string arguments, int timeoutMs)
+        public async Task<string> RunRgAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(arguments))
             {
                 return "run_rg failed: arguments are empty.";
             }
 
-            return await RunProcessAsync("rg", arguments, ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs);
+            return await RunProcessAsync("rg", arguments, ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
         }
 
-        public async Task<string> RunPowerShellAsync(string command, int timeoutMs)
+        public async Task<string> RunPowerShellAsync(string command, int timeoutMs, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(command))
             {
                 return "run_powershell failed: command is empty.";
@@ -156,7 +159,7 @@ namespace TxtAIEditor.Controls
             string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
             var profile = TerminalShellProfile.Resolve("PowerShell");
             string shellPath = profile.ExecutablePath;
-            return await RunProcessAsync(shellPath, $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}", ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs);
+            return await RunProcessAsync(shellPath, $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}", ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
         }
 
         public async Task<string> CreateFileAsync(string path, string content)
@@ -288,7 +291,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static async Task<string> RunProcessAsync(string fileName, string arguments, string workingDirectory, int timeoutMs)
+        private static async Task<string> RunProcessAsync(string fileName, string arguments, string workingDirectory, int timeoutMs, CancellationToken cancellationToken)
         {
             var output = new StringBuilder();
             using var process = new Process();
@@ -307,7 +310,12 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 process.Start();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -316,20 +324,40 @@ namespace TxtAIEditor.Controls
 
             Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
             Task<string> stderrTask = process.StandardError.ReadToEndAsync();
-            Task exitTask = process.WaitForExitAsync();
+            Task exitTask = process.WaitForExitAsync(cancellationToken);
 
-            Task completed = await Task.WhenAny(exitTask, Task.Delay(Math.Clamp(timeoutMs, 1000, 60000)));
-            if (completed != exitTask)
+            try
+            {
+                Task completed = await Task.WhenAny(exitTask, Task.Delay(Math.Clamp(timeoutMs, 1000, 60000), cancellationToken));
+                if (completed != exitTask)
+                {
+                    try
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                    catch
+                    {
+                    }
+
+                    return $"{fileName} timed out after {timeoutMs}ms.";
+                }
+
+                await exitTask;
+            }
+            catch (OperationCanceledException)
             {
                 try
                 {
-                    process.Kill(entireProcessTree: true);
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
                 }
                 catch
                 {
                 }
 
-                return $"{fileName} timed out after {timeoutMs}ms.";
+                throw;
             }
 
             string stdout = await stdoutTask;

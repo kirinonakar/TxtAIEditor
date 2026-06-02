@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Services.LLM;
@@ -175,12 +176,12 @@ namespace TxtAIEditor.Core.Services
             return await ExecuteLlmAsync(systemPrompt, userContent, onChunk);
         }
 
-        public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null)
+        public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
             string langCode = GetActiveLanguage();
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, mode);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty);
-            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk);
+            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }
 
         public Task SaveApiKeyAsync(string provider, string apiKey)
@@ -223,8 +224,9 @@ namespace TxtAIEditor.Core.Services
         // Private dynamic Provider Dispatcher
         // ----------------------------------------------------
 
-        private async Task<string> ExecuteLlmAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null)
+        private async Task<string> ExecuteLlmAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var settings = _settingsService.CurrentSettings;
             string providerName = settings.LlmProvider;
             string apiKey = await GetApiKeyAsync(providerName);
@@ -266,7 +268,8 @@ namespace TxtAIEditor.Core.Services
                         {
                             fullResponse.Append(chunk);
                             await onChunk(chunk);
-                        }
+                        },
+                        cancellationToken
                     );
                     return fullResponse.ToString();
                 }
@@ -277,9 +280,14 @@ namespace TxtAIEditor.Core.Services
                         apiKey,
                         settings.LlmModel,
                         systemPrompt,
-                        userContent
+                        userContent,
+                        cancellationToken
                     );
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

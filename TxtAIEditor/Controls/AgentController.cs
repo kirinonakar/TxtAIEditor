@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -30,6 +30,7 @@ namespace TxtAIEditor.Controls
 
         private string _lastSelectionText = string.Empty;
         private bool _isRunning;
+        private CancellationTokenSource? _runCancellation;
 
         public AgentController(
             ILLMService llmService,
@@ -78,6 +79,7 @@ namespace TxtAIEditor.Controls
         private void WireEvents()
         {
             _agentPane.RunRequested += async (_, _) => await RunAgentAsync("run");
+            _agentPane.StopRequested += (_, _) => StopAgent();
             _agentPane.PlanRequested += async (_, _) => await RunAgentAsync("plan");
             _agentPane.EditRequested += async (_, _) => await RunAgentAsync("edit");
             _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
@@ -110,10 +112,13 @@ namespace TxtAIEditor.Controls
             }
 
             _isRunning = true;
+            var cancellationSource = new CancellationTokenSource();
+            _runCancellation = cancellationSource;
+            CancellationToken cancellationToken = cancellationSource.Token;
             _agentPane.SetBusy(true);
             _agentPane.ClearActivity(_getString("AgentActivityStarting", "시작 중"));
+            _agentPane.BeginOutputBlock(BuildRunHeader(mode, instruction));
             AppendActivity(_getString("AgentActivityCollectingContext", "맥락 수집 중"));
-            _agentPane.Output.Text = string.Empty;
 
             try
             {
@@ -124,12 +129,13 @@ namespace TxtAIEditor.Controls
 
                 for (int step = 0; step < 8; step++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     AppendActivity(string.Format(
                         _getString("AgentActivityThinkingFormat", "생각중 ({0}/8)"),
                         step + 1));
-                    _agentPane.Output.Text = string.Empty;
 
                     var responseBuilder = new StringBuilder();
+                    bool toolCallPlaceholderShown = false;
                     response = await _llmService.RunAgentAsync(
                         instruction,
                         transcript,
@@ -137,41 +143,105 @@ namespace TxtAIEditor.Controls
                         mode,
                         async chunk =>
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             responseBuilder.Append(chunk);
                             _agentPane.DispatcherQueue.TryEnqueue(() =>
                             {
-                                _agentPane.Output.Text += chunk;
-                                _agentPane.Output.SelectionStart = _agentPane.Output.Text.Length;
-                                _agentPane.Output.SelectionLength = 0;
+                                string streamedText = responseBuilder.ToString();
+                                if (IsToolCallLike(streamedText) || MightBeToolCallPrefix(streamedText))
+                                {
+                                    if (!toolCallPlaceholderShown)
+                                    {
+                                        _agentPane.AppendOutputLine(_getString("AgentOutputPreparingTool", "도구 호출 준비 중..."));
+                                        toolCallPlaceholderShown = true;
+                                    }
+                                }
+                                else
+                                {
+                                    _agentPane.AppendOutputText(chunk);
+                                }
                             });
                             await Task.CompletedTask;
-                        });
+                        },
+                        cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
-                    _agentPane.Output.Text = response;
 
                     if (!TryParseToolCall(response, out string toolName, out JsonElement arguments))
                     {
+                        if (responseBuilder.Length == 0 && !string.IsNullOrWhiteSpace(response))
+                        {
+                            _agentPane.AppendOutputText(response);
+                        }
+
                         AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                         break;
                     }
 
-                    string toolResult = await ExecuteToolAsync(toolName, arguments);
+                    string toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
                     transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResult}";
-                    _agentPane.Output.Text = $"{_getString("AgentToolRunning", "도구 실행 중")}: {toolName}\n\n{toolResult}";
+                    _agentPane.AppendOutputLine($"{_getString("AgentToolRunning", "도구 실행 중")}: {toolName}");
+                    _agentPane.AppendOutputText(toolResult.TrimEnd() + Environment.NewLine);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                AppendActivity(_getString("AgentActivityStopped", "중단됨"));
+                _agentPane.AppendOutputLine(_getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
             }
             catch (Exception ex)
             {
-                _agentPane.Output.Text = string.Format(
+                _agentPane.AppendOutputLine(string.Format(
                     _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
-                    ex.Message);
+                    ex.Message));
             }
             finally
             {
                 _isRunning = false;
+                if (ReferenceEquals(_runCancellation, cancellationSource))
+                {
+                    _runCancellation = null;
+                }
+
+                cancellationSource.Dispose();
                 _agentPane.SetBusy(false);
                 UpdateContextStats();
             }
+        }
+
+        private void StopAgent()
+        {
+            if (!_isRunning)
+            {
+                return;
+            }
+
+            if (_runCancellation?.IsCancellationRequested == true)
+            {
+                return;
+            }
+
+            AppendActivity(_getString("AgentActivityStopRequested", "중단 요청됨"));
+            if (string.IsNullOrWhiteSpace(_agentPane.Output.Text))
+            {
+                _agentPane.AppendOutputLine(_getString("AgentOutputStopping", "Agent 실행을 중단하는 중..."));
+            }
+
+            _runCancellation?.Cancel();
+        }
+
+        private string BuildRunHeader(string mode, string instruction)
+        {
+            string modeText = mode switch
+            {
+                "plan" => _getString("AgentModePlan", "계획"),
+                "edit" => _getString("AgentModeEdit", "수정안"),
+                _ => _getString("AgentModeRun", "실행")
+            };
+
+            string timestamp = DateTime.Now.ToString("HH:mm:ss");
+            return $"===== {timestamp}  Agent {modeText}: {TruncateForActivity(instruction)} =====";
         }
 
         private string BuildWorkspaceContext()
@@ -220,10 +290,11 @@ namespace TxtAIEditor.Controls
             return string.Join(Environment.NewLine, context);
         }
 
-        private async Task<string> ExecuteToolAsync(string toolName, JsonElement arguments)
+        private async Task<string> ExecuteToolAsync(string toolName, JsonElement arguments, CancellationToken cancellationToken)
         {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string normalizedToolName = NormalizeToolName(toolName);
                 AppendActivity(GetToolStartMessage(normalizedToolName, arguments));
                 string result;
@@ -251,10 +322,12 @@ namespace TxtAIEditor.Controls
                             GetIntArgument(arguments, "maxResults", 80)),
                         "run_rg" => await _fileTools.RunRgAsync(
                             GetStringArgument(arguments, "arguments"),
-                            GetIntArgument(arguments, "timeoutMs", 10000)),
+                            GetIntArgument(arguments, "timeoutMs", 10000),
+                            cancellationToken),
                         "run_powershell" => await _fileTools.RunPowerShellAsync(
                             GetStringArgument(arguments, "command"),
-                            GetIntArgument(arguments, "timeoutMs", 10000)),
+                            GetIntArgument(arguments, "timeoutMs", 10000),
+                            cancellationToken),
                         "read_file" => await _fileTools.ReadFileAsync(
                             GetStringArgument(arguments, "path"),
                             GetIntArgument(arguments, "startLine", 1),
@@ -268,10 +341,16 @@ namespace TxtAIEditor.Controls
                         _ => $"Unknown tool: {toolName}"
                     };
                 }
+                cancellationToken.ThrowIfCancellationRequested();
                 AppendActivity(string.Format(
                     _getString("AgentActivityToolDoneFormat", "도구 완료: {0}"),
                     normalizedToolName));
                 return result;
+            }
+            catch (OperationCanceledException)
+            {
+                AppendActivity(_getString("AgentActivityToolCancelled", "도구 실행 중단됨"));
+                throw;
             }
             catch (Exception ex)
             {
@@ -340,15 +419,14 @@ namespace TxtAIEditor.Controls
             toolName = string.Empty;
             arguments = default;
 
-            var match = Regex.Match(response ?? string.Empty, @"<tool_call>\s*(?<json>\{[\s\S]*\})\s*</tool_call>", RegexOptions.IgnoreCase);
-            if (!match.Success)
+            if (!TryExtractToolCallJson(response, out string json))
             {
                 return false;
             }
 
             try
             {
-                using var document = JsonDocument.Parse(match.Groups["json"].Value);
+                using var document = JsonDocument.Parse(json);
                 var root = document.RootElement.Clone();
                 if (!root.TryGetProperty("name", out var nameProp))
                 {
@@ -366,6 +444,93 @@ namespace TxtAIEditor.Controls
             {
                 return false;
             }
+        }
+
+        private static bool IsToolCallLike(string response)
+        {
+            string trimmed = (response ?? string.Empty).TrimStart();
+            return trimmed.StartsWith("<tool_call>", StringComparison.OrdinalIgnoreCase) ||
+                   trimmed.StartsWith("{\"name\"", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool MightBeToolCallPrefix(string response)
+        {
+            string trimmed = (response ?? string.Empty).TrimStart();
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                return true;
+            }
+
+            return "<tool_call>".StartsWith(trimmed, StringComparison.OrdinalIgnoreCase) ||
+                   "{\"name\"".StartsWith(trimmed, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryExtractToolCallJson(string response, out string json)
+        {
+            json = string.Empty;
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return false;
+            }
+
+            string text = response.Trim();
+            int toolCallIndex = text.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+            if (toolCallIndex >= 0)
+            {
+                text = text.Substring(toolCallIndex + "<tool_call>".Length).TrimStart();
+            }
+
+            int jsonStart = text.IndexOf('{');
+            if (jsonStart < 0)
+            {
+                return false;
+            }
+
+            int depth = 0;
+            bool inString = false;
+            bool escaped = false;
+            for (int i = jsonStart; i < text.Length; i++)
+            {
+                char ch = text[i];
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+
+                if (ch == '\\' && inString)
+                {
+                    escaped = true;
+                    continue;
+                }
+
+                if (ch == '"')
+                {
+                    inString = !inString;
+                    continue;
+                }
+
+                if (inString)
+                {
+                    continue;
+                }
+
+                if (ch == '{')
+                {
+                    depth++;
+                }
+                else if (ch == '}')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        json = text.Substring(jsonStart, i - jsonStart + 1);
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private static string GetStringArgument(JsonElement arguments, string name)

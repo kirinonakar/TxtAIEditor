@@ -136,12 +136,14 @@
                     Style="{StaticResource AgentButtonStyle}"/>
         </Grid>
 
-        <Border Grid.Row="5"
+        <Border x:Name="AgentActivityPanel"
+                Grid.Row="5"
                 Background="{ThemeResource ToolbarBackgroundBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 Padding="8"
-                CornerRadius="4">
+                CornerRadius="4"
+                Visibility="Collapsed">
             <Grid RowSpacing="4">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

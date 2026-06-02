@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
         }
 
         public event RoutedEventHandler? RunRequested;
+        public event RoutedEventHandler? StopRequested;
         public event RoutedEventHandler? PlanRequested;
         public event RoutedEventHandler? EditRequested;
         public event RoutedEventHandler? InsertOutputRequested;
@@ -24,11 +25,16 @@ namespace TxtAIEditor.Controls
         public TextBlock ContextStats => AgentContextStatsText;
         public bool IncludeActiveFile => AgentIncludeActiveFileCheckBox.IsChecked == true;
 
+        private bool _isBusy;
+        private string _runButtonText = "실행";
+        private string _stopButtonText = "중단";
+
         public void Localize(Func<string, string, string> getString)
         {
-            if (AgentOutputText.Text.Contains("대기 중...") ||
-                AgentOutputText.Text.Contains("Waiting...") ||
-                AgentOutputText.Text.Contains("待機中..."))
+            string outputText = AgentOutputText.Text.TrimStart();
+            if (outputText.StartsWith("대기 중...", StringComparison.Ordinal) ||
+                outputText.StartsWith("Waiting...", StringComparison.Ordinal) ||
+                outputText.StartsWith("待機中...", StringComparison.Ordinal))
             {
                 AgentOutputText.Text = getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
             }
@@ -36,7 +42,9 @@ namespace TxtAIEditor.Controls
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
             AgentIncludeActiveFileCheckBox.Content = getString("AgentIncludeActiveFile", "현재 탭 포함");
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
-            AgentRunButton.Content = getString("AgentRunButton", "실행");
+            _runButtonText = getString("AgentRunButton", "실행");
+            _stopButtonText = getString("AgentStopButton", "중단");
+            AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
             AgentPlanButton.Content = getString("AgentPlanButton", "계획");
             AgentEditButton.Content = getString("AgentEditButton", "수정안");
             AgentInsertOutputButton.Content = getString("LlmInsertOutputButtonText", "입력");
@@ -50,7 +58,9 @@ namespace TxtAIEditor.Controls
 
         public void SetBusy(bool isBusy)
         {
-            AgentRunButton.IsEnabled = !isBusy;
+            _isBusy = isBusy;
+            AgentRunButton.IsEnabled = true;
+            AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
             AgentPlanButton.IsEnabled = !isBusy;
             AgentEditButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
@@ -65,6 +75,7 @@ namespace TxtAIEditor.Controls
         public void AppendActivity(string message)
         {
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
+            AppendOutputLine($"{timestamp}  {message}");
             if (string.IsNullOrWhiteSpace(AgentActivityText.Text) ||
                 AgentActivityText.Text == "대기 중" ||
                 AgentActivityText.Text == "Idle")
@@ -80,8 +91,73 @@ namespace TxtAIEditor.Controls
             AgentActivityText.SelectionLength = 0;
         }
 
+        public void AppendOutputText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            ClearOutputPlaceholder();
+            AgentOutputText.Text += text;
+            ScrollOutputToEnd();
+        }
+
+        public void AppendOutputLine(string line)
+        {
+            ClearOutputPlaceholder();
+            if (!string.IsNullOrEmpty(AgentOutputText.Text) &&
+                !AgentOutputText.Text.EndsWith(Environment.NewLine, StringComparison.Ordinal))
+            {
+                AgentOutputText.Text += Environment.NewLine;
+            }
+
+            AgentOutputText.Text += line + Environment.NewLine;
+            ScrollOutputToEnd();
+        }
+
+        public void BeginOutputBlock(string title)
+        {
+            ClearOutputPlaceholder();
+            if (!string.IsNullOrWhiteSpace(AgentOutputText.Text))
+            {
+                if (!AgentOutputText.Text.EndsWith(Environment.NewLine + Environment.NewLine, StringComparison.Ordinal))
+                {
+                    AgentOutputText.Text += AgentOutputText.Text.EndsWith(Environment.NewLine, StringComparison.Ordinal)
+                        ? Environment.NewLine
+                        : Environment.NewLine + Environment.NewLine;
+                }
+            }
+
+            AgentOutputText.Text += title + Environment.NewLine;
+            ScrollOutputToEnd();
+        }
+
+        private void ClearOutputPlaceholder()
+        {
+            string text = AgentOutputText.Text.TrimStart();
+            if (text.StartsWith("대기 중...", StringComparison.Ordinal) ||
+                text.StartsWith("Waiting...", StringComparison.Ordinal) ||
+                text.StartsWith("待機中...", StringComparison.Ordinal))
+            {
+                AgentOutputText.Text = string.Empty;
+            }
+        }
+
+        private void ScrollOutputToEnd()
+        {
+            AgentOutputText.SelectionStart = AgentOutputText.Text.Length;
+            AgentOutputText.SelectionLength = 0;
+        }
+
         private void OnRunClick(object sender, RoutedEventArgs e)
         {
+            if (_isBusy)
+            {
+                StopRequested?.Invoke(sender, e);
+                return;
+            }
+
             RunRequested?.Invoke(sender, e);
         }
 
@@ -114,6 +190,11 @@ namespace TxtAIEditor.Controls
             }
 
             e.Handled = true;
+            if (_isBusy)
+            {
+                return;
+            }
+
             RunRequested?.Invoke(sender, e);
         }
     }

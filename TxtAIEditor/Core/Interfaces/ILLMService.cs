@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TxtAIEditor.Core.Interfaces
@@ -10,7 +11,7 @@ namespace TxtAIEditor.Core.Interfaces
         Task<string> TranslateTextAsync(string text, Func<string, Task>? onChunk = null);
         Task<string> ImproveTextAsync(string text, Func<string, Task>? onChunk = null);
         Task<string> CustomPromptAsync(string prompt, string fileContext, string selectedText, Func<string, Task>? onChunk = null);
-        Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null);
+        Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
         
         // Secure API Key handling
         Task SaveApiKeyAsync(string provider, string apiKey);
