@@ -334,7 +334,7 @@ namespace TxtAIEditor.Controls
             _sessionHistory.Clear();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
-                _agentPane.Output.Text = _getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
+                _agentPane.ResetOutput(_getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요."));
                 _agentPane.ClearActivity(_getString("AgentActivityIdle", "대기 중"));
             });
         }

@@ -199,7 +199,18 @@ namespace TxtAIEditor.Controls
                 trimmed.StartsWith("待機中...", StringComparison.Ordinal))
             {
                 AgentOutputText.Text = string.Empty;
+                _outputLength = 0;
             }
+            else
+            {
+                _outputLength = text.Length;
+            }
+        }
+
+        public void ResetOutput(string text)
+        {
+            AgentOutputText.Text = text;
+            _outputLength = text?.Length ?? 0;
         }
 
         private void ScrollOutputToEnd()
