@@ -39,8 +39,15 @@ namespace TxtAIEditor.Controls
 
         private void AppendText(string text)
         {
+            int currentLength = AgentOutputText.Text.Length;
+            if (_outputLength < 0 || _outputLength > currentLength)
+            {
+                _outputLength = currentLength;
+            }
+            AgentOutputText.IsReadOnly = false;
             AgentOutputText.Select(_outputLength, 0);
             AgentOutputText.SelectedText = text;
+            AgentOutputText.IsReadOnly = true;
             _outputLength += text.Length;
         }
 
@@ -215,7 +222,12 @@ namespace TxtAIEditor.Controls
 
         private void ScrollOutputToEnd()
         {
-            AgentOutputText.SelectionStart = AgentOutputText.Text.Length;
+            int currentLength = AgentOutputText.Text.Length;
+            if (_outputLength < 0 || _outputLength > currentLength)
+            {
+                _outputLength = currentLength;
+            }
+            AgentOutputText.SelectionStart = _outputLength;
             AgentOutputText.SelectionLength = 0;
         }
 

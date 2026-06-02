@@ -146,7 +146,7 @@ namespace TxtAIEditor.Controls
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string thinkingLabel = _getString("AgentActivityThinking", "생각중");
-                    _agentPane.BeginThinkingActivity(thinkingLabel);
+                    await RunOnUIThreadAsync(() => _agentPane.BeginThinkingActivity(thinkingLabel));
 
                     var responseBuilder = new StringBuilder();
                     int printedLength = 0;
@@ -357,6 +357,42 @@ namespace TxtAIEditor.Controls
             return tcs.Task;
         }
 
+        private Task<T> RunOnUIThreadAsync<T>(Func<T> func)
+        {
+            var tcs = new TaskCompletionSource<T>();
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    T result = func();
+                    tcs.SetResult(result);
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+            return tcs.Task;
+        }
+
+        private Task<T> RunOnUIThreadAsync<T>(Func<Task<T>> func)
+        {
+            var tcs = new TaskCompletionSource<T>();
+            _agentPane.DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    T result = await func();
+                    tcs.SetResult(result);
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+            return tcs.Task;
+        }
+
         private void StopAgent()
         {
             if (!_isRunning)
@@ -507,7 +543,10 @@ namespace TxtAIEditor.Controls
 
         private void AppendActivity(string message)
         {
-            _agentPane.AppendActivity(message);
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                _agentPane.AppendActivity(message);
+            });
         }
 
         private string GetToolStartMessage(string toolName, JsonElement arguments)
@@ -930,7 +969,7 @@ namespace TxtAIEditor.Controls
                 return "insert_text failed: content is empty.";
             }
 
-            bool inserted = await _insertIntoActiveEditorAsync(content);
+            bool inserted = await RunOnUIThreadAsync(async () => await _insertIntoActiveEditorAsync(content));
             return inserted
                 ? $"inserted into active editor: {content.Length:N0} chars"
                 : "insert_text failed: active editor did not accept the text.";
@@ -942,54 +981,57 @@ namespace TxtAIEditor.Controls
                 _getString("AgentActivityDiffReviewFormat", "파일 변경 승인 대기 중: {0}"),
                 preview.RelativePath));
 
-            double rootWidth = _agentPane.XamlRoot?.Size.Width ?? 900;
-            double dialogWidth = Math.Clamp(rootWidth - 96, 480, 720);
-
-            var content = new StackPanel
+            return await RunOnUIThreadAsync(async () =>
             {
-                Width = dialogWidth,
-                Spacing = 12
-            };
+                double rootWidth = _agentPane.XamlRoot?.Size.Width ?? 900;
+                double dialogWidth = Math.Clamp(rootWidth - 96, 480, 720);
 
-            var summary = new TextBlock
-            {
-                Text = BuildDiffSummary(preview),
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 14,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
-            };
-            content.Children.Add(summary);
+                var content = new StackPanel
+                {
+                    Width = dialogWidth,
+                    Spacing = 12
+                };
 
-            string titleKey = preview.ActionName switch
-            {
-                "create_file" => "AgentCreateDialogTitle",
-                _ => "AgentEditDialogTitle"
-            };
+                var summary = new TextBlock
+                {
+                    Text = BuildDiffSummary(preview),
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 14,
+                    Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+                };
+                content.Children.Add(summary);
 
-            string defaultTitle = preview.ActionName switch
-            {
-                "create_file" => "Agent 파일 생성 확인: {0}",
-                _ => "Agent 파일 수정 확인: {0}"
-            };
+                string titleKey = preview.ActionName switch
+                {
+                    "create_file" => "AgentCreateDialogTitle",
+                    _ => "AgentEditDialogTitle"
+                };
 
-            var dialog = new ContentDialog
-            {
-                Title = string.Format(
-                    _getString(titleKey, defaultTitle),
-                    preview.RelativePath),
-                Content = content,
-                PrimaryButtonText = _getString("AgentDiffApplyButton", "승인"),
-                CloseButtonText = _getString("AgentDiffCancelButton", "취소"),
-                XamlRoot = _agentPane.XamlRoot,
-                RequestedTheme = _agentPane.ActualTheme
-            };
+                string defaultTitle = preview.ActionName switch
+                {
+                    "create_file" => "Agent 파일 생성 확인: {0}",
+                    _ => "Agent 파일 수정 확인: {0}"
+                };
 
-            var result = await dialog.ShowAsync();
-            bool approved = result == ContentDialogResult.Primary;
-            AppendActivity(approved
-                ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
-                : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
-            return approved;
+                var dialog = new ContentDialog
+                {
+                    Title = string.Format(
+                        _getString(titleKey, defaultTitle),
+                        preview.RelativePath),
+                    Content = content,
+                    PrimaryButtonText = _getString("AgentDiffApplyButton", "승인"),
+                    CloseButtonText = _getString("AgentDiffCancelButton", "취소"),
+                    XamlRoot = _agentPane.XamlRoot,
+                    RequestedTheme = _agentPane.ActualTheme
+                };
+
+                var result = await dialog.ShowAsync();
+                bool approved = result == ContentDialogResult.Primary;
+                AppendActivity(approved
+                    ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
+                    : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
+                return approved;
+            });
         }
 
         private string BuildDiffSummary(AgentFileEditPreview preview)
