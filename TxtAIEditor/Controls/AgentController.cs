@@ -815,6 +815,11 @@ namespace TxtAIEditor.Controls
                 _getString("AgentActivityDiffReviewFormat", "diff 확인 대기 중: {0}"),
                 preview.RelativePath));
 
+            double rootWidth = _agentPane.XamlRoot?.Size.Width ?? 900;
+            double rootHeight = _agentPane.XamlRoot?.Size.Height ?? 700;
+            double dialogWidth = Math.Clamp(rootWidth - 96, 560, 980);
+            double diffHeight = Math.Clamp(rootHeight - 260, 320, 620);
+
             var diffBox = new TextBox
             {
                 Text = BuildDiffPreview(preview),
@@ -823,20 +828,39 @@ namespace TxtAIEditor.Controls
                 IsReadOnly = true,
                 FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Cascadia Mono"),
                 FontSize = 12,
-                MinWidth = 720,
-                MaxWidth = 920,
-                MaxHeight = 520,
+                Width = dialogWidth,
+                Height = diffHeight,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
             ScrollViewer.SetVerticalScrollBarVisibility(diffBox, ScrollBarVisibility.Auto);
             ScrollViewer.SetHorizontalScrollBarVisibility(diffBox, ScrollBarVisibility.Auto);
+
+            var content = new Grid
+            {
+                Width = dialogWidth,
+                RowSpacing = 8
+            };
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            var summary = new TextBlock
+            {
+                Text = BuildDiffSummary(preview),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            };
+            Grid.SetRow(summary, 0);
+            Grid.SetRow(diffBox, 1);
+            content.Children.Add(summary);
+            content.Children.Add(diffBox);
 
             var dialog = new ContentDialog
             {
                 Title = string.Format(
                     _getString("AgentDiffDialogTitleFormat", "Agent 파일 수정 확인: {0}"),
                     preview.RelativePath),
-                Content = diffBox,
+                Content = content,
                 PrimaryButtonText = _getString("AgentDiffApplyButton", "적용"),
                 CloseButtonText = _getString("AgentDiffCancelButton", "취소"),
                 XamlRoot = _agentPane.XamlRoot,
@@ -854,14 +878,19 @@ namespace TxtAIEditor.Controls
         private static string BuildDiffPreview(AgentFileEditPreview preview)
         {
             var builder = new StringBuilder();
-            builder.AppendLine($"--- {preview.RelativePath}");
-            builder.AppendLine($"+++ {preview.RelativePath}");
+            string displayPath = preview.RelativePath.Replace('\\', '/');
+            builder.AppendLine($"diff --git a/{displayPath} b/{displayPath}");
 
             string[] oldLines = preview.OldContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             string[] newLines = preview.NewContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
 
             if (preview.IsNewFile)
             {
+                builder.AppendLine("new file mode 100644");
+                builder.AppendLine("index 0000000..0000000");
+                builder.AppendLine("--- /dev/null");
+                builder.AppendLine($"+++ b/{displayPath}");
+                builder.AppendLine($"@@ -0,0 +1,{FormatDiffCount(newLines.Length)} @@");
                 foreach (string line in newLines)
                 {
                     builder.Append('+');
@@ -871,6 +900,94 @@ namespace TxtAIEditor.Controls
                 return TruncateDiff(builder.ToString());
             }
 
+            builder.AppendLine("index 0000000..0000000 100644");
+            builder.AppendLine($"--- a/{displayPath}");
+            builder.AppendLine($"+++ b/{displayPath}");
+
+            foreach (var hunk in BuildUnifiedDiffHunks(BuildLineDiff(oldLines, newLines), 3))
+            {
+                builder.AppendLine($"@@ -{hunk.OldStart},{FormatDiffCount(hunk.OldCount)} +{hunk.NewStart},{FormatDiffCount(hunk.NewCount)} @@");
+                for (int i = hunk.StartIndex; i <= hunk.EndIndex; i++)
+                {
+                    var line = hunk.Lines[i];
+                    builder.Append(line.Prefix);
+                    builder.AppendLine(line.Text);
+                }
+            }
+
+            return TruncateDiff(builder.ToString());
+        }
+
+        private static string BuildDiffSummary(AgentFileEditPreview preview)
+        {
+            string[] oldLines = preview.OldContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            string[] newLines = preview.NewContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            int added = Math.Max(0, newLines.Length - oldLines.Length);
+            int removed = Math.Max(0, oldLines.Length - newLines.Length);
+            return preview.IsNewFile
+                ? $"New file: {preview.RelativePath} ({newLines.Length:N0} lines)"
+                : $"Review changes for {preview.RelativePath}  (+{added:N0} / -{removed:N0}, {oldLines.Length:N0} -> {newLines.Length:N0} lines)";
+        }
+
+        private static List<(char Prefix, string Text, int OldLine, int NewLine)> BuildLineDiff(string[] oldLines, string[] newLines)
+        {
+            if ((long)oldLines.Length * newLines.Length > 400_000)
+            {
+                return BuildPositionalDiff(oldLines, newLines);
+            }
+
+            int[,] lcs = new int[oldLines.Length + 1, newLines.Length + 1];
+            for (int i = oldLines.Length - 1; i >= 0; i--)
+            {
+                for (int j = newLines.Length - 1; j >= 0; j--)
+                {
+                    lcs[i, j] = oldLines[i] == newLines[j]
+                        ? lcs[i + 1, j + 1] + 1
+                        : Math.Max(lcs[i + 1, j], lcs[i, j + 1]);
+                }
+            }
+
+            var result = new List<(char Prefix, string Text, int OldLine, int NewLine)>();
+            int oldIndex = 0;
+            int newIndex = 0;
+            while (oldIndex < oldLines.Length && newIndex < newLines.Length)
+            {
+                if (oldLines[oldIndex] == newLines[newIndex])
+                {
+                    result.Add((' ', oldLines[oldIndex], oldIndex + 1, newIndex + 1));
+                    oldIndex++;
+                    newIndex++;
+                }
+                else if (lcs[oldIndex + 1, newIndex] >= lcs[oldIndex, newIndex + 1])
+                {
+                    result.Add(('-', oldLines[oldIndex], oldIndex + 1, 0));
+                    oldIndex++;
+                }
+                else
+                {
+                    result.Add(('+', newLines[newIndex], 0, newIndex + 1));
+                    newIndex++;
+                }
+            }
+
+            while (oldIndex < oldLines.Length)
+            {
+                result.Add(('-', oldLines[oldIndex], oldIndex + 1, 0));
+                oldIndex++;
+            }
+
+            while (newIndex < newLines.Length)
+            {
+                result.Add(('+', newLines[newIndex], 0, newIndex + 1));
+                newIndex++;
+            }
+
+            return result;
+        }
+
+        private static List<(char Prefix, string Text, int OldLine, int NewLine)> BuildPositionalDiff(string[] oldLines, string[] newLines)
+        {
+            var result = new List<(char Prefix, string Text, int OldLine, int NewLine)>();
             int max = Math.Max(oldLines.Length, newLines.Length);
             for (int i = 0; i < max; i++)
             {
@@ -879,25 +996,91 @@ namespace TxtAIEditor.Controls
 
                 if (oldLine == newLine)
                 {
-                    builder.Append(' ');
-                    builder.AppendLine(oldLine ?? string.Empty);
+                    result.Add((' ', oldLine ?? string.Empty, i + 1, i + 1));
                     continue;
                 }
 
                 if (oldLine != null)
                 {
-                    builder.Append('-');
-                    builder.AppendLine(oldLine);
+                    result.Add(('-', oldLine, i + 1, 0));
                 }
 
                 if (newLine != null)
                 {
-                    builder.Append('+');
-                    builder.AppendLine(newLine);
+                    result.Add(('+', newLine, 0, i + 1));
                 }
             }
 
-            return TruncateDiff(builder.ToString());
+            return result;
+        }
+
+        private static List<(List<(char Prefix, string Text, int OldLine, int NewLine)> Lines, int StartIndex, int EndIndex, int OldStart, int OldCount, int NewStart, int NewCount)> BuildUnifiedDiffHunks(
+            List<(char Prefix, string Text, int OldLine, int NewLine)> lines,
+            int contextLines)
+        {
+            var hunks = new List<(List<(char Prefix, string Text, int OldLine, int NewLine)> Lines, int StartIndex, int EndIndex, int OldStart, int OldCount, int NewStart, int NewCount)>();
+            var changedIndexes = lines
+                .Select((line, index) => (line, index))
+                .Where(item => item.line.Prefix != ' ')
+                .Select(item => item.index)
+                .ToList();
+
+            if (changedIndexes.Count == 0)
+            {
+                return hunks;
+            }
+
+            int hunkStart = Math.Max(0, changedIndexes[0] - contextLines);
+            int hunkEnd = Math.Min(lines.Count - 1, changedIndexes[0] + contextLines);
+            for (int i = 1; i < changedIndexes.Count; i++)
+            {
+                int nextStart = Math.Max(0, changedIndexes[i] - contextLines);
+                int nextEnd = Math.Min(lines.Count - 1, changedIndexes[i] + contextLines);
+                if (nextStart <= hunkEnd + 1)
+                {
+                    hunkEnd = Math.Max(hunkEnd, nextEnd);
+                    continue;
+                }
+
+                hunks.Add(BuildHunk(lines, hunkStart, hunkEnd));
+                hunkStart = nextStart;
+                hunkEnd = nextEnd;
+            }
+
+            hunks.Add(BuildHunk(lines, hunkStart, hunkEnd));
+            return hunks;
+        }
+
+        private static (List<(char Prefix, string Text, int OldLine, int NewLine)> Lines, int StartIndex, int EndIndex, int OldStart, int OldCount, int NewStart, int NewCount) BuildHunk(
+            List<(char Prefix, string Text, int OldLine, int NewLine)> lines,
+            int startIndex,
+            int endIndex)
+        {
+            int oldStart = lines.Skip(startIndex).Take(endIndex - startIndex + 1).FirstOrDefault(line => line.Prefix != '+' && line.OldLine > 0).OldLine;
+            int newStart = lines.Skip(startIndex).Take(endIndex - startIndex + 1).FirstOrDefault(line => line.Prefix != '-' && line.NewLine > 0).NewLine;
+            oldStart = oldStart == 0 ? 1 : oldStart;
+            newStart = newStart == 0 ? 1 : newStart;
+            int oldCount = 0;
+            int newCount = 0;
+            for (int i = startIndex; i <= endIndex; i++)
+            {
+                if (lines[i].Prefix != '+')
+                {
+                    oldCount++;
+                }
+
+                if (lines[i].Prefix != '-')
+                {
+                    newCount++;
+                }
+            }
+
+            return (lines, startIndex, endIndex, oldStart, oldCount, newStart, newCount);
+        }
+
+        private static string FormatDiffCount(int count)
+        {
+            return count.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private static string TruncateDiff(string diff)
