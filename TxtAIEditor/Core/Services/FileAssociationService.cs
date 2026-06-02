@@ -29,7 +29,11 @@ namespace TxtAIEditor.Core.Services
                 changed |= RegisterFileType(".txt", "TxtAIEditor.txt", "Text Document", executablePath);
                 changed |= RegisterFileType(".md", "TxtAIEditor.md", "Markdown Document", executablePath);
                 changed |= RegisterFileType(".csv", "TxtAIEditor.csv", "CSV Document", executablePath);
-                changed |= RegisterClassicContextMenu(executablePath);
+
+                if (IsRunningPackaged())
+                {
+                    changed |= RemoveClassicContextMenu();
+                }
 
                 if (changed)
                 {
@@ -108,58 +112,37 @@ namespace TxtAIEditor.Core.Services
             return changed;
         }
 
-        private static bool RegisterClassicContextMenu(string executablePath)
+        private static bool RemoveClassicContextMenu()
         {
             bool changed = false;
-            changed |= RegisterClassicContextMenuForType(
-                @"Software\Classes\*\shell\Open in TxtAIEditor",
-                executablePath);
-            changed |= RegisterClassicContextMenuForType(
-                @"Software\Classes\Folder\shell\Open in TxtAIEditor",
-                executablePath);
+            changed |= DeleteCurrentUserSubKeyTree(@"Software\Classes\*\shell\Open in TxtAIEditor");
+            changed |= DeleteCurrentUserSubKeyTree(@"Software\Classes\Folder\shell\Open in TxtAIEditor");
+            changed |= RunRegDelete(@"HKCU\Software\Classes\*\shell\Open in TxtAIEditor");
+            changed |= RunRegDelete(@"HKCU\Software\Classes\Folder\shell\Open in TxtAIEditor");
+            return changed;
+        }
 
-            if (IsRunningPackaged())
+        private static bool DeleteCurrentUserSubKeyTree(string keyPath)
+        {
+            try
             {
-                changed |= RegisterClassicContextMenuWithRegExe(executablePath);
+                using RegistryKey? key = Registry.CurrentUser.OpenSubKey(keyPath);
+                if (key == null)
+                {
+                    return false;
+                }
+
+                Registry.CurrentUser.DeleteSubKeyTree(keyPath, false);
+                return true;
             }
-
-            return changed;
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to remove classic context menu key '{keyPath}': {ex.Message}");
+                return false;
+            }
         }
 
-        private static bool RegisterClassicContextMenuForType(string shellKeyPath, string executablePath)
-        {
-            bool changed = false;
-            using RegistryKey shellKey = Registry.CurrentUser.CreateSubKey(shellKeyPath);
-            changed |= SetValueIfDifferent(shellKey, string.Empty, "Open in TxtAIEditor", RegistryValueKind.String);
-            changed |= SetValueIfDifferent(shellKey, "MUIVerb", "Open in TxtAIEditor", RegistryValueKind.String);
-            changed |= SetValueIfDifferent(shellKey, "Icon", $"{Quote(executablePath)},0", RegistryValueKind.String);
-
-            using RegistryKey commandKey = shellKey.CreateSubKey("command");
-            changed |= SetValueIfDifferent(commandKey, string.Empty, BuildOpenCommand(executablePath), RegistryValueKind.String);
-            return changed;
-        }
-
-        private static bool RegisterClassicContextMenuWithRegExe(string executablePath)
-        {
-            bool succeeded = true;
-            succeeded &= RunRegAdd(@"HKCU\Software\Classes\*\shell\Open in TxtAIEditor", "/ve", "Open in TxtAIEditor");
-            succeeded &= RunRegAdd(@"HKCU\Software\Classes\*\shell\Open in TxtAIEditor", "/v", "MUIVerb", "Open in TxtAIEditor");
-            succeeded &= RunRegAdd(@"HKCU\Software\Classes\*\shell\Open in TxtAIEditor", "/v", "Icon", $"{Quote(executablePath)},0");
-            succeeded &= RunRegAdd(@"HKCU\Software\Classes\*\shell\Open in TxtAIEditor\command", "/ve", BuildOpenCommand(executablePath));
-
-            succeeded &= RunRegAdd(@"HKCU\Software\Classes\Folder\shell\Open in TxtAIEditor", "/ve", "Open in TxtAIEditor");
-            succeeded &= RunRegAdd(@"HKCU\Software\Classes\Folder\shell\Open in TxtAIEditor", "/v", "MUIVerb", "Open in TxtAIEditor");
-            succeeded &= RunRegAdd(@"HKCU\Software\Classes\Folder\shell\Open in TxtAIEditor", "/v", "Icon", $"{Quote(executablePath)},0");
-            succeeded &= RunRegAdd(@"HKCU\Software\Classes\Folder\shell\Open in TxtAIEditor\command", "/ve", BuildOpenCommand(executablePath));
-            return succeeded;
-        }
-
-        private static bool RunRegAdd(string keyPath, string valueSwitch, string valueData)
-        {
-            return RunRegAdd(keyPath, valueSwitch, null, valueData);
-        }
-
-        private static bool RunRegAdd(string keyPath, string valueSwitch, string? valueName, string valueData)
+        private static bool RunRegDelete(string keyPath)
         {
             try
             {
@@ -169,17 +152,8 @@ namespace TxtAIEditor.Core.Services
                     UseShellExecute = false,
                     WindowStyle = ProcessWindowStyle.Hidden
                 };
-                startInfo.ArgumentList.Add("add");
+                startInfo.ArgumentList.Add("delete");
                 startInfo.ArgumentList.Add(keyPath);
-                startInfo.ArgumentList.Add(valueSwitch);
-                if (!string.IsNullOrEmpty(valueName))
-                {
-                    startInfo.ArgumentList.Add(valueName);
-                }
-                startInfo.ArgumentList.Add("/t");
-                startInfo.ArgumentList.Add("REG_SZ");
-                startInfo.ArgumentList.Add("/d");
-                startInfo.ArgumentList.Add(valueData);
                 startInfo.ArgumentList.Add("/f");
 
                 using Process process = Process.Start(startInfo)!;
@@ -187,7 +161,7 @@ namespace TxtAIEditor.Core.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to register classic context menu via reg.exe: {ex.Message}");
+                Debug.WriteLine($"Failed to remove classic context menu via reg.exe: {ex.Message}");
                 return false;
             }
         }
