@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -9,11 +9,11 @@
   IgnorableNamespaces="uap rescap systemai">
 
   <Identity
-    Name="858b50c1-2e4a-488a-8e5f-1ab4d73f9252"
-    Publisher="CN=kirinonakar"
+    Name="kirinonakar.TxtAIEditor"
+    Publisher="CN=5F40B554-380B-47DB-92AD-D044EB10269C"
     Version="1.3.3.0" />
 
-  <mp:PhoneIdentity PhoneProductId="858b50c1-2e4a-488a-8e5f-1ab4d73f9252" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="4bfb70cd-06b5-4bfb-b83c-7709463daab3" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>TxtAIEditor</DisplayName>
