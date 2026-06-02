@@ -23,6 +23,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _ensureLeftPanelVisible;
         private readonly Action<int> _showLeftSidebarPage;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
+        private readonly ILocalizationService _localizationService;
 
         public ExplorerNavigationController(
             LeftSidebarPane leftSidebar,
@@ -35,7 +36,8 @@ namespace TxtAIEditor.Controls
             Func<Task> refreshGitStatusAsync,
             Action ensureLeftPanelVisible,
             Action<int> showLeftSidebarPage,
-            Func<string, Task> loadFileIntoTabAsync)
+            Func<string, Task> loadFileIntoTabAsync,
+            ILocalizationService localizationService)
         {
             _leftSidebar = leftSidebar;
             _viewModel = viewModel;
@@ -48,6 +50,7 @@ namespace TxtAIEditor.Controls
             _ensureLeftPanelVisible = ensureLeftPanelVisible;
             _showLeftSidebarPage = showLeftSidebarPage;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
+            _localizationService = localizationService;
 
             WireEvents();
         }
@@ -64,7 +67,7 @@ namespace TxtAIEditor.Controls
                 _viewModel.ExplorerItems.Add(item);
             }
 
-            _leftSidebar.ExplorerStatus.Text = $"{folderPath}\n{_viewModel.ExplorerItems.Count:N0}개 항목";
+            _leftSidebar.ExplorerStatus.Text = $"{folderPath}\n{FormatExplorerItemCount(_viewModel.ExplorerItems.Count)}";
         }
 
         public async Task NavigateToFolderAsync(string folderPath)
@@ -170,6 +173,14 @@ namespace TxtAIEditor.Controls
         private void UpdateRepoPath(string path)
         {
             _currentRepoPathChanged(_gitService.FindRepositoryRoot(path) ?? string.Empty);
+        }
+
+        private string FormatExplorerItemCount(int itemCount)
+        {
+            string key = itemCount == 1 ? "ExplorerItemCountSingular" : "ExplorerItemCountPlural";
+            string fallback = itemCount == 1 ? "{0:N0}개 항목" : "{0:N0}개 항목";
+            string format = _localizationService.GetString(key, fallback);
+            return string.Format(format, itemCount);
         }
     }
 }

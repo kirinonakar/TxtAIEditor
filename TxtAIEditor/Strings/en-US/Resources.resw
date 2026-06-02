@@ -107,6 +107,12 @@
   <data name="NoFolderSelected" xml:space="preserve">
     <value>Please select a folder.</value>
   </data>
+  <data name="ExplorerItemCountSingular" xml:space="preserve">
+    <value>{0:N0} item</value>
+  </data>
+  <data name="ExplorerItemCountPlural" xml:space="preserve">
+    <value>{0:N0} items</value>
+  </data>
   <data name="FavoritesHeader" xml:space="preserve">
     <value>Favorites List</value>
   </data>

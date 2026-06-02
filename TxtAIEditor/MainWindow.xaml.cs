@@ -272,7 +272,8 @@ namespace TxtAIEditor
                 RefreshGitStatusUIAsync,
                 EnsureLeftPanelVisible,
                 ShowLeftSidebarPage,
-                LoadFileIntoTabAsync);
+                LoadFileIntoTabAsync,
+                _localizationService);
             _favoritesRecentController = new FavoritesRecentController(
                 _settingsService,
                 _recentFilesService,

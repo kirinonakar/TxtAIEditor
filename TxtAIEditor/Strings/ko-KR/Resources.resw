@@ -107,6 +107,12 @@
   <data name="NoFolderSelected" xml:space="preserve">
     <value>폴더를 선택하세요.</value>
   </data>
+  <data name="ExplorerItemCountSingular" xml:space="preserve">
+    <value>{0:N0}개 항목</value>
+  </data>
+  <data name="ExplorerItemCountPlural" xml:space="preserve">
+    <value>{0:N0}개 항목</value>
+  </data>
   <data name="FavoritesHeader" xml:space="preserve">
     <value>즐겨찾기 목록</value>
   </data>
