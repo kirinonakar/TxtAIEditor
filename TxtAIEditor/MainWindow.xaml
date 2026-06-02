@@ -30,7 +30,7 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                <Image Source="ms-appx:///Assets/TxtAIEditor.png" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <Image Source="ms-appx:///Assets/Square44x44Logo.targetsize-16.png" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                 <TextBlock x:Name="AppTitleTextBlock" Text="TxtAIEditor" FontSize="12" FontWeight="SemiBold"
                            VerticalAlignment="Center"
                            Foreground="{ThemeResource TitleBarForegroundBrush}"/>

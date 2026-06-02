@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <Content Include="Assets\TxtAIEditor.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\*.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Strings\**\Resources.resw" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="WebResources\**" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="md\**" CopyToOutputDirectory="PreserveNewest" />
