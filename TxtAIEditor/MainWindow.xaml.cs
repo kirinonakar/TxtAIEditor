@@ -656,6 +656,7 @@ namespace TxtAIEditor
                 // 1. Handle command-line file opening or open a blank tab instantly
                 string[] args = Environment.GetCommandLineArgs();
                 var filesToOpen = new List<string>();
+                var foldersToOpen = new List<string>();
 
                 if (args != null && args.Length > 1)
                 {
@@ -670,14 +671,23 @@ namespace TxtAIEditor
                         try
                         {
                             string filePath = arg.Trim('"', '\'');
-                            if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+                            if (string.IsNullOrWhiteSpace(filePath))
+                            {
+                                continue;
+                            }
+
+                            if (File.Exists(filePath))
                             {
                                 filesToOpen.Add(filePath);
+                            }
+                            else if (Directory.Exists(filePath))
+                            {
+                                foldersToOpen.Add(filePath);
                             }
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Failed to pre-check command-line file '{arg}': {ex.Message}");
+                            System.Diagnostics.Debug.WriteLine($"Failed to pre-check command-line path '{arg}': {ex.Message}");
                         }
                     }
                 }
@@ -707,21 +717,29 @@ namespace TxtAIEditor
                 LocalizeUi();
                 ApplyToolbarSettings(_settingsService.CurrentSettings);
 
+                if (foldersToOpen.Count > 0)
+                {
+                    await NavigateExplorerToFolderAsync(foldersToOpen[0]);
+                }
+
                 if (filesToOpen.Count > 0)
                 {
-                    string? folderPath = Path.GetDirectoryName(filesToOpen[0]);
-                    if (!string.IsNullOrEmpty(folderPath))
+                    if (foldersToOpen.Count == 0)
                     {
-                        try
+                        string? folderPath = Path.GetDirectoryName(filesToOpen[0]);
+                        if (!string.IsNullOrEmpty(folderPath))
                         {
-                            if (Directory.Exists(folderPath))
+                            try
                             {
-                                await NavigateExplorerToFolderAsync(folderPath);
+                                if (Directory.Exists(folderPath))
+                                {
+                                    await NavigateExplorerToFolderAsync(folderPath);
+                                }
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Failed to navigate startup folder '{folderPath}': {ex.Message}");
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Failed to navigate startup folder '{folderPath}': {ex.Message}");
+                            }
                         }
                     }
 
@@ -730,7 +748,7 @@ namespace TxtAIEditor
                         await LoadFileIntoTabAsync(filePath);
                     }
                 }
-                else
+                else if (foldersToOpen.Count == 0)
                 {
                     // Open a blank tab instantly (so the tab and Monaco editor container are rendered immediately)
                     OpenNewTab();
@@ -2081,6 +2099,24 @@ namespace TxtAIEditor
         private async Task NavigateExplorerToFolderAsync(string folderPath)
         {
             await _explorerNavigationController.NavigateToFolderAsync(folderPath);
+        }
+
+        internal async Task OpenShellPathAsync(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            string cleanedPath = path.Trim().Trim('"', '\'');
+            if (File.Exists(cleanedPath))
+            {
+                await LoadFileIntoTabAsync(cleanedPath);
+            }
+            else if (Directory.Exists(cleanedPath))
+            {
+                await NavigateExplorerToFolderAsync(cleanedPath);
+            }
         }
 
         private void OnOpenTerminalClick(object sender, RoutedEventArgs e)
