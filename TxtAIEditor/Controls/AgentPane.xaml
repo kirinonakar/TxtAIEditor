@@ -41,6 +41,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <ScrollViewer Grid.Row="0"
@@ -134,5 +135,37 @@
                     Click="OnEditClick"
                     Style="{StaticResource AgentButtonStyle}"/>
         </Grid>
+
+        <Border Grid.Row="5"
+                Background="{ThemeResource ToolbarBackgroundBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                Padding="8"
+                CornerRadius="4">
+            <Grid RowSpacing="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="AgentActivityHeaderText"
+                           Text="진행 상황"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                <TextBox x:Name="AgentActivityText"
+                         Grid.Row="1"
+                         Text="대기 중"
+                         MaxHeight="88"
+                         FontSize="11"
+                         FontFamily="Consolas, Cascadia Mono, Segoe UI, Malgun Gothic"
+                         TextWrapping="Wrap"
+                         IsReadOnly="True"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Padding="0"
+                         AcceptsReturn="True"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

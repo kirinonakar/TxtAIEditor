@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 
@@ -24,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
+        private readonly Func<string, Task>? _fileModifiedAsync;
 
         private string _lastSelectionText = string.Empty;
         private bool _isRunning;
@@ -37,7 +40,8 @@ namespace TxtAIEditor.Controls
             Func<string, Task<bool>> insertIntoActiveEditorAsync,
             Action<string, string> showError,
             Func<string, string, string> getString,
-            AgentFileToolService fileTools)
+            AgentFileToolService fileTools,
+            Func<string, Task>? fileModifiedAsync = null)
         {
             _llmService = llmService;
             _agentPane = agentPane;
@@ -48,6 +52,12 @@ namespace TxtAIEditor.Controls
             _showError = showError;
             _getString = getString;
             _fileTools = fileTools;
+            _fileModifiedAsync = fileModifiedAsync;
+            _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
+            if (_fileModifiedAsync != null)
+            {
+                _fileTools.FileModifiedAsync = _fileModifiedAsync;
+            }
 
             WireEvents();
             UpdateContextStats();
@@ -101,6 +111,8 @@ namespace TxtAIEditor.Controls
 
             _isRunning = true;
             _agentPane.SetBusy(true);
+            _agentPane.ClearActivity(_getString("AgentActivityStarting", "시작 중"));
+            AppendActivity(_getString("AgentActivityCollectingContext", "맥락 수집 중"));
             _agentPane.Output.Text = string.Empty;
 
             try
@@ -112,11 +124,34 @@ namespace TxtAIEditor.Controls
 
                 for (int step = 0; step < 8; step++)
                 {
-                    response = await _llmService.RunAgentAsync(instruction, transcript, selectedText, mode);
+                    AppendActivity(string.Format(
+                        _getString("AgentActivityThinkingFormat", "생각중 ({0}/8)"),
+                        step + 1));
+                    _agentPane.Output.Text = string.Empty;
+
+                    var responseBuilder = new StringBuilder();
+                    response = await _llmService.RunAgentAsync(
+                        instruction,
+                        transcript,
+                        selectedText,
+                        mode,
+                        async chunk =>
+                        {
+                            responseBuilder.Append(chunk);
+                            _agentPane.DispatcherQueue.TryEnqueue(() =>
+                            {
+                                _agentPane.Output.Text += chunk;
+                                _agentPane.Output.SelectionStart = _agentPane.Output.Text.Length;
+                                _agentPane.Output.SelectionLength = 0;
+                            });
+                            await Task.CompletedTask;
+                        });
+                    response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
                     _agentPane.Output.Text = response;
 
                     if (!TryParseToolCall(response, out string toolName, out JsonElement arguments))
                     {
+                        AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                         break;
                     }
 
@@ -189,42 +224,115 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                return toolName switch
+                string normalizedToolName = NormalizeToolName(toolName);
+                AppendActivity(GetToolStartMessage(normalizedToolName, arguments));
+                string result;
+                if (normalizedToolName == "replace_in_file")
                 {
-                    "list_files" => await _fileTools.ListFilesAsync(
-                        GetStringArgument(arguments, "glob"),
-                        GetIntArgument(arguments, "maxResults", 80)),
-                    "search_text" => await _fileTools.SearchTextAsync(
-                        GetStringArgument(arguments, "query"),
-                        GetStringArgument(arguments, "glob"),
-                        GetIntArgument(arguments, "maxResults", 80)),
-                    "run_rg" => await _fileTools.RunRgAsync(
-                        GetStringArgument(arguments, "arguments"),
-                        GetIntArgument(arguments, "timeoutMs", 10000)),
-                    "run_powershell" => await _fileTools.RunPowerShellAsync(
-                        GetStringArgument(arguments, "command"),
-                        GetIntArgument(arguments, "timeoutMs", 10000)),
-                    "read_file" => await _fileTools.ReadFileAsync(
-                        GetStringArgument(arguments, "path"),
-                        GetIntArgument(arguments, "startLine", 1),
-                        GetIntArgument(arguments, "lineCount", 160)),
-                    "create_file" => await _fileTools.CreateFileAsync(
-                        GetStringArgument(arguments, "path"),
-                        GetStringArgument(arguments, "content")),
-                    "replace_in_file" => await _fileTools.ReplaceInFileAsync(
-                        GetStringArgument(arguments, "path"),
-                        GetStringArgument(arguments, "oldText"),
-                        GetStringArgument(arguments, "newText")),
-                    "overwrite_file" => await _fileTools.OverwriteFileAsync(
-                        GetStringArgument(arguments, "path"),
-                        GetStringArgument(arguments, "content")),
-                    _ => $"Unknown tool: {toolName}"
-                };
+                    string path = GetPathArgument(arguments);
+                    string oldText = GetFirstStringArgument(arguments, "oldText", "old_text", "find", "search", "target", "before");
+                    string newText = GetFirstStringArgument(arguments, "newText", "new_text", "replace", "replacement", "after");
+                    string content = GetFirstStringArgument(arguments, "content", "text");
+
+                    result = string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(content)
+                        ? await _fileTools.OverwriteFileAsync(path, content)
+                        : await _fileTools.ReplaceInFileAsync(path, oldText, newText);
+                }
+                else
+                {
+                    result = normalizedToolName switch
+                    {
+                        "list_files" => await _fileTools.ListFilesAsync(
+                            GetStringArgument(arguments, "glob"),
+                            GetIntArgument(arguments, "maxResults", 80)),
+                        "search_text" => await _fileTools.SearchTextAsync(
+                            GetStringArgument(arguments, "query"),
+                            GetStringArgument(arguments, "glob"),
+                            GetIntArgument(arguments, "maxResults", 80)),
+                        "run_rg" => await _fileTools.RunRgAsync(
+                            GetStringArgument(arguments, "arguments"),
+                            GetIntArgument(arguments, "timeoutMs", 10000)),
+                        "run_powershell" => await _fileTools.RunPowerShellAsync(
+                            GetStringArgument(arguments, "command"),
+                            GetIntArgument(arguments, "timeoutMs", 10000)),
+                        "read_file" => await _fileTools.ReadFileAsync(
+                            GetStringArgument(arguments, "path"),
+                            GetIntArgument(arguments, "startLine", 1),
+                            GetIntArgument(arguments, "lineCount", 160)),
+                        "create_file" => await _fileTools.CreateFileAsync(
+                            GetPathArgument(arguments),
+                            GetStringArgument(arguments, "content")),
+                        "overwrite_file" => await _fileTools.OverwriteFileAsync(
+                            GetPathArgument(arguments),
+                            GetFirstStringArgument(arguments, "content", "newText", "new_text", "text")),
+                        _ => $"Unknown tool: {toolName}"
+                    };
+                }
+                AppendActivity(string.Format(
+                    _getString("AgentActivityToolDoneFormat", "도구 완료: {0}"),
+                    normalizedToolName));
+                return result;
             }
             catch (Exception ex)
             {
-                return $"Tool failed: {ex.Message}";
+                string result = $"Tool failed: {ex.Message}";
+                AppendActivity(string.Format(
+                    _getString("AgentActivityToolFailedFormat", "도구 실패: {0}"),
+                    toolName));
+                return result;
             }
+        }
+
+        private void AppendActivity(string message)
+        {
+            _agentPane.AppendActivity(message);
+        }
+
+        private string GetToolStartMessage(string toolName, JsonElement arguments)
+        {
+            return toolName switch
+            {
+                "list_files" => string.Format(
+                    _getString("AgentActivityListFilesFormat", "파일 목록 조회 중: {0}"),
+                    GetStringArgument(arguments, "glob")),
+                "search_text" => string.Format(
+                    _getString("AgentActivitySearchTextFormat", "텍스트 검색 중: {0}"),
+                    GetStringArgument(arguments, "query")),
+                "run_rg" => string.Format(
+                    _getString("AgentActivityRunRgFormat", "rg 실행 중: {0}"),
+                    TruncateForActivity(GetStringArgument(arguments, "arguments"))),
+                "run_powershell" => string.Format(
+                    _getString("AgentActivityRunPowerShellFormat", "PowerShell 실행 중: {0}"),
+                    TruncateForActivity(GetStringArgument(arguments, "command"))),
+                "read_file" => string.Format(
+                    _getString("AgentActivityReadFileFormat", "파일 읽는 중: {0} ({1}줄부터 {2}줄)"),
+                    GetStringArgument(arguments, "path"),
+                    GetIntArgument(arguments, "startLine", 1),
+                    GetIntArgument(arguments, "lineCount", 160)),
+                "create_file" => string.Format(
+                    _getString("AgentActivityCreateFileFormat", "파일 만드는 중: {0}"),
+                    GetStringArgument(arguments, "path")),
+                "replace_in_file" => string.Format(
+                    _getString("AgentActivityReplaceFileFormat", "파일 수정 중: {0}"),
+                    GetStringArgument(arguments, "path")),
+                "overwrite_file" => string.Format(
+                    _getString("AgentActivityOverwriteFileFormat", "파일 덮어쓰는 중: {0}"),
+                    GetStringArgument(arguments, "path")),
+                _ => string.Format(
+                    _getString("AgentActivityUnknownToolFormat", "도구 실행 중: {0}"),
+                    toolName)
+            };
+        }
+
+        private static string TruncateForActivity(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "(empty)";
+            }
+
+            value = value.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\n', ' ').Replace('\r', ' ');
+            return value.Length > 120 ? value.Substring(0, 120) + "..." : value;
         }
 
         private static bool TryParseToolCall(string response, out string toolName, out JsonElement arguments)
@@ -265,6 +373,54 @@ namespace TxtAIEditor.Controls
             return arguments.TryGetProperty(name, out var value) ? value.GetString() ?? string.Empty : string.Empty;
         }
 
+        private string GetPathArgument(JsonElement arguments)
+        {
+            string path = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path");
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                return path;
+            }
+
+            return _activeTabProvider()?.FilePath ?? string.Empty;
+        }
+
+        private static string GetFirstStringArgument(JsonElement arguments, params string[] names)
+        {
+            foreach (string name in names)
+            {
+                string value = GetStringArgument(arguments, name);
+                if (!string.IsNullOrEmpty(value))
+                {
+                    return value;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static string NormalizeToolName(string toolName)
+        {
+            string normalized = (toolName ?? string.Empty)
+                .Trim()
+                .Replace("-", "_", StringComparison.Ordinal)
+                .Replace(" ", "_", StringComparison.Ordinal)
+                .ToLowerInvariant();
+
+            return normalized switch
+            {
+                "replace_text" => "replace_in_file",
+                "replace" => "replace_in_file",
+                "edit_file" => "replace_in_file",
+                "write_file" => "overwrite_file",
+                "write_text" => "overwrite_file",
+                "read" => "read_file",
+                "search" => "search_text",
+                "powershell" => "run_powershell",
+                "rg" => "run_rg",
+                _ => normalized
+            };
+        }
+
         private static int GetIntArgument(JsonElement arguments, string name, int fallback)
         {
             if (!arguments.TryGetProperty(name, out var value))
@@ -278,6 +434,105 @@ namespace TxtAIEditor.Controls
             }
 
             return int.TryParse(value.GetString(), out int parsed) ? parsed : fallback;
+        }
+
+        private async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)
+        {
+            AppendActivity(string.Format(
+                _getString("AgentActivityDiffReviewFormat", "diff 확인 대기 중: {0}"),
+                preview.RelativePath));
+
+            var diffBox = new TextBox
+            {
+                Text = BuildDiffPreview(preview),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.NoWrap,
+                IsReadOnly = true,
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Cascadia Mono"),
+                FontSize = 12,
+                MinWidth = 720,
+                MaxWidth = 920,
+                MaxHeight = 520,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            ScrollViewer.SetVerticalScrollBarVisibility(diffBox, ScrollBarVisibility.Auto);
+            ScrollViewer.SetHorizontalScrollBarVisibility(diffBox, ScrollBarVisibility.Auto);
+
+            var dialog = new ContentDialog
+            {
+                Title = string.Format(
+                    _getString("AgentDiffDialogTitleFormat", "Agent 파일 수정 확인: {0}"),
+                    preview.RelativePath),
+                Content = diffBox,
+                PrimaryButtonText = _getString("AgentDiffApplyButton", "적용"),
+                CloseButtonText = _getString("AgentDiffCancelButton", "취소"),
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+
+            var result = await dialog.ShowAsync();
+            bool approved = result == ContentDialogResult.Primary;
+            AppendActivity(approved
+                ? string.Format(_getString("AgentActivityDiffAppliedFormat", "diff 적용 승인: {0}"), preview.RelativePath)
+                : string.Format(_getString("AgentActivityDiffCancelledFormat", "diff 적용 취소: {0}"), preview.RelativePath));
+            return approved;
+        }
+
+        private static string BuildDiffPreview(AgentFileEditPreview preview)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine($"--- {preview.RelativePath}");
+            builder.AppendLine($"+++ {preview.RelativePath}");
+
+            string[] oldLines = preview.OldContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            string[] newLines = preview.NewContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+
+            if (preview.IsNewFile)
+            {
+                foreach (string line in newLines)
+                {
+                    builder.Append('+');
+                    builder.AppendLine(line);
+                }
+
+                return TruncateDiff(builder.ToString());
+            }
+
+            int max = Math.Max(oldLines.Length, newLines.Length);
+            for (int i = 0; i < max; i++)
+            {
+                string? oldLine = i < oldLines.Length ? oldLines[i] : null;
+                string? newLine = i < newLines.Length ? newLines[i] : null;
+
+                if (oldLine == newLine)
+                {
+                    builder.Append(' ');
+                    builder.AppendLine(oldLine ?? string.Empty);
+                    continue;
+                }
+
+                if (oldLine != null)
+                {
+                    builder.Append('-');
+                    builder.AppendLine(oldLine);
+                }
+
+                if (newLine != null)
+                {
+                    builder.Append('+');
+                    builder.AppendLine(newLine);
+                }
+            }
+
+            return TruncateDiff(builder.ToString());
+        }
+
+        private static string TruncateDiff(string diff)
+        {
+            const int maxChars = 60_000;
+            return diff.Length <= maxChars
+                ? diff
+                : diff.Substring(0, maxChars) + Environment.NewLine + "[diff truncated]";
         }
 
         private async Task InsertOutputAsync()

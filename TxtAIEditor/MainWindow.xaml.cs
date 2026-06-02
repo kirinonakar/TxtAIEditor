@@ -403,7 +403,8 @@ namespace TxtAIEditor
                 InsertTextIntoActiveEditorAsync,
                 ShowErrorMessage,
                 GetLocalizedString,
-                new AgentFileToolService(GetAgentWorkspaceRoot));
+                new AgentFileToolService(GetAgentWorkspaceRoot),
+                OnAgentFileModifiedAsync);
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,
@@ -2174,6 +2175,18 @@ namespace TxtAIEditor
             }
 
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
+
+        private async Task OnAgentFileModifiedAsync(string filePath)
+        {
+            await OnSearchReplaceFileModifiedAsync(filePath);
+
+            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
+            {
+                LoadDirectoryRoot(_currentFolderPath);
+            }
+
+            QueueGitStatusRefresh();
         }
 
         #endregion

@@ -37,6 +37,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- create_file: create a new file under the workspace root. args: {\"path\":\"relative/path.txt\",\"content\":\"...\"}");
             builder.AppendLine("- replace_in_file: exact text replacement under the workspace root. args: {\"path\":\"relative/path.cs\",\"oldText\":\"...\",\"newText\":\"...\"}");
             builder.AppendLine("- overwrite_file: overwrite a workspace file. Use only when the user explicitly requested a full rewrite. args: {\"path\":\"relative/path.cs\",\"content\":\"...\"}");
+            builder.AppendLine("- Always use these exact tool names. For text replacement, use replace_in_file, not replace_text.");
             builder.AppendLine();
             builder.AppendLine("Tool call protocol:");
             builder.AppendLine("- When you need a tool, output exactly one XML tag and nothing else:");
@@ -51,6 +52,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- For multi-step work, present a short checklist and then the result or patch.");
             builder.AppendLine("- Use search tools before reading large files. Read only the line windows you need.");
             builder.AppendLine("- Do not use file-writing tools unless the user asked you to create or modify files.");
+            builder.AppendLine("- File-writing tools show the user a diff confirmation dialog before changes are applied.");
             builder.AppendLine("- Do not fabricate terminal output, file reads, tests, or tool execution. Use tools when evidence matters.");
             builder.AppendLine("- Write the final answer in " + outputLanguage + ".");
             return builder.ToString();

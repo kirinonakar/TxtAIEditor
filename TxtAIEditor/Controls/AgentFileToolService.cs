@@ -10,6 +10,16 @@ using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
 {
+    public sealed class AgentFileEditPreview
+    {
+        public string ActionName { get; init; } = string.Empty;
+        public string RelativePath { get; init; } = string.Empty;
+        public string FullPath { get; init; } = string.Empty;
+        public string OldContent { get; init; } = string.Empty;
+        public string NewContent { get; init; } = string.Empty;
+        public bool IsNewFile { get; init; }
+    }
+
     public sealed class AgentFileToolService
     {
         private static readonly HashSet<string> ExcludedDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
@@ -23,6 +33,9 @@ namespace TxtAIEditor.Controls
         {
             _workspaceRootProvider = workspaceRootProvider;
         }
+
+        public Func<AgentFileEditPreview, Task<bool>>? ConfirmFileEditAsync { get; set; }
+        public Func<string, Task>? FileModifiedAsync { get; set; }
 
         public string WorkspaceRoot => ResolveWorkspaceRoot();
 
@@ -160,7 +173,24 @@ namespace TxtAIEditor.Controls
                 Directory.CreateDirectory(dir);
             }
 
-            await File.WriteAllTextAsync(fullPath, NormalizeNewlines(content));
+            string newContent = NormalizeNewlines(content);
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "create_file",
+                RelativePath = RelativePath(ResolveWorkspaceRoot(), fullPath),
+                FullPath = fullPath,
+                OldContent = string.Empty,
+                NewContent = newContent,
+                IsNewFile = true
+            };
+
+            if (!await ConfirmEditAsync(preview))
+            {
+                return $"create_file cancelled: {path}";
+            }
+
+            await File.WriteAllTextAsync(fullPath, newContent);
+            await NotifyFileModifiedAsync(fullPath);
             return $"created: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
 
@@ -177,29 +207,85 @@ namespace TxtAIEditor.Controls
                 return "replace_in_file failed: oldText is empty.";
             }
 
-            string content = await File.ReadAllTextAsync(fullPath);
-            int index = content.IndexOf(oldText, StringComparison.Ordinal);
+            string content = NormalizeNewlines(await File.ReadAllTextAsync(fullPath));
+            string normalizedOldText = NormalizeNewlines(oldText);
+            string normalizedNewText = NormalizeNewlines(newText);
+            int index = content.IndexOf(normalizedOldText, StringComparison.Ordinal);
             if (index < 0)
             {
                 return "replace_in_file failed: oldText was not found exactly.";
             }
 
-            string updated = content.Remove(index, oldText.Length).Insert(index, newText ?? string.Empty);
+            string updated = content.Remove(index, normalizedOldText.Length).Insert(index, normalizedNewText);
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "replace_in_file",
+                RelativePath = RelativePath(ResolveWorkspaceRoot(), fullPath),
+                FullPath = fullPath,
+                OldContent = content,
+                NewContent = updated
+            };
+
+            if (!await ConfirmEditAsync(preview))
+            {
+                return $"replace_in_file cancelled: {path}";
+            }
+
             await File.WriteAllTextAsync(fullPath, updated);
+            await NotifyFileModifiedAsync(fullPath);
             return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
 
         public async Task<string> OverwriteFileAsync(string path, string content)
         {
             string fullPath = ResolveInsideWorkspace(path);
+            string oldContent = File.Exists(fullPath)
+                ? NormalizeNewlines(await File.ReadAllTextAsync(fullPath))
+                : string.Empty;
+            string newContent = NormalizeNewlines(content);
+
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "overwrite_file",
+                RelativePath = RelativePath(ResolveWorkspaceRoot(), fullPath),
+                FullPath = fullPath,
+                OldContent = oldContent,
+                NewContent = newContent,
+                IsNewFile = !File.Exists(fullPath)
+            };
+
+            if (!await ConfirmEditAsync(preview))
+            {
+                return $"overwrite_file cancelled: {path}";
+            }
+
             string? dir = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrWhiteSpace(dir))
             {
                 Directory.CreateDirectory(dir);
             }
 
-            await File.WriteAllTextAsync(fullPath, NormalizeNewlines(content));
+            await File.WriteAllTextAsync(fullPath, newContent);
+            await NotifyFileModifiedAsync(fullPath);
             return $"overwritten: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
+        }
+
+        private async Task<bool> ConfirmEditAsync(AgentFileEditPreview preview)
+        {
+            if (ConfirmFileEditAsync == null)
+            {
+                return true;
+            }
+
+            return await ConfirmFileEditAsync(preview);
+        }
+
+        private async Task NotifyFileModifiedAsync(string fullPath)
+        {
+            if (FileModifiedAsync != null)
+            {
+                await FileModifiedAsync(fullPath);
+            }
         }
 
         private static async Task<string> RunProcessAsync(string fileName, string arguments, string workingDirectory, int timeoutMs)

@@ -20,6 +20,7 @@ namespace TxtAIEditor.Controls
 
         public TextBox Output => AgentOutputText;
         public TextBox Prompt => AgentPromptInput;
+        public TextBox Activity => AgentActivityText;
         public TextBlock ContextStats => AgentContextStatsText;
         public bool IncludeActiveFile => AgentIncludeActiveFileCheckBox.IsChecked == true;
 
@@ -39,6 +40,11 @@ namespace TxtAIEditor.Controls
             AgentPlanButton.Content = getString("AgentPlanButton", "계획");
             AgentEditButton.Content = getString("AgentEditButton", "수정안");
             AgentInsertOutputButton.Content = getString("LlmInsertOutputButtonText", "입력");
+            AgentActivityHeaderText.Text = getString("AgentActivityHeader", "진행 상황");
+            if (AgentActivityText.Text == "대기 중" || AgentActivityText.Text == "Idle")
+            {
+                AgentActivityText.Text = getString("AgentActivityIdle", "대기 중");
+            }
             ToolTipService.SetToolTip(AgentInsertOutputButton, getString("AgentInsertOutputTooltip", "Agent 응답을 현재 커서에 입력"));
         }
 
@@ -49,6 +55,29 @@ namespace TxtAIEditor.Controls
             AgentEditButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
             AgentIncludeActiveFileCheckBox.IsEnabled = !isBusy;
+        }
+
+        public void ClearActivity(string idleText)
+        {
+            AgentActivityText.Text = idleText;
+        }
+
+        public void AppendActivity(string message)
+        {
+            string timestamp = DateTime.Now.ToString("HH:mm:ss");
+            if (string.IsNullOrWhiteSpace(AgentActivityText.Text) ||
+                AgentActivityText.Text == "대기 중" ||
+                AgentActivityText.Text == "Idle")
+            {
+                AgentActivityText.Text = $"{timestamp}  {message}";
+            }
+            else
+            {
+                AgentActivityText.Text += Environment.NewLine + $"{timestamp}  {message}";
+            }
+
+            AgentActivityText.SelectionStart = AgentActivityText.Text.Length;
+            AgentActivityText.SelectionLength = 0;
         }
 
         private void OnRunClick(object sender, RoutedEventArgs e)
