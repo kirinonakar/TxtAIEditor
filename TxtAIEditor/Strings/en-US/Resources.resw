@@ -1343,6 +1343,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
     <value>[{0}] Preset applied. Enter additional instructions...</value>
   </data>
+  <data name="AgentActivityThinkingStepFormat" xml:space="preserve">
+    <value>Thinking (Step {0}/8)</value>
+  </data>
   <data name="AgentErrorTitle" xml:space="preserve">
     <value>Agent Error</value>
   </data>

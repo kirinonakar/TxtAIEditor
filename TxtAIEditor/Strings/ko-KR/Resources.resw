@@ -1343,6 +1343,9 @@
   <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
     <value>[{0}] 프리셋 적용됨. 추가 지시사항 입력...</value>
   </data>
+  <data name="AgentActivityThinkingStepFormat" xml:space="preserve">
+    <value>생각중 (단계 {0}/8)</value>
+  </data>
   <data name="AgentErrorTitle" xml:space="preserve">
     <value>Agent 오류</value>
   </data>

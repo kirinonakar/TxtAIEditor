@@ -113,20 +113,40 @@ namespace TxtAIEditor.Controls
 
             int start = Math.Max(1, startLine <= 0 ? 1 : startLine);
             int count = Math.Clamp(lineCount <= 0 ? 160 : lineCount, 1, 600);
-            string[] lines = await File.ReadAllLinesAsync(fullPath);
 
-            if (start > lines.Length)
+            var readLines = new List<string>();
+            int currentLine = 0;
+            int endLine = start + count - 1;
+
+            using (var reader = new StreamReader(fullPath, Encoding.UTF8))
             {
-                return $"read_file: startLine {start} is beyond EOF ({lines.Length} lines).";
+                string? line;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    currentLine++;
+                    if (currentLine >= start && currentLine <= endLine)
+                    {
+                        readLines.Add(line);
+                    }
+                    if (currentLine > endLine)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            if (start > currentLine && currentLine > 0)
+            {
+                return $"read_file: startLine {start} is beyond EOF ({currentLine} lines).";
             }
 
             var builder = new StringBuilder();
-            int end = Math.Min(lines.Length, start + count - 1);
-            for (int lineNumber = start; lineNumber <= end; lineNumber++)
+            for (int i = 0; i < readLines.Count; i++)
             {
+                int lineNumber = start + i;
                 builder.Append(lineNumber.ToString().PadLeft(5));
                 builder.Append(" | ");
-                builder.AppendLine(lines[lineNumber - 1]);
+                builder.AppendLine(readLines[i]);
             }
 
             return builder.ToString();

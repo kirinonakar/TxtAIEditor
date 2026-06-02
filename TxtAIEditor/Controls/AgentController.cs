@@ -145,9 +145,13 @@ namespace TxtAIEditor.Controls
                 for (int step = 0; step < 8; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    _agentPane.BeginThinkingActivity(_getString("AgentActivityThinking", "생각중"));
+                    string thinkingLabel = string.Format(
+                        _getString("AgentActivityThinkingStepFormat", "생각중 (단계 {0}/8)"),
+                        step + 1);
+                    _agentPane.BeginThinkingActivity(thinkingLabel);
 
                     var responseBuilder = new StringBuilder();
+                    int printedLength = 0;
                     bool toolCallPlaceholderShown = false;
                     bool visibleTextFlushed = false;
                     response = await _llmService.RunAgentAsync(
@@ -160,7 +164,9 @@ namespace TxtAIEditor.Controls
                             cancellationToken.ThrowIfCancellationRequested();
                             responseBuilder.Append(chunk);
                             string streamedText = responseBuilder.ToString();
-                            if (IsToolCallLike(streamedText))
+
+                            string trimmed = streamedText.TrimStart();
+                            if (trimmed.StartsWith("{", StringComparison.Ordinal))
                             {
                                 if (!toolCallPlaceholderShown)
                                 {
@@ -168,36 +174,74 @@ namespace TxtAIEditor.Controls
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
                                         _agentPane.BeginThinkingActivity(_getString("AgentOutputPreparingTool", "도구 호출 준비 중")));
                                 }
-
                                 return;
                             }
 
-                            if (!visibleTextFlushed && MightBeToolCallPrefix(streamedText))
+                            int toolCallIndex = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                            if (toolCallIndex >= 0)
                             {
+                                if (printedLength < toolCallIndex)
+                                {
+                                    string textToPrint = streamedText.Substring(printedLength, toolCallIndex - printedLength);
+                                    visibleTextFlushed = true;
+                                    _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(textToPrint));
+                                    printedLength = toolCallIndex;
+                                }
+
                                 if (!toolCallPlaceholderShown)
                                 {
                                     toolCallPlaceholderShown = true;
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
                                         _agentPane.BeginThinkingActivity(_getString("AgentOutputPreparingTool", "도구 호출 준비 중")));
                                 }
-
-                                return;
                             }
+                            else
+                            {
+                                int holdBack = 0;
+                                string tag = "<tool_call>";
+                                for (int i = 1; i < tag.Length; i++)
+                                {
+                                    string sub = tag.Substring(0, i);
+                                    if (streamedText.EndsWith(sub, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        holdBack = i;
+                                        break;
+                                    }
+                                }
 
-                            string textToAppend = visibleTextFlushed ? chunk : streamedText;
-                            visibleTextFlushed = true;
-                            _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(textToAppend));
+                                int safeLength = streamedText.Length - holdBack;
+                                if (printedLength < safeLength)
+                                {
+                                    string textToPrint = streamedText.Substring(printedLength, safeLength - printedLength);
+                                    visibleTextFlushed = true;
+                                    _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(textToPrint));
+                                    printedLength = safeLength;
+                                }
+                            }
                             await Task.CompletedTask;
                         },
                         cancellationToken);
 
+                    cancellationToken.ThrowIfCancellationRequested();
+                    response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
+
                     await RunOnUIThreadAsync(() =>
                     {
                         _agentPane.StopThinkingActivity();
+                        if (printedLength < response.Length)
+                        {
+                            int toolCallIndex = response.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                            int endLength = toolCallIndex >= 0 ? toolCallIndex : response.Length;
+                            if (printedLength < endLength)
+                            {
+                                string remainingText = response.Substring(printedLength, endLength - printedLength);
+                                visibleTextFlushed = true;
+                                _agentPane.AppendOutputText(remainingText);
+                            }
+                        }
                     });
 
                     cancellationToken.ThrowIfCancellationRequested();
-                    response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
 
                     if (!TryParseToolCall(response, out string toolName, out JsonElement arguments))
                     {
