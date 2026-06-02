@@ -81,6 +81,9 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
         *   **Dynamic Prompt Merging:** Combines the active preset content with any manual additional instructions typed in the custom text box during transmission.
         *   **CRUD Management:** Directly create new custom presets, edit existing ones via multiline dialog popups (optimized with fixed heights to prevent composition flickering), or delete them directly from the preset list.
 *   **Context Actions:** Quick AI actions (Explain, Refactor, Summarize, Fix) on selected text.
+*   **Agent Mode:** Solve complex, multi-step coding tasks automatically by allowing the AI assistant to run workspace tools (file search, read/write, and terminal command execution).
+    *   **Git Repository Requirement:** Agent mode can only be activated and used inside a directory containing a Git repository (`.git`).
+    *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`) and [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`).
 
 ### 💻 Terminal
 *   **Shell Profiles:** Launch PowerShell, Command Prompt, Git Bash, or WSL sessions directly beneath your editor canvas.
