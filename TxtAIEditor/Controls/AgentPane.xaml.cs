@@ -29,6 +29,11 @@ namespace TxtAIEditor.Controls
         private string _runButtonText = "실행";
         private string _stopButtonText = "중단";
         private const string OutputLineBreak = "\r\n";
+        private DispatcherTimer? _thinkingTimer;
+        private bool _thinkingLineActive;
+        private int _thinkingLineStart;
+        private int _thinkingDotCount;
+        private string _thinkingLinePrefix = string.Empty;
 
         public void Localize(Func<string, string, string> getString)
         {
@@ -99,6 +104,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            CompleteThinkingLine();
             ClearOutputPlaceholder();
             AgentOutputText.Text += text;
             ScrollOutputToEnd();
@@ -106,6 +112,7 @@ namespace TxtAIEditor.Controls
 
         public void AppendOutputLine(string line)
         {
+            CompleteThinkingLine();
             ClearOutputPlaceholder();
             if (!string.IsNullOrEmpty(AgentOutputText.Text) &&
                 !EndsWithLineBreak(AgentOutputText.Text))
@@ -119,6 +126,7 @@ namespace TxtAIEditor.Controls
 
         public void BeginOutputBlock(string title)
         {
+            CompleteThinkingLine();
             ClearOutputPlaceholder();
             if (!string.IsNullOrWhiteSpace(AgentOutputText.Text))
             {
@@ -132,6 +140,34 @@ namespace TxtAIEditor.Controls
 
             AgentOutputText.Text += title + OutputLineBreak;
             ScrollOutputToEnd();
+        }
+
+        public void BeginThinkingActivity(string label)
+        {
+            CompleteThinkingLine();
+            ClearOutputPlaceholder();
+
+            if (!string.IsNullOrEmpty(AgentOutputText.Text) &&
+                !EndsWithLineBreak(AgentOutputText.Text))
+            {
+                AgentOutputText.Text += OutputLineBreak;
+            }
+
+            string timestamp = DateTime.Now.ToString("HH:mm:ss");
+            _thinkingLinePrefix = $"{timestamp}  {label}";
+            _thinkingLineStart = AgentOutputText.Text.Length;
+            _thinkingDotCount = 0;
+            _thinkingLineActive = true;
+            AgentOutputText.Text += _thinkingLinePrefix;
+            ScrollOutputToEnd();
+
+            _thinkingTimer ??= CreateThinkingTimer();
+            _thinkingTimer.Start();
+        }
+
+        public void StopThinkingActivity()
+        {
+            CompleteThinkingLine();
         }
 
         private void ClearOutputPlaceholder()
@@ -149,6 +185,55 @@ namespace TxtAIEditor.Controls
         {
             AgentOutputText.SelectionStart = AgentOutputText.Text.Length;
             AgentOutputText.SelectionLength = 0;
+        }
+
+        private DispatcherTimer CreateThinkingTimer()
+        {
+            var timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(450)
+            };
+            timer.Tick += (_, _) =>
+            {
+                if (!_thinkingLineActive)
+                {
+                    timer.Stop();
+                    return;
+                }
+
+                _thinkingDotCount = (_thinkingDotCount + 1) % 4;
+                ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
+            };
+            return timer;
+        }
+
+        private void CompleteThinkingLine()
+        {
+            if (!_thinkingLineActive)
+            {
+                return;
+            }
+
+            _thinkingTimer?.Stop();
+            ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
+            if (!EndsWithLineBreak(AgentOutputText.Text))
+            {
+                AgentOutputText.Text += OutputLineBreak;
+            }
+
+            _thinkingLineActive = false;
+            ScrollOutputToEnd();
+        }
+
+        private void ReplaceThinkingLine(string text)
+        {
+            if (_thinkingLineStart < 0 || _thinkingLineStart > AgentOutputText.Text.Length)
+            {
+                return;
+            }
+
+            AgentOutputText.Text = AgentOutputText.Text.Substring(0, _thinkingLineStart) + text;
+            ScrollOutputToEnd();
         }
 
         private static bool EndsWithLineBreak(string text)

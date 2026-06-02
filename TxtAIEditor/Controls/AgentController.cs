@@ -131,9 +131,7 @@ namespace TxtAIEditor.Controls
                 for (int step = 0; step < 8; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    AppendActivity(string.Format(
-                        _getString("AgentActivityThinkingFormat", "생각중 ({0}/8)"),
-                        step + 1));
+                    _agentPane.BeginThinkingActivity(_getString("AgentActivityThinking", "생각중"));
 
                     var responseBuilder = new StringBuilder();
                     bool toolCallPlaceholderShown = false;
@@ -178,6 +176,7 @@ namespace TxtAIEditor.Controls
                             await Task.CompletedTask;
                         },
                         cancellationToken);
+                    _agentPane.StopThinkingActivity();
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
 
@@ -439,7 +438,8 @@ namespace TxtAIEditor.Controls
 
             if (!TryExtractToolCallJson(response, out string json))
             {
-                return false;
+                return TryExtractToolCallPayload(response, out string payload) &&
+                       TryParseToolCallLenient(payload, out toolName, out arguments);
             }
 
             try
@@ -537,9 +537,19 @@ namespace TxtAIEditor.Controls
                 return null;
             }
 
-            return TryExtractBalancedJsonObject(text, objectStart, out string objectText)
-                ? objectText
-                : null;
+            if (TryExtractBalancedJsonObject(text, objectStart, out string objectText))
+            {
+                return objectText;
+            }
+
+            string fallback = text.Substring(objectStart);
+            int closingTagIndex = fallback.IndexOf("</tool_call>", StringComparison.OrdinalIgnoreCase);
+            if (closingTagIndex >= 0)
+            {
+                fallback = fallback.Substring(0, closingTagIndex);
+            }
+
+            return fallback;
         }
 
         private static string DecodeLenientJsonString(string value)
@@ -630,6 +640,38 @@ namespace TxtAIEditor.Controls
             }
 
             return TryExtractBalancedJsonObject(text, jsonStart, out json);
+        }
+
+        private static bool TryExtractToolCallPayload(string response, out string payload)
+        {
+            payload = string.Empty;
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return false;
+            }
+
+            string text = response.Trim();
+            int toolCallIndex = text.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+            if (toolCallIndex >= 0)
+            {
+                int payloadStart = toolCallIndex + "<tool_call>".Length;
+                int payloadEnd = text.IndexOf("</tool_call>", payloadStart, StringComparison.OrdinalIgnoreCase);
+                payload = payloadEnd >= 0
+                    ? text.Substring(payloadStart, payloadEnd - payloadStart).Trim()
+                    : text.Substring(payloadStart).Trim();
+            }
+            else
+            {
+                int jsonStart = text.IndexOf('{');
+                if (jsonStart < 0)
+                {
+                    return false;
+                }
+
+                payload = text.Substring(jsonStart).Trim();
+            }
+
+            return payload.StartsWith("{", StringComparison.Ordinal);
         }
 
         private static bool TryExtractBalancedJsonObject(string text, int jsonStart, out string json)
