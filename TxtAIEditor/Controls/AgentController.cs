@@ -145,9 +145,7 @@ namespace TxtAIEditor.Controls
                 for (int step = 0; step < 8; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    string thinkingLabel = string.Format(
-                        _getString("AgentActivityThinkingStepFormat", "생각중 (단계 {0}/8)"),
-                        step + 1);
+                    string thinkingLabel = _getString("AgentActivityThinking", "생각중");
                     _agentPane.BeginThinkingActivity(thinkingLabel);
 
                     var responseBuilder = new StringBuilder();

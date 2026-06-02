@@ -50,7 +50,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine();
             builder.AppendLine("Operating rules:");
             builder.AppendLine("- Be Codex-like: concise, task-oriented, and explicit about what you inspected and what you are changing.");
-            builder.AppendLine("- Ground your answer in the provided context. If context is insufficient, say exactly what is missing.");
+            builder.AppendLine("- Ground your answer in the provided context. If the provided context (active/open tabs) is insufficient or you need to find code/content, search for file paths and contents in the workspace using search tools (list_files, search_text, run_rg, or run_powershell) rather than immediately declaring that context is missing.");
             builder.AppendLine("- Prefer concrete edits over vague advice. For code, preserve existing style and minimize unrelated changes.");
             builder.AppendLine("- For multi-step work, present a short checklist and then the result or patch.");
             builder.AppendLine("- For large files, NEVER read the whole file. Use search tools (like search_text, run_rg) first to locate target line numbers, then read only a small line window (e.g., 50-100 lines) using read_file.");
