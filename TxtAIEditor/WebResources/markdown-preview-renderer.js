@@ -100,6 +100,20 @@ function resolvePreviewResourceUrl(value, options = {}) {
     }
 }
 
+function resolvePreviewSrcset(value, options = {}) {
+    return String(value || '')
+        .split(',')
+        .map(candidate => {
+            const trimmed = candidate.trim();
+            if (!trimmed) return '';
+            const parts = trimmed.split(/\s+/);
+            const url = parts.shift() || '';
+            return [resolvePreviewResourceUrl(url, options), ...parts].join(' ');
+        })
+        .filter(Boolean)
+        .join(', ');
+}
+
 function renderMarkdownImage(alt, target, options) {
     const parsed = parseMarkdownImageTarget(target);
     if (!isSafeMediaUrl(parsed.src)) return escapeHtml(`![${alt}](${target})`);
@@ -125,6 +139,9 @@ function sanitizeHtml(html, options = {}) {
     });
     template.content.querySelectorAll('img[src], video[src], audio[src], source[src], track[src]').forEach(node => {
         node.setAttribute('src', resolvePreviewResourceUrl(node.getAttribute('src'), options));
+    });
+    template.content.querySelectorAll('img[srcset], source[srcset]').forEach(node => {
+        node.setAttribute('srcset', resolvePreviewSrcset(node.getAttribute('srcset'), options));
     });
     template.content.querySelectorAll('video[poster]').forEach(node => {
         node.setAttribute('poster', resolvePreviewResourceUrl(node.getAttribute('poster'), options));

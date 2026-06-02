@@ -19,8 +19,8 @@ namespace TxtAIEditor.Core.Services
             "hangul-autocomplete.js"
         };
 
-        public const string ResourceHostName = "TxtAIEditor.local";
-        public const string DocumentHostName = "TxtAIEditor-doc.local";
+        public const string ResourceHostName = "txtaieditor.local";
+        public const string DocumentHostName = "txtaieditor-doc.local";
 
         public static string WebResourcesPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WebResources");
 
