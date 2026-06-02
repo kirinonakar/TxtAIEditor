@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TxtAIEditor.Controls.MarkdownToolbarControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Border x:Name="ToolbarRoot"
+            Height="32"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+            BorderThickness="0,0,0,1"
+            Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+        <Border.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Light">
+                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#15000000"/>
+                        <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#26000000"/>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent"/>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent"/>
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="Dark">
+                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#15FFFFFF"/>
+                        <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#26FFFFFF"/>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent"/>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent"/>
+                    </ResourceDictionary>
+                </ResourceDictionary.ThemeDictionaries>
+
+                <Style x:Key="MarkdownToolbarButtonStyle" TargetType="Button">
+                    <Setter Property="MinWidth" Value="28"/>
+                    <Setter Property="Width" Value="28"/>
+                    <Setter Property="MinHeight" Value="26"/>
+                    <Setter Property="Height" Value="26"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="1,0,1,0"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    <Setter Property="VerticalAlignment" Value="Center"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                </Style>
+                <Style x:Key="MarkdownToolbarGlyphStyle" TargetType="TextBlock">
+                    <Setter Property="FontSize" Value="12"/>
+                    <Setter Property="LineHeight" Value="14"/>
+                    <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+                    <Setter Property="TextAlignment" Value="Center"/>
+                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                    <Setter Property="VerticalAlignment" Value="Center"/>
+                    <Setter Property="Margin" Value="0"/>
+                </Style>
+            </ResourceDictionary>
+        </Border.Resources>
+
+        <ScrollViewer Height="32"
+                      HorizontalAlignment="Right"
+                      HorizontalScrollBarVisibility="Auto"
+                      HorizontalScrollMode="Auto"
+                      VerticalScrollBarVisibility="Disabled"
+                      VerticalScrollMode="Disabled">
+            <StackPanel Orientation="Horizontal" Height="32" VerticalAlignment="Center" Padding="6,0,6,0">
+                <Button x:Name="MarkdownHeadingButton" Tag="heading" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="제목">
+                    <TextBlock Text="H" FontWeight="SemiBold" Style="{StaticResource MarkdownToolbarGlyphStyle}"/>
+                </Button>
+                <Button x:Name="MarkdownBoldButton" Tag="bold" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="굵게">
+                    <TextBlock Text="B" FontWeight="Bold" Style="{StaticResource MarkdownToolbarGlyphStyle}"/>
+                </Button>
+                <Button x:Name="MarkdownItalicButton" Tag="italic" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="기울임">
+                    <TextBlock Text="I" FontStyle="Italic" Style="{StaticResource MarkdownToolbarGlyphStyle}"/>
+                </Button>
+                <Button x:Name="MarkdownUnderlineButton" Tag="underline" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="밑줄">
+                    <TextBlock Text="U" TextDecorations="Underline" Style="{StaticResource MarkdownToolbarGlyphStyle}"/>
+                </Button>
+                <Button x:Name="MarkdownHighlightButton" Tag="highlight" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="형광펜">
+                    <Border Width="21" Height="16" CornerRadius="2" Background="#FFFFD54F" BorderBrush="#FFE0A800" BorderThickness="1">
+                        <TextBlock Text="HL" Foreground="#FF202020" FontSize="9" LineHeight="12" FontWeight="Bold" Style="{StaticResource MarkdownToolbarGlyphStyle}"/>
+                    </Border>
+                </Button>
+                <Border Width="1" Height="18" Margin="5,0" Background="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+                <Button x:Name="MarkdownUlButton" Tag="ul" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="글머리 목록">
+                    <FontIcon Glyph="&#xE8FD;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownCutLineButton" Tag="cutLine" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="현재 줄 자르기">
+                    <FontIcon Glyph="&#xE8C6;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownQuoteButton" Tag="quote" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="인용문">
+                    <FontIcon Glyph="&#xE90A;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownArrowButton" Tag="arrow" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="화살표">
+                    <FontIcon Glyph="&#xE72A;" FontSize="13"/>
+                </Button>
+                <Border Width="1" Height="18" Margin="5,0" Background="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+                <Button x:Name="MarkdownInlineCodeButton" Tag="inlineCode" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="인라인 코드">
+                    <FontIcon Glyph="&#xE943;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownTaskButton" Tag="task" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="체크리스트">
+                    <FontIcon Glyph="&#xE73A;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownTableButton" Tag="table" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="표">
+                    <FontIcon Glyph="&#xE80A;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownConvertToTableButton" Tag="convertToTable" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="테이블로 바꾸기">
+                    <FontIcon Glyph="&#xE9F9;" FontSize="13"/>
+                </Button>
+                <Border Width="1" Height="18" Margin="5,0" Background="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+                <Button x:Name="MarkdownFontIncreaseButton" Tag="fontIncrease" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="글자 크게">
+                    <TextBlock Text="A+" FontSize="10" LineHeight="12" FontWeight="SemiBold" Style="{StaticResource MarkdownToolbarGlyphStyle}"/>
+                </Button>
+                <Button x:Name="MarkdownFontDecreaseButton" Tag="fontDecrease" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="글자 작게">
+                    <TextBlock Text="A-" FontSize="10" LineHeight="12" FontWeight="SemiBold" Style="{StaticResource MarkdownToolbarGlyphStyle}"/>
+                </Button>
+                <Button x:Name="TextColorButton" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnTextColorButtonClick" ToolTipService.ToolTip="글자색 (우클릭: 색상 선택)" RightTapped="OnTextColorButtonRightTapped">
+                    <FontIcon x:Name="TextColorIcon" Glyph="&#xE8D3;" FontSize="13"/>
+                    <Button.ContextFlyout>
+                        <Flyout x:Name="ColorPickerFlyout" Placement="Bottom">
+                            <Flyout.FlyoutPresenterStyle>
+                                <Style TargetType="FlyoutPresenter">
+                                    <Setter Property="Padding" Value="8"/>
+                                    <Setter Property="MinWidth" Value="360"/>
+                                    <Setter Property="MaxWidth" Value="400"/>
+                                </Style>
+                            </Flyout.FlyoutPresenterStyle>
+                            <StackPanel Spacing="8" Padding="4" HorizontalAlignment="Stretch">
+                                <TextBlock x:Name="TextColorPickerTitle" Text="글자색 선택" FontWeight="SemiBold" FontSize="13"/>
+                                <ColorPicker x:Name="TextColorPicker" IsAlphaEnabled="False" HorizontalAlignment="Stretch" IsMoreButtonVisible="False"/>
+                                <Button x:Name="TextColorApplyButton" Content="적용" Click="OnApplyTextColorClick" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch"/>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.ContextFlyout>
+                </Button>
+                <Button x:Name="MarkdownCharMapButton" Tag="charmap" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="문자표">
+                    <FontIcon Glyph="&#xE8D2;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownEmojiButton" Tag="emoji" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="이모지">
+                    <FontIcon Glyph="&#xE11D;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownCurrentDateButton" Tag="currentDate" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="현재 날짜">
+                    <FontIcon Glyph="&#xE787;" FontSize="13"/>
+                </Button>
+                <Button x:Name="MarkdownLinkButton" Tag="link" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="링크">
+                    <FontIcon Glyph="&#xE71B;" FontSize="13"/>
+                </Button>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>

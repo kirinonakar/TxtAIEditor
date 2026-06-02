@@ -1,0 +1,1341 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="0" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" msdata:Ordinal="2" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppTitle" xml:space="preserve">
+    <value>TxtAIEditor</value>
+  </data>
+  <data name="OpenFile" xml:space="preserve">
+    <value>ファイルを開く</value>
+  </data>
+  <data name="SaveFile" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="SaveAsFile" xml:space="preserve">
+    <value>名前を付けて保存</value>
+  </data>
+  <data name="Compare" xml:space="preserve">
+    <value>比較</value>
+  </data>
+  <data name="Terminal" xml:space="preserve">
+    <value>ターミナル</value>
+  </data>
+  <data name="TopMost" xml:space="preserve">
+    <value>常に手前</value>
+  </data>
+  <data name="StickyNote" xml:space="preserve">
+    <value>付箋</value>
+  </data>
+  <data name="WordWrap" xml:space="preserve">
+    <value>右端で折り返す</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>検索</value>
+  </data>
+  <data name="Markdown" xml:space="preserve">
+    <value>Markdown</value>
+  </data>
+  <data name="CsvTable" xml:space="preserve">
+    <value>CSVテーブル</value>
+  </data>
+  <data name="CsvNameBoxPlaceholder" xml:space="preserve">
+    <value>セル</value>
+  </data>
+  <data name="CsvFormulaPlaceholder" xml:space="preserve">
+    <value>選択したCSVセルの値</value>
+  </data>
+  <data name="Theme" xml:space="preserve">
+    <value>テーマ</value>
+  </data>
+  <data name="Split" xml:space="preserve">
+    <value>分割</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="FolderSelect" xml:space="preserve">
+    <value>フォルダ選択...</value>
+  </data>
+  <data name="NoFolderSelected" xml:space="preserve">
+    <value>フォルダを選択してください。</value>
+  </data>
+  <data name="FavoritesHeader" xml:space="preserve">
+    <value>お気に入りリスト</value>
+  </data>
+  <data name="SnippetsHeader" xml:space="preserve">
+    <value>コードと数式テンプレート</value>
+  </data>
+  <data name="AddSnippet" xml:space="preserve">
+    <value>スニペット追加...</value>
+  </data>
+  <data name="SplitNone" xml:space="preserve">
+    <value>分割なし (単一)</value>
+  </data>
+  <data name="SplitVertical" xml:space="preserve">
+    <value>左右に分割</value>
+  </data>
+  <data name="SplitHorizontal" xml:space="preserve">
+    <value>上下に分割</value>
+  </data>
+  <data name="LanguageChangedTitle" xml:space="preserve">
+    <value>言語の変更</value>
+  </data>
+  <data name="LanguageChangedMessage" xml:space="preserve">
+    <value>言語設定を適用するにはアプリケーションを再起動する必要があります。今すぐ再起動しますか？</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>はい</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>いいえ</value>
+  </data>
+  <data name="Restart" xml:space="preserve">
+    <value>再起動</value>
+  </data>
+  <data name="LanguageDefault" xml:space="preserve">
+    <value>デフォルト (OS設定)</value>
+  </data>
+  <data name="LanguageKorean" xml:space="preserve">
+    <value>韓国語</value>
+  </data>
+  <data name="LanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="LanguageJapanese" xml:space="preserve">
+    <value>日本語</value>
+  </data>
+  <data name="Print" xml:space="preserve">
+    <value>印刷</value>
+  </data>
+  <data name="Explorer" xml:space="preserve">
+    <value>エクスプローラー</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>お気に入り</value>
+  </data>
+  <data name="Git" xml:space="preserve">
+    <value>Git</value>
+  </data>
+  <data name="Snippets" xml:space="preserve">
+    <value>スニペット</value>
+  </data>
+  <data name="RecentFiles" xml:space="preserve">
+    <value>最近のファイル</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>見出し</value>
+  </data>
+  <data name="Bold" xml:space="preserve">
+    <value>太字</value>
+  </data>
+  <data name="Italic" xml:space="preserve">
+    <value>斜体</value>
+  </data>
+  <data name="Underline" xml:space="preserve">
+    <value>下線</value>
+  </data>
+  <data name="Highlight" xml:space="preserve">
+    <value>蛍光ペン</value>
+  </data>
+  <data name="UnorderedList" xml:space="preserve">
+    <value>箇条書き</value>
+  </data>
+  <data name="CutLine" xml:space="preserve">
+    <value>現在の行を切り取り</value>
+  </data>
+  <data name="Quote" xml:space="preserve">
+    <value>引用</value>
+  </data>
+  <data name="Arrow" xml:space="preserve">
+    <value>矢印</value>
+  </data>
+  <data name="InlineCode" xml:space="preserve">
+    <value>インラインコード</value>
+  </data>
+  <data name="Tasklist" xml:space="preserve">
+    <value>チェックリスト</value>
+  </data>
+  <data name="Table" xml:space="preserve">
+    <value>表</value>
+  </data>
+  <data name="ConvertToTable" xml:space="preserve">
+    <value>テーブルに変換</value>
+  </data>
+  <data name="FontIncrease" xml:space="preserve">
+    <value>フォントサイズ拡大</value>
+  </data>
+  <data name="FontDecrease" xml:space="preserve">
+    <value>フォントサイズ縮小</value>
+  </data>
+  <data name="TextColor" xml:space="preserve">
+    <value>文字色 (右クリック: 色選択)</value>
+  </data>
+  <data name="Link" xml:space="preserve">
+    <value>リンク</value>
+  </data>
+  <data name="CharMap" xml:space="preserve">
+    <value>文字の選択</value>
+  </data>
+  <data name="Emoji" xml:space="preserve">
+    <value>絵文字</value>
+  </data>
+  <data name="CurrentDate" xml:space="preserve">
+    <value>現在の日付</value>
+  </data>
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>TxtAIEditor 設定</value>
+  </data>
+  <data name="SettingsSave" xml:space="preserve">
+    <value>適用して保存</value>
+  </data>
+  <data name="SettingsCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="SettingsAppearance" xml:space="preserve">
+    <value>外観</value>
+  </data>
+  <data name="SettingsEditing" xml:space="preserve">
+    <value>編集</value>
+  </data>
+  <data name="SettingsTerminal" xml:space="preserve">
+    <value>ターミナル</value>
+  </data>
+  <data name="SettingsTerminalProfile" xml:space="preserve">
+    <value>ターミナル シェル</value>
+  </data>
+  <data name="SettingsTerminalFontFamily" xml:space="preserve">
+    <value>ターミナル フォント</value>
+  </data>
+  <data name="SettingsTerminalFontSize" xml:space="preserve">
+    <value>ターミナルの文字サイズ</value>
+  </data>
+  <data name="SettingsTerminalProfileInfo" xml:space="preserve">
+    <value>PowerShell は PowerShell 7 (pwsh) がインストールされている場合、自動的に PowerShell 7 を使用します。CMD、Git Bash、WSL も選択できます。新しい設定は次に開くターミナルから適用されます。</value>
+  </data>
+  <data name="SettingsTerminalNotFound" xml:space="preserve">
+    <value>未インストール</value>
+  </data>
+  <data name="SettingsLLM" xml:space="preserve">
+    <value>LLM</value>
+  </data>
+  <data name="SettingsLanguage" xml:space="preserve">
+    <value>アプリケーションの言語</value>
+  </data>
+  <data name="SettingsTheme" xml:space="preserve">
+    <value>アプリとエディタのテーマ</value>
+  </data>
+  <data name="SettingsFontSize" xml:space="preserve">
+    <value>エディタの文字サイズ</value>
+  </data>
+  <data name="SettingsFontFamily" xml:space="preserve">
+    <value>エディタのフォント</value>
+  </data>
+  <data name="SettingsUiFontFamily" xml:space="preserve">
+    <value>UI シェルのフォント</value>
+  </data>
+  <data name="SettingsUseCustomBg" xml:space="preserve">
+    <value>カスタム背景色を使用する</value>
+  </data>
+  <data name="SettingsUseCustomFg" xml:space="preserve">
+    <value>カスタム文字色を使用する</value>
+  </data>
+  <data name="SettingsWordWrap" xml:space="preserve">
+    <value>デフォルトで右端折り返しを有効にする</value>
+  </data>
+  <data name="SettingsBracketPair" xml:space="preserve">
+    <value>ブラケットペアのカラー表示</value>
+  </data>
+  <data name="SettingsAutocompleteEnter" xml:space="preserve">
+    <value>Enterで自動補完</value>
+  </data>
+  <data name="SettingsAutocompleteTab" xml:space="preserve">
+    <value>Tabで自動補完</value>
+  </data>
+  <data name="SettingsAutocomplete" xml:space="preserve">
+    <value>自動補完機能を使用する</value>
+  </data>
+  <data name="SettingsAutoSave" xml:space="preserve">
+    <value>自動保存を使用する</value>
+  </data>
+  <data name="SettingsLivePreview" xml:space="preserve">
+    <value>デフォルトでライブプレビューを有効にする</value>
+  </data>
+  <data name="SettingsMarkdownToolbar" xml:space="preserve">
+    <value>デフォルトでMarkdownツールバーを表示する</value>
+  </data>
+  <data name="SettingsToolbar" xml:space="preserve">
+    <value>ツールバー</value>
+  </data>
+  <data name="SettingsToolbarShowLabels" xml:space="preserve">
+    <value>ツールバーボタンのラベルを表示</value>
+  </data>
+  <data name="SettingsToolbarOrderHint" xml:space="preserve">
+    <value>ドラッグしてボタンの順序を変更（設定ボタンは固定）</value>
+  </data>
+  <data name="SettingsTabSize" xml:space="preserve">
+    <value>タブサイズ</value>
+  </data>
+  <data name="SettingsLlmProvider" xml:space="preserve">
+    <value>LLM プロバイダー</value>
+  </data>
+  <data name="SettingsLlmEndpoint" xml:space="preserve">
+    <value>LLM API エンドポイント</value>
+  </data>
+  <data name="SettingsLlmModel" xml:space="preserve">
+    <value>LLM モデル名</value>
+  </data>
+  <data name="SettingsLlmApiKey" xml:space="preserve">
+    <value>LLM API キー</value>
+  </data>
+  <data name="SettingsLlmLoadModels" xml:space="preserve">
+    <value>LM Studioモデルを取得</value>
+  </data>
+  <data name="SettingsLlmInfo" xml:space="preserve">
+    <value>LM Studioは、サーバーが起動しているときに http://localhost:1234/v1/models からモデルリストを取得します。</value>
+  </data>
+  <data name="SettingsLlmSelectModel" xml:space="preserve">
+    <value>モデル選択</value>
+  </data>
+  <data name="SettingsLlmApiKeyPlaceholder" xml:space="preserve">
+    <value>APIキーを入力（空欄にすると保存されたキーを削除）</value>
+  </data>
+  <data name="SettingsLlmEndpointPlaceholder" xml:space="preserve">
+    <value>例: http://localhost:1234/v1</value>
+  </data>
+  <data name="SettingsLlmLoadModelsNotSupported" xml:space="preserve">
+    <value>このプロバイダーはモデルの読み込みをサポートしていません。</value>
+  </data>
+  <data name="SettingsLlmLoadingModelsFormat" xml:space="preserve">
+    <value>{0} のモデルリストを読み込んでいます...</value>
+  </data>
+  <data name="SettingsLlmModelsLoadedFormat" xml:space="preserve">
+    <value>{0} 個のモデルを読み込みました。</value>
+  </data>
+  <data name="SettingsLlmNoModelsFoundFormat" xml:space="preserve">
+    <value>{0} で利用可能なモデルが見つかりませんでした。</value>
+  </data>
+  <data name="SettingsLlmLoadModelsFailedFormat" xml:space="preserve">
+    <value>{0} のモデルリストを読み込めませんでした: {1}</value>
+  </data>
+  <data name="SettingsLlmLoadOpenRouterModels" xml:space="preserve">
+    <value>OpenRouterモデルを取得</value>
+  </data>
+  <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
+    <value>OpenRouterは https://openrouter.ai/api/v1/models からモデルリストを取得します。</value>
+  </data>
+  <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
+    <value>APIキーは設定ファイルではなく、Windowsの資格情報マネージャーに保存されます。</value>
+  </data>
+  <data name="SettingsLlmConfirmBeforeSending" xml:space="preserve">
+    <value>送信前に確認</value>
+  </data>
+  <data name="SettingsLlmSourceLanguage" xml:space="preserve">
+    <value>翻訳元言語 (Source Language)</value>
+  </data>
+  <data name="SettingsLlmTargetLanguage" xml:space="preserve">
+    <value>翻訳先言語 (Target Language)</value>
+  </data>
+  <data name="LlmLangAutoDetect" xml:space="preserve">
+    <value>自動検出 (Auto Detect)</value>
+  </data>
+  <data name="LlmLangKorean" xml:space="preserve">
+    <value>韓国語 (Korean)</value>
+  </data>
+  <data name="LlmLangEnglish" xml:space="preserve">
+    <value>英語 (English)</value>
+  </data>
+  <data name="LlmLangJapanese" xml:space="preserve">
+    <value>日本語 (Japanese)</value>
+  </data>
+  <data name="LlmLangChinese" xml:space="preserve">
+    <value>中国語 (Chinese)</value>
+  </data>
+  <data name="LlmLangFrench" xml:space="preserve">
+    <value>フランス語 (French)</value>
+  </data>
+  <data name="LlmLangSpanish" xml:space="preserve">
+    <value>スペイン語 (Spanish)</value>
+  </data>
+  <data name="LlmLangGerman" xml:space="preserve">
+    <value>ドイツ語 (German)</value>
+  </data>
+  <data name="SelectionNoneBlocked" xml:space="preserve">
+    <value>選択範囲: なし (ファイル全体の場合はファイル追加を使用)</value>
+  </data>
+  <data name="SelectionStats" xml:space="preserve">
+    <value>選択範囲: {0} 文字 (約 {1} トークン)</value>
+  </data>
+  <data name="SearchHeader" xml:space="preserve">
+    <value>フォルダ内検索と置換</value>
+  </data>
+  <data name="SearchPlaceholder" xml:space="preserve">
+    <value>検索語を入力...</value>
+  </data>
+  <data name="ReplacePlaceholder" xml:space="preserve">
+    <value>置換する文字列を入力...</value>
+  </data>
+  <data name="SearchMatchCaseTooltip" xml:space="preserve">
+    <value>大文字小文字を区別</value>
+  </data>
+  <data name="SearchWholeWordTooltip" xml:space="preserve">
+    <value>単語単位</value>
+  </data>
+  <data name="SearchRegexTooltip" xml:space="preserve">
+    <value>正規表現</value>
+  </data>
+  <data name="SearchAllFiles" xml:space="preserve">
+    <value>すべて検索</value>
+  </data>
+  <data name="ReplaceAllFiles" xml:space="preserve">
+    <value>すべて置換</value>
+  </data>
+  <data name="RecentFilesHeader" xml:space="preserve">
+    <value>最近のファイル (ダブルクリックで開く)</value>
+  </data>
+  <data name="GitRepoHeader" xml:space="preserve">
+    <value>Git リポジトリ</value>
+  </data>
+  <data name="GitBranchPlaceholder" xml:space="preserve">
+    <value>ブランチ一覧</value>
+  </data>
+  <data name="GitCommitPlaceholder" xml:space="preserve">
+    <value>コミットメッセージを入力...</value>
+  </data>
+  <data name="GitCommit" xml:space="preserve">
+    <value>コミット</value>
+  </data>
+  <data name="GitStageAll" xml:space="preserve">
+    <value>すべてステージ</value>
+  </data>
+  <data name="GitRestoreAll" xml:space="preserve">
+    <value>すべて復元</value>
+  </data>
+  <data name="GitPush" xml:space="preserve">
+    <value>Push</value>
+  </data>
+  <data name="GitRefresh" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="GitHistory" xml:space="preserve">
+    <value>履歴</value>
+  </data>
+  <data name="GitRestoreFile" xml:space="preserve">
+    <value>ファイル復元</value>
+  </data>
+  <data name="ExplorerUpTooltip" xml:space="preserve">
+    <value>親フォルダ</value>
+  </data>
+  <data name="ExplorerSelectFolder" xml:space="preserve">
+    <value>フォルダ選択...</value>
+  </data>
+  <data name="ExplorerOpenTerminalTooltip" xml:space="preserve">
+    <value>このフォルダでターミナルを開く</value>
+  </data>
+  <data name="ExplorerAddToFavorites" xml:space="preserve">
+    <value>お気に入りに追加</value>
+  </data>
+  <data name="ExplorerAddFolderToFavorites" xml:space="preserve">
+    <value>フォルダをお気に入りに追加</value>
+  </data>
+  <data name="FavoritesFileTab" xml:space="preserve">
+    <value>ファイル</value>
+  </data>
+  <data name="FavoritesFolderTab" xml:space="preserve">
+    <value>フォルダ</value>
+  </data>
+  <data name="FavoritesPinTooltip" xml:space="preserve">
+    <value>固定</value>
+  </data>
+  <data name="GitNotDetected" xml:space="preserve">
+    <value>Git: 検出されていません</value>
+  </data>
+  <data name="TerminalTitle" xml:space="preserve">
+    <value>ターミナル</value>
+  </data>
+  <data name="NewTerminal" xml:space="preserve">
+    <value>新規ターミナル</value>
+  </data>
+  <data name="CloseTerminal" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
+  <data name="TerminalPrompt" xml:space="preserve">
+    <value>コマンドを入力してEnter</value>
+  </data>
+  <data name="SettingsToolbarCustomize" xml:space="preserve">
+    <value>ボタン表示設定</value>
+  </data>
+  <data name="SettingsToolbarButtonVisibility" xml:space="preserve">
+    <value>ツールバーボタンの表示/非表示</value>
+  </data>
+  <data name="SettingsToolbarDragHint" xml:space="preserve">
+    <value>ドラッグして順序変更 (設定ボタンは固定)</value>
+  </data>
+  <data name="SettingsToolbarSettingsPinned" xml:space="preserve">
+    <value>設定ボタンは常に表示されます。</value>
+  </data>
+  <data name="SettingsToolbarCustomization" xml:space="preserve">
+    <value>ツールバー</value>
+  </data>
+  <data name="SettingsToolbarReset" xml:space="preserve">
+    <value>ツールバーの初期化</value>
+  </data>
+
+  <data name="StatusRightPanelTooltip" xml:space="preserve">
+    <value>右パネル</value>
+  </data>
+  <data name="StatusColumnLabel" xml:space="preserve">
+    <value>列</value>
+  </data>
+  <data name="StatusLeftPanelTooltip" xml:space="preserve">
+    <value>左パネル</value>
+  </data>
+  <data name="StatusLineEndingTooltip" xml:space="preserve">
+    <value>クリックして改行コードを変更</value>
+  </data>
+  <data name="StatusGoToLineTooltip" xml:space="preserve">
+    <value>クリックして行へ移動</value>
+  </data>
+  <data name="StatusFileSizeFormat" xml:space="preserve">
+    <value>サイズ: {0:N0} bytes</value>
+  </data>
+  <data name="StatusLineLabel" xml:space="preserve">
+    <value>行</value>
+  </data>
+  <data name="StatusEncodingTooltip" xml:space="preserve">
+    <value>ファイルエンコーディングを選択</value>
+  </data>
+  <data name="LivePreviewTabHeader" xml:space="preserve">
+    <value>リアルタイムプレビュー</value>
+  </data>
+  <data name="AiAssistantTabHeader" xml:space="preserve">
+    <value>AI アシスタント</value>
+  </data>
+  <data name="ComboItemMarkdown" xml:space="preserve">
+    <value>Markdown</value>
+  </data>
+  <data name="ComboItemHtml" xml:space="preserve">
+    <value>HTMLプレビュー</value>
+  </data>
+  <data name="ComboItemLatex" xml:space="preserve">
+    <value>LaTeX Block</value>
+  </data>
+  <data name="ComboItemAozora" xml:space="preserve">
+    <value>Aozora</value>
+  </data>
+  <data name="ComboItemCsv" xml:space="preserve">
+    <value>CSV Table</value>
+  </data>
+  <data name="OpenInBrowserButtonText" xml:space="preserve">
+    <value>ブラウザ</value>
+  </data>
+  <data name="OpenInBrowserTooltip" xml:space="preserve">
+    <value>HTMLプレビューをブラウザで開く</value>
+  </data>
+  <data name="LlmOutputPlaceholder" xml:space="preserve">
+    <value>待機中... エディタで範囲を選択し、下部のAI分析ツールを使用してください。</value>
+  </data>
+  <data name="SelectionStatsPlaceholder" xml:space="preserve">
+    <value>選択範囲: なし (ファイル全体の場合はファイル追加を使用)</value>
+  </data>
+  <data name="LlmFileContextPlaceholder" xml:space="preserve">
+    <value>ファイルのコンテキストなし</value>
+  </data>
+  <data name="LlmAddFileContextButtonText" xml:space="preserve">
+    <value>ファイル追加</value>
+  </data>
+  <data name="LlmRemoveFileContextButtonText" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="LlmExplainButtonText" xml:space="preserve">
+    <value>解説</value>
+  </data>
+  <data name="LlmSummarizeButtonText" xml:space="preserve">
+    <value>要約</value>
+  </data>
+  <data name="LlmTranslateButtonText" xml:space="preserve">
+    <value>翻訳</value>
+  </data>
+  <data name="LlmImproveButtonText" xml:space="preserve">
+    <value>改善</value>
+  </data>
+  <data name="LlmCustomPromptPlaceholder" xml:space="preserve">
+    <value>質問やカスタム指示を入力...</value>
+  </data>
+  <data name="LlmCustomRunButtonText" xml:space="preserve">
+    <value>送信</value>
+  </data>
+  <data name="LlmInsertOutputButtonText" xml:space="preserve">
+    <value>入力</value>
+  </data>
+  <data name="LlmInsertOutputTooltip" xml:space="preserve">
+    <value>AIの応答を現在のカーソルに入力 (選択された場合は選択部分のみ)</value>
+  </data>
+  <data name="LlmErrorTitle" xml:space="preserve">
+    <value>AI エラー</value>
+  </data>
+  <data name="LlmNoSelectionExplain" xml:space="preserve">
+    <value>選択されたテキストがありません。エディタで分析する範囲を選択してから実行してください。</value>
+  </data>
+  <data name="LlmNoSelectionSummarize" xml:space="preserve">
+    <value>選択されたテキストがありません。要約する範囲を選択してください。</value>
+  </data>
+  <data name="LlmNoSelectionTranslate" xml:space="preserve">
+    <value>選択されたテキストがありません。翻訳する範囲を選択してください。</value>
+  </data>
+  <data name="LlmNoSelectionImprove" xml:space="preserve">
+    <value>選択されたテキストがありません。改善する範囲を選択してください。</value>
+  </data>
+  <data name="LlmNoSelectionCustom" xml:space="preserve">
+    <value>選択範囲またはファイルコンテキストがありません。テキストを選択するか、ファイルコンテキストを追加してください。</value>
+  </data>
+  <data name="LlmEmptyCustomPrompt" xml:space="preserve">
+    <value>カスタム指示の入力欄が空です。</value>
+  </data>
+  <data name="LlmFileContextTitle" xml:space="preserve">
+    <value>AI ファイルコンテキスト</value>
+  </data>
+  <data name="LlmNoActiveTabForFileContext" xml:space="preserve">
+    <value>ファイルコンテキストとして追加するアクティブなタブがありません。</value>
+  </data>
+  <data name="LlmInsertTitle" xml:space="preserve">
+    <value>AI 応答入力</value>
+  </data>
+  <data name="LlmNoOutputToInsert" xml:space="preserve">
+    <value>入力するAIの応答がありません。</value>
+  </data>
+  <data name="LlmActionExplain" xml:space="preserve">
+    <value>解説</value>
+  </data>
+  <data name="LlmActionSummarize" xml:space="preserve">
+    <value>要約</value>
+  </data>
+  <data name="LlmActionTranslate" xml:space="preserve">
+    <value>翻訳</value>
+  </data>
+  <data name="LlmActionImprove" xml:space="preserve">
+    <value>改善</value>
+  </data>
+  <data name="LlmActionCustom" xml:space="preserve">
+    <value>カスタム送信</value>
+  </data>
+  <data name="LlmPreflightTitle" xml:space="preserve">
+    <value>AI送信前の確認 (Pre-flight Check)</value>
+  </data>
+  <data name="LlmPreflightContentFormat" xml:space="preserve">
+    <value>アクション: {0}
+
+送信先AIプロバイダー: {1} ({2})
+送信テキストサイズ: {3:N0} 文字 (約 {4:N0} トークン消費)
+
+[送信内容のプレビュー]
+{5}
+
+セキュリティ上の問題や意図しないトークンの大量消費がないか確認してから送信してください。</value>
+  </data>
+  <data name="LlmPreflightApprove" xml:space="preserve">
+    <value>API送信を承認</value>
+  </data>
+  <data name="LlmPreflightCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="LlmRunningMessage" xml:space="preserve">
+    <value>AI分析および応答の生成が非同期で実行されています。しばらくお待ちください...</value>
+  </data>
+  <data name="LlmExceptionFormat" xml:space="preserve">
+    <value>AIの実行中に例外が発生しました: {0}</value>
+  </data>
+  <data name="LlmInstructionDefaultName" xml:space="preserve">
+    <value>指示</value>
+  </data>
+  <data name="LlmAddInstructionTooltip" xml:space="preserve">
+    <value>新しいカスタム指示を追加</value>
+  </data>
+  <data name="MoveTabLeftTooltip" xml:space="preserve">
+    <value>左のタブへ移動 (Ctrl/Shiftキーを押しながらクリックでタブ位置を変更)</value>
+  </data>
+  <data name="MoveTabRightTooltip" xml:space="preserve">
+    <value>右のタブへ移動 (Ctrl/Shiftキーを押しながらクリックでタブ位置を変更)</value>
+  </data>
+  <data name="SettingsAbout" xml:space="preserve">
+    <value>情報</value>
+  </data>
+  <data name="SettingsAboutDescription" xml:space="preserve">
+    <value>強力で軽量なテキスト＆Markdownエディタです。
+リアルタイムプレビュー、コードと数式のテンプレート、ターミナル、Git、AIアシスタントなどの機能を備えています。</value>
+  </data>
+  <data name="SettingsAboutProjectGitHub" xml:space="preserve">
+    <value>Project GitHub</value>
+  </data>
+  <data name="SettingsAboutThirdPartyNotices" xml:space="preserve">
+    <value>オープンソース ライセンス通知 (Third-Party Notices)</value>
+  </data>
+  <data name="SettingsPreviewFontFamily" xml:space="preserve">
+    <value>プレビューフォント</value>
+  </data>
+  <data name="SettingsPreviewUseCustomBg" xml:space="preserve">
+    <value>カスタムプレビュー背景色を使用</value>
+  </data>
+  <data name="SettingsPreviewUseCustomFg" xml:space="preserve">
+    <value>カスタムプレビュー文字色を使用</value>
+  </data>
+  <data name="SettingsPreviewFontSize" xml:space="preserve">
+    <value>プレビューフォントサイズ</value>
+  </data>
+  <data name="SettingsShortcuts" xml:space="preserve">
+    <value>ショートカット</value>
+  </data>
+  <data name="SettingsShortcutsHeaderKey" xml:space="preserve">
+    <value>ショートカット</value>
+  </data>
+  <data name="SettingsShortcutsHeaderDesc" xml:space="preserve">
+    <value>説明</value>
+  </data>
+  <data name="ShortcutDescNewTab" xml:space="preserve">
+    <value>新規タブ</value>
+  </data>
+  <data name="ShortcutDescSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="ShortcutDescOpen" xml:space="preserve">
+    <value>ファイルを開く</value>
+  </data>
+  <data name="ShortcutDescFind" xml:space="preserve">
+    <value>検索</value>
+  </data>
+  <data name="ShortcutDescClose" xml:space="preserve">
+    <value>タブを閉じる</value>
+  </data>
+  <data name="ShortcutDescPrint" xml:space="preserve">
+    <value>印刷</value>
+  </data>
+  <data name="ShortcutDescLeftPanel" xml:space="preserve">
+    <value>左パネル切り替え</value>
+  </data>
+  <data name="ShortcutDescRightPanel" xml:space="preserve">
+    <value>右パネル切り替え</value>
+  </data>
+  <data name="ShortcutDescTerminal" xml:space="preserve">
+    <value>ターミナル切り替え</value>
+  </data>
+  <data name="ShortcutDescUndo" xml:space="preserve">
+    <value>元に戻す</value>
+  </data>
+  <data name="ShortcutDescRedo" xml:space="preserve">
+    <value>やり直し</value>
+  </data>
+  <data name="ShortcutDescCopy" xml:space="preserve">
+    <value>コピー</value>
+  </data>
+  <data name="ShortcutDescPaste" xml:space="preserve">
+    <value>貼り付け</value>
+  </data>
+  <data name="ShortcutDescCut" xml:space="preserve">
+    <value>切り取り</value>
+  </data>
+  <data name="ShortcutDescAiPrompt" xml:space="preserve">
+    <value>AIプロンプト送信</value>
+  </data>
+  <data name="ShortcutDescSaveAs" xml:space="preserve">
+    <value>名前を付けて保存</value>
+  </data>
+  <data name="ShortcutDescTopMost" xml:space="preserve">
+    <value>最前面表示</value>
+  </data>
+  <data name="ShortcutDescTheme" xml:space="preserve">
+    <value>テーマ切り替え</value>
+  </data>
+  <data name="ShortcutDescStickyNote" xml:space="preserve">
+    <value>付箋</value>
+  </data>
+  <data name="EditorFindPlaceholder" xml:space="preserve">
+    <value>検索</value>
+  </data>
+  <data name="EditorReplacePlaceholder" xml:space="preserve">
+    <value>置換</value>
+  </data>
+  <data name="EditorReplaceButton" xml:space="preserve">
+    <value>置換</value>
+  </data>
+  <data name="EditorReplaceAllButton" xml:space="preserve">
+    <value>すべて置換</value>
+  </data>
+  <data name="EditorFindPrevTooltip" xml:space="preserve">
+    <value>前へ</value>
+  </data>
+  <data name="EditorFindNextTooltip" xml:space="preserve">
+    <value>次へ</value>
+  </data>
+  <data name="EditorFindCloseTooltip" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
+  <data name="StatusTotalLinesFormat" xml:space="preserve">
+    <value>総行数: {0}</value>
+  </data>
+  <data name="StatusSelectionStatsFormat" xml:space="preserve">
+    <value>選択済: {0}文字 / {1}単語 / {2}行</value>
+  </data>
+  <data name="UnsavedChangesAppCloseTitle" xml:space="preserve">
+    <value>保存されていない変更</value>
+  </data>
+  <data name="UnsavedChangesAppCloseMessage" xml:space="preserve">
+    <value>保存されていないタブが {0} 個あります。終了する前に保存しますか？</value>
+  </data>
+  <data name="UnsavedChangesAppCloseDiscard" xml:space="preserve">
+    <value>保存せずに終了</value>
+  </data>
+  <data name="UnsavedChangesAppCloseSave" xml:space="preserve">
+    <value>保存して終了</value>
+  </data>
+  <data name="UnsavedChangesTabCloseTitle" xml:space="preserve">
+    <value>変更の保存</value>
+  </data>
+  <data name="UnsavedChangesTabCloseMessage" xml:space="preserve">
+    <value>ファイル '{0}' の変更は保存されていません。閉じますか？</value>
+  </data>
+  <data name="UnsavedChangesTabCloseDiscard" xml:space="preserve">
+    <value>保存せずに閉じる</value>
+  </data>
+  <data name="UnsavedChangesTabCloseSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="UnsavedChangesCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="GitHistoryItemDialogTitle" xml:space="preserve">
+    <value>コミット情報 [{0}]</value>
+  </data>
+  <data name="GitHistoryItemClose" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
+  <data name="GitHistoryItemDialogHeader" xml:space="preserve">
+    <value>変更されたファイルの一覧 (ダブルクリックで比較ビューを開く):</value>
+  </data>
+  <data name="GitCommitSuccessTitle" xml:space="preserve">
+    <value>Git コミット</value>
+  </data>
+  <data name="GitCommitSuccessMessage" xml:space="preserve">
+    <value>正常にコミットが完了しました！</value>
+  </data>
+  <data name="UntitledNewTab" xml:space="preserve">
+    <value>無題</value>
+  </data>
+  <data name="GoToLinePlaceholder" xml:space="preserve">
+    <value>移動する行番号を入力...</value>
+  </data>
+  <data name="GoToLineTitle" xml:space="preserve">
+    <value>行へ移動</value>
+  </data>
+  <data name="GoToLineButton" xml:space="preserve">
+    <value>移動</value>
+  </data>
+  <data name="GoToLineCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="SnippetInsertErrorTitle" xml:space="preserve">
+    <value>スニペット挿入エラー</value>
+  </data>
+  <data name="SnippetInsertErrorMessage" xml:space="preserve">
+    <value>アクティブなテキストエディタウィンドウが見つかりません。</value>
+  </data>
+  <data name="SnippetAddTitle" xml:space="preserve">
+    <value>新しいコード/数式スニペットの追加</value>
+  </data>
+  <data name="SnippetAddButton" xml:space="preserve">
+    <value>追加</value>
+  </data>
+  <data name="SnippetEditTitle" xml:space="preserve">
+    <value>スニペットの編集</value>
+  </data>
+  <data name="SnippetEditSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="SnippetPlaceholderName" xml:space="preserve">
+    <value>スニペット名 (例: C# Loop)</value>
+  </data>
+  <data name="SnippetPlaceholderKeyword" xml:space="preserve">
+    <value>キーワード (例: loop)</value>
+  </data>
+  <data name="SnippetPlaceholderDesc" xml:space="preserve">
+    <value>簡単な説明</value>
+  </data>
+  <data name="SnippetPlaceholderContent" xml:space="preserve">
+    <value>コード本文を入力...</value>
+  </data>
+  <data name="SnippetLabelName" xml:space="preserve">
+    <value>スニペット名</value>
+  </data>
+  <data name="SnippetLabelKeyword" xml:space="preserve">
+    <value>自動補完キーワード</value>
+  </data>
+  <data name="SnippetLabelDesc" xml:space="preserve">
+    <value>説明</value>
+  </data>
+  <data name="SnippetLabelContent" xml:space="preserve">
+    <value>テンプレート内容</value>
+  </data>
+  <data name="SnippetCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="CompareSelectFromTab" xml:space="preserve">
+    <value>タブから選択...</value>
+  </data>
+  <data name="CompareTabPrefix" xml:space="preserve">
+    <value>タブ</value>
+  </data>
+  <data name="CompareOriginalPathPlaceholder" xml:space="preserve">
+    <value>元のファイルのパス...</value>
+  </data>
+  <data name="CompareBrowse" xml:space="preserve">
+    <value>参照...</value>
+  </data>
+  <data name="CompareModifiedPathPlaceholder" xml:space="preserve">
+    <value>比較対象ファイルのパス...</value>
+  </data>
+  <data name="CompareOriginalFileLabel" xml:space="preserve">
+    <value>元のファイル (Original File)</value>
+  </data>
+  <data name="CompareModifiedFileLabel" xml:space="preserve">
+    <value>比較対象ファイル (Modified File)</value>
+  </data>
+  <data name="CompareDialogTitle" xml:space="preserve">
+    <value>ファイル比較 (File Compare)</value>
+  </data>
+  <data name="CompareDialogCompareButton" xml:space="preserve">
+    <value>比較する</value>
+  </data>
+  <data name="CompareDialogCancelButton" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="TextColorPickerTitle" xml:space="preserve">
+    <value>文字色の選択</value>
+  </data>
+  <data name="TextColorApplyButton" xml:space="preserve">
+    <value>適用</value>
+  </data>
+  <data name="TabMenuCopyFileName" xml:space="preserve">
+    <value>ファイル名をコピー</value>
+  </data>
+  <data name="TabMenuCopyFilePath" xml:space="preserve">
+    <value>パスをコピー</value>
+  </data>
+  <data name="TabMenuReload" xml:space="preserve">
+    <value>再読み込み</value>
+  </data>
+  <data name="TabMenuEncrypt" xml:space="preserve">
+    <value>暗号化</value>
+  </data>
+  <data name="TabMenuChangeEncryptionPassword" xml:space="preserve">
+    <value>パスワードを変更</value>
+  </data>
+  <data name="TabMenuRemoveEncryption" xml:space="preserve">
+    <value>パスワードを解除</value>
+  </data>
+  <data name="EncryptedTabTooltip" xml:space="preserve">
+    <value>暗号化済み</value>
+  </data>
+  <data name="EncryptionPasswordDialogTitle" xml:space="preserve">
+    <value>パスワード入力</value>
+  </data>
+  <data name="EncryptionSetPasswordTitle" xml:space="preserve">
+    <value>暗号化</value>
+  </data>
+  <data name="EncryptionChangePasswordTitle" xml:space="preserve">
+    <value>パスワードを変更</value>
+  </data>
+  <data name="EncryptionRemoveTitle" xml:space="preserve">
+    <value>パスワードを解除</value>
+  </data>
+  <data name="EncryptionPasswordLabel" xml:space="preserve">
+    <value>パスワード</value>
+  </data>
+  <data name="EncryptionConfirmPasswordLabel" xml:space="preserve">
+    <value>パスワード確認</value>
+  </data>
+  <data name="EncryptionCurrentPasswordLabel" xml:space="preserve">
+    <value>現在のパスワード</value>
+  </data>
+  <data name="EncryptionOpenButton" xml:space="preserve">
+    <value>開く</value>
+  </data>
+  <data name="EncryptionApplyButton" xml:space="preserve">
+    <value>適用</value>
+  </data>
+  <data name="EncryptionCancelButton" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="EncryptionPasswordEmpty" xml:space="preserve">
+    <value>パスワードを入力してください。</value>
+  </data>
+  <data name="EncryptionPasswordMismatch" xml:space="preserve">
+    <value>入力したパスワードが一致しません。</value>
+  </data>
+  <data name="EncryptionCurrentPasswordMismatch" xml:space="preserve">
+    <value>現在のパスワードが正しくありません。</value>
+  </data>
+  <data name="EncryptionDialogNotReady" xml:space="preserve">
+    <value>パスワード入力画面を準備できません。しばらくしてからもう一度お試しください。</value>
+  </data>
+  <data name="TabMenuLivePreview" xml:space="preserve">
+    <value>ライブプレビュー</value>
+  </data>
+  <data name="TabMenuAddToFavorites" xml:space="preserve">
+    <value>お気に入りに追加</value>
+  </data>
+  <data name="TabMenuOpenFolder" xml:space="preserve">
+    <value>このフォルダを開く</value>
+  </data>
+  <data name="TabMenuCloseRight" xml:space="preserve">
+    <value>右側のタブを閉じる</value>
+  </data>
+  <data name="TabMenuCloseLeft" xml:space="preserve">
+    <value>左側のタブを閉じる</value>
+  </data>
+  <data name="TabMenuCloseOthers" xml:space="preserve">
+    <value>他のタブを閉じる</value>
+  </data>
+  <data name="EditorContextMenuCut" xml:space="preserve">
+    <value>切り取り</value>
+  </data>
+  <data name="EditorContextMenuCopy" xml:space="preserve">
+    <value>コピー</value>
+  </data>
+  <data name="EditorContextMenuPaste" xml:space="preserve">
+    <value>貼り付け</value>
+  </data>
+  <data name="EditorContextMenuDelete" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="EditorContextMenuSelectAll" xml:space="preserve">
+    <value>すべて選択</value>
+  </data>
+  <data name="EditorContextMenuToggleComment" xml:space="preserve">
+    <value>コメントの切り替え</value>
+  </data>
+  <data name="EditorContextMenuIndent" xml:space="preserve">
+    <value>インデント</value>
+  </data>
+  <data name="EditorContextMenuOutdent" xml:space="preserve">
+    <value>アウトデント</value>
+  </data>
+  <data name="EditorContextMenuLineCleanup" xml:space="preserve">
+    <value>行のクリーンアップ</value>
+  </data>
+  <data name="EditorContextMenuSortAsc" xml:space="preserve">
+    <value>昇順で並べ替え</value>
+  </data>
+  <data name="EditorContextMenuSortDesc" xml:space="preserve">
+    <value>降順で並べ替え</value>
+  </data>
+  <data name="EditorContextMenuRemoveDuplicates" xml:space="preserve">
+    <value>重複行の削除</value>
+  </data>
+  <data name="EditorContextMenuRemoveEmptyLines" xml:space="preserve">
+    <value>空行の削除</value>
+  </data>
+  <data name="EditorContextMenuCollapseConsecutiveEmptyLines" xml:space="preserve">
+    <value>連続する空行をまとめる</value>
+  </data>
+  <data name="EditorContextMenuTrimSpaces" xml:space="preserve">
+    <value>前後の空白をトリミング</value>
+  </data>
+  <data name="EditorContextMenuConvert" xml:space="preserve">
+    <value>変換</value>
+  </data>
+  <data name="EditorContextMenuToUpperCase" xml:space="preserve">
+    <value>大文字にする</value>
+  </data>
+  <data name="EditorContextMenuToLowerCase" xml:space="preserve">
+    <value>小文字にする</value>
+  </data>
+  <data name="EditorContextMenuToSentenceCase" xml:space="preserve">
+    <value>文頭のみ大文字にする</value>
+  </data>
+  <data name="EditorContextMenuToTitleCase" xml:space="preserve">
+    <value>各単語の先頭を大文字にする</value>
+  </data>
+  <data name="EditorContextMenuUrlEncode" xml:space="preserve">
+    <value>URLエンコード</value>
+  </data>
+  <data name="EditorContextMenuUrlDecode" xml:space="preserve">
+    <value>URLデコード</value>
+  </data>
+  <data name="EditorContextMenuBase64Encode" xml:space="preserve">
+    <value>Base64エンコード</value>
+  </data>
+  <data name="EditorContextMenuBase64Decode" xml:space="preserve">
+    <value>Base64デコード</value>
+  </data>
+  <data name="EditorContextMenuHexToDec" xml:space="preserve">
+    <value>16進数 → 10進数</value>
+  </data>
+  <data name="EditorContextMenuDecToHex" xml:space="preserve">
+    <value>10進数 → 16進数</value>
+  </data>
+  <data name="EditorContextMenuFormatText" xml:space="preserve">
+    <value>テキストの整形</value>
+  </data>
+  <data name="EditorContextMenuScrollSync" xml:space="preserve">
+    <value>スクロール同期</value>
+  </data>
+  <data name="EditorAutocompleteSnippet" xml:space="preserve">
+    <value>スニペット</value>
+  </data>
+  <data name="EditorAutocompleteSnippetPrefix" xml:space="preserve">
+    <value>スニペット: </value>
+  </data>
+  <data name="DiffCompareToolTitle" xml:space="preserve">
+    <value>TxtAIEditor ファイル比較ツール (File Compare)</value>
+  </data>
+  <data name="DiffStatsGathering" xml:space="preserve">
+    <value>収集中...</value>
+  </data>
+  <data name="DiffOriginalFileLabel" xml:space="preserve">
+    <value>元のファイル (Original)</value>
+  </data>
+  <data name="DiffModifiedFileLabel" xml:space="preserve">
+    <value>比較対象ファイル (Modified)</value>
+  </data>
+  <data name="DiffOriginalPrefix" xml:space="preserve">
+    <value>元のファイル: </value>
+  </data>
+  <data name="DiffModifiedPrefix" xml:space="preserve">
+    <value>修正ファイル: </value>
+  </data>
+  <data name="DiffStatsFormat" xml:space="preserve">
+    <value>変更箇所: 追加 {0} 行, 削除 {1} 行</value>
+  </data>
+  <data name="GitPreviousCommitFormat" xml:space="preserve">
+    <value>{0} (前回のコミット)</value>
+  </data>
+  <data name="GitCommitHashFormat" xml:space="preserve">
+    <value>{0} (コミット {1})</value>
+  </data>
+  <data name="GitCompareTitleFormat" xml:space="preserve">
+    <value>比較 [{0}]: {1}</value>
+  </data>
+  <data name="GitCompareDiffTitleFormat" xml:space="preserve">
+    <value>Git 比較: {0}</value>
+  </data>
+  <data name="GitPreviousVersionFormat" xml:space="preserve">
+    <value>{0} (以前のバージョン)</value>
+  </data>
+  <data name="GitCurrentChangesFormat" xml:space="preserve">
+    <value>{0} (現在の変更点)</value>
+  </data>
+  <data name="SearchReplaceOneTooltip" xml:space="preserve">
+    <value>この項目だけ置換</value>
+  </data>
+  <data name="SnippetExport" xml:space="preserve">
+    <value>エクスポート</value>
+  </data>
+  <data name="SnippetImport" xml:space="preserve">
+    <value>インポート</value>
+  </data>
+  <data name="SnippetImportErrorTitle" xml:space="preserve">
+    <value>スニペットインポートエラー</value>
+  </data>
+  <data name="SnippetImportErrorMessage" xml:space="preserve">
+    <value>ファイルのインポート中にエラーが発生しました: {0}</value>
+  </data>
+  <data name="SnippetReset" xml:space="preserve">
+    <value>リセット</value>
+  </data>
+  <data name="SnippetResetTitle" xml:space="preserve">
+    <value>スニペットのリセット</value>
+  </data>
+  <data name="SnippetResetConfirm" xml:space="preserve">
+    <value>デフォルトのスニペットにリセットしますか？ カスタムスニペットはすべて削除されます。</value>
+  </data>
+  <data name="SnippetResetConfirmButton" xml:space="preserve">
+    <value>リセット</value>
+  </data>
+  <data name="TOC" xml:space="preserve">
+    <value>目次</value>
+  </data>
+  <data name="TOCHeader" xml:space="preserve">
+    <value>目次</value>
+  </data>
+  <data name="SnippetEditTooltip" xml:space="preserve">
+    <value>編集</value>
+  </data>
+  <data name="SnippetDeleteTooltip" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="StickyNoteTitle" xml:space="preserve">
+    <value>付箋モード</value>
+  </data>
+  <data name="ExitStickyNoteTooltip" xml:space="preserve">
+    <value>付箋モード終了</value>
+  </data>
+  <data name="ExitStickyNoteText" xml:space="preserve">
+    <value>終了</value>
+  </data>
+  <data name="TerminalExited" xml:space="preserve">
+    <value>ターミナル終了</value>
+  </data>
+  <data name="TerminalStartFailed" xml:space="preserve">
+    <value>ターミナルの起動に失敗しました</value>
+  </data>
+  <data name="TerminalHasExited" xml:space="preserve">
+    <value>ターミナルが終了しました</value>
+  </data>
+  <data name="TerminalSendFailed" xml:space="preserve">
+    <value>コマンド送信失敗</value>
+  </data>
+  <data name="ExplorerCopyFileName" xml:space="preserve">
+    <value>ファイル名をコピー</value>
+  </data>
+  <data name="ExplorerCopyFilePath" xml:space="preserve">
+    <value>パスをコピー</value>
+  </data>
+  <data name="ExplorerRefreshTooltip" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="ExplorerCopyFolderPath" xml:space="preserve">
+    <value>フォルダパスをコピー</value>
+  </data>
+  <data name="ExplorerRename" xml:space="preserve">
+    <value>名前の変更</value>
+  </data>
+  <data name="ExplorerDelete" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="RenameDialogTitle" xml:space="preserve">
+    <value>名前の変更</value>
+  </data>
+  <data name="RenameDialogOK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="RenameDialogCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="RenameErrorTitle" xml:space="preserve">
+    <value>名前の変更エラー</value>
+  </data>
+  <data name="DeleteConfirmTitle" xml:space="preserve">
+    <value>削除の確認</value>
+  </data>
+  <data name="DeleteConfirmMessage" xml:space="preserve">
+    <value>'{0}'をごみ箱に移動しますか？</value>
+  </data>
+  <data name="DeleteConfirmOK" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="DeleteConfirmCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="DeleteErrorTitle" xml:space="preserve">
+    <value>削除エラー</value>
+  </data>
+  <data name="LlmPresetButtonText" xml:space="preserve">
+    <value>プリセット</value>
+  </data>
+  <data name="LlmPresetButtonTooltip" xml:space="preserve">
+    <value>指示事項のプリセット一覧</value>
+  </data>
+  <data name="LlmPresetAddText" xml:space="preserve">
+    <value>プリセット追加</value>
+  </data>
+  <data name="LlmPresetApplyText" xml:space="preserve">
+    <value>適用</value>
+  </data>
+  <data name="LlmPresetDeleteText" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="LlmPresetSaveTitle" xml:space="preserve">
+    <value>現在のタブをプリセットとして追加</value>
+  </data>
+  <data name="LlmPresetSavePlaceholder" xml:space="preserve">
+    <value>プリセット名を入力...</value>
+  </data>
+  <data name="LlmPresetSaveLabel" xml:space="preserve">
+    <value>プリセット名</value>
+  </data>
+  <data name="LlmPresetSaveAddButton" xml:space="preserve">
+    <value>追加</value>
+  </data>
+  <data name="LlmPresetSaveCancelButton" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="LlmPresetNameEmptyTitle" xml:space="preserve">
+    <value>プリセット追加エラー</value>
+  </data>
+  <data name="LlmPresetNameEmptyMessage" xml:space="preserve">
+    <value>プリセット名を入力してください。</value>
+  </data>
+  <data name="LlmPresetDuplicateTitle" xml:space="preserve">
+    <value>プリセットの重複</value>
+  </data>
+  <data name="LlmPresetDuplicateMessage" xml:space="preserve">
+    <value>同じ名前のプリセットが既に存在します。上書きしますか？</value>
+  </data>
+  <data name="LlmPresetContentLabel" xml:space="preserve">
+    <value>プリセットの内容</value>
+  </data>
+  <data name="LlmPresetContentPlaceholder" xml:space="preserve">
+    <value>プリセットの内容...</value>
+  </data>
+  <data name="LlmPresetEditTitle" xml:space="preserve">
+    <value>プリセットの編集</value>
+  </data>
+  <data name="LlmPresetEditSaveButton" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="ExpandPreviewTooltip" xml:space="preserve">
+    <value>プレビューを拡大</value>
+  </data>
+  <data name="LlmMaxInstructionsReached" xml:space="preserve">
+    <value>指示事項タブは最大4つまで作成できます。既存のタブを削除してからやり直してください。</value>
+  </data>
+  <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
+    <value>[{0}] プリセット適用。追加の指示事項を入力...</value>
+  </data>
+</root>

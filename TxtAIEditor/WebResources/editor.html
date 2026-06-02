@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TxtAIEditor Virtual Editor</title>
+    <link rel="stylesheet" href="katex/katex.min.css">
+    <script src="katex/katex.min.js"></script>
+    <script src="mermaid/mermaid.min.js"></script>
+    <script>
+        // Diagnostic global error handler
+        window.onerror = function (message, source, lineno, colno, error) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.style.background = '#800000';
+                overlay.style.color = '#ffffff';
+                overlay.style.padding = '20px';
+                overlay.style.overflow = 'auto';
+                overlay.style.textAlign = 'left';
+                overlay.style.fontFamily = 'monospace';
+                overlay.style.display = 'block';
+                overlay.style.visibility = 'visible';
+                overlay.style.opacity = '1';
+                overlay.style.pointerEvents = 'auto';
+                overlay.innerHTML = `<h3>JavaScript Error Detected:</h3>
+                <p><b>Message:</b> ${message}</p>
+                <p><b>Source:</b> ${source}</p>
+                <p><b>Line:</b> ${lineno} | <b>Column:</b> ${colno}</p>
+                <pre>${error ? error.stack : ''}</pre>`;
+            }
+        };
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const version = urlParams.get('v') || Date.now();
+        window.__TxtAIEditorVersion = version;
+        const theme = urlParams.get('theme') || 'Dark';
+        const bg = urlParams.get('customBg') || (theme === 'Light' ? '#ffffff' : '#1e1e1e');
+        const fg = urlParams.get('customFg') || (theme === 'Light' ? '#111111' : '#d4d4d4');
+        
+        // Instantly style the root element before body is parsed to prevent FOUC (flicker)
+        document.documentElement.style.background = bg;
+        document.documentElement.style.color = fg;
+        document.documentElement.style.setProperty('--bg', bg);
+        document.documentElement.style.setProperty('--fg', fg);
+        
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `editor.css?v=${version}`;
+        document.head.appendChild(link);
+    </script>
+</head>
+
+<body>
+    <div id="editor-host">
+        <div id="loading-overlay" class="hidden" style="display: none;">로딩 중...</div>
+        <div id="csv-toolbar" hidden>
+            <input id="csv-name-box" type="text" value="" placeholder="셀" readonly spellcheck="false">
+            <input id="csv-formula-input" type="text" placeholder="선택한 CSV 셀 값" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="csv-column-header" hidden>
+            <div id="csv-column-header-inner"></div>
+        </div>
+        <div id="scroll-container">
+            <div id="virtual-spacer"></div>
+            <div id="viewport"></div>
+        </div>
+        <div id="find-panel" hidden>
+            <div style="display: flex; gap: 8px; width: 100%;">
+                <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                    <div class="find-input-wrap">
+                        <input id="find-input" type="text" placeholder="찾기" autocomplete="off" spellcheck="false"
+                            style="width: 100%; padding-right: 84px;">
+                        <div class="find-input-actions">
+                            <button id="find-clear" class="find-clear-btn" type="button" title="지우기">×</button>
+                            <button id="find-match-case" class="find-option-btn" type="button" title="대소문자 구분 (Aa)">Aa</button>
+                            <button id="find-regex" class="find-option-btn" type="button" title="정규식 사용 (.*)">.*</button>
+                        </div>
+                    </div>
+                    <div id="replace-row" class="find-input-wrap">
+                        <input id="replace-input" type="text" placeholder="바꾸기" autocomplete="off" spellcheck="false"
+                            style="width: 100%; padding-right: 32px;">
+                        <button id="replace-clear" class="find-clear-btn find-clear-btn-single" type="button" title="지우기">×</button>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+                    <div style="display: flex; gap: 6px; height: 28px; align-items: center;">
+                        <button id="find-prev" class="find-button" type="button" title="이전">↑</button>
+                        <button id="find-next" class="find-button" type="button" title="다음">↓</button>
+                        <button id="find-close" class="find-button" type="button" title="닫기">×</button>
+                    </div>
+                    <div id="replace-actions-row" style="display: flex; gap: 6px; height: 28px; align-items: center;">
+                        <button id="replace-btn" class="find-button" type="button" style="min-width: 52px;"
+                            title="바꾸기">바꾸기</button>
+                        <button id="replace-all-btn" class="find-button" type="button" style="min-width: 64px;"
+                            title="모두 바꾸기">모두 바꾸기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="context-menu" hidden>
+            <button class="context-menu-button" type="button" data-action="cut" data-requires-edit="true">잘라내기</button>
+            <button class="context-menu-button" type="button" data-action="copy">복사</button>
+            <button class="context-menu-button" type="button" data-action="paste"
+                data-requires-edit="true">붙여넣기</button>
+            <button class="context-menu-button" type="button" data-action="delete" data-requires-edit="true">삭제</button>
+            <button class="context-menu-button" type="button" data-action="selectAll">모두 선택</button>
+            <div class="context-menu-separator" role="separator"></div>
+            <button class="context-menu-button" type="button" data-action="toggleComment" data-requires-edit="true">주석
+                토글</button>
+            <button class="context-menu-button" type="button" data-action="indentLines"
+                data-requires-edit="true">들여쓰기</button>
+            <button class="context-menu-button" type="button" data-action="outdentLines"
+                data-requires-edit="true">내여쓰기</button>
+            <div class="context-menu-item has-submenu">
+                <button class="context-menu-button" type="button">
+                    <span data-label="lineCleanup">줄 정리</span>
+                    <span class="arrow">▶</span>
+                </button>
+                <div class="submenu">
+                    <button class="context-menu-button" type="button" data-action="sortAsc"
+                        data-requires-edit="true">오름차순 정렬</button>
+                    <button class="context-menu-button" type="button" data-action="sortDesc"
+                        data-requires-edit="true">내림차순 정렬</button>
+                    <button class="context-menu-button" type="button" data-action="removeDuplicates"
+                        data-requires-edit="true">중복 줄 제거</button>
+                    <button class="context-menu-button" type="button" data-action="removeEmptyLines"
+                        data-requires-edit="true">빈 줄 제거</button>
+                    <button class="context-menu-button" type="button" data-action="collapseConsecutiveEmptyLines"
+                        data-requires-edit="true">연속 빈줄 하나로 줄이기</button>
+                    <button class="context-menu-button" type="button" data-action="trimSpaces"
+                        data-requires-edit="true">앞뒤 공백 제거</button>
+                </div>
+            </div>
+            <div class="context-menu-item has-submenu">
+                <button class="context-menu-button" type="button">
+                    <span data-label="convert">변환</span>
+                    <span class="arrow">▶</span>
+                </button>
+                <div class="submenu">
+                    <button class="context-menu-button" type="button" data-action="toUpperCase"
+                        data-requires-edit="true">대문자로</button>
+                    <button class="context-menu-button" type="button" data-action="toLowerCase"
+                        data-requires-edit="true">소문자로</button>
+                    <button class="context-menu-button" type="button" data-action="toSentenceCase"
+                        data-requires-edit="true">Sentence case</button>
+                    <button class="context-menu-button" type="button" data-action="toTitleCase"
+                        data-requires-edit="true">Title case</button>
+                    <button class="context-menu-button" type="button" data-action="urlEncode"
+                        data-requires-edit="true">URL Encode</button>
+                    <button class="context-menu-button" type="button" data-action="urlDecode"
+                        data-requires-edit="true">URL Decode</button>
+                    <button class="context-menu-button" type="button" data-action="base64Encode"
+                        data-requires-edit="true">Base64 Encode</button>
+                    <button class="context-menu-button" type="button" data-action="base64Decode"
+                        data-requires-edit="true">Base64 Decode</button>
+                    <button class="context-menu-button" type="button" data-action="hexToDec"
+                        data-requires-edit="true">HEX → DEC</button>
+                    <button class="context-menu-button" type="button" data-action="decToHex"
+                        data-requires-edit="true">DEC → HEX</button>
+                </div>
+            </div>
+            <button class="context-menu-button" type="button" data-action="formatText" data-requires-edit="true">Format
+                text</button>
+            <div class="context-menu-separator" role="separator"></div>
+            <button class="context-menu-button" type="button" data-action="toggleScrollSync">✓ 스크롤 동기화</button>
+        </div>
+        <div id="autocomplete-popup" class="autocomplete-popup" hidden></div>
+    </div>
+
+    <script type="module">
+        const moduleVersion = window.__TxtAIEditorVersion || Date.now();
+        import(`./editor-main.js?v=${encodeURIComponent(moduleVersion)}`).catch(error => {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.style.background = '#800000';
+                overlay.style.color = '#ffffff';
+                overlay.style.padding = '20px';
+                overlay.style.overflow = 'auto';
+                overlay.style.textAlign = 'left';
+                overlay.style.fontFamily = 'monospace';
+                overlay.style.display = 'block';
+                overlay.style.visibility = 'visible';
+                overlay.style.opacity = '1';
+                overlay.style.pointerEvents = 'auto';
+                overlay.innerHTML = `<h3>Failed to load editor module</h3>
+                <p>${error?.message || error}</p>
+                <pre>${error?.stack || ''}</pre>`;
+            }
+        });
+    </script>
+</body>
+
+</html>

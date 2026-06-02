@@ -1,0 +1,1340 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="0" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" msdata:Ordinal="2" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppTitle" xml:space="preserve">
+    <value>TxtAIEditor</value>
+  </data>
+  <data name="OpenFile" xml:space="preserve">
+    <value>파일 열기</value>
+  </data>
+  <data name="SaveFile" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="SaveAsFile" xml:space="preserve">
+    <value>다른 이름으로 저장</value>
+  </data>
+  <data name="Compare" xml:space="preserve">
+    <value>비교</value>
+  </data>
+  <data name="Terminal" xml:space="preserve">
+    <value>터미널</value>
+  </data>
+  <data name="TopMost" xml:space="preserve">
+    <value>항상위</value>
+  </data>
+  <data name="StickyNote" xml:space="preserve">
+    <value>스티커</value>
+  </data>
+  <data name="WordWrap" xml:space="preserve">
+    <value>Word Wrap</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>검색</value>
+  </data>
+  <data name="Markdown" xml:space="preserve">
+    <value>Markdown</value>
+  </data>
+  <data name="CsvTable" xml:space="preserve">
+    <value>CSV 테이블</value>
+  </data>
+  <data name="CsvNameBoxPlaceholder" xml:space="preserve">
+    <value>셀</value>
+  </data>
+  <data name="CsvFormulaPlaceholder" xml:space="preserve">
+    <value>선택한 CSV 셀 값</value>
+  </data>
+  <data name="Theme" xml:space="preserve">
+    <value>테마</value>
+  </data>
+  <data name="Split" xml:space="preserve">
+    <value>분할</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>설정</value>
+  </data>
+  <data name="FolderSelect" xml:space="preserve">
+    <value>폴더 선택...</value>
+  </data>
+  <data name="NoFolderSelected" xml:space="preserve">
+    <value>폴더를 선택하세요.</value>
+  </data>
+  <data name="FavoritesHeader" xml:space="preserve">
+    <value>즐겨찾기 목록</value>
+  </data>
+  <data name="SnippetsHeader" xml:space="preserve">
+    <value>코드 및 수식 템플릿</value>
+  </data>
+  <data name="AddSnippet" xml:space="preserve">
+    <value>스니펫 추가...</value>
+  </data>
+  <data name="SplitNone" xml:space="preserve">
+    <value>분할 없음 (단일)</value>
+  </data>
+  <data name="SplitVertical" xml:space="preserve">
+    <value>좌우 분할</value>
+  </data>
+  <data name="SplitHorizontal" xml:space="preserve">
+    <value>상하 분할</value>
+  </data>
+  <data name="LanguageChangedTitle" xml:space="preserve">
+    <value>언어 변경</value>
+  </data>
+  <data name="LanguageChangedMessage" xml:space="preserve">
+    <value>언어 설정을 적용하려면 애플리케이션을 다시 시작해야 합니다. 다시 시작하시겠습니까?</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>예</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>아니오</value>
+  </data>
+  <data name="Restart" xml:space="preserve">
+    <value>다시 시작</value>
+  </data>
+  <data name="LanguageDefault" xml:space="preserve">
+    <value>기본값 (OS 설정)</value>
+  </data>
+  <data name="LanguageKorean" xml:space="preserve">
+    <value>한국어</value>
+  </data>
+  <data name="LanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="LanguageJapanese" xml:space="preserve">
+    <value>日本語</value>
+  </data>
+  <data name="Print" xml:space="preserve">
+    <value>인쇄</value>
+  </data>
+  <data name="Explorer" xml:space="preserve">
+    <value>탐색기</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>즐겨찾기</value>
+  </data>
+  <data name="Git" xml:space="preserve">
+    <value>Git</value>
+  </data>
+  <data name="Snippets" xml:space="preserve">
+    <value>스니펫</value>
+  </data>
+  <data name="RecentFiles" xml:space="preserve">
+    <value>최근 파일</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>제목</value>
+  </data>
+  <data name="Bold" xml:space="preserve">
+    <value>굵게</value>
+  </data>
+  <data name="Italic" xml:space="preserve">
+    <value>기울임</value>
+  </data>
+  <data name="Underline" xml:space="preserve">
+    <value>밑줄</value>
+  </data>
+  <data name="Highlight" xml:space="preserve">
+    <value>형광펜</value>
+  </data>
+  <data name="UnorderedList" xml:space="preserve">
+    <value>글머리 목록</value>
+  </data>
+  <data name="CutLine" xml:space="preserve">
+    <value>현재 줄 자르기</value>
+  </data>
+  <data name="Quote" xml:space="preserve">
+    <value>인용문</value>
+  </data>
+  <data name="Arrow" xml:space="preserve">
+    <value>화살표</value>
+  </data>
+  <data name="InlineCode" xml:space="preserve">
+    <value>인라인 코드</value>
+  </data>
+  <data name="Tasklist" xml:space="preserve">
+    <value>체크리스트</value>
+  </data>
+  <data name="Table" xml:space="preserve">
+    <value>표</value>
+  </data>
+  <data name="ConvertToTable" xml:space="preserve">
+    <value>테이블로 바꾸기</value>
+  </data>
+  <data name="FontIncrease" xml:space="preserve">
+    <value>글자 크게</value>
+  </data>
+  <data name="FontDecrease" xml:space="preserve">
+    <value>글자 작게</value>
+  </data>
+  <data name="TextColor" xml:space="preserve">
+    <value>글자색 (우클릭: 색상 선택)</value>
+  </data>
+  <data name="Link" xml:space="preserve">
+    <value>링크</value>
+  </data>
+  <data name="CharMap" xml:space="preserve">
+    <value>문자표</value>
+  </data>
+  <data name="Emoji" xml:space="preserve">
+    <value>이모지</value>
+  </data>
+  <data name="CurrentDate" xml:space="preserve">
+    <value>현재 날짜</value>
+  </data>
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>TxtAIEditor 설정</value>
+  </data>
+  <data name="SettingsSave" xml:space="preserve">
+    <value>적용 및 저장</value>
+  </data>
+  <data name="SettingsCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="SettingsAppearance" xml:space="preserve">
+    <value>모양</value>
+  </data>
+  <data name="SettingsEditing" xml:space="preserve">
+    <value>편집</value>
+  </data>
+  <data name="SettingsTerminal" xml:space="preserve">
+    <value>터미널</value>
+  </data>
+  <data name="SettingsTerminalProfile" xml:space="preserve">
+    <value>터미널 셸</value>
+  </data>
+  <data name="SettingsTerminalFontFamily" xml:space="preserve">
+    <value>터미널 폰트</value>
+  </data>
+  <data name="SettingsTerminalFontSize" xml:space="preserve">
+    <value>터미널 글자 크기</value>
+  </data>
+  <data name="SettingsTerminalProfileInfo" xml:space="preserve">
+    <value>PowerShell은 PowerShell 7(pwsh)이 설치되어 있으면 자동으로 PowerShell 7을 사용합니다. CMD, Git Bash, WSL도 선택할 수 있으며 새 설정은 다음 새 터미널부터 적용됩니다.</value>
+  </data>
+  <data name="SettingsTerminalNotFound" xml:space="preserve">
+    <value>설치되지 않음</value>
+  </data>
+  <data name="SettingsLLM" xml:space="preserve">
+    <value>LLM</value>
+  </data>
+  <data name="SettingsLanguage" xml:space="preserve">
+    <value>애플리케이션 언어 (Language)</value>
+  </data>
+  <data name="SettingsTheme" xml:space="preserve">
+    <value>앱/에디터 테마</value>
+  </data>
+  <data name="SettingsFontSize" xml:space="preserve">
+    <value>에디터 글자 크기</value>
+  </data>
+  <data name="SettingsFontFamily" xml:space="preserve">
+    <value>에디터 폰트</value>
+  </data>
+  <data name="SettingsUiFontFamily" xml:space="preserve">
+    <value>UI 쉘 폰트</value>
+  </data>
+  <data name="SettingsUseCustomBg" xml:space="preserve">
+    <value>커스텀 에디터 배경색 사용</value>
+  </data>
+  <data name="SettingsUseCustomFg" xml:space="preserve">
+    <value>커스텀 에디터 글자색 사용</value>
+  </data>
+  <data name="SettingsWordWrap" xml:space="preserve">
+    <value>기본 Word Wrap 켜기</value>
+  </data>
+  <data name="SettingsBracketPair" xml:space="preserve">
+    <value>괄호 쌍 색상화 활성화</value>
+  </data>
+  <data name="SettingsAutocompleteEnter" xml:space="preserve">
+    <value>Enter로 자동완성</value>
+  </data>
+  <data name="SettingsAutocompleteTab" xml:space="preserve">
+    <value>Tab으로 자동완성</value>
+  </data>
+  <data name="SettingsAutocomplete" xml:space="preserve">
+    <value>자동완성 기능 사용</value>
+  </data>
+  <data name="SettingsAutoSave" xml:space="preserve">
+    <value>Autosave 사용</value>
+  </data>
+  <data name="SettingsLivePreview" xml:space="preserve">
+    <value>실시간 미리보기 기본 활성화</value>
+  </data>
+  <data name="SettingsMarkdownToolbar" xml:space="preserve">
+    <value>기본 마크다운 툴바 활성화</value>
+  </data>
+  <data name="SettingsToolbar" xml:space="preserve">
+    <value>툴바</value>
+  </data>
+  <data name="SettingsToolbarShowLabels" xml:space="preserve">
+    <value>툴바 버튼 글자 표시</value>
+  </data>
+  <data name="SettingsToolbarOrderHint" xml:space="preserve">
+    <value>드래그하여 버튼 순서 변경 (설정 버튼은 고정)</value>
+  </data>
+  <data name="SettingsTabSize" xml:space="preserve">
+    <value>Tab size</value>
+  </data>
+  <data name="SettingsLlmProvider" xml:space="preserve">
+    <value>LLM 공급자</value>
+  </data>
+  <data name="SettingsLlmEndpoint" xml:space="preserve">
+    <value>LLM API Endpoint</value>
+  </data>
+  <data name="SettingsLlmModel" xml:space="preserve">
+    <value>LLM 모델명</value>
+  </data>
+  <data name="SettingsLlmApiKey" xml:space="preserve">
+    <value>LLM API Key</value>
+  </data>
+  <data name="SettingsLlmLoadModels" xml:space="preserve">
+    <value>LM Studio 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmInfo" xml:space="preserve">
+    <value>LM Studio는 서버가 켜져 있을 때 http://localhost:1234/v1/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
+  <data name="SettingsLlmSelectModel" xml:space="preserve">
+    <value>모델 선택</value>
+  </data>
+  <data name="SettingsLlmApiKeyPlaceholder" xml:space="preserve">
+    <value>API Key 입력 (비워두면 저장된 Key 삭제)</value>
+  </data>
+  <data name="SettingsLlmEndpointPlaceholder" xml:space="preserve">
+    <value>예: http://localhost:1234/v1</value>
+  </data>
+  <data name="SettingsLlmLoadModelsNotSupported" xml:space="preserve">
+    <value>해당 공급자는 모델 불러오기를 지원하지 않습니다.</value>
+  </data>
+  <data name="SettingsLlmLoadingModelsFormat" xml:space="preserve">
+    <value>{0} 모델 목록을 불러오는 중입니다...</value>
+  </data>
+  <data name="SettingsLlmModelsLoadedFormat" xml:space="preserve">
+    <value>{0}개 모델을 불러왔습니다.</value>
+  </data>
+  <data name="SettingsLlmNoModelsFoundFormat" xml:space="preserve">
+    <value>{0}에서 사용 가능한 모델을 찾지 못했습니다.</value>
+  </data>
+  <data name="SettingsLlmLoadModelsFailedFormat" xml:space="preserve">
+    <value>{0} 모델 목록을 불러오지 못했습니다: {1}</value>
+  </data>
+  <data name="SettingsLlmLoadOpenRouterModels" xml:space="preserve">
+    <value>OpenRouter 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
+    <value>OpenRouter는 https://openrouter.ai/api/v1/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
+  <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
+    <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
+  </data>
+  <data name="SettingsLlmConfirmBeforeSending" xml:space="preserve">
+    <value>전송 전 확인</value>
+  </data>
+  <data name="SettingsLlmSourceLanguage" xml:space="preserve">
+    <value>번역 원본 언어 (Source Language)</value>
+  </data>
+  <data name="SettingsLlmTargetLanguage" xml:space="preserve">
+    <value>번역 대상 언어 (Target Language)</value>
+  </data>
+  <data name="LlmLangAutoDetect" xml:space="preserve">
+    <value>자동 감지 (Auto Detect)</value>
+  </data>
+  <data name="LlmLangKorean" xml:space="preserve">
+    <value>한국어 (Korean)</value>
+  </data>
+  <data name="LlmLangEnglish" xml:space="preserve">
+    <value>영어 (English)</value>
+  </data>
+  <data name="LlmLangJapanese" xml:space="preserve">
+    <value>일본어 (Japanese)</value>
+  </data>
+  <data name="LlmLangChinese" xml:space="preserve">
+    <value>중국어 (Chinese)</value>
+  </data>
+  <data name="LlmLangFrench" xml:space="preserve">
+    <value>프랑스어 (French)</value>
+  </data>
+  <data name="LlmLangSpanish" xml:space="preserve">
+    <value>스페인어 (Spanish)</value>
+  </data>
+  <data name="LlmLangGerman" xml:space="preserve">
+    <value>독일어 (German)</value>
+  </data>
+  <data name="SelectionNoneBlocked" xml:space="preserve">
+    <value>선택 영역: 없음 (전체 파일의 경우 파일 맥락 추가 사용)</value>
+  </data>
+  <data name="SelectionStats" xml:space="preserve">
+    <value>선택 영역: {0} 글자 수 (약 {1} 토큰)</value>
+  </data>
+  <data name="SearchHeader" xml:space="preserve">
+    <value>폴더 전체 검색 및 바꾸기</value>
+  </data>
+  <data name="SearchPlaceholder" xml:space="preserve">
+    <value>검색어 입력...</value>
+  </data>
+  <data name="ReplacePlaceholder" xml:space="preserve">
+    <value>바꿀 단어 입력...</value>
+  </data>
+  <data name="SearchMatchCaseTooltip" xml:space="preserve">
+    <value>대소문자 구분</value>
+  </data>
+  <data name="SearchWholeWordTooltip" xml:space="preserve">
+    <value>단어 단위</value>
+  </data>
+  <data name="SearchRegexTooltip" xml:space="preserve">
+    <value>정규식 검색</value>
+  </data>
+  <data name="SearchAllFiles" xml:space="preserve">
+    <value>전체 검색</value>
+  </data>
+  <data name="ReplaceAllFiles" xml:space="preserve">
+    <value>모두 바꾸기</value>
+  </data>
+  <data name="RecentFilesHeader" xml:space="preserve">
+    <value>최근 열린 파일</value>
+  </data>
+  <data name="GitRepoHeader" xml:space="preserve">
+    <value>Git 저장소 관리</value>
+  </data>
+  <data name="GitBranchPlaceholder" xml:space="preserve">
+    <value>브랜치 목록</value>
+  </data>
+  <data name="GitCommitPlaceholder" xml:space="preserve">
+    <value>커밋 메시지 입력...</value>
+  </data>
+  <data name="GitCommit" xml:space="preserve">
+    <value>커밋 (Commit)</value>
+  </data>
+  <data name="GitStageAll" xml:space="preserve">
+    <value>전체 Stage</value>
+  </data>
+  <data name="GitRestoreAll" xml:space="preserve">
+    <value>전체 Restore</value>
+  </data>
+  <data name="GitPush" xml:space="preserve">
+    <value>Push</value>
+  </data>
+  <data name="GitRefresh" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="GitHistory" xml:space="preserve">
+    <value>과거 기록</value>
+  </data>
+  <data name="GitRestoreFile" xml:space="preserve">
+    <value>파일 복원</value>
+  </data>
+  <data name="ExplorerUpTooltip" xml:space="preserve">
+    <value>상위 폴더</value>
+  </data>
+  <data name="ExplorerSelectFolder" xml:space="preserve">
+    <value>폴더 선택...</value>
+  </data>
+  <data name="ExplorerOpenTerminalTooltip" xml:space="preserve">
+    <value>현재 폴더에서 터미널 열기</value>
+  </data>
+  <data name="ExplorerAddToFavorites" xml:space="preserve">
+    <value>즐겨찾기에 추가</value>
+  </data>
+  <data name="ExplorerAddFolderToFavorites" xml:space="preserve">
+    <value>폴더를 즐겨찾기에 추가</value>
+  </data>
+  <data name="FavoritesFileTab" xml:space="preserve">
+    <value>파일</value>
+  </data>
+  <data name="FavoritesFolderTab" xml:space="preserve">
+    <value>폴더</value>
+  </data>
+  <data name="FavoritesPinTooltip" xml:space="preserve">
+    <value>고정</value>
+  </data>
+  <data name="GitNotDetected" xml:space="preserve">
+    <value>Git: 감지 안됨</value>
+  </data>
+  <data name="TerminalTitle" xml:space="preserve">
+    <value>터미널</value>
+  </data>
+  <data name="NewTerminal" xml:space="preserve">
+    <value>새 터미널</value>
+  </data>
+  <data name="CloseTerminal" xml:space="preserve">
+    <value>닫기</value>
+  </data>
+  <data name="TerminalPrompt" xml:space="preserve">
+    <value>명령 입력 후 Enter</value>
+  </data>
+  <data name="SettingsToolbarCustomize" xml:space="preserve">
+    <value>버튼 표시 설정</value>
+  </data>
+  <data name="SettingsToolbarButtonVisibility" xml:space="preserve">
+    <value>툴바 버튼 표시/숨기기</value>
+  </data>
+  <data name="SettingsToolbarDragHint" xml:space="preserve">
+    <value>드래그하여 버튼 순서 변경 (설정 버튼은 고정)</value>
+  </data>
+  <data name="SettingsToolbarSettingsPinned" xml:space="preserve">
+    <value>설정 버튼은 항상 표시됩니다.</value>
+  </data>
+  <data name="SettingsToolbarCustomization" xml:space="preserve">
+    <value>툴바</value>
+  </data>
+  <data name="SettingsToolbarReset" xml:space="preserve">
+    <value>툴바 초기화</value>
+  </data>
+  <data name="StatusRightPanelTooltip" xml:space="preserve">
+    <value>우측 패널</value>
+  </data>
+  <data name="StatusColumnLabel" xml:space="preserve">
+    <value>열</value>
+  </data>
+  <data name="StatusLeftPanelTooltip" xml:space="preserve">
+    <value>좌측 패널</value>
+  </data>
+  <data name="StatusLineEndingTooltip" xml:space="preserve">
+    <value>클릭하여 줄 끝 방식 변경</value>
+  </data>
+  <data name="StatusGoToLineTooltip" xml:space="preserve">
+    <value>클릭하여 줄 이동</value>
+  </data>
+  <data name="StatusFileSizeFormat" xml:space="preserve">
+    <value>크기: {0:N0} bytes</value>
+  </data>
+  <data name="StatusLineLabel" xml:space="preserve">
+    <value>줄</value>
+  </data>
+  <data name="StatusEncodingTooltip" xml:space="preserve">
+    <value>파일 인코딩 선택</value>
+  </data>
+  <data name="LivePreviewTabHeader" xml:space="preserve">
+    <value>실시간 프리뷰</value>
+  </data>
+  <data name="AiAssistantTabHeader" xml:space="preserve">
+    <value>AI Assistant</value>
+  </data>
+  <data name="ComboItemMarkdown" xml:space="preserve">
+    <value>Markdown</value>
+  </data>
+  <data name="ComboItemHtml" xml:space="preserve">
+    <value>HTML</value>
+  </data>
+  <data name="ComboItemLatex" xml:space="preserve">
+    <value>LaTeX Block</value>
+  </data>
+  <data name="ComboItemAozora" xml:space="preserve">
+    <value>Aozora</value>
+  </data>
+  <data name="ComboItemCsv" xml:space="preserve">
+    <value>CSV Table</value>
+  </data>
+  <data name="OpenInBrowserButtonText" xml:space="preserve">
+    <value>브라우저</value>
+  </data>
+  <data name="OpenInBrowserTooltip" xml:space="preserve">
+    <value>HTML 미리보기를 브라우저로 열기</value>
+  </data>
+  <data name="LlmOutputPlaceholder" xml:space="preserve">
+    <value>대기 중... 에디터에서 영역을 선택한 후 하단의 AI 분석 도구를 사용해 보세요.</value>
+  </data>
+  <data name="SelectionStatsPlaceholder" xml:space="preserve">
+    <value>선택 영역: 없음 (전체 파일의 경우 파일 맥락 추가 사용)</value>
+  </data>
+  <data name="LlmFileContextPlaceholder" xml:space="preserve">
+    <value>파일 맥락 없음</value>
+  </data>
+  <data name="LlmAddFileContextButtonText" xml:space="preserve">
+    <value>파일 맥락 추가</value>
+  </data>
+  <data name="LlmRemoveFileContextButtonText" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="LlmExplainButtonText" xml:space="preserve">
+    <value>설명</value>
+  </data>
+  <data name="LlmSummarizeButtonText" xml:space="preserve">
+    <value>요약</value>
+  </data>
+  <data name="LlmTranslateButtonText" xml:space="preserve">
+    <value>번역</value>
+  </data>
+  <data name="LlmImproveButtonText" xml:space="preserve">
+    <value>개선</value>
+  </data>
+  <data name="LlmCustomPromptPlaceholder" xml:space="preserve">
+    <value>질문이나 커스텀 지시사항 입력...</value>
+  </data>
+  <data name="LlmCustomRunButtonText" xml:space="preserve">
+    <value>전송</value>
+  </data>
+  <data name="LlmInsertOutputButtonText" xml:space="preserve">
+    <value>입력</value>
+  </data>
+  <data name="LlmInsertOutputTooltip" xml:space="preserve">
+    <value>AI 응답을 현재 커서에 입력 (선택한 경우 선택부위만)</value>
+  </data>
+  <data name="LlmErrorTitle" xml:space="preserve">
+    <value>AI 오류</value>
+  </data>
+  <data name="LlmNoSelectionExplain" xml:space="preserve">
+    <value>선택된 텍스트가 없습니다. 에디터에서 분석할 범위를 드래그한 후 실행하십시오.</value>
+  </data>
+  <data name="LlmNoSelectionSummarize" xml:space="preserve">
+    <value>선택된 텍스트가 없습니다. 요약할 범위를 드래그하십시오.</value>
+  </data>
+  <data name="LlmNoSelectionTranslate" xml:space="preserve">
+    <value>선택된 텍스트가 없습니다. 번역할 범위를 드래그하십시오.</value>
+  </data>
+  <data name="LlmNoSelectionImprove" xml:space="preserve">
+    <value>선택된 텍스트가 없습니다. 개선할 범위를 드래그하십시오.</value>
+  </data>
+  <data name="LlmNoSelectionCustom" xml:space="preserve">
+    <value>선택 영역이나 파일 맥락이 없습니다. 텍스트를 선택하거나 파일 맥락을 추가하십시오.</value>
+  </data>
+  <data name="LlmEmptyCustomPrompt" xml:space="preserve">
+    <value>커스텀 지시사항 입력란이 비어 있습니다.</value>
+  </data>
+  <data name="LlmFileContextTitle" xml:space="preserve">
+    <value>AI 파일 맥락</value>
+  </data>
+  <data name="LlmNoActiveTabForFileContext" xml:space="preserve">
+    <value>파일 맥락으로 추가할 활성 탭이 없습니다.</value>
+  </data>
+  <data name="LlmInsertTitle" xml:space="preserve">
+    <value>AI 응답 입력</value>
+  </data>
+  <data name="LlmNoOutputToInsert" xml:space="preserve">
+    <value>입력할 AI 응답이 없습니다.</value>
+  </data>
+  <data name="LlmActionExplain" xml:space="preserve">
+    <value>설명</value>
+  </data>
+  <data name="LlmActionSummarize" xml:space="preserve">
+    <value>요약</value>
+  </data>
+  <data name="LlmActionTranslate" xml:space="preserve">
+    <value>번역</value>
+  </data>
+  <data name="LlmActionImprove" xml:space="preserve">
+    <value>개선</value>
+  </data>
+  <data name="LlmActionCustom" xml:space="preserve">
+    <value>커스텀 전송</value>
+  </data>
+  <data name="LlmPreflightTitle" xml:space="preserve">
+    <value>AI 전송 사전 확인 (Pre-flight Check)</value>
+  </data>
+  <data name="LlmPreflightContentFormat" xml:space="preserve">
+    <value>액션: {0}
+
+전송될 AI 공급자: {1} ({2})
+전송 텍스트 크기: {3:N0} 자 (약 {4:N0} 토큰 소모)
+
+[전송 내용 미리보기]
+{5}
+
+보안상의 문제나 의도하지 않은 토큰 대량 유실이 없는지 확인 후 전송해 주십시오.</value>
+  </data>
+  <data name="LlmPreflightApprove" xml:space="preserve">
+    <value>API 전송 승인</value>
+  </data>
+  <data name="LlmPreflightCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="LlmRunningMessage" xml:space="preserve">
+    <value>AI 분석 및 응답 생성이 비동기 구동 중입니다. 잠시만 대기해 주십시오...</value>
+  </data>
+  <data name="LlmExceptionFormat" xml:space="preserve">
+    <value>AI 실행 도중 예외가 터졌습니다: {0}</value>
+  </data>
+  <data name="LlmInstructionDefaultName" xml:space="preserve">
+    <value>지시문</value>
+  </data>
+  <data name="LlmAddInstructionTooltip" xml:space="preserve">
+    <value>새 커스텀 지시문 추가</value>
+  </data>
+  <data name="MoveTabLeftTooltip" xml:space="preserve">
+    <value>왼쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)</value>
+  </data>
+  <data name="MoveTabRightTooltip" xml:space="preserve">
+    <value>오른쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)</value>
+  </data>
+  <data name="SettingsAbout" xml:space="preserve">
+    <value>정보</value>
+  </data>
+  <data name="SettingsAboutDescription" xml:space="preserve">
+    <value>강력하고 가벼운 텍스트 및 마크다운 에디터입니다.
+실시간 미리보기, 코드 및 수식 템플릿, 터미널 인터페이스, Git 통합, AI Assistant 등을 지원합니다.</value>
+  </data>
+  <data name="SettingsAboutProjectGitHub" xml:space="preserve">
+    <value>Project GitHub</value>
+  </data>
+  <data name="SettingsAboutThirdPartyNotices" xml:space="preserve">
+    <value>오픈소스 라이선스 고지 (Third-Party Notices)</value>
+  </data>
+  <data name="SettingsPreviewFontFamily" xml:space="preserve">
+    <value>프리뷰 폰트</value>
+  </data>
+  <data name="SettingsPreviewUseCustomBg" xml:space="preserve">
+    <value>커스텀 프리뷰 배경색 사용</value>
+  </data>
+  <data name="SettingsPreviewUseCustomFg" xml:space="preserve">
+    <value>커스텀 프리뷰 글자색 사용</value>
+  </data>
+  <data name="SettingsPreviewFontSize" xml:space="preserve">
+    <value>프리뷰 글자 크기</value>
+  </data>
+  <data name="SettingsShortcuts" xml:space="preserve">
+    <value>단축키</value>
+  </data>
+  <data name="SettingsShortcutsHeaderKey" xml:space="preserve">
+    <value>단축키</value>
+  </data>
+  <data name="SettingsShortcutsHeaderDesc" xml:space="preserve">
+    <value>설명</value>
+  </data>
+  <data name="ShortcutDescNewTab" xml:space="preserve">
+    <value>새 탭</value>
+  </data>
+  <data name="ShortcutDescSave" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="ShortcutDescOpen" xml:space="preserve">
+    <value>파일 열기</value>
+  </data>
+  <data name="ShortcutDescFind" xml:space="preserve">
+    <value>찾기</value>
+  </data>
+  <data name="ShortcutDescClose" xml:space="preserve">
+    <value>탭 닫기</value>
+  </data>
+  <data name="ShortcutDescPrint" xml:space="preserve">
+    <value>인쇄</value>
+  </data>
+  <data name="ShortcutDescLeftPanel" xml:space="preserve">
+    <value>좌측 패널 토글</value>
+  </data>
+  <data name="ShortcutDescRightPanel" xml:space="preserve">
+    <value>우측 패널 토글</value>
+  </data>
+  <data name="ShortcutDescTerminal" xml:space="preserve">
+    <value>터미널 토글</value>
+  </data>
+  <data name="ShortcutDescUndo" xml:space="preserve">
+    <value>실행 취소</value>
+  </data>
+  <data name="ShortcutDescRedo" xml:space="preserve">
+    <value>다시 실행</value>
+  </data>
+  <data name="ShortcutDescCopy" xml:space="preserve">
+    <value>복사</value>
+  </data>
+  <data name="ShortcutDescPaste" xml:space="preserve">
+    <value>붙여넣기</value>
+  </data>
+  <data name="ShortcutDescCut" xml:space="preserve">
+    <value>잘라내기</value>
+  </data>
+  <data name="ShortcutDescAiPrompt" xml:space="preserve">
+    <value>AI 프롬프트 전송</value>
+  </data>
+  <data name="ShortcutDescSaveAs" xml:space="preserve">
+    <value>다른 이름으로 저장</value>
+  </data>
+  <data name="ShortcutDescTopMost" xml:space="preserve">
+    <value>항상위 토글</value>
+  </data>
+  <data name="ShortcutDescTheme" xml:space="preserve">
+    <value>테마 토글</value>
+  </data>
+  <data name="ShortcutDescStickyNote" xml:space="preserve">
+    <value>스티커 노트</value>
+  </data>
+  <data name="EditorFindPlaceholder" xml:space="preserve">
+    <value>찾기</value>
+  </data>
+  <data name="EditorReplacePlaceholder" xml:space="preserve">
+    <value>바꾸기</value>
+  </data>
+  <data name="EditorReplaceButton" xml:space="preserve">
+    <value>바꾸기</value>
+  </data>
+  <data name="EditorReplaceAllButton" xml:space="preserve">
+    <value>모두 바꾸기</value>
+  </data>
+  <data name="EditorFindPrevTooltip" xml:space="preserve">
+    <value>이전</value>
+  </data>
+  <data name="EditorFindNextTooltip" xml:space="preserve">
+    <value>다음</value>
+  </data>
+  <data name="EditorFindCloseTooltip" xml:space="preserve">
+    <value>닫기</value>
+  </data>
+  <data name="StatusTotalLinesFormat" xml:space="preserve">
+    <value>전체 줄수: {0}</value>
+  </data>
+  <data name="StatusSelectionStatsFormat" xml:space="preserve">
+    <value>선택됨: {0}자 / {1}단어 / {2}줄</value>
+  </data>
+  <data name="UnsavedChangesAppCloseTitle" xml:space="preserve">
+    <value>저장되지 않은 변경 사항</value>
+  </data>
+  <data name="UnsavedChangesAppCloseMessage" xml:space="preserve">
+    <value>저장되지 않은 탭이 {0}개 있습니다. 종료하기 전에 저장하시겠습니까?</value>
+  </data>
+  <data name="UnsavedChangesAppCloseDiscard" xml:space="preserve">
+    <value>저장하지 않고 종료</value>
+  </data>
+  <data name="UnsavedChangesAppCloseSave" xml:space="preserve">
+    <value>저장하고 종료</value>
+  </data>
+  <data name="UnsavedChangesTabCloseTitle" xml:space="preserve">
+    <value>변경 내용 저장</value>
+  </data>
+  <data name="UnsavedChangesTabCloseMessage" xml:space="preserve">
+    <value>파일 '{0}'의 변경 내용이 저장되지 않았습니다. 닫으시겠습니까?</value>
+  </data>
+  <data name="UnsavedChangesTabCloseDiscard" xml:space="preserve">
+    <value>저장하지 않고 닫기</value>
+  </data>
+  <data name="UnsavedChangesTabCloseSave" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="UnsavedChangesCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="GitHistoryItemDialogTitle" xml:space="preserve">
+    <value>커밋 정보 [{0}]</value>
+  </data>
+  <data name="GitHistoryItemClose" xml:space="preserve">
+    <value>닫기</value>
+  </data>
+  <data name="GitHistoryItemDialogHeader" xml:space="preserve">
+    <value>변경된 파일 목록 (더블클릭 시 비교 뷰어 열림):</value>
+  </data>
+  <data name="GitCommitSuccessTitle" xml:space="preserve">
+    <value>Git 커밋</value>
+  </data>
+  <data name="GitCommitSuccessMessage" xml:space="preserve">
+    <value>성공적으로 커밋 완료되었습니다!</value>
+  </data>
+  <data name="UntitledNewTab" xml:space="preserve">
+    <value>제목 없음</value>
+  </data>
+  <data name="GoToLinePlaceholder" xml:space="preserve">
+    <value>이동할 줄 번호 입력...</value>
+  </data>
+  <data name="GoToLineTitle" xml:space="preserve">
+    <value>줄 이동 (Go to Line)</value>
+  </data>
+  <data name="GoToLineButton" xml:space="preserve">
+    <value>이동</value>
+  </data>
+  <data name="GoToLineCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="SnippetInsertErrorTitle" xml:space="preserve">
+    <value>스니펫 삽입 오류</value>
+  </data>
+  <data name="SnippetInsertErrorMessage" xml:space="preserve">
+    <value>현재 텍스트 에디터 창이 활성화되어 있지 않습니다.</value>
+  </data>
+  <data name="SnippetAddTitle" xml:space="preserve">
+    <value>새 코드/수식 스니펫 추가</value>
+  </data>
+  <data name="SnippetAddButton" xml:space="preserve">
+    <value>추가</value>
+  </data>
+  <data name="SnippetEditTitle" xml:space="preserve">
+    <value>스니펫 수정</value>
+  </data>
+  <data name="SnippetEditSave" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="SnippetPlaceholderName" xml:space="preserve">
+    <value>스니펫 이름 (예: C# Loop)</value>
+  </data>
+  <data name="SnippetPlaceholderKeyword" xml:space="preserve">
+    <value>키워드 (예: loop)</value>
+  </data>
+  <data name="SnippetPlaceholderDesc" xml:space="preserve">
+    <value>간단한 설명</value>
+  </data>
+  <data name="SnippetPlaceholderContent" xml:space="preserve">
+    <value>코드 본문 입력...</value>
+  </data>
+  <data name="SnippetLabelName" xml:space="preserve">
+    <value>스니펫 이름</value>
+  </data>
+  <data name="SnippetLabelKeyword" xml:space="preserve">
+    <value>자동완성 키워드</value>
+  </data>
+  <data name="SnippetLabelDesc" xml:space="preserve">
+    <value>설명</value>
+  </data>
+  <data name="SnippetLabelContent" xml:space="preserve">
+    <value>템플릿 내용</value>
+  </data>
+  <data name="SnippetCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="CompareSelectFromTab" xml:space="preserve">
+    <value>탭에서 선택...</value>
+  </data>
+  <data name="CompareTabPrefix" xml:space="preserve">
+    <value>탭</value>
+  </data>
+  <data name="CompareOriginalPathPlaceholder" xml:space="preserve">
+    <value>원본 파일 경로...</value>
+  </data>
+  <data name="CompareBrowse" xml:space="preserve">
+    <value>찾아보기...</value>
+  </data>
+  <data name="CompareModifiedPathPlaceholder" xml:space="preserve">
+    <value>비교 대상 파일 경로...</value>
+  </data>
+  <data name="CompareOriginalFileLabel" xml:space="preserve">
+    <value>원본 파일 (Original File)</value>
+  </data>
+  <data name="CompareModifiedFileLabel" xml:space="preserve">
+    <value>비교 대상 파일 (Modified File)</value>
+  </data>
+  <data name="CompareDialogTitle" xml:space="preserve">
+    <value>파일 비교 (File Compare)</value>
+  </data>
+  <data name="CompareDialogCompareButton" xml:space="preserve">
+    <value>비교하기</value>
+  </data>
+  <data name="CompareDialogCancelButton" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="TextColorPickerTitle" xml:space="preserve">
+    <value>글자색 선택</value>
+  </data>
+  <data name="TextColorApplyButton" xml:space="preserve">
+    <value>적용</value>
+  </data>
+  <data name="TabMenuCopyFileName" xml:space="preserve">
+    <value>파일이름 복사</value>
+  </data>
+  <data name="TabMenuCopyFilePath" xml:space="preserve">
+    <value>경로 복사</value>
+  </data>
+  <data name="TabMenuReload" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="TabMenuEncrypt" xml:space="preserve">
+    <value>암호화</value>
+  </data>
+  <data name="TabMenuChangeEncryptionPassword" xml:space="preserve">
+    <value>암호 변경</value>
+  </data>
+  <data name="TabMenuRemoveEncryption" xml:space="preserve">
+    <value>암호 해제</value>
+  </data>
+  <data name="EncryptedTabTooltip" xml:space="preserve">
+    <value>암호화됨</value>
+  </data>
+  <data name="EncryptionPasswordDialogTitle" xml:space="preserve">
+    <value>암호 입력</value>
+  </data>
+  <data name="EncryptionSetPasswordTitle" xml:space="preserve">
+    <value>암호화</value>
+  </data>
+  <data name="EncryptionChangePasswordTitle" xml:space="preserve">
+    <value>암호 변경</value>
+  </data>
+  <data name="EncryptionRemoveTitle" xml:space="preserve">
+    <value>암호 해제</value>
+  </data>
+  <data name="EncryptionPasswordLabel" xml:space="preserve">
+    <value>암호</value>
+  </data>
+  <data name="EncryptionConfirmPasswordLabel" xml:space="preserve">
+    <value>암호 확인</value>
+  </data>
+  <data name="EncryptionCurrentPasswordLabel" xml:space="preserve">
+    <value>현재 암호</value>
+  </data>
+  <data name="EncryptionOpenButton" xml:space="preserve">
+    <value>열기</value>
+  </data>
+  <data name="EncryptionApplyButton" xml:space="preserve">
+    <value>적용</value>
+  </data>
+  <data name="EncryptionCancelButton" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="EncryptionPasswordEmpty" xml:space="preserve">
+    <value>암호를 입력해 주세요.</value>
+  </data>
+  <data name="EncryptionPasswordMismatch" xml:space="preserve">
+    <value>입력한 암호가 일치하지 않습니다.</value>
+  </data>
+  <data name="EncryptionCurrentPasswordMismatch" xml:space="preserve">
+    <value>현재 암호가 올바르지 않습니다.</value>
+  </data>
+  <data name="EncryptionDialogNotReady" xml:space="preserve">
+    <value>암호 입력 창을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요.</value>
+  </data>
+  <data name="TabMenuLivePreview" xml:space="preserve">
+    <value>라이브 프리뷰</value>
+  </data>
+  <data name="TabMenuAddToFavorites" xml:space="preserve">
+    <value>즐겨찾기 추가</value>
+  </data>
+  <data name="TabMenuOpenFolder" xml:space="preserve">
+    <value>해당 폴더로 이동</value>
+  </data>
+  <data name="TabMenuCloseRight" xml:space="preserve">
+    <value>오른쪽 탭 닫기</value>
+  </data>
+  <data name="TabMenuCloseLeft" xml:space="preserve">
+    <value>왼쪽 탭 닫기</value>
+  </data>
+  <data name="TabMenuCloseOthers" xml:space="preserve">
+    <value>다른 탭 닫기</value>
+  </data>
+  <data name="EditorContextMenuCut" xml:space="preserve">
+    <value>잘라내기</value>
+  </data>
+  <data name="EditorContextMenuCopy" xml:space="preserve">
+    <value>복사</value>
+  </data>
+  <data name="EditorContextMenuPaste" xml:space="preserve">
+    <value>붙여넣기</value>
+  </data>
+  <data name="EditorContextMenuDelete" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="EditorContextMenuSelectAll" xml:space="preserve">
+    <value>모두 선택</value>
+  </data>
+  <data name="EditorContextMenuToggleComment" xml:space="preserve">
+    <value>주석 토글</value>
+  </data>
+  <data name="EditorContextMenuIndent" xml:space="preserve">
+    <value>들여쓰기</value>
+  </data>
+  <data name="EditorContextMenuOutdent" xml:space="preserve">
+    <value>내여쓰기</value>
+  </data>
+  <data name="EditorContextMenuLineCleanup" xml:space="preserve">
+    <value>줄 정리</value>
+  </data>
+  <data name="EditorContextMenuSortAsc" xml:space="preserve">
+    <value>오름차순 정렬</value>
+  </data>
+  <data name="EditorContextMenuSortDesc" xml:space="preserve">
+    <value>내림차순 정렬</value>
+  </data>
+  <data name="EditorContextMenuRemoveDuplicates" xml:space="preserve">
+    <value>중복 줄 제거</value>
+  </data>
+  <data name="EditorContextMenuRemoveEmptyLines" xml:space="preserve">
+    <value>빈 줄 제거</value>
+  </data>
+  <data name="EditorContextMenuCollapseConsecutiveEmptyLines" xml:space="preserve">
+    <value>연속 빈줄 하나로 줄이기</value>
+  </data>
+  <data name="EditorContextMenuTrimSpaces" xml:space="preserve">
+    <value>앞뒤 공백 제거</value>
+  </data>
+  <data name="EditorContextMenuConvert" xml:space="preserve">
+    <value>변환</value>
+  </data>
+  <data name="EditorContextMenuToUpperCase" xml:space="preserve">
+    <value>대문자로</value>
+  </data>
+  <data name="EditorContextMenuToLowerCase" xml:space="preserve">
+    <value>소문자로</value>
+  </data>
+  <data name="EditorContextMenuToSentenceCase" xml:space="preserve">
+    <value>Sentence case</value>
+  </data>
+  <data name="EditorContextMenuToTitleCase" xml:space="preserve">
+    <value>Title case</value>
+  </data>
+  <data name="EditorContextMenuUrlEncode" xml:space="preserve">
+    <value>URL Encode</value>
+  </data>
+  <data name="EditorContextMenuUrlDecode" xml:space="preserve">
+    <value>URL Decode</value>
+  </data>
+  <data name="EditorContextMenuBase64Encode" xml:space="preserve">
+    <value>Base64 Encode</value>
+  </data>
+  <data name="EditorContextMenuBase64Decode" xml:space="preserve">
+    <value>Base64 Decode</value>
+  </data>
+  <data name="EditorContextMenuHexToDec" xml:space="preserve">
+    <value>HEX → DEC</value>
+  </data>
+  <data name="EditorContextMenuDecToHex" xml:space="preserve">
+    <value>DEC → HEX</value>
+  </data>
+  <data name="EditorContextMenuFormatText" xml:space="preserve">
+    <value>Format text</value>
+  </data>
+  <data name="EditorContextMenuScrollSync" xml:space="preserve">
+    <value>스크롤 동기화</value>
+  </data>
+  <data name="EditorAutocompleteSnippet" xml:space="preserve">
+    <value>스니펫</value>
+  </data>
+  <data name="EditorAutocompleteSnippetPrefix" xml:space="preserve">
+    <value>스니펫: </value>
+  </data>
+  <data name="DiffCompareToolTitle" xml:space="preserve">
+    <value>TxtAIEditor 파일 비교 도구 (File Compare)</value>
+  </data>
+  <data name="DiffStatsGathering" xml:space="preserve">
+    <value>수집 중...</value>
+  </data>
+  <data name="DiffOriginalFileLabel" xml:space="preserve">
+    <value>원본 파일 (Original)</value>
+  </data>
+  <data name="DiffModifiedFileLabel" xml:space="preserve">
+    <value>비교 대상 파일 (Modified)</value>
+  </data>
+  <data name="DiffOriginalPrefix" xml:space="preserve">
+    <value>원본: </value>
+  </data>
+  <data name="DiffModifiedPrefix" xml:space="preserve">
+    <value>수정본: </value>
+  </data>
+  <data name="DiffStatsFormat" xml:space="preserve">
+    <value>변경사항: 추가 {0}줄, 삭제 {1}줄</value>
+  </data>
+  <data name="GitPreviousCommitFormat" xml:space="preserve">
+    <value>{0} (이전 커밋)</value>
+  </data>
+  <data name="GitCommitHashFormat" xml:space="preserve">
+    <value>{0} (커밋 {1})</value>
+  </data>
+  <data name="GitCompareTitleFormat" xml:space="preserve">
+    <value>비교 [{0}]: {1}</value>
+  </data>
+  <data name="GitCompareDiffTitleFormat" xml:space="preserve">
+    <value>Git 비교: {0}</value>
+  </data>
+  <data name="GitPreviousVersionFormat" xml:space="preserve">
+    <value>{0} (이전 버전)</value>
+  </data>
+  <data name="GitCurrentChangesFormat" xml:space="preserve">
+    <value>{0} (현재 변경 사항)</value>
+  </data>
+  <data name="SearchReplaceOneTooltip" xml:space="preserve">
+    <value>이 항목만 바꾸기</value>
+  </data>
+  <data name="SnippetExport" xml:space="preserve">
+    <value>내보내기</value>
+  </data>
+  <data name="SnippetImport" xml:space="preserve">
+    <value>가져오기</value>
+  </data>
+  <data name="SnippetImportErrorTitle" xml:space="preserve">
+    <value>스니펫 가져오기 오류</value>
+  </data>
+  <data name="SnippetImportErrorMessage" xml:space="preserve">
+    <value>파일을 가져오는 중 오류가 발생했습니다: {0}</value>
+  </data>
+  <data name="SnippetReset" xml:space="preserve">
+    <value>초기화</value>
+  </data>
+  <data name="SnippetResetTitle" xml:space="preserve">
+    <value>스니펫 초기화</value>
+  </data>
+  <data name="SnippetResetConfirm" xml:space="preserve">
+    <value>기본 스니펫으로 초기화하시겠습니까? 추가한 스니펫이 모두 삭제됩니다.</value>
+  </data>
+  <data name="SnippetResetConfirmButton" xml:space="preserve">
+    <value>초기화</value>
+  </data>
+  <data name="TOC" xml:space="preserve">
+    <value>목차 (TOC)</value>
+  </data>
+  <data name="TOCHeader" xml:space="preserve">
+    <value>목차 (TOC)</value>
+  </data>
+  <data name="SnippetEditTooltip" xml:space="preserve">
+    <value>수정</value>
+  </data>
+  <data name="SnippetDeleteTooltip" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="StickyNoteTitle" xml:space="preserve">
+    <value>스티커 노트</value>
+  </data>
+  <data name="ExitStickyNoteTooltip" xml:space="preserve">
+    <value>스티커 노트 모드 종료</value>
+  </data>
+  <data name="ExitStickyNoteText" xml:space="preserve">
+    <value>나가기</value>
+  </data>
+  <data name="TerminalExited" xml:space="preserve">
+    <value>터미널 종료</value>
+  </data>
+  <data name="TerminalStartFailed" xml:space="preserve">
+    <value>터미널을 시작하지 못했습니다</value>
+  </data>
+  <data name="TerminalHasExited" xml:space="preserve">
+    <value>터미널이 종료되었습니다</value>
+  </data>
+  <data name="TerminalSendFailed" xml:space="preserve">
+    <value>명령 전송 실패</value>
+  </data>
+  <data name="ExplorerCopyFileName" xml:space="preserve">
+    <value>파일이름 복사</value>
+  </data>
+  <data name="ExplorerCopyFilePath" xml:space="preserve">
+    <value>경로 복사</value>
+  </data>
+  <data name="ExplorerRefreshTooltip" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="ExplorerCopyFolderPath" xml:space="preserve">
+    <value>폴더 경로 복사</value>
+  </data>
+  <data name="ExplorerRename" xml:space="preserve">
+    <value>이름 바꾸기</value>
+  </data>
+  <data name="ExplorerDelete" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="RenameDialogTitle" xml:space="preserve">
+    <value>이름 바꾸기</value>
+  </data>
+  <data name="RenameDialogOK" xml:space="preserve">
+    <value>확인</value>
+  </data>
+  <data name="RenameDialogCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="RenameErrorTitle" xml:space="preserve">
+    <value>이름 바꾸기 오류</value>
+  </data>
+  <data name="DeleteConfirmTitle" xml:space="preserve">
+    <value>삭제 확인</value>
+  </data>
+  <data name="DeleteConfirmMessage" xml:space="preserve">
+    <value>'{0}'을(를) 휴지통으로 이동하시겠습니까?</value>
+  </data>
+  <data name="DeleteConfirmOK" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="DeleteConfirmCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="DeleteErrorTitle" xml:space="preserve">
+    <value>삭제 오류</value>
+  </data>
+  <data name="LlmPresetButtonText" xml:space="preserve">
+    <value>프리셋</value>
+  </data>
+  <data name="LlmPresetButtonTooltip" xml:space="preserve">
+    <value>지시사항 프리셋 목록</value>
+  </data>
+  <data name="LlmPresetAddText" xml:space="preserve">
+    <value>프리셋 추가</value>
+  </data>
+  <data name="LlmPresetApplyText" xml:space="preserve">
+    <value>적용</value>
+  </data>
+  <data name="LlmPresetDeleteText" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="LlmPresetSaveTitle" xml:space="preserve">
+    <value>현재 탭 내용을 프리셋으로 추가</value>
+  </data>
+  <data name="LlmPresetSavePlaceholder" xml:space="preserve">
+    <value>프리셋 이름 입력...</value>
+  </data>
+  <data name="LlmPresetSaveLabel" xml:space="preserve">
+    <value>프리셋 이름</value>
+  </data>
+  <data name="LlmPresetSaveAddButton" xml:space="preserve">
+    <value>추가</value>
+  </data>
+  <data name="LlmPresetSaveCancelButton" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="LlmPresetNameEmptyTitle" xml:space="preserve">
+    <value>프리셋 추가 오류</value>
+  </data>
+  <data name="LlmPresetNameEmptyMessage" xml:space="preserve">
+    <value>프리셋 이름을 입력해주세요.</value>
+  </data>
+  <data name="LlmPresetDuplicateTitle" xml:space="preserve">
+    <value>프리셋 중복</value>
+  </data>
+  <data name="LlmPresetDuplicateMessage" xml:space="preserve">
+    <value>이미 동일한 이름의 프리셋이 존재합니다. 덮어쓰시겠습니까?</value>
+  </data>
+  <data name="LlmPresetContentLabel" xml:space="preserve">
+    <value>프리셋 내용</value>
+  </data>
+  <data name="LlmPresetContentPlaceholder" xml:space="preserve">
+    <value>프리셋 내용...</value>
+  </data>
+  <data name="LlmPresetEditTitle" xml:space="preserve">
+    <value>프리셋 수정</value>
+  </data>
+  <data name="LlmPresetEditSaveButton" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="ExpandPreviewTooltip" xml:space="preserve">
+    <value>프리뷰 늘리기</value>
+  </data>
+  <data name="LlmMaxInstructionsReached" xml:space="preserve">
+    <value>지시문 탭은 최대 4개까지만 생성할 수 있습니다. 기존 탭을 삭제한 후 다시 시도해 주세요.</value>
+  </data>
+  <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
+    <value>[{0}] 프리셋 적용됨. 추가 지시사항 입력...</value>
+  </data>
+</root>

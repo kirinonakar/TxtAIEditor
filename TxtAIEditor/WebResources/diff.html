@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TxtAIEditor File Compare</title>
+    <style>
+        :root {
+            --bg: transparent; /* Start transparent to prevent dark flashes on load */
+            --fg: #d4d4d4;
+            --border: #3e3e3e;
+            --header-bg: #252526;
+            --gutter-bg: #1e1e1e;
+            --gutter-fg: #858585;
+            --added-bg: rgba(46, 160, 67, 0.15);
+            --added-border: rgba(46, 160, 67, 0.4);
+            --added-text: #3fb950;
+            --removed-bg: rgba(248, 81, 73, 0.15);
+            --removed-border: rgba(248, 81, 73, 0.4);
+            --removed-text: #f85149;
+            --empty-bg: #171717;
+            --font-family: Consolas, "Courier New", monospace;
+            --ui-font: "Segoe UI", "Malgun Gothic", sans-serif;
+            --scrollmap-width: 14px;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --fg: #1a1a1a;
+                --border: #e1e4e8;
+                --header-bg: #f3f3f3;
+                --gutter-bg: #f3f3f3;
+                --gutter-fg: #6a737d;
+                --added-text: #22863a;
+                --removed-text: #cb2431;
+                --empty-bg: #f9f9f9;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: var(--ui-font);
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+
+        #title-bar {
+            display: flex;
+            justify-content: space-between;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        #diff-panels {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .diff-column {
+            display: flex;
+            flex-direction: column;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+            border-right: 1px solid var(--border);
+        }
+
+        .diff-column:last-child {
+            border-right: 0;
+        }
+
+        .panel-header {
+            background: var(--header-bg);
+            padding: 6px 12px;
+            font-size: 12px;
+            color: var(--gutter-fg);
+            border-bottom: 1px solid var(--border);
+            font-family: var(--ui-font);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Wrapper that contains both the scrollable content and the scrollmap */
+        .panel-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .view-wrapper {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            /* Hide native scrollbar on right side — we draw our own scrollmap there */
+            scrollbar-width: none; /* Firefox */
+        }
+        .view-wrapper::-webkit-scrollbar {
+            display: none; /* Chrome/WebView2 */
+        }
+
+        .diff-view {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-family);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .diff-row {
+            display: table-row;
+        }
+
+        .line-number {
+            display: table-cell;
+            width: 50px;
+            text-align: right;
+            padding-right: 10px;
+            color: var(--gutter-fg);
+            background: var(--gutter-bg);
+            user-select: none;
+            border-right: 1px solid var(--border);
+        }
+
+        .line-content {
+            display: table-cell;
+            padding-left: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Diff styling states */
+        .row-added {
+            background: var(--added-bg);
+        }
+        .row-added .line-content {
+            color: var(--added-text);
+            background: rgba(46, 160, 67, 0.08);
+            border-left: 3px solid var(--added-border);
+        }
+
+        .row-removed {
+            background: var(--removed-bg);
+        }
+        .row-removed .line-content {
+            color: var(--removed-text);
+            background: rgba(248, 81, 73, 0.08);
+            border-left: 3px solid var(--removed-border);
+        }
+
+        .row-empty {
+            background: var(--empty-bg);
+            user-select: none;
+        }
+        .row-empty .line-number {
+            color: transparent;
+            background: var(--empty-bg);
+        }
+
+        /* ── Scrollmap (custom scrollbar with diff markers) ── */
+        .scrollmap {
+            width: var(--scrollmap-width);
+            height: 100%;
+            position: relative;
+            flex-shrink: 0;
+            background: rgba(128, 128, 128, 0.08);  /* 배경을 아주 옅게 */
+            border-left: 1px solid var(--border);
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        /* Coloured markers rendered absolutely inside the scrollmap */
+        .scrollmap-marker {
+            position: absolute;
+            left: 1px;
+            right: 1px;
+            min-height: 2px;
+            border-radius: 1px;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .scrollmap-marker.added {
+            background: rgba(46, 160, 67, 0.8);
+        }
+        .scrollmap-marker.removed {
+            background: rgba(248, 81, 73, 0.8);
+        }
+
+        /* Viewport thumb — shows the current visible region */
+        .scrollmap-thumb {
+            position: absolute;
+            left: 0;
+            right: 0;
+            background: rgba(160, 160, 160, 0.25);
+            border-top: 2px solid rgba(200, 200, 200, 0.7);
+            border-bottom: 2px solid rgba(200, 200, 200, 0.7);
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 10;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="title-bar">
+            <span id="diff-title">TxtAIEditor 파일 비교 도구 (File Compare)</span>
+            <span id="diff-stats" style="font-weight: normal; color: var(--gutter-fg);">수집 중...</span>
+        </div>
+        <div id="diff-panels">
+            <!-- Left Panel (Original) -->
+            <div class="diff-column">
+                <div class="panel-header" id="left-header">원본 파일 (Original)</div>
+                <div class="panel-body">
+                    <div class="view-wrapper" id="left-wrapper">
+                        <div class="diff-view" id="left-view"></div>
+                    </div>
+                    <div class="scrollmap" id="left-scrollmap">
+                        <div class="scrollmap-thumb" id="left-thumb"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right Panel (Modified) -->
+            <div class="diff-column">
+                <div class="panel-header" id="right-header">비교 대상 파일 (Modified)</div>
+                <div class="panel-body">
+                    <div class="view-wrapper" id="right-wrapper">
+                        <div class="diff-view" id="right-view"></div>
+                    </div>
+                    <div class="scrollmap" id="right-scrollmap">
+                        <div class="scrollmap-thumb" id="right-thumb"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const leftWrapper  = document.getElementById('left-wrapper');
+        const rightWrapper = document.getElementById('right-wrapper');
+        const leftView     = document.getElementById('left-view');
+        const rightView    = document.getElementById('right-view');
+        const leftScrollmap  = document.getElementById('left-scrollmap');
+        const rightScrollmap = document.getElementById('right-scrollmap');
+        const leftThumb  = document.getElementById('left-thumb');
+        const rightThumb = document.getElementById('right-thumb');
+
+        // Prevent dragging duplicate windows
+        window.addEventListener('dragover', e => e.preventDefault());
+        window.addEventListener('drop',     e => e.preventDefault());
+
+        // ── Keyboard shortcut forwarding ──────────────────────────────────
+        function post(msg) {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage(msg);
+            }
+        }
+
+        window.addEventListener('keydown', event => {
+            if (event.key === 'F9') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f9' });
+            } else if (event.key === 'F10') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f10' });
+            } else if (event.key === 'F12') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f12' });
+            }
+        });
+
+        // ── LCS diff comparison logic ──────────────────────────────────────
+        function computeLineDiff(textA, textB) {
+            const linesA = textA.split(/\r?\n/);
+            const linesB = textB.split(/\r?\n/);
+
+            const dp = Array(linesA.length + 1).fill(null).map(() => Array(linesB.length + 1).fill(0));
+            for (let i = 1; i <= linesA.length; i++) {
+                for (let j = 1; j <= linesB.length; j++) {
+                    if (linesA[i - 1] === linesB[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+            }
+
+            let i = linesA.length;
+            let j = linesB.length;
+            const diffA = [];
+            const diffB = [];
+
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && linesA[i - 1] === linesB[j - 1]) {
+                    diffA.unshift({ type: 'unchanged', text: linesA[i - 1], lineNum: i });
+                    diffB.unshift({ type: 'unchanged', text: linesB[j - 1], lineNum: j });
+                    i--; j--;
+                } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                    diffA.unshift({ type: 'empty', text: '', lineNum: null });
+                    diffB.unshift({ type: 'added', text: linesB[j - 1], lineNum: j });
+                    j--;
+                } else {
+                    diffA.unshift({ type: 'removed', text: linesA[i - 1], lineNum: i });
+                    diffB.unshift({ type: 'empty', text: '', lineNum: null });
+                    i--;
+                }
+            }
+
+            return { diffA, diffB };
+        }
+
+        // ── Scrollmap helpers ──────────────────────────────────────────────
+
+        /**
+         * Build coloured diff markers for a scrollmap.
+         * @param {HTMLElement} scrollmap  - the scrollmap container
+         * @param {HTMLElement} view       - the diff-view table element
+         * @param {'removed'|'added'} markerClass - CSS class for the markers
+         */
+        function buildScrollmapMarkers(scrollmap, wrapper, view, markerClass) {
+            // Remove old markers (but keep the thumb)
+            scrollmap.querySelectorAll('.scrollmap-marker').forEach(el => el.remove());
+
+            const mapH   = scrollmap.clientHeight;
+            const totalH = wrapper.scrollHeight;   // full scrollable height of the wrapper
+            if (totalH === 0 || mapH === 0) return;
+
+            const scale = mapH / totalH;
+
+            // Gather all changed rows
+            const selector = markerClass === 'added' ? '.row-added' : '.row-removed';
+            const rows = view.querySelectorAll(selector);
+
+            // Collapse adjacent rows into bands
+            const bands = [];
+            rows.forEach(row => {
+                const top    = row.offsetTop  * scale;
+                const height = Math.max(row.offsetHeight * scale, 2);
+                const bottom = top + height;
+
+                if (bands.length > 0 && top <= bands[bands.length - 1].bottom + 1) {
+                    bands[bands.length - 1].bottom = Math.max(bands[bands.length - 1].bottom, bottom);
+                } else {
+                    bands.push({ top, bottom });
+                }
+            });
+
+            const thumb = scrollmap.querySelector('.scrollmap-thumb');
+            bands.forEach(band => {
+                const marker = document.createElement('div');
+                marker.className = `scrollmap-marker ${markerClass}`;
+                marker.style.top    = `${band.top}px`;
+                marker.style.height = `${Math.max(band.bottom - band.top, 2)}px`;
+                scrollmap.insertBefore(marker, thumb);
+            });
+        }
+
+        /**
+         * Update the viewport thumb position inside a scrollmap.
+         */
+        function updateScrollmapThumb(wrapper, scrollmap, thumb) {
+            const mapH   = scrollmap.clientHeight;
+            const totalH = wrapper.scrollHeight;   // full scrollable height
+            if (totalH === 0 || mapH === 0) return;
+
+            const scale   = mapH / totalH;
+            const viewH   = wrapper.clientHeight;
+            const scrollY = wrapper.scrollTop;
+
+            const thumbTop = scrollY * scale;
+            // If content fits entirely, thumb fills the whole map
+            const thumbH   = totalH <= viewH ? mapH : Math.max(viewH * scale, 8);
+
+            thumb.style.top    = `${thumbTop}px`;
+            thumb.style.height = `${thumbH}px`;
+        }
+
+        /**
+         * Attach click/drag scrolling on a scrollmap.
+         */
+        function attachScrollmapInput(scrollmap, wrapper, view, thumb) {
+            function scrollToRatio(clientY) {
+                const rect   = scrollmap.getBoundingClientRect();
+                const ratio  = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
+                const maxSc  = view.scrollHeight - wrapper.clientHeight;
+                wrapper.scrollTop = ratio * maxSc;
+            }
+
+            let dragging = false;
+            scrollmap.addEventListener('mousedown', e => {
+                dragging = true;
+                scrollToRatio(e.clientY);
+                e.preventDefault();
+            });
+            window.addEventListener('mousemove', e => {
+                if (dragging) scrollToRatio(e.clientY);
+            });
+            window.addEventListener('mouseup', () => { dragging = false; });
+        }
+
+        // ── Render ─────────────────────────────────────────────────────────
+        function renderDiff(data) {
+            const { diffA, diffB } = computeLineDiff(data.textA, data.textB);
+
+            // Update title
+            const diffTitleEl = document.getElementById('diff-title');
+            if (diffTitleEl && data.compareToolTitle) {
+                diffTitleEl.textContent = data.compareToolTitle;
+            }
+
+            const prefixA = data.originalPrefix || '원본: ';
+            const prefixB = data.modifiedPrefix || '수정본: ';
+            const defaultLabelA = data.originalFileLabel || '원본 파일 (Original)';
+            const defaultLabelB = data.modifiedFileLabel || '비교 대상 파일 (Modified)';
+
+            document.getElementById('left-header').textContent  = `${prefixA}${data.titleA || defaultLabelA}`;
+            document.getElementById('right-header').textContent = `${prefixB}${data.titleB || defaultLabelB}`;
+
+            let leftHtml  = '';
+            let rightHtml = '';
+            let additions = 0;
+            let deletions = 0;
+
+            for (let k = 0; k < diffA.length; k++) {
+                const itemA = diffA[k];
+                const itemB = diffB[k];
+
+                // Left row
+                if (itemA.type === 'removed') {
+                    leftHtml += `<div class="diff-row row-removed"><div class="line-number">${itemA.lineNum}</div><div class="line-content">- ${escapeHtml(itemA.text)}</div></div>`;
+                    deletions++;
+                } else if (itemA.type === 'empty') {
+                    leftHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
+                } else {
+                    leftHtml += `<div class="diff-row"><div class="line-number">${itemA.lineNum}</div><div class="line-content">  ${escapeHtml(itemA.text)}</div></div>`;
+                }
+
+                // Right row
+                if (itemB.type === 'added') {
+                    rightHtml += `<div class="diff-row row-added"><div class="line-number">${itemB.lineNum}</div><div class="line-content">+ ${escapeHtml(itemB.text)}</div></div>`;
+                    additions++;
+                } else if (itemB.type === 'empty') {
+                    rightHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
+                } else {
+                    rightHtml += `<div class="diff-row"><div class="line-number">${itemB.lineNum}</div><div class="line-content">  ${escapeHtml(itemB.text)}</div></div>`;
+                }
+            }
+
+            leftView.innerHTML  = leftHtml;
+            rightView.innerHTML = rightHtml;
+
+            const formatStr = data.diffStatsFormat || '변경사항: 추가 {0}줄, 삭제 {1}줄';
+            document.getElementById('diff-stats').textContent = formatStr
+                .replace('{0}', additions)
+                .replace('{1}', deletions);
+
+            // Build scrollmaps after a paint cycle so offsetTop values are ready
+            requestAnimationFrame(() => {
+                buildScrollmapMarkers(leftScrollmap,  leftWrapper,  leftView,  'removed');
+                buildScrollmapMarkers(rightScrollmap, rightWrapper, rightView, 'added');
+                updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
+                updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
+            });
+        }
+
+        function escapeHtml(value) {
+            return (value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // ── Synchronized Scrolling ─────────────────────────────────────────
+        let isSyncingLeftScroll  = false;
+        let isSyncingRightScroll = false;
+
+        leftWrapper.addEventListener('scroll', () => {
+            updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
+            updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
+            if (isSyncingLeftScroll) { isSyncingLeftScroll = false; return; }
+            isSyncingRightScroll = true;
+            rightWrapper.scrollTop  = leftWrapper.scrollTop;
+            rightWrapper.scrollLeft = leftWrapper.scrollLeft;
+        });
+
+        rightWrapper.addEventListener('scroll', () => {
+            updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
+            updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
+            if (isSyncingRightScroll) { isSyncingRightScroll = false; return; }
+            isSyncingLeftScroll = true;
+            leftWrapper.scrollTop  = rightWrapper.scrollTop;
+            leftWrapper.scrollLeft = rightWrapper.scrollLeft;
+        });
+
+        // Scrollmap click/drag
+        attachScrollmapInput(leftScrollmap,  leftWrapper,  leftView,  leftThumb);
+        attachScrollmapInput(rightScrollmap, rightWrapper, rightView, rightThumb);
+
+        // Rebuild on resize
+        const resizeObs = new ResizeObserver(() => {
+            buildScrollmapMarkers(leftScrollmap,  leftWrapper,  leftView,  'removed');
+            buildScrollmapMarkers(rightScrollmap, rightWrapper, rightView, 'added');
+            updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
+            updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
+        });
+        resizeObs.observe(leftScrollmap);
+        resizeObs.observe(rightScrollmap);
+
+        function applyThemeSettings(theme, uiFontFamily, editorFontFamily) {
+            const bg    = theme === 'Light' ? '#ffffff' : '#1e1e1e';
+            const fg    = theme === 'Light' ? '#1a1a1a' : '#d4d4d4';
+            const empty = theme === 'Light' ? '#f9f9f9' : '#171717';
+            
+            document.documentElement.style.setProperty('--bg',         bg);
+            document.documentElement.style.setProperty('--fg',         fg);
+            document.documentElement.style.setProperty('--empty-bg',   empty);
+            document.documentElement.style.setProperty('--header-bg',  theme === 'Light' ? '#f3f3f3' : '#252526');
+            document.documentElement.style.setProperty('--gutter-bg',  theme === 'Light' ? '#f3f3f3' : '#1e1e1e');
+            document.documentElement.style.setProperty('--border',     theme === 'Light' ? '#e1e4e8' : '#3e3e3e');
+            
+            if (uiFontFamily) {
+                document.documentElement.style.setProperty('--ui-font',    uiFontFamily);
+            }
+            if (editorFontFamily) {
+                document.documentElement.style.setProperty('--font-family', editorFontFamily);
+            }
+
+            const addedText   = theme === 'Light' ? '#22863a' : '#3fb950';
+            const removedText = theme === 'Light' ? '#cb2431' : '#f85149';
+            document.documentElement.style.setProperty('--added-text',   addedText);
+            document.documentElement.style.setProperty('--removed-text', removedText);
+        }
+
+        // ── WebView2 IPC ───────────────────────────────────────────────────
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.addEventListener('message', event => {
+                const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                if (msg.action === 'compare') {
+                    if (msg.statsGathering) {
+                        document.getElementById('diff-stats').textContent = msg.statsGathering;
+                    }
+                    applyThemeSettings(msg.theme || 'Dark', msg.uiFontFamily, null);
+                    renderDiff(msg);
+                } else if (msg.action === 'updateOptions') {
+                    applyThemeSettings(msg.theme || 'Dark', null, msg.fontFamily);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

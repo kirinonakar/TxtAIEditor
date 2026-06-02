@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="TxtAIEditor.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:TxtAIEditor">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="TitleBarBackgroundBrush" Color="#F3F4F6"/>
+                    <SolidColorBrush x:Key="TitleBarForegroundBrush" Color="#1F2937"/>
+                    <SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="#F3F4F6"/>
+                    <SolidColorBrush x:Key="ToolbarBorderBrush" Color="#E5E7EB"/>
+                    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#F9FAFB"/>
+                    <SolidColorBrush x:Key="ActivityBarBackgroundBrush" Color="#F3F4F6"/>
+                    <SolidColorBrush x:Key="SidebarBorderBrush" Color="#E5E7EB"/>
+                    <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="#F3F4F6"/>
+                    <SolidColorBrush x:Key="StatusBarForegroundBrush" Color="#1F2937"/>
+                    <SolidColorBrush x:Key="SplitterBackgroundBrush" Color="#E0E2E6"/>
+                    <SolidColorBrush x:Key="SplitterHoverBackgroundBrush" Color="#C8CCD0"/>
+                    <SolidColorBrush x:Key="EditorSurfaceBackgroundBrush" Color="#FFFFFF"/>
+                    <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#FFFFFF"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="TitleBarBackgroundBrush" Color="#18191B"/>
+                    <SolidColorBrush x:Key="TitleBarForegroundBrush" Color="#D4D4D4"/>
+                    <SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="#1E1F22"/>
+                    <SolidColorBrush x:Key="ToolbarBorderBrush" Color="#2E3033"/>
+                    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#1E1F22"/>
+                    <SolidColorBrush x:Key="ActivityBarBackgroundBrush" Color="#151618"/>
+                    <SolidColorBrush x:Key="SidebarBorderBrush" Color="#2E3033"/>
+                    <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="#18191B"/>
+                    <SolidColorBrush x:Key="StatusBarForegroundBrush" Color="#FFFFFF"/>
+                    <SolidColorBrush x:Key="SplitterBackgroundBrush" Color="#2B2D31"/>
+                    <SolidColorBrush x:Key="SplitterHoverBackgroundBrush" Color="#4B4E54"/>
+                    <SolidColorBrush x:Key="EditorSurfaceBackgroundBrush" Color="#1E1E1E"/>
+
+                    <!-- TabView & TabViewItem lightweight style overrides for Dark Theme -->
+                    <SolidColorBrush x:Key="TabViewTabStripBackground" Color="#181818"/>
+                    
+                    <!-- Inactive Tab Background & Foreground -->
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackground" Color="#141517"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderForeground" Color="#969696"/>
+                    
+                    <!-- Inactive Tab Hover (PointerOver) -->
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="#28292D"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderForegroundPointerOver" Color="#E0E0E0"/>
+                    
+                    <!-- Inactive Tab Pressed -->
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="#303136"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderForegroundPressed" Color="#FFFFFF"/>
+                    
+                    <!-- Selected/Active Tab Background & Foreground (seamless blending with editor background #1E1E1E) -->
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="#1E1E1E"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderForegroundSelected" Color="#FFFFFF"/>
+                    
+                    <!-- Active Tab Hover / Pressed overrides -->
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelectedPointerOver" Color="#222327"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelectedPressed" Color="#2B2C31"/>
+                    
+                    <!-- Tab Borders -->
+                    <SolidColorBrush x:Key="TabViewItemHeaderBorderBrush" Color="Transparent"/>
+                    <SolidColorBrush x:Key="TabViewBorderBrush" Color="#2E3033"/>
+                    <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#181818"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <!-- Other merged dictionaries here -->
+            </ResourceDictionary.MergedDictionaries>
+            <!-- Other app resources here -->
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

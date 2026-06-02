@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TxtAIEditor Virtual Preview</title>
+    <link rel="stylesheet" href="katex/katex.min.css">
+    <script src="katex/katex.min.js"></script>
+    <script src="mermaid/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg: transparent;
+            --fg: #d4d4d4;
+            --muted: #9aa0a6;
+            --link: #4da3ff;
+            --code-bg: #2d2d2d;
+            --border: #3e3e3e;
+            --font: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
+            --row-height: 24px;
+            --empty-row-height: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: var(--font);
+            font-size: var(--font-size, 15px);
+            line-height: 1.55;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: color-mix(in srgb, var(--fg) 22%, transparent);
+            border: 2px solid var(--bg);
+            border-radius: 5px;
+        }
+
+        #preview-scroll {
+            position: absolute;
+            inset: 0;
+            overflow: auto;
+            padding: 0;
+        }
+
+        #html-preview {
+            position: absolute;
+            inset: 0;
+            display: none;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: #fff;
+            overflow: auto;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        body.html-mode #preview-scroll {
+            display: none;
+        }
+
+        body.html-mode #html-preview {
+            display: block;
+        }
+
+        #virtual-spacer {
+            width: 1px;
+            height: var(--row-height);
+        }
+
+        #preview-viewport {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            will-change: transform;
+        }
+
+        body:not(.wrap-enabled) #preview-viewport {
+            right: auto;
+            min-width: 100%;
+            width: max-content;
+        }
+
+        .preview-row {
+            min-height: var(--row-height);
+            padding: 0 22px;
+            overflow: visible;
+            border-bottom: none;
+            overflow-wrap: anywhere;
+        }
+
+        .preview-row.empty {
+            min-height: var(--empty-row-height);
+            height: var(--empty-row-height);
+            padding-top: 0;
+            padding-bottom: 0;
+            border-bottom-color: transparent;
+        }
+
+        .preview-row.skipped {
+            min-height: 0;
+            height: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .preview-row.loading {
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p,
+        blockquote,
+        ul,
+        ol,
+        pre {
+            margin: 0;
+        }
+
+        h1,
+        h2 {
+            line-height: 1.25;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            line-height: 1.25;
+        }
+
+        h1 {
+            font-size: 1.35em;
+        }
+
+        h2 {
+            font-size: 1.2em;
+        }
+
+        h3 {
+            font-size: 1.08em;
+        }
+
+        [align="center" i] {
+            text-align: center;
+        }
+
+        [align="right" i] {
+            text-align: right;
+        }
+
+        [align="left" i] {
+            text-align: left;
+        }
+
+        a {
+            color: var(--link);
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            vertical-align: middle;
+        }
+
+        p>img:only-child {
+            display: block;
+            margin: 6px 0;
+        }
+
+        p[align="center"]>img:only-child,
+        div[align="center"]>img:only-child,
+        center>img:only-child {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        p[align="right"]>img:only-child,
+        div[align="right"]>img:only-child {
+            margin-left: auto;
+            margin-right: 0;
+        }
+
+        code {
+            padding: 2px 5px;
+            border-radius: 4px;
+            background: var(--code-bg);
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            padding: 16px;
+            overflow: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--code-bg);
+            white-space: pre;
+            line-height: 1.45;
+        }
+
+        body.wrap-enabled pre {
+            white-space: pre;
+        }
+
+        pre code {
+            display: block;
+            padding: 0;
+            border-radius: 0;
+            background: transparent;
+            font-size: 0.9em;
+            line-height: inherit;
+            white-space: inherit;
+        }
+
+        body:not(.wrap-enabled) .preview-row {
+            min-width: 100%;
+            width: max-content;
+            overflow: visible;
+            white-space: nowrap;
+            overflow-wrap: normal;
+        }
+
+        body:not(.wrap-enabled) pre {
+            overflow: visible;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 6px 0;
+            font-size: 0.9em;
+        }
+
+        th,
+        td {
+            border: 1px solid var(--border);
+            padding: 5px 10px;
+            text-align: left;
+        }
+
+        th {
+            background: color-mix(in srgb, var(--fg) 10%, transparent);
+            font-weight: 600;
+        }
+
+        blockquote {
+            padding-left: 12px;
+            color: var(--muted);
+            border-left: 3px solid var(--border);
+        }
+
+        .math {
+            overflow: hidden;
+            font-family: "Cambria Math", "Times New Roman", serif;
+            text-align: center;
+        }
+
+        .math.inline {
+            display: inline-block;
+            overflow: visible;
+            vertical-align: 0.0em;
+            text-align: left;
+        }
+
+        .math.display {
+            display: block;
+            overflow-x: auto;
+            padding: 2px 0;
+        }
+
+        .aozora {
+            font-family: "Noto Serif JP", "Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
+            letter-spacing: 0.04em;
+        }
+
+        .empty-message {
+            padding: 20px 22px;
+            color: var(--muted);
+        }
+
+        .mermaid-block {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            margin: 6px 0;
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow-x: auto;
+            min-height: 48px;
+        }
+
+        .mermaid-block svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        body.csv-mode #preview-viewport {
+            position: relative;
+            width: 100%;
+            will-change: auto;
+            overflow: visible;
+        }
+
+        .csv-table-wrap {
+            padding: 0 22px 22px;
+        }
+
+        .csv-table-wrap table {
+            font-size: 0.85em;
+        }
+
+        .csv-table-wrap thead {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .csv-table-wrap thead th {
+            background: var(--bg);
+        }
+
+        .csv-table-wrap th,
+        .csv-table-wrap td {
+            white-space: nowrap;
+            padding: 4px 12px;
+        }
+
+        .csv-table-wrap td.csv-numeric {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .csv-empty {
+            padding: 20px 22px;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="preview-scroll">
+        <div id="virtual-spacer"></div>
+        <div id="preview-viewport"></div>
+    </div>
+    <iframe id="html-preview"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"></iframe>
+
+    <script type="module">
+        const moduleVersion = new URLSearchParams(window.location.search).get('v') || Date.now();
+        const {
+            escapeAttribute,
+            escapeHtml,
+            initializeMermaid,
+            renderPreviewLineAt,
+            renderMermaidBlocks: renderSharedMermaidBlocks,
+        } = await import(`./markdown-preview-renderer.js?v=${encodeURIComponent(moduleVersion)}`);
+
+        const scroll = document.getElementById('preview-scroll');
+        const spacer = document.getElementById('virtual-spacer');
+        const viewport = document.getElementById('preview-viewport');
+        const htmlPreview = document.getElementById('html-preview');
+
+        const state = {
+            lineCount: 1,
+            rowHeight: 24,
+            overscan: 20,
+            mode: 'markdown',
+            cache: new Map(),
+            pending: new Set(),
+            rowHeights: new Map(),
+            wordWrap: true,
+            baseHref: '',
+            requestSeq: 1,
+            renderQueued: false,
+            lastRangeKey: '',
+            cacheVersion: 0,
+            blockContextLines: 120,
+            scrollSyncEnabled: true,
+            theme: 'Dark',
+            tabSize: 4
+        };
+
+        initializeMermaid('Dark');
+
+        function post(msg) {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage(msg);
+            }
+        }
+
+        let isSyncingScroll = false;
+        let suppressPreviewScrollEvents = false;
+        let scrollSuppressionToken = 0;
+
+        function suppressPreviewScrollUntilNextFrame() {
+            const token = ++scrollSuppressionToken;
+            suppressPreviewScrollEvents = true;
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (token === scrollSuppressionToken) {
+                        suppressPreviewScrollEvents = false;
+                    }
+                });
+            });
+        }
+
+        function setPreviewScrollTopSilently(value) {
+            const target = Math.max(0, Number(value || 0));
+            if (Math.abs(scroll.scrollTop - target) <= 0.5) return;
+            suppressPreviewScrollUntilNextFrame();
+            scroll.scrollTop = target;
+        }
+
+        function trimRowHeights() {
+            for (const line of [...state.rowHeights.keys()]) {
+                if (line > state.lineCount) {
+                    state.rowHeights.delete(line);
+                }
+            }
+        }
+
+        function getHtmlPreviewScrollTop() {
+            try {
+                const doc = htmlPreview.contentDocument;
+                const win = htmlPreview.contentWindow;
+                return win?.scrollY || doc?.documentElement?.scrollTop || doc?.body?.scrollTop || 0;
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        function restoreHtmlPreviewScrollTop(scrollTop) {
+            try {
+                htmlPreview.contentWindow?.scrollTo(0, Math.max(0, Number(scrollTop || 0)));
+            } catch (e) {
+                // Ignore inaccessible iframe state.
+            }
+        }
+
+        function htmlPreviewInjection(baseHref) {
+            const base = baseHref ? `<base href="${escapeAttribute(baseHref)}">` : '';
+            return `${base}<style id="TxtAIEditor-html-preview-selection-fix">html,body{min-height:100%;overflow:auto!important;-webkit-user-select:text!important;user-select:text!important;}body{cursor:text;}</style>`;
+        }
+
+        function setPreviewBaseHref(baseHref) {
+            state.baseHref = String(baseHref || '');
+            let base = document.getElementById('preview-base-href');
+            if (!state.baseHref) {
+                if (base) base.remove();
+                return;
+            }
+            if (!base) {
+                base = document.createElement('base');
+                base.id = 'preview-base-href';
+                document.head.appendChild(base);
+            }
+            base.setAttribute('href', state.baseHref);
+        }
+
+        function buildHtmlPreviewDocument(html, baseHref) {
+            const source = String(html || '');
+            const injection = htmlPreviewInjection(baseHref);
+            if (/<head(?:\s[^>]*)?>/i.test(source)) {
+                return source.replace(/<head(\s[^>]*)?>/i, match => `${match}${injection}`);
+            }
+            if (/<html(?:\s[^>]*)?>/i.test(source)) {
+                return source.replace(/<html(\s[^>]*)?>/i, match => `${match}<head>${injection}</head>`);
+            }
+            const bodySource = source.replace(/^\s*<!doctype[^>]*>\s*/i, '');
+            if (/<body(?:\s[^>]*)?>/i.test(bodySource)) {
+                return `<!DOCTYPE html><html><head>${injection}</head>${bodySource}</html>`;
+            }
+            return `<!DOCTYPE html><html><head>${injection}</head><body>${bodySource}</body></html>`;
+        }
+
+        function setHtmlMode(enabled) {
+            document.body.classList.toggle('html-mode', enabled);
+            if (!enabled) {
+                htmlPreview.removeAttribute('srcdoc');
+            }
+        }
+
+        function renderHtmlPreview(message) {
+            const previousFrameScrollTop = getHtmlPreviewScrollTop();
+            state.mode = 'html';
+            state.scrollSyncEnabled = message.scrollSyncEnabled !== false;
+            setPreviewBaseHref(message.baseHref || '');
+            state.cache.clear();
+            state.pending.clear();
+            state.rowHeights.clear();
+            state.cacheVersion++;
+            state.lastRangeKey = '';
+            setHtmlMode(true);
+            viewport.innerHTML = '';
+            spacer.style.height = `${state.rowHeight}px`;
+            htmlPreview.addEventListener('load', () => {
+                restoreHtmlPreviewScrollTop(previousFrameScrollTop);
+                requestAnimationFrame(() => restoreHtmlPreviewScrollTop(previousFrameScrollTop));
+            }, { once: true });
+            htmlPreview.srcdoc = buildHtmlPreviewDocument(message.text || '', message.baseHref || '');
+        }
+
+        function parseCsvLine(line) {
+            const cells = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (inQuotes) {
+                    if (ch === '"' && i + 1 < line.length && line[i + 1] === '"') {
+                        current += '"';
+                        i++;
+                    } else if (ch === '"') {
+                        inQuotes = false;
+                    } else {
+                        current += ch;
+                    }
+                } else if (ch === '"') {
+                    inQuotes = true;
+                } else if (ch === ',') {
+                    cells.push(current);
+                    current = '';
+                } else {
+                    current += ch;
+                }
+            }
+            cells.push(current);
+            return cells;
+        }
+
+        function renderCsvCell(content, tag, isNumeric) {
+            const escaped = escapeHtml(content);
+            const cls = isNumeric ? ' class="csv-numeric"' : '';
+            return `<${tag}${cls}>${escaped || '&nbsp;'}</${tag}>`;
+        }
+
+        function renderCsvPreview(message) {
+            applyTheme(message);
+            state.mode = 'csv';
+            state.scrollSyncEnabled = message.scrollSyncEnabled !== false;
+            state.cache.clear();
+            state.pending.clear();
+            state.rowHeights.clear();
+            state.cacheVersion++;
+            state.lastRangeKey = '';
+            setHtmlMode(false);
+            document.body.classList.remove('wrap-enabled');
+            document.body.classList.add('csv-mode');
+            viewport.innerHTML = '';
+            spacer.style.height = '0';
+
+            const text = String(message.text || '');
+            if (!text.trim()) {
+                viewport.innerHTML = '<div class="csv-empty">빈 CSV 파일입니다.</div>';
+                return;
+            }
+
+            const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            const nonEmpty = lines.filter(l => l.trim().length > 0);
+            if (nonEmpty.length === 0) {
+                viewport.innerHTML = '<div class="csv-empty">빈 CSV 파일입니다.</div>';
+                return;
+            }
+
+            const parsedRows = nonEmpty.map(parseCsvLine);
+            const maxColumns = parsedRows.reduce((max, row) => Math.max(max, row.length), 0);
+            const headerCells = parsedRows[0];
+            const dataRows = parsedRows.slice(1);
+
+            let html = '<div class="csv-table-wrap"><table>';
+            html += '<thead><tr>';
+            for (let i = 0; i < Math.max(headerCells.length, maxColumns); i++) {
+                html += renderCsvCell(headerCells[i] || '', 'th', false);
+            }
+            html += '</tr></thead><tbody>';
+            for (let r = 0; r < dataRows.length; r++) {
+                html += '<tr>';
+                for (let c = 0; c < maxColumns; c++) {
+                    const val = dataRows[r][c] || '';
+                    const isNumeric = /^-?\d+(\.\d+)?$/.test(val.trim());
+                    html += renderCsvCell(val, 'td', isNumeric);
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table></div>';
+
+            viewport.innerHTML = html;
+        }
+
+        function applyTheme(message) {
+            const theme = message.theme || 'Dark';
+            const previewBg = message.previewCustomBackgroundColor || message.customBackgroundColor || (theme === 'Light' ? '#ffffff' : '#1e1e1e');
+            const previewFg = message.previewCustomForegroundColor || message.customForegroundColor || (theme === 'Light' ? '#1a1a1a' : '#d4d4d4');
+            document.documentElement.style.setProperty('--bg', previewBg);
+            document.documentElement.style.setProperty('--fg', previewFg);
+            document.documentElement.style.setProperty('--code-bg', theme === 'Light' ? '#f3f5f7' : '#2d2d2d');
+            document.documentElement.style.setProperty('--border', theme === 'Light' ? '#d8dee4' : '#3e3e3e');
+            document.documentElement.style.setProperty('--muted', theme === 'Light' ? '#667085' : '#9aa0a6');
+            document.documentElement.style.setProperty('--font', message.previewFontFamily || message.uiFontFamily || '"Segoe UI", "Malgun Gothic", Arial, sans-serif');
+            var previewSize = message.previewFontSize || 15;
+            document.documentElement.style.setProperty('--font-size', previewSize + 'px');
+
+            state.theme = theme;
+            if (typeof mermaid !== 'undefined') {
+                initializeMermaid(theme);
+                const blocks = viewport.querySelectorAll('.mermaid-block');
+                blocks.forEach(block => {
+                    block.classList.remove('rendered', 'rendering');
+                    block.innerHTML = 'Rendering...';
+                });
+                if (blocks.length > 0) {
+                    renderSharedMermaidBlocks(viewport, () => {
+                        state.lastRangeKey = '';
+                        measureRenderedRows();
+                    });
+                }
+            }
+        }
+
+        function setupVirtualHeight() {
+            spacer.style.height = `${totalVirtualHeight()}px`;
+        }
+
+        function rowHeightFor(lineNumber) {
+            return state.rowHeights.has(lineNumber) ? state.rowHeights.get(lineNumber) : state.rowHeight;
+        }
+
+        function totalVirtualHeight() {
+            let total = Math.max(1, state.lineCount) * state.rowHeight;
+            for (const height of state.rowHeights.values()) {
+                total += Math.max(0, height) - state.rowHeight;
+            }
+            return Math.max(1, total);
+        }
+
+        function rowTop(lineNumber) {
+            let top = (Math.max(1, lineNumber) - 1) * state.rowHeight;
+            for (const [line, height] of state.rowHeights.entries()) {
+                if (line < lineNumber) {
+                    top += Math.max(0, height) - state.rowHeight;
+                }
+            }
+            return top;
+        }
+
+        function lineAt(scrollTop) {
+            let line = Math.min(state.lineCount, Math.max(1, Math.floor(scrollTop / state.rowHeight) + 1));
+            while (line < state.lineCount && rowTop(line + 1) <= scrollTop) line++;
+            while (line > 1 && rowTop(line) > scrollTop) line--;
+            return line;
+        }
+
+        function initVirtualPreview(message) {
+            const preserveScrollTop = scroll.scrollTop;
+            const nextMode = message.mode || 'markdown';
+            const nextWordWrap = true; // Always enable wrapping in the preview panel
+            const canReuseMeasuredHeights = state.mode === nextMode && state.wordWrap === nextWordWrap;
+            const modeChanged = state.mode !== nextMode;
+            state.mode = nextMode;
+            setPreviewBaseHref(message.baseHref || '');
+            state.wordWrap = nextWordWrap;
+            state.tabSize = Number(message.tabSize || 4);
+            state.lineCount = Math.max(1, Number(message.lineCount || 1));
+            state.scrollSyncEnabled = message.scrollSyncEnabled !== false;
+            state.cache.clear();
+            state.pending.clear();
+            if (canReuseMeasuredHeights) {
+                trimRowHeights();
+            } else {
+                state.rowHeights.clear();
+            }
+            state.cacheVersion++;
+            state.lastRangeKey = '';
+            setHtmlMode(false);
+            document.body.classList.remove('csv-mode');
+            document.body.classList.toggle('wrap-enabled', state.wordWrap);
+            if (modeChanged) {
+                viewport.innerHTML = '';
+            }
+            applyTheme(message);
+            setupVirtualHeight();
+            receiveLineBlock(message.initialStartLine || 1, message.initialLines || []);
+            const maxScrollTop = Math.max(0, totalVirtualHeight() - scroll.clientHeight);
+            setPreviewScrollTopSilently(Math.min(preserveScrollTop, maxScrollTop));
+            queueRender(true);
+        }
+
+        function visibleRange() {
+            const viewHeight = Math.max(scroll.clientHeight, state.rowHeight);
+            const firstVisible = lineAt(scroll.scrollTop);
+            const lastVisible = lineAt(scroll.scrollTop + viewHeight);
+            const start = Math.max(1, firstVisible - state.overscan);
+            const end = Math.min(state.lineCount, lastVisible + state.overscan);
+            return { start, end, count: Math.max(0, end - start + 1) };
+        }
+
+        function requestLines(start, count) {
+            if (count <= 0) return;
+            const key = `${start}:${count}`;
+            if (state.pending.has(key)) return;
+            state.pending.add(key);
+            post({
+                type: 'previewRequestLines',
+                requestId: state.requestSeq++,
+                startLine: start,
+                count
+            });
+        }
+
+        function requestMissingLines(start, end) {
+            let missingStart = 0;
+            let missingCount = 0;
+            for (let line = start; line <= end; line++) {
+                if (!state.cache.has(line)) {
+                    if (missingStart === 0) {
+                        missingStart = line;
+                        missingCount = 1;
+                    } else {
+                        missingCount++;
+                    }
+                } else if (missingStart !== 0) {
+                    requestLines(missingStart, missingCount);
+                    missingStart = 0;
+                    missingCount = 0;
+                }
+            }
+            if (missingStart !== 0) requestLines(missingStart, missingCount);
+        }
+
+        function queueRender(force = false) {
+            if (force) state.lastRangeKey = '';
+            if (state.renderQueued) return;
+            state.renderQueued = true;
+            requestAnimationFrame(() => {
+                state.renderQueued = false;
+                render();
+            });
+        }
+
+        // Compute what HTML + class a row should have, returning {html, extraClass}
+        // Returns {pending: true} when the line is not yet cached — caller keeps existing DOM as-is.
+        function computeRowContent(lineNumber, rangeEnd, skipUntilLineRef) {
+            const renderedLine = renderPreviewLineAt(
+                lineNumber,
+                state.lineCount,
+                line => state.cache.has(line) ? state.cache.get(line) : undefined,
+                { mode: state.mode, baseHref: state.baseHref, tabSize: state.tabSize, rangeEnd },
+                skipUntilLineRef);
+            if (renderedLine.pending) {
+                return { pending: true, extendRangeEnd: renderedLine.extendRangeEnd };
+            }
+            const extraClass = renderedLine.skipped ? 'skipped' : (renderedLine.empty ? 'empty' : '');
+            return {
+                html: renderedLine.html ?? '',
+                extraClass,
+                extendRangeEnd: renderedLine.extendRangeEnd
+            };
+        }
+
+        function render() {
+            if (state.mode === 'csv') return;
+            const visible = visibleRange();
+            const contextStart = state.mode === 'markdown'
+                ? Math.max(1, visible.start - state.blockContextLines)
+                : visible.start;
+            requestMissingLines(contextStart, visible.end);
+            const range = {
+                start: contextStart,
+                end: visible.end
+            };
+            requestMissingLines(range.start, range.end);
+            const key = `${visible.start}:${visible.end}:${range.start}:${range.end}:${state.lineCount}:${state.mode}:${scroll.clientWidth}:${totalVirtualHeight()}:${state.cacheVersion}`;
+            if (key === state.lastRangeKey) return;
+            state.lastRangeKey = key;
+            viewport.style.transform = `translateY(${rowTop(range.start)}px)`;
+
+            // --- DOM diffing: reuse existing row elements ---
+            // Build a map of existing rendered rows by line number
+            const existingRows = new Map();
+            for (const el of viewport.children) {
+                const ln = Number(el.dataset.line || 0);
+                if (ln) existingRows.set(ln, el);
+            }
+
+            // Collect desired rows with their content
+            // pending:true rows keep whatever is already in the DOM (no flicker).
+            const desired = []; // [{lineNumber, html, extraClass, pending}]
+            const skipRef = { val: 0 };
+            for (let lineNumber = range.start; lineNumber <= range.end; lineNumber++) {
+                const result = computeRowContent(lineNumber, range.end, skipRef);
+                if (result.extendRangeEnd > range.end) {
+                    const previousEnd = range.end;
+                    range.end = Math.min(state.lineCount, result.extendRangeEnd);
+                    requestMissingLines(previousEnd + 1, range.end);
+                }
+                desired.push(result.pending
+                    ? { lineNumber, pending: true }
+                    : { lineNumber, html: result.html, extraClass: result.extraClass }
+                );
+            }
+
+            // Patch viewport DOM without full replacement
+            const desiredSet = new Set(desired.map(d => d.lineNumber));
+
+            // Remove rows that are no longer in range
+            for (const [ln, el] of existingRows) {
+                if (!desiredSet.has(ln)) {
+                    el.remove();
+                    existingRows.delete(ln);
+                }
+            }
+
+            // Insert/update rows in order
+            let cursor = viewport.firstChild;
+            let newImagesAdded = false;
+            for (const { lineNumber, html, extraClass, pending } of desired) {
+                const existing = existingRows.get(lineNumber);
+
+                if (pending) {
+                    // Line not yet in cache: keep existing row untouched to avoid flicker.
+                    // If there's no existing row, insert an invisible placeholder.
+                    if (existing) {
+                        if (existing !== cursor) {
+                            viewport.insertBefore(existing, cursor || null);
+                        } else {
+                            cursor = existing.nextSibling;
+                        }
+                        if (cursor === existing) cursor = existing.nextSibling;
+                    } else {
+                        const el = document.createElement('div');
+                        el.className = 'preview-row empty';
+                        el.dataset.line = lineNumber;
+                        viewport.insertBefore(el, cursor || null);
+                    }
+                    continue;
+                }
+
+                const expectedClass = `preview-row${extraClass ? ` ${extraClass}` : ''}`;
+
+                if (existing) {
+                    // Move to correct position if needed
+                    if (existing !== cursor) {
+                        viewport.insertBefore(existing, cursor || null);
+                    } else {
+                        cursor = existing.nextSibling;
+                    }
+                    // Update content if changed
+                    if (existing.className !== expectedClass) {
+                        existing.className = expectedClass;
+                    }
+                    if (existing.innerHTML !== html) {
+                        existing.innerHTML = html;
+                        newImagesAdded = true;
+                    }
+                    if (cursor === existing) cursor = existing.nextSibling;
+                } else {
+                    // Create new row
+                    const el = document.createElement('div');
+                    el.className = expectedClass;
+                    el.dataset.line = lineNumber;
+                    el.innerHTML = html;
+                    viewport.insertBefore(el, cursor || null);
+                    newImagesAdded = true;
+                }
+            }
+
+            if (newImagesAdded) watchRenderedImages();
+            renderSharedMermaidBlocks(viewport, () => {
+                state.lastRangeKey = '';
+                measureRenderedRows();
+            });
+            measureRenderedRows();
+        }
+
+        function watchRenderedImages() {
+            viewport.querySelectorAll('img').forEach(img => {
+                const update = () => {
+                    state.lastRangeKey = '';
+                    measureRenderedRows();
+                };
+                if (img.complete) {
+                    requestAnimationFrame(update);
+                } else {
+                    img.addEventListener('load', update, { once: true });
+                    img.addEventListener('error', update, { once: true });
+                }
+            });
+        }
+
+        function measureRenderedRows() {
+            let changed = false;
+            const rows = viewport.querySelectorAll('.preview-row');
+            rows.forEach(row => {
+                const lineNumber = Number(row.dataset.line || 0);
+                if (!lineNumber) return;
+
+                const measured = row.classList.contains('skipped')
+                    ? 0
+                    : Math.max(0, Math.ceil(row.getBoundingClientRect().height || row.scrollHeight || 0));
+                const previous = rowHeightFor(lineNumber);
+                if (Math.abs(previous - measured) > 1) {
+                    state.rowHeights.set(lineNumber, measured);
+                    changed = true;
+                }
+            });
+
+            if (changed) {
+                // Anchor scroll to the first visible line to prevent jump
+                const anchorLine = lineAt(scroll.scrollTop);
+                const anchorTop = rowTop(anchorLine);
+                const anchorOffset = scroll.scrollTop - anchorTop;
+
+                setupVirtualHeight();
+
+                // Restore scroll position relative to anchor line
+                const newAnchorTop = rowTop(anchorLine);
+                const corrected = newAnchorTop + anchorOffset;
+                if (Math.abs(scroll.scrollTop - corrected) > 1) {
+                    suppressPreviewScrollUntilNextFrame();
+                    scroll.scrollTop = Math.max(0, corrected);
+                }
+
+                state.lastRangeKey = '';
+                requestAnimationFrame(() => render());
+            }
+        }
+
+        function receiveLineBlock(startLine, lines) {
+            const start = Number(startLine || 1);
+            const safeLines = Array.isArray(lines) ? lines : [];
+            for (let i = 0; i < safeLines.length; i++) {
+                state.cache.set(start + i, safeLines[i] ?? '');
+            }
+            state.cacheVersion++;
+            for (const key of [...state.pending]) {
+                const [pendingStart, pendingCount] = key.split(':').map(Number);
+                const pendingEnd = pendingStart + pendingCount - 1;
+                const receivedEnd = start + safeLines.length - 1;
+                if (start <= pendingStart && (safeLines.length === 0 || receivedEnd >= pendingEnd || receivedEnd >= state.lineCount)) {
+                    state.pending.delete(key);
+                }
+            }
+            return safeLines.length;
+        }
+
+        function receiveLines(message) {
+            receiveLineBlock(message.startLine || 1, message.lines || []);
+            queueRender(true);
+        }
+
+        function renderFullFallback(message) {
+            const preserveScrollTop = scroll.scrollTop;
+            const nextMode = message.mode || 'markdown';
+            const nextWordWrap = true; // Always enable wrapping in the preview panel
+            const canReuseMeasuredHeights = state.mode === nextMode && state.wordWrap === nextWordWrap;
+            const modeChanged = state.mode !== nextMode;
+            state.mode = nextMode;
+            state.scrollSyncEnabled = message.scrollSyncEnabled !== false;
+            setPreviewBaseHref(message.baseHref || '');
+            if (state.mode === 'html') {
+                renderHtmlPreview(message);
+                return;
+            }
+            state.wordWrap = nextWordWrap;
+            state.tabSize = Number(message.tabSize || 4);
+            applyTheme(message);
+            const lines = String(message.text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            state.lineCount = Math.max(1, lines.length);
+            state.cache.clear();
+            if (canReuseMeasuredHeights) {
+                trimRowHeights();
+            } else {
+                state.rowHeights.clear();
+            }
+            lines.forEach((line, index) => state.cache.set(index + 1, line));
+            state.cacheVersion++;
+            setHtmlMode(false);
+            document.body.classList.remove('csv-mode');
+            document.body.classList.toggle('wrap-enabled', state.wordWrap);
+            if (modeChanged) {
+                viewport.innerHTML = '';
+            }
+            setupVirtualHeight();
+            const maxScrollTop = Math.max(0, totalVirtualHeight() - scroll.clientHeight);
+            setPreviewScrollTopSilently(Math.min(preserveScrollTop, maxScrollTop));
+            queueRender(true);
+        }
+
+        scroll.addEventListener('scroll', () => {
+            queueRender();
+            if (state.scrollSyncEnabled && !isSyncingScroll && !suppressPreviewScrollEvents) {
+                const firstVisible = lineAt(scroll.scrollTop);
+                const offset = scroll.scrollTop - rowTop(firstVisible);
+                post({
+                    type: 'previewScroll',
+                    firstLine: firstVisible,
+                    offset: offset
+                });
+            }
+        });
+        window.addEventListener('resize', () => queueRender(true));
+        window.addEventListener('dragover', event => event.preventDefault(), false);
+        window.addEventListener('drop', event => event.preventDefault(), false);
+
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.addEventListener('message', event => {
+                const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                if (message.action === 'initVirtualPreview') initVirtualPreview(message);
+                else if (message.action === 'previewLines') receiveLines(message);
+                else if (message.action === 'renderHtmlPreview') renderHtmlPreview(message);
+                else if (message.action === 'renderCsvPreview') renderCsvPreview(message);
+                else if (message.action === 'render') renderFullFallback(message);
+                else if (message.action === 'scrollSyncChanged') {
+                    state.scrollSyncEnabled = !!message.enabled;
+                }
+                else if (message.action === 'syncScroll') {
+                    if (state.scrollSyncEnabled && message.firstLine) {
+                        isSyncingScroll = true;
+                        const targetScrollTop = rowTop(message.firstLine) + (message.offset || 0);
+                        setPreviewScrollTopSilently(targetScrollTop);
+                        requestAnimationFrame(() => {
+                            isSyncingScroll = false;
+                        });
+                    }
+                }
+            });
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'F9') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f9' });
+                return;
+            }
+            if (event.key === 'F10') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f10' });
+                return;
+            }
+            if (event.key === 'F12') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f12' });
+                return;
+            }
+            const ctrl = event.ctrlKey || event.metaKey;
+            const key = event.key ? event.key.toLowerCase() : '';
+            if (ctrl && key === 'f') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'find' });
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyDown);
+        htmlPreview.addEventListener('load', () => {
+            try {
+                htmlPreview.contentWindow.addEventListener('keydown', handleKeyDown);
+            } catch (e) {
+                // Ignore cross-origin errors
+            }
+        });
+    </script>
+</body>
+
+</html>

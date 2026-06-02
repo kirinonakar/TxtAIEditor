@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TxtAIEditor (Unpackaged)": {
+      "commandName": "Project"
+    },
+    "TxtAIEditor (Package)": {
+      "commandName": "MsixPackage"
+    }
+  }
+}

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TxtAIEditor.Controls.TopCommandBarPane"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Border BorderBrush="{ThemeResource ToolbarBorderBrush}" BorderThickness="0,0,0,1">
+        <CommandBar x:Name="TopCommandBar" Background="{ThemeResource ToolbarBackgroundBrush}" DefaultLabelPosition="Right">
+            <AppBarButton x:Name="OpenFileButton" Icon="OpenFile" Label="파일 열기" Click="OnOpenFileClick" AccessKey="O" ToolTipService.ToolTip="파일 열기 (Ctrl+O)"/>
+            <AppBarButton x:Name="SaveFileButton" Icon="Save" Label="저장" Click="OnSaveFileClick" AccessKey="S" ToolTipService.ToolTip="저장 (Ctrl+S)"/>
+            <AppBarButton x:Name="SaveAsFileButton" Label="다른 이름으로 저장" Click="OnSaveAsFileClick" ToolTipService.ToolTip="다른 이름으로 저장 (Ctrl+Shift+S)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE792;"/>
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="CompareButton" Label="비교" Click="OnCompareFilesClick" ToolTipService.ToolTip="파일 비교 (Diff)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE13C;"/>
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator/>
+            <AppBarToggleButton x:Name="TerminalToggleButton" Click="OnOpenTerminalClick" ToolTipService.ToolTip="터미널 (Ctrl+`)">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE756;"/>
+                </AppBarToggleButton.Icon>
+                <AppBarToggleButton.Label>터미널</AppBarToggleButton.Label>
+            </AppBarToggleButton>
+            <AppBarButton x:Name="PrintButton" Label="인쇄" Click="OnPrintClick" ToolTipService.ToolTip="인쇄 (Ctrl+P)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE749;"/>
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarToggleButton x:Name="TopMostToggleButton" Click="OnTopMostToggleClick" ToolTipService.ToolTip="항상 위 (F9)">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE840;"/>
+                </AppBarToggleButton.Icon>
+                <AppBarToggleButton.Label>항상위</AppBarToggleButton.Label>
+            </AppBarToggleButton>
+            <AppBarButton x:Name="StickyNoteButton" Label="스티커" Click="OnStickyNoteClick" ToolTipService.ToolTip="스티커 노트 (F12)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE70B;"/>
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator/>
+            <AppBarToggleButton x:Name="WordWrapToggle" Label="Word Wrap" Click="OnWordWrapToggleClick" IsChecked="True">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE751;"/>
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarButton x:Name="SearchButton" Icon="Find" Label="검색" Click="OnFindClick" ToolTipService.ToolTip="검색 (Ctrl+F)"/>
+            <AppBarSeparator/>
+            <AppBarToggleButton x:Name="MarkdownToolbarToggle" Click="OnToggleMarkdownToolbarClick" ToolTipService.ToolTip="마크다운 툴바 토글">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE70F;"/>
+                </AppBarToggleButton.Icon>
+                <AppBarToggleButton.Label>Markdown</AppBarToggleButton.Label>
+            </AppBarToggleButton>
+            <AppBarToggleButton x:Name="CsvTableToggle" Click="OnToggleCsvTableClick" ToolTipService.ToolTip="CSV 테이블 보기">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE80A;"/>
+                </AppBarToggleButton.Icon>
+                <AppBarToggleButton.Label>CSV 테이블</AppBarToggleButton.Label>
+            </AppBarToggleButton>
+            <AppBarSeparator/>
+            <AppBarButton x:Name="ThemeButton" Label="테마" Click="OnToggleThemeClick" ToolTipService.ToolTip="테마 (F10)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE790;"/>
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator/>
+            <AppBarButton x:Name="SplitButton" Label="분할" ToolTipService.ToolTip="에디터 화면 분할">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE154;"/>
+                </AppBarButton.Icon>
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem x:Name="SplitNoneItem" Text="분할 없음 (단일)" Click="OnSplitNoneClick"/>
+                        <MenuFlyoutItem x:Name="SplitVerticalItem" Text="좌우 분할" Click="OnSplitVerticalClick"/>
+                        <MenuFlyoutItem x:Name="SplitHorizontalItem" Text="상하 분할" Click="OnSplitHorizontalClick"/>
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
+            </AppBarButton>
+            <AppBarSeparator/>
+            <AppBarButton x:Name="SettingsButton" Icon="Setting" Label="설정" Click="OnSettingsClick"/>
+        </CommandBar>
+    </Border>
+</UserControl>

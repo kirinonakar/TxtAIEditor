@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TxtAIEditor.Controls.StickyNoteBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource TitleBarBackgroundBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+            <FontIcon Glyph="&#xE70F;" FontSize="14" Foreground="{ThemeResource TitleBarForegroundBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+            <TextBlock x:Name="TitleText" Text="스티커 노트" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource TitleBarForegroundBrush}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+            <ToggleButton x:Name="TopMostButton"
+                          Click="OnTopMostClick"
+                          Height="28"
+                          Padding="12,0,12,0"
+                          CornerRadius="4"
+                          BorderThickness="0"
+                          Foreground="{ThemeResource TitleBarForegroundBrush}"
+                          FontSize="12"
+                          FontWeight="SemiBold">
+                <ToggleButton.Resources>
+                    <SolidColorBrush x:Key="ToggleButtonBackground" Color="Transparent"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#15808080"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#30808080"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#0078D4"/>
+                    <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="White"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#106EBE"/>
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="White"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#005A9E"/>
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="White"/>
+                </ToggleButton.Resources>
+                <ToggleButton.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE718;" FontSize="12" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TopMostText" Text="항상 위" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ToggleButton.Content>
+            </ToggleButton>
+
+            <Button x:Name="ExitButton"
+                    Click="OnExitClick"
+                    Background="#FF5C5C"
+                    Foreground="White"
+                    BorderThickness="0"
+                    CornerRadius="4"
+                    Height="28"
+                    Padding="12,0,12,0"
+                    FontSize="12"
+                    FontWeight="SemiBold">
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE711;" FontSize="12" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="ExitText" Text="나가기" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button.Content>
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#FF7373"/>
+                    <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#E04343"/>
+                    <SolidColorBrush x:Key="ButtonForegroundPressed" Color="White"/>
+                </Button.Resources>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

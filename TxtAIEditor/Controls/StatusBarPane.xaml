@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TxtAIEditor.Controls.StatusBarPane"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Border Background="{ThemeResource StatusBarBackgroundBrush}"
+            Height="26"
+            BorderBrush="{ThemeResource SidebarBorderBrush}"
+            BorderThickness="0,1,0,0">
+        <Border.Resources>
+            <!-- Implicit text styling inside the status bar -->
+            <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource StatusBarForegroundBrush}"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+            <!-- Implicit transparent button styling inside the status bar -->
+            <Style TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{ThemeResource StatusBarForegroundBrush}"/>
+                <Setter Property="Padding" Value="4,0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+            <!-- Implicit transparent toggle button styling inside the status bar -->
+            <Style TargetType="ToggleButton">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{ThemeResource StatusBarForegroundBrush}"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <!-- Custom style for left/right sidebar toggles in the status bar -->
+            <Style x:Key="SidebarToggleButtonStyle" TargetType="ToggleButton">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{ThemeResource StatusBarForegroundBrush}"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Height" Value="22"/>
+                <Setter Property="Width" Value="26"/>
+                <Setter Property="CornerRadius" Value="3"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Grid x:Name="RootGrid" CornerRadius="{TemplateBinding CornerRadius}" Background="{TemplateBinding Background}">
+                                <ContentPresenter x:Name="ContentPresenter"
+                                                  Content="{TemplateBinding Content}"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                  Padding="{TemplateBinding Padding}"
+                                                  Foreground="{TemplateBinding Foreground}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal"/>
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="RootGrid.Background" Value="{ThemeResource SystemControlBackgroundBaseLowBrush}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="RootGrid.Background" Value="{ThemeResource SystemControlBackgroundBaseMediumBrush}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled"/>
+                                        <VisualState x:Name="Checked">
+                                            <VisualState.Setters>
+                                                <Setter Target="RootGrid.Background" Value="{ThemeResource AccentFillColorDefaultBrush}"/>
+                                                <Setter Target="ContentPresenter.Foreground" Value="#FFFFFF"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="CheckedPointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="RootGrid.Background" Value="{ThemeResource AccentFillColorSecondaryBrush}"/>
+                                                <Setter Target="ContentPresenter.Foreground" Value="#FFFFFF"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="CheckedPressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="RootGrid.Background" Value="{ThemeResource AccentFillColorTertiaryBrush}"/>
+                                                <Setter Target="ContentPresenter.Foreground" Value="#FFFFFF"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Border.Resources>
+
+        <Grid Margin="6,0,6,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <ToggleButton x:Name="LeftPanelToggle"
+                          Grid.Column="0"
+                          Style="{StaticResource SidebarToggleButtonStyle}"
+                          IsChecked="True"
+                          Click="HandleLeftPanelToggleClick"
+                          ToolTipService.ToolTip="좌측 패널">
+                <FontIcon Glyph="&#xE145;" FontSize="11"/>
+            </ToggleButton>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="15" VerticalAlignment="Center" Margin="8,0,0,0">
+                <Button x:Name="LineNumberButton" MinWidth="90" HorizontalContentAlignment="Left" Padding="0" Background="Transparent" BorderBrush="Transparent" Click="HandleLineNumberClick" ToolTipService.ToolTip="클릭하여 줄 이동">
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock x:Name="StatusLineLabel" Text="줄" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="StatusLine" Text="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Text=":" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="StatusColumnLabel" Text="열" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="StatusCol" Text="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <TextBlock x:Name="StatusTotalLines" MinWidth="85" Text="전체 줄수: 0" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusFileStats" MinWidth="110" Text="크기: 0 bytes" FontSize="11" VerticalAlignment="Center"/>
+                <Button x:Name="LineEndingButton" MinWidth="35" HorizontalContentAlignment="Left" Padding="4,0" Background="Transparent" BorderBrush="Transparent" Click="HandleLineEndingClick" ToolTipService.ToolTip="클릭하여 줄 끝 방식 변경">
+                    <TextBlock x:Name="StatusLineEnding" Text="LF" FontSize="11" VerticalAlignment="Center"/>
+                </Button>
+                <TextBlock x:Name="StatusSelectionStats" Text="" FontSize="11" VerticalAlignment="Center" Visibility="Collapsed"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="15" VerticalAlignment="Center">
+                <TextBlock x:Name="StatusGitBranch" Text="Git: 감지 안됨" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusLanguage" Text="PLAINTEXT" FontSize="11" VerticalAlignment="Center"/>
+                <ComboBox x:Name="StatusEncodingCombo"
+                          Width="100"
+                          Height="20"
+                          FontSize="10"
+                          Padding="4,0,4,0"
+                          SelectionChanged="HandleEncodingSelectionChanged"
+                          ToolTipService.ToolTip="파일 인코딩 선택"
+                          VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <Button x:Name="ExpandPreviewButton"
+                    Grid.Column="4"
+                    Height="22" Width="26" Padding="0"
+                    Click="HandleExpandPreviewClick"
+                    ToolTipService.ToolTip="프리뷰 늘리기"
+                    CornerRadius="3"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <FontIcon Glyph="&#xE1BF;" FontSize="11"/>
+            </Button>
+
+            <ToggleButton x:Name="RightPanelToggle"
+                          Grid.Column="5"
+                          Style="{StaticResource SidebarToggleButtonStyle}"
+                          IsChecked="True"
+                          Click="HandleRightPanelToggleClick"
+                          ToolTipService.ToolTip="우측 패널"
+                          Margin="8,0,0,0">
+                <FontIcon Glyph="&#xE145;" FontSize="11" RenderTransformOrigin="0.5,0.5">
+                    <FontIcon.RenderTransform>
+                        <ScaleTransform ScaleX="-1"/>
+                    </FontIcon.RenderTransform>
+                </FontIcon>
+            </ToggleButton>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./xterm/xterm.css" />
+  <style>
+    :root {
+      --terminal-bg: #1e1e1e;
+      --terminal-fg: #d4d4d4;
+      --terminal-cursor: #f8f8f0;
+      --scroll-track: transparent;
+      --scroll-thumb: #4e4e4e;
+      --scroll-thumb-hover: #606060;
+      --scroll-thumb-active: #7a7a7a;
+    }
+
+    :root.light {
+      --terminal-bg: #ffffff;
+      --terminal-fg: #1f2937;
+      --terminal-cursor: #111827;
+      --scroll-thumb: #c1c1c1;
+      --scroll-thumb-hover: #a6a6a6;
+      --scroll-thumb-active: #8c8c8c;
+    }
+
+    html,
+    body,
+    #terminal {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--terminal-bg);
+    }
+
+    body {
+      color: var(--terminal-fg);
+    }
+
+    #terminal {
+      box-sizing: border-box;
+      padding: 8px 8px 6px 10px;
+    }
+
+    .xterm {
+      height: 100%;
+    }
+
+    .xterm-viewport {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+    }
+
+    .xterm-viewport::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .xterm-viewport::-webkit-scrollbar-track {
+      background: var(--scroll-track);
+    }
+
+    .xterm-viewport::-webkit-scrollbar-thumb {
+      background: var(--scroll-thumb);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+
+    .xterm-viewport::-webkit-scrollbar-thumb:hover {
+      background-color: var(--scroll-thumb-hover);
+    }
+
+    .xterm-viewport::-webkit-scrollbar-thumb:active {
+      background-color: var(--scroll-thumb-active);
+    }
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+  <script src="./xterm/xterm.js"></script>
+  <script src="./xterm/addon-fit.js"></script>
+  <script>
+    const vscodeBridge = window.chrome?.webview;
+    const fitAddon = new FitAddon.FitAddon();
+    let activeSessionId = null;
+    let pendingFit = 0;
+    let terminalFontSize = 13;
+
+    const darkTheme = {
+      background: '#1e1e1e',
+      foreground: '#d4d4d4',
+      cursor: '#f8f8f0',
+      selectionBackground: '#264f78',
+      black: '#000000',
+      red: '#cd3131',
+      green: '#0dbc79',
+      yellow: '#e5e510',
+      blue: '#2472c8',
+      magenta: '#bc3fbc',
+      cyan: '#11a8cd',
+      white: '#e5e5e5',
+      brightBlack: '#666666',
+      brightRed: '#f14c4c',
+      brightGreen: '#23d18b',
+      brightYellow: '#f5f543',
+      brightBlue: '#3b8eea',
+      brightMagenta: '#d670d6',
+      brightCyan: '#29b8db',
+      brightWhite: '#ffffff'
+    };
+
+    const lightTheme = {
+      background: '#ffffff',
+      foreground: '#1f2937',
+      cursor: '#111827',
+      selectionBackground: '#add6ff',
+      black: '#000000',
+      red: '#cd3131',
+      green: '#008000',
+      yellow: '#949800',
+      blue: '#0451a5',
+      magenta: '#bc05bc',
+      cyan: '#0598bc',
+      white: '#555555',
+      brightBlack: '#666666',
+      brightRed: '#cd3131',
+      brightGreen: '#14ce14',
+      brightYellow: '#b5ba00',
+      brightBlue: '#0451a5',
+      brightMagenta: '#bc05bc',
+      brightCyan: '#0598bc',
+      brightWhite: '#a5a5a5'
+    };
+
+    const term = new Terminal({
+      allowProposedApi: true,
+      convertEol: false,
+      cursorBlink: true,
+      fontFamily: 'Consolas, Cascadia Mono, Courier New, monospace',
+      fontSize: terminalFontSize,
+      letterSpacing: 0,
+      lineHeight: 1.08,
+      scrollback: 5000,
+      theme: darkTheme,
+      windowsMode: true
+    });
+
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal'));
+    term.onData(data => vscodeBridge?.postMessage({ type: 'input', sessionId: activeSessionId, data }));
+    term.onResize(size => vscodeBridge?.postMessage({ type: 'resize', sessionId: activeSessionId, cols: size.cols, rows: size.rows }));
+
+    document.getElementById('terminal').addEventListener('contextmenu', event => {
+      event.preventDefault();
+      const selection = term.getSelection();
+      if (selection) {
+        vscodeBridge?.postMessage({ type: 'copy', text: selection });
+        term.clearSelection();
+      } else {
+        vscodeBridge?.postMessage({ type: 'paste', sessionId: activeSessionId });
+      }
+    });
+
+    document.getElementById('terminal').addEventListener('paste', event => {
+      const text = event.clipboardData?.getData('text/plain') || '';
+      if (!text) {
+        return;
+      }
+
+      event.preventDefault();
+      vscodeBridge?.postMessage({ type: 'input', sessionId: activeSessionId, data: text });
+    });
+
+    const terminalPathPattern = /(?:file:\/\/\/[^\s<>"']+|[A-Za-z]:\\[^\s<>"|?*]+|\\\\[^\s<>"|?*]+|\/[^\s<>"']+|(?:\.{1,2}[\\/])?(?:[^\s:<>"'|?*]+[\\/])*[^\s:<>"'|?*]+\.[A-Za-z0-9_+~-]{1,12}(?::\d+(?::\d+)?)?)/g;
+
+    function trimTerminalPath(value) {
+      return (value || '').replace(/[.,;)\]}]+$/g, '');
+    }
+
+    function isTerminalPathCandidate(value) {
+      return /^(?:file:\/\/\/|[A-Za-z]:\\|\\\\|\/)/.test(value) ||
+        /[\\/]/.test(value) ||
+        /:\d+(?::\d+)?$/.test(value);
+    }
+
+    term.registerLinkProvider({
+      provideLinks(lineNumber, callback) {
+        const line = term.buffer.active.getLine(lineNumber - 1)?.translateToString(true) || '';
+        const links = [];
+        terminalPathPattern.lastIndex = 0;
+        let match;
+        while ((match = terminalPathPattern.exec(line)) !== null) {
+          const text = trimTerminalPath(match[0]);
+          if (!text) {
+            continue;
+          }
+          if (!isTerminalPathCandidate(text)) {
+            continue;
+          }
+
+          const start = match.index + 1;
+          const end = start + text.length - 1;
+          links.push({
+            text,
+            range: {
+              start: { x: start, y: lineNumber },
+              end: { x: end, y: lineNumber }
+            },
+            activate(event, path) {
+              if (event.ctrlKey || event.metaKey) {
+                vscodeBridge?.postMessage({ type: 'openPath', path });
+              }
+            }
+          });
+        }
+
+        callback(links);
+      }
+    });
+
+    function fitAndNotify() {
+      cancelAnimationFrame(pendingFit);
+      pendingFit = requestAnimationFrame(() => {
+        fitAddon.fit();
+        vscodeBridge?.postMessage({ type: 'resize', sessionId: activeSessionId, cols: term.cols, rows: term.rows });
+      });
+    }
+
+    function applyTheme(themeName) {
+      const isLight = themeName === 'Light';
+      document.documentElement.classList.toggle('light', isLight);
+      term.options.theme = isLight ? lightTheme : darkTheme;
+    }
+
+    function applySettings(message) {
+      applyTheme(message.theme || 'Dark');
+      if (message.fontFamily) {
+        term.options.fontFamily = message.fontFamily;
+      }
+      if (typeof message.fontSize === 'number') {
+        terminalFontSize = Math.max(8, Math.min(36, message.fontSize));
+        term.options.fontSize = terminalFontSize;
+      }
+      fitAndNotify();
+    }
+
+    window.chrome?.webview?.addEventListener('message', event => {
+      const message = event.data || {};
+      switch (message.type) {
+        case 'setSession':
+          activeSessionId = message.sessionId || null;
+          term.reset();
+          applySettings(message);
+          term.focus();
+          break;
+        case 'output':
+          if (!message.sessionId || message.sessionId === activeSessionId) {
+            term.write(message.data || '');
+          }
+          break;
+        case 'theme':
+          applyTheme(message.theme || 'Dark');
+          break;
+        case 'settings':
+          applySettings(message);
+          break;
+        case 'fit':
+          fitAndNotify();
+          break;
+        case 'focus':
+          term.focus();
+          break;
+      }
+    });
+
+    window.addEventListener('resize', fitAndNotify);
+    window.addEventListener('focus', () => term.focus());
+    setTimeout(() => {
+      fitAndNotify();
+      vscodeBridge?.postMessage({ type: 'ready', cols: term.cols, rows: term.rows });
+    }, 0);
+  </script>
+</body>
+</html>
