@@ -107,7 +107,13 @@
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      IsSpellCheckEnabled="False"
                      IsTextPredictionEnabled="False"
-                     KeyDown="OnPromptInputKeyDown"/>
+                     KeyDown="OnPromptInputKeyDown">
+                <TextBox.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="Enter"
+                                         Modifiers="Control"
+                                         Invoked="OnPromptRunKeyboardAcceleratorInvoked"/>
+                </TextBox.KeyboardAccelerators>
+            </TextBox>
             <Button x:Name="AgentRunButton"
                     Grid.Column="1"
                     Content="실행"

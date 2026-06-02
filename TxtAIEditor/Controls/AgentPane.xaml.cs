@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         private bool _isBusy;
         private string _runButtonText = "실행";
         private string _stopButtonText = "중단";
+        private const string OutputLineBreak = "\r\n";
 
         public void Localize(Func<string, string, string> getString)
         {
@@ -107,12 +108,12 @@ namespace TxtAIEditor.Controls
         {
             ClearOutputPlaceholder();
             if (!string.IsNullOrEmpty(AgentOutputText.Text) &&
-                !AgentOutputText.Text.EndsWith(Environment.NewLine, StringComparison.Ordinal))
+                !EndsWithLineBreak(AgentOutputText.Text))
             {
-                AgentOutputText.Text += Environment.NewLine;
+                AgentOutputText.Text += OutputLineBreak;
             }
 
-            AgentOutputText.Text += line + Environment.NewLine;
+            AgentOutputText.Text += line + OutputLineBreak;
             ScrollOutputToEnd();
         }
 
@@ -121,15 +122,15 @@ namespace TxtAIEditor.Controls
             ClearOutputPlaceholder();
             if (!string.IsNullOrWhiteSpace(AgentOutputText.Text))
             {
-                if (!AgentOutputText.Text.EndsWith(Environment.NewLine + Environment.NewLine, StringComparison.Ordinal))
+                if (!EndsWithBlankLine(AgentOutputText.Text))
                 {
-                    AgentOutputText.Text += AgentOutputText.Text.EndsWith(Environment.NewLine, StringComparison.Ordinal)
-                        ? Environment.NewLine
-                        : Environment.NewLine + Environment.NewLine;
+                    AgentOutputText.Text += EndsWithLineBreak(AgentOutputText.Text)
+                        ? OutputLineBreak
+                        : OutputLineBreak + OutputLineBreak;
                 }
             }
 
-            AgentOutputText.Text += title + Environment.NewLine;
+            AgentOutputText.Text += title + OutputLineBreak;
             ScrollOutputToEnd();
         }
 
@@ -148,6 +149,42 @@ namespace TxtAIEditor.Controls
         {
             AgentOutputText.SelectionStart = AgentOutputText.Text.Length;
             AgentOutputText.SelectionLength = 0;
+        }
+
+        private static bool EndsWithLineBreak(string text)
+        {
+            return text.EndsWith("\r\n", StringComparison.Ordinal) ||
+                   text.EndsWith("\n", StringComparison.Ordinal) ||
+                   text.EndsWith("\r", StringComparison.Ordinal);
+        }
+
+        private static bool EndsWithBlankLine(string text)
+        {
+            return text.EndsWith("\r\n\r\n", StringComparison.Ordinal) ||
+                   text.EndsWith("\n\n", StringComparison.Ordinal);
+        }
+
+        private bool IsControlDown()
+        {
+            return IsKeyDown(VirtualKey.Control) ||
+                   IsKeyDown(VirtualKey.LeftControl) ||
+                   IsKeyDown(VirtualKey.RightControl);
+        }
+
+        private static bool IsKeyDown(VirtualKey key)
+        {
+            return (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key) &
+                    Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+        }
+
+        private void RequestRunFromPrompt()
+        {
+            if (_isBusy)
+            {
+                return;
+            }
+
+            RunRequested?.Invoke(AgentPromptInput, new RoutedEventArgs());
         }
 
         private void OnRunClick(object sender, RoutedEventArgs e)
@@ -183,19 +220,19 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var ctrl = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
-            if (!ctrl)
+            if (!IsControlDown())
             {
                 return;
             }
 
             e.Handled = true;
-            if (_isBusy)
-            {
-                return;
-            }
+            RequestRunFromPrompt();
+        }
 
-            RunRequested?.Invoke(sender, e);
+        private void OnPromptRunKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+        {
+            args.Handled = true;
+            RequestRunFromPrompt();
         }
     }
 }

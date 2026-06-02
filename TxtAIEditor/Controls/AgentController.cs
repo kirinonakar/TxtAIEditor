@@ -136,6 +136,7 @@ namespace TxtAIEditor.Controls
 
                     var responseBuilder = new StringBuilder();
                     bool toolCallPlaceholderShown = false;
+                    bool visibleTextFlushed = false;
                     response = await _llmService.RunAgentAsync(
                         instruction,
                         transcript,
@@ -145,22 +146,34 @@ namespace TxtAIEditor.Controls
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             responseBuilder.Append(chunk);
-                            _agentPane.DispatcherQueue.TryEnqueue(() =>
+                            string streamedText = responseBuilder.ToString();
+                            if (IsToolCallLike(streamedText))
                             {
-                                string streamedText = responseBuilder.ToString();
-                                if (IsToolCallLike(streamedText) || MightBeToolCallPrefix(streamedText))
+                                if (!toolCallPlaceholderShown)
                                 {
-                                    if (!toolCallPlaceholderShown)
-                                    {
-                                        _agentPane.AppendOutputLine(_getString("AgentOutputPreparingTool", "도구 호출 준비 중..."));
-                                        toolCallPlaceholderShown = true;
-                                    }
+                                    toolCallPlaceholderShown = true;
+                                    _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                        _agentPane.AppendOutputLine(_getString("AgentOutputPreparingTool", "도구 호출 준비 중...")));
                                 }
-                                else
+
+                                return;
+                            }
+
+                            if (!visibleTextFlushed && MightBeToolCallPrefix(streamedText))
+                            {
+                                if (!toolCallPlaceholderShown)
                                 {
-                                    _agentPane.AppendOutputText(chunk);
+                                    toolCallPlaceholderShown = true;
+                                    _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                        _agentPane.AppendOutputLine(_getString("AgentOutputPreparingTool", "도구 호출 준비 중...")));
                                 }
-                            });
+
+                                return;
+                            }
+
+                            string textToAppend = visibleTextFlushed ? chunk : streamedText;
+                            visibleTextFlushed = true;
+                            _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(textToAppend));
                             await Task.CompletedTask;
                         },
                         cancellationToken);
@@ -169,8 +182,9 @@ namespace TxtAIEditor.Controls
 
                     if (!TryParseToolCall(response, out string toolName, out JsonElement arguments))
                     {
-                        if (responseBuilder.Length == 0 && !string.IsNullOrWhiteSpace(response))
+                        if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
+                            _agentPane.AppendOutputLine(_getString("AgentToolCallParseFailed", "도구 호출을 해석하지 못해 원문을 표시합니다."));
                             _agentPane.AppendOutputText(response);
                         }
 
@@ -338,6 +352,8 @@ namespace TxtAIEditor.Controls
                         "overwrite_file" => await _fileTools.OverwriteFileAsync(
                             GetPathArgument(arguments),
                             GetFirstStringArgument(arguments, "content", "newText", "new_text", "text")),
+                        "insert_text" => await InsertTextToolAsync(
+                            GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
                         _ => $"Unknown tool: {toolName}"
                     };
                 }
@@ -397,6 +413,7 @@ namespace TxtAIEditor.Controls
                 "overwrite_file" => string.Format(
                     _getString("AgentActivityOverwriteFileFormat", "파일 덮어쓰는 중: {0}"),
                     GetStringArgument(arguments, "path")),
+                "insert_text" => _getString("AgentActivityInsertText", "현재 편집기에 입력 중"),
                 _ => string.Format(
                     _getString("AgentActivityUnknownToolFormat", "도구 실행 중: {0}"),
                     toolName)
@@ -578,6 +595,10 @@ namespace TxtAIEditor.Controls
                 "edit_file" => "replace_in_file",
                 "write_file" => "overwrite_file",
                 "write_text" => "overwrite_file",
+                "insert" => "insert_text",
+                "insert_into_editor" => "insert_text",
+                "insert_text_into_editor" => "insert_text",
+                "paste_text" => "insert_text",
                 "read" => "read_file",
                 "search" => "search_text",
                 "powershell" => "run_powershell",
@@ -599,6 +620,19 @@ namespace TxtAIEditor.Controls
             }
 
             return int.TryParse(value.GetString(), out int parsed) ? parsed : fallback;
+        }
+
+        private async Task<string> InsertTextToolAsync(string content)
+        {
+            if (string.IsNullOrEmpty(content))
+            {
+                return "insert_text failed: content is empty.";
+            }
+
+            bool inserted = await _insertIntoActiveEditorAsync(content);
+            return inserted
+                ? $"inserted into active editor: {content.Length:N0} chars"
+                : "insert_text failed: active editor did not accept the text.";
         }
 
         private async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)

@@ -38,6 +38,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- create_file: create a new file under the workspace root. args: {\"path\":\"relative/path.txt\",\"content\":\"...\"}");
             builder.AppendLine("- replace_in_file: exact text replacement under the workspace root. args: {\"path\":\"relative/path.cs\",\"oldText\":\"...\",\"newText\":\"...\"}");
             builder.AppendLine("- overwrite_file: overwrite a workspace file. Use only when the user explicitly requested a full rewrite. args: {\"path\":\"relative/path.cs\",\"content\":\"...\"}");
+            builder.AppendLine("- insert_text: insert text into the active editor at the current cursor/selection. Use this when the user says to input, insert, paste, or place generated text into the editor. args: {\"content\":\"...\"}");
             builder.AppendLine("- Always use these exact tool names. For text replacement, use replace_in_file, not replace_text.");
             builder.AppendLine();
             builder.AppendLine("PowerShell tool:");
