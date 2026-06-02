@@ -55,6 +55,7 @@ namespace TxtAIEditor
         private readonly RootKeyboardShortcutController _rootKeyboardShortcutController;
         private readonly SnippetsController _snippetsController;
         private readonly LlmAssistantController _llmAssistantController;
+        private readonly AgentController _agentController;
         private readonly TocController _tocController;
         private readonly ShellPaneController _shellPaneController;
         private readonly MarkdownToolbarController _markdownToolbarController;
@@ -393,6 +394,16 @@ namespace TxtAIEditor
                 GetLocalizedString,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
+            _agentController = new AgentController(
+                _llmService,
+                PreviewGrid.AgentPane,
+                GetActiveTab,
+                () => _viewModel.Tabs.ToList(),
+                GetTabTextForLlmContext,
+                InsertTextIntoActiveEditorAsync,
+                ShowErrorMessage,
+                GetLocalizedString,
+                new AgentFileToolService(GetAgentWorkspaceRoot));
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,
@@ -437,6 +448,7 @@ namespace TxtAIEditor
                 _tabBridges,
                 DispatcherQueue,
                 _llmAssistantController,
+                _agentController,
                 SelectionStatsText,
                 _statusBarController,
                 GetLocalizedString,
@@ -1241,6 +1253,7 @@ namespace TxtAIEditor
             bridge.SelectionReceived += (selectedText) =>
             {
                 _llmAssistantController.SetSelectionText(selectedText);
+                _agentController.SetSelectionText(selectedText);
                 if (GetActiveTab() == tab)
                 {
                     if (string.IsNullOrEmpty(selectedText))
@@ -2132,6 +2145,35 @@ namespace TxtAIEditor
         private void ToggleTerminal()
         {
             _terminalPanelController.Toggle();
+        }
+
+        private string GetAgentWorkspaceRoot()
+        {
+            if (FileListView.SelectedItem is ExplorerItem selectedItem)
+            {
+                if (selectedItem.IsFolder && Directory.Exists(selectedItem.Path))
+                {
+                    return selectedItem.Path;
+                }
+
+                string? selectedFileDirectory = Path.GetDirectoryName(selectedItem.Path);
+                if (!string.IsNullOrWhiteSpace(selectedFileDirectory) && Directory.Exists(selectedFileDirectory))
+                {
+                    return selectedFileDirectory;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
+            {
+                return _currentFolderPath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_currentRepoPath) && Directory.Exists(_currentRepoPath))
+            {
+                return _currentRepoPath;
+            }
+
+            return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
 
         #endregion

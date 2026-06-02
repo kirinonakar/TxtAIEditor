@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TxtAIEditor.Controls.AgentPane"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="AgentButtonBackground" Color="#FCFCFC"/>
+                    <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#E0E0E0"/>
+                    <SolidColorBrush x:Key="AgentOutputBackground" Color="#FCFCFC"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="AgentButtonBackground" Color="#2B2D31"/>
+                    <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#2E3033"/>
+                    <SolidColorBrush x:Key="AgentOutputBackground" Color="#151618"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <Style x:Key="AgentButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{ThemeResource AgentButtonBackground}"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource AgentButtonBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="10,4,10,4"/>
+                <Setter Property="CornerRadius" Value="4"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid Padding="15" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      Background="{ThemeResource AgentOutputBackground}"
+                      BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                      BorderThickness="1"
+                      Padding="10"
+                      CornerRadius="4">
+            <TextBox x:Name="AgentOutputText"
+                     Text="대기 중... Agent에게 작업을 지시해 보세요."
+                     TextWrapping="Wrap"
+                     FontSize="13"
+                     IsReadOnly="True"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     Padding="0"
+                     AcceptsReturn="True"/>
+        </ScrollViewer>
+
+        <Button x:Name="AgentInsertOutputButton"
+                Grid.Row="1"
+                Content="입력"
+                HorizontalAlignment="Stretch"
+                Height="32"
+                Click="OnInsertOutputClick"
+                ToolTipService.ToolTip="Agent 응답을 현재 커서에 입력"
+                Style="{StaticResource AccentButtonStyle}"/>
+
+        <Border Grid.Row="2" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="8" CornerRadius="4">
+            <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon Glyph="&#xE946;" FontSize="14" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="AgentContextStatsText"
+                               Text="현재 탭과 선택 영역을 맥락으로 사용"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <CheckBox x:Name="AgentIncludeActiveFileCheckBox"
+                          Content="현재 탭 포함"
+                          IsChecked="True"
+                          FontSize="12"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="3" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="AgentPromptInput"
+                     Grid.Column="0"
+                     PlaceholderText="Agent에게 맡길 작업 입력..."
+                     MinHeight="72"
+                     MaxHeight="120"
+                     FontSize="12"
+                     FontFamily="Segoe UI, Malgun Gothic"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     Padding="10,8,10,8"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     IsSpellCheckEnabled="False"
+                     IsTextPredictionEnabled="False"
+                     KeyDown="OnPromptInputKeyDown"/>
+            <Button x:Name="AgentRunButton"
+                    Grid.Column="1"
+                    Content="실행"
+                    Width="64"
+                    VerticalAlignment="Stretch"
+                    Click="OnRunClick"
+                    Style="{StaticResource AccentButtonStyle}"/>
+        </Grid>
+
+        <Grid Grid.Row="4" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="AgentPlanButton"
+                    Grid.Column="0"
+                    Content="계획"
+                    HorizontalAlignment="Stretch"
+                    Click="OnPlanClick"
+                    Style="{StaticResource AgentButtonStyle}"/>
+            <Button x:Name="AgentEditButton"
+                    Grid.Column="1"
+                    Content="수정안"
+                    HorizontalAlignment="Stretch"
+                    Click="OnEditClick"
+                    Style="{StaticResource AgentButtonStyle}"/>
+        </Grid>
+    </Grid>
+</UserControl>

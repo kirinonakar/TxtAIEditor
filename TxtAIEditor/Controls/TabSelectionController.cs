@@ -19,6 +19,7 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly LlmAssistantController _llmAssistantController;
+        private readonly AgentController _agentController;
         private readonly TextBlock _selectionStatsText;
         private readonly StatusBarController _statusBarController;
         private readonly Func<string, string, string> _getString;
@@ -35,6 +36,7 @@ namespace TxtAIEditor.Controls
             Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             DispatcherQueue dispatcherQueue,
             LlmAssistantController llmAssistantController,
+            AgentController agentController,
             TextBlock selectionStatsText,
             StatusBarController statusBarController,
             Func<string, string, string> getString,
@@ -49,6 +51,7 @@ namespace TxtAIEditor.Controls
             _tabBridges = tabBridges;
             _dispatcherQueue = dispatcherQueue;
             _llmAssistantController = llmAssistantController;
+            _agentController = agentController;
             _selectionStatsText = selectionStatsText;
             _statusBarController = statusBarController;
             _getString = getString;
@@ -102,6 +105,7 @@ namespace TxtAIEditor.Controls
         private async Task HandleSelectionChangedAsync(TabViewItem activeTabItem)
         {
             _llmAssistantController.ClearSelection();
+            _agentController.ClearSelection();
             _selectionStatsText.Text = _getString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");
 
             if (activeTabItem.Tag is string tabId)

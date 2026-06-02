@@ -35,6 +35,7 @@ namespace TxtAIEditor.Controls
         public TextBlock SelectionStats => SelectionStatsText;
         public TextBox LlmFileContext => LlmFileContextInput;
         public TextBox LlmCustomPrompt => LlmCustomPromptInput;
+        public AgentPane AgentPane => AgentPaneControl;
 
         // Named controls exposed for localization
         public TabViewItem LivePreviewTabItem => LivePreviewTab;
@@ -46,6 +47,7 @@ namespace TxtAIEditor.Controls
         public Button OpenBrowserBtn => OpenBrowserButton;
         public TextBlock OpenBrowserBtnText => OpenBrowserButtonText;
         public TabViewItem AiAssistantTabItem => AiAssistantTab;
+        public TabViewItem AgentTabItem => AgentTab;
         public Button LlmAddFileCtxButton => LlmAddFileContextButton;
         public Button LlmRemoveFileCtxButton => LlmRemoveFileContextButton;
         public Button LlmPresetBtn => LlmPresetButton;
@@ -70,6 +72,8 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(OpenBrowserButton, getString("OpenInBrowserTooltip", "HTML 미리보기를 브라우저로 열기"));
 
             AiAssistantTab.Header = getString("AiAssistantTabHeader", "AI Assistant");
+            AgentTab.Header = getString("AgentTabHeader", "Agent");
+            AgentPaneControl.Localize(getString);
 
             string currentLlmText = LlmOutputText.Text;
             if (currentLlmText.Contains("대기 중...") || currentLlmText.Contains("待機中...") || currentLlmText.Contains("Waiting..."))
