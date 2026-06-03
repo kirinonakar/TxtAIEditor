@@ -167,7 +167,7 @@ namespace TxtAIEditor.Controls
                     response = await _llmService.RunAgentAsync(
                         instruction,
                         transcript,
-                        selectedText,
+                        _lastSelectionText,
                         "run",
                         async chunk =>
                         {
@@ -485,6 +485,34 @@ namespace TxtAIEditor.Controls
                 cancellationToken.ThrowIfCancellationRequested();
                 string normalizedToolName = NormalizeToolName(toolName);
                 AppendActivity(GetToolStartMessage(normalizedToolName, arguments));
+
+                bool isEditingActiveFile = false;
+                if (normalizedToolName == "replace_in_file" ||
+                    normalizedToolName == "replace_range" ||
+                    normalizedToolName == "apply_patch" ||
+                    normalizedToolName == "overwrite_file")
+                {
+                    try
+                    {
+                        string editedPath = GetPathArgument(arguments);
+                        string activePath = _activeTabProvider()?.FilePath ?? string.Empty;
+                        if (!string.IsNullOrEmpty(editedPath) && !string.IsNullOrEmpty(activePath))
+                        {
+                            string resolvedEdited = Path.IsPathRooted(editedPath) ? editedPath : Path.Combine(_fileTools.WorkspaceRoot, editedPath);
+                            string resolvedActive = Path.IsPathRooted(activePath) ? activePath : Path.Combine(_fileTools.WorkspaceRoot, activePath);
+                            if (string.Equals(Path.GetFullPath(resolvedEdited), Path.GetFullPath(resolvedActive), StringComparison.OrdinalIgnoreCase))
+                            {
+                                isEditingActiveFile = true;
+                            }
+                        }
+                    }
+                    catch {}
+                }
+                else if (normalizedToolName == "insert_text")
+                {
+                    isEditingActiveFile = true;
+                }
+
                 string result;
                 if (normalizedToolName == "replace_in_file")
                 {
@@ -551,6 +579,12 @@ namespace TxtAIEditor.Controls
                 AppendActivity(string.Format(
                     _getString("AgentActivityToolDoneFormat", "도구 완료: {0}"),
                     normalizedToolName));
+
+                if (isEditingActiveFile && !result.Contains("failed") && !result.Contains("cancelled"))
+                {
+                    ClearSelection();
+                }
+
                 return result;
             }
             catch (OperationCanceledException)
