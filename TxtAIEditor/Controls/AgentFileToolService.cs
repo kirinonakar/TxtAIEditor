@@ -163,7 +163,22 @@ namespace TxtAIEditor.Controls
                 return "run_rg failed: arguments are empty.";
             }
 
-            return await RunProcessAsync("rg", arguments, ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
+            string resolvedRg = ResolveExecutablePath("rg");
+            string workspaceRoot = ResolveWorkspaceRoot();
+
+            string result = await RunProcessAsync(resolvedRg, arguments, workspaceRoot, timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
+
+            if (result.Contains("failed to start") || result.Contains("timed out after"))
+            {
+                string query = ExtractQueryFromRgArguments(arguments);
+                if (!string.IsNullOrWhiteSpace(query))
+                {
+                    string fallbackResult = await SearchTextAsync(query, null, 80);
+                    return $"[run_rg failed: fell back to search_text for query \"{query}\"]\n{fallbackResult}";
+                }
+            }
+
+            return result;
         }
 
         public async Task<string> RunPowerShellAsync(string command, int timeoutMs, CancellationToken cancellationToken = default)
@@ -773,7 +788,155 @@ namespace TxtAIEditor.Controls
                 root = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             }
 
-            return Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string fullPath = Path.GetFullPath(root);
+            try
+            {
+                var dirInfo = new DirectoryInfo(fullPath);
+                if (dirInfo.Exists)
+                {
+                    var target = dirInfo.ResolveLinkTarget(returnFinalTarget: true);
+                    if (target != null)
+                    {
+                        fullPath = target.FullName;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
+        private static string ResolveExecutablePath(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return fileName;
+            }
+
+            string candidate = string.Empty;
+            if (Path.IsPathRooted(fileName))
+            {
+                candidate = fileName;
+            }
+            else
+            {
+                string? pathValue = Environment.GetEnvironmentVariable("PATH");
+                if (!string.IsNullOrWhiteSpace(pathValue))
+                {
+                    string searchName = fileName;
+                    if (!searchName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        searchName += ".exe";
+                    }
+
+                    foreach (string directory in pathValue.Split(Path.PathSeparator))
+                    {
+                        if (string.IsNullOrWhiteSpace(directory))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            string path = Path.Combine(directory.Trim(), searchName);
+                            if (File.Exists(path))
+                            {
+                                candidate = path;
+                                break;
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(candidate) || !File.Exists(candidate))
+            {
+                return fileName;
+            }
+
+            try
+            {
+                var fileInfo = new FileInfo(candidate);
+                if (fileInfo.Exists)
+                {
+                    var target = fileInfo.ResolveLinkTarget(returnFinalTarget: true);
+                    if (target != null)
+                    {
+                        return target.FullName;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return candidate;
+        }
+
+        private static string ExtractQueryFromRgArguments(string arguments)
+        {
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                return string.Empty;
+            }
+
+            var match = Regex.Match(arguments, @"(?:-e|--regexp|-F|--fixed-strings)\s+""([^""]+)""");
+            if (match.Success) return match.Groups[1].Value;
+
+            match = Regex.Match(arguments, @"(?:-e|--regexp|-F|--fixed-strings)\s+'([^']+)'");
+            if (match.Success) return match.Groups[1].Value;
+
+            match = Regex.Match(arguments, @"(?:-e|--regexp|-F|--fixed-strings)\s+(\S+)");
+            if (match.Success) return match.Groups[1].Value;
+
+            var quotedMatches = Regex.Matches(arguments, @"""([^""]+)""");
+            if (quotedMatches.Count > 0)
+            {
+                foreach (Match m in quotedMatches)
+                {
+                    string val = m.Groups[1].Value;
+                    if (!val.StartsWith('-'))
+                    {
+                        return val;
+                    }
+                }
+            }
+
+            quotedMatches = Regex.Matches(arguments, @"'([^']+)'");
+            if (quotedMatches.Count > 0)
+            {
+                foreach (Match m in quotedMatches)
+                {
+                    string val = m.Groups[1].Value;
+                    if (!val.StartsWith('-'))
+                    {
+                        return val;
+                    }
+                }
+            }
+
+            string[] tokens = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = tokens.Length - 1; i >= 0; i--)
+            {
+                string token = tokens[i];
+                if (!token.StartsWith('-'))
+                {
+                    if (i > 0 && (tokens[i - 1] == "-g" || tokens[i - 1] == "-t" || tokens[i - 1] == "--type" || tokens[i - 1] == "-e"))
+                    {
+                        continue;
+                    }
+                    return token;
+                }
+            }
+
+            string cleaned = Regex.Replace(arguments, @"-[a-zA-Z0-9\-]+", "").Trim();
+            cleaned = cleaned.Replace("\"", "").Replace("'", "").Trim();
+            return cleaned;
         }
 
         private string ResolveInsideWorkspace(string path, bool allowOutside = false)
