@@ -1517,4 +1517,10 @@
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k 토큰</value>
   </data>
+  <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
+    <value>파일 변경 확인</value>
+  </data>
+  <data name="AgentDiffConfirmDescriptionDefault" xml:space="preserve">
+    <value>파일을 수정하시겠습니까?</value>
+  </data>
 </root>

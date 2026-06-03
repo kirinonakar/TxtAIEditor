@@ -1518,4 +1518,10 @@
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k トークン</value>
   </data>
+  <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
+    <value>ファイル変更の確認</value>
+  </data>
+  <data name="AgentDiffConfirmDescriptionDefault" xml:space="preserve">
+    <value>ファイルを修正しますか？</value>
+  </data>
 </root>

@@ -1517,4 +1517,10 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k tokens</value>
   </data>
+  <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
+    <value>Confirm File Changes</value>
+  </data>
+  <data name="AgentDiffConfirmDescriptionDefault" xml:space="preserve">
+    <value>Do you want to modify the file?</value>
+  </data>
 </root>

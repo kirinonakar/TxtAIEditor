@@ -20,6 +20,8 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? StopRequested;
         public event RoutedEventHandler? NewSessionRequested;
         public event RoutedEventHandler? InsertOutputRequested;
+        public event RoutedEventHandler? DiffApproved;
+        public event RoutedEventHandler? DiffCancelled;
 
         public TextBox Output => AgentOutputText;
         public TextBox Prompt => AgentPromptInput;
@@ -78,6 +80,11 @@ namespace TxtAIEditor.Controls
                 AgentActivityText.Text = getString("AgentActivityIdle", "대기 중");
             }
             ToolTipService.SetToolTip(AgentInsertOutputButton, getString("AgentInsertOutputTooltip", "Agent 응답을 현재 커서에 입력"));
+
+            AgentDiffApproveButton.Content = getString("AgentDiffApplyButton", "승인");
+            AgentDiffCancelButton.Content = getString("AgentDiffCancelButton", "취소");
+            AgentDiffConfirmHeader.Text = getString("AgentDiffConfirmHeaderDefault", "파일 변경 확인");
+            AgentDiffConfirmDescription.Text = getString("AgentDiffConfirmDescriptionDefault", "파일을 수정하시겠습니까?");
         }
 
         public void SetBusy(bool isBusy)
@@ -362,6 +369,28 @@ namespace TxtAIEditor.Controls
         {
             args.Handled = true;
             RequestRunFromPrompt();
+        }
+
+        private void OnDiffApproveClick(object sender, RoutedEventArgs e)
+        {
+            DiffApproved?.Invoke(sender, e);
+        }
+
+        private void OnDiffCancelClick(object sender, RoutedEventArgs e)
+        {
+            DiffCancelled?.Invoke(sender, e);
+        }
+
+        public void ShowDiffConfirm(string header, string description)
+        {
+            AgentDiffConfirmHeader.Text = header;
+            AgentDiffConfirmDescription.Text = description;
+            AgentDiffConfirmPanel.Visibility = Visibility.Visible;
+        }
+
+        public void HideDiffConfirm()
+        {
+            AgentDiffConfirmPanel.Visibility = Visibility.Collapsed;
         }
     }
 }

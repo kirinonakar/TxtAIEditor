@@ -42,12 +42,13 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="90"/>
             </Grid.ColumnDefinitions>
             <Button x:Name="AgentNewSessionButton"
                     Grid.Column="0"
@@ -59,6 +60,7 @@
                        Grid.Column="1"
                        Text="0.0k tokens"
                        VerticalAlignment="Center"
+                       HorizontalAlignment="Right"
                        FontSize="12"
                        Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
         </Grid>
@@ -103,7 +105,7 @@
                 </StackPanel>
                 <CheckBox x:Name="AgentIncludeActiveFileCheckBox"
                           Content="현재 탭 포함"
-                          IsChecked="True"
+                          IsChecked="False"
                           FontSize="12"/>
             </StackPanel>
         </Border>
@@ -142,8 +144,51 @@
                     Style="{StaticResource AccentButtonStyle}"/>
         </Grid>
 
-        <Border x:Name="AgentActivityPanel"
+        <Border x:Name="AgentDiffConfirmPanel"
                 Grid.Row="5"
+                Background="{ThemeResource ToolbarBackgroundBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                Padding="10"
+                CornerRadius="4"
+                Visibility="Collapsed">
+            <StackPanel Spacing="10">
+                <TextBlock x:Name="AgentDiffConfirmHeader"
+                           Text="파일 변경 확인"
+                           FontWeight="SemiBold"
+                           FontSize="12"/>
+                <TextBlock x:Name="AgentDiffConfirmDescription"
+                           Text="파일을 수정하시겠습니까?"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="AgentDiffApproveButton"
+                            Grid.Column="0"
+                            Content="승인"
+                            HorizontalAlignment="Stretch"
+                            Height="28"
+                            FontSize="11"
+                            Click="OnDiffApproveClick"
+                            Style="{StaticResource AccentButtonStyle}"/>
+                    <Button x:Name="AgentDiffCancelButton"
+                            Grid.Column="1"
+                            Content="취소"
+                            HorizontalAlignment="Stretch"
+                            Height="28"
+                            FontSize="11"
+                            Click="OnDiffCancelClick"
+                            Style="{StaticResource AgentButtonStyle}"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="AgentActivityPanel"
+                Grid.Row="6"
                 Background="{ThemeResource ToolbarBackgroundBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="1"

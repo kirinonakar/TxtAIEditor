@@ -34,6 +34,7 @@ namespace TxtAIEditor.Controls
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
         private readonly StringBuilder _sessionHistory = new();
+        private TaskCompletionSource<bool>? _diffApprovalTcs;
 
         public AgentController(
             ILLMService llmService,
@@ -91,6 +92,9 @@ namespace TxtAIEditor.Controls
             _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
             _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
             _agentPane.IncludeActiveFileCheckBox.Unchecked += (_, _) => UpdateContextStats();
+
+            _agentPane.DiffApproved += (_, _) => _diffApprovalTcs?.TrySetResult(true);
+            _agentPane.DiffCancelled += (_, _) => _diffApprovalTcs?.TrySetResult(false);
         }
  
         private async Task RunAgentAsync()
@@ -417,6 +421,7 @@ namespace TxtAIEditor.Controls
             }
 
             _runCancellation?.Cancel();
+            _diffApprovalTcs?.TrySetResult(false);
         }
 
         private string BuildRunHeader(string instruction)
@@ -988,24 +993,6 @@ namespace TxtAIEditor.Controls
 
             return await RunOnUIThreadAsync(async () =>
             {
-                double rootWidth = _agentPane.XamlRoot?.Size.Width ?? 900;
-                double dialogWidth = Math.Clamp(rootWidth - 96, 480, 720);
-
-                var content = new StackPanel
-                {
-                    Width = dialogWidth,
-                    Spacing = 12
-                };
-
-                var summary = new TextBlock
-                {
-                    Text = BuildDiffSummary(preview),
-                    TextWrapping = TextWrapping.Wrap,
-                    FontSize = 14,
-                    Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
-                };
-                content.Children.Add(summary);
-
                 string titleKey = preview.ActionName switch
                 {
                     "create_file" => "AgentCreateDialogTitle",
@@ -1018,23 +1005,26 @@ namespace TxtAIEditor.Controls
                     _ => "Agent 파일 수정 확인: {0}"
                 };
 
-                var dialog = new ContentDialog
-                {
-                    Title = string.Format(
-                        _getString(titleKey, defaultTitle),
-                        preview.RelativePath),
-                    Content = content,
-                    PrimaryButtonText = _getString("AgentDiffApplyButton", "승인"),
-                    CloseButtonText = _getString("AgentDiffCancelButton", "취소"),
-                    XamlRoot = _agentPane.XamlRoot,
-                    RequestedTheme = _agentPane.ActualTheme
-                };
+                string summaryText = preview.IsNewFile
+                    ? string.Format(_getString("AgentCreateSummaryFormat", "파일을 생성하시겠습니까? 경로: {0}"), preview.RelativePath)
+                    : string.Format(_getString("AgentEditSummaryFormat", "파일을 수정하시겠습니까? 경로: {0}"), preview.RelativePath);
 
-                var result = await dialog.ShowAsync();
-                bool approved = result == ContentDialogResult.Primary;
+                string headerText = string.Format(
+                    _getString(titleKey, defaultTitle),
+                    Path.GetFileName(preview.RelativePath));
+
+                _agentPane.ShowDiffConfirm(headerText, summaryText);
+
+                _diffApprovalTcs = new TaskCompletionSource<bool>();
+
+                bool approved = await _diffApprovalTcs.Task;
+
+                _agentPane.HideDiffConfirm();
+
                 AppendActivity(approved
                     ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
                     : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
+
                 return approved;
             });
         }
