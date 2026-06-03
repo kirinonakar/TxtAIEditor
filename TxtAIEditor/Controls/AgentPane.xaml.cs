@@ -25,6 +25,8 @@ namespace TxtAIEditor.Controls
         public TextBox Prompt => AgentPromptInput;
         public TextBox Activity => AgentActivityText;
         public TextBlock ContextStats => AgentContextStatsText;
+        public TextBlock TokenCount => AgentTokenCountText;
+        public CheckBox IncludeActiveFileCheckBox => AgentIncludeActiveFileCheckBox;
         public bool IncludeActiveFile => AgentIncludeActiveFileCheckBox.IsChecked == true;
 
         private bool _isBusy;

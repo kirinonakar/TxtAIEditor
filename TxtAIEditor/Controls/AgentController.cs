@@ -87,6 +87,10 @@ namespace TxtAIEditor.Controls
             _agentPane.StopRequested += (_, _) => StopAgent();
             _agentPane.NewSessionRequested += (_, _) => ClearSession();
             _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
+            
+            _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
+            _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
+            _agentPane.IncludeActiveFileCheckBox.Unchecked += (_, _) => UpdateContextStats();
         }
  
         private async Task RunAgentAsync()
@@ -336,6 +340,7 @@ namespace TxtAIEditor.Controls
             {
                 _agentPane.ResetOutput(_getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요."));
                 _agentPane.ClearActivity(_getString("AgentActivityIdle", "대기 중"));
+                UpdateContextStats();
             });
         }
 
@@ -1080,6 +1085,64 @@ namespace TxtAIEditor.Controls
                 _getString("AgentContextStatsFormat", "맥락: {0} · {1}"),
                 tabPart,
                 selectionPart);
+
+            double estimatedTokens = EstimateContextTokens();
+            double kTokens = estimatedTokens / 1000.0;
+            _agentPane.TokenCount.Text = string.Format(
+                _getString("AgentTokenCountFormat", "{0:F1}k tokens"),
+                kTokens);
+        }
+
+        private string GetActiveLanguageCode()
+        {
+            string mode = _getString("AgentModeRun", "Run");
+            if (mode == "실행") return "ko-KR";
+            if (mode == "実行") return "ja-JP";
+            return "en-US";
+        }
+
+        private double EstimateContextTokens()
+        {
+            string langCode = GetActiveLanguageCode();
+            string systemPrompt = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildSystemPrompt(langCode);
+
+            string instruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
+            string workspaceContext = BuildWorkspaceContext();
+            string selectedText = _lastSelectionText;
+
+            var initialTranscriptBuilder = new StringBuilder();
+            if (_sessionHistory.Length > 0)
+            {
+                initialTranscriptBuilder.AppendLine("[Session History]");
+                initialTranscriptBuilder.AppendLine(_sessionHistory.ToString());
+                initialTranscriptBuilder.AppendLine("=================================");
+                initialTranscriptBuilder.AppendLine();
+            }
+            initialTranscriptBuilder.AppendLine(workspaceContext);
+            string initialTranscript = initialTranscriptBuilder.ToString();
+
+            string userContent = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildUserContent(instruction, initialTranscript, selectedText, string.Empty);
+
+            return EstimateTokenCount(systemPrompt) + EstimateTokenCount(userContent);
+        }
+
+        private static double EstimateTokenCount(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            double tokens = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c <= 127)
+                {
+                    tokens += 0.25;
+                }
+                else
+                {
+                    tokens += 0.7;
+                }
+            }
+            return tokens;
         }
     }
 }

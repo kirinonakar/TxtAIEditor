@@ -1515,4 +1515,7 @@
   <data name="AgentInsertOutputTooltip" xml:space="preserve">
     <value>Agentの応答を現在のカーソル位置に入力します</value>
   </data>
+  <data name="AgentTokenCountFormat" xml:space="preserve">
+    <value>{0:F1}k トークン</value>
+  </data>
 </root>

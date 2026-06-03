@@ -1514,4 +1514,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentInsertOutputTooltip" xml:space="preserve">
     <value>Insert Agent response at current cursor</value>
   </data>
+  <data name="AgentTokenCountFormat" xml:space="preserve">
+    <value>{0:F1}k tokens</value>
+  </data>
 </root>

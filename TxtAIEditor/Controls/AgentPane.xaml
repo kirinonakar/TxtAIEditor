@@ -36,15 +36,34 @@
 
     <Grid Padding="15" RowSpacing="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="0"
+        <Grid Grid.Row="0" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="AgentNewSessionButton"
+                    Grid.Column="0"
+                    Content="새 세션"
+                    HorizontalAlignment="Stretch"
+                    Click="OnNewSessionClick"
+                    Style="{StaticResource AgentButtonStyle}"/>
+            <TextBlock x:Name="AgentTokenCountText"
+                       Grid.Column="1"
+                       Text="0.0k tokens"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1"
                       VerticalScrollBarVisibility="Auto"
                       Background="{ThemeResource AgentOutputBackground}"
                       BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
@@ -63,7 +82,7 @@
         </ScrollViewer>
 
         <Button x:Name="AgentInsertOutputButton"
-                Grid.Row="1"
+                Grid.Row="2"
                 Content="입력"
                 HorizontalAlignment="Stretch"
                 Height="32"
@@ -71,7 +90,7 @@
                 ToolTipService.ToolTip="Agent 응답을 현재 커서에 입력"
                 Style="{StaticResource AccentButtonStyle}"/>
 
-        <Border Grid.Row="2" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="8" CornerRadius="4">
+        <Border Grid.Row="3" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="8" CornerRadius="4">
             <StackPanel Spacing="6">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                     <FontIcon Glyph="&#xE946;" FontSize="14" VerticalAlignment="Center"/>
@@ -89,7 +108,7 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="3" ColumnSpacing="8">
+        <Grid Grid.Row="4" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -121,14 +140,6 @@
                     VerticalAlignment="Stretch"
                     Click="OnRunClick"
                     Style="{StaticResource AccentButtonStyle}"/>
-        </Grid>
-
-        <Grid Grid.Row="4">
-            <Button x:Name="AgentNewSessionButton"
-                    Content="새 세션"
-                    HorizontalAlignment="Stretch"
-                    Click="OnNewSessionClick"
-                    Style="{StaticResource AgentButtonStyle}"/>
         </Grid>
 
         <Border x:Name="AgentActivityPanel"

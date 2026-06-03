@@ -1514,4 +1514,7 @@
   <data name="AgentInsertOutputTooltip" xml:space="preserve">
     <value>Agent 응답을 현재 커서에 입력</value>
   </data>
+  <data name="AgentTokenCountFormat" xml:space="preserve">
+    <value>{0:F1}k 토큰</value>
+  </data>
 </root>
