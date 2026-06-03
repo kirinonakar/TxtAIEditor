@@ -88,15 +88,27 @@ namespace TxtAIEditor.Controls
 
             string branch = await _gitService.GetCurrentBranchAsync(repoPath);
             string localizedBranch = _isGitNotDetected(branch) ? _getString("GitNotDetected", "Git: 감지 안됨") : branch;
+
+            // Fetch everything asynchronously first to avoid race conditions and UI flickering
+            var branchesTask = _gitService.GetBranchesAsync(repoPath);
+            var historyTask = _gitService.GetRecentHistoryAsync(repoPath);
+            var fileStatusesTask = _gitService.GetFileStatusesAsync(repoPath);
+
+            await Task.WhenAll(branchesTask, historyTask, fileStatusesTask);
+
+            var branches = await branchesTask;
+            var historyList = await historyTask;
+            var fileStatuses = await fileStatusesTask;
+
+            // Update UI components in a single synchronous block to prevent duplicate display and empty states
             _leftSidebar.GitPanelBranch.Text = localizedBranch;
             _statusGitBranch.Text = localizedBranch;
             _startAutoRefresh();
 
-            _viewModel.GitFiles.Clear();
             _leftSidebar.GitBranches.Items.Clear();
             int selectedIndex = -1;
             int i = 0;
-            foreach (var branchName in await _gitService.GetBranchesAsync(repoPath))
+            foreach (var branchName in branches)
             {
                 string cleanedBranchName = branchName.Trim();
                 _leftSidebar.GitBranches.Items.Add(cleanedBranchName);
@@ -112,12 +124,12 @@ namespace TxtAIEditor.Controls
             }
 
             _leftSidebar.GitHistory.Items.Clear();
-            foreach (var history in await _gitService.GetRecentHistoryAsync(repoPath))
+            foreach (var history in historyList)
             {
                 _leftSidebar.GitHistory.Items.Add(history);
             }
 
-            var fileStatuses = await _gitService.GetFileStatusesAsync(repoPath);
+            _viewModel.GitFiles.Clear();
             foreach (var kvp in fileStatuses)
             {
                 _viewModel.GitFiles.Add(CreateGitFileItem(kvp.Key, kvp.Value));

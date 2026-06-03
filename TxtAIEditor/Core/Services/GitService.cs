@@ -88,7 +88,8 @@ namespace TxtAIEditor.Core.Services
                         string relativePath = entry.Substring(3).Trim().Replace('/', '\\');
 
                         // In -z porcelain, rename/copy entries are followed by the original path.
-                        if ((status[0] == 'R' || status[0] == 'C') && i + 1 < entries.Length)
+                        // Check both index status and worktree status (e.g. status contains 'R' or 'C') to handle unstaged renames correctly.
+                        if ((status.Contains('R') || status.Contains('C')) && i + 1 < entries.Length)
                         {
                             i++;
                         }
