@@ -78,6 +78,7 @@ namespace TxtAIEditor.Controls
         private int _thinkingLineStart;
         private int _thinkingDotCount;
         private string _thinkingLinePrefix = string.Empty;
+        private string _thinkingLineTimestamp = string.Empty;
 
         private void AppendText(string text)
         {
@@ -111,7 +112,7 @@ namespace TxtAIEditor.Controls
             if (isPlaceholder ||
                 outputText.StartsWith("대기 중...", StringComparison.Ordinal) ||
                 outputText.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                outputText.StartsWith("待機중...", StringComparison.Ordinal) ||
+                outputText.StartsWith("待機中...", StringComparison.Ordinal) ||
                 outputText.StartsWith("待機中...", StringComparison.Ordinal))
             {
                 _rawOutputText = getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
@@ -237,8 +238,8 @@ namespace TxtAIEditor.Controls
                 lineBreakLength = OutputLineBreak.Length;
             }
 
-            string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            _thinkingLinePrefix = $"{timestamp}  {label}";
+            _thinkingLineTimestamp = DateTime.Now.ToString("HH:mm:ss");
+            _thinkingLinePrefix = $"{_thinkingLineTimestamp}  {label}";
             _thinkingLineStart = currentText.Length + lineBreakLength;
             _thinkingDotCount = 0;
             _thinkingLineActive = true;
@@ -247,6 +248,16 @@ namespace TxtAIEditor.Controls
 
             _thinkingTimer ??= CreateThinkingTimer();
             _thinkingTimer.Start();
+        }
+
+        public void UpdateThinkingActivity(string label)
+        {
+            if (!_thinkingLineActive)
+            {
+                return;
+            }
+            _thinkingLinePrefix = $"{_thinkingLineTimestamp}  {label}";
+            ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
         }
 
         public void StopThinkingActivity()
@@ -265,7 +276,7 @@ namespace TxtAIEditor.Controls
             string trimmed = text.TrimStart();
             if (trimmed.StartsWith("대기 중...", StringComparison.Ordinal) ||
                 trimmed.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                trimmed.StartsWith("待機중...", StringComparison.Ordinal))
+                trimmed.StartsWith("待機中...", StringComparison.Ordinal))
             {
                 _rawOutputText = string.Empty;
                 UpdateRichText(_rawOutputText);

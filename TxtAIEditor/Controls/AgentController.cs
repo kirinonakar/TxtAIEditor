@@ -265,19 +265,40 @@ namespace TxtAIEditor.Controls
                                     if (isJsonToolCall.Value)
                                     {
                                         toolCallPlaceholderShown = true;
+                                        int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
+                                        string label = FormatPreparingToolLabel(tokenCount);
                                         _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                            _agentPane.BeginThinkingActivity(_getString("AgentOutputPreparingTool", "도구 호출 준비 중")));
+                                        {
+                                            _agentPane.BeginThinkingActivity(label);
+                                            UpdateGeneratedTokenCount(tokenCount);
+                                        });
                                     }
                                 }
                             }
 
                             if (isJsonToolCall == true)
                             {
+                                int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
+                                string label = FormatPreparingToolLabel(tokenCount);
+                                _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                {
+                                    _agentPane.UpdateThinkingActivity(label);
+                                    UpdateGeneratedTokenCount(tokenCount);
+                                });
                                 return;
                             }
 
                             if (hasToolCall)
                             {
+                                int idx = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                                string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
+                                int tokenCount = (int)Math.Round(EstimateTokenCount(toolCallText));
+                                string label = FormatPreparingToolLabel(tokenCount);
+                                _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                {
+                                    _agentPane.UpdateThinkingActivity(label);
+                                    UpdateGeneratedTokenCount(tokenCount);
+                                });
                                 return;
                             }
 
@@ -297,8 +318,13 @@ namespace TxtAIEditor.Controls
                                 if (!toolCallPlaceholderShown)
                                 {
                                     toolCallPlaceholderShown = true;
+                                    int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText.Substring(toolCallIndex)));
+                                    string label = FormatPreparingToolLabel(tokenCount);
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                        _agentPane.BeginThinkingActivity(_getString("AgentOutputPreparingTool", "도구 호출 준비 중")));
+                                    {
+                                        _agentPane.BeginThinkingActivity(label);
+                                        UpdateGeneratedTokenCount(tokenCount);
+                                    });
                                 }
                             }
                             else
@@ -1452,6 +1478,41 @@ namespace TxtAIEditor.Controls
                 }
             }
             return tokens;
+        }
+
+        private string FormatPreparingToolLabel(int tokenCount)
+        {
+            string baseLabel = _getString("AgentOutputPreparingTool", "도구 호출 준비 중");
+            string lang = GetActiveLanguageCode();
+            if (lang == "ko-KR")
+            {
+                return $"{baseLabel} ({tokenCount} 토큰)";
+            }
+            else if (lang == "ja-JP")
+            {
+                return $"{baseLabel} ({tokenCount} トークン)";
+            }
+            else
+            {
+                return $"{baseLabel} ({tokenCount} tokens)";
+            }
+        }
+
+        private void UpdateGeneratedTokenCount(int tokenCount)
+        {
+            string lang = GetActiveLanguageCode();
+            if (lang == "ko-KR")
+            {
+                _agentPane.TokenCount.Text = $"{tokenCount} 토큰";
+            }
+            else if (lang == "ja-JP")
+            {
+                _agentPane.TokenCount.Text = $"{tokenCount} トークン";
+            }
+            else
+            {
+                _agentPane.TokenCount.Text = $"{tokenCount} tokens";
+            }
         }
     }
 }
