@@ -1279,7 +1279,7 @@ namespace TxtAIEditor
                 }
             };
 
-            bridge.SelectionReceived += (selectedText) =>
+            bridge.SelectionReceived += (selectedText, selStartLine, selEndLine) =>
             {
                 var ownerTabView = GetTabViewForTab(tab);
                 if (ownerTabView != null && EditorWorkspace.ActiveTabView != ownerTabView)
@@ -1294,7 +1294,7 @@ namespace TxtAIEditor
                 if (GetActiveTab() == tab)
                 {
                     _llmAssistantController.SetSelectionText(selectedText);
-                    _agentController.SetSelectionText(selectedText, tab);
+                    _agentController.SetSelectionText(selectedText, tab, selStartLine, selEndLine);
                     if (string.IsNullOrEmpty(selectedText))
                     {
                         SelectionStatsText.Text = GetLocalizedString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");

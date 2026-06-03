@@ -23,7 +23,7 @@ namespace TxtAIEditor.Editor
         private int _flushRequestSeq = 0;
 
         public event Action<bool>? ContentChanged;
-        public event Action<string>? SelectionReceived;
+        public event Action<string, int, int>? SelectionReceived;
         public event Action<int, int>? CursorChanged;
         public event Action? EditorReady;
         public event Action<string>? ShortcutPressed;
@@ -732,7 +732,9 @@ namespace TxtAIEditor.Editor
                         case "selectionResult":
                             if (root.TryGetProperty("text", out JsonElement selectionProp))
                             {
-                                SelectionReceived?.Invoke(selectionProp.GetString() ?? string.Empty);
+                                int selStartLine = root.TryGetProperty("startLine", out JsonElement selStartProp) && selStartProp.TryGetInt32(out int sl) ? sl : 0;
+                                int selEndLine = root.TryGetProperty("endLine", out JsonElement selEndProp) && selEndProp.TryGetInt32(out int el) ? el : 0;
+                                SelectionReceived?.Invoke(selectionProp.GetString() ?? string.Empty, selStartLine, selEndLine);
                             }
                             break;
 

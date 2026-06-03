@@ -749,7 +749,30 @@ function reportCursorAndSelection(element = document.activeElement) {
     }
 
     post({ type: 'cursorChanged', line: state.currentLine, column: state.currentColumn });
-    post({ type: 'selectionResult', text: selectedText() });
+    const selInfo = selectionInfo();
+    post({ type: 'selectionResult', text: selInfo.text, startLine: selInfo.startLine, endLine: selInfo.endLine });
+}
+
+function selectionInfo() {
+    const selection = runtime.normalizeSelection();
+    if (selection && runtime.hasCustomSelection()) {
+        const parts = [];
+        for (let line = selection.start.line; line <= selection.end.line; line++) {
+            const text = state.cache.get(line) || '';
+            if (selection.isColumn) {
+                const start = Math.min(selection.start.column, selection.end.column);
+                const end = Math.max(selection.start.column, selection.end.column);
+                parts.push(text.slice(Math.max(0, start), Math.max(0, end)));
+            } else {
+                const start = line === selection.start.line ? selection.start.column : 0;
+                const end = line === selection.end.line ? selection.end.column : text.length;
+                parts.push(text.slice(Math.max(0, start), Math.max(0, end)));
+            }
+        }
+        return { text: parts.join('\n'), startLine: selection.start.line, endLine: selection.end.line };
+    }
+
+    return { text: window.getSelection()?.toString() || '', startLine: 0, endLine: 0 };
 }
 
 function selectedText() {
@@ -979,6 +1002,7 @@ export {
     requestLines,
     requestMissingLines,
     selectedLineRange,
+    selectionInfo,
     selectedText,
     setOriginalLines,
     setupModel,

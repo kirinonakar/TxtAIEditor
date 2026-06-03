@@ -28,6 +28,7 @@ import {
     requestLines,
     requestMissingLines,
     selectedText,
+    selectionInfo,
     setOriginalLines,
     setupModel,
     setupVirtualHeight,
@@ -504,7 +505,12 @@ function handleCsharpMessage(msg) {
             openFindPanel();
             break;
         case 'getSelection':
-            post({ type: 'selectionResult', text: state.csvTableEnabled ? selectedCsvText() : selectedText() });
+            if (state.csvTableEnabled) {
+                post({ type: 'selectionResult', text: selectedCsvText(), startLine: 0, endLine: 0 });
+            } else {
+                const selInfo = selectionInfo();
+                post({ type: 'selectionResult', text: selInfo.text, startLine: selInfo.startLine, endLine: selInfo.endLine });
+            }
             break;
         case 'flushForSave':
             flushPendingEditForSave(msg.requestId || 0);

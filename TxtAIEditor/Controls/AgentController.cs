@@ -34,6 +34,8 @@ namespace TxtAIEditor.Controls
         private string? _lastSelectionTabId;
         private string? _lastSelectionSourceTitle;
         private string? _lastSelectionSourcePath;
+        private int _lastSelectionStartLine;
+        private int _lastSelectionEndLine;
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
         private readonly StringBuilder _sessionHistory = new();
@@ -74,7 +76,7 @@ namespace TxtAIEditor.Controls
             UpdateContextStats();
         }
 
-        public void SetSelectionText(string selectedText, OpenedTab? sourceTab = null)
+        public void SetSelectionText(string selectedText, OpenedTab? sourceTab = null, int startLine = 0, int endLine = 0)
         {
             _lastSelectionText = selectedText ?? string.Empty;
             if (string.IsNullOrEmpty(_lastSelectionText))
@@ -82,12 +84,16 @@ namespace TxtAIEditor.Controls
                 _lastSelectionTabId = null;
                 _lastSelectionSourceTitle = null;
                 _lastSelectionSourcePath = null;
+                _lastSelectionStartLine = 0;
+                _lastSelectionEndLine = 0;
             }
             else
             {
                 _lastSelectionTabId = sourceTab?.Id;
                 _lastSelectionSourceTitle = sourceTab?.Title;
                 _lastSelectionSourcePath = sourceTab?.FilePath;
+                _lastSelectionStartLine = startLine;
+                _lastSelectionEndLine = endLine;
             }
             UpdateContextStats();
         }
@@ -98,6 +104,8 @@ namespace TxtAIEditor.Controls
             _lastSelectionTabId = null;
             _lastSelectionSourceTitle = null;
             _lastSelectionSourcePath = null;
+            _lastSelectionStartLine = 0;
+            _lastSelectionEndLine = 0;
             UpdateContextStats();
         }
 
@@ -147,6 +155,10 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrWhiteSpace(_lastSelectionSourcePath))
             {
                 builder.AppendLine($"Path: {_lastSelectionSourcePath}");
+            }
+            if (_lastSelectionStartLine > 0 && _lastSelectionEndLine > 0)
+            {
+                builder.AppendLine($"Lines: {_lastSelectionStartLine}-{_lastSelectionEndLine}");
             }
             builder.AppendLine();
             builder.AppendLine("[Selection text]");
@@ -374,6 +386,70 @@ namespace TxtAIEditor.Controls
                         _agentPane.AppendOutputLine($"{_getString("AgentToolRunning", "도구 실행 중")}: {toolName}");
                         _agentPane.AppendOutputText(toolResult.TrimEnd() + Environment.NewLine);
                     });
+
+                    // Selection-edit verification: after a file-edit tool succeeds on the
+                    // selection's file, read the affected lines back to verify the change.
+                    // If the content differs from the original selection, stop the loop to
+                    // prevent the agent from modifying unrelated parts of the file.
+                    string verifyToolName = NormalizeToolName(toolName);
+                    bool isFileEditTool = verifyToolName is "replace_in_file" or "replace_range"
+                        or "apply_patch" or "overwrite_file";
+                    if (isFileEditTool
+                        && !toolResult.Contains("failed") && !toolResult.Contains("cancelled")
+                        && _lastSelectionStartLine > 0 && _lastSelectionEndLine > 0
+                        && !string.IsNullOrEmpty(_lastSelectionSourcePath))
+                    {
+                        try
+                        {
+                            string editedPath = GetPathArgument(arguments);
+                            string resolvedEdited = Path.IsPathRooted(editedPath)
+                                ? editedPath
+                                : Path.Combine(_fileTools.WorkspaceRoot, editedPath);
+                            string resolvedSelection = Path.IsPathRooted(_lastSelectionSourcePath)
+                                ? _lastSelectionSourcePath
+                                : Path.Combine(_fileTools.WorkspaceRoot, _lastSelectionSourcePath);
+
+                            if (string.Equals(
+                                Path.GetFullPath(resolvedEdited),
+                                Path.GetFullPath(resolvedSelection),
+                                StringComparison.OrdinalIgnoreCase))
+                            {
+                                int verifyLineCount = _lastSelectionEndLine - _lastSelectionStartLine + 1;
+                                string verifyContent = await _fileTools.ReadFileAsync(
+                                    editedPath, _lastSelectionStartLine, verifyLineCount);
+
+                                if (!string.IsNullOrEmpty(verifyContent)
+                                    && !string.Equals(
+                                        verifyContent.Trim(),
+                                        _lastSelectionText.Trim(),
+                                        StringComparison.Ordinal))
+                                {
+                                    string verifyMsg = _getString(
+                                        "AgentSelectionEditVerified",
+                                        "선택 영역 수정이 확인되었습니다. 작업을 완료합니다.");
+
+                                    transcript += $"\n\n[Selection edit verification: lines {_lastSelectionStartLine}-{_lastSelectionEndLine} changed successfully. Task complete.]";
+
+                                    await RunOnUIThreadAsync(() =>
+                                    {
+                                        AppendActivity(verifyMsg);
+                                        _agentPane.AppendOutputLine(verifyMsg);
+                                    });
+
+                                    _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                                    string verifyRunTranscript = transcript.Substring(initialTranscript.Length);
+                                    if (!string.IsNullOrWhiteSpace(verifyRunTranscript))
+                                    {
+                                        _sessionHistory.AppendLine(verifyRunTranscript.Trim());
+                                    }
+                                    _sessionHistory.AppendLine();
+
+                                    break;
+                                }
+                            }
+                        }
+                        catch { /* verification is best-effort; continue the loop on failure */ }
+                    }
                 }
             }
             catch (OperationCanceledException)
