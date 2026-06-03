@@ -1550,4 +1550,21 @@
   <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
     <value>예: https://mcp.exa.ai/mcp</value>
   </data>
+  <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
+    <value>PowerShell 실행 확인</value>
+  </data>
+  <data name="AgentPowerShellConfirmSummaryFormat" xml:space="preserve">
+    <value>아래 명령을 실행하시겠습니까?
+
+{0}</value>
+  </data>
+  <data name="AgentActivityPowerShellConfirmationPending" xml:space="preserve">
+    <value>PowerShell 실행 승인 대기 중</value>
+  </data>
+  <data name="AgentActivityPowerShellApproved" xml:space="preserve">
+    <value>PowerShell 실행 승인됨</value>
+  </data>
+  <data name="AgentActivityPowerShellCancelled" xml:space="preserve">
+    <value>PowerShell 실행 취소됨</value>
+  </data>
 </root>

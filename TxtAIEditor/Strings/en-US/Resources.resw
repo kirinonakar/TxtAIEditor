@@ -1550,4 +1550,21 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
     <value>e.g., https://mcp.exa.ai/mcp</value>
   </data>
+  <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
+    <value>PowerShell Execution Confirmation</value>
+  </data>
+  <data name="AgentPowerShellConfirmSummaryFormat" xml:space="preserve">
+    <value>Do you want to run the following command?
+
+{0}</value>
+  </data>
+  <data name="AgentActivityPowerShellConfirmationPending" xml:space="preserve">
+    <value>Waiting for PowerShell execution approval</value>
+  </data>
+  <data name="AgentActivityPowerShellApproved" xml:space="preserve">
+    <value>PowerShell execution approved</value>
+  </data>
+  <data name="AgentActivityPowerShellCancelled" xml:space="preserve">
+    <value>PowerShell execution cancelled</value>
+  </data>
 </root>

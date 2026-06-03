@@ -61,6 +61,7 @@ namespace TxtAIEditor.Controls
             _isGitRepoProvider = isGitRepoProvider;
             _fileModifiedAsync = fileModifiedAsync;
             _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
+            _fileTools.ConfirmPowerShellAsync = ConfirmPowerShellAsync;
             if (_fileModifiedAsync != null)
             {
                 _fileTools.FileModifiedAsync = _fileModifiedAsync;
@@ -1102,6 +1103,31 @@ namespace TxtAIEditor.Controls
                 AppendActivity(approved
                     ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
                     : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
+
+                return approved;
+            });
+        }
+
+        private async Task<bool> ConfirmPowerShellAsync(string command)
+        {
+            AppendActivity(_getString("AgentActivityPowerShellConfirmationPending", "PowerShell 실행 승인 대기 중"));
+
+            return await RunOnUIThreadAsync(async () =>
+            {
+                string headerText = _getString("AgentPowerShellConfirmHeader", "PowerShell 실행 확인");
+                string summaryText = string.Format(_getString("AgentPowerShellConfirmSummaryFormat", "아래 명령을 실행하시겠습니까?\n\n{0}"), command);
+
+                _agentPane.ShowDiffConfirm(headerText, summaryText);
+
+                _diffApprovalTcs = new TaskCompletionSource<bool>();
+
+                bool approved = await _diffApprovalTcs.Task;
+
+                _agentPane.HideDiffConfirm();
+
+                AppendActivity(approved
+                    ? _getString("AgentActivityPowerShellApproved", "PowerShell 실행 승인됨")
+                    : _getString("AgentActivityPowerShellCancelled", "PowerShell 실행 취소됨"));
 
                 return approved;
             });

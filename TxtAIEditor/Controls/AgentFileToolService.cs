@@ -36,6 +36,7 @@ namespace TxtAIEditor.Controls
         }
 
         public Func<AgentFileEditPreview, Task<bool>>? ConfirmFileEditAsync { get; set; }
+        public Func<string, Task<bool>>? ConfirmPowerShellAsync { get; set; }
         public Func<string, Task>? FileModifiedAsync { get; set; }
 
         public string WorkspaceRoot => ResolveWorkspaceRoot();
@@ -189,9 +190,12 @@ namespace TxtAIEditor.Controls
                 return "run_powershell failed: command is empty.";
             }
 
-            if (LooksDestructive(command))
+            if (!IsClearlySafePowerShell(command))
             {
-                return "run_powershell blocked: destructive commands are not executed automatically by Agent.";
+                if (ConfirmPowerShellAsync == null || !await ConfirmPowerShellAsync(command))
+                {
+                    return "run_powershell cancelled by user.";
+                }
             }
 
             // Normalize command line endings to CRLF for Windows PowerShell compatibility
@@ -1018,17 +1022,72 @@ namespace TxtAIEditor.Controls
             return Regex.IsMatch(normalizedPath, pattern, RegexOptions.IgnoreCase);
         }
 
-        private static bool LooksDestructive(string command)
+        private static bool IsClearlySafePowerShell(string command)
         {
-            string normalized = command.ToLowerInvariant();
-            string[] blocked =
+            if (string.IsNullOrWhiteSpace(command))
             {
-                "remove-item", " rm ", " del ", " erase ", " rmdir ", " rd ",
-                "git reset --hard", "git clean", "format-volume", "clear-recyclebin",
-                "stop-computer", "restart-computer", "set-executionpolicy"
+                return false;
+            }
+
+            string normalized = command.Trim().ToLowerInvariant();
+
+            // Semicolon, double ampersand, pipeline, redirects, backticks, or subexpressions make it not "clearly safe"
+            string[] riskyOperators = { ";", "&&", "||", "|", ">", ">>", "$(", "@(", "&" };
+            if (riskyOperators.Any(op => normalized.Contains(op, StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            string[] safePrefixes =
+            {
+                "get-childitem",
+                "gci",
+                "dir",
+                "ls",
+                "get-content",
+                "gc",
+                "select-string",
+                "test-path",
+                "get-item",
+                "get-command",
+                "where.exe",
+                "git status",
+                "git diff",
+                "git log",
+                "dotnet --info",
+                "dotnet build",
+                "dotnet test"
             };
 
-            return blocked.Any(token => normalized.Contains(token, StringComparison.Ordinal));
+            // Make sure it starts with a safe prefix and has a boundary (like space or end of string)
+            bool startsWithSafePrefix = safePrefixes.Any(prefix =>
+            {
+                if (normalized == prefix) return true;
+                if (normalized.StartsWith(prefix + " ", StringComparison.Ordinal)) return true;
+                return false;
+            });
+
+            if (!startsWithSafePrefix)
+            {
+                return false;
+            }
+
+            // Double check it doesn't contain any risky content
+            string[] risky =
+            {
+                "set-content", "add-content", "out-file",
+                "new-item", "remove-item", "move-item", "rename-item", "copy-item",
+                "invoke-expression", "iex", "invoke-webrequest", "iwr", "curl",
+                "start-process", "cmd ", "cmd.exe", "powershell", "pwsh",
+                "reg ", "schtasks", "icacls", "takeown"
+            };
+
+            if (risky.Any(x => normalized.Contains(x, StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private static string RelativePath(string root, string path)

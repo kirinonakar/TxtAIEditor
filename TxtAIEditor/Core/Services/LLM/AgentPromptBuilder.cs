@@ -56,6 +56,10 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine();
             builder.AppendLine("PowerShell tool:");
             builder.AppendLine("- run_powershell: run a real, non-destructive PowerShell command from the workspace root. Only the command argument is PowerShell.");
+            builder.AppendLine("- run_powershell is read-only by default.");
+            builder.AppendLine("- Prefer internal tools over PowerShell.");
+            builder.AppendLine("- Use run_powershell only for inspection commands such as Get-ChildItem, Get-Content, Select-String, git status, git diff, dotnet build, or dotnet test.");
+            builder.AppendLine("- Never use PowerShell to create, delete, overwrite, move, rename, download, install, execute downloaded scripts, change permissions, change git history, or modify system settings unless the user explicitly asks.");
             builder.AppendLine("- Valid PowerShell examples: {\"command\":\"Get-ChildItem -Recurse -Filter *.cs | Select-Object -First 20\",\"timeoutMs\":10000}");
             builder.AppendLine("- Valid PowerShell examples: {\"command\":\"Select-String -Path TxtAIEditor\\\\**\\\\*.cs -Pattern \\\"AgentController\\\"\",\"timeoutMs\":10000}");
             builder.AppendLine("- Do not treat list_files arguments such as glob as PowerShell commands.");
