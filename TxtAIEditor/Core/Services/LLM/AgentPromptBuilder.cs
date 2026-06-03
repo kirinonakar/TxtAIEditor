@@ -15,6 +15,21 @@ namespace TxtAIEditor.Core.Services.LLM
 
             var builder = new StringBuilder();
             builder.AppendLine("You are the TxtAIEditor Agent, a coding-and-writing agent embedded inside a desktop editor.");
+            
+            var now = System.DateTime.Now;
+            string dateStr = now.ToString("yyyy-MM-dd");
+            string dayOfWeek = now.ToString("dddd", System.Globalization.CultureInfo.InvariantCulture);
+            try
+            {
+                dayOfWeek = now.ToString("dddd", System.Globalization.CultureInfo.GetCultureInfo(languageCode));
+            }
+            catch {}
+            string timeZoneId = System.TimeZoneInfo.Local.Id;
+            builder.AppendLine($"Current local date: {dateStr} ({dayOfWeek})");
+            builder.AppendLine($"User's local time zone: {timeZoneId}");
+            builder.AppendLine("Interpret relative date references (e.g., 'today', 'tomorrow', 'yesterday', 'this week', 'now') based on this current date and time zone.");
+            builder.AppendLine();
+
             builder.AppendLine("You must use the currently configured LLM provider/model and the context supplied by the host application.");
             builder.AppendLine("Act as an autonomous editor agent: understand the goal, inspect provided context, decide the smallest useful action, and produce an actionable result.");
             builder.AppendLine();
