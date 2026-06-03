@@ -16,5 +16,8 @@ namespace TxtAIEditor.Core.Interfaces
         // Secure API Key handling
         Task SaveApiKeyAsync(string provider, string apiKey);
         Task<string> GetApiKeyAsync(string provider);
+
+        // Exa Search Tool
+        Task<string> SearchExaAsync(string query, int numResults, CancellationToken cancellationToken = default);
     }
 }

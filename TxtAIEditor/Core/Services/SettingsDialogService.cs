@@ -119,6 +119,8 @@ namespace TxtAIEditor.Core.Services
             llmModelCombo.Loaded += (s, e) => ApplyEditableComboBoxVisualStyles(llmModelCombo);
             var llmApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsLlmApiKeyPlaceholder", "API Key 입력 (비워두면 저장된 Key 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
             llmApiKeyBox.Password = await _llmService.GetApiKeyAsync(providerNames[providerIndex]);
+            var exaApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsExaApiKeyPlaceholder", "Exa API Key 입력 (비워두면 저장된 Key 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
+            exaApiKeyBox.Password = await _llmService.GetApiKeyAsync("Exa");
 
             var confirmBeforeSendingCheck = new CheckBox { Content = getString("SettingsLlmConfirmBeforeSending", "전송 전 확인"), IsChecked = settings.LlmConfirmBeforeSending };
 
@@ -457,6 +459,16 @@ namespace TxtAIEditor.Core.Services
             {
                 Text = getString("SettingsLlmApiKeyInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다."),
                 TextWrapping = TextWrapping.Wrap
+            });
+
+            AddLabel(llmSection, getString("SettingsExaApiKey", "Exa API Key (웹 검색 기능용)"));
+            llmSection.Children.Add(exaApiKeyBox);
+            llmSection.Children.Add(new TextBlock
+            {
+                Text = getString("SettingsExaApiKeyInfo", "Exa API Key는 Agent의 웹 검색(Exa) 기능에 사용되며, Windows 자격 증명 관리자에 안전하게 저장됩니다."),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
             });
 
             AddLabel(llmSection, getString("SettingsLlmModel", "LLM 모델명"));
@@ -943,6 +955,8 @@ SOFTWARE.",
 
             string newApiKey = llmApiKeyBox.Password.Trim();
             await _llmService.SaveApiKeyAsync(settings.LlmProvider, newApiKey);
+            string newExaApiKey = exaApiKeyBox.Password.Trim();
+            await _llmService.SaveApiKeyAsync("Exa", newExaApiKey);
             string apiKeyStatus = string.IsNullOrEmpty(newApiKey)
                 ? $"{settings.LlmProvider} API Key가 Windows 자격 증명 저장소에서 삭제되었습니다."
                 : $"{settings.LlmProvider} API Key가 Windows 자격 증명 저장소에 저장되었습니다.";

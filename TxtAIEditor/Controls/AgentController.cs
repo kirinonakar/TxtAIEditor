@@ -527,6 +527,10 @@ namespace TxtAIEditor.Controls
                             GetFirstStringArgument(arguments, "content", "newText", "new_text", "text")),
                         "insert_text" => await InsertTextToolAsync(
                             GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
+                        "web_search_exa" => await _llmService.SearchExaAsync(
+                            GetStringArgument(arguments, "query"),
+                            GetIntArgument(arguments, "numResults", 5),
+                            cancellationToken),
                         _ => $"Unknown tool: {toolName}"
                     };
                 }
@@ -590,6 +594,9 @@ namespace TxtAIEditor.Controls
                     _getString("AgentActivityOverwriteFileFormat", "파일 덮어쓰는 중: {0}"),
                     GetStringArgument(arguments, "path")),
                 "insert_text" => _getString("AgentActivityInsertText", "현재 편집기에 입력 중"),
+                "web_search_exa" => string.Format(
+                    _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
+                    GetStringArgument(arguments, "query")),
                 _ => string.Format(
                     _getString("AgentActivityUnknownToolFormat", "도구 실행 중: {0}"),
                     toolName)
@@ -953,6 +960,9 @@ namespace TxtAIEditor.Controls
                 "search" => "search_text",
                 "powershell" => "run_powershell",
                 "rg" => "run_rg",
+                "search_exa" => "web_search_exa",
+                "exa_search" => "web_search_exa",
+                "exa" => "web_search_exa",
                 _ => normalized
             };
         }

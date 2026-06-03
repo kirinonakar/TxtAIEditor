@@ -1,5 +1,7 @@
 using System;
+using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
@@ -298,6 +300,110 @@ namespace TxtAIEditor.Core.Services
                     _ => "AI 통신 오류가 발생했습니다: "
                 };
                 return $"{errorPrefix}{ex.Message}";
+            }
+        }
+
+        // ----------------------------------------------------
+        // Exa Search Implementation
+        // ----------------------------------------------------
+        private static readonly HttpClient _exaHttpClient = new HttpClient();
+
+        public async Task<string> SearchExaAsync(string query, int numResults, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return "Exa search failed: query is empty.";
+            }
+
+            string apiKey = await GetApiKeyAsync("Exa");
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                apiKey = Environment.GetEnvironmentVariable("EXA_API_KEY") ?? string.Empty;
+            }
+
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                string langCode = GetActiveLanguage();
+                return langCode switch
+                {
+                    "ja-JP" => "エラー: Exa API Keyが設定されていません。設定を開いて保存するか、EXA_API_KEY環境変数をご設定ください。",
+                    "en-US" => "Error: Exa API Key is not set. Please open Settings to save it, or configure the EXA_API_KEY environment variable.",
+                    _ => "에러: Exa API Key가 설정되어 있지 않습니다. 설정을 열어 저장하거나, EXA_API_KEY 환경 변수를 설정해 주십시오."
+                };
+            }
+
+            int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
+            
+            var requestUrl = "https://api.exa.ai/search";
+            var payload = new
+            {
+                query = query,
+                useAutoprompt = true,
+                numResults = resultsCount,
+                text = new { maxCharacters = 1000 },
+                highlights = true
+            };
+
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
+                {
+                    request.Headers.Add("x-api-key", apiKey);
+                    string jsonPayload = JsonSerializer.Serialize(payload);
+                    request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                    using (var response = await _exaHttpClient.SendAsync(request, cancellationToken))
+                    {
+                        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            return $"Exa search API failed ({response.StatusCode}): {responseBody}";
+                        }
+
+                        using (var doc = JsonDocument.Parse(responseBody))
+                        {
+                            var root = doc.RootElement;
+                            if (!root.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+                            {
+                                return "Exa search returned no results format.";
+                            }
+
+                            var sb = new StringBuilder();
+                            int index = 1;
+                            foreach (var item in results.EnumerateArray())
+                            {
+                                string title = item.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "No Title" : "No Title";
+                                string url = item.TryGetProperty("url", out var urlProp) ? urlProp.GetString() ?? "" : "";
+                                string textContent = item.TryGetProperty("text", out var textProp) ? textProp.GetString() ?? "" : "";
+                                
+                                sb.AppendLine($"[{index}] Title: {title}");
+                                sb.AppendLine($"URL: {url}");
+                                
+                                if (item.TryGetProperty("highlights", out var highlightsProp) && highlightsProp.ValueKind == JsonValueKind.Array && highlightsProp.GetArrayLength() > 0)
+                                {
+                                    sb.AppendLine("Highlights:");
+                                    foreach (var highlight in highlightsProp.EnumerateArray())
+                                    {
+                                        sb.AppendLine($"- {highlight.GetString()}");
+                                    }
+                                }
+                                else if (!string.IsNullOrEmpty(textContent))
+                                {
+                                    string preview = textContent.Length > 300 ? textContent.Substring(0, 300) + "..." : textContent;
+                                    sb.AppendLine($"Snippet: {preview}");
+                                }
+                                sb.AppendLine();
+                                index++;
+                            }
+
+                            return sb.ToString().TrimEnd();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Exa search exception occurred: {ex.Message}";
             }
         }
     }
