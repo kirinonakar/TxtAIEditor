@@ -260,16 +260,91 @@ namespace TxtAIEditor.Controls
                 return "replace_in_file failed: oldText is empty.";
             }
 
-            string content = NormalizeNewlines(await File.ReadAllTextAsync(fullPath));
+            string rawText = await File.ReadAllTextAsync(fullPath);
+            string lineEnding = DetectLineEnding(rawText);
+            string content = NormalizeNewlines(rawText);
             string normalizedOldText = NormalizeNewlines(oldText);
             string normalizedNewText = NormalizeNewlines(newText);
+            
             int index = content.IndexOf(normalizedOldText, StringComparison.Ordinal);
+            int matchLength = normalizedOldText.Length;
+
             if (index < 0)
             {
-                return "replace_in_file failed: oldText was not found exactly.";
+                // Fallback to relaxed line-by-line matching
+                string[] lines = content.Split('\n');
+                string[] oldLines = normalizedOldText.Split('\n');
+                
+                var lineIndices = new int[lines.Length];
+                int currentIdx = 0;
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    lineIndices[i] = currentIdx;
+                    currentIdx += lines[i].Length + 1;
+                }
+
+                bool MatchesAt(int startIdx, int mode)
+                {
+                    if (startIdx + oldLines.Length > lines.Length) return false;
+                    for (int k = 0; k < oldLines.Length; k++)
+                    {
+                        string fileLine = lines[startIdx + k];
+                        string queryLine = oldLines[k];
+                        if (mode == 1)
+                        {
+                            if (fileLine.TrimEnd() != queryLine.TrimEnd()) return false;
+                        }
+                        else if (mode == 2)
+                        {
+                            if (fileLine.Trim() != queryLine.Trim()) return false;
+                        }
+                    }
+                    return true;
+                }
+
+                var matchesMode1 = new List<int>();
+                for (int i = 0; i <= lines.Length - oldLines.Length; i++)
+                {
+                    if (MatchesAt(i, 1))
+                    {
+                        matchesMode1.Add(i);
+                    }
+                }
+
+                if (matchesMode1.Count == 1)
+                {
+                    int matchLineIdx = matchesMode1[0];
+                    index = lineIndices[matchLineIdx];
+                    int endLineIdx = matchLineIdx + oldLines.Length - 1;
+                    matchLength = lineIndices[endLineIdx] + lines[endLineIdx].Length - index;
+                }
+                else if (matchesMode1.Count == 0)
+                {
+                    var matchesMode2 = new List<int>();
+                    for (int i = 0; i <= lines.Length - oldLines.Length; i++)
+                    {
+                        if (MatchesAt(i, 2))
+                        {
+                            matchesMode2.Add(i);
+                        }
+                    }
+
+                    if (matchesMode2.Count == 1)
+                    {
+                        int matchLineIdx = matchesMode2[0];
+                        index = lineIndices[matchLineIdx];
+                        int endLineIdx = matchLineIdx + oldLines.Length - 1;
+                        matchLength = lineIndices[endLineIdx] + lines[endLineIdx].Length - index;
+                    }
+                }
+
+                if (index < 0)
+                {
+                    return "replace_in_file failed: oldText was not found exactly.";
+                }
             }
 
-            string updated = content.Remove(index, normalizedOldText.Length).Insert(index, normalizedNewText);
+            string updated = content.Remove(index, matchLength).Insert(index, normalizedNewText);
             var preview = new AgentFileEditPreview
             {
                 ActionName = "replace_in_file",
@@ -284,7 +359,7 @@ namespace TxtAIEditor.Controls
                 return $"replace_in_file cancelled: {path}";
             }
 
-            await File.WriteAllTextAsync(fullPath, updated);
+            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
             await NotifyFileModifiedAsync(fullPath);
             return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
@@ -297,7 +372,9 @@ namespace TxtAIEditor.Controls
                 return $"replace_range failed: file not found: {path}";
             }
 
-            string content = NormalizeNewlines(await File.ReadAllTextAsync(fullPath));
+            string rawText = await File.ReadAllTextAsync(fullPath);
+            string lineEnding = DetectLineEnding(rawText);
+            string content = NormalizeNewlines(rawText);
             string[] lines = content.Split('\n');
 
             if (startLine < 1 || startLine > lines.Length)
@@ -321,7 +398,12 @@ namespace TxtAIEditor.Controls
                 string normalizedExpected = NormalizeNewlines(expectedSnippet);
                 if (!targetText.Contains(normalizedExpected, StringComparison.Ordinal))
                 {
-                    return $"replace_range failed: expectedSnippet was not found in the target line range ({startLine}-{endLine}).";
+                    string cleanTarget = Regex.Replace(targetText, @"\s+", " ").Trim();
+                    string cleanExpected = Regex.Replace(normalizedExpected, @"\s+", " ").Trim();
+                    if (!cleanTarget.Contains(cleanExpected, StringComparison.Ordinal))
+                    {
+                        return $"replace_range failed: expectedSnippet was not found in the target line range ({startLine}-{endLine}).";
+                    }
                 }
             }
 
@@ -352,7 +434,7 @@ namespace TxtAIEditor.Controls
                 return $"replace_range cancelled: {path}";
             }
 
-            await File.WriteAllTextAsync(fullPath, updated);
+            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
             await NotifyFileModifiedAsync(fullPath);
             return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
@@ -379,7 +461,9 @@ namespace TxtAIEditor.Controls
                 return "apply_patch failed: patch content is empty.";
             }
 
-            string content = NormalizeNewlines(await File.ReadAllTextAsync(fullPath));
+            string rawText = await File.ReadAllTextAsync(fullPath);
+            string lineEnding = DetectLineEnding(rawText);
+            string content = NormalizeNewlines(rawText);
             List<string> lines = content.Split('\n').ToList();
 
             string[] patchLines = NormalizeNewlines(patchText).Split('\n');
@@ -468,7 +552,7 @@ namespace TxtAIEditor.Controls
                 return $"apply_patch cancelled: {path}";
             }
 
-            await File.WriteAllTextAsync(fullPath, updated);
+            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
             await NotifyFileModifiedAsync(fullPath);
             return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
@@ -533,11 +617,14 @@ namespace TxtAIEditor.Controls
         public async Task<string> OverwriteFileAsync(string path, string content)
         {
             string fullPath = ResolveInsideWorkspace(path);
-            string oldContent = File.Exists(fullPath)
-                ? NormalizeNewlines(await File.ReadAllTextAsync(fullPath))
+            string rawText = File.Exists(fullPath)
+                ? await File.ReadAllTextAsync(fullPath)
                 : string.Empty;
+            string lineEnding = DetectLineEnding(rawText);
+            
+            string oldContent = NormalizeNewlines(rawText);
             string newContent = NormalizeNewlines(content);
-
+ 
             var preview = new AgentFileEditPreview
             {
                 ActionName = "overwrite_file",
@@ -547,19 +634,19 @@ namespace TxtAIEditor.Controls
                 NewContent = newContent,
                 IsNewFile = !File.Exists(fullPath)
             };
-
+ 
             if (!await ConfirmEditAsync(preview))
             {
                 return $"overwrite_file cancelled: {path}";
             }
-
+ 
             string? dir = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrWhiteSpace(dir))
             {
                 Directory.CreateDirectory(dir);
             }
-
-            await File.WriteAllTextAsync(fullPath, newContent);
+ 
+            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(newContent, lineEnding));
             await NotifyFileModifiedAsync(fullPath);
             return $"overwritten: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
@@ -800,6 +887,16 @@ namespace TxtAIEditor.Controls
         private static string NormalizeNewlines(string? content)
         {
             return (content ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+        }
+
+        private static string DetectLineEnding(string text)
+        {
+            return text.Contains("\r\n") ? "\r\n" : "\n";
+        }
+
+        private static string RestoreLineEndings(string text, string lineEnding)
+        {
+            return lineEnding == "\r\n" ? text.Replace("\n", "\r\n") : text;
         }
     }
 }
