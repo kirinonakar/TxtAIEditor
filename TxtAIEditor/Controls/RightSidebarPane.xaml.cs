@@ -401,5 +401,17 @@ namespace TxtAIEditor.Controls
                 LlmPresetListPanel.Children.Add(rowGrid);
             }
         }
+
+        private void OnRightTabViewSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                RightTabView.Focus(FocusState.Programmatic);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to shift focus on right tab selection change: {ex.Message}");
+            }
+        }
     }
 }

@@ -46,7 +46,8 @@
 
                     <TabView x:Name="RightTabView" 
                              VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
-                             IsAddTabButtonVisible="False" AllowDropTabs="False">
+                             IsAddTabButtonVisible="False" AllowDropTabs="False"
+                             SelectionChanged="OnRightTabViewSelectionChanged">
                         
                         <!-- Tab 1: Live Preview -->
                         <TabViewItem x:Name="LivePreviewTab" Header="실시간 프리뷰" IsClosable="False">
