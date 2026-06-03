@@ -3142,6 +3142,11 @@ namespace TxtAIEditor
                     {
                         CleanDirtyStateOnOtherTabs(tab);
                     }
+
+                    if (tab == GetActiveTab())
+                    {
+                        UpdateLivePreview(tab);
+                    }
                 }
             }
             catch (Exception ex)
