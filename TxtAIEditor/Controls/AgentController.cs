@@ -822,32 +822,62 @@ namespace TxtAIEditor.Controls
             toolName = string.Empty;
             arguments = default;
 
-            if (!TryExtractToolCallJson(response, out string json))
+            if (!TryExtractToolCallPayload(response, out string payload))
             {
-                return TryExtractToolCallPayload(response, out string payload) &&
-                       TryParseToolCallLenient(payload, out toolName, out arguments);
+                return false;
             }
 
-            try
+            string trimmedPayload = payload.Trim();
+
+            // Check if the payload starts with a tool name, followed by JSON arguments.
+            // e.g. create_file\n{"arguments":{"path":"test/fire.html","content":"..."}}
+            int openBraceIndex = trimmedPayload.IndexOf('{');
+            if (openBraceIndex > 0)
             {
-                using var document = JsonDocument.Parse(json);
-                var root = document.RootElement.Clone();
-                if (!root.TryGetProperty("name", out var nameProp))
+                string possibleName = trimmedPayload.Substring(0, openBraceIndex).Trim();
+                if (Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$"))
                 {
-                    return false;
+                    toolName = possibleName;
+                    string jsonPart = trimmedPayload.Substring(openBraceIndex);
+                    try
+                    {
+                        using var document = JsonDocument.Parse(jsonPart);
+                        var root = document.RootElement.Clone();
+                        arguments = root.TryGetProperty("arguments", out var argsProp)
+                            ? argsProp.Clone()
+                            : root.Clone();
+                        return !string.IsNullOrWhiteSpace(toolName);
+                    }
+                    catch
+                    {
+                        // Fall through to lenient/other parsing methods on failure
+                    }
                 }
-
-                toolName = nameProp.GetString() ?? string.Empty;
-                arguments = root.TryGetProperty("arguments", out var argsProp)
-                    ? argsProp.Clone()
-                    : JsonDocument.Parse("{}").RootElement.Clone();
-
-                return !string.IsNullOrWhiteSpace(toolName);
             }
-            catch
+
+            if (TryExtractToolCallJson(response, out string json))
             {
-                return TryParseToolCallLenient(json, out toolName, out arguments);
+                try
+                {
+                    using var document = JsonDocument.Parse(json);
+                    var root = document.RootElement.Clone();
+                    if (root.TryGetProperty("name", out var nameProp))
+                    {
+                        toolName = nameProp.GetString() ?? string.Empty;
+                        arguments = root.TryGetProperty("arguments", out var argsProp)
+                            ? argsProp.Clone()
+                            : JsonDocument.Parse("{}").RootElement.Clone();
+
+                        return !string.IsNullOrWhiteSpace(toolName);
+                    }
+                }
+                catch
+                {
+                    // Fall through to lenient
+                }
             }
+
+            return TryParseToolCallLenient(payload, out toolName, out arguments);
         }
 
         private static bool TryParseToolCallLenient(string json, out string toolName, out JsonElement arguments)
