@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -2198,6 +2198,21 @@ namespace TxtAIEditor
             }
 
             QueueGitStatusRefresh();
+
+            // Auto-update open compare tabs for this file
+            var edit = _agentController.SessionEdits.FirstOrDefault(e => string.Equals(e.FullPath, filePath, StringComparison.OrdinalIgnoreCase));
+            if (edit != null)
+            {
+                string title = $"{GetLocalizedString("AgentDiffTitle", "Agent 변경 비교")}: {Path.GetFileName(edit.RelativePath)}";
+                await _compareTabController.UpdateCompareTabIfOpenAsync(
+                    title,
+                    edit.FullPath,
+                    edit.FullPath,
+                    edit.OldContent,
+                    edit.NewContent,
+                    labelA: GetLocalizedString("DiffOriginalLabel", "원본"),
+                    labelB: GetLocalizedString("DiffModifiedLabel", "수정본"));
+            }
         }
 
         private async Task OpenAgentDiffViewAsync(AgentFileEditPreview preview)

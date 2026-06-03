@@ -83,6 +83,8 @@ namespace TxtAIEditor.Controls
             UpdateContextStats();
         }
 
+        public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
+
         public void SetSelectionText(string selectedText, OpenedTab? sourceTab = null, int startLine = 0, int endLine = 0)
         {
             _lastSelectionText = selectedText ?? string.Empty;
@@ -1405,7 +1407,7 @@ namespace TxtAIEditor.Controls
                     ActionName = preview.ActionName,
                     RelativePath = preview.RelativePath,
                     FullPath = preview.FullPath,
-                    OldContent = existing.OldContent, // Keep original
+                    OldContent = preview.OldContent, // Immediately preceding content
                     NewContent = preview.NewContent,   // Latest version
                     IsNewFile = existing.IsNewFile     // Keep original flag
                 };

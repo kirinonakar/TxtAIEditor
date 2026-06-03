@@ -61,6 +61,63 @@ namespace TxtAIEditor.Controls
             contentB ??= await _fileService.ReadTextFileAsync(pathB);
 
             string title = customTitle ?? $"비교: {Path.GetFileName(pathA)} ↔ {Path.GetFileName(pathB)}";
+
+            OpenedTab? existingTab = null;
+            foreach (var t in _viewModel.Tabs)
+            {
+                if (string.Equals(t.Title, title, StringComparison.Ordinal))
+                {
+                    existingTab = t;
+                    break;
+                }
+            }
+
+            if (existingTab != null)
+            {
+                TabViewItem? existingTabItem = null;
+                foreach (var item in _editorTabView.TabItems)
+                {
+                    if (item is TabViewItem tvi && string.Equals(tvi.Tag as string, existingTab.Id, StringComparison.Ordinal))
+                    {
+                        existingTabItem = tvi;
+                        break;
+                    }
+                }
+
+                if (existingTabItem != null)
+                {
+                    _editorTabView.SelectedItem = existingTabItem;
+                }
+
+                if (_tabBridges.TryGetValue(existingTab.Id, out var bridgeGroup) && bridgeGroup.WebView != null)
+                {
+                    var existingCoreWebView = bridgeGroup.WebView.CoreWebView2;
+                    if (existingCoreWebView != null)
+                    {
+                        var msg = new
+                        {
+                            action = "compare",
+                            titleA = labelA ?? Path.GetFileName(pathA),
+                            titleB = labelB ?? Path.GetFileName(pathB),
+                            textA = contentA,
+                            textB = contentB,
+                            theme = _settingsService.CurrentSettings.Theme,
+                            uiFontFamily = _settingsService.CurrentSettings.UiFontFamily,
+                            compareToolTitle = _getString("DiffCompareToolTitle", "TxtAIEditor 파일 비교 도구 (File Compare)"),
+                            statsGathering = _getString("DiffStatsGathering", "수집 중..."),
+                            originalFileLabel = _getString("DiffOriginalFileLabel", "원본 파일 (Original)"),
+                            modifiedFileLabel = _getString("DiffModifiedFileLabel", "비교 대상 파일 (Modified)"),
+                            originalPrefix = _getString("DiffOriginalPrefix", "원본: "),
+                            modifiedPrefix = _getString("DiffModifiedPrefix", "수정본: "),
+                            diffStatsFormat = _getString("DiffStatsFormat", "변경사항: 추가 {0}줄, 삭제 {1}줄")
+                        };
+                        string json = JsonSerializer.Serialize(msg);
+                        existingCoreWebView.PostWebMessageAsJson(json);
+                    }
+                }
+                return;
+            }
+
             var tab = new OpenedTab
             {
                 Title = title,
@@ -155,5 +212,54 @@ namespace TxtAIEditor.Controls
             catch { }
         }
 
+        public async Task UpdateCompareTabIfOpenAsync(
+            string title,
+            string pathA,
+            string pathB,
+            string? contentA = null,
+            string? contentB = null,
+            string? labelA = null,
+            string? labelB = null)
+        {
+            OpenedTab? existingTab = null;
+            foreach (var t in _viewModel.Tabs)
+            {
+                if (string.Equals(t.Title, title, StringComparison.Ordinal))
+                {
+                    existingTab = t;
+                    break;
+                }
+            }
+
+            if (existingTab != null && _tabBridges.TryGetValue(existingTab.Id, out var bridgeGroup) && bridgeGroup.WebView != null)
+            {
+                contentA ??= await _fileService.ReadTextFileAsync(pathA);
+                contentB ??= await _fileService.ReadTextFileAsync(pathB);
+
+                var coreWebView = bridgeGroup.WebView.CoreWebView2;
+                if (coreWebView != null)
+                {
+                    var msg = new
+                    {
+                        action = "compare",
+                        titleA = labelA ?? Path.GetFileName(pathA),
+                        titleB = labelB ?? Path.GetFileName(pathB),
+                        textA = contentA,
+                        textB = contentB,
+                        theme = _settingsService.CurrentSettings.Theme,
+                        uiFontFamily = _settingsService.CurrentSettings.UiFontFamily,
+                        compareToolTitle = _getString("DiffCompareToolTitle", "TxtAIEditor 파일 비교 도구 (File Compare)"),
+                        statsGathering = _getString("DiffStatsGathering", "수집 중..."),
+                        originalFileLabel = _getString("DiffOriginalFileLabel", "원본 파일 (Original)"),
+                        modifiedFileLabel = _getString("DiffModifiedFileLabel", "비교 대상 파일 (Modified)"),
+                        originalPrefix = _getString("DiffOriginalPrefix", "원본: "),
+                        modifiedPrefix = _getString("DiffModifiedPrefix", "수정본: "),
+                        diffStatsFormat = _getString("DiffStatsFormat", "변경사항: 추가 {0}줄, 삭제 {1}줄")
+                    };
+                    string json = JsonSerializer.Serialize(msg);
+                    coreWebView.PostWebMessageAsJson(json);
+                }
+            }
+        }
     }
 }
