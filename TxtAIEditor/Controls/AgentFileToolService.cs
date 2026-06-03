@@ -233,10 +233,27 @@ namespace TxtAIEditor.Controls
 
         public async Task<string> CreateFileAsync(string path, string content)
         {
+            string originalPath = path;
+            bool wasRenamed = false;
             string fullPath = ResolveInsideWorkspace(path);
             if (File.Exists(fullPath))
             {
-                return $"create_file failed: file already exists: {path}";
+                wasRenamed = true;
+                string directory = Path.GetDirectoryName(fullPath) ?? string.Empty;
+                string filenameWithoutExtension = Path.GetFileNameWithoutExtension(fullPath);
+                string extension = Path.GetExtension(fullPath);
+
+                int counter = 1;
+                string newFullPath;
+                do
+                {
+                    string newFilename = $"{filenameWithoutExtension} ({counter}){extension}";
+                    newFullPath = Path.Combine(directory, newFilename);
+                    counter++;
+                } while (File.Exists(newFullPath));
+
+                fullPath = newFullPath;
+                path = RelativePath(ResolveWorkspaceRoot(), fullPath).Replace('\\', '/');
             }
 
             string? dir = Path.GetDirectoryName(fullPath);
@@ -258,12 +275,18 @@ namespace TxtAIEditor.Controls
 
             if (!await ConfirmEditAsync(preview))
             {
-                return $"create_file cancelled: {path}";
+                return wasRenamed
+                    ? $"create_file cancelled: {path} (Note: '{originalPath}' already existed, so it was renamed to '{path}')"
+                    : $"create_file cancelled: {path}";
             }
 
             await File.WriteAllTextAsync(fullPath, newContent);
             await NotifyFileModifiedAsync(fullPath);
-            return $"created: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
+
+            string finalRelativePath = RelativePath(ResolveWorkspaceRoot(), fullPath);
+            return wasRenamed
+                ? $"created: {finalRelativePath} (Note: '{originalPath}' already existed, so the file was renamed to '{finalRelativePath}')"
+                : $"created: {finalRelativePath}";
         }
 
         public async Task<string> ReplaceInFileAsync(string path, string oldText, string newText)
