@@ -19,6 +19,7 @@ namespace TxtAIEditor.Controls
         private const int MaxActiveFileContextChars = 120_000;
 
         private readonly ILLMService _llmService;
+        private readonly ISettingsService _settingsService;
         private readonly AgentPane _agentPane;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<IReadOnlyList<OpenedTab>> _openTabsProvider;
@@ -43,6 +44,7 @@ namespace TxtAIEditor.Controls
 
         public AgentController(
             ILLMService llmService,
+            ISettingsService settingsService,
             AgentPane agentPane,
             Func<OpenedTab?> activeTabProvider,
             Func<IReadOnlyList<OpenedTab>> openTabsProvider,
@@ -55,6 +57,7 @@ namespace TxtAIEditor.Controls
             Func<string, Task>? fileModifiedAsync = null)
         {
             _llmService = llmService;
+            _settingsService = settingsService;
             _agentPane = agentPane;
             _activeTabProvider = activeTabProvider;
             _openTabsProvider = openTabsProvider;
@@ -407,10 +410,46 @@ namespace TxtAIEditor.Controls
                     cancellationToken.ThrowIfCancellationRequested();
                     transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResult}";
                     
+                    string displayResult = toolResult;
+                    if (!_settingsService.CurrentSettings.LlmAgentVerbose && !toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string normalizedName = NormalizeToolName(toolName);
+                        if (normalizedName == "read_file")
+                        {
+                            string path = GetStringArgument(arguments, "path");
+                            displayResult = string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
+                        }
+                        else if (normalizedName == "list_files")
+                        {
+                            string glob = GetStringArgument(arguments, "glob");
+                            displayResult = string.Format(_getString("AgentVerboseListFilesOnly", "폴더를 읽었습니다: {0}"), glob);
+                        }
+                        else if (normalizedName == "search_text")
+                        {
+                            string query = GetStringArgument(arguments, "query");
+                            displayResult = string.Format(_getString("AgentVerboseSearchTextOnly", "텍스트 검색을 완료했습니다: {0}"), query);
+                        }
+                        else if (normalizedName == "run_rg")
+                        {
+                            string args = GetStringArgument(arguments, "arguments");
+                            displayResult = string.Format(_getString("AgentVerboseRunRgOnly", "Ripgrep 검색을 완료했습니다: {0}"), args);
+                        }
+                        else if (normalizedName == "web_search_exa")
+                        {
+                            string query = GetStringArgument(arguments, "query");
+                            displayResult = string.Format(_getString("AgentVerboseWebSearchOnly", "웹 검색을 완료했습니다: {0}"), query);
+                        }
+                        else if (normalizedName == "web_fetch_exa")
+                        {
+                            string[] urls = GetUrlsArgument(arguments);
+                            displayResult = string.Format(_getString("AgentVerboseWebFetchOnly", "웹페이지를 읽었습니다: {0}"), string.Join(", ", urls));
+                        }
+                    }
+
                     await RunOnUIThreadAsync(() =>
                     {
                         _agentPane.AppendOutputLine($"{_getString("AgentToolRunning", "도구 실행 중")}: {toolName}");
-                        _agentPane.AppendOutputText(toolResult.TrimEnd() + Environment.NewLine);
+                        _agentPane.AppendOutputText(displayResult.TrimEnd() + Environment.NewLine);
                     });
 
                     // Selection-edit verification: after a file-edit tool succeeds on the

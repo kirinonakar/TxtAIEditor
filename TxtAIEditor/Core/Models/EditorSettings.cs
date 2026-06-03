@@ -48,6 +48,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmModelOpenRouter { get; set; } = "moonshotai/kimi-k2.6:free";
         public string LlmModelLmStudio { get; set; } = "";
         public bool LlmConfirmBeforeSending { get; set; } = false;
+        public bool LlmAgentVerbose { get; set; } = false;
         public string LlmSourceLanguage { get; set; } = "Auto";
         public string LlmTargetLanguage { get; set; } = "Korean";
 

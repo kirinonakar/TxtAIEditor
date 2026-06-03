@@ -396,6 +396,7 @@ namespace TxtAIEditor
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
             _agentController = new AgentController(
                 _llmService,
+                _settingsService,
                 PreviewGrid.AgentPane,
                 GetActiveTab,
                 () => _viewModel.Tabs.ToList(),

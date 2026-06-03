@@ -1567,4 +1567,25 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityPowerShellCancelled" xml:space="preserve">
     <value>PowerShell execution cancelled</value>
   </data>
+  <data name="SettingsLlmAgentVerbose" xml:space="preserve">
+    <value>Enable agent verbose output (Verbose)</value>
+  </data>
+  <data name="AgentVerboseReadFileOnly" xml:space="preserve">
+    <value>Read file: {0}</value>
+  </data>
+  <data name="AgentVerboseListFilesOnly" xml:space="preserve">
+    <value>Read directory: {0}</value>
+  </data>
+  <data name="AgentVerboseSearchTextOnly" xml:space="preserve">
+    <value>Completed text search for: {0}</value>
+  </data>
+  <data name="AgentVerboseRunRgOnly" xml:space="preserve">
+    <value>Completed Ripgrep search: {0}</value>
+  </data>
+  <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
+    <value>Completed web search for: {0}</value>
+  </data>
+  <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
+    <value>Read web page content: {0}</value>
+  </data>
 </root>

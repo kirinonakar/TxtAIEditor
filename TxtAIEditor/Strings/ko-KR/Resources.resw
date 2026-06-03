@@ -1567,4 +1567,25 @@
   <data name="AgentActivityPowerShellCancelled" xml:space="preserve">
     <value>PowerShell 실행 취소됨</value>
   </data>
+  <data name="SettingsLlmAgentVerbose" xml:space="preserve">
+    <value>Agent 상세 출력 활성화 (Verbose)</value>
+  </data>
+  <data name="AgentVerboseReadFileOnly" xml:space="preserve">
+    <value>파일을 읽었습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseListFilesOnly" xml:space="preserve">
+    <value>폴더를 읽었습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseSearchTextOnly" xml:space="preserve">
+    <value>텍스트 검색을 완료했습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseRunRgOnly" xml:space="preserve">
+    <value>Ripgrep 검색을 완료했습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
+    <value>웹 검색을 완료했습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
+    <value>웹페이지를 읽었습니다: {0}</value>
+  </data>
 </root>
