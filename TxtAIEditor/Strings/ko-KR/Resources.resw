@@ -1535,4 +1535,10 @@
   <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
     <value>Exa 웹 검색 중: {0}</value>
   </data>
+  <data name="SettingsExaEndpoint" xml:space="preserve">
+    <value>Exa 검색 API / MCP Endpoint</value>
+  </data>
+  <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
+    <value>예: https://mcp.exa.ai/mcp</value>
+  </data>
 </root>

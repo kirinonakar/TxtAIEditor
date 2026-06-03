@@ -119,6 +119,7 @@ namespace TxtAIEditor.Core.Services
             llmModelCombo.Loaded += (s, e) => ApplyEditableComboBoxVisualStyles(llmModelCombo);
             var llmApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsLlmApiKeyPlaceholder", "API Key 입력 (비워두면 저장된 Key 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
             llmApiKeyBox.Password = await _llmService.GetApiKeyAsync(providerNames[providerIndex]);
+            var exaEndpointBox = new TextBox { PlaceholderText = getString("SettingsExaEndpointPlaceholder", "예: https://mcp.exa.ai/mcp"), Text = settings.ExaEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
             var exaApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsExaApiKeyPlaceholder", "Exa API Key 입력 (비워두면 저장된 Key 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
             exaApiKeyBox.Password = await _llmService.GetApiKeyAsync("Exa");
 
@@ -460,6 +461,9 @@ namespace TxtAIEditor.Core.Services
                 Text = getString("SettingsLlmApiKeyInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다."),
                 TextWrapping = TextWrapping.Wrap
             });
+
+            AddLabel(llmSection, getString("SettingsExaEndpoint", "Exa 검색 API / MCP Endpoint"));
+            llmSection.Children.Add(exaEndpointBox);
 
             AddLabel(llmSection, getString("SettingsExaApiKey", "Exa API Key (웹 검색 기능용)"));
             llmSection.Children.Add(exaApiKeyBox);
@@ -953,6 +957,7 @@ SOFTWARE.",
                 .Where(id => !string.IsNullOrWhiteSpace(id))
                 .ToList();
 
+            settings.ExaEndpoint = exaEndpointBox.Text.Trim();
             string newApiKey = llmApiKeyBox.Password.Trim();
             await _llmService.SaveApiKeyAsync(settings.LlmProvider, newApiKey);
             string newExaApiKey = exaApiKeyBox.Password.Trim();

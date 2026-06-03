@@ -51,6 +51,9 @@ namespace TxtAIEditor.Core.Models
         public string LlmSourceLanguage { get; set; } = "Auto";
         public string LlmTargetLanguage { get; set; } = "Korean";
 
+        // Exa Config
+        public string ExaEndpoint { get; set; } = "https://mcp.exa.ai/mcp";
+
         // Git Config
         public bool AutoGitDetect { get; set; } = true;
 
