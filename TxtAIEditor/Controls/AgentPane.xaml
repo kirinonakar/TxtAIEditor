@@ -14,11 +14,15 @@
                     <SolidColorBrush x:Key="AgentButtonBackground" Color="#FCFCFC"/>
                     <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#E0E0E0"/>
                     <SolidColorBrush x:Key="AgentOutputBackground" Color="#FCFCFC"/>
+                    <SolidColorBrush x:Key="AgentCodeBackground" Color="#EAEAEA"/>
+                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#C7254E"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="AgentButtonBackground" Color="#2B2D31"/>
                     <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#2E3033"/>
                     <SolidColorBrush x:Key="AgentOutputBackground" Color="#151618"/>
+                    <SolidColorBrush x:Key="AgentCodeBackground" Color="#2D3139"/>
+                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#E06C75"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
@@ -66,22 +70,19 @@
         </Grid>
 
         <ScrollViewer Grid.Row="1"
+                      x:Name="AgentOutputScrollViewer"
                       VerticalScrollBarVisibility="Auto"
                       Background="{ThemeResource AgentOutputBackground}"
                       BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                       BorderThickness="1"
                       Padding="10"
                       CornerRadius="4">
-            <TextBox x:Name="AgentOutputText"
-                     Text="대기 중... Agent에게 작업을 지시해 보세요."
-                     TextWrapping="Wrap"
-                     FontSize="13"
-                     IsReadOnly="True"
-                     BorderThickness="0"
-                     Background="Transparent"
-                     Padding="0"
-                     AcceptsReturn="True"
-                     KeyDown="OnOutputTextKeyDown"/>
+            <RichTextBlock x:Name="AgentOutputText"
+                           TextWrapping="Wrap"
+                           FontSize="13"
+                           IsTextSelectionEnabled="True"
+                           Padding="0"
+                           KeyDown="OnOutputTextKeyDown"/>
         </ScrollViewer>
 
         <Button x:Name="AgentInsertOutputButton"

@@ -1,19 +1,55 @@
 using System;
+using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.System;
 
 namespace TxtAIEditor.Controls
 {
+    public sealed class AgentOutputWrapper
+    {
+        private readonly AgentPane _pane;
+        public AgentOutputWrapper(AgentPane pane)
+        {
+            _pane = pane;
+        }
+
+        public string Text => _pane.RawOutputText;
+        public string SelectedText => _pane.SelectedOutputText;
+    }
+
     public sealed partial class AgentPane : UserControl
     {
         private int _outputLength;
+        private string _rawOutputText = string.Empty;
+
+        public string RawOutputText => _rawOutputText;
+        public string SelectedOutputText => AgentOutputText.SelectedText;
 
         public AgentPane()
         {
             InitializeComponent();
-            _outputLength = AgentOutputText.Text?.Length ?? 0;
+            
+            string placeholder = "대기 중... Agent에게 작업을 지시해 보세요.";
+            try
+            {
+                var loader = new Microsoft.Windows.ApplicationModel.Resources.ResourceLoader();
+                string localized = loader.GetString("AgentOutputPlaceholder");
+                if (!string.IsNullOrEmpty(localized))
+                {
+                    placeholder = localized;
+                }
+            }
+            catch
+            {
+            }
+
+            _rawOutputText = placeholder;
+            UpdateRichText(_rawOutputText);
+            _outputLength = _rawOutputText.Length;
         }
 
         public event RoutedEventHandler? RunRequested;
@@ -23,7 +59,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? DiffApproved;
         public event RoutedEventHandler? DiffCancelled;
 
-        public TextBox Output => AgentOutputText;
+        public AgentOutputWrapper Output => new AgentOutputWrapper(this);
         public TextBox Prompt => AgentPromptInput;
         public TextBox Activity => AgentActivityText;
         public TextBlock ContextStats => AgentContextStatsText;
@@ -43,27 +79,42 @@ namespace TxtAIEditor.Controls
 
         private void AppendText(string text)
         {
-            int currentLength = AgentOutputText.Text.Length;
+            int currentLength = _rawOutputText.Length;
             if (_outputLength < 0 || _outputLength > currentLength)
             {
                 _outputLength = currentLength;
             }
-            AgentOutputText.IsReadOnly = false;
-            AgentOutputText.Select(_outputLength, 0);
-            AgentOutputText.SelectedText = text;
-            AgentOutputText.IsReadOnly = true;
+            _rawOutputText = _rawOutputText.Insert(_outputLength, text);
             _outputLength += text.Length;
+            UpdateRichText(_rawOutputText);
         }
 
         public void Localize(Func<string, string, string> getString)
         {
-            string outputText = AgentOutputText.Text.TrimStart();
-            if (outputText.StartsWith("대기 중...", StringComparison.Ordinal) ||
+            string outputText = _rawOutputText.TrimStart();
+            bool isPlaceholder = false;
+            try
+            {
+                var loader = new Microsoft.Windows.ApplicationModel.Resources.ResourceLoader();
+                string localized = loader.GetString("AgentOutputPlaceholder")?.TrimStart() ?? string.Empty;
+                if (!string.IsNullOrEmpty(localized) && outputText.StartsWith(localized, System.StringComparison.Ordinal))
+                {
+                    isPlaceholder = true;
+                }
+            }
+            catch
+            {
+            }
+
+            if (isPlaceholder ||
+                outputText.StartsWith("대기 중...", StringComparison.Ordinal) ||
                 outputText.StartsWith("Waiting...", StringComparison.Ordinal) ||
+                outputText.StartsWith("待機중...", StringComparison.Ordinal) ||
                 outputText.StartsWith("待機中...", StringComparison.Ordinal))
             {
-                AgentOutputText.Text = getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
-                _outputLength = AgentOutputText.Text.Length;
+                _rawOutputText = getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
+                UpdateRichText(_rawOutputText);
+                _outputLength = _rawOutputText.Length;
             }
 
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
@@ -139,7 +190,7 @@ namespace TxtAIEditor.Controls
             CompleteThinkingLine();
             ClearOutputPlaceholder();
 
-            string currentText = AgentOutputText.Text;
+            string currentText = _rawOutputText;
             if (!string.IsNullOrEmpty(currentText) &&
                 !EndsWithLineBreak(currentText))
             {
@@ -155,7 +206,7 @@ namespace TxtAIEditor.Controls
             CompleteThinkingLine();
             ClearOutputPlaceholder();
 
-            string currentText = AgentOutputText.Text;
+            string currentText = _rawOutputText;
             if (!string.IsNullOrWhiteSpace(currentText))
             {
                 if (!EndsWithBlankLine(currentText))
@@ -175,7 +226,7 @@ namespace TxtAIEditor.Controls
             CompleteThinkingLine();
             ClearOutputPlaceholder();
 
-            string currentText = AgentOutputText.Text;
+            string currentText = _rawOutputText;
             int lineBreakLength = 0;
             if (!string.IsNullOrEmpty(currentText) &&
                 !EndsWithLineBreak(currentText))
@@ -203,7 +254,7 @@ namespace TxtAIEditor.Controls
 
         private void ClearOutputPlaceholder()
         {
-            string text = AgentOutputText.Text;
+            string text = _rawOutputText;
             if (text.Length > 100)
             {
                 return;
@@ -212,9 +263,10 @@ namespace TxtAIEditor.Controls
             string trimmed = text.TrimStart();
             if (trimmed.StartsWith("대기 중...", StringComparison.Ordinal) ||
                 trimmed.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                trimmed.StartsWith("待機中...", StringComparison.Ordinal))
+                trimmed.StartsWith("待機중...", StringComparison.Ordinal))
             {
-                AgentOutputText.Text = string.Empty;
+                _rawOutputText = string.Empty;
+                UpdateRichText(_rawOutputText);
                 _outputLength = 0;
             }
             else
@@ -225,19 +277,19 @@ namespace TxtAIEditor.Controls
 
         public void ResetOutput(string text)
         {
-            AgentOutputText.Text = text;
-            _outputLength = text?.Length ?? 0;
+            _rawOutputText = text ?? string.Empty;
+            UpdateRichText(_rawOutputText);
+            _outputLength = _rawOutputText.Length;
         }
 
         private void ScrollOutputToEnd()
         {
-            int currentLength = AgentOutputText.Text.Length;
+            int currentLength = _rawOutputText.Length;
             if (_outputLength < 0 || _outputLength > currentLength)
             {
                 _outputLength = currentLength;
             }
-            AgentOutputText.SelectionStart = _outputLength;
-            AgentOutputText.SelectionLength = 0;
+            AgentOutputScrollViewer.ChangeView(null, AgentOutputScrollViewer.ScrollableHeight, null);
         }
 
         private DispatcherTimer CreateThinkingTimer()
@@ -269,7 +321,7 @@ namespace TxtAIEditor.Controls
 
             _thinkingTimer?.Stop();
             ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
-            string currentText = AgentOutputText.Text;
+            string currentText = _rawOutputText;
             if (!EndsWithLineBreak(currentText))
             {
                 AppendText(OutputLineBreak);
@@ -281,14 +333,15 @@ namespace TxtAIEditor.Controls
 
         private void ReplaceThinkingLine(string text)
         {
-            int currentLength = AgentOutputText.Text.Length;
+            int currentLength = _rawOutputText.Length;
             if (_thinkingLineStart < 0 || _thinkingLineStart > currentLength)
             {
                 return;
             }
 
-            AgentOutputText.Text = AgentOutputText.Text.Substring(0, _thinkingLineStart) + text;
+            _rawOutputText = _rawOutputText.Substring(0, _thinkingLineStart) + text;
             _outputLength = _thinkingLineStart + text.Length;
+            UpdateRichText(_rawOutputText);
             ScrollOutputToEnd();
         }
 
@@ -388,7 +441,7 @@ namespace TxtAIEditor.Controls
                 string textToCopy = AgentOutputText.SelectedText;
                 if (string.IsNullOrEmpty(textToCopy))
                 {
-                    textToCopy = AgentOutputText.Text;
+                    textToCopy = _rawOutputText;
                 }
 
                 if (!string.IsNullOrEmpty(textToCopy))
@@ -400,6 +453,163 @@ namespace TxtAIEditor.Controls
                     e.Handled = true;
                 }
             }
+        }
+
+        private void UpdateRichText(string rawText)
+        {
+            AgentOutputText.Blocks.Clear();
+
+            string normalized = (rawText ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+            string[] lines = normalized.Split('\n');
+
+            foreach (var line in lines)
+            {
+                var paragraph = new Paragraph();
+                ParseLineToInlines(line, paragraph.Inlines);
+                AgentOutputText.Blocks.Add(paragraph);
+            }
+        }
+
+        private void ParseLineToInlines(string line, InlineCollection inlines)
+        {
+            if (string.IsNullOrEmpty(line))
+            {
+                inlines.Add(new Run { Text = string.Empty });
+                return;
+            }
+
+            int i = 0;
+            bool isBold = false;
+            bool isCode = false;
+            var currentSegment = new StringBuilder();
+
+            void FlushCurrentSegment()
+            {
+                if (currentSegment.Length == 0)
+                {
+                    return;
+                }
+
+                string text = currentSegment.ToString();
+                currentSegment.Clear();
+
+                if (isCode)
+                {
+                    var container = new InlineUIContainer();
+                    Brush? bgBrush = null;
+                    Brush? fgBrush = null;
+
+                    if (Application.Current.Resources.ContainsKey("AgentCodeBackground"))
+                    {
+                        bgBrush = Application.Current.Resources["AgentCodeBackground"] as Brush;
+                    }
+                    else
+                    {
+                        bgBrush = new SolidColorBrush(Microsoft.UI.Colors.LightGray);
+                    }
+
+                    if (Application.Current.Resources.ContainsKey("AgentCodeForeground"))
+                    {
+                        fgBrush = Application.Current.Resources["AgentCodeForeground"] as Brush;
+                    }
+
+                    var border = new Border
+                    {
+                        Background = bgBrush,
+                        CornerRadius = new CornerRadius(3),
+                        Padding = new Thickness(4, 1, 4, 1),
+                        Margin = new Thickness(2, 0, 2, 0)
+                    };
+
+                    var textBlock = new TextBlock
+                    {
+                        Text = text,
+                        FontFamily = new FontFamily("Consolas"),
+                        FontSize = 12,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+
+                    if (fgBrush != null)
+                    {
+                        textBlock.Foreground = fgBrush;
+                    }
+
+                    border.Child = textBlock;
+                    container.Child = border;
+                    inlines.Add(container);
+                }
+                else
+                {
+                    var run = new Run { Text = text };
+                    if (isBold)
+                    {
+                        run.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
+                    }
+                    inlines.Add(run);
+                }
+            }
+
+            while (i < line.Length)
+            {
+                if (isCode)
+                {
+                    if (line[i] == '`')
+                    {
+                        FlushCurrentSegment();
+                        isCode = false;
+                        i++;
+                    }
+                    else
+                    {
+                        currentSegment.Append(line[i]);
+                        i++;
+                    }
+                }
+                else
+                {
+                    if (line[i] == '`')
+                    {
+                        if (line.IndexOf('`', i + 1) >= 0)
+                        {
+                            FlushCurrentSegment();
+                            isCode = true;
+                            i++;
+                        }
+                        else
+                        {
+                            currentSegment.Append(line[i]);
+                            i++;
+                        }
+                    }
+                    else if (i + 1 < line.Length && line[i] == '*' && line[i + 1] == '*')
+                    {
+                        if (isBold)
+                        {
+                            FlushCurrentSegment();
+                            isBold = false;
+                            i += 2;
+                        }
+                        else if (line.IndexOf("**", i + 2, StringComparison.Ordinal) >= 0)
+                        {
+                            FlushCurrentSegment();
+                            isBold = true;
+                            i += 2;
+                        }
+                        else
+                        {
+                            currentSegment.Append("**");
+                            i += 2;
+                        }
+                    }
+                    else
+                    {
+                        currentSegment.Append(line[i]);
+                        i++;
+                    }
+                }
+            }
+
+            FlushCurrentSegment();
         }
 
         public void ShowDiffConfirm(string header, string description)
