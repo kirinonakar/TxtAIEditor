@@ -513,6 +513,7 @@ function handleCsharpMessage(msg) {
             }
             break;
         case 'flushForSave':
+            hideAutocomplete();
             flushPendingEditForSave(msg.requestId || 0);
             break;
         case 'insertText':
@@ -1403,6 +1404,7 @@ document.addEventListener('keydown', event => {
     const earlyKey = event.key ? event.key.toLowerCase() : '';
     if (earlyCtrl && earlyKey === 's') {
         event.preventDefault();
+        hideAutocomplete();
         post({ type: 'shortcut', name: 'save' });
         return;
     }
@@ -1513,6 +1515,7 @@ document.addEventListener('keydown', event => {
         }
         if (key === 's') {
             event.preventDefault();
+            hideAutocomplete();
             post({ type: 'shortcut', name: 'save' });
             return;
         }
