@@ -462,6 +462,11 @@ namespace TxtAIEditor.Core.Services
                 TextWrapping = TextWrapping.Wrap
             });
 
+            AddLabel(llmSection, getString("SettingsLlmModel", "LLM 모델명"));
+            llmSection.Children.Add(llmModelCombo);
+            llmSection.Children.Add(refreshLmStudioModelsButton);
+            llmSection.Children.Add(llmModelStatusText);
+
             AddLabel(llmSection, getString("SettingsExaEndpoint", "Exa 검색 API / MCP Endpoint"));
             llmSection.Children.Add(exaEndpointBox);
 
@@ -474,11 +479,6 @@ namespace TxtAIEditor.Core.Services
                 FontSize = 11,
                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
             });
-
-            AddLabel(llmSection, getString("SettingsLlmModel", "LLM 모델명"));
-            llmSection.Children.Add(llmModelCombo);
-            llmSection.Children.Add(refreshLmStudioModelsButton);
-            llmSection.Children.Add(llmModelStatusText);
 
             llmSection.Children.Add(confirmBeforeSendingCheck);
 
