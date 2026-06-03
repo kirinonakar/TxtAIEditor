@@ -1589,4 +1589,28 @@
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
     <value>ウェブページを読み込みました: {0}</value>
   </data>
+  <data name="AgentModifiedFilesHeader" xml:space="preserve">
+    <value>変更済み (ダブルクリックで比較)</value>
+  </data>
+  <data name="AgentModifiedFilesDescription" xml:space="preserve">
+    <value>変更されたファイルの一覧です。元に戻すには右のアイコンをクリックしてください。</value>
+  </data>
+  <data name="AgentActivityFileReverted" xml:space="preserve">
+    <value>ファイルの変更を元に戻しました: {0}</value>
+  </data>
+  <data name="AgentRevertErrorTitle" xml:space="preserve">
+    <value>元に戻すエラー</value>
+  </data>
+  <data name="AgentRevertErrorFormat" xml:space="preserve">
+    <value>ファイルを元に戻す際にエラーが発生しました: {0}</value>
+  </data>
+  <data name="AgentDiffTitle" xml:space="preserve">
+    <value>Agent 変更比較</value>
+  </data>
+  <data name="DiffOriginalLabel" xml:space="preserve">
+    <value>オリジナル</value>
+  </data>
+  <data name="DiffModifiedLabel" xml:space="preserve">
+    <value>修正版</value>
+  </data>
 </root>

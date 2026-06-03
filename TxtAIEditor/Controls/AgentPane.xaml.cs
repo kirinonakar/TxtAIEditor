@@ -60,6 +60,8 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? InsertOutputRequested;
         public event RoutedEventHandler? DiffApproved;
         public event RoutedEventHandler? DiffCancelled;
+        public event EventHandler<AgentFileEditPreview>? FileRevertRequested;
+        public event EventHandler<AgentFileEditPreview>? FileDiffRequested;
 
         public AgentOutputWrapper Output => new AgentOutputWrapper(this);
         public TextBox Prompt => AgentPromptInput;
@@ -139,6 +141,8 @@ namespace TxtAIEditor.Controls
             AgentDiffCancelButton.Content = getString("AgentDiffCancelButton", "취소");
             AgentDiffConfirmHeader.Text = getString("AgentDiffConfirmHeaderDefault", "파일 변경 확인");
             AgentDiffConfirmDescription.Text = getString("AgentDiffConfirmDescriptionDefault", "파일을 수정하시겠습니까?");
+            AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (더블클릭 시 비교)");
+            AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
         }
 
         public void SetBusy(bool isBusy)
@@ -660,6 +664,28 @@ namespace TxtAIEditor.Controls
         public void HideDiffConfirm()
         {
             AgentDiffConfirmPanel.Visibility = Visibility.Collapsed;
+        }
+
+        public void UpdateModifiedFiles(IReadOnlyList<AgentFileEditPreview> edits)
+        {
+            AgentModifiedFilesList.ItemsSource = edits;
+            AgentModifiedFilesPanel.Visibility = edits.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void OnModifiedFilesListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            if (AgentModifiedFilesList.SelectedItem is AgentFileEditPreview preview)
+            {
+                FileDiffRequested?.Invoke(this, preview);
+            }
+        }
+
+        private void OnRevertFileClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is AgentFileEditPreview preview)
+            {
+                FileRevertRequested?.Invoke(this, preview);
+            }
         }
     }
 }

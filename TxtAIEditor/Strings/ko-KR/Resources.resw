@@ -1588,4 +1588,28 @@
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
     <value>웹페이지를 읽었습니다: {0}</value>
   </data>
+  <data name="AgentModifiedFilesHeader" xml:space="preserve">
+    <value>변경됨 (더블클릭 시 비교)</value>
+  </data>
+  <data name="AgentModifiedFilesDescription" xml:space="preserve">
+    <value>수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.</value>
+  </data>
+  <data name="AgentActivityFileReverted" xml:space="preserve">
+    <value>파일 변경 취소 완료: {0}</value>
+  </data>
+  <data name="AgentRevertErrorTitle" xml:space="preserve">
+    <value>변경 취소 오류</value>
+  </data>
+  <data name="AgentRevertErrorFormat" xml:space="preserve">
+    <value>파일을 되돌리는 중 오류가 발생했습니다: {0}</value>
+  </data>
+  <data name="AgentDiffTitle" xml:space="preserve">
+    <value>Agent 변경 비교</value>
+  </data>
+  <data name="DiffOriginalLabel" xml:space="preserve">
+    <value>원본</value>
+  </data>
+  <data name="DiffModifiedLabel" xml:space="preserve">
+    <value>수정본</value>
+  </data>
 </root>

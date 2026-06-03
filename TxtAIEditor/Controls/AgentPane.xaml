@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:TxtAIEditor.Controls"
     mc:Ignorable="d">
 
     <UserControl.Resources>
@@ -42,6 +43,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -155,7 +157,78 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="5" ColumnSpacing="8">
+        <Border x:Name="AgentModifiedFilesPanel"
+                Grid.Row="5"
+                Background="{ThemeResource ToolbarBackgroundBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                Padding="10"
+                CornerRadius="4"
+                Visibility="Collapsed">
+            <Grid RowSpacing="6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Spacing="2">
+                    <TextBlock x:Name="AgentModifiedFilesHeader"
+                               Text="변경됨 (더블클릭 시 비교)"
+                               FontWeight="SemiBold"
+                               FontSize="12"/>
+                    <TextBlock x:Name="AgentModifiedFilesDescription"
+                               Text="수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요."
+                               FontSize="11"
+                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                </StackPanel>
+                
+                <ListView x:Name="AgentModifiedFilesList"
+                          Grid.Row="1"
+                          MinHeight="60"
+                          MaxHeight="150"
+                          Margin="0,4,0,0"
+                          SelectionMode="Single"
+                          DoubleTapped="OnModifiedFilesListDoubleTapped">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="MinHeight" Value="32"/>
+                            <Setter Property="Padding" Value="4,2,4,2"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="local:AgentFileEditPreview">
+                            <Grid HorizontalAlignment="Stretch" Margin="0,2,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE7C3;" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                                    <TextBlock Text="{Binding RelativePath}" 
+                                               FontSize="11" 
+                                               TextWrapping="NoWrap" 
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Click="OnRevertFileClick"
+                                        Tag="{Binding}"
+                                        Width="24"
+                                        Height="24"
+                                        Padding="0"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        ToolTipService.ToolTip="이 파일의 변경 취소">
+                                    <FontIcon Glyph="&#xE7A7;" FontSize="11"/>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="6" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -190,7 +263,7 @@
         </Grid>
 
         <Border x:Name="AgentActivityPanel"
-                Grid.Row="6"
+                Grid.Row="7"
                 Background="{ThemeResource ToolbarBackgroundBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="1"

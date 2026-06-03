@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -406,6 +406,7 @@ namespace TxtAIEditor
                 GetLocalizedString,
                 new AgentFileToolService(GetAgentWorkspaceRoot),
                 path => _gitService.FindRepositoryRoot(path) != null,
+                OpenAgentDiffViewAsync,
                 OnAgentFileModifiedAsync);
             _tocController = new TocController(
                 _viewModel,
@@ -2187,6 +2188,30 @@ namespace TxtAIEditor
             _terminalPanelController.Toggle();
         }
 
+        private async Task OnAgentFileModifiedAsync(string filePath)
+        {
+            await OnSearchReplaceFileModifiedAsync(filePath);
+
+            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
+            {
+                LoadDirectoryRoot(_currentFolderPath);
+            }
+
+            QueueGitStatusRefresh();
+        }
+
+        private async Task OpenAgentDiffViewAsync(AgentFileEditPreview preview)
+        {
+            await _compareTabController.OpenCompareTabAsync(
+                preview.FullPath,
+                preview.FullPath,
+                preview.OldContent,
+                preview.NewContent,
+                customTitle: $"{GetLocalizedString("AgentDiffTitle", "Agent 변경 비교")}: {Path.GetFileName(preview.RelativePath)}",
+                labelA: GetLocalizedString("DiffOriginalLabel", "원본"),
+                labelB: GetLocalizedString("DiffModifiedLabel", "수정본"));
+        }
+
         private string GetAgentWorkspaceRoot()
         {
             if (FileListView.SelectedItem is ExplorerItem selectedItem)
@@ -2216,17 +2241,7 @@ namespace TxtAIEditor
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
 
-        private async Task OnAgentFileModifiedAsync(string filePath)
-        {
-            await OnSearchReplaceFileModifiedAsync(filePath);
 
-            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
-            {
-                LoadDirectoryRoot(_currentFolderPath);
-            }
-
-            QueueGitStatusRefresh();
-        }
 
         #endregion
 

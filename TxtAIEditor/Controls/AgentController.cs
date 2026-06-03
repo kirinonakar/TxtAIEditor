@@ -30,6 +30,8 @@ namespace TxtAIEditor.Controls
         private readonly AgentFileToolService _fileTools;
         private readonly Func<string, bool> _isGitRepoProvider;
         private readonly Func<string, Task>? _fileModifiedAsync;
+        private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
+        private readonly List<AgentFileEditPreview> _sessionEdits = new();
 
         private string _lastSelectionText = string.Empty;
         private string? _lastSelectionTabId;
@@ -54,6 +56,7 @@ namespace TxtAIEditor.Controls
             Func<string, string, string> getString,
             AgentFileToolService fileTools,
             Func<string, bool> isGitRepoProvider,
+            Func<AgentFileEditPreview, Task> openDiffViewAsync,
             Func<string, Task>? fileModifiedAsync = null)
         {
             _llmService = llmService;
@@ -67,6 +70,7 @@ namespace TxtAIEditor.Controls
             _getString = getString;
             _fileTools = fileTools;
             _isGitRepoProvider = isGitRepoProvider;
+            _openDiffViewAsync = openDiffViewAsync;
             _fileModifiedAsync = fileModifiedAsync;
             _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
             _fileTools.ConfirmPowerShellAsync = ConfirmPowerShellAsync;
@@ -182,6 +186,8 @@ namespace TxtAIEditor.Controls
 
             _agentPane.DiffApproved += (_, _) => _diffApprovalTcs?.TrySetResult(true);
             _agentPane.DiffCancelled += (_, _) => _diffApprovalTcs?.TrySetResult(false);
+            _agentPane.FileRevertRequested += async (_, preview) => await RevertFileChangeAsync(preview);
+            _agentPane.FileDiffRequested += async (_, preview) => await _openDiffViewAsync(preview);
         }
  
         private async Task RunAgentAsync()
@@ -551,10 +557,12 @@ namespace TxtAIEditor.Controls
         private void ClearSession()
         {
             _sessionHistory.Clear();
+            _sessionEdits.Clear();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 _agentPane.ResetOutput(_getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요."));
                 _agentPane.ClearActivity(_getString("AgentActivityIdle", "대기 중"));
+                _agentPane.UpdateModifiedFiles(new List<AgentFileEditPreview>());
                 UpdateContextStats();
             });
         }
@@ -1378,8 +1386,72 @@ namespace TxtAIEditor.Controls
                     ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
                     : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
 
+                if (approved)
+                {
+                    TrackSessionEdit(preview);
+                }
+
                 return approved;
             });
+        }
+
+        private void TrackSessionEdit(AgentFileEditPreview preview)
+        {
+            var existing = _sessionEdits.FirstOrDefault(e => string.Equals(e.FullPath, preview.FullPath, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                var updatedEdit = new AgentFileEditPreview
+                {
+                    ActionName = preview.ActionName,
+                    RelativePath = preview.RelativePath,
+                    FullPath = preview.FullPath,
+                    OldContent = existing.OldContent, // Keep original
+                    NewContent = preview.NewContent,   // Latest version
+                    IsNewFile = existing.IsNewFile     // Keep original flag
+                };
+                _sessionEdits.Remove(existing);
+                _sessionEdits.Add(updatedEdit);
+            }
+            else
+            {
+                _sessionEdits.Add(preview);
+            }
+
+            _agentPane.UpdateModifiedFiles(_sessionEdits.ToList());
+        }
+
+        private async Task RevertFileChangeAsync(AgentFileEditPreview preview)
+        {
+            try
+            {
+                if (preview.IsNewFile)
+                {
+                    if (File.Exists(preview.FullPath))
+                    {
+                        File.Delete(preview.FullPath);
+                    }
+                }
+                else
+                {
+                    await File.WriteAllTextAsync(preview.FullPath, preview.OldContent);
+                }
+
+                _sessionEdits.Remove(preview);
+                _agentPane.UpdateModifiedFiles(_sessionEdits.ToList());
+
+                if (_fileModifiedAsync != null)
+                {
+                    await _fileModifiedAsync(preview.FullPath);
+                }
+
+                AppendActivity(string.Format(_getString("AgentActivityFileReverted", "파일 변경 취소 완료: {0}"), preview.RelativePath));
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("AgentRevertErrorTitle", "변경 취소 오류"),
+                    string.Format(_getString("AgentRevertErrorFormat", "파일을 되돌리는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
         }
 
         private async Task<bool> ConfirmPowerShellAsync(string command)

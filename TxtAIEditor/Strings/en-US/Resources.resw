@@ -1588,4 +1588,28 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
     <value>Read web page content: {0}</value>
   </data>
+  <data name="AgentModifiedFilesHeader" xml:space="preserve">
+    <value>Modified Files (Double-click to compare)</value>
+  </data>
+  <data name="AgentModifiedFilesDescription" xml:space="preserve">
+    <value>List of modified files. Click the right icon to revert.</value>
+  </data>
+  <data name="AgentActivityFileReverted" xml:space="preserve">
+    <value>Reverted file changes: {0}</value>
+  </data>
+  <data name="AgentRevertErrorTitle" xml:space="preserve">
+    <value>Revert Error</value>
+  </data>
+  <data name="AgentRevertErrorFormat" xml:space="preserve">
+    <value>An error occurred while reverting the file: {0}</value>
+  </data>
+  <data name="AgentDiffTitle" xml:space="preserve">
+    <value>Agent Change Compare</value>
+  </data>
+  <data name="DiffOriginalLabel" xml:space="preserve">
+    <value>Original</value>
+  </data>
+  <data name="DiffModifiedLabel" xml:space="preserve">
+    <value>Modified</value>
+  </data>
 </root>
