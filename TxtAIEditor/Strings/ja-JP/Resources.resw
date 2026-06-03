@@ -1613,4 +1613,7 @@
   <data name="DiffModifiedLabel" xml:space="preserve">
     <value>修正版</value>
   </data>
+  <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
+    <value>リストを閉じる</value>
+  </data>
 </root>

@@ -143,6 +143,7 @@ namespace TxtAIEditor.Controls
             AgentDiffConfirmDescription.Text = getString("AgentDiffConfirmDescriptionDefault", "파일을 수정하시겠습니까?");
             AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (더블클릭 시 비교)");
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
+            ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
         }
 
         public void SetBusy(bool isBusy)
@@ -686,6 +687,11 @@ namespace TxtAIEditor.Controls
             {
                 FileRevertRequested?.Invoke(this, preview);
             }
+        }
+
+        private void OnModifiedFilesCloseClick(object sender, RoutedEventArgs e)
+        {
+            AgentModifiedFilesPanel.Visibility = Visibility.Collapsed;
         }
     }
 }

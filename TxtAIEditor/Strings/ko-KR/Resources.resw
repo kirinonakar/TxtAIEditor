@@ -1612,4 +1612,7 @@
   <data name="DiffModifiedLabel" xml:space="preserve">
     <value>수정본</value>
   </data>
+  <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
+    <value>목록 닫기</value>
+  </data>
 </root>

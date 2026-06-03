@@ -170,16 +170,34 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0" Spacing="2">
-                    <TextBlock x:Name="AgentModifiedFilesHeader"
-                               Text="변경됨 (더블클릭 시 비교)"
-                               FontWeight="SemiBold"
-                               FontSize="12"/>
-                    <TextBlock x:Name="AgentModifiedFilesDescription"
-                               Text="수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요."
-                               FontSize="11"
-                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                </StackPanel>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock x:Name="AgentModifiedFilesHeader"
+                                   Text="변경됨 (더블클릭 시 비교)"
+                                   FontWeight="SemiBold"
+                                   FontSize="12"/>
+                        <TextBlock x:Name="AgentModifiedFilesDescription"
+                                   Text="수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요."
+                                   FontSize="11"
+                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            x:Name="AgentModifiedFilesCloseButton"
+                            Click="OnModifiedFilesCloseClick"
+                            Width="24"
+                            Height="24"
+                            Padding="0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            VerticalAlignment="Top"
+                            ToolTipService.ToolTip="목록 닫기">
+                        <FontIcon Glyph="&#xE10A;" FontSize="11"/>
+                    </Button>
+                </Grid>
                 
                 <ListView x:Name="AgentModifiedFilesList"
                           Grid.Row="1"

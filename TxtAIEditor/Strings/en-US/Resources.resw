@@ -1612,4 +1612,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="DiffModifiedLabel" xml:space="preserve">
     <value>Modified</value>
   </data>
+  <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
+    <value>Close list</value>
+  </data>
 </root>
