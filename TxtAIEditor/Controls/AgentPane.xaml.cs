@@ -545,7 +545,7 @@ namespace TxtAIEditor.Controls
                         Background = bgBrush,
                         CornerRadius = new CornerRadius(3),
                         Padding = new Thickness(4, 1, 4, 1),
-                        Margin = new Thickness(2, 0, 2, 0)
+                        Margin = new Thickness(2, 2.5, 2, -2.5)
                     };
 
                     var textBlock = new TextBlock
