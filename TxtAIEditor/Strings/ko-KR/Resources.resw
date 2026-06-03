@@ -1512,7 +1512,7 @@
     <value>대기 중</value>
   </data>
   <data name="AgentInsertOutputTooltip" xml:space="preserve">
-    <value>Agent 응답을 현재 커서에 입력</value>
+    <value>Agent 응답을 현재 커서에 입력 (선택한 경우 선택부위만)</value>
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k 토큰</value>

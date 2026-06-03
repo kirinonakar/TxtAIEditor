@@ -1512,7 +1512,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Idle</value>
   </data>
   <data name="AgentInsertOutputTooltip" xml:space="preserve">
-    <value>Insert Agent response at current cursor</value>
+    <value>Insert Agent response at current cursor (Selected part only, if selected)</value>
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k tokens</value>
