@@ -80,7 +80,8 @@
                      BorderThickness="0"
                      Background="Transparent"
                      Padding="0"
-                     AcceptsReturn="True"/>
+                     AcceptsReturn="True"
+                     KeyDown="OnOutputTextKeyDown"/>
         </ScrollViewer>
 
         <Button x:Name="AgentInsertOutputButton"

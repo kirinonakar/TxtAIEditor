@@ -27,7 +27,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- list_files: list workspace files by an internal glob pattern. args: {\"glob\":\"**/*.cs\",\"maxResults\":80}");
             builder.AppendLine("- search_text: text search implemented by the host with an internal glob filter. args: {\"query\":\"needle\",\"glob\":\"**/*.cs\",\"maxResults\":80}");
             builder.AppendLine("- run_rg: run ripgrep from the workspace root. args: {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}");
-            builder.AppendLine("- read_file: read only the needed line window. args: {\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":120,\"lineCount\":80}");
+            builder.AppendLine("- read_file: read a file's content. You can read a line window or larger segments by specifying lineCount (up to 5000 lines). args: {\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":120,\"lineCount\":80}");
             builder.AppendLine("- create_file: create a new file under the workspace root. args: {\"path\":\"relative/path.txt\",\"content\":\"...\"}");
             builder.AppendLine("- replace_in_file: exact text replacement under the workspace root. args: {\"path\":\"relative/path.cs\",\"oldText\":\"...\",\"newText\":\"...\"}");
             builder.AppendLine("- overwrite_file: overwrite a workspace file. Use only when the user explicitly requested a full rewrite. args: {\"path\":\"relative/path.cs\",\"content\":\"...\"}");
@@ -53,7 +53,8 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- Ground your answer in the provided context. If the provided context (active/open tabs) is insufficient or you need to find code/content, search for file paths and contents in the workspace using search tools (list_files, search_text, run_rg, or run_powershell) rather than immediately declaring that context is missing.");
             builder.AppendLine("- Prefer concrete edits over vague advice. For code, preserve existing style and minimize unrelated changes.");
             builder.AppendLine("- For multi-step work, present a short checklist and then the result or patch.");
-            builder.AppendLine("- For large files, NEVER read the whole file. Use search tools (like search_text, run_rg) first to locate target line numbers, then read only a small line window (e.g., 50-100 lines) using read_file.");
+            builder.AppendLine("- For very large files, avoid reading the whole file at once. Use search tools (like search_text, run_rg) first to locate target line numbers, then read only the needed segment using read_file. If you need to read more, you can query subsequent parts by adjusting startLine and lineCount (which supports up to 5000 lines).");
+            builder.AppendLine("- When analyzing, processing, or modifying a file, ensure you read all relevant parts of the file. If a file is small (under 5000 lines), you can read it entirely in one read_file call by setting a larger lineCount. If the tool output indicates there are more lines (e.g., '[... more lines ...]') and you need that content to complete the task, you MUST make subsequent read_file calls to read the rest of the file before giving your final answer.");
             builder.AppendLine("- Do not use file-writing tools unless the user asked you to create or modify files.");
             builder.AppendLine("- File-writing tools show the user a diff confirmation dialog before changes are applied.");
             builder.AppendLine("- Do not fabricate terminal output, file reads, tests, or tool execution. Use tools when evidence matters.");

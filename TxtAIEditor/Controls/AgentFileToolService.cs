@@ -112,7 +112,7 @@ namespace TxtAIEditor.Controls
             }
 
             int start = Math.Max(1, startLine <= 0 ? 1 : startLine);
-            int count = Math.Clamp(lineCount <= 0 ? 160 : lineCount, 1, 600);
+            int count = Math.Clamp(lineCount <= 0 ? 160 : lineCount, 1, 5000);
 
             var readLines = new List<string>();
             int currentLine = 0;
@@ -128,10 +128,6 @@ namespace TxtAIEditor.Controls
                     {
                         readLines.Add(line);
                     }
-                    if (currentLine > endLine)
-                    {
-                        break;
-                    }
                 }
             }
 
@@ -141,12 +137,19 @@ namespace TxtAIEditor.Controls
             }
 
             var builder = new StringBuilder();
+            int lastRead = start + readLines.Count - 1;
+            builder.AppendLine($"[File: {path} | Lines {start} to {lastRead} of {currentLine} total lines]");
             for (int i = 0; i < readLines.Count; i++)
             {
                 int lineNumber = start + i;
                 builder.Append(lineNumber.ToString().PadLeft(5));
                 builder.Append(" | ");
                 builder.AppendLine(readLines[i]);
+            }
+
+            if (lastRead < currentLine)
+            {
+                builder.AppendLine($"[... {currentLine - lastRead} more lines. Use read_file with startLine={lastRead + 1} and larger lineCount if needed to read more ...]");
             }
 
             return builder.ToString();

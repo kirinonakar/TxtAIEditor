@@ -381,6 +381,27 @@ namespace TxtAIEditor.Controls
             DiffCancelled?.Invoke(sender, e);
         }
 
+        private void OnOutputTextKeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == VirtualKey.C && IsControlDown())
+            {
+                string textToCopy = AgentOutputText.SelectedText;
+                if (string.IsNullOrEmpty(textToCopy))
+                {
+                    textToCopy = AgentOutputText.Text;
+                }
+
+                if (!string.IsNullOrEmpty(textToCopy))
+                {
+                    var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                    dataPackage.SetText(textToCopy);
+                    Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+                    Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+                    e.Handled = true;
+                }
+            }
+        }
+
         public void ShowDiffConfirm(string header, string description)
         {
             AgentDiffConfirmHeader.Text = header;
