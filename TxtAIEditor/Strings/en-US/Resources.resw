@@ -1535,6 +1535,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
     <value>Exa web searching: {0}</value>
   </data>
+  <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
+    <value>Exa fetching web content: {0}</value>
+  </data>
   <data name="SettingsExaEndpoint" xml:space="preserve">
     <value>Exa Search API / MCP Endpoint</value>
   </data>

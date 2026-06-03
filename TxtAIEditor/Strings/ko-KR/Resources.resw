@@ -1535,6 +1535,9 @@
   <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
     <value>Exa 웹 검색 중: {0}</value>
   </data>
+  <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
+    <value>Exa 웹 페이지 읽는 중: {0}</value>
+  </data>
   <data name="SettingsExaEndpoint" xml:space="preserve">
     <value>Exa 검색 API / MCP Endpoint</value>
   </data>

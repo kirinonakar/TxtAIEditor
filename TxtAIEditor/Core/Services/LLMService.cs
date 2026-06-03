@@ -771,5 +771,126 @@ namespace TxtAIEditor.Core.Services
 
             return sb.ToString().TrimEnd();
         }
+
+        public async Task<string> FetchExaAsync(string[] urls, CancellationToken cancellationToken = default)
+        {
+            if (urls == null || urls.Length == 0)
+            {
+                return "Exa fetch failed: urls list is empty.";
+            }
+
+            string apiKey = await GetApiKeyAsync("Exa");
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                apiKey = Environment.GetEnvironmentVariable("EXA_API_KEY") ?? string.Empty;
+            }
+
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                string langCode = GetActiveLanguage();
+                return langCode switch
+                {
+                    "ja-JP" => "エラー: Exa API Keyが設定されていません。設定を開いて保存するか、EXA_API_KEY환경변수をご設定ください。",
+                    "en-US" => "Error: Exa API Key is not set. Please open Settings to save it, or configure the EXA_API_KEY environment variable.",
+                    _ => "에러: Exa API Key가 설정되어 있지 않습니다. 설정을 열어 저장하거나, EXA_API_KEY 환경 변수를 설정해 주십시오."
+                };
+            }
+
+            string endpoint = _settingsService?.CurrentSettings?.ExaEndpoint ?? "https://mcp.exa.ai/mcp";
+
+            // If it is configured as an MCP / SSE URL (e.g. contains '/mcp' or '/sse'), use the MCP SSE transport client.
+            if (endpoint.Contains("/mcp", StringComparison.OrdinalIgnoreCase) || 
+                endpoint.Contains("/sse", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var arguments = new
+                    {
+                        urls = urls
+                    };
+                    return await CallMcpSseToolAsync(endpoint, apiKey, "web_fetch_exa", arguments, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    // Fallback to direct REST contents fetch if MCP fails
+                    System.Diagnostics.Debug.WriteLine($"Exa fetch MCP failed, falling back to direct API: {ex.Message}");
+                }
+            }
+
+            // Fallback direct REST API call: POST https://api.exa.ai/contents
+            string requestUrl = endpoint;
+            if (requestUrl.Contains("/mcp", StringComparison.OrdinalIgnoreCase) || 
+                requestUrl.Contains("/sse", StringComparison.OrdinalIgnoreCase))
+            {
+                requestUrl = "https://api.exa.ai/contents";
+            }
+            else if (!requestUrl.Contains("/contents"))
+            {
+                requestUrl = requestUrl.TrimEnd('/') + "/contents";
+                if (!requestUrl.StartsWith("http://") && !requestUrl.StartsWith("https://"))
+                {
+                    requestUrl = "https://api.exa.ai/contents";
+                }
+            }
+
+            var payload = new
+            {
+                urls = urls,
+                text = true
+            };
+
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
+                {
+                    request.Headers.Add("x-api-key", apiKey);
+                    string jsonPayload = JsonSerializer.Serialize(payload);
+                    request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                    using (var response = await _exaHttpClient.SendAsync(request, cancellationToken))
+                    {
+                        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            return $"Exa fetch API failed ({response.StatusCode}): {responseBody}";
+                        }
+
+                        using (var doc = JsonDocument.Parse(responseBody))
+                        {
+                            var root = doc.RootElement;
+                            if (!root.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+                            {
+                                return "Exa fetch returned no contents results format.";
+                            }
+
+                            var sb = new StringBuilder();
+                            int index = 1;
+                            foreach (var item in results.EnumerateArray())
+                            {
+                                string title = item.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "No Title" : "No Title";
+                                string url = item.TryGetProperty("url", out var urlProp) ? urlProp.GetString() ?? "" : "";
+                                string textContent = item.TryGetProperty("text", out var textProp) ? textProp.GetString() ?? "" : "";
+                                
+                                sb.AppendLine($"[{index}] Title: {title}");
+                                sb.AppendLine($"URL: {url}");
+                                if (!string.IsNullOrEmpty(textContent))
+                                {
+                                    sb.AppendLine("Content:");
+                                    sb.AppendLine(textContent);
+                                }
+                                sb.AppendLine();
+                                index++;
+                            }
+
+                            return sb.ToString().TrimEnd();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Exa fetch exception occurred: {ex.Message}";
+            }
+        }
     }
 }

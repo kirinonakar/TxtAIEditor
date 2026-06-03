@@ -531,6 +531,9 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "query"),
                             GetIntArgument(arguments, "numResults", 5),
                             cancellationToken),
+                        "web_fetch_exa" => await _llmService.FetchExaAsync(
+                            GetUrlsArgument(arguments),
+                            cancellationToken),
                         _ => $"Unknown tool: {toolName}"
                     };
                 }
@@ -597,6 +600,9 @@ namespace TxtAIEditor.Controls
                 "web_search_exa" => string.Format(
                     _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
                     GetStringArgument(arguments, "query")),
+                "web_fetch_exa" => string.Format(
+                    _getString("AgentActivityWebFetchExaFormat", "Exa 웹 페이지 읽는 중: {0}"),
+                    string.Join(", ", GetUrlsArgument(arguments))),
                 _ => string.Format(
                     _getString("AgentActivityUnknownToolFormat", "도구 실행 중: {0}"),
                     toolName)
@@ -912,6 +918,46 @@ namespace TxtAIEditor.Controls
             return arguments.TryGetProperty(name, out var value) ? value.GetString() ?? string.Empty : string.Empty;
         }
 
+        private static string[] GetUrlsArgument(JsonElement arguments)
+        {
+            if (arguments.TryGetProperty("urls", out var urlsProp))
+            {
+                if (urlsProp.ValueKind == JsonValueKind.Array)
+                {
+                    var list = new System.Collections.Generic.List<string>();
+                    foreach (var item in urlsProp.EnumerateArray())
+                    {
+                        string val = item.GetString() ?? "";
+                        if (!string.IsNullOrEmpty(val))
+                        {
+                            list.Add(val);
+                        }
+                    }
+                    if (list.Count > 0)
+                    {
+                        return list.ToArray();
+                    }
+                }
+                else if (urlsProp.ValueKind == JsonValueKind.String)
+                {
+                    string singleUrl = urlsProp.GetString() ?? "";
+                    if (!string.IsNullOrEmpty(singleUrl))
+                    {
+                        return new[] { singleUrl };
+                    }
+                }
+            }
+
+            // Fallback to checking single "url" key
+            string fallbackUrl = GetFirstStringArgument(arguments, "url", "uri", "address");
+            if (!string.IsNullOrEmpty(fallbackUrl))
+            {
+                return new[] { fallbackUrl };
+            }
+
+            return System.Array.Empty<string>();
+        }
+
         private string GetPathArgument(JsonElement arguments)
         {
             string path = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path");
@@ -963,6 +1009,9 @@ namespace TxtAIEditor.Controls
                 "search_exa" => "web_search_exa",
                 "exa_search" => "web_search_exa",
                 "exa" => "web_search_exa",
+                "fetch_exa" => "web_fetch_exa",
+                "exa_fetch" => "web_fetch_exa",
+                "fetch" => "web_fetch_exa",
                 _ => normalized
             };
         }

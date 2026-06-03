@@ -17,7 +17,8 @@ namespace TxtAIEditor.Core.Interfaces
         Task SaveApiKeyAsync(string provider, string apiKey);
         Task<string> GetApiKeyAsync(string provider);
 
-        // Exa Search Tool
+        // Exa Search & Content Retrieval Tools
         Task<string> SearchExaAsync(string query, int numResults, CancellationToken cancellationToken = default);
+        Task<string> FetchExaAsync(string[] urls, CancellationToken cancellationToken = default);
     }
 }
