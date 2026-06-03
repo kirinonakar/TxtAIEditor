@@ -179,11 +179,37 @@ namespace TxtAIEditor.Controls
                 return "run_powershell blocked: destructive commands are not executed automatically by Agent.";
             }
 
-            string utf8Command = $"$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {command}";
+            // Normalize command line endings to CRLF for Windows PowerShell compatibility
+            string normalizedCommand = command.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n");
+
+            // Set $OutputEncoding to UTF-8. Wrap [Console]::OutputEncoding in a try-catch 
+            // since it can throw "The handle is invalid" in headless/GUI-only environments.
+            string utf8Command = $"$OutputEncoding = [System.Text.Encoding]::UTF8; try {{ [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 }} catch {{}}; {normalizedCommand}";
             string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(utf8Command));
+            
             var profile = TerminalShellProfile.Resolve("PowerShell");
             string shellPath = profile.ExecutablePath;
-            return await RunProcessAsync(shellPath, $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}", ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
+
+            // If running legacy Windows PowerShell (powershell.exe) instead of PowerShell 7 (pwsh.exe),
+            // and no console handle is present, attempts to set output encoding to UTF-8 might fail.
+            // In Windows PowerShell, it defaults to the system's active OEM encoding (e.g. CP949 on Korean Windows).
+            // So we use the culture's OEM code page (or fallback to UTF-8) to read stdout.
+            bool isPowerShell7 = shellPath.Contains("pwsh.exe", StringComparison.OrdinalIgnoreCase);
+            Encoding outputEncoding = Encoding.UTF8;
+            if (!isPowerShell7)
+            {
+                try
+                {
+                    int oemCodePage = System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage;
+                    outputEncoding = Encoding.GetEncoding(oemCodePage);
+                }
+                catch
+                {
+                    outputEncoding = Encoding.UTF8;
+                }
+            }
+
+            return await RunProcessAsync(shellPath, $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}", ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken, outputEncoding);
         }
 
         public async Task<string> CreateFileAsync(string path, string content)
@@ -316,10 +342,17 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static async Task<string> RunProcessAsync(string fileName, string arguments, string workingDirectory, int timeoutMs, CancellationToken cancellationToken)
+        private static async Task<string> RunProcessAsync(
+            string fileName, 
+            string arguments, 
+            string workingDirectory, 
+            int timeoutMs, 
+            CancellationToken cancellationToken,
+            Encoding? outputEncoding = null)
         {
             var output = new StringBuilder();
             using var process = new Process();
+            var encoding = outputEncoding ?? Encoding.UTF8;
             process.StartInfo = new ProcessStartInfo
             {
                 FileName = fileName,
@@ -329,8 +362,8 @@ namespace TxtAIEditor.Controls
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
+                StandardOutputEncoding = encoding,
+                StandardErrorEncoding = encoding
             };
 
             try
