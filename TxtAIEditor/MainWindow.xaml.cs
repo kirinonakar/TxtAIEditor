@@ -1294,7 +1294,7 @@ namespace TxtAIEditor
                 if (GetActiveTab() == tab)
                 {
                     _llmAssistantController.SetSelectionText(selectedText);
-                    _agentController.SetSelectionText(selectedText);
+                    _agentController.SetSelectionText(selectedText, tab);
                     if (string.IsNullOrEmpty(selectedText))
                     {
                         SelectionStatsText.Text = GetLocalizedString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");

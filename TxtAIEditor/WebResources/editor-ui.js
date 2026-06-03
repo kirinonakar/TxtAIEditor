@@ -441,6 +441,9 @@ function handleCsharpMessage(msg) {
                 const text = msg.text || '';
                 const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
                 state.selection = null;
+                try {
+                    window.getSelection()?.removeAllRanges();
+                } catch (e) { }
                 syncCustomSelectionClass();
                 const targetLine = Math.min(state.currentLine, lines.length);
                 const targetCol = Math.min(Math.max(0, state.currentColumn - 1), (lines[targetLine - 1] || '').length);

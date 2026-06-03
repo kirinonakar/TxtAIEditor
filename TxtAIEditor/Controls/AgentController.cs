@@ -31,6 +31,9 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task>? _fileModifiedAsync;
 
         private string _lastSelectionText = string.Empty;
+        private string? _lastSelectionTabId;
+        private string? _lastSelectionSourceTitle;
+        private string? _lastSelectionSourcePath;
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
         private readonly StringBuilder _sessionHistory = new();
@@ -71,16 +74,84 @@ namespace TxtAIEditor.Controls
             UpdateContextStats();
         }
 
-        public void SetSelectionText(string selectedText)
+        public void SetSelectionText(string selectedText, OpenedTab? sourceTab = null)
         {
             _lastSelectionText = selectedText ?? string.Empty;
+            if (string.IsNullOrEmpty(_lastSelectionText))
+            {
+                _lastSelectionTabId = null;
+                _lastSelectionSourceTitle = null;
+                _lastSelectionSourcePath = null;
+            }
+            else
+            {
+                _lastSelectionTabId = sourceTab?.Id;
+                _lastSelectionSourceTitle = sourceTab?.Title;
+                _lastSelectionSourcePath = sourceTab?.FilePath;
+            }
             UpdateContextStats();
         }
 
         public void ClearSelection()
         {
             _lastSelectionText = string.Empty;
+            _lastSelectionTabId = null;
+            _lastSelectionSourceTitle = null;
+            _lastSelectionSourcePath = null;
             UpdateContextStats();
+        }
+
+        private string GetActiveSelectionText()
+        {
+            var activeTab = _activeTabProvider();
+            if (string.IsNullOrEmpty(_lastSelectionText))
+            {
+                return string.Empty;
+            }
+
+            if (activeTab == null)
+            {
+                return string.Empty;
+            }
+
+            if (_lastSelectionTabId == null)
+            {
+                return _lastSelectionText;
+            }
+
+            return string.Equals(_lastSelectionTabId, activeTab.Id, StringComparison.Ordinal)
+                ? _lastSelectionText
+                : string.Empty;
+        }
+
+        private string BuildActiveSelectionContext()
+        {
+            string selectedText = GetActiveSelectionText();
+            if (string.IsNullOrEmpty(selectedText))
+            {
+                return string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(_lastSelectionSourceTitle) &&
+                string.IsNullOrWhiteSpace(_lastSelectionSourcePath))
+            {
+                return selectedText;
+            }
+
+            var builder = new StringBuilder();
+            builder.AppendLine("[Selection source]");
+            if (!string.IsNullOrWhiteSpace(_lastSelectionSourceTitle))
+            {
+                builder.AppendLine($"Title: {_lastSelectionSourceTitle}");
+            }
+            if (!string.IsNullOrWhiteSpace(_lastSelectionSourcePath))
+            {
+                builder.AppendLine($"Path: {_lastSelectionSourcePath}");
+            }
+            builder.AppendLine();
+            builder.AppendLine("[Selection text]");
+            builder.Append(selectedText);
+            return builder.ToString();
         }
 
         private void WireEvents()
@@ -135,8 +206,6 @@ namespace TxtAIEditor.Controls
             try
             {
                 string workspaceContext = BuildWorkspaceContext();
-                string selectedText = _lastSelectionText;
-
                 var initialTranscriptBuilder = new StringBuilder();
                 if (_sessionHistory.Length > 0)
                 {
@@ -167,7 +236,7 @@ namespace TxtAIEditor.Controls
                     response = await _llmService.RunAgentAsync(
                         instruction,
                         transcript,
-                        _lastSelectionText,
+                        BuildActiveSelectionContext(),
                         "run",
                         async chunk =>
                         {
@@ -1210,9 +1279,10 @@ namespace TxtAIEditor.Controls
                 ? _getString("AgentNoActiveTab", "활성 탭 없음")
                 : Path.GetFileName(string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath);
 
-            string selectionPart = string.IsNullOrEmpty(_lastSelectionText)
+            string activeSelectionText = GetActiveSelectionText();
+            string selectionPart = string.IsNullOrEmpty(activeSelectionText)
                 ? _getString("AgentNoSelection", "선택 없음")
-                : string.Format(_getString("AgentSelectionStats", "선택 {0:N0}자"), _lastSelectionText.Length);
+                : string.Format(_getString("AgentSelectionStats", "선택 {0:N0}자"), activeSelectionText.Length);
 
             _agentPane.ContextStats.Text = string.Format(
                 _getString("AgentContextStatsFormat", "맥락: {0} · {1}"),
@@ -1241,7 +1311,7 @@ namespace TxtAIEditor.Controls
 
             string instruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
             string workspaceContext = BuildWorkspaceContext();
-            string selectedText = _lastSelectionText;
+            string selectedText = BuildActiveSelectionContext();
 
             var initialTranscriptBuilder = new StringBuilder();
             if (_sessionHistory.Length > 0)
