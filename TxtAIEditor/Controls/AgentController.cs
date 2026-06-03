@@ -1062,6 +1062,11 @@ namespace TxtAIEditor.Controls
 
         private void UpdateContextStats()
         {
+            if (_isRunning)
+            {
+                return;
+            }
+
             var activeTab = _activeTabProvider();
             string tabPart = activeTab == null
                 ? _getString("AgentNoActiveTab", "활성 탭 없음")

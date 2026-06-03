@@ -74,6 +74,7 @@ namespace TxtAIEditor.Controls
                 Interval = TimeSpan.FromMilliseconds(50)
             };
             _previewDebounceTimer.Tick += OnPreviewDebounceTimerTick;
+            _previewPane.RightTabs.SelectionChanged += OnRightTabsSelectionChanged;
         }
 
         private WebView2 PreviewWebView => _previewPane.PreviewWebViewControl;
@@ -146,6 +147,11 @@ namespace TxtAIEditor.Controls
             try
             {
                 if (PreviewWebView.CoreWebView2 == null)
+                {
+                    return;
+                }
+
+                if ((TabViewItem)_previewPane.RightTabs.SelectedItem != _previewPane.LivePreviewTabItem)
                 {
                     return;
                 }
@@ -293,6 +299,11 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if ((TabViewItem)_previewPane.RightTabs.SelectedItem != _previewPane.LivePreviewTabItem)
+            {
+                return;
+            }
+
             try
             {
                 if (PreviewWebView.CoreWebView2 == null)
@@ -316,6 +327,11 @@ namespace TxtAIEditor.Controls
 
         public void PostScrollSyncState(bool enabled)
         {
+            if ((TabViewItem)_previewPane.RightTabs.SelectedItem != _previewPane.LivePreviewTabItem)
+            {
+                return;
+            }
+
             try
             {
                 if (PreviewWebView.CoreWebView2 == null)
@@ -362,6 +378,14 @@ namespace TxtAIEditor.Controls
             if (_activeTabForPreview != null)
             {
                 Render(_activeTabForPreview);
+            }
+        }
+
+        private void OnRightTabsSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if ((TabViewItem)_previewPane.RightTabs.SelectedItem == _previewPane.LivePreviewTabItem)
+            {
+                RenderActiveTab();
             }
         }
 

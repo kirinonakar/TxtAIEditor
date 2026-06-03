@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -25,6 +26,7 @@ namespace TxtAIEditor.Controls
     {
         private int _outputLength;
         private string _rawOutputText = string.Empty;
+        private readonly List<string> _renderedLines = new List<string>();
 
         public string RawOutputText => _rawOutputText;
         public string SelectedOutputText => AgentOutputText.SelectedText;
@@ -457,16 +459,41 @@ namespace TxtAIEditor.Controls
 
         private void UpdateRichText(string rawText)
         {
-            AgentOutputText.Blocks.Clear();
-
             string normalized = (rawText ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
             string[] lines = normalized.Split('\n');
 
-            foreach (var line in lines)
+            // Adjust the number of blocks in AgentOutputText and cache to match lines.Length
+            while (AgentOutputText.Blocks.Count > lines.Length)
             {
-                var paragraph = new Paragraph();
-                ParseLineToInlines(line, paragraph.Inlines);
-                AgentOutputText.Blocks.Add(paragraph);
+                AgentOutputText.Blocks.RemoveAt(AgentOutputText.Blocks.Count - 1);
+            }
+            while (_renderedLines.Count > lines.Length)
+            {
+                _renderedLines.RemoveAt(_renderedLines.Count - 1);
+            }
+
+            while (AgentOutputText.Blocks.Count < lines.Length)
+            {
+                AgentOutputText.Blocks.Add(new Paragraph());
+            }
+            while (_renderedLines.Count < lines.Length)
+            {
+                _renderedLines.Add(null!);
+            }
+
+            // Update only the changed lines
+            for (int k = 0; k < lines.Length; k++)
+            {
+                string line = lines[k];
+                if (_renderedLines[k] != line)
+                {
+                    if (AgentOutputText.Blocks[k] is Paragraph paragraph)
+                    {
+                        paragraph.Inlines.Clear();
+                        ParseLineToInlines(line, paragraph.Inlines);
+                    }
+                    _renderedLines[k] = line;
+                }
             }
         }
 
