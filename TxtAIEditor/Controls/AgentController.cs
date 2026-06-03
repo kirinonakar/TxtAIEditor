@@ -525,6 +525,15 @@ namespace TxtAIEditor.Controls
                         "overwrite_file" => await _fileTools.OverwriteFileAsync(
                             GetPathArgument(arguments),
                             GetFirstStringArgument(arguments, "content", "newText", "new_text", "text")),
+                        "replace_range" => await _fileTools.ReplaceRangeAsync(
+                            GetPathArgument(arguments),
+                            GetIntArgument(arguments, "startLine", 1),
+                            GetIntArgument(arguments, "endLine", 1),
+                            GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
+                            GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected")),
+                        "apply_patch" => await _fileTools.ApplyPatchAsync(
+                            GetPathArgument(arguments),
+                            GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content")),
                         "insert_text" => await InsertTextToolAsync(
                             GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
                         "web_search_exa" => await _llmService.SearchExaAsync(
@@ -592,6 +601,14 @@ namespace TxtAIEditor.Controls
                     GetStringArgument(arguments, "path")),
                 "replace_in_file" => string.Format(
                     _getString("AgentActivityReplaceFileFormat", "파일 수정 중: {0}"),
+                    GetStringArgument(arguments, "path")),
+                "replace_range" => string.Format(
+                    _getString("AgentActivityReplaceRangeFormat", "파일 범위 수정 중: {0} ({1}줄부터 {2}줄)"),
+                    GetStringArgument(arguments, "path"),
+                    GetIntArgument(arguments, "startLine", 1),
+                    GetIntArgument(arguments, "endLine", 1)),
+                "apply_patch" => string.Format(
+                    _getString("AgentActivityApplyPatchFormat", "파일 패치 적용 중: {0}"),
                     GetStringArgument(arguments, "path")),
                 "overwrite_file" => string.Format(
                     _getString("AgentActivityOverwriteFileFormat", "파일 덮어쓰는 중: {0}"),
@@ -1012,6 +1029,8 @@ namespace TxtAIEditor.Controls
                 "fetch_exa" => "web_fetch_exa",
                 "exa_fetch" => "web_fetch_exa",
                 "fetch" => "web_fetch_exa",
+                "patch" => "apply_patch",
+                "apply_diff" => "apply_patch",
                 _ => normalized
             };
         }

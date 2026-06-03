@@ -289,6 +289,247 @@ namespace TxtAIEditor.Controls
             return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
 
+        public async Task<string> ReplaceRangeAsync(string path, int startLine, int endLine, string newText, string? expectedSnippet)
+        {
+            string fullPath = ResolveInsideWorkspace(path);
+            if (!File.Exists(fullPath))
+            {
+                return $"replace_range failed: file not found: {path}";
+            }
+
+            string content = NormalizeNewlines(await File.ReadAllTextAsync(fullPath));
+            string[] lines = content.Split('\n');
+
+            if (startLine < 1 || startLine > lines.Length)
+            {
+                return $"replace_range failed: startLine {startLine} is out of bounds (1-{lines.Length}).";
+            }
+            if (endLine < startLine || endLine > lines.Length)
+            {
+                return $"replace_range failed: endLine {endLine} is out of bounds (startLine-{lines.Length}).";
+            }
+
+            var targetLines = new List<string>();
+            for (int i = startLine - 1; i <= endLine - 1; i++)
+            {
+                targetLines.Add(lines[i]);
+            }
+            string targetText = string.Join("\n", targetLines);
+
+            if (!string.IsNullOrEmpty(expectedSnippet))
+            {
+                string normalizedExpected = NormalizeNewlines(expectedSnippet);
+                if (!targetText.Contains(normalizedExpected, StringComparison.Ordinal))
+                {
+                    return $"replace_range failed: expectedSnippet was not found in the target line range ({startLine}-{endLine}).";
+                }
+            }
+
+            var beforeLines = lines.Take(startLine - 1);
+            var afterLines = lines.Skip(endLine);
+            string updated = string.Join("\n", beforeLines);
+            if (startLine - 1 > 0)
+            {
+                updated += "\n";
+            }
+            updated += NormalizeNewlines(newText);
+            if (afterLines.Any())
+            {
+                updated += "\n" + string.Join("\n", afterLines);
+            }
+
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "replace_range",
+                RelativePath = RelativePath(ResolveWorkspaceRoot(), fullPath),
+                FullPath = fullPath,
+                OldContent = content,
+                NewContent = updated
+            };
+
+            if (!await ConfirmEditAsync(preview))
+            {
+                return $"replace_range cancelled: {path}";
+            }
+
+            await File.WriteAllTextAsync(fullPath, updated);
+            await NotifyFileModifiedAsync(fullPath);
+            return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
+        }
+
+        private class PatchHunk
+        {
+            public int OldStart { get; set; }
+            public int OldCount { get; set; }
+            public int NewStart { get; set; }
+            public int NewCount { get; set; }
+            public List<string> Lines { get; } = new List<string>();
+        }
+
+        public async Task<string> ApplyPatchAsync(string path, string patchText)
+        {
+            string fullPath = ResolveInsideWorkspace(path);
+            if (!File.Exists(fullPath))
+            {
+                return $"apply_patch failed: file not found: {path}";
+            }
+
+            if (string.IsNullOrWhiteSpace(patchText))
+            {
+                return "apply_patch failed: patch content is empty.";
+            }
+
+            string content = NormalizeNewlines(await File.ReadAllTextAsync(fullPath));
+            List<string> lines = content.Split('\n').ToList();
+
+            string[] patchLines = NormalizeNewlines(patchText).Split('\n');
+            var hunkHeaderRegex = new Regex(@"^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@", RegexOptions.Compiled);
+            var hunks = new List<PatchHunk>();
+            PatchHunk? currentHunk = null;
+
+            foreach (string line in patchLines)
+            {
+                var match = hunkHeaderRegex.Match(line);
+                if (match.Success)
+                {
+                    int oldStart = int.Parse(match.Groups[1].Value);
+                    int oldCount = match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 1;
+                    int newStart = int.Parse(match.Groups[3].Value);
+                    int newCount = match.Groups[4].Success ? int.Parse(match.Groups[4].Value) : 1;
+
+                    currentHunk = new PatchHunk
+                    {
+                        OldStart = oldStart,
+                        OldCount = oldCount,
+                        NewStart = newStart,
+                        NewCount = newCount
+                    };
+                    hunks.Add(currentHunk);
+                }
+                else if (currentHunk != null)
+                {
+                    if (line.StartsWith('+') || line.StartsWith('-') || line.StartsWith(' '))
+                    {
+                        currentHunk.Lines.Add(line);
+                    }
+                }
+            }
+
+            if (hunks.Count == 0)
+            {
+                return "apply_patch failed: no valid hunks found in patch.";
+            }
+
+            // Apply hunks in descending order of OldStart to avoid line shifts
+            var sortedHunks = hunks.OrderByDescending(h => h.OldStart).ToList();
+            foreach (var hunk in sortedHunks)
+            {
+                int matchIndex = FindHunkMatch(lines, hunk);
+                if (matchIndex < 0)
+                {
+                    return $"apply_patch failed: could not match hunk starting at line {hunk.OldStart} in file {path}.";
+                }
+
+                int fileLinesConsumed = 0;
+                var replacementLines = new List<string>();
+                foreach (string hunkLine in hunk.Lines)
+                {
+                    if (hunkLine.StartsWith(' '))
+                    {
+                        replacementLines.Add(hunkLine.Substring(1));
+                        fileLinesConsumed++;
+                    }
+                    else if (hunkLine.StartsWith('-'))
+                    {
+                        fileLinesConsumed++;
+                    }
+                    else if (hunkLine.StartsWith('+'))
+                    {
+                        replacementLines.Add(hunkLine.Substring(1));
+                    }
+                }
+
+                lines.RemoveRange(matchIndex, fileLinesConsumed);
+                lines.InsertRange(matchIndex, replacementLines);
+            }
+
+            string updated = string.Join("\n", lines);
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "apply_patch",
+                RelativePath = RelativePath(ResolveWorkspaceRoot(), fullPath),
+                FullPath = fullPath,
+                OldContent = content,
+                NewContent = updated
+            };
+
+            if (!await ConfirmEditAsync(preview))
+            {
+                return $"apply_patch cancelled: {path}";
+            }
+
+            await File.WriteAllTextAsync(fullPath, updated);
+            await NotifyFileModifiedAsync(fullPath);
+            return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
+        }
+
+        private int FindHunkMatch(List<string> lines, PatchHunk hunk)
+        {
+            int expectedIdx = hunk.OldStart - 1;
+            if (expectedIdx >= 0 && expectedIdx < lines.Count && IsHunkMatch(lines, expectedIdx, hunk))
+            {
+                return expectedIdx;
+            }
+
+            int maxWindow = 200;
+            for (int offset = 1; offset <= maxWindow; offset++)
+            {
+                int up = expectedIdx - offset;
+                if (up >= 0 && up < lines.Count && IsHunkMatch(lines, up, hunk))
+                {
+                    return up;
+                }
+                int down = expectedIdx + offset;
+                if (down >= 0 && down < lines.Count && IsHunkMatch(lines, down, hunk))
+                {
+                    return down;
+                }
+            }
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (Math.Abs(i - expectedIdx) > maxWindow && IsHunkMatch(lines, i, hunk))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private bool IsHunkMatch(List<string> lines, int fileIndex, PatchHunk hunk)
+        {
+            int fileLineIdx = fileIndex;
+            foreach (string hunkLine in hunk.Lines)
+            {
+                if (hunkLine.StartsWith(' ') || hunkLine.StartsWith('-'))
+                {
+                    if (fileLineIdx >= lines.Count)
+                    {
+                        return false;
+                    }
+                    string expectedText = hunkLine.Substring(1);
+                    if (lines[fileLineIdx] != expectedText)
+                    {
+                        return false;
+                    }
+                    fileLineIdx++;
+                }
+            }
+            return true;
+        }
+
+
         public async Task<string> OverwriteFileAsync(string path, string content)
         {
             string fullPath = ResolveInsideWorkspace(path);

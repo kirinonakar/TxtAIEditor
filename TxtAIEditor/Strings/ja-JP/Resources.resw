@@ -1422,6 +1422,12 @@
   <data name="AgentActivityReplaceFileFormat" xml:space="preserve">
     <value>ファイルの修正中: {0}</value>
   </data>
+  <data name="AgentActivityReplaceRangeFormat" xml:space="preserve">
+    <value>ファイルの範囲を修正中: {0} ({1}行目から{2}行目)</value>
+  </data>
+  <data name="AgentActivityApplyPatchFormat" xml:space="preserve">
+    <value>ファイルにパッチを適用中: {0}</value>
+  </data>
   <data name="AgentActivityOverwriteFileFormat" xml:space="preserve">
     <value>ファイルの上書き中: {0}</value>
   </data>
