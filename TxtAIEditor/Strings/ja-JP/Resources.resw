@@ -1524,4 +1524,16 @@
   <data name="AgentDiffConfirmDescriptionDefault" xml:space="preserve">
     <value>ファイルを修正しますか？</value>
   </data>
+  <data name="SettingsExaApiKey" xml:space="preserve">
+    <value>Exa API Key (ウェブ検索用)</value>
+  </data>
+  <data name="SettingsExaApiKeyPlaceholder" xml:space="preserve">
+    <value>Exa API Keyを入力 (空欄の場合は保存されたKeyを削除)</value>
+  </data>
+  <data name="SettingsExaApiKeyInfo" xml:space="preserve">
+    <value>Exa API KeyはAgentのウェブ検索(Exa)機能に使用され、Windows資格情報マネージャーに安全に保存されます。</value>
+  </data>
+  <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
+    <value>Exaウェブ検索中: {0}</value>
+  </data>
 </root>

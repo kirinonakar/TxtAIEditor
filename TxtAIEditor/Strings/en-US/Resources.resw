@@ -1523,4 +1523,16 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentDiffConfirmDescriptionDefault" xml:space="preserve">
     <value>Do you want to modify the file?</value>
   </data>
+  <data name="SettingsExaApiKey" xml:space="preserve">
+    <value>Exa API Key (for web search)</value>
+  </data>
+  <data name="SettingsExaApiKeyPlaceholder" xml:space="preserve">
+    <value>Enter Exa API Key (leave empty to delete)</value>
+  </data>
+  <data name="SettingsExaApiKeyInfo" xml:space="preserve">
+    <value>The Exa API Key is used for the Agent's web search (Exa) function and is securely stored in the Windows Credential Manager.</value>
+  </data>
+  <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
+    <value>Exa web searching: {0}</value>
+  </data>
 </root>

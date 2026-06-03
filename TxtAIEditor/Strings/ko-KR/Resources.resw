@@ -1523,4 +1523,16 @@
   <data name="AgentDiffConfirmDescriptionDefault" xml:space="preserve">
     <value>파일을 수정하시겠습니까?</value>
   </data>
+  <data name="SettingsExaApiKey" xml:space="preserve">
+    <value>Exa API Key (웹 검색 기능용)</value>
+  </data>
+  <data name="SettingsExaApiKeyPlaceholder" xml:space="preserve">
+    <value>Exa API Key 입력 (비워두면 저장된 Key 삭제)</value>
+  </data>
+  <data name="SettingsExaApiKeyInfo" xml:space="preserve">
+    <value>Exa API Key는 Agent의 웹 검색(Exa) 기능에 사용되며, Windows 자격 증명 관리자에 안전하게 저장됩니다.</value>
+  </data>
+  <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
+    <value>Exa 웹 검색 중: {0}</value>
+  </data>
 </root>
