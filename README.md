@@ -83,8 +83,9 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Context Actions:** Quick AI actions (Explain, Refactor, Summarize, Fix) on selected text.
 
 ### 🤖 AI Agent
-*   Solve complex, multi-step coding tasks automatically by allowing the AI assistant to run workspace tools (file search, read/write, and terminal command execution).
+*   Solve complex, multi-step coding tasks automatically by allowing the AI assistant to run workspace tools (file search, read/write, terminal command execution, and web search/retrieval).
     *   **Git Repository Requirement:** Agent mode can only be activated and used inside a directory containing a Git repository (`.git`).
+    *   **Exa Web Search & Fetch:** Supports real-time web search and webpage content extraction powered by the Exa API or Exa MCP server, allowing the agent to find live documentation, code samples, and up-to-date information. (Configurable via Exa API Key and Endpoint in the settings).
     *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`) and [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`).
 
 ### 💻 Terminal
