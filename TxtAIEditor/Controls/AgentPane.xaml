@@ -110,42 +110,8 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="4" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBox x:Name="AgentPromptInput"
-                     Grid.Column="0"
-                     PlaceholderText="Agent에게 맡길 작업 입력..."
-                     MinHeight="72"
-                     MaxHeight="120"
-                     FontSize="12"
-                     FontFamily="Segoe UI, Malgun Gothic"
-                     TextWrapping="Wrap"
-                     AcceptsReturn="True"
-                     Padding="10,8,10,8"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                     IsSpellCheckEnabled="False"
-                     IsTextPredictionEnabled="False"
-                     KeyDown="OnPromptInputKeyDown">
-                <TextBox.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="Enter"
-                                         Modifiers="Control"
-                                         Invoked="OnPromptRunKeyboardAcceleratorInvoked"/>
-                </TextBox.KeyboardAccelerators>
-            </TextBox>
-            <Button x:Name="AgentRunButton"
-                    Grid.Column="1"
-                    Content="실행"
-                    Width="64"
-                    VerticalAlignment="Stretch"
-                    Click="OnRunClick"
-                    Style="{StaticResource AccentButtonStyle}"/>
-        </Grid>
-
         <Border x:Name="AgentDiffConfirmPanel"
-                Grid.Row="5"
+                Grid.Row="4"
                 Background="{ThemeResource ToolbarBackgroundBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="1"
@@ -186,6 +152,40 @@
                 </Grid>
             </StackPanel>
         </Border>
+
+        <Grid Grid.Row="5" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="AgentPromptInput"
+                     Grid.Column="0"
+                     PlaceholderText="Agent에게 맡길 작업 입력..."
+                     MinHeight="72"
+                     MaxHeight="120"
+                     FontSize="12"
+                     FontFamily="Segoe UI, Malgun Gothic"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     Padding="10,8,10,8"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     IsSpellCheckEnabled="False"
+                     IsTextPredictionEnabled="False"
+                     KeyDown="OnPromptInputKeyDown">
+                <TextBox.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="Enter"
+                                         Modifiers="Control"
+                                         Invoked="OnPromptRunKeyboardAcceleratorInvoked"/>
+                </TextBox.KeyboardAccelerators>
+            </TextBox>
+            <Button x:Name="AgentRunButton"
+                    Grid.Column="1"
+                    Content="실행"
+                    Width="64"
+                    VerticalAlignment="Stretch"
+                    Click="OnRunClick"
+                    Style="{StaticResource AccentButtonStyle}"/>
+        </Grid>
 
         <Border x:Name="AgentActivityPanel"
                 Grid.Row="6"
