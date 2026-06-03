@@ -428,7 +428,7 @@ namespace TxtAIEditor.Controls
         {
             string modeText = _getString("AgentModeRun", "실행");
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            return $"===== {timestamp}  Agent {modeText}: {TruncateForActivity(instruction)} =====";
+            return $"{timestamp}  Agent {modeText}: {TruncateForActivity(instruction)}";
         }
 
         private string BuildWorkspaceContext()
