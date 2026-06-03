@@ -1012,6 +1012,23 @@ namespace TxtAIEditor
             EditorDocumentSession session,
             bool isReadOnly)
         {
+            editorWebView.GotFocus += (sender, args) =>
+            {
+                this.DispatcherQueue.TryEnqueue(() =>
+                {
+                    var ownerTabView = GetTabViewForTabItem(tabItem);
+                    if (ownerTabView != null)
+                    {
+                        if (EditorWorkspace.ActiveTabView != ownerTabView || !ReferenceEquals(ownerTabView.SelectedItem, tabItem))
+                        {
+                            EditorWorkspace.ActiveTabView = ownerTabView;
+                            ownerTabView.SelectedItem = tabItem;
+                            _tabSelectionController.QueueChanged(ownerTabView, tabItem);
+                        }
+                    }
+                });
+            };
+
             bridge.ShortcutPressed += (shortcutName) =>
             {
                 this.DispatcherQueue.TryEnqueue(() =>
@@ -1245,6 +1262,16 @@ namespace TxtAIEditor
 
             bridge.CursorChanged += (line, col) =>
             {
+                var ownerTabView = GetTabViewForTab(tab);
+                if (ownerTabView != null && EditorWorkspace.ActiveTabView != ownerTabView)
+                {
+                    EditorWorkspace.ActiveTabView = ownerTabView;
+                    if (ownerTabView.SelectedItem is TabViewItem activeTabItem)
+                    {
+                        _tabSelectionController.QueueChanged(ownerTabView, activeTabItem);
+                    }
+                }
+
                 if (GetActiveTab() == tab)
                 {
                     _statusBarController.SetCursorPosition(line, col);
@@ -1254,10 +1281,20 @@ namespace TxtAIEditor
 
             bridge.SelectionReceived += (selectedText) =>
             {
-                _llmAssistantController.SetSelectionText(selectedText);
-                _agentController.SetSelectionText(selectedText);
+                var ownerTabView = GetTabViewForTab(tab);
+                if (ownerTabView != null && EditorWorkspace.ActiveTabView != ownerTabView)
+                {
+                    EditorWorkspace.ActiveTabView = ownerTabView;
+                    if (ownerTabView.SelectedItem is TabViewItem activeTabItem)
+                    {
+                        _tabSelectionController.QueueChanged(ownerTabView, activeTabItem);
+                    }
+                }
+
                 if (GetActiveTab() == tab)
                 {
+                    _llmAssistantController.SetSelectionText(selectedText);
+                    _agentController.SetSelectionText(selectedText);
                     if (string.IsNullOrEmpty(selectedText))
                     {
                         SelectionStatsText.Text = GetLocalizedString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");
@@ -2716,6 +2753,13 @@ namespace TxtAIEditor
         private bool IsTabOpen(OpenedTab tab)
         {
             return IsTabInTabView(EditorTabView, tab.Id) || IsTabInTabView(EditorTabView2, tab.Id);
+        }
+
+        private TabView? GetTabViewForTab(OpenedTab tab)
+        {
+            if (IsTabInTabView(EditorTabView, tab.Id)) return EditorTabView;
+            if (IsTabInTabView(EditorTabView2, tab.Id)) return EditorTabView2;
+            return null;
         }
 
         private TabView? GetTabViewForTabItem(TabViewItem tabItem)
