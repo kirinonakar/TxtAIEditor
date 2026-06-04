@@ -2290,8 +2290,15 @@ namespace TxtAIEditor
                 settings,
                 AppWindow,
                 Content as FrameworkElement,
-                MarkdownToolbar.SetToolbarBackground);
+                ApplyMarkdownToolbarBackground);
             ApplyEditorSurfaceBackground(settings);
+        }
+
+        private void ApplyMarkdownToolbarBackground(Windows.UI.Color color)
+        {
+            var brush = new Microsoft.UI.Xaml.Media.SolidColorBrush(color);
+            MarkdownToolbarHost.Background = brush;
+            MarkdownToolbar.SetToolbarBackground(color);
         }
 
         private void ApplyToolbarSettings(EditorSettings settings)

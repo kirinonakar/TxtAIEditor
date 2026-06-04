@@ -43,7 +43,8 @@
         <!-- 1. Top Command Toolbar (상단 툴바) -->
         <controls:TopCommandBarPane x:Name="TopToolbar" Grid.Row="1"/>
 
-        <Grid Grid.Row="2"
+        <Grid x:Name="MarkdownToolbarHost"
+              Grid.Row="2"
               Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding Width, ElementName=ExplorerColumn}"/>
