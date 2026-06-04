@@ -62,13 +62,13 @@
                                 <!-- Preview Toolbar -->
                                 <Border Grid.Row="0" BorderBrush="{ThemeResource ToolbarBorderBrush}" BorderThickness="0,0,0,1" Background="{ThemeResource ToolbarBackgroundBrush}">
                                     <StackPanel Orientation="Horizontal" Margin="10,4,0,4" Spacing="10" VerticalAlignment="Center">
-                                        <ComboBox x:Name="PreviewModeCombo" SelectedIndex="0" Height="24" Padding="5,0,5,0" Width="120" FontSize="11" SelectionChanged="OnPreviewModeComboSelectionChanged">
+                                        <controls:FixedCursorComboBox x:Name="PreviewModeCombo" SelectedIndex="0" Height="24" Padding="5,0,5,0" Width="120" FontSize="11" SelectionChanged="OnPreviewModeComboSelectionChanged">
                                             <ComboBoxItem x:Name="ComboItemMarkdown" Content="Markdown"/>
                                             <ComboBoxItem x:Name="ComboItemHtml" Content="HTML Preview"/>
                                             <ComboBoxItem x:Name="ComboItemLatex" Content="LaTeX Block"/>
                                             <ComboBoxItem x:Name="ComboItemAozora" Content="Aozora"/>
                                             <ComboBoxItem x:Name="ComboItemCsv" Content="CSV Table"/>
-                                        </ComboBox>
+                                        </controls:FixedCursorComboBox>
                                         <Button x:Name="OpenBrowserButton" Click="OnOpenPreviewInBrowserClick" Height="24" Padding="8,0,8,0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="HTML 미리보기를 브라우저로 열기">
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <FontIcon Glyph="&#xE774;" FontSize="12"/>

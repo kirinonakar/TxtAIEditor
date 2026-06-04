@@ -31,7 +31,9 @@ namespace TxtAIEditor
 
             this.PointerEntered += CustomSplitter_PointerEntered;
             this.PointerExited += CustomSplitter_PointerExited;
+            this.PointerCaptureLost += CustomSplitter_PointerCaptureLost;
             this.Loaded += CustomSplitter_Loaded;
+            this.Unloaded += CustomSplitter_Unloaded;
             this.SizeChanged += CustomSplitter_SizeChanged;
             this.ActualThemeChanged += CustomSplitter_ActualThemeChanged;
         }
@@ -84,6 +86,21 @@ namespace TxtAIEditor
         }
 
         private void CustomSplitter_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            ClearPointerState();
+        }
+
+        private void CustomSplitter_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+        {
+            ClearPointerState();
+        }
+
+        private void CustomSplitter_Unloaded(object sender, RoutedEventArgs e)
+        {
+            ClearPointerState();
+        }
+
+        private void ClearPointerState()
         {
             _isPointerOver = false;
             this.ProtectedCursor = null;
