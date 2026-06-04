@@ -29,6 +29,8 @@ namespace TxtAIEditor.Core.Services
                 changed |= RegisterFileType(".txt", "TxtAIEditor.txt", "Text Document", executablePath);
                 changed |= RegisterFileType(".md", "TxtAIEditor.md", "Markdown Document", executablePath);
                 changed |= RegisterFileType(".csv", "TxtAIEditor.csv", "CSV Document", executablePath);
+                changed |= RegisterFileType(".yaml", "TxtAIEditor.yaml", "YAML Document", executablePath);
+                changed |= RegisterFileType(".yml", "TxtAIEditor.yml", "YAML Document", executablePath);
 
                 if (IsRunningPackaged())
                 {
@@ -73,6 +75,8 @@ namespace TxtAIEditor.Core.Services
             changed |= SetValueIfDifferent(supportedTypesKey, ".txt", string.Empty, RegistryValueKind.String);
             changed |= SetValueIfDifferent(supportedTypesKey, ".md", string.Empty, RegistryValueKind.String);
             changed |= SetValueIfDifferent(supportedTypesKey, ".csv", string.Empty, RegistryValueKind.String);
+            changed |= SetValueIfDifferent(supportedTypesKey, ".yaml", string.Empty, RegistryValueKind.String);
+            changed |= SetValueIfDifferent(supportedTypesKey, ".yml", string.Empty, RegistryValueKind.String);
 
             using RegistryKey capabilitiesKey = appKey.CreateSubKey("Capabilities");
             changed |= SetValueIfDifferent(capabilitiesKey, "ApplicationName", AppName, RegistryValueKind.String);
@@ -82,6 +86,8 @@ namespace TxtAIEditor.Core.Services
             changed |= SetValueIfDifferent(fileAssociationsKey, ".txt", "TxtAIEditor.txt", RegistryValueKind.String);
             changed |= SetValueIfDifferent(fileAssociationsKey, ".md", "TxtAIEditor.md", RegistryValueKind.String);
             changed |= SetValueIfDifferent(fileAssociationsKey, ".csv", "TxtAIEditor.csv", RegistryValueKind.String);
+            changed |= SetValueIfDifferent(fileAssociationsKey, ".yaml", "TxtAIEditor.yaml", RegistryValueKind.String);
+            changed |= SetValueIfDifferent(fileAssociationsKey, ".yml", "TxtAIEditor.yml", RegistryValueKind.String);
 
             using RegistryKey registeredAppsKey = Registry.CurrentUser.CreateSubKey(RegisteredApplicationsPath);
             changed |= SetValueIfDifferent(registeredAppsKey, AppName, ApplicationRegistryPath + @"\Capabilities", RegistryValueKind.String);

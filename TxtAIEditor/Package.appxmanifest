@@ -86,6 +86,15 @@
             </uap:SupportedFileTypes>
           </uap:FileTypeAssociation>
         </uap:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="txtaieditor.yaml">
+            <uap:DisplayName>TxtAIEditor YAML</uap:DisplayName>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.yaml</uap:FileType>
+              <uap:FileType>.yml</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
         <desktop4:Extension Category="windows.fileExplorerContextMenus">
           <desktop4:FileExplorerContextMenus>
             <desktop4:ItemType Type="*">

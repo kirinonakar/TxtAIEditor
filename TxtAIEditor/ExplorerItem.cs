@@ -63,6 +63,8 @@ namespace TxtAIEditor
                 ".xaml" => "\uF158",
                 ".xml" => "\uF158",
                 ".json" => "\uE94A",
+                ".yaml" => "\uE94A",
+                ".yml" => "\uE94A",
                 ".png" => "\uEB9F", // Picture icon
                 ".jpg" => "\uEB9F",
                 ".jpeg" => "\uEB9F",
