@@ -4,14 +4,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.Web.WebView2.Core;
 using WinRT.Interop;
 using TxtAIEditor.Core.Interfaces;
@@ -51,6 +48,9 @@ namespace TxtAIEditor
         private readonly FavoritesRecentController _favoritesRecentController;
         private readonly ExplorerFileActionsController _explorerFileActionsController;
         private readonly TabContextMenuController _tabContextMenuController;
+        private readonly TabEncryptionController _tabEncryptionController;
+        private readonly EditorTabViewItemFactory _editorTabViewItemFactory;
+        private readonly EditorTabDocumentFactory _editorTabDocumentFactory;
         private readonly FileOpenDropController _fileOpenDropController;
         private readonly RootKeyboardShortcutController _rootKeyboardShortcutController;
         private readonly SnippetsController _snippetsController;
@@ -68,10 +68,11 @@ namespace TxtAIEditor
         private readonly SplitImeSyncController _splitImeSyncController;
         private readonly TabSaveController _tabSaveController;
         private readonly AutoSaveController _autoSaveController;
-        private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
+        private readonly FileTabLoadController _fileTabLoadController;
         private readonly TerminalPanelController _terminalPanelController;
         private readonly ExplorerNavigationController _explorerNavigationController;
         private readonly UnsavedChangesDialogService _unsavedChangesDialogService;
+        private readonly WindowDialogController _dialogController;
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private string _currentFolderPath = string.Empty;
         private string _currentRepoPath = string.Empty;
@@ -145,6 +146,8 @@ namespace TxtAIEditor
             _settingsDialogService = new SettingsDialogService(_llmService);
             _uiPersonalizationService = new UiPersonalizationService();
             _localizationService = new ResourceLocalizationService(_settingsService);
+            _editorTabViewItemFactory = new EditorTabViewItemFactory(_localizationService);
+            _editorTabDocumentFactory = new EditorTabDocumentFactory(_languageDetectionService, GetLocalizedString);
             _explorerDirectoryService = new ExplorerDirectoryService();
             _secureNoteEncryptionService = new SecureNoteEncryptionService();
             var fileSaveDialogService = new FileSaveDialogService();
@@ -160,6 +163,18 @@ namespace TxtAIEditor
                 PreviewGrid);
             _terminalShortcutService = new TerminalShortcutService(WindowNative.GetWindowHandle(this));
             _terminalShortcutService.ToggleRequested += (_, _) => ToggleTerminal();
+            _dialogController = new WindowDialogController(
+                () => this.Content.XamlRoot,
+                GetCurrentElementTheme,
+                () => EditorWorkspace.IsTerminalVisible,
+                () => TerminalPane.SuspendNativeWindows(),
+                () => TerminalPane.ResumeNativeWindows());
+            _tabEncryptionController = new TabEncryptionController(
+                GetLocalizedString,
+                _dialogController.WaitForDialogXamlRootAsync,
+                GetCurrentElementTheme,
+                UpdateWindowTitle,
+                _dialogController.ShowErrorMessage);
             _stickyNoteModeController = new StickyNoteModeController(
                 this,
                 AppTitleBar,
@@ -208,7 +223,7 @@ namespace TxtAIEditor
                 NormalizeWebMessageJson,
                 HandleWebViewShortcut,
                 SyncPreviewScrollToEditors,
-                ShowErrorMessage);
+                _dialogController.ShowErrorMessage);
             _splitImeSyncController = new SplitImeSyncController(
                 _tabBridges,
                 _editorSessions,
@@ -235,7 +250,7 @@ namespace TxtAIEditor
                 GetSearchRoot,
                 GetLargeFileThresholdBytes,
                 () => this.Content.XamlRoot,
-                ShowErrorMessage,
+                _dialogController.ShowErrorMessage,
                 LoadFileIntoTabAndHighlightAsync,
                 RefreshGitStatusUIAsync,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
@@ -251,7 +266,7 @@ namespace TxtAIEditor
                 () => this.Content.XamlRoot,
                 GetLocalizedString,
                 IsGitNotDetectedText,
-                ShowErrorMessage,
+                _dialogController.ShowErrorMessage,
                 () => _gitAutoRefreshTimer.Start(),
                 _compareTabController.OpenCompareTabAsync,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
@@ -262,6 +277,27 @@ namespace TxtAIEditor
                 _gitAutoRefreshTimer,
                 () => _currentRepoPath,
                 _gitPanelController.RefreshAsync);
+            _fileTabLoadController = new FileTabLoadController(
+                _gitService,
+                _secureNoteEncryptionService,
+                _viewModel,
+                EditorTabView,
+                EditorTabView2,
+                _tabBridges,
+                path => CurrentRepoPath = path,
+                GetLocalizedString,
+                _tabEncryptionController.PromptPasswordAsync,
+                request => OpenNewTab(
+                    request.FilePath,
+                    request.Content,
+                    request.IsReadOnly,
+                    request.EncodingName,
+                    request.EncodingWasAutoDetected,
+                    request.TextModel,
+                    request.IsEncrypted,
+                    request.EncryptionPassword),
+                QueueGitStatusRefresh,
+                _dialogController.ShowErrorMessage);
             _explorerNavigationController = new ExplorerNavigationController(
                 LeftSidebarTabView,
                 _viewModel,
@@ -283,7 +319,7 @@ namespace TxtAIEditor
                 callback => DispatcherQueue.TryEnqueue(() => callback()),
                 NavigateExplorerToFolderAsync,
                 LoadFileIntoTabAsync,
-                ShowErrorMessage);
+                _dialogController.ShowErrorMessage);
             _tabSaveController = new TabSaveController(
                 this,
                 _fileService,
@@ -303,7 +339,7 @@ namespace TxtAIEditor
                 () => _currentFolderPath,
                 LoadDirectoryRoot,
                 GetLocalizedString,
-                ShowErrorMessage);
+                _dialogController.ShowErrorMessage);
             _autoSaveController = new AutoSaveController(
                 _viewModel,
                 () => _settingsService.CurrentSettings,
@@ -321,7 +357,7 @@ namespace TxtAIEditor
                 () => this.Content.XamlRoot,
                 GetCurrentElementTheme,
                 GetLocalizedString,
-                ShowErrorMessage,
+                _dialogController.ShowErrorMessage,
                 () => EditorWorkspace.IsTerminalVisible,
                 () => TerminalPane.SuspendNativeWindows(),
                 () => TerminalPane.ResumeNativeWindows());
@@ -332,9 +368,9 @@ namespace TxtAIEditor
                 NavigateExplorerToFolderAsync,
                 OnTabReloadAsync,
                 OnToggleTabLivePreview,
-                EncryptTabAsync,
-                ChangeTabEncryptionPasswordAsync,
-                RemoveTabEncryptionAsync,
+                _tabEncryptionController.EncryptAsync,
+                _tabEncryptionController.ChangePasswordAsync,
+                _tabEncryptionController.RemoveEncryptionAsync,
                 OnCloseRightTabs,
                 OnCloseLeftTabs,
                 OnCloseOtherTabs);
@@ -343,7 +379,7 @@ namespace TxtAIEditor
                 InitializePickerWindow,
                 LoadFileIntoTabAsync,
                 NavigateExplorerToFolderAsync,
-                ShowErrorMessage);
+                _dialogController.ShowErrorMessage);
             _rootKeyboardShortcutController = new RootKeyboardShortcutController(
                 () => OpenNewTab(),
                 ToggleLeftPanelAsync,
@@ -376,7 +412,7 @@ namespace TxtAIEditor
                 () => this.Content.XamlRoot,
                 InsertTextIntoActiveEditorAsync,
                 SyncSnippetsToOpenEditorsAsync,
-                ShowErrorMessage,
+                _dialogController.ShowErrorMessage,
                 GetLocalizedString,
                 InitializePickerWindow,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
@@ -390,7 +426,7 @@ namespace TxtAIEditor
                 GetActiveTab,
                 GetTabTextForLlmContext,
                 InsertTextIntoActiveEditorAsync,
-                ShowErrorMessage,
+                _dialogController.ShowErrorMessage,
                 GetLocalizedString,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
@@ -402,7 +438,7 @@ namespace TxtAIEditor
                 () => _viewModel.Tabs.ToList(),
                 GetTabTextForLlmContext,
                 InsertTextIntoActiveEditorAsync,
-                ShowErrorMessage,
+                _dialogController.ShowErrorMessage,
                 GetLocalizedString,
                 new AgentFileToolService(GetAgentWorkspaceRoot),
                 path => _gitService.FindRepositoryRoot(path) != null,
@@ -444,7 +480,7 @@ namespace TxtAIEditor
                 _tabBridges,
                 LoadFileIntoTabAsync,
                 InsertTextIntoActiveEditorAsync,
-                ShowErrorMessage);
+                _dialogController.ShowErrorMessage);
             _tabSelectionController = new TabSelectionController(
                 EditorWorkspace,
                 _viewModel,
@@ -790,7 +826,7 @@ namespace TxtAIEditor
                     OpenNewTab();
                 }
 
-                ShowErrorMessage("시작 파일 열기 실패", ex.Message);
+                _dialogController.ShowErrorMessage("시작 파일 열기 실패", ex.Message);
             }
         }
 
@@ -806,168 +842,47 @@ namespace TxtAIEditor
             bool isEncrypted = false,
             string? encryptionPassword = null)
         {
-            var tab = new OpenedTab();
-            tab.EncodingName = encodingName;
-            tab.EncodingWasAutoDetected = encodingWasAutoDetected;
-            tab.IsEncrypted = isEncrypted;
-            tab.EncryptionPassword = encryptionPassword;
-
-            // Auto-enforce read-only mode for .diff files
-            if (filePath != null && filePath.EndsWith(".diff", StringComparison.OrdinalIgnoreCase))
-            {
-                isReadOnly = true;
-            }
-
-            if (filePath != null)
-            {
-                tab.FilePath = filePath;
-                tab.Title = Path.GetFileName(filePath);
-                tab.Content = content;
-                tab.Language = _languageDetectionService.GetMonacoLanguageName(filePath);
-                if (File.Exists(filePath))
-                {
-                    _favoritesRecentController.AddRecentFile(filePath);
-                }
-            }
-            else
-            {
-                tab.Title = GetLocalizedString("UntitledNewTab", "제목 없음");
-                tab.Content = "";
-            }
-
-            var documentModel = textModel ?? LineArrayTextModel.FromText(content);
-            var session = new EditorDocumentSession(tab, documentModel);
+            var documentParts = _editorTabDocumentFactory.Create(
+                filePath,
+                content,
+                isReadOnly,
+                encodingName,
+                encodingWasAutoDetected,
+                textModel,
+                isEncrypted,
+                encryptionPassword);
+            var tab = documentParts.Tab;
+            var session = documentParts.Session;
+            isReadOnly = documentParts.IsReadOnly;
             _editorSessions[tab.Id] = session;
-            tab.OriginalContent = documentModel.GetText();
-            tab.OriginalLineEnding = documentModel.LineEnding;
-            tab.OriginalEncodingName = encodingName;
 
             _viewModel.Tabs.Add(tab);
+            if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
+            {
+                _favoritesRecentController.AddRecentFile(tab.FilePath);
+            }
 
             var settings = _settingsService.CurrentSettings;
             var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
             ApplyEditorSurfaceBackground(settings);
 
-            // Create host layout grid for standard WebView2 editor
-            var grid = new Grid
-            {
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(editorBgColor)
-            };
-            var editorWebView = new WebView2
-            {
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch,
-                DefaultBackgroundColor = editorBgColor,
-                Opacity = 0
-            };
-            var editorLoadCover = new Border
-            {
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(editorBgColor),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch,
-                IsHitTestVisible = false,
-                Tag = "EditorLoadCover"
-            };
-            grid.Children.Add(editorWebView);
-            grid.Children.Add(editorLoadCover);
-
-            // Instantiate TabViewItem XAML element
-            // Build tab header with dirty indicator as a red prefix dot
-            var dirtyIndicator = new TextBlock
-            {
-                Text = "●",
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 220, 60, 60)),
-                FontSize = 8,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Microsoft.UI.Xaml.Thickness(0, 0, 4, 0),
-                Visibility = Visibility.Collapsed,
-                Opacity = 1,
-                Transitions = new TransitionCollection()
-            };
-            var lockIcon = new FontIcon
-            {
-                Glyph = "\uE72E",
-                FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Microsoft.UI.Xaml.Thickness(0, 0, 6, 0),
-                Visibility = tab.IsEncrypted ? Visibility.Visible : Visibility.Collapsed,
-                Opacity = 1,
-                Transitions = new TransitionCollection()
-            };
-            ToolTipService.SetToolTip(lockIcon, GetLocalizedString("EncryptedTabTooltip", "암호화됨"));
-            lockIcon.RightTapped += (_, args) =>
-            {
-                args.Handled = true;
-                ShowTabEncryptionMenu(tab, lockIcon, args);
-            };
-            var titleText = new TextBlock
-            {
-                // Text를 먼저 직접 넣어 바인딩이 적용되기 전에도 탭 제목이 즉시 보이게 한다.
-                Text = tab.Title,
-                VerticalAlignment = VerticalAlignment.Center,
-                Opacity = 1,
-                Transitions = new TransitionCollection()
-            };
-            titleText.SetBinding(TextBlock.TextProperty, new Binding
-            {
-                Path = new PropertyPath("Title"),
-                Mode = BindingMode.OneWay,
-                Source = tab
-            });
-            var headerPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center,
-                Opacity = 1,
-                Transitions = new TransitionCollection()
-            };
-            headerPanel.Children.Add(lockIcon);
-            headerPanel.Children.Add(dirtyIndicator);
-            headerPanel.Children.Add(titleText);
-            // Track dirty state changes to update the indicator visibility
-            tab.PropertyChanged += (sender, args) =>
-            {
-                if (args.PropertyName == nameof(OpenedTab.IsDirty))
-                {
-                    dirtyIndicator.Visibility = tab.IsDirty ? Visibility.Visible : Visibility.Collapsed;
-                }
-                else if (args.PropertyName == nameof(OpenedTab.IsEncrypted))
-                {
-                    lockIcon.Visibility = tab.IsEncrypted ? Visibility.Visible : Visibility.Collapsed;
-                }
-            };
-            var tabItem = new TabViewItem
-            {
-                Content = grid,
-                Tag = tab.Id,
-                Header = headerPanel,
-                ContentTransitions = new TransitionCollection(),
-                Transitions = new TransitionCollection(),
-                Opacity = 1
-            };
             var targetTabView = GetCurrentActiveTabView();
-            tabItem.RightTapped += (_, args) => ShowTabContextMenu(tab, tabItem, targetTabView, tabItem, args);
+            var tabParts = _editorTabViewItemFactory.Create(
+                tab,
+                editorBgColor,
+                settings.UiFontFamily,
+                GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                _tabEncryptionController.ShowMenu,
+                (tabItem, args) => ShowTabContextMenu(tab, tabItem, targetTabView, tabItem, args));
+            _tabBridges[tab.Id] = (tabParts.WebView, tabParts.Bridge);
 
-            // Apply UI font directly to TabViewItem to guarantee visual style consistency
-            try
-            {
-                if (!string.IsNullOrEmpty(_settingsService.CurrentSettings.UiFontFamily))
-                {
-                    tabItem.FontFamily = new Microsoft.UI.Xaml.Media.FontFamily(_settingsService.CurrentSettings.UiFontFamily);
-                }
-            }
-            catch { }
-
-            var bridge = new MonacoBridge(editorWebView, _localizationService);
-            _tabBridges[tab.Id] = (editorWebView, bridge);
-
-            WireEditorBridge(bridge, editorWebView, editorLoadCover, tab, tabItem, session, isReadOnly);
+            WireEditorBridge(tabParts.Bridge, tabParts.WebView, tabParts.LoadCover, tab, tabParts.TabItem, session, isReadOnly);
 
             // 탭 헤더와 선택 상태를 먼저 UI에 올린다.
             // WebView2 초기화가 간헐적으로 UI 턴을 잡으면 파일 내용보다 탭 제목이 늦게 보이는 현상이 생길 수 있다.
             EditorWorkspace.DisableTabItemTransitions();
-            targetTabView.TabItems.Add(tabItem);
-            targetTabView.SelectedItem = tabItem;
+            targetTabView.TabItems.Add(tabParts.TabItem);
+            targetTabView.SelectedItem = tabParts.TabItem;
             EditorWorkspace.SetEditorSurfaceBackground(editorBgColor);
             EditorWorkspace.DisableTabItemTransitions();
             this.DispatcherQueue.TryEnqueue(
@@ -993,13 +908,13 @@ namespace TxtAIEditor
                 {
                     if (_tabBridges.ContainsKey(tab.Id))
                     {
-                        InitializeEditorWebView(editorWebView, bridge);
+                        InitializeEditorWebView(tabParts.WebView, tabParts.Bridge);
                     }
                 });
 
             if (!initQueued)
             {
-                InitializeEditorWebView(editorWebView, bridge);
+                InitializeEditorWebView(tabParts.WebView, tabParts.Bridge);
             }
 
             return tab;
@@ -1673,106 +1588,7 @@ namespace TxtAIEditor
 
         internal async Task LoadFileIntoTabAsync(string filePath)
         {
-            await _fileOpenSemaphore.WaitAsync();
-            try
-            {
-                string? repoRoot = _gitService.FindRepositoryRoot(Path.GetDirectoryName(filePath));
-                if (!string.IsNullOrEmpty(repoRoot))
-                {
-                    CurrentRepoPath = repoRoot;
-                }
-
-                // Check if file is already open in an existing tab
-                var existingTab = _viewModel.Tabs.FirstOrDefault(t => string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
-                if (existingTab != null)
-                {
-                    var tabItem = EditorTabView.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == existingTab.Id);
-                    if (tabItem != null)
-                    {
-                        EditorTabView.SelectedItem = tabItem;
-                    }
-                    else
-                    {
-                        tabItem = EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == existingTab.Id);
-                        if (tabItem != null)
-                        {
-                            EditorTabView2.SelectedItem = tabItem;
-                        }
-                    }
-
-                    if (tabItem != null)
-                    {
-                        if (_tabBridges.TryGetValue(existingTab.Id, out var bridgeGroup))
-                        {
-                            if (bridgeGroup.WebView != null)
-                            {
-                                bridgeGroup.WebView.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
-                            }
-                            if (bridgeGroup.Bridge != null)
-                            {
-                                _ = bridgeGroup.Bridge.FocusAsync();
-                            }
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(repoRoot))
-                    {
-                        QueueGitStatusRefresh();
-                    }
-
-                    return;
-                }
-
-                bool isEncrypted = await _secureNoteEncryptionService.IsSecureNoteFileAsync(filePath);
-                if (isEncrypted)
-                {
-                    string? password = await PromptPasswordAsync(
-                        GetLocalizedString("EncryptionPasswordDialogTitle", "암호 입력"),
-                        GetLocalizedString("EncryptionOpenButton", "열기"));
-                    if (password == null)
-                    {
-                        return;
-                    }
-
-                    string decryptedText = await _secureNoteEncryptionService.DecryptFileAsync(filePath, password);
-                    OpenNewTab(
-                        filePath,
-                        decryptedText,
-                        encodingName: "UTF-8",
-                        encodingWasAutoDetected: false,
-                        textModel: LineArrayTextModel.FromText(decryptedText),
-                        isEncrypted: true,
-                        encryptionPassword: password);
-
-                    if (!string.IsNullOrEmpty(repoRoot))
-                    {
-                        QueueGitStatusRefresh();
-                    }
-
-                    return;
-                }
-
-                var readResult = await LineArrayTextModel.LoadFromFileAsync(filePath, "Auto");
-                OpenNewTab(
-                    filePath,
-                    "",
-                    encodingName: readResult.EncodingName,
-                    encodingWasAutoDetected: readResult.EncodingWasAutoDetected,
-                    textModel: readResult.Model);
-
-                if (!string.IsNullOrEmpty(repoRoot))
-                {
-                    QueueGitStatusRefresh();
-                }
-            }
-            catch (Exception ex)
-            {
-                ShowErrorMessage("파일 로드 에러", ex.Message);
-            }
-            finally
-            {
-                _fileOpenSemaphore.Release();
-            }
+            await _fileTabLoadController.LoadAsync(filePath);
         }
 
         private void OnRootDragOver(object sender, DragEventArgs e)
@@ -2450,7 +2266,7 @@ namespace TxtAIEditor
         {
             ClearPendingSplitImeSync(tab.Id);
             _viewModel.Tabs.Remove(tab);
-            ForgetTabEncryptionPassword(tab);
+            _tabEncryptionController.ForgetPassword(tab);
             if (EditorTabView.TabItems.Contains(tabItem))
             {
                 EditorTabView.TabItems.Remove(tabItem);
@@ -2473,11 +2289,6 @@ namespace TxtAIEditor
                 OpenNewTab();
             }
             UpdateWindowTitle();
-        }
-
-        private static void ForgetTabEncryptionPassword(OpenedTab tab)
-        {
-            tab.EncryptionPassword = null;
         }
 
         #endregion
@@ -2511,7 +2322,7 @@ namespace TxtAIEditor
                     string? password = tab.EncryptionPassword;
                     if (string.IsNullOrWhiteSpace(password))
                     {
-                        password = await PromptPasswordAsync(
+                        password = await _tabEncryptionController.PromptPasswordAsync(
                             GetLocalizedString("EncryptionPasswordDialogTitle", "암호 입력"),
                             GetLocalizedString("EncryptionOpenButton", "열기"));
                         if (password == null)
@@ -2584,7 +2395,7 @@ namespace TxtAIEditor
             }
             catch (Exception ex)
             {
-                ShowErrorMessage("인코딩 변경 실패", ex.Message);
+                _dialogController.ShowErrorMessage("인코딩 변경 실패", ex.Message);
                 _statusBarController.SyncEncodingCombo(tab);
                 _statusBarController.SyncLineEndingText(tab);
             }
@@ -2749,33 +2560,6 @@ namespace TxtAIEditor
             }
         }
 
-        private async void ShowErrorMessage(string title, string message)
-        {
-            bool terminalWasVisible = EditorWorkspace.IsTerminalVisible;
-            if (terminalWasVisible)
-                TerminalPane.SuspendNativeWindows();
-            XamlRoot? xamlRoot = await WaitForDialogXamlRootAsync();
-            if (xamlRoot == null)
-            {
-                System.Diagnostics.Debug.WriteLine($"{title}: {message}");
-                if (terminalWasVisible)
-                    TerminalPane.ResumeNativeWindows();
-                return;
-            }
-
-            var dialog = new ContentDialog
-            {
-                Title = title,
-                Content = message,
-                CloseButtonText = "확인",
-                XamlRoot = xamlRoot,
-                RequestedTheme = GetCurrentElementTheme()
-            };
-            await dialog.ShowAsync();
-            if (terminalWasVisible)
-                TerminalPane.ResumeNativeWindows();
-        }
-
         private OpenedTab? GetActiveTab()
         {
             var activeTabView = GetCurrentActiveTabView();
@@ -2842,245 +2626,6 @@ namespace TxtAIEditor
             {
                 Position = args.GetPosition(target)
             });
-        }
-
-        private void ShowTabEncryptionMenu(OpenedTab tab, FrameworkElement target, RightTappedRoutedEventArgs args)
-        {
-            var menu = new MenuFlyout();
-
-            if (tab.IsEncrypted)
-            {
-                var changePasswordItem = new MenuFlyoutItem { Text = GetLocalizedString("TabMenuChangeEncryptionPassword", "암호 변경") };
-                changePasswordItem.Click += async (_, __) => await ChangeTabEncryptionPasswordAsync(tab);
-                menu.Items.Add(changePasswordItem);
-
-                var removeEncryptionItem = new MenuFlyoutItem { Text = GetLocalizedString("TabMenuRemoveEncryption", "암호 해제") };
-                removeEncryptionItem.Click += async (_, __) => await RemoveTabEncryptionAsync(tab);
-                menu.Items.Add(removeEncryptionItem);
-            }
-            else
-            {
-                var encryptItem = new MenuFlyoutItem { Text = GetLocalizedString("TabMenuEncrypt", "암호화") };
-                encryptItem.Click += async (_, __) => await EncryptTabAsync(tab);
-                menu.Items.Add(encryptItem);
-            }
-
-            menu.ShowAt(target, new FlyoutShowOptions
-            {
-                Position = args.GetPosition(target)
-            });
-        }
-
-        private async Task EncryptTabAsync(OpenedTab tab)
-        {
-            if (tab.IsEncrypted)
-            {
-                await ChangeTabEncryptionPasswordAsync(tab);
-                return;
-            }
-
-            string? password = await PromptConfirmedPasswordAsync(
-                GetLocalizedString("EncryptionSetPasswordTitle", "암호화"),
-                GetLocalizedString("EncryptionPasswordLabel", "암호"),
-                GetLocalizedString("EncryptionConfirmPasswordLabel", "암호 확인"));
-            if (password == null)
-            {
-                return;
-            }
-
-            tab.EncryptionPassword = password;
-            tab.IsEncrypted = true;
-            tab.IsDirty = true;
-            UpdateWindowTitle();
-        }
-
-        private async Task ChangeTabEncryptionPasswordAsync(OpenedTab tab)
-        {
-            string? password = await PromptConfirmedPasswordAsync(
-                GetLocalizedString("EncryptionChangePasswordTitle", "암호 변경"),
-                GetLocalizedString("EncryptionPasswordLabel", "새 암호"),
-                GetLocalizedString("EncryptionConfirmPasswordLabel", "새 암호 확인"));
-            if (password == null)
-            {
-                return;
-            }
-
-            tab.EncryptionPassword = password;
-            tab.IsEncrypted = true;
-            tab.IsDirty = true;
-            UpdateWindowTitle();
-        }
-
-        private async Task RemoveTabEncryptionAsync(OpenedTab tab)
-        {
-            if (!tab.IsEncrypted)
-            {
-                return;
-            }
-
-            string? password = await PromptConfirmedPasswordAsync(
-                GetLocalizedString("EncryptionRemoveTitle", "암호 해제"),
-                GetLocalizedString("EncryptionCurrentPasswordLabel", "현재 암호"),
-                GetLocalizedString("EncryptionConfirmPasswordLabel", "현재 암호 확인"));
-            if (password == null)
-            {
-                return;
-            }
-
-            if (!string.IsNullOrEmpty(tab.EncryptionPassword) &&
-                !string.Equals(tab.EncryptionPassword, password, StringComparison.Ordinal))
-            {
-                ShowErrorMessage(
-                    GetLocalizedString("EncryptionRemoveTitle", "암호 해제"),
-                    GetLocalizedString("EncryptionCurrentPasswordMismatch", "현재 암호가 올바르지 않습니다."));
-                return;
-            }
-
-            tab.EncryptionPassword = null;
-            tab.IsEncrypted = false;
-            tab.IsDirty = true;
-            UpdateWindowTitle();
-        }
-
-        private async Task<string?> PromptPasswordAsync(string title, string primaryButtonText)
-        {
-            XamlRoot? xamlRoot = await WaitForDialogXamlRootAsync();
-            if (xamlRoot == null)
-            {
-                throw new InvalidOperationException(GetLocalizedString("EncryptionDialogNotReady", "암호 입력 창을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요."));
-            }
-
-            var panel = new StackPanel
-            {
-                Spacing = 8,
-                Width = 360,
-                RequestedTheme = GetCurrentElementTheme()
-            };
-            var passwordBox = new PasswordBox
-            {
-                PasswordChar = "●",
-                PlaceholderText = GetLocalizedString("EncryptionPasswordLabel", "암호"),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            var errorText = new TextBlock
-            {
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 220, 60, 60)),
-                Visibility = Visibility.Collapsed,
-                TextWrapping = TextWrapping.Wrap
-            };
-            panel.Children.Add(passwordBox);
-            panel.Children.Add(errorText);
-
-            var dialog = new ContentDialog
-            {
-                Title = title,
-                Content = panel,
-                PrimaryButtonText = primaryButtonText,
-                CloseButtonText = GetLocalizedString("EncryptionCancelButton", "취소"),
-                XamlRoot = xamlRoot,
-                RequestedTheme = GetCurrentElementTheme()
-            };
-
-            dialog.PrimaryButtonClick += (_, args) =>
-            {
-                if (string.IsNullOrWhiteSpace(passwordBox.Password))
-                {
-                    args.Cancel = true;
-                    errorText.Text = GetLocalizedString("EncryptionPasswordEmpty", "암호를 입력해 주세요.");
-                    errorText.Visibility = Visibility.Visible;
-                }
-            };
-
-            return await dialog.ShowAsync() == ContentDialogResult.Primary
-                ? passwordBox.Password
-                : null;
-        }
-
-        private async Task<string?> PromptConfirmedPasswordAsync(string title, string passwordLabel, string confirmLabel)
-        {
-            XamlRoot? xamlRoot = await WaitForDialogXamlRootAsync();
-            if (xamlRoot == null)
-            {
-                throw new InvalidOperationException(GetLocalizedString("EncryptionDialogNotReady", "암호 입력 창을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요."));
-            }
-
-            var panel = new StackPanel
-            {
-                Spacing = 8,
-                Width = 360,
-                RequestedTheme = GetCurrentElementTheme()
-            };
-            var passwordBox = new PasswordBox
-            {
-                PasswordChar = "●",
-                PlaceholderText = passwordLabel,
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            var confirmBox = new PasswordBox
-            {
-                PasswordChar = "●",
-                PlaceholderText = confirmLabel,
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            var errorText = new TextBlock
-            {
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 220, 60, 60)),
-                Visibility = Visibility.Collapsed,
-                TextWrapping = TextWrapping.Wrap
-            };
-
-            panel.Children.Add(new TextBlock { Text = passwordLabel });
-            panel.Children.Add(passwordBox);
-            panel.Children.Add(new TextBlock { Text = confirmLabel });
-            panel.Children.Add(confirmBox);
-            panel.Children.Add(errorText);
-
-            var dialog = new ContentDialog
-            {
-                Title = title,
-                Content = panel,
-                PrimaryButtonText = GetLocalizedString("EncryptionApplyButton", "적용"),
-                CloseButtonText = GetLocalizedString("EncryptionCancelButton", "취소"),
-                XamlRoot = xamlRoot,
-                RequestedTheme = GetCurrentElementTheme()
-            };
-
-            dialog.PrimaryButtonClick += (_, args) =>
-            {
-                if (string.IsNullOrWhiteSpace(passwordBox.Password))
-                {
-                    args.Cancel = true;
-                    errorText.Text = GetLocalizedString("EncryptionPasswordEmpty", "암호를 입력해 주세요.");
-                    errorText.Visibility = Visibility.Visible;
-                    return;
-                }
-
-                if (!string.Equals(passwordBox.Password, confirmBox.Password, StringComparison.Ordinal))
-                {
-                    args.Cancel = true;
-                    errorText.Text = GetLocalizedString("EncryptionPasswordMismatch", "입력한 암호가 일치하지 않습니다.");
-                    errorText.Visibility = Visibility.Visible;
-                }
-            };
-
-            return await dialog.ShowAsync() == ContentDialogResult.Primary
-                ? passwordBox.Password
-                : null;
-        }
-
-        private async Task<XamlRoot?> WaitForDialogXamlRootAsync()
-        {
-            for (int attempt = 0; attempt < 20; attempt++)
-            {
-                if (this.Content.XamlRoot != null)
-                {
-                    return this.Content.XamlRoot;
-                }
-
-                await Task.Delay(50);
-            }
-
-            return this.Content.XamlRoot;
         }
 
         private async void OnToggleTabLivePreview(OpenedTab tab, TabViewItem tabItem, bool enabled)
@@ -3449,7 +2994,7 @@ namespace TxtAIEditor
             }
             else
             {
-                ShowErrorMessage("비교 오류", "올바른 두 파일 혹은 탭을 선택해 주세요.");
+                _dialogController.ShowErrorMessage("비교 오류", "올바른 두 파일 혹은 탭을 선택해 주세요.");
             }
         }
 
@@ -3463,7 +3008,7 @@ namespace TxtAIEditor
                     string? password = tab.EncryptionPassword;
                     if (string.IsNullOrWhiteSpace(password))
                     {
-                        password = await PromptPasswordAsync(
+                        password = await _tabEncryptionController.PromptPasswordAsync(
                             GetLocalizedString("EncryptionPasswordDialogTitle", "암호 입력"),
                             GetLocalizedString("EncryptionOpenButton", "열기"));
                         if (password == null)
