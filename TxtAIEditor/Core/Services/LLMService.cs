@@ -308,6 +308,23 @@ namespace TxtAIEditor.Core.Services
         // ----------------------------------------------------
         private static readonly HttpClient _exaHttpClient = new HttpClient();
 
+        private static bool IsExaMcpEndpoint(string endpoint)
+        {
+            return endpoint.Contains("/mcp", StringComparison.OrdinalIgnoreCase) ||
+                   endpoint.Contains("/sse", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string GetMissingExaApiKeyMessage()
+        {
+            string langCode = GetActiveLanguage();
+            return langCode switch
+            {
+                "ja-JP" => "エラー: Exa API Keyが設定されていません。設定を開いて保存するか、EXA_API_KEY環境変数をご設定ください。",
+                "en-US" => "Error: Exa API Key is not set. Please open Settings to save it, or configure the EXA_API_KEY environment variable.",
+                _ => "에러: Exa API Key가 설정되어 있지 않습니다. 설정을 열어 저장하거나, EXA_API_KEY 환경 변수를 설정해 주십시오."
+            };
+        }
+
         public async Task<string> SearchExaAsync(string query, int numResults, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(query))
@@ -321,22 +338,11 @@ namespace TxtAIEditor.Core.Services
                 apiKey = Environment.GetEnvironmentVariable("EXA_API_KEY") ?? string.Empty;
             }
 
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                string langCode = GetActiveLanguage();
-                return langCode switch
-                {
-                    "ja-JP" => "エラー: Exa API Keyが設定されていません。設定を開いて保存するか、EXA_API_KEY環境変数をご設定ください。",
-                    "en-US" => "Error: Exa API Key is not set. Please open Settings to save it, or configure the EXA_API_KEY environment variable.",
-                    _ => "에러: Exa API Key가 설정되어 있지 않습니다. 설정을 열어 저장하거나, EXA_API_KEY 환경 변수를 설정해 주십시오."
-                };
-            }
-
             string endpoint = _settingsService?.CurrentSettings?.ExaEndpoint ?? "https://mcp.exa.ai/mcp";
+            bool isMcpEndpoint = IsExaMcpEndpoint(endpoint);
 
             // If it is configured as an MCP / SSE URL (e.g. contains '/mcp' or '/sse'), use the MCP SSE transport client.
-            if (endpoint.Contains("/mcp", StringComparison.OrdinalIgnoreCase) || 
-                endpoint.Contains("/sse", StringComparison.OrdinalIgnoreCase))
+            if (isMcpEndpoint)
             {
                 try
                 {
@@ -355,12 +361,16 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                return GetMissingExaApiKeyMessage();
+            }
+
             int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
             
             // If the endpoint is just a domain or base URL without path, default to /search
             string requestUrl = endpoint;
-            if (requestUrl.Contains("/mcp", StringComparison.OrdinalIgnoreCase) || 
-                requestUrl.Contains("/sse", StringComparison.OrdinalIgnoreCase))
+            if (isMcpEndpoint)
             {
                 // If we fell back here because MCP failed, force standard API URL
                 requestUrl = "https://api.exa.ai/search";
@@ -785,22 +795,11 @@ namespace TxtAIEditor.Core.Services
                 apiKey = Environment.GetEnvironmentVariable("EXA_API_KEY") ?? string.Empty;
             }
 
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                string langCode = GetActiveLanguage();
-                return langCode switch
-                {
-                    "ja-JP" => "エラー: Exa API Keyが設定されていません。設定を開いて保存するか、EXA_API_KEY환경변수をご設定ください。",
-                    "en-US" => "Error: Exa API Key is not set. Please open Settings to save it, or configure the EXA_API_KEY environment variable.",
-                    _ => "에러: Exa API Key가 설정되어 있지 않습니다. 설정을 열어 저장하거나, EXA_API_KEY 환경 변수를 설정해 주십시오."
-                };
-            }
-
             string endpoint = _settingsService?.CurrentSettings?.ExaEndpoint ?? "https://mcp.exa.ai/mcp";
+            bool isMcpEndpoint = IsExaMcpEndpoint(endpoint);
 
             // If it is configured as an MCP / SSE URL (e.g. contains '/mcp' or '/sse'), use the MCP SSE transport client.
-            if (endpoint.Contains("/mcp", StringComparison.OrdinalIgnoreCase) || 
-                endpoint.Contains("/sse", StringComparison.OrdinalIgnoreCase))
+            if (isMcpEndpoint)
             {
                 try
                 {
@@ -817,10 +816,14 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                return GetMissingExaApiKeyMessage();
+            }
+
             // Fallback direct REST API call: POST https://api.exa.ai/contents
             string requestUrl = endpoint;
-            if (requestUrl.Contains("/mcp", StringComparison.OrdinalIgnoreCase) || 
-                requestUrl.Contains("/sse", StringComparison.OrdinalIgnoreCase))
+            if (isMcpEndpoint)
             {
                 requestUrl = "https://api.exa.ai/contents";
             }
