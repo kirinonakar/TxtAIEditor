@@ -319,7 +319,6 @@ namespace TxtAIEditor.Controls
                                             _agentPane.DispatcherQueue.TryEnqueue(() =>
                                             {
                                                 _agentPane.BeginThinkingActivity(label);
-                                                UpdateGeneratedTokenCount(tokenCount);
                                             });
                                         }
                                         else
@@ -340,7 +339,6 @@ namespace TxtAIEditor.Controls
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
                                     {
                                         _agentPane.UpdateThinkingActivity(label);
-                                        UpdateGeneratedTokenCount(tokenCount);
                                     });
                                 }
                                 else
@@ -362,7 +360,6 @@ namespace TxtAIEditor.Controls
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
                                     {
                                         _agentPane.UpdateThinkingActivity(label);
-                                        UpdateGeneratedTokenCount(tokenCount);
                                     });
                                 }
                                 else
@@ -396,7 +393,6 @@ namespace TxtAIEditor.Controls
                                         _agentPane.DispatcherQueue.TryEnqueue(() =>
                                         {
                                             _agentPane.BeginThinkingActivity(label);
-                                            UpdateGeneratedTokenCount(tokenCount);
                                         });
                                     }
                                 }
@@ -2140,21 +2136,5 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void UpdateGeneratedTokenCount(int tokenCount)
-        {
-            string lang = GetActiveLanguageCode();
-            if (lang == "ko-KR")
-            {
-                _agentPane.TokenCount.Text = $"{tokenCount} 토큰";
-            }
-            else if (lang == "ja-JP")
-            {
-                _agentPane.TokenCount.Text = $"{tokenCount} トークン";
-            }
-            else
-            {
-                _agentPane.TokenCount.Text = $"{tokenCount} tokens";
-            }
-        }
     }
 }
