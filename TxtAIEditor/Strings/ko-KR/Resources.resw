@@ -1499,6 +1499,9 @@
   <data name="AgentContextStatsDefault" xml:space="preserve">
     <value>현재 탭과 선택 영역을 맥락으로 사용</value>
   </data>
+  <data name="AgentModelFormat" xml:space="preserve">
+    <value>모델: {0} ({1})</value>
+  </data>
   <data name="AgentIncludeActiveFile" xml:space="preserve">
     <value>현재 탭 포함</value>
   </data>

@@ -1500,6 +1500,9 @@
   <data name="AgentContextStatsDefault" xml:space="preserve">
     <value>現在のアクティブなタブと選択範囲をコンテキストとして使用します</value>
   </data>
+  <data name="AgentModelFormat" xml:space="preserve">
+    <value>モデル: {0} ({1})</value>
+  </data>
   <data name="AgentIncludeActiveFile" xml:space="preserve">
     <value>アクティブなタブを含める</value>
   </data>

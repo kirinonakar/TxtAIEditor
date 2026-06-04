@@ -1499,6 +1499,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentContextStatsDefault" xml:space="preserve">
     <value>Use active tab and selection as context</value>
   </data>
+  <data name="AgentModelFormat" xml:space="preserve">
+    <value>Model: {0} ({1})</value>
+  </data>
   <data name="AgentIncludeActiveFile" xml:space="preserve">
     <value>Include active tab</value>
   </data>

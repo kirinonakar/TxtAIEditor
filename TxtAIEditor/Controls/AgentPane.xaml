@@ -245,13 +245,17 @@
             </Border>
         </StackPanel>
 
-        <Grid Grid.Row="5" ColumnSpacing="8">
+        <Grid Grid.Row="5" ColumnSpacing="8" RowSpacing="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBox x:Name="AgentPromptInput"
-                     Grid.Column="0"
+                     Grid.Row="0" Grid.Column="0"
                      PlaceholderText="Agent에게 맡길 작업 입력..."
                      MinHeight="72"
                      MaxHeight="120"
@@ -271,12 +275,17 @@
                 </TextBox.KeyboardAccelerators>
             </TextBox>
             <Button x:Name="AgentRunButton"
-                    Grid.Column="1"
+                    Grid.Row="0" Grid.Column="1"
                     Content="실행"
                     Width="64"
                     VerticalAlignment="Stretch"
                     Click="OnRunClick"
                     Style="{StaticResource AccentButtonStyle}"/>
+            <TextBlock x:Name="AgentModelNameText"
+                       Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                       FontSize="11"
+                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                       Margin="2,1,0,-12"/>
         </Grid>
 
         <Border x:Name="AgentActivityPanel"

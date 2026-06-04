@@ -693,5 +693,10 @@ namespace TxtAIEditor.Controls
         {
             AgentModifiedFilesPanel.Visibility = Visibility.Collapsed;
         }
+
+        public void UpdateModelName(string text)
+        {
+            AgentModelNameText.Text = text;
+        }
     }
 }

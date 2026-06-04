@@ -1577,6 +1577,20 @@ namespace TxtAIEditor.Controls
             _agentPane.TokenCount.Text = string.Format(
                 _getString("AgentTokenCountFormat", "{0:F1}k tokens"),
                 kTokens);
+
+            UpdateModelDisplay();
+        }
+
+        public void UpdateModelDisplay()
+        {
+            var settings = _settingsService.CurrentSettings;
+            if (settings != null)
+            {
+                string provider = settings.LlmProvider ?? string.Empty;
+                string model = settings.LlmModel ?? string.Empty;
+                string format = _getString("AgentModelFormat", "모델: {0} ({1})");
+                _agentPane.UpdateModelName(string.Format(format, model, provider));
+            }
         }
 
         private string GetActiveLanguageCode()
