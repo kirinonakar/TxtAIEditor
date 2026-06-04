@@ -1250,6 +1250,36 @@
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>경로 복사</value>
   </data>
+  <data name="ExplorerCreateFolderTooltip" xml:space="preserve">
+    <value>새 폴더</value>
+  </data>
+  <data name="CreateFolderDialogTitle" xml:space="preserve">
+    <value>새 폴더</value>
+  </data>
+  <data name="CreateFolderPlaceholder" xml:space="preserve">
+    <value>폴더 이름 입력...</value>
+  </data>
+  <data name="CreateFolderDialogCreate" xml:space="preserve">
+    <value>만들기</value>
+  </data>
+  <data name="CreateFolderDialogCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="CreateFolderErrorTitle" xml:space="preserve">
+    <value>새 폴더 만들기 오류</value>
+  </data>
+  <data name="CreateFolderNoFolderSelected" xml:space="preserve">
+    <value>먼저 탐색기에서 폴더를 선택하십시오.</value>
+  </data>
+  <data name="CreateFolderEmptyName" xml:space="preserve">
+    <value>폴더 이름을 입력하십시오.</value>
+  </data>
+  <data name="CreateFolderInvalidName" xml:space="preserve">
+    <value>폴더 이름에 사용할 수 없는 문자가 포함되어 있습니다.</value>
+  </data>
+  <data name="CreateFolderAlreadyExists" xml:space="preserve">
+    <value>'{0}'이(가) 이미 존재합니다.</value>
+  </data>
   <data name="ExplorerRefreshTooltip" xml:space="preserve">
     <value>새로고침</value>
   </data>

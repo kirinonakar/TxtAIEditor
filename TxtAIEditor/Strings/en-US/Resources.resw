@@ -1250,6 +1250,36 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>Copy File Path</value>
   </data>
+  <data name="ExplorerCreateFolderTooltip" xml:space="preserve">
+    <value>New Folder</value>
+  </data>
+  <data name="CreateFolderDialogTitle" xml:space="preserve">
+    <value>New Folder</value>
+  </data>
+  <data name="CreateFolderPlaceholder" xml:space="preserve">
+    <value>Enter folder name...</value>
+  </data>
+  <data name="CreateFolderDialogCreate" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="CreateFolderDialogCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="CreateFolderErrorTitle" xml:space="preserve">
+    <value>New Folder Error</value>
+  </data>
+  <data name="CreateFolderNoFolderSelected" xml:space="preserve">
+    <value>Please select a folder in Explorer first.</value>
+  </data>
+  <data name="CreateFolderEmptyName" xml:space="preserve">
+    <value>Please enter a folder name.</value>
+  </data>
+  <data name="CreateFolderInvalidName" xml:space="preserve">
+    <value>The folder name contains characters that cannot be used.</value>
+  </data>
+  <data name="CreateFolderAlreadyExists" xml:space="preserve">
+    <value>'{0}' already exists.</value>
+  </data>
   <data name="ExplorerRefreshTooltip" xml:space="preserve">
     <value>Refresh</value>
   </data>

@@ -71,6 +71,7 @@ namespace TxtAIEditor.Controls
         private void WireEvents()
         {
             _leftSidebar.FileListViewItemRightTapped += OnFileListViewItemRightTapped;
+            _leftSidebar.CreateFolderClick += OnCreateFolderClick;
             _leftSidebar.CopyFileNameClick += OnCopyFileNameClick;
             _leftSidebar.CopyFilePathClick += OnCopyFilePathClick;
             _leftSidebar.CopyFolderPathClick += OnCopyFolderPathClick;
@@ -91,6 +92,91 @@ namespace TxtAIEditor.Controls
             }
 
             e.Handled = true;
+        }
+
+        private async void OnCreateFolderClick(object sender, RoutedEventArgs e)
+        {
+            string currentFolder = _currentFolderProvider();
+            if (string.IsNullOrWhiteSpace(currentFolder) || !Directory.Exists(currentFolder))
+            {
+                _showError(
+                    _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
+                    _getString("CreateFolderNoFolderSelected", "먼저 탐색기에서 폴더를 선택하십시오."));
+                return;
+            }
+
+            var nameInput = new TextBox
+            {
+                PlaceholderText = _getString("CreateFolderPlaceholder", "폴더 이름 입력..."),
+                MinWidth = 260,
+                MaxLength = 255
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = _getString("CreateFolderDialogTitle", "새 폴더"),
+                Content = nameInput,
+                PrimaryButtonText = _getString("CreateFolderDialogCreate", "만들기"),
+                CloseButtonText = _getString("CreateFolderDialogCancel", "취소"),
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = _xamlRootProvider(),
+                RequestedTheme = _themeProvider()
+            };
+
+            if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            string folderName = nameInput.Text.Trim();
+            if (string.IsNullOrWhiteSpace(folderName))
+            {
+                _showError(
+                    _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
+                    _getString("CreateFolderEmptyName", "폴더 이름을 입력하십시오."));
+                return;
+            }
+
+            if (folderName == "." ||
+                folderName == ".." ||
+                folderName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            {
+                _showError(
+                    _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
+                    _getString("CreateFolderInvalidName", "폴더 이름에 사용할 수 없는 문자가 포함되어 있습니다."));
+                return;
+            }
+
+            string newFolderPath = Path.Combine(currentFolder, folderName);
+            if (Directory.Exists(newFolderPath) || File.Exists(newFolderPath))
+            {
+                _showError(
+                    _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
+                    string.Format(
+                        _getString("CreateFolderAlreadyExists", "'{0}'이(가) 이미 존재합니다."),
+                        folderName));
+                return;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(newFolderPath);
+                _loadDirectoryRoot(currentFolder);
+
+                var createdItem = _viewModel.ExplorerItems
+                    .FirstOrDefault(item => string.Equals(item.Path, newFolderPath, StringComparison.OrdinalIgnoreCase));
+                if (createdItem != null)
+                {
+                    _leftSidebar.FileList.SelectedItem = createdItem;
+                    _leftSidebar.FileList.ScrollIntoView(createdItem);
+                }
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
+                    ex.Message);
+            }
         }
 
         private void LocalizeContextFlyout(MenuFlyout flyout)

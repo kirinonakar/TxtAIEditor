@@ -55,6 +55,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? LeftActivityClick;
         public event RoutedEventHandler? ExplorerUpClick;
         public event RoutedEventHandler? SelectFolderClick;
+        public event RoutedEventHandler? CreateFolderClick;
         public event RoutedEventHandler? RefreshClick;
         public event DoubleTappedEventHandler? FileListViewDoubleTapped;
         public event RightTappedEventHandler? FileListViewItemRightTapped;
@@ -131,6 +132,7 @@ namespace TxtAIEditor.Controls
         public TextBlock GitHistoryHeaderLabel => GitHistoryHeader;
         public Button ExplorerUpBtn => ExplorerUpButton;
         public Button ExplorerSelectFolderBtn => ExplorerSelectFolderButton;
+        public Button ExplorerCreateFolderBtn => ExplorerCreateFolderButton;
         public Button ExplorerRefreshBtn => ExplorerRefreshButton;
 
         public ListView FileList => FileListView;
@@ -182,6 +184,7 @@ namespace TxtAIEditor.Controls
 
             ToolTipService.SetToolTip(ExplorerUpButton, getString("ExplorerUpTooltip", "상위 폴더"));
             ExplorerSelectFolderButton.Content = getString("ExplorerSelectFolder", "폴더 선택...");
+            ToolTipService.SetToolTip(ExplorerCreateFolderButton, getString("ExplorerCreateFolderTooltip", "새 폴더"));
             ToolTipService.SetToolTip(ExplorerRefreshButton, getString("ExplorerRefreshTooltip", "새로고침"));
 
             FavoritesFileTab.Content = getString("FavoritesFileTab", "파일");
@@ -259,6 +262,7 @@ namespace TxtAIEditor.Controls
         private void OnLeftActivityClick(object sender, RoutedEventArgs e) => LeftActivityClick?.Invoke(sender, e);
         private void OnExplorerUpClick(object sender, RoutedEventArgs e) => ExplorerUpClick?.Invoke(sender, e);
         private void OnSelectFolderClick(object sender, RoutedEventArgs e) => SelectFolderClick?.Invoke(sender, e);
+        private void OnCreateFolderClick(object sender, RoutedEventArgs e) => CreateFolderClick?.Invoke(sender, e);
         private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
         private void OnFileListViewDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => FileListViewDoubleTapped?.Invoke(sender, e);
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e) => FileListViewItemRightTapped?.Invoke(sender, e);

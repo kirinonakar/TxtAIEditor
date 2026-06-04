@@ -135,10 +135,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                     <Button x:Name="ExplorerUpButton" Content="↑" Click="OnExplorerUpClick" ToolTipService.ToolTip="상위 폴더" Padding="8,0" FontSize="11" Height="32"/>
                                     <Button x:Name="ExplorerSelectFolderButton" Grid.Column="1" Content="폴더 선택..." HorizontalAlignment="Stretch" Click="OnSelectFolderClick" Style="{StaticResource AccentButtonStyle}" FontSize="11" Height="32"/>
-                                    <Button x:Name="ExplorerRefreshButton" Grid.Column="2" Click="OnRefreshClick" ToolTipService.ToolTip="새로고침" Padding="8,0" Height="32">
+                                    <Button x:Name="ExplorerCreateFolderButton" Grid.Column="2" Click="OnCreateFolderClick" ToolTipService.ToolTip="새 폴더" Padding="8,0" MinWidth="32" Height="32">
+                                            <FontIcon Glyph="&#xE710;" FontSize="12"/>
+                                        </Button>
+                                    <Button x:Name="ExplorerRefreshButton" Grid.Column="3" Click="OnRefreshClick" ToolTipService.ToolTip="새로고침" Padding="8,0" Height="32">
                                             <FontIcon Glyph="&#xE72C;" FontSize="12"/>
                                         </Button>
                                     </Grid>

@@ -1251,6 +1251,36 @@
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>パスをコピー</value>
   </data>
+  <data name="ExplorerCreateFolderTooltip" xml:space="preserve">
+    <value>新しいフォルダ</value>
+  </data>
+  <data name="CreateFolderDialogTitle" xml:space="preserve">
+    <value>新しいフォルダ</value>
+  </data>
+  <data name="CreateFolderPlaceholder" xml:space="preserve">
+    <value>フォルダ名を入力...</value>
+  </data>
+  <data name="CreateFolderDialogCreate" xml:space="preserve">
+    <value>作成</value>
+  </data>
+  <data name="CreateFolderDialogCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="CreateFolderErrorTitle" xml:space="preserve">
+    <value>新しいフォルダの作成エラー</value>
+  </data>
+  <data name="CreateFolderNoFolderSelected" xml:space="preserve">
+    <value>先にエクスプローラーでフォルダを選択してください。</value>
+  </data>
+  <data name="CreateFolderEmptyName" xml:space="preserve">
+    <value>フォルダ名を入力してください。</value>
+  </data>
+  <data name="CreateFolderInvalidName" xml:space="preserve">
+    <value>フォルダ名に使用できない文字が含まれています。</value>
+  </data>
+  <data name="CreateFolderAlreadyExists" xml:space="preserve">
+    <value>'{0}' は既に存在します。</value>
+  </data>
   <data name="ExplorerRefreshTooltip" xml:space="preserve">
     <value>更新</value>
   </data>
