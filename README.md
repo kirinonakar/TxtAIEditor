@@ -69,7 +69,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   `Arrow Keys` (`Up`, `Down`) to navigate vertically.
     *   `Enter` to commit input and move focus down (auto-appends a new blank row at the end of the file), and `Shift + Enter` to move focus up.
 
-### 🤖 Secure AI Assistant
+### 🤖 AI Assistant
 *   **Multi-Provider:** Connect with Gemini, OpenAI, or local LM Studio endpoints.
 *   **Secure Storage:** API keys are securely saved via native Windows Credential Manager.
 *   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Chinese, French, Spanish, German, etc. while safely preserving code structure, markdown formatting, and commands.
