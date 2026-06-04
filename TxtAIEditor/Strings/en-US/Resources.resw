@@ -1618,4 +1618,22 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
     <value>Close list</value>
   </data>
+  <data name="AgentAddAttachmentTooltip" xml:space="preserve">
+    <value>Add image or file</value>
+  </data>
+  <data name="AgentRemoveAttachmentTooltip" xml:space="preserve">
+    <value>Remove attachment</value>
+  </data>
+  <data name="AgentAttachmentErrorTitle" xml:space="preserve">
+    <value>Attachment Error</value>
+  </data>
+  <data name="AgentAttachmentErrorFormat" xml:space="preserve">
+    <value>An error occurred while adding the attachment: {0}</value>
+  </data>
+  <data name="AgentAttachmentFileDetail" xml:space="preserve">
+    <value>File, {0:N0} chars</value>
+  </data>
+  <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
+    <value>File, included first {0:N0} chars</value>
+  </data>
 </root>

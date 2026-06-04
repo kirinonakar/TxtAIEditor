@@ -188,7 +188,7 @@
                                         Padding="0"
                                         Background="Transparent"
                                         BorderThickness="0"
-                                        ToolTipService.ToolTip="첨부 제거">
+                                        ToolTipService.ToolTip="{Binding RemoveTooltip}">
                                     <FontIcon Glyph="&#xE10A;" FontSize="10"/>
                                 </Button>
                             </Grid>

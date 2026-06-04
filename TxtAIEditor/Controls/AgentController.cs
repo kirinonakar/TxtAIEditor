@@ -1009,6 +1009,7 @@ namespace TxtAIEditor.Controls
                     DisplayName = a.DisplayName,
                     Detail = a.Detail,
                     TokenText = FormatAttachmentTokens(a.EstimatedTokens),
+                    RemoveTooltip = _getString("AgentRemoveAttachmentTooltip", "첨부 제거"),
                     IconGlyph = a.IsImage ? "\uEB9F" : "\uE8A5"
                 })
                 .ToList();

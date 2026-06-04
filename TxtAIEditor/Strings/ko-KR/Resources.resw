@@ -1618,4 +1618,22 @@
   <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
     <value>목록 닫기</value>
   </data>
+  <data name="AgentAddAttachmentTooltip" xml:space="preserve">
+    <value>이미지 또는 파일 추가</value>
+  </data>
+  <data name="AgentRemoveAttachmentTooltip" xml:space="preserve">
+    <value>첨부 제거</value>
+  </data>
+  <data name="AgentAttachmentErrorTitle" xml:space="preserve">
+    <value>첨부 추가 오류</value>
+  </data>
+  <data name="AgentAttachmentErrorFormat" xml:space="preserve">
+    <value>첨부를 추가하는 중 오류가 발생했습니다: {0}</value>
+  </data>
+  <data name="AgentAttachmentFileDetail" xml:space="preserve">
+    <value>파일, {0:N0}자</value>
+  </data>
+  <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
+    <value>파일, {0:N0}자까지 포함</value>
+  </data>
 </root>

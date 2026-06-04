@@ -1619,4 +1619,22 @@
   <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
     <value>リストを閉じる</value>
   </data>
+  <data name="AgentAddAttachmentTooltip" xml:space="preserve">
+    <value>画像またはファイルを追加</value>
+  </data>
+  <data name="AgentRemoveAttachmentTooltip" xml:space="preserve">
+    <value>添付を削除</value>
+  </data>
+  <data name="AgentAttachmentErrorTitle" xml:space="preserve">
+    <value>添付追加エラー</value>
+  </data>
+  <data name="AgentAttachmentErrorFormat" xml:space="preserve">
+    <value>添付の追加中にエラーが発生しました: {0}</value>
+  </data>
+  <data name="AgentAttachmentFileDetail" xml:space="preserve">
+    <value>ファイル、{0:N0} 文字</value>
+  </data>
+  <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
+    <value>ファイル、先頭 {0:N0} 文字まで含めました</value>
+  </data>
 </root>
