@@ -597,22 +597,8 @@ namespace TxtAIEditor.Controls
                 if (isCode)
                 {
                     var container = new InlineUIContainer();
-                    Brush? bgBrush = null;
-                    Brush? fgBrush = null;
-
-                    if (Application.Current.Resources.ContainsKey("AgentCodeBackground"))
-                    {
-                        bgBrush = Application.Current.Resources["AgentCodeBackground"] as Brush;
-                    }
-                    else
-                    {
-                        bgBrush = new SolidColorBrush(Microsoft.UI.Colors.LightGray);
-                    }
-
-                    if (Application.Current.Resources.ContainsKey("AgentCodeForeground"))
-                    {
-                        fgBrush = Application.Current.Resources["AgentCodeForeground"] as Brush;
-                    }
+                    Brush bgBrush = GetBrushResource("AgentCodeBackground", Microsoft.UI.Colors.LightGray);
+                    Brush fgBrush = GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.Black);
 
                     var border = new Border
                     {
@@ -630,10 +616,7 @@ namespace TxtAIEditor.Controls
                         VerticalAlignment = VerticalAlignment.Center
                     };
 
-                    if (fgBrush != null)
-                    {
-                        textBlock.Foreground = fgBrush;
-                    }
+                    textBlock.Foreground = fgBrush;
 
                     border.Child = textBlock;
                     container.Child = border;
@@ -711,6 +694,21 @@ namespace TxtAIEditor.Controls
             }
 
             FlushCurrentSegment();
+        }
+
+        private Brush GetBrushResource(string key, Windows.UI.Color fallbackColor)
+        {
+            if (Resources.TryGetValue(key, out object resource) && resource is Brush localBrush)
+            {
+                return localBrush;
+            }
+
+            if (Application.Current.Resources.TryGetValue(key, out resource) && resource is Brush appBrush)
+            {
+                return appBrush;
+            }
+
+            return new SolidColorBrush(fallbackColor);
         }
 
         public void ShowDiffConfirm(string header, string description)

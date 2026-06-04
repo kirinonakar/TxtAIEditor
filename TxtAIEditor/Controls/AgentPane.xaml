@@ -15,6 +15,7 @@
                     <SolidColorBrush x:Key="AgentButtonBackground" Color="#FCFCFC"/>
                     <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#E0E0E0"/>
                     <SolidColorBrush x:Key="AgentOutputBackground" Color="#FCFCFC"/>
+                    <SolidColorBrush x:Key="AgentOutputForeground" Color="#1F2937"/>
                     <SolidColorBrush x:Key="AgentCodeBackground" Color="#EAEAEA"/>
                     <SolidColorBrush x:Key="AgentCodeForeground" Color="#C7254E"/>
                 </ResourceDictionary>
@@ -22,8 +23,9 @@
                     <SolidColorBrush x:Key="AgentButtonBackground" Color="#2B2D31"/>
                     <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#2E3033"/>
                     <SolidColorBrush x:Key="AgentOutputBackground" Color="#151618"/>
-                    <SolidColorBrush x:Key="AgentCodeBackground" Color="#2D3139"/>
-                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#E06C75"/>
+                    <SolidColorBrush x:Key="AgentOutputForeground" Color="#D4D4D4"/>
+                    <SolidColorBrush x:Key="AgentCodeBackground" Color="#252526"/>
+                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#DCDCAA"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
@@ -81,6 +83,7 @@
             <RichTextBlock x:Name="AgentOutputText"
                            TextWrapping="Wrap"
                            FontSize="13"
+                           Foreground="{ThemeResource AgentOutputForeground}"
                            IsTextSelectionEnabled="True"
                            Padding="0"
                            KeyDown="OnOutputTextKeyDown"/>
