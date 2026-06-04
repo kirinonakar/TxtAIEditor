@@ -19,7 +19,9 @@ const autocompleteState = {
     activeIndex: 0,
     element: null,
     wordStart: 0,
+    caret: 0,
     word: '',
+    textBeforeCaret: '',
     suppressUntil: 0  // ESC로 닫은 후 compositionend 재오픈 방지용 타임스탬프
 };
 
@@ -46,7 +48,7 @@ function normalizeAutocompleteComparisonText(value) {
     return String(value || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').normalize('NFC').toLowerCase();
 }
 
-function autocompleteReplaceStart(candidate, text, wordStart) {
+function autocompleteReplaceStart(candidate, text, wordStart, caret = null) {
     let replaceStart = wordStart;
     if (candidate.kind === 'snippet') {
         const specialPrefix = snippetKeywordSpecialPrefix(candidate.label || '');
@@ -57,6 +59,25 @@ function autocompleteReplaceStart(candidate, text, wordStart) {
             }
         }
     }
+
+    if (Number.isFinite(caret) && caret > replaceStart) {
+        const insertText = String(candidate.insertText || candidate.label || '')
+            .replace(/\r\n/g, '\n')
+            .replace(/\r/g, '\n');
+        const textBeforeCaret = text.slice(0, caret);
+        const currentReplaceLength = caret - replaceStart;
+        const maxOverlap = Math.min(textBeforeCaret.length, insertText.length);
+
+        for (let length = maxOverlap; length > currentReplaceLength; length--) {
+            const existingSuffix = textBeforeCaret.slice(textBeforeCaret.length - length);
+            const insertPrefix = insertText.slice(0, length);
+            if (normalizeAutocompleteComparisonText(existingSuffix) === normalizeAutocompleteComparisonText(insertPrefix)) {
+                replaceStart = caret - length;
+                break;
+            }
+        }
+    }
+
     return replaceStart;
 }
 
@@ -232,7 +253,7 @@ function triggerAutocomplete(element) {
     const textBeforeCaret = text.slice(0, caret);
     const candidates = getAutocompleteCandidates(word, textBeforeCaret)
         .filter(candidate => {
-            const replaceStart = autocompleteReplaceStart(candidate, text, start);
+            const replaceStart = autocompleteReplaceStart(candidate, text, start, caret);
             const typedText = text.slice(replaceStart, caret);
             const fullTypedText = text.slice(replaceStart, end);
             return !isAutocompleteSameAsInput(candidate, typedText)
@@ -251,6 +272,7 @@ function triggerAutocomplete(element) {
     autocompleteState.activeIndex = preserveActiveIndex ? Math.min(autocompleteState.activeIndex, candidates.length - 1) : 0;
     autocompleteState.element = element;
     autocompleteState.wordStart = start;
+    autocompleteState.caret = caret;
     autocompleteState.word = word;
     autocompleteState.textBeforeCaret = textBeforeCaret;
 
@@ -297,6 +319,8 @@ function hideAutocomplete(suppressMs = 0) {
     autocompleteState.candidates = [];
     autocompleteState.activeIndex = 0;
     autocompleteState.element = null;
+    autocompleteState.caret = 0;
+    autocompleteState.textBeforeCaret = '';
     if (suppressMs > 0) {
         autocompleteState.suppressUntil = performance.now() + suppressMs;
     }
@@ -326,8 +350,13 @@ function insertSelectedCandidate() {
     }
 
     const text = lineTextFromElement(element);
-    let wordStart = autocompleteReplaceStart(candidate, text, autocompleteState.wordStart);
-    const caret = getCaretOffset(element);
+    const currentCaret = getCaretOffset(element);
+    const savedCaret = Math.max(0, Math.min(Number(autocompleteState.caret || 0), text.length));
+    const savedTextBeforeCaret = autocompleteState.textBeforeCaret || '';
+    const caret = text.slice(0, currentCaret) === savedTextBeforeCaret
+        ? currentCaret
+        : savedCaret;
+    let wordStart = autocompleteReplaceStart(candidate, text, autocompleteState.wordStart, caret);
 
     replaceWordWithAutocompleteText(element, wordStart, caret, candidate.insertText || candidate.label || '');
     hideAutocomplete();
@@ -338,7 +367,10 @@ function replaceWordWithAutocompleteText(element, wordStart, caret, insertText) 
     const normalized = String(insertText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     if (!normalized.includes('\n')) {
         const nextText = text.slice(0, wordStart) + normalized + text.slice(caret);
-        updateSingleLine(element, nextText, wordStart + normalized.length);
+        const nextCaret = wordStart + normalized.length;
+        const lineNumber = Number(element.dataset.line || 1);
+        updateSingleLine(element, nextText, nextCaret);
+        setTimeout(() => focusLine(lineNumber, nextCaret), 0);
         return;
     }
 
