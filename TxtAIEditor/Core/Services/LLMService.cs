@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
@@ -307,22 +310,12 @@ namespace TxtAIEditor.Core.Services
         // Exa Search Implementation
         // ----------------------------------------------------
         private static readonly HttpClient _exaHttpClient = new HttpClient();
+        private const int NoKeyFetchMaxCharacters = 6000;
 
         private static bool IsExaMcpEndpoint(string endpoint)
         {
             return endpoint.Contains("/mcp", StringComparison.OrdinalIgnoreCase) ||
                    endpoint.Contains("/sse", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private string GetMissingExaApiKeyMessage()
-        {
-            string langCode = GetActiveLanguage();
-            return langCode switch
-            {
-                "ja-JP" => "エラー: Exa API Keyが設定されていません。設定を開いて保存するか、EXA_API_KEY環境変数をご設定ください。",
-                "en-US" => "Error: Exa API Key is not set. Please open Settings to save it, or configure the EXA_API_KEY environment variable.",
-                _ => "에러: Exa API Key가 설정되어 있지 않습니다. 설정을 열어 저장하거나, EXA_API_KEY 환경 변수를 설정해 주십시오."
-            };
         }
 
         public async Task<string> SearchExaAsync(string query, int numResults, CancellationToken cancellationToken = default)
@@ -363,7 +356,7 @@ namespace TxtAIEditor.Core.Services
 
             if (string.IsNullOrEmpty(apiKey))
             {
-                return GetMissingExaApiKeyMessage();
+                return await SearchWebWithoutApiKeyAsync(query, numResults, cancellationToken);
             }
 
             int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
@@ -453,6 +446,73 @@ namespace TxtAIEditor.Core.Services
             catch (Exception ex)
             {
                 return $"Exa search exception occurred: {ex.Message}";
+            }
+        }
+
+        private async Task<string> SearchWebWithoutApiKeyAsync(string query, int numResults, CancellationToken cancellationToken)
+        {
+            int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
+            string requestUrl = "https://duckduckgo.com/html/?q=" + Uri.EscapeDataString(query);
+
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, requestUrl))
+                {
+                    AddNoKeyWebHeaders(request);
+
+                    using (var response = await _exaHttpClient.SendAsync(request, cancellationToken))
+                    {
+                        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            return $"No-key web search failed ({response.StatusCode}): {LimitText(StripHtmlToText(responseBody), 1000)}";
+                        }
+
+                        var matches = Regex.Matches(
+                            responseBody,
+                            "<a[^>]*class=[\"'][^\"']*result__a[^\"']*[\"'][^>]*href=[\"'](?<href>[^\"']+)[\"'][^>]*>(?<title>.*?)</a>",
+                            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+                        var seenUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        var sb = new StringBuilder();
+                        int index = 1;
+
+                        foreach (Match match in matches)
+                        {
+                            if (index > resultsCount)
+                            {
+                                break;
+                            }
+
+                            string title = StripHtmlToText(match.Groups["title"].Value);
+                            string url = DecodeDuckDuckGoHref(match.Groups["href"].Value);
+                            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(url) || !seenUrls.Add(url))
+                            {
+                                continue;
+                            }
+
+                            sb.AppendLine($"[{index}] Title: {title}");
+                            sb.AppendLine($"URL: {url}");
+                            sb.AppendLine("Snippet: No-key fallback result from DuckDuckGo HTML search.");
+                            sb.AppendLine();
+                            index++;
+                        }
+
+                        if (sb.Length == 0)
+                        {
+                            string pageText = LimitText(StripHtmlToText(responseBody), 1000);
+                            return string.IsNullOrWhiteSpace(pageText)
+                                ? "No-key web search returned no results."
+                                : $"No-key web search returned no parsed results. Raw page text:\n{pageText}";
+                        }
+
+                        return sb.ToString().TrimEnd();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"No-key web search exception occurred: {ex.Message}";
             }
         }
 
@@ -818,7 +878,7 @@ namespace TxtAIEditor.Core.Services
 
             if (string.IsNullOrEmpty(apiKey))
             {
-                return GetMissingExaApiKeyMessage();
+                return await FetchUrlsWithoutApiKeyAsync(urls, cancellationToken);
             }
 
             // Fallback direct REST API call: POST https://api.exa.ai/contents
@@ -894,6 +954,154 @@ namespace TxtAIEditor.Core.Services
             {
                 return $"Exa fetch exception occurred: {ex.Message}";
             }
+        }
+
+        private async Task<string> FetchUrlsWithoutApiKeyAsync(string[] urls, CancellationToken cancellationToken)
+        {
+            var sb = new StringBuilder();
+            int index = 1;
+
+            foreach (string rawUrl in urls)
+            {
+                string url = (rawUrl ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    continue;
+                }
+
+                if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    url = "https://" + url;
+                }
+
+                sb.AppendLine($"[{index}] URL: {url}");
+
+                try
+                {
+                    using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                    {
+                        AddNoKeyWebHeaders(request);
+
+                        using (var response = await _exaHttpClient.SendAsync(request, cancellationToken))
+                        {
+                            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                sb.AppendLine($"Fetch failed ({response.StatusCode}): {LimitText(StripHtmlToText(responseBody), 1000)}");
+                                sb.AppendLine();
+                                index++;
+                                continue;
+                            }
+
+                            string title = ExtractHtmlTitle(responseBody);
+                            if (!string.IsNullOrWhiteSpace(title))
+                            {
+                                sb.AppendLine($"Title: {title}");
+                            }
+
+                            sb.AppendLine("Content:");
+                            sb.AppendLine(LimitText(StripHtmlToText(responseBody), NoKeyFetchMaxCharacters));
+                            sb.AppendLine();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sb.AppendLine($"Fetch exception occurred: {ex.Message}");
+                    sb.AppendLine();
+                }
+
+                index++;
+            }
+
+            return sb.Length == 0
+                ? "No-key web fetch failed: urls list is empty."
+                : sb.ToString().TrimEnd();
+        }
+
+        private static void AddNoKeyWebHeaders(HttpRequestMessage request)
+        {
+            request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36 TxtAIEditor/1.0");
+            request.Headers.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+            request.Headers.AcceptLanguage.ParseAdd("ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7");
+        }
+
+        private static string DecodeDuckDuckGoHref(string href)
+        {
+            string decoded = WebUtility.HtmlDecode(href ?? string.Empty);
+            string uddg = GetQueryStringValue(decoded, "uddg");
+            if (!string.IsNullOrWhiteSpace(uddg))
+            {
+                return Uri.UnescapeDataString(uddg);
+            }
+
+            if (decoded.StartsWith("//", StringComparison.Ordinal))
+            {
+                return "https:" + decoded;
+            }
+
+            if (decoded.StartsWith("/", StringComparison.Ordinal))
+            {
+                return "https://duckduckgo.com" + decoded;
+            }
+
+            return decoded;
+        }
+
+        private static string GetQueryStringValue(string url, string name)
+        {
+            int questionIndex = url.IndexOf('?');
+            string query = questionIndex >= 0 ? url.Substring(questionIndex + 1) : url;
+            string[] pairs = query.Split('&', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (string pair in pairs)
+            {
+                int equalsIndex = pair.IndexOf('=');
+                string key = equalsIndex >= 0 ? pair.Substring(0, equalsIndex) : pair;
+                if (!key.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return equalsIndex >= 0 ? pair.Substring(equalsIndex + 1) : string.Empty;
+            }
+
+            return string.Empty;
+        }
+
+        private static string ExtractHtmlTitle(string html)
+        {
+            var match = Regex.Match(html ?? string.Empty, "<title[^>]*>(?<title>.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            return match.Success ? StripHtmlToText(match.Groups["title"].Value) : string.Empty;
+        }
+
+        private static string StripHtmlToText(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return string.Empty;
+            }
+
+            string text = Regex.Replace(html, "<(script|style|svg|noscript)[^>]*>.*?</\\1>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            text = Regex.Replace(text, "</?(br|p|div|li|h[1-6]|tr|section|article|header|footer|main|nav)[^>]*>", "\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, "<[^>]+>", " ", RegexOptions.Singleline);
+            text = WebUtility.HtmlDecode(text);
+            text = text.Replace('\u00A0', ' ');
+            text = Regex.Replace(text, "[ \\t\\f\\v]+", " ");
+            text = Regex.Replace(text, "\\s*\\n\\s*", "\n");
+            text = Regex.Replace(text, "\\n{3,}", "\n\n");
+            return text.Trim();
+        }
+
+        private static string LimitText(string text, int maxCharacters)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= maxCharacters)
+            {
+                return text;
+            }
+
+            return text.Substring(0, maxCharacters) + "...";
         }
     }
 }
