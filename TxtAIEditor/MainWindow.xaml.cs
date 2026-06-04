@@ -2540,7 +2540,6 @@ namespace TxtAIEditor
                             _settingsService.CurrentSettings,
                             isReadOnly: isReadOnly,
                             initialLines: encryptedSession.GetLines(1, InitialEditorLineWarmupCount));
-                        await encryptedBridgeGroup.Bridge.SetLanguageAsync(tab.FilePath);
                     }
 
                     UpdateLivePreview(tab);
@@ -2558,6 +2557,9 @@ namespace TxtAIEditor
                 tab.EncodingName = readResult.EncodingName;
                 tab.EncodingWasAutoDetected = readResult.EncodingWasAutoDetected;
                 tab.IsDirty = false;
+                tab.OriginalContent = readResult.Model.GetText();
+                tab.OriginalLineEnding = readResult.Model.LineEnding;
+                tab.OriginalEncodingName = readResult.EncodingName;
                 var session = new EditorDocumentSession(tab, readResult.Model);
                 _editorSessions[tab.Id] = session;
 
@@ -2569,7 +2571,6 @@ namespace TxtAIEditor
                         _settingsService.CurrentSettings,
                         isReadOnly: isReadOnly,
                         initialLines: session.GetLines(1, InitialEditorLineWarmupCount));
-                    await bridgeGroup.Bridge.SetLanguageAsync(tab.FilePath);
                 }
 
                 UpdateLivePreview(tab);
