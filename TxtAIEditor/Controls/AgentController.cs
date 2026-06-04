@@ -260,7 +260,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                string workspaceContext = BuildWorkspaceContext();
+                string workspaceContext = BuildWorkspaceContext(instruction);
                 var initialTranscriptBuilder = new StringBuilder();
                 if (_sessionHistory.Length > 0)
                 {
@@ -750,12 +750,14 @@ namespace TxtAIEditor.Controls
             return $"{timestamp}  Agent {modeText}: {TruncateForActivity(instruction)}";
         }
 
-        private string BuildWorkspaceContext()
+        private string BuildWorkspaceContext(string instruction)
         {
             var context = new List<string>();
             context.Add("[Workspace root]");
             context.Add(_fileTools.WorkspaceRoot);
             context.Add("");
+
+            AddReferencedPathContext(context, instruction);
 
             var openTabs = _openTabsProvider();
             if (openTabs.Count > 0)
@@ -815,6 +817,135 @@ namespace TxtAIEditor.Controls
             }
 
             return string.Join(Environment.NewLine, context);
+        }
+
+        private void AddReferencedPathContext(List<string> context, string instruction)
+        {
+            var mentionedPaths = ExtractMentionedPaths(instruction).Take(20).ToList();
+            if (mentionedPaths.Count == 0)
+            {
+                return;
+            }
+
+            context.Add("[User-referenced file names]");
+            context.Add("Use these exact file names and paths. Do not translate, romanize, or rename them.");
+            foreach (string mentionedPath in mentionedPaths)
+            {
+                context.Add($"- Mentioned exactly: {mentionedPath}");
+                var matches = FindWorkspacePathMatches(mentionedPath, 5).ToList();
+                if (matches.Count == 0)
+                {
+                    context.Add("  Workspace match: not found yet; if the user asked to create/save this file, create it with exactly this name.");
+                }
+                else
+                {
+                    foreach (string match in matches)
+                    {
+                        context.Add($"  Workspace match: {match}");
+                    }
+                }
+            }
+            context.Add("");
+        }
+
+        private IEnumerable<string> ExtractMentionedPaths(string instruction)
+        {
+            if (string.IsNullOrWhiteSpace(instruction))
+            {
+                yield break;
+            }
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            const string extensions = "csv|md|txt|json|xml|html|htm|css|js|ts|tsx|jsx|cs|xaml|py|rs|java|kt|cpp|c|h|hpp|sql|xlsx|xls|docx|pptx|pdf|png|jpg|jpeg|webp|gif|bmp";
+            string pattern = $@"(?<path>[^\s""'<>|:*?\r\n]+?\.(?:{extensions}))(?=$|[\s""'<>|,.;:!?()\[\]{{}}]|[가-힣])";
+            foreach (Match match in Regex.Matches(instruction, pattern, RegexOptions.IgnoreCase))
+            {
+                string path = match.Groups["path"].Value
+                    .Trim()
+                    .Trim('.', ',', ';', ':', '!', '?', ')', ']', '}');
+
+                if (string.IsNullOrWhiteSpace(path) ||
+                    path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (seen.Add(path))
+                {
+                    yield return path;
+                }
+            }
+        }
+
+        private IEnumerable<string> FindWorkspacePathMatches(string mentionedPath, int maxResults)
+        {
+            string root = _fileTools.WorkspaceRoot;
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            {
+                yield break;
+            }
+
+            string normalizedMention = mentionedPath.Replace('\\', '/');
+            string mentionedFileName = Path.GetFileName(mentionedPath);
+            int count = 0;
+
+            foreach (string filePath in EnumerateWorkspaceFilesForContext(root))
+            {
+                string relative = Path.GetRelativePath(root, filePath).Replace('\\', '/');
+                bool isMatch = string.Equals(relative, normalizedMention, StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(Path.GetFileName(filePath), mentionedFileName, StringComparison.OrdinalIgnoreCase);
+                if (!isMatch)
+                {
+                    continue;
+                }
+
+                yield return relative;
+                count++;
+                if (count >= maxResults)
+                {
+                    yield break;
+                }
+            }
+        }
+
+        private static IEnumerable<string> EnumerateWorkspaceFilesForContext(string root)
+        {
+            var excludedDirectoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".git", ".vs", "bin", "obj", "node_modules", ".next", "dist", "build"
+            };
+
+            var pending = new Stack<string>();
+            pending.Push(root);
+            while (pending.Count > 0)
+            {
+                string dir = pending.Pop();
+                IEnumerable<string> files;
+                IEnumerable<string> subdirs;
+                try
+                {
+                    files = Directory.EnumerateFiles(dir);
+                    subdirs = Directory.EnumerateDirectories(dir);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (string file in files)
+                {
+                    yield return file;
+                }
+
+                foreach (string subdir in subdirs)
+                {
+                    if (!excludedDirectoryNames.Contains(Path.GetFileName(subdir)))
+                    {
+                        pending.Push(subdir);
+                    }
+                }
+            }
         }
 
         private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForCurrentRun()
@@ -1155,6 +1286,11 @@ namespace TxtAIEditor.Controls
                 if (normalizedToolName == "replace_in_file")
                 {
                     string path = GetPathArgument(arguments);
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        return "replace_in_file failed: path is empty. Provide the exact file path from the user task; do not use the active tab title as a fallback.";
+                    }
+
                     string oldText = GetFirstStringArgument(arguments, "oldText", "old_text", "find", "search", "target", "before");
                     string newText = GetFirstStringArgument(arguments, "newText", "new_text", "replace", "replacement", "after");
                     string content = GetFirstStringArgument(arguments, "content", "text");
@@ -1186,21 +1322,10 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "path"),
                             GetIntArgument(arguments, "startLine", 1),
                             GetIntArgument(arguments, "lineCount", 160)),
-                        "create_file" => await _fileTools.CreateFileAsync(
-                            GetPathArgument(arguments),
-                            GetStringArgument(arguments, "content")),
-                        "overwrite_file" => await _fileTools.OverwriteFileAsync(
-                            GetPathArgument(arguments),
-                            GetFirstStringArgument(arguments, "content", "newText", "new_text", "text")),
-                        "replace_range" => await _fileTools.ReplaceRangeAsync(
-                            GetPathArgument(arguments),
-                            GetIntArgument(arguments, "startLine", 1),
-                            GetIntArgument(arguments, "endLine", 1),
-                            GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
-                            GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected")),
-                        "apply_patch" => await _fileTools.ApplyPatchAsync(
-                            GetPathArgument(arguments),
-                            GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content")),
+                        "create_file" => await CreateFileToolAsync(arguments),
+                        "overwrite_file" => await OverwriteFileToolAsync(arguments),
+                        "replace_range" => await ReplaceRangeToolAsync(arguments),
+                        "apply_patch" => await ApplyPatchToolAsync(arguments),
                         "insert_text" => await InsertTextToolAsync(
                             GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
                         "web_search_exa" => await _llmService.SearchExaAsync(
@@ -1759,7 +1884,7 @@ namespace TxtAIEditor.Controls
                 return path;
             }
 
-            return _activeTabProvider()?.FilePath ?? string.Empty;
+            return string.Empty;
         }
 
         private static string GetFirstStringArgument(JsonElement arguments, params string[] names)
@@ -1824,6 +1949,59 @@ namespace TxtAIEditor.Controls
             }
 
             return int.TryParse(value.GetString(), out int parsed) ? parsed : fallback;
+        }
+
+        private async Task<string> CreateFileToolAsync(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "create_file failed: path is empty. Provide the exact output file path requested by the user.";
+            }
+
+            return await _fileTools.CreateFileAsync(path, GetStringArgument(arguments, "content"));
+        }
+
+        private async Task<string> OverwriteFileToolAsync(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "overwrite_file failed: path is empty. Provide the exact output file path requested by the user; do not use the active tab title as a fallback.";
+            }
+
+            return await _fileTools.OverwriteFileAsync(
+                path,
+                GetFirstStringArgument(arguments, "content", "newText", "new_text", "text"));
+        }
+
+        private async Task<string> ReplaceRangeToolAsync(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "replace_range failed: path is empty. Provide the exact file path from the user task; do not use the active tab title as a fallback.";
+            }
+
+            return await _fileTools.ReplaceRangeAsync(
+                path,
+                GetIntArgument(arguments, "startLine", 1),
+                GetIntArgument(arguments, "endLine", 1),
+                GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
+                GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected"));
+        }
+
+        private async Task<string> ApplyPatchToolAsync(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "apply_patch failed: path is empty. Provide the exact file path from the user task; do not use the active tab title as a fallback.";
+            }
+
+            return await _fileTools.ApplyPatchAsync(
+                path,
+                GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content"));
         }
 
         private async Task<string> InsertTextToolAsync(string content)
@@ -2065,7 +2243,7 @@ namespace TxtAIEditor.Controls
             string systemPrompt = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildSystemPrompt(langCode);
 
             string instruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
-            string workspaceContext = BuildWorkspaceContext();
+            string workspaceContext = BuildWorkspaceContext(instruction);
             string selectedText = BuildActiveSelectionContext();
 
             var initialTranscriptBuilder = new StringBuilder();

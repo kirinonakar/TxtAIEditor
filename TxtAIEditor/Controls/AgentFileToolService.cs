@@ -106,10 +106,15 @@ namespace TxtAIEditor.Controls
 
         public async Task<string> ReadFileAsync(string path, int startLine, int lineCount)
         {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "read_file failed: path is empty. Provide the exact file path from the user task or list_files.";
+            }
+
             string fullPath = ResolveInsideWorkspace(path, allowOutside: true);
             if (!File.Exists(fullPath))
             {
-                return $"read_file failed: file not found: {path}";
+                return BuildMissingFileMessage("read_file", path);
             }
 
             int start = Math.Max(1, startLine <= 0 ? 1 : startLine);
@@ -154,6 +159,60 @@ namespace TxtAIEditor.Controls
             }
 
             return builder.ToString();
+        }
+
+        private string BuildMissingFileMessage(string toolName, string path)
+        {
+            var builder = new StringBuilder();
+            builder.Append($"{toolName} failed: file not found: {path}");
+
+            var suggestions = SuggestWorkspaceFiles(path, 10).ToList();
+            if (suggestions.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine("Possible workspace matches. Preserve exact non-English file names; do not translate them:");
+                foreach (string suggestion in suggestions)
+                {
+                    builder.AppendLine($"- {suggestion}");
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private IEnumerable<string> SuggestWorkspaceFiles(string path, int maxResults)
+        {
+            string root = ResolveWorkspaceRoot();
+            string requestedName = Path.GetFileName(path);
+            string requestedExtension = Path.GetExtension(path);
+            var yielded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string filePath in EnumerateWorkspaceFiles(root))
+            {
+                string relative = RelativePath(root, filePath);
+                if (string.Equals(Path.GetFileName(filePath), requestedName, StringComparison.OrdinalIgnoreCase) &&
+                    yielded.Add(relative))
+                {
+                    yield return relative;
+                    if (yielded.Count >= maxResults) yield break;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(requestedExtension))
+            {
+                yield break;
+            }
+
+            foreach (string filePath in EnumerateWorkspaceFiles(root))
+            {
+                string relative = RelativePath(root, filePath);
+                if (string.Equals(Path.GetExtension(filePath), requestedExtension, StringComparison.OrdinalIgnoreCase) &&
+                    yielded.Add(relative))
+                {
+                    yield return relative;
+                    if (yielded.Count >= maxResults) yield break;
+                }
+            }
         }
 
         public async Task<string> RunRgAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)

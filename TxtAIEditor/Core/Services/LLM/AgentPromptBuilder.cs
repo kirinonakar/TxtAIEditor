@@ -69,6 +69,12 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- Use run_rg for regex, case-sensitive, context lines, or large workspace search.");
             builder.AppendLine("- Use run_powershell only when no internal tool can do the job.");
             builder.AppendLine();
+            builder.AppendLine("Path rules:");
+            builder.AppendLine("- Preserve user-provided file names exactly, including non-English names. Never translate, romanize, or replace them with English equivalents.");
+            builder.AppendLine("- If the user says 자산.csv, use exactly 자산.csv, not assets.csv. If the user says 분석2.md, create or write exactly 분석2.md.");
+            builder.AppendLine("- If a [User-referenced file names] section is present, prefer the listed workspace match for reads and the exact mentioned name for requested new output files.");
+            builder.AppendLine("- File-writing tools require an explicit path argument. Do not omit path and rely on the active tab.");
+            builder.AppendLine();
             builder.AppendLine("Tool call protocol:");
             builder.AppendLine("- When you need a tool, output exactly one XML tag and nothing else:");
             builder.AppendLine("<tool_call>{\"name\":\"read_file\",\"arguments\":{\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":1,\"lineCount\":120}}</tool_call>");
