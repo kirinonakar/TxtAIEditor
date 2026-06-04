@@ -275,7 +275,11 @@ namespace TxtAIEditor.Controls
                 string transcript = initialTranscript;
                 string response = string.Empty;
 
-                for (int step = 0; step < 8; step++)
+                bool completed = false;
+                bool reachedToolStepLimit = false;
+                const int maxToolSteps = 8;
+
+                for (int step = 0; step < maxToolSteps; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string thinkingLabel = _getString("AgentActivityThinking", "생각중");
@@ -482,6 +486,7 @@ namespace TxtAIEditor.Controls
                         _sessionHistory.AppendLine($"[Agent Response]: {response.Trim()}");
                         _sessionHistory.AppendLine();
 
+                        completed = true;
                         break;
                     }
 
@@ -532,9 +537,8 @@ namespace TxtAIEditor.Controls
                     });
 
                     // Selection-edit verification: after a file-edit tool succeeds on the
-                    // selection's file, read the affected lines back to verify the change.
-                    // If the content differs from the original selection, stop the loop to
-                    // prevent the agent from modifying unrelated parts of the file.
+                    // selection's file, inspect the raw affected lines. Do not use read_file
+                    // here because its headers/line numbers would make every comparison differ.
                     string verifyToolName = NormalizeToolName(toolName);
                     bool isFileEditTool = verifyToolName is "replace_in_file" or "replace_range"
                         or "apply_patch" or "overwrite_file";
@@ -558,15 +562,12 @@ namespace TxtAIEditor.Controls
                                 Path.GetFullPath(resolvedSelection),
                                 StringComparison.OrdinalIgnoreCase))
                             {
-                                int verifyLineCount = _lastSelectionEndLine - _lastSelectionStartLine + 1;
-                                string verifyContent = await _fileTools.ReadFileAsync(
-                                    editedPath, _lastSelectionStartLine, verifyLineCount);
+                                string verifyContent = await ReadRawLineRangeAsync(
+                                    resolvedSelection,
+                                    _lastSelectionStartLine,
+                                    _lastSelectionEndLine);
 
-                                if (!string.IsNullOrEmpty(verifyContent)
-                                    && !string.Equals(
-                                        verifyContent.Trim(),
-                                        _lastSelectionText.Trim(),
-                                        StringComparison.Ordinal))
+                                if (SelectionLineRangeChanged(verifyContent, _lastSelectionText))
                                 {
                                     string verifyMsg = _getString(
                                         "AgentSelectionEditVerified",
@@ -588,12 +589,40 @@ namespace TxtAIEditor.Controls
                                     }
                                     _sessionHistory.AppendLine();
 
+                                    completed = true;
                                     break;
                                 }
                             }
                         }
                         catch { /* verification is best-effort; continue the loop on failure */ }
                     }
+
+                    if (step == maxToolSteps - 1)
+                    {
+                        reachedToolStepLimit = true;
+                    }
+                }
+
+                if (!completed && reachedToolStepLimit)
+                {
+                    string limitMsg = _getString(
+                        "AgentToolStepLimitReached",
+                        "도구 호출 한도에 도달해 작업을 중단했습니다. 지금까지의 결과를 검토한 뒤 다시 실행해 주세요.");
+
+                    await RunOnUIThreadAsync(() =>
+                    {
+                        AppendActivity(limitMsg);
+                        _agentPane.AppendOutputLine(limitMsg);
+                    });
+
+                    _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                    string runTranscript = transcript.Substring(initialTranscript.Length);
+                    if (!string.IsNullOrWhiteSpace(runTranscript))
+                    {
+                        _sessionHistory.AppendLine(runTranscript.Trim());
+                    }
+                    _sessionHistory.AppendLine("[Agent Response]: Tool step limit reached before a final answer.");
+                    _sessionHistory.AppendLine();
                 }
             }
             catch (OperationCanceledException)
@@ -1274,6 +1303,67 @@ namespace TxtAIEditor.Controls
             };
         }
 
+        private static async Task<string> ReadRawLineRangeAsync(string fullPath, int startLine, int endLine)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath) || !File.Exists(fullPath))
+            {
+                return string.Empty;
+            }
+
+            int start = Math.Max(1, startLine);
+            int end = Math.Max(start, endLine);
+            var lines = new List<string>();
+            int currentLine = 0;
+
+            using (var reader = new StreamReader(fullPath, Encoding.UTF8))
+            {
+                string? line;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    currentLine++;
+                    if (currentLine >= start && currentLine <= end)
+                    {
+                        lines.Add(line);
+                    }
+
+                    if (currentLine > end)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return string.Join("\n", lines);
+        }
+
+        private static bool SelectionLineRangeChanged(string currentLineRange, string originalSelection)
+        {
+            string current = NormalizeForSelectionCompare(currentLineRange);
+            string original = NormalizeForSelectionCompare(originalSelection);
+            if (string.IsNullOrEmpty(current) || string.IsNullOrEmpty(original))
+            {
+                return false;
+            }
+
+            if (string.Equals(current, original, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            // For partial-line selections, the raw line range can differ from the exact
+            // selection even before any edit. Only treat it as changed when the original
+            // selected text no longer appears in the affected line window.
+            return !current.Contains(original, StringComparison.Ordinal);
+        }
+
+        private static string NormalizeForSelectionCompare(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n')
+                .Trim();
+        }
+
         private static string TruncateForActivity(string value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -1555,7 +1645,19 @@ namespace TxtAIEditor.Controls
                 payload = text.Substring(jsonStart).Trim();
             }
 
-            return payload.StartsWith("{", StringComparison.Ordinal);
+            if (payload.StartsWith("{", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            int openBraceIndex = payload.IndexOf('{');
+            if (openBraceIndex <= 0)
+            {
+                return false;
+            }
+
+            string possibleName = payload.Substring(0, openBraceIndex).Trim();
+            return Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$");
         }
 
         private static bool TryExtractBalancedJsonObject(string text, int jsonStart, out string json)
