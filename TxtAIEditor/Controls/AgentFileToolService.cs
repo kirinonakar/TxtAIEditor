@@ -1038,6 +1038,7 @@ namespace TxtAIEditor.Controls
             string normalizedPath = relativePath.Replace('\\', '/');
             string normalizedGlob = glob.Replace('\\', '/');
             string pattern = "^" + Regex.Escape(normalizedGlob)
+                .Replace("\\*\\*/", "(?:.*/)?", StringComparison.Ordinal)
                 .Replace("\\*\\*", ".*", StringComparison.Ordinal)
                 .Replace("\\*", "[^/]*", StringComparison.Ordinal)
                 .Replace("\\?", ".", StringComparison.Ordinal) + "$";
