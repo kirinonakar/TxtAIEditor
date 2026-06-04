@@ -773,7 +773,7 @@ function printDocument(fullText) {
     var editorFontSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size').trim()) || 13;
     var printFontSize = Math.max(16, editorFontSize * 1.2);
 
-    printContainer.style.cssText = 'display:block; font-family: ' + getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim() + '; font-size: ' + printFontSize + 'px; white-space: pre; padding: 20px; color: ' + currentFg + '; background: ' + currentBg + '; margin: 0; position: absolute; inset: 0; z-index: 1000; overflow: auto;';
+    printContainer.style.cssText = 'display:block; font-family: ' + getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim() + '; font-size: ' + printFontSize + 'px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; padding: 20px; color: ' + currentFg + '; background: ' + currentBg + '; margin: 0; position: absolute; inset: 0; z-index: 1000; overflow: auto;';
     editorHost.style.display = 'none';
 
     var baseFontSize = printFontSize;

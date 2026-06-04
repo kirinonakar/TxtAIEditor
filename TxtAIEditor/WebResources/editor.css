@@ -1150,6 +1150,9 @@ mark.active-match {
         inset: auto !important;
         padding: 0 !important;
         overflow: visible !important;
+        white-space: pre-wrap !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-all !important;
     }
 
     .line-number {
