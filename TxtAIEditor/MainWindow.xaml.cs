@@ -1014,6 +1014,8 @@ namespace TxtAIEditor
             EditorDocumentSession session,
             bool isReadOnly)
         {
+            Func<EditorDocumentSession> getSession = () => _editorSessions.TryGetValue(tab.Id, out var s) ? s : session;
+
             editorWebView.GotFocus += (sender, args) =>
             {
                 this.DispatcherQueue.TryEnqueue(() =>
@@ -1035,6 +1037,7 @@ namespace TxtAIEditor
             {
                 this.DispatcherQueue.TryEnqueue(() =>
                 {
+                    var currentSession = getSession();
                     switch (shortcutName)
                     {
                         case "f9":
@@ -1078,7 +1081,7 @@ namespace TxtAIEditor
                             break;
                         case "undo":
                             {
-                                var text = session.Undo();
+                                var text = currentSession.Undo();
                                 if (text != null)
                                 {
                                     MarkTabDirty(tab, tabItem);
@@ -1091,7 +1094,7 @@ namespace TxtAIEditor
                             break;
                         case "redo":
                             {
-                                var text = session.Redo();
+                                var text = currentSession.Redo();
                                 if (text != null)
                                 {
                                     MarkTabDirty(tab, tabItem);
@@ -1108,12 +1111,13 @@ namespace TxtAIEditor
 
             bridge.EditorReady += async () =>
             {
+                var currentSession = getSession();
                 await bridge.InitializeModelAsync(
-                    session.Model.LineCount,
+                    currentSession.Model.LineCount,
                     tab.Language,
                     _settingsService.CurrentSettings,
                     isReadOnly,
-                    session.GetLines(1, InitialEditorLineWarmupCount));
+                    currentSession.GetLines(1, InitialEditorLineWarmupCount));
                 await bridge.UpdateSnippetsAsync(_snippetService.GetSnippets());
                 await bridge.UpdateScrollSyncStateAsync(_scrollSyncEnabled);
                 await bridge.SetInlineLivePreviewAsync(tab.InlineLivePreviewEnabled, GetPreviewBaseHref(tab));
@@ -1138,7 +1142,8 @@ namespace TxtAIEditor
             {
                 try
                 {
-                    var lines = session.GetLines(startLine, count);
+                    var currentSession = getSession();
+                    var lines = currentSession.GetLines(startLine, count);
                     await bridge.SendLinesAsync(requestId, startLine, lines);
                 }
                 catch (Exception ex)
@@ -1149,7 +1154,8 @@ namespace TxtAIEditor
 
             bridge.LineChanged += async (lineNumber, text, isComposing) =>
             {
-                session.ReplaceLine(lineNumber, text);
+                var currentSession = getSession();
+                currentSession.ReplaceLine(lineNumber, text);
 
                 if (!isComposing)
                 {
@@ -1179,7 +1185,8 @@ namespace TxtAIEditor
 
             bridge.LineInsertRequested += async (lineNumber, text) =>
             {
-                int lineCount = session.InsertLine(lineNumber, text);
+                var currentSession = getSession();
+                int lineCount = currentSession.InsertLine(lineNumber, text);
                 MarkTabDirty(tab, tabItem);
                 PropagateDirtyStateToOtherTabs(tab);
                 await bridge.UpdateLineCountAsync(lineCount);
@@ -1190,7 +1197,8 @@ namespace TxtAIEditor
 
             bridge.LineSplitRequested += async (lineNumber, before, after) =>
             {
-                int lineCount = session.SplitLine(lineNumber, before, after);
+                var currentSession = getSession();
+                int lineCount = currentSession.SplitLine(lineNumber, before, after);
                 MarkTabDirty(tab, tabItem);
                 PropagateDirtyStateToOtherTabs(tab);
                 await bridge.UpdateLineCountAsync(lineCount);
@@ -1201,7 +1209,8 @@ namespace TxtAIEditor
 
             bridge.MergeLineWithPreviousRequested += async (lineNumber) =>
             {
-                int lineCount = session.MergeLineWithPrevious(lineNumber);
+                var currentSession = getSession();
+                int lineCount = currentSession.MergeLineWithPrevious(lineNumber);
                 MarkTabDirty(tab, tabItem);
                 PropagateDirtyStateToOtherTabs(tab);
                 await bridge.UpdateLineCountAsync(lineCount);
@@ -1212,7 +1221,8 @@ namespace TxtAIEditor
 
             bridge.DeleteLineRequested += async (lineNumber) =>
             {
-                int lineCount = session.DeleteLine(lineNumber);
+                var currentSession = getSession();
+                int lineCount = currentSession.DeleteLine(lineNumber);
                 MarkTabDirty(tab, tabItem);
                 PropagateDirtyStateToOtherTabs(tab);
                 await bridge.UpdateLineCountAsync(lineCount);
@@ -1223,23 +1233,26 @@ namespace TxtAIEditor
 
             bridge.FindRequested += async (query, startLine, startColumn, reverse, matchCase, isRegex) =>
             {
-                var result = session.Find(query, startLine, startColumn, reverse, matchCase, isRegex);
+                var currentSession = getSession();
+                var result = currentSession.Find(query, startLine, startColumn, reverse, matchCase, isRegex);
                 await bridge.SendFindResultAsync(result, query);
             };
 
             bridge.FindAllRequested += async (query, matchCase, isRegex) =>
             {
-                var results = session.FindAll(query, matchCase, isRegex);
+                var currentSession = getSession();
+                var results = currentSession.FindAll(query, matchCase, isRegex);
                 await bridge.SendFindAllResultsAsync(results, query);
             };
 
             bridge.ReplaceAllRequested += async (query, replace, matchCase, isRegex) =>
             {
-                session.ReplaceAll(query, replace, matchCase, isRegex);
-                string updatedText = session.GetText();
+                var currentSession = getSession();
+                currentSession.ReplaceAll(query, replace, matchCase, isRegex);
+                string updatedText = currentSession.GetText();
                 await bridge.SetTextAsync(updatedText, shouldFocus: false);
                 await SyncEditsToOtherTabsAsync(tab);
-                await bridge.SendFindAllResultsAsync(session.FindAll(query, matchCase, isRegex), query);
+                await bridge.SendFindAllResultsAsync(currentSession.FindAll(query, matchCase, isRegex), query);
 
                 MarkTabDirty(tab, tabItem);
                 PropagateDirtyStateToOtherTabs(tab);
@@ -2491,6 +2504,8 @@ namespace TxtAIEditor
             {
                 if (string.IsNullOrWhiteSpace(tab.FilePath)) return;
 
+                bool isReadOnly = tab.FilePath.EndsWith(".diff", StringComparison.OrdinalIgnoreCase);
+
                 if (tab.IsEncrypted)
                 {
                     string? password = tab.EncryptionPassword;
@@ -2523,7 +2538,7 @@ namespace TxtAIEditor
                             encryptedSession.Model.LineCount,
                             tab.Language,
                             _settingsService.CurrentSettings,
-                            isReadOnly: false,
+                            isReadOnly: isReadOnly,
                             initialLines: encryptedSession.GetLines(1, InitialEditorLineWarmupCount));
                         await encryptedBridgeGroup.Bridge.SetLanguageAsync(tab.FilePath);
                     }
@@ -2552,7 +2567,7 @@ namespace TxtAIEditor
                         session.Model.LineCount,
                         tab.Language,
                         _settingsService.CurrentSettings,
-                        isReadOnly: false,
+                        isReadOnly: isReadOnly,
                         initialLines: session.GetLines(1, InitialEditorLineWarmupCount));
                     await bridgeGroup.Bridge.SetLanguageAsync(tab.FilePath);
                 }
