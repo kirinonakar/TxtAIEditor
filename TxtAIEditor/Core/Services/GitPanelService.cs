@@ -47,7 +47,7 @@ namespace TxtAIEditor.Core.Services
 
                 files.Add(new GitFileItem
                 {
-                    Name = Path.GetFileName(fullPath),
+                    Name = GetDisplayName(fullPath),
                     Path = fullPath,
                     StatusText = $"{statusDesc} ({status.Trim()})",
                     ActionGlyph = isStaged ? "\xE108" : "\xE109",
@@ -84,7 +84,7 @@ namespace TxtAIEditor.Core.Services
                 ? await _fileService.ReadTextFileAsync(filePath)
                 : string.Empty;
 
-            string fileName = Path.GetFileName(filePath);
+            string fileName = GetDisplayName(filePath);
             return new GitComparisonContent
             {
                 Path = filePath,
@@ -114,6 +114,13 @@ namespace TxtAIEditor.Core.Services
         public Task<bool> RestoreAllAsync(string repoPath)
         {
             return _gitService.RestoreAllAsync(repoPath);
+        }
+
+        private static string GetDisplayName(string path)
+        {
+            string normalizedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string name = Path.GetFileName(normalizedPath);
+            return string.IsNullOrWhiteSpace(name) ? normalizedPath : name;
         }
     }
 }

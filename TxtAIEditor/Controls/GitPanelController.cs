@@ -188,7 +188,7 @@ namespace TxtAIEditor.Controls
                 ? await _fileService.ReadTextFileAsync(item.Path)
                 : string.Empty;
 
-            string fileName = Path.GetFileName(item.Path);
+            string fileName = GetDisplayName(item.Path);
             await _openCompareTabAsync(
                 item.Path,
                 item.Path,
@@ -216,7 +216,7 @@ namespace TxtAIEditor.Controls
             var dialog = new ContentDialog
             {
                 Title = "Git 파일 복원",
-                Content = $"{Path.GetFileName(filePath)} 변경 사항을 복원합니다. Untracked 파일은 삭제됩니다.",
+                Content = $"{GetDisplayName(filePath)} 변경 사항을 복원합니다. Untracked 파일은 삭제됩니다.",
                 PrimaryButtonText = "복원",
                 CloseButtonText = "취소",
                 XamlRoot = _xamlRootProvider(),
@@ -499,7 +499,7 @@ namespace TxtAIEditor.Controls
                 contentB = await _gitService.GetCommitFileContentAsync(repoPath, currentHash, relativePath);
             }
 
-            string fileName = Path.GetFileName(relativePath);
+            string fileName = GetDisplayName(relativePath);
             string shortHash = currentHash.Substring(0, 7);
             await _openCompareTabAsync(
                 fullPath,
@@ -524,12 +524,19 @@ namespace TxtAIEditor.Controls
 
             return new GitFileItem
             {
-                Name = Path.GetFileName(fullPath),
+                Name = GetDisplayName(fullPath),
                 Path = fullPath,
                 StatusText = $"{statusDesc} ({status.Trim()})",
                 ActionGlyph = isStaged ? "\xE108" : "\xE109",
                 IsStaged = isStaged
             };
+        }
+
+        private static string GetDisplayName(string path)
+        {
+            string normalizedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string name = Path.GetFileName(normalizedPath);
+            return string.IsNullOrWhiteSpace(name) ? normalizedPath : name;
         }
 
         private void WireEvents()

@@ -85,7 +85,7 @@ namespace TxtAIEditor.Core.Services
                     if (entry.Length >= 4)
                     {
                         string status = entry.Substring(0, 2);
-                        string relativePath = entry.Substring(3).Trim().Replace('/', '\\');
+                        string relativePath = NormalizeStatusPath(entry.Substring(3));
 
                         // In -z porcelain, rename/copy entries are followed by the original path.
                         // Check both index status and worktree status (e.g. status contains 'R' or 'C') to handle unstaged renames correctly.
@@ -94,8 +94,11 @@ namespace TxtAIEditor.Core.Services
                             i++;
                         }
 
-                        string fullPath = Path.GetFullPath(Path.Combine(repoPath, relativePath));
-                        statuses[fullPath] = status;
+                        if (!string.IsNullOrEmpty(relativePath))
+                        {
+                            string fullPath = Path.GetFullPath(Path.Combine(repoPath, relativePath));
+                            statuses[fullPath] = status;
+                        }
                     }
                 }
             }
@@ -105,6 +108,25 @@ namespace TxtAIEditor.Core.Services
             }
 
             return statuses;
+        }
+
+        private static string NormalizeStatusPath(string path)
+        {
+            return path
+                .Replace('/', Path.DirectorySeparatorChar)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
+        private static string ToGitPathSpec(string repoPath, string filePath)
+        {
+            string relativePath = Path.IsPathRooted(filePath)
+                ? Path.GetRelativePath(repoPath, filePath)
+                : filePath;
+
+            return relativePath
+                .Replace(Path.DirectorySeparatorChar, '/')
+                .Replace(Path.AltDirectorySeparatorChar, '/')
+                .TrimEnd('/');
         }
 
         private static string QuotePath(string path)
@@ -163,7 +185,7 @@ namespace TxtAIEditor.Core.Services
             try
             {
                 // Make path relative to repoPath to satisfy git cli arguments
-                string relativePath = Path.GetRelativePath(repoPath, filePath);
+                string relativePath = ToGitPathSpec(repoPath, filePath);
                 string quotedRelativePath = QuotePath(relativePath);
 
                 // Run diff. First check unstaged diff, then cached (staged) diff.
@@ -222,8 +244,8 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                string relativePath = Path.GetRelativePath(repoPath, filePath);
-                string quotedRelativePath = QuotePath(relativePath).Replace('\\', '/');
+                string relativePath = ToGitPathSpec(repoPath, filePath);
+                string quotedRelativePath = QuotePath(relativePath);
 
                 // Try to get staged version first (index :0), then HEAD version
                 string content = await RunGitCommandAsync(repoPath, $"show :0:\"{quotedRelativePath}\"");
@@ -250,7 +272,7 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(filePath))
                 return false;
 
-            string relativePath = Path.GetRelativePath(repoPath, filePath);
+            string relativePath = ToGitPathSpec(repoPath, filePath);
             string output = await RunGitCommandAsync(repoPath, $"add -- \"{QuotePath(relativePath)}\"");
             return !output.StartsWith("fatal:");
         }
@@ -269,7 +291,7 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(filePath))
                 return false;
 
-            string relativePath = Path.GetRelativePath(repoPath, filePath);
+            string relativePath = ToGitPathSpec(repoPath, filePath);
             string output = await RunGitCommandAsync(repoPath, $"restore --staged -- \"{QuotePath(relativePath)}\"");
             return !output.StartsWith("fatal:");
         }
@@ -279,7 +301,7 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(filePath))
                 return false;
 
-            string relativePath = Path.GetRelativePath(repoPath, filePath);
+            string relativePath = ToGitPathSpec(repoPath, filePath);
             string status = await RunGitCommandAsync(repoPath, $"status --porcelain -- \"{QuotePath(relativePath)}\"");
 
             if (status.TrimStart().StartsWith("??", StringComparison.Ordinal))
@@ -406,8 +428,8 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                string relativePath = Path.IsPathRooted(filePath) ? Path.GetRelativePath(repoPath, filePath) : filePath;
-                string quotedRelativePath = QuotePath(relativePath).Replace('\\', '/');
+                string relativePath = ToGitPathSpec(repoPath, filePath);
+                string quotedRelativePath = QuotePath(relativePath);
 
                 string content = await RunGitCommandAsync(repoPath, $"show {commitHash}:\"{quotedRelativePath}\"");
                 if (content.StartsWith("fatal:"))
