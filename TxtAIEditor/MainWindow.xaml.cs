@@ -71,6 +71,9 @@ namespace TxtAIEditor
         private readonly TabCloseController _tabCloseController;
         private readonly TabMoveController _tabMoveController;
         private readonly AutoSaveController _autoSaveController;
+        private readonly MainWindowStartupController _startupController;
+        private readonly MainWindowLifecycleController _lifecycleController;
+        private readonly MainWindowShellInteractionController _shellInteractionController;
         private readonly FileTabLoadController _fileTabLoadController;
         private readonly TerminalPanelController _terminalPanelController;
         private readonly ExplorerNavigationController _explorerNavigationController;
@@ -571,6 +574,52 @@ namespace TxtAIEditor
                 _tabSelectionController.QueueChanged,
                 _tabSelectionController.ClearQueue,
                 UpdateWindowTitle);
+            _startupController = new MainWindowStartupController(
+                this,
+                _settingsService,
+                _viewModel,
+                EditorWorkspace,
+                TerminalPane,
+                TopToolbar,
+                LeftPanelToggle,
+                RightPanelToggle,
+                MarkdownToolbar,
+                PreviewModeCombo,
+                _gitAutoRefreshTimer,
+                _livePreviewController,
+                _snippetsController,
+                _favoritesRecentController,
+                () => _currentRepoPath,
+                NavigateExplorerToFolderAsync,
+                LoadFileIntoTabAsync,
+                () => OpenNewTab(),
+                ApplyLeftSidebarVisibility,
+                ApplyPreviewVisibility,
+                ApplyUiPersonalization,
+                LocalizeUi,
+                ApplyToolbarSettings,
+                RefreshGitStatusUIAsync,
+                UpdateAutoSaveStatus,
+                _dialogController.ShowErrorMessage);
+            _lifecycleController = new MainWindowLifecycleController(
+                this,
+                AppTitleBar,
+                _terminalShortcutService,
+                _functionKeyShortcutService,
+                _autoSaveController,
+                _gitAutoRefreshTimer,
+                _splitImeSyncController,
+                EditorWorkspace,
+                _tabBridges,
+                _livePreviewController);
+            _shellInteractionController = new MainWindowShellInteractionController(
+                RootGrid,
+                DragOverlay,
+                LeftSplitter,
+                RightSplitter,
+                _fileOpenDropController,
+                _shellPanelLayoutService,
+                _rootKeyboardShortcutController);
 
             if (Content is FrameworkElement rootElement)
             {
@@ -587,14 +636,13 @@ namespace TxtAIEditor
 
             // Load local configurations and boot initial states
             // Setup custom title bar
-            SetupCustomTitleBar();
+            _lifecycleController.InitializeTitleBar();
 
             this.Activated += OnWindowActivated;
-            this.Activated += OnWindowActivationChanged;
-            this.Closed += OnWindowClosed;
+            this.Activated += _lifecycleController.HandleActivationChanged;
+            this.Closed += _lifecycleController.HandleWindowClosed;
             this.AppWindow.Closing += OnAppWindowClosing;
-            _terminalShortcutService.Start();
-            _functionKeyShortcutService.Start();
+            _lifecycleController.StartShortcuts();
         }
 
         private void WireLeftSidebarEvents()
@@ -632,82 +680,6 @@ namespace TxtAIEditor
             EditorWorkspace.TerminalPanelHeightChanged += async (_, _) => await SaveUiLayoutSettingsAsync();
         }
 
-        private void SetupCustomTitleBar()
-        {
-            this.ExtendsContentIntoTitleBar = true;
-            this.SetTitleBar(AppTitleBar);
-        }
-
-        private void OnWindowClosed(object sender, WindowEventArgs args)
-        {
-            try
-            {
-                _terminalShortcutService.Stop();
-                _functionKeyShortcutService.Stop();
-            }
-            catch { }
-
-            try
-            {
-                _autoSaveController.Stop();
-                _gitAutoRefreshTimer.Stop();
-                _splitImeSyncController.ClearAll();
-            }
-            catch { }
-
-            try
-            {
-                EditorWorkspace.StopAllTerminalSessions();
-            }
-            catch { }
-
-            foreach (var bridge in _tabBridges.Values)
-            {
-                try { bridge.WebView.Close(); }
-                catch { }
-            }
-            _tabBridges.Clear();
-
-            _livePreviewController.Close();
-
-            try
-            {
-                if (Application.Current is App app)
-                {
-                    app.CleanupAppResources();
-                }
-                else
-                {
-                    Environment.Exit(0);
-                }
-            }
-            catch
-            {
-                Environment.Exit(0);
-            }
-        }
-
-        private void CleanupBeforeRestart()
-        {
-            _terminalShortcutService.Stop();
-            _functionKeyShortcutService.Stop();
-
-            _autoSaveController.Stop();
-            _gitAutoRefreshTimer.Stop();
-            _splitImeSyncController.ClearAll();
-
-            EditorWorkspace.StopAllTerminalSessions();
-
-            foreach (var bridge in _tabBridges.Values)
-            {
-                try { bridge.WebView.Close(); }
-                catch { }
-            }
-            _tabBridges.Clear();
-
-            _livePreviewController.Close();
-        }
-
         private async Task SaveUiLayoutSettingsAsync()
         {
             try
@@ -741,148 +713,10 @@ namespace TxtAIEditor
             }
         }
 
-        private void OnWindowActivationChanged(object sender, WindowActivatedEventArgs e)
-        {
-            if (e.WindowActivationState == WindowActivationState.Deactivated)
-            {
-                _terminalShortcutService.Stop();
-                _functionKeyShortcutService.Stop();
-            }
-            else
-            {
-                _terminalShortcutService.Start();
-                _functionKeyShortcutService.Start();
-            }
-        }
-
         private async void OnWindowActivated(object sender, WindowActivatedEventArgs e)
         {
             this.Activated -= OnWindowActivated;
-
-            try
-            {
-                // 1. Handle command-line file opening or open a blank tab instantly
-                string[] args = Environment.GetCommandLineArgs();
-                var filesToOpen = new List<string>();
-                var foldersToOpen = new List<string>();
-
-                if (args != null && args.Length > 1)
-                {
-                    for (int i = 1; i < args.Length; i++)
-                    {
-                        string arg = args[i];
-                        if (arg.StartsWith("-") || arg.StartsWith("/"))
-                        {
-                            continue;
-                        }
-
-                        try
-                        {
-                            string filePath = arg.Trim('"', '\'');
-                            if (string.IsNullOrWhiteSpace(filePath))
-                            {
-                                continue;
-                            }
-
-                            if (File.Exists(filePath))
-                            {
-                                filesToOpen.Add(filePath);
-                            }
-                            else if (Directory.Exists(filePath))
-                            {
-                                foldersToOpen.Add(filePath);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Failed to pre-check command-line path '{arg}': {ex.Message}");
-                        }
-                    }
-                }
-
-                // Load settings first so InitializeEditorWebView can use the correct theme from the start
-                await _settingsService.LoadSettingsAsync();
-                WindowPlacementService.ApplySavedWindowPlacement(AppWindow, _settingsService.CurrentSettings);
-                EditorWorkspace.LastTerminalHeight = Math.Clamp(_settingsService.CurrentSettings.TerminalPanelHeight, 120, 600);
-                TerminalPane.ApplySettings(_settingsService.CurrentSettings);
-
-                // Load Snippets, Favorites and Recent Files FIRST so opening files can safely update them
-                await _snippetsController.LoadAsync();
-                _favoritesRecentController.RefreshFavorites();
-                _favoritesRecentController.LoadRecentFiles();
-
-                // 2. Apply settings to UI and initialize preview panel WebView2 in the background
-                TopToolbar.WordWrapIsChecked = _settingsService.CurrentSettings.WordWrap;
-                LeftPanelToggle.IsChecked = _settingsService.CurrentSettings.LeftSidebarVisible;
-                ApplyLeftSidebarVisibility(_settingsService.CurrentSettings.LeftSidebarVisible);
-                bool rightPanelVisible = _settingsService.CurrentSettings.RightSidebarVisible && _settingsService.CurrentSettings.DefaultMarkdownEnabled;
-                RightPanelToggle.IsChecked = rightPanelVisible;
-                ApplyPreviewVisibility(rightPanelVisible);
-                TopToolbar.MarkdownToolbarIsChecked = _settingsService.CurrentSettings.DefaultMarkdownToolbarEnabled;
-                MarkdownToolbar.Visibility = _settingsService.CurrentSettings.DefaultMarkdownToolbarEnabled ? Visibility.Visible : Visibility.Collapsed;
-                PreviewModeCombo.SelectedIndex = 0;
-                ApplyUiPersonalization(_settingsService.CurrentSettings);
-                LocalizeUi();
-                ApplyToolbarSettings(_settingsService.CurrentSettings);
-
-                if (foldersToOpen.Count > 0)
-                {
-                    await NavigateExplorerToFolderAsync(foldersToOpen[0]);
-                }
-
-                if (filesToOpen.Count > 0)
-                {
-                    if (foldersToOpen.Count == 0)
-                    {
-                        string? folderPath = Path.GetDirectoryName(filesToOpen[0]);
-                        if (!string.IsNullOrEmpty(folderPath))
-                        {
-                            try
-                            {
-                                if (Directory.Exists(folderPath))
-                                {
-                                    await NavigateExplorerToFolderAsync(folderPath);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Failed to navigate startup folder '{folderPath}': {ex.Message}");
-                            }
-                        }
-                    }
-
-                    foreach (var filePath in filesToOpen)
-                    {
-                        await LoadFileIntoTabAsync(filePath);
-                    }
-                }
-                else if (foldersToOpen.Count == 0)
-                {
-                    // Open a blank tab instantly (so the tab and Monaco editor container are rendered immediately)
-                    OpenNewTab();
-                }
-
-                // If we have a Git repo path from a loaded file, refresh Git status UI
-                if (!string.IsNullOrEmpty(_currentRepoPath))
-                {
-                    _ = RefreshGitStatusUIAsync();
-                    _gitAutoRefreshTimer.Start();
-                }
-
-                UpdateAutoSaveStatus();
-
-                await _livePreviewController.InitializeAsync();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Startup initialization failed: {ex.Message}");
-                if (_viewModel.Tabs.Count == 0)
-                {
-                    OpenNewTab();
-                }
-
-                _dialogController.ShowErrorMessage("시작 파일 열기 실패", ex.Message);
-            }
+            await _startupController.InitializeAsync();
         }
 
         #region Tab Operations (탭 비즈니스 로직)
@@ -1646,31 +1480,6 @@ namespace TxtAIEditor
             await _fileTabLoadController.LoadAsync(filePath);
         }
 
-        private void OnRootDragOver(object sender, DragEventArgs e)
-        {
-            _fileOpenDropController.HandleRootDragOver(e);
-        }
-
-        private void OnDragOverlayOver(object sender, DragEventArgs e)
-        {
-            _fileOpenDropController.HandleDragOverlayOver(e);
-        }
-
-        private async void OnDragOverlayDrop(object sender, DragEventArgs e)
-        {
-            await _fileOpenDropController.HandleDragOverlayDropAsync(e);
-        }
-
-        private void OnDragOverlayLeave(object sender, DragEventArgs e)
-        {
-            _fileOpenDropController.HandleDragOverlayLeave();
-        }
-
-        private async void OnRootDrop(object sender, DragEventArgs e)
-        {
-            await _fileOpenDropController.HandleRootDropAsync(e);
-        }
-
         private async void OnSaveFileClick(object sender, RoutedEventArgs e)
         {
             var activeTabView = GetCurrentActiveTabView();
@@ -1917,7 +1726,7 @@ namespace TxtAIEditor
 
             if (oldLanguage != settings.Language && await ConfirmRestartForLanguageChangeAsync(GetSettingsString))
             {
-                CleanupBeforeRestart();
+                _lifecycleController.CleanupBeforeRestart();
                 Microsoft.Windows.AppLifecycle.AppInstance.Restart("");
                 return;
             }
@@ -1993,40 +1802,6 @@ namespace TxtAIEditor
         private void RefreshActivePreview()
         {
             _livePreviewController.RenderActiveTab();
-        }
-
-        #endregion
-
-        #region Custom Splitters Event Handlers
-
-        private void OnLeftSplitterPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-        {
-            _shellPanelLayoutService.OnLeftSplitterPointerPressed(sender, e);
-        }
-
-        private void OnLeftSplitterPointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-        {
-            _shellPanelLayoutService.OnLeftSplitterPointerMoved(sender, e);
-        }
-
-        private void OnLeftSplitterPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-        {
-            _shellPanelLayoutService.OnLeftSplitterPointerReleased(sender, e);
-        }
-
-        private void OnRightSplitterPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-        {
-            _shellPanelLayoutService.OnRightSplitterPointerPressed(sender, e);
-        }
-
-        private void OnRightSplitterPointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-        {
-            _shellPanelLayoutService.OnRightSplitterPointerMoved(sender, e);
-        }
-
-        private void OnRightSplitterPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-        {
-            _shellPanelLayoutService.OnRightSplitterPointerReleased(sender, e);
         }
 
         #endregion
@@ -2787,11 +2562,6 @@ namespace TxtAIEditor
                     bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(System.Text.Json.JsonSerializer.Serialize(msg));
                 }
             }
-        }
-
-        private void OnRootKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
-        {
-            _rootKeyboardShortcutController.HandleKeyDown(e);
         }
 
         private void ApplyEditorSurfaceBackground(EditorSettings settings)
