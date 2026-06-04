@@ -2,21 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.Graphics.Imaging;
+using Windows.Storage;
+using Windows.Storage.Pickers;
+using Windows.Storage.Streams;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Controls
 {
     public sealed class AgentController
     {
         private const int MaxActiveFileContextChars = 120_000;
+        private const int MaxAttachmentTextChars = 120_000;
+        private const int MaxImageDimension = 1024;
 
         private readonly ILLMService _llmService;
         private readonly ISettingsService _settingsService;
@@ -28,10 +36,14 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
+        private readonly Action<object> _initializePickerWindow;
         private readonly Func<string, bool> _isGitRepoProvider;
         private readonly Func<string, Task>? _fileModifiedAsync;
         private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
+        private readonly Action? _beforeDialog;
+        private readonly Action? _afterDialog;
         private readonly List<AgentFileEditPreview> _sessionEdits = new();
+        private readonly List<AgentAttachmentState> _attachments = new();
 
         private string _lastSelectionText = string.Empty;
         private string? _lastSelectionTabId;
@@ -44,6 +56,18 @@ namespace TxtAIEditor.Controls
         private readonly StringBuilder _sessionHistory = new();
         private TaskCompletionSource<bool>? _diffApprovalTcs;
 
+        private sealed class AgentAttachmentState
+        {
+            public string Id { get; set; } = Guid.NewGuid().ToString("N");
+            public string Path { get; set; } = string.Empty;
+            public string DisplayName { get; set; } = string.Empty;
+            public string Detail { get; set; } = string.Empty;
+            public string? TextContent { get; set; }
+            public LlmMessageAttachment? ImageContent { get; set; }
+            public int EstimatedTokens { get; set; }
+            public bool IsImage => ImageContent != null;
+        }
+
         public AgentController(
             ILLMService llmService,
             ISettingsService settingsService,
@@ -55,9 +79,12 @@ namespace TxtAIEditor.Controls
             Action<string, string> showError,
             Func<string, string, string> getString,
             AgentFileToolService fileTools,
+            Action<object> initializePickerWindow,
             Func<string, bool> isGitRepoProvider,
             Func<AgentFileEditPreview, Task> openDiffViewAsync,
-            Func<string, Task>? fileModifiedAsync = null)
+            Func<string, Task>? fileModifiedAsync = null,
+            Action? beforeDialog = null,
+            Action? afterDialog = null)
         {
             _llmService = llmService;
             _settingsService = settingsService;
@@ -69,9 +96,12 @@ namespace TxtAIEditor.Controls
             _showError = showError;
             _getString = getString;
             _fileTools = fileTools;
+            _initializePickerWindow = initializePickerWindow;
             _isGitRepoProvider = isGitRepoProvider;
             _openDiffViewAsync = openDiffViewAsync;
             _fileModifiedAsync = fileModifiedAsync;
+            _beforeDialog = beforeDialog;
+            _afterDialog = afterDialog;
             _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
             _fileTools.ConfirmPowerShellAsync = ConfirmPowerShellAsync;
             if (_fileModifiedAsync != null)
@@ -181,6 +211,8 @@ namespace TxtAIEditor.Controls
             _agentPane.StopRequested += (_, _) => StopAgent();
             _agentPane.NewSessionRequested += (_, _) => ClearSession();
             _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
+            _agentPane.AddAttachmentRequested += async (_, _) => await AddAttachmentsAsync();
+            _agentPane.RemoveAttachmentRequested += (_, attachment) => RemoveAttachment(attachment.Id);
             
             _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
             _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
@@ -396,7 +428,8 @@ namespace TxtAIEditor.Controls
                             }
                             await Task.CompletedTask;
                         },
-                        cancellationToken);
+                        cancellationToken,
+                        GetImageAttachmentsForCurrentRun());
 
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
@@ -598,11 +631,13 @@ namespace TxtAIEditor.Controls
         {
             _sessionHistory.Clear();
             _sessionEdits.Clear();
+            _attachments.Clear();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 _agentPane.ResetOutput(_getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요."));
                 _agentPane.ClearActivity(_getString("AgentActivityIdle", "대기 중"));
                 _agentPane.UpdateModifiedFiles(new List<AgentFileEditPreview>());
+                _agentPane.UpdateAttachments(new List<AgentAttachmentItem>());
                 UpdateContextStats();
             });
         }
@@ -709,31 +744,350 @@ namespace TxtAIEditor.Controls
             }
 
             var activeTab = _activeTabProvider();
-            if (activeTab == null || !_agentPane.IncludeActiveFile)
+            if (activeTab != null && _agentPane.IncludeActiveFile)
             {
-                return string.Join(Environment.NewLine, context);
+                string title = string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath;
+                string content = _getTabText(activeTab, MaxActiveFileContextChars);
+                bool truncated = content.Length >= MaxActiveFileContextChars;
+
+                context.Add("");
+                context.Add("[Active tab]");
+                context.Add($"Title: {activeTab.Title}");
+                context.Add($"Path: {title}");
+                context.Add($"Language: {activeTab.Language ?? "plaintext"}");
+                context.Add($"Dirty: {activeTab.IsDirty}");
+                context.Add("");
+                context.Add("[Active tab content]");
+                context.Add(content);
+                if (truncated)
+                {
+                    context.Add("");
+                    context.Add("[Context truncated: active tab exceeded the maximum included length]");
+                }
             }
 
-            string title = string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath;
-            string content = _getTabText(activeTab, MaxActiveFileContextChars);
-            bool truncated = content.Length >= MaxActiveFileContextChars;
-
-            context.Add("");
-            context.Add("[Active tab]");
-            context.Add($"Title: {activeTab.Title}");
-            context.Add($"Path: {title}");
-            context.Add($"Language: {activeTab.Language ?? "plaintext"}");
-            context.Add($"Dirty: {activeTab.IsDirty}");
-            context.Add("");
-            context.Add("[Active tab content]");
-            context.Add(content);
-            if (truncated)
+            if (_attachments.Count > 0)
             {
                 context.Add("");
-                context.Add("[Context truncated: active tab exceeded the maximum included length]");
+                context.Add("[Agent attachments]");
+                foreach (var attachment in _attachments)
+                {
+                    context.Add($"- {attachment.DisplayName} ({attachment.Detail}, approx {attachment.EstimatedTokens:N0} tokens)");
+                    if (attachment.IsImage)
+                    {
+                        var image = attachment.ImageContent;
+                        context.Add($"  Image input included separately for vision-capable models: {image?.MimeType}, {image?.Width}x{image?.Height}");
+                    }
+                    else if (!string.IsNullOrEmpty(attachment.TextContent))
+                    {
+                        context.Add("");
+                        context.Add($"[Attachment file: {attachment.DisplayName}]");
+                        context.Add($"Path: {attachment.Path}");
+                        context.Add(attachment.TextContent);
+                        context.Add("");
+                    }
+                }
             }
 
             return string.Join(Environment.NewLine, context);
+        }
+
+        private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForCurrentRun()
+        {
+            return _attachments
+                .Select(a => a.ImageContent)
+                .Where(a => a != null)
+                .Cast<LlmMessageAttachment>()
+                .ToList();
+        }
+
+        private async Task AddAttachmentsAsync()
+        {
+            if (_isRunning)
+            {
+                return;
+            }
+
+            var picker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.List,
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+            };
+            _initializePickerWindow(picker);
+
+            foreach (string extension in GetAttachmentPickerExtensions())
+            {
+                picker.FileTypeFilter.Add(extension);
+            }
+
+            try
+            {
+                _beforeDialog?.Invoke();
+                var files = await picker.PickMultipleFilesAsync();
+                if (files == null || files.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (var file in files)
+                {
+                    try
+                    {
+                        var attachment = await CreateAttachmentAsync(file);
+                        if (attachment != null)
+                        {
+                            _attachments.RemoveAll(a => string.Equals(a.Path, attachment.Path, StringComparison.OrdinalIgnoreCase));
+                            _attachments.Add(attachment);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _showError(
+                            _getString("AgentAttachmentErrorTitle", "첨부 추가 오류"),
+                            string.Format(_getString("AgentAttachmentErrorFormat", "첨부를 추가하는 중 오류가 발생했습니다: {0}"), ex.Message));
+                    }
+                }
+
+                RefreshAttachments();
+                UpdateContextStats();
+            }
+            finally
+            {
+                _afterDialog?.Invoke();
+            }
+        }
+
+        private static IReadOnlyList<string> GetAttachmentPickerExtensions()
+        {
+            return new[] { "*" };
+        }
+
+        private async Task<AgentAttachmentState?> CreateAttachmentAsync(StorageFile file)
+        {
+            string displayName = file.Name;
+            string path = file.Path ?? displayName;
+            string mimeType = GetMimeType(file);
+
+            if (IsImageFile(file, mimeType))
+            {
+                var image = await CreateImageAttachmentAsync(file, displayName, mimeType);
+                return new AgentAttachmentState
+                {
+                    Path = path,
+                    DisplayName = displayName,
+                    Detail = $"{image.MimeType}, {image.Width}x{image.Height}",
+                    ImageContent = image,
+                    EstimatedTokens = image.EstimatedTokens
+                };
+            }
+
+            string text = await ReadAttachmentTextAsync(file);
+            int estimatedTokens = (int)Math.Round(EstimateTokenCount(text));
+            bool truncated = text.Length >= MaxAttachmentTextChars;
+            return new AgentAttachmentState
+            {
+                Path = path,
+                DisplayName = displayName,
+                Detail = truncated
+                    ? string.Format(_getString("AgentAttachmentFileTruncatedDetail", "파일, {0:N0}자까지 포함"), text.Length)
+                    : string.Format(_getString("AgentAttachmentFileDetail", "파일, {0:N0}자"), text.Length),
+                TextContent = text,
+                EstimatedTokens = estimatedTokens
+            };
+        }
+
+        private async Task<LlmMessageAttachment> CreateImageAttachmentAsync(StorageFile file, string displayName, string mimeType)
+        {
+            using IRandomAccessStream input = await file.OpenReadAsync();
+            BitmapDecoder decoder = await BitmapDecoder.CreateAsync(input);
+            uint originalWidth = decoder.PixelWidth;
+            uint originalHeight = decoder.PixelHeight;
+            uint outputWidth = originalWidth;
+            uint outputHeight = originalHeight;
+            string outputMimeType = string.IsNullOrWhiteSpace(mimeType) ? "image/png" : mimeType;
+            byte[] bytes;
+
+            if (Math.Max(originalWidth, originalHeight) > MaxImageDimension)
+            {
+                double scale = MaxImageDimension / (double)Math.Max(originalWidth, originalHeight);
+                outputWidth = Math.Max(1, (uint)Math.Round(originalWidth * scale));
+                outputHeight = Math.Max(1, (uint)Math.Round(originalHeight * scale));
+
+                var transform = new BitmapTransform
+                {
+                    ScaledWidth = outputWidth,
+                    ScaledHeight = outputHeight,
+                    InterpolationMode = BitmapInterpolationMode.Fant
+                };
+
+                PixelDataProvider pixelData = await decoder.GetPixelDataAsync(
+                    BitmapPixelFormat.Bgra8,
+                    BitmapAlphaMode.Premultiplied,
+                    transform,
+                    ExifOrientationMode.RespectExifOrientation,
+                    ColorManagementMode.ColorManageToSRgb);
+
+                using var output = new InMemoryRandomAccessStream();
+                BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, output);
+                encoder.SetPixelData(
+                    BitmapPixelFormat.Bgra8,
+                    BitmapAlphaMode.Premultiplied,
+                    outputWidth,
+                    outputHeight,
+                    96,
+                    96,
+                    pixelData.DetachPixelData());
+                await encoder.FlushAsync();
+                output.Seek(0);
+                bytes = await ReadRandomAccessStreamAsync(output);
+                outputMimeType = "image/jpeg";
+            }
+            else
+            {
+                input.Seek(0);
+                bytes = await ReadRandomAccessStreamAsync(input);
+            }
+
+            int estimatedTokens = EstimateImageTokens((int)outputWidth, (int)outputHeight);
+            return new LlmMessageAttachment
+            {
+                DisplayName = displayName,
+                MimeType = outputMimeType,
+                Base64Data = Convert.ToBase64String(bytes),
+                Width = (int)outputWidth,
+                Height = (int)outputHeight,
+                EstimatedTokens = estimatedTokens
+            };
+        }
+
+        private static async Task<byte[]> ReadRandomAccessStreamAsync(IRandomAccessStream stream)
+        {
+            using var managedStream = stream.AsStreamForRead();
+            using var memory = new MemoryStream();
+            await managedStream.CopyToAsync(memory);
+            return memory.ToArray();
+        }
+
+        private static async Task<string> ReadAttachmentTextAsync(StorageFile file)
+        {
+            if (!string.IsNullOrWhiteSpace(file.Path) && File.Exists(file.Path))
+            {
+                using var stream = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                char[] buffer = new char[MaxAttachmentTextChars + 1];
+                int read = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
+                string text = new string(buffer, 0, Math.Min(read, MaxAttachmentTextChars));
+                return StripBinaryControlCharacters(text);
+            }
+
+            string fallback = await FileIO.ReadTextAsync(file);
+            if (fallback.Length > MaxAttachmentTextChars)
+            {
+                fallback = fallback.Substring(0, MaxAttachmentTextChars);
+            }
+            return StripBinaryControlCharacters(fallback);
+        }
+
+        private void RemoveAttachment(string id)
+        {
+            if (_isRunning)
+            {
+                return;
+            }
+
+            _attachments.RemoveAll(a => string.Equals(a.Id, id, StringComparison.Ordinal));
+            RefreshAttachments();
+            UpdateContextStats();
+        }
+
+        private void RefreshAttachments()
+        {
+            var items = _attachments
+                .Select(a => new AgentAttachmentItem
+                {
+                    Id = a.Id,
+                    DisplayName = a.DisplayName,
+                    Detail = a.Detail,
+                    TokenText = FormatAttachmentTokens(a.EstimatedTokens),
+                    IconGlyph = a.IsImage ? "\uEB9F" : "\uE8A5"
+                })
+                .ToList();
+            _agentPane.UpdateAttachments(items);
+        }
+
+        private string FormatAttachmentTokens(int tokenCount)
+        {
+            string lang = GetActiveLanguageCode();
+            if (lang == "ko-KR")
+            {
+                return $"{tokenCount:N0} 토큰";
+            }
+            if (lang == "ja-JP")
+            {
+                return $"{tokenCount:N0} トークン";
+            }
+            return $"{tokenCount:N0} tokens";
+        }
+
+        private static int EstimateImageTokens(int width, int height)
+        {
+            int tilesWide = Math.Max(1, (int)Math.Ceiling(width / 512.0));
+            int tilesHigh = Math.Max(1, (int)Math.Ceiling(height / 512.0));
+            return 85 + (tilesWide * tilesHigh * 170);
+        }
+
+        private static string StripBinaryControlCharacters(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder(text.Length);
+            foreach (char ch in text)
+            {
+                if (ch == '\r' || ch == '\n' || ch == '\t' || ch >= ' ')
+                {
+                    builder.Append(ch);
+                }
+            }
+            return builder.ToString();
+        }
+
+        private static bool IsImageFile(StorageFile file, string mimeType)
+        {
+            if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string extension = Path.GetExtension(file.Name);
+            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetMimeType(StorageFile file)
+        {
+            if (!string.IsNullOrWhiteSpace(file.ContentType) &&
+                !file.ContentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            {
+                return file.ContentType;
+            }
+
+            string extension = Path.GetExtension(file.Name).ToLowerInvariant();
+            return extension switch
+            {
+                ".png" => "image/png",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".webp" => "image/webp",
+                ".bmp" => "image/bmp",
+                ".gif" => "image/gif",
+                _ => "text/plain"
+            };
         }
 
         private async Task<string> ExecuteToolAsync(string toolName, JsonElement arguments, CancellationToken cancellationToken)
@@ -1567,6 +1921,11 @@ namespace TxtAIEditor.Controls
                 ? _getString("AgentNoSelection", "선택 없음")
                 : string.Format(_getString("AgentSelectionStats", "선택 {0:N0}자"), activeSelectionText.Length);
 
+            if (_attachments.Count > 0)
+            {
+                selectionPart = $"{selectionPart} · {FormatAttachmentCount(_attachments.Count)}";
+            }
+
             _agentPane.ContextStats.Text = string.Format(
                 _getString("AgentContextStatsFormat", "맥락: {0} · {1}"),
                 tabPart,
@@ -1623,7 +1982,22 @@ namespace TxtAIEditor.Controls
 
             string userContent = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildUserContent(instruction, initialTranscript, selectedText, string.Empty);
 
-            return EstimateTokenCount(systemPrompt) + EstimateTokenCount(userContent);
+            return EstimateTokenCount(systemPrompt) + EstimateTokenCount(userContent) +
+                   _attachments.Where(a => a.IsImage).Sum(a => a.EstimatedTokens);
+        }
+
+        private string FormatAttachmentCount(int count)
+        {
+            string lang = GetActiveLanguageCode();
+            if (lang == "ko-KR")
+            {
+                return $"첨부 {count:N0}개";
+            }
+            if (lang == "ja-JP")
+            {
+                return $"添付 {count:N0}件";
+            }
+            return $"{count:N0} attachment{(count == 1 ? string.Empty : "s")}";
         }
 
         private static double EstimateTokenCount(string text)

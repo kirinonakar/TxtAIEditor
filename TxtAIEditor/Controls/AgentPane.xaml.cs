@@ -22,6 +22,15 @@ namespace TxtAIEditor.Controls
         public string SelectedText => _pane.SelectedOutputText;
     }
 
+    public sealed class AgentAttachmentItem
+    {
+        public string Id { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string Detail { get; set; } = string.Empty;
+        public string TokenText { get; set; } = string.Empty;
+        public string IconGlyph { get; set; } = "\uE8A5";
+    }
+
     public sealed partial class AgentPane : UserControl
     {
         private int _outputLength;
@@ -58,6 +67,8 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? StopRequested;
         public event RoutedEventHandler? NewSessionRequested;
         public event RoutedEventHandler? InsertOutputRequested;
+        public event RoutedEventHandler? AddAttachmentRequested;
+        public event EventHandler<AgentAttachmentItem>? RemoveAttachmentRequested;
         public event RoutedEventHandler? DiffApproved;
         public event RoutedEventHandler? DiffCancelled;
         public event EventHandler<AgentFileEditPreview>? FileRevertRequested;
@@ -125,6 +136,7 @@ namespace TxtAIEditor.Controls
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
             AgentIncludeActiveFileCheckBox.Content = getString("AgentIncludeActiveFile", "현재 탭 포함");
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
+            ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
             _runButtonText = getString("AgentRunButton", "실행");
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
@@ -154,6 +166,8 @@ namespace TxtAIEditor.Controls
             AgentNewSessionButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
             AgentIncludeActiveFileCheckBox.IsEnabled = !isBusy;
+            AgentAddAttachmentButton.IsEnabled = !isBusy;
+            AgentAttachmentsList.IsEnabled = !isBusy;
         }
 
         public void ClearActivity(string idleText)
@@ -420,6 +434,19 @@ namespace TxtAIEditor.Controls
             InsertOutputRequested?.Invoke(sender, e);
         }
 
+        private void OnAddAttachmentClick(object sender, RoutedEventArgs e)
+        {
+            AddAttachmentRequested?.Invoke(sender, e);
+        }
+
+        private void OnRemoveAttachmentClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is AgentAttachmentItem item)
+            {
+                RemoveAttachmentRequested?.Invoke(this, item);
+            }
+        }
+
         private void OnPromptInputKeyDown(object sender, KeyRoutedEventArgs e)
         {
             if (e.Key != VirtualKey.Enter)
@@ -671,6 +698,12 @@ namespace TxtAIEditor.Controls
         {
             AgentModifiedFilesList.ItemsSource = edits;
             AgentModifiedFilesPanel.Visibility = edits.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public void UpdateAttachments(IReadOnlyList<AgentAttachmentItem> attachments)
+        {
+            AgentAttachmentsList.ItemsSource = attachments;
+            AgentAttachmentsList.Visibility = attachments.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void OnModifiedFilesListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)

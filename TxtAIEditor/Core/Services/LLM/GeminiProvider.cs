@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -30,7 +32,7 @@ namespace TxtAIEditor.Core.Services.LLM
             return url;
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -46,10 +48,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     new
                     {
                         role = "user",
-                        parts = new[]
-                        {
-                            new { text = userContent }
-                        }
+                        parts = BuildUserParts(userContent, attachments)
                     }
                 },
                 systemInstruction = new
@@ -103,7 +102,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -119,10 +118,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     new
                     {
                         role = "user",
-                        parts = new[]
-                        {
-                            new { text = userContent }
-                        }
+                        parts = BuildUserParts(userContent, attachments)
                     }
                 },
                 systemInstruction = new
@@ -197,6 +193,28 @@ namespace TxtAIEditor.Core.Services.LLM
                     }
                 }
             }
+        }
+
+        private static object[] BuildUserParts(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
+        {
+            var parts = new List<object>
+            {
+                new { text = userContent }
+            };
+
+            foreach (var image in attachments?.Where(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)) ?? Enumerable.Empty<LlmMessageAttachment>())
+            {
+                parts.Add(new
+                {
+                    inline_data = new
+                    {
+                        mime_type = image.MimeType,
+                        data = image.Base64Data
+                    }
+                });
+            }
+
+            return parts.ToArray();
         }
     }
 }

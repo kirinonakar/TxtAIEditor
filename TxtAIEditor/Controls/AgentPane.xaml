@@ -96,21 +96,106 @@
                 Style="{StaticResource AccentButtonStyle}"/>
 
         <Border Grid.Row="3" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="8" CornerRadius="4">
-            <StackPanel Spacing="6">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <FontIcon Glyph="&#xE946;" FontSize="14" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="AgentContextStatsText"
-                               Text="현재 탭과 선택 영역을 맥락으로 사용"
-                               FontSize="11"
-                               TextWrapping="Wrap"
-                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                               VerticalAlignment="Center"/>
+            <Grid RowSpacing="6" ColumnSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <FontIcon Glyph="&#xE946;" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="AgentContextStatsText"
+                                   Text="현재 탭과 선택 영역을 맥락으로 사용"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <CheckBox x:Name="AgentIncludeActiveFileCheckBox"
+                              Content="현재 탭 포함"
+                              IsChecked="False"
+                              FontSize="12"/>
                 </StackPanel>
-                <CheckBox x:Name="AgentIncludeActiveFileCheckBox"
-                          Content="현재 탭 포함"
-                          IsChecked="False"
-                          FontSize="12"/>
-            </StackPanel>
+
+                <Button x:Name="AgentAddAttachmentButton"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Width="30"
+                        Height="30"
+                        Padding="0"
+                        VerticalAlignment="Top"
+                        Click="OnAddAttachmentClick"
+                        ToolTipService.ToolTip="이미지 또는 파일 추가"
+                        Style="{StaticResource AgentButtonStyle}">
+                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                </Button>
+
+                <ListView x:Name="AgentAttachmentsList"
+                          Grid.Row="1"
+                          Grid.Column="0"
+                          Grid.ColumnSpan="2"
+                          MaxHeight="96"
+                          SelectionMode="None"
+                          Visibility="Collapsed"
+                          Padding="0">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="MinHeight" Value="30"/>
+                            <Setter Property="Padding" Value="0"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="local:AgentAttachmentItem">
+                            <Grid ColumnSpacing="6" Margin="0,2,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0"
+                                          Glyph="{Binding IconGlyph}"
+                                          FontSize="12"
+                                          Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                          VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding DisplayName}"
+                                               FontSize="11"
+                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap"/>
+                                    <TextBlock Text="{Binding Detail}"
+                                               FontSize="10"
+                                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding TokenText}"
+                                           FontSize="10"
+                                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="3"
+                                        Tag="{Binding}"
+                                        Click="OnRemoveAttachmentClick"
+                                        Width="24"
+                                        Height="24"
+                                        Padding="0"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        ToolTipService.ToolTip="첨부 제거">
+                                    <FontIcon Glyph="&#xE10A;" FontSize="10"/>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
         </Border>
 
         <StackPanel Grid.Row="4" Spacing="12">

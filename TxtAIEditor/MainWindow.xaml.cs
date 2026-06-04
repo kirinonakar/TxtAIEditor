@@ -493,9 +493,12 @@ namespace TxtAIEditor
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString,
                 new AgentFileToolService(GetAgentWorkspaceRoot),
+                InitializePickerWindow,
                 path => _gitService.FindRepositoryRoot(path) != null,
                 OpenAgentDiffViewAsync,
-                OnAgentFileModifiedAsync);
+                OnAgentFileModifiedAsync,
+                beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
+                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,

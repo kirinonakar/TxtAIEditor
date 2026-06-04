@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -12,18 +14,18 @@ namespace TxtAIEditor.Core.Services.LLM
     {
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
             var sb = new StringBuilder();
             await GenerateCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, chunk =>
             {
                 sb.Append(chunk);
                 return Task.CompletedTask;
-            }, cancellationToken);
+            }, cancellationToken, attachments);
             return sb.ToString();
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -36,8 +38,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 model = model,
                 messages = new[]
                 {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userContent }
+                    new { role = "system", content = (object)systemPrompt },
+                    new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
                 temperature = 0.5,
                 stream = true
@@ -104,6 +106,34 @@ namespace TxtAIEditor.Core.Services.LLM
                     }
                 }
             }
+        }
+
+        private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
+        {
+            var images = attachments?.Where(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)).ToList();
+            if (images == null || images.Count == 0)
+            {
+                return userContent;
+            }
+
+            var parts = new List<object>
+            {
+                new { type = "text", text = userContent }
+            };
+
+            foreach (var image in images)
+            {
+                parts.Add(new
+                {
+                    type = "image_url",
+                    image_url = new
+                    {
+                        url = $"data:{image.MimeType};base64,{image.Base64Data}"
+                    }
+                });
+            }
+
+            return parts;
         }
     }
 }
