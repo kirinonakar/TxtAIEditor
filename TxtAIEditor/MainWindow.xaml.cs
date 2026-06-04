@@ -61,18 +61,22 @@ namespace TxtAIEditor
         private readonly MarkdownToolbarController _markdownToolbarController;
         private readonly StickyNoteModeController _stickyNoteModeController;
         private readonly StatusBarController _statusBarController;
+        private readonly TabReloadController _tabReloadController;
         private readonly CompareTabController _compareTabController;
         private readonly LivePreviewController _livePreviewController;
         private readonly TabSelectionController _tabSelectionController;
         private readonly EditorSplitLayoutController _editorSplitLayoutController;
         private readonly SplitImeSyncController _splitImeSyncController;
         private readonly TabSaveController _tabSaveController;
+        private readonly TabCloseController _tabCloseController;
+        private readonly TabMoveController _tabMoveController;
         private readonly AutoSaveController _autoSaveController;
         private readonly FileTabLoadController _fileTabLoadController;
         private readonly TerminalPanelController _terminalPanelController;
         private readonly ExplorerNavigationController _explorerNavigationController;
         private readonly UnsavedChangesDialogService _unsavedChangesDialogService;
         private readonly WindowDialogController _dialogController;
+        private readonly WindowCloseController _windowCloseController;
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private string _currentFolderPath = string.Empty;
         private string _currentRepoPath = string.Empty;
@@ -224,6 +228,20 @@ namespace TxtAIEditor
                 HandleWebViewShortcut,
                 SyncPreviewScrollToEditors,
                 _dialogController.ShowErrorMessage);
+            _tabReloadController = new TabReloadController(
+                _secureNoteEncryptionService,
+                _settingsService,
+                _tabBridges,
+                _editorSessions,
+                _statusBarController,
+                InitialEditorLineWarmupCount,
+                _tabEncryptionController.PromptPasswordAsync,
+                GetLocalizedString,
+                UpdateLivePreview,
+                UpdateLanguageUI,
+                SchedulePreview,
+                UpdateWindowTitle,
+                _dialogController.ShowErrorMessage);
             _splitImeSyncController = new SplitImeSyncController(
                 _tabBridges,
                 _editorSessions,
@@ -345,6 +363,40 @@ namespace TxtAIEditor
                 () => _settingsService.CurrentSettings,
                 () => _currentRepoPath,
                 SaveTabAsync);
+            _tabCloseController = new TabCloseController(
+                _viewModel,
+                EditorTabView,
+                EditorTabView2,
+                _tabBridges,
+                _editorSessions,
+                _livePreviewController,
+                _unsavedChangesDialogService,
+                () => this.Content.XamlRoot,
+                GetCurrentElementTheme,
+                GetLocalizedString,
+                () => EditorWorkspace.IsTerminalVisible,
+                () => TerminalPane.SuspendNativeWindows(),
+                () => TerminalPane.ResumeNativeWindows(),
+                ClearPendingSplitImeSync,
+                _tabEncryptionController.ForgetPassword,
+                SaveTabAsync,
+                () => OpenNewTab(),
+                UpdateWindowTitle);
+            _tabMoveController = new TabMoveController(
+                _viewModel,
+                GetCurrentActiveTabView);
+            _windowCloseController = new WindowCloseController(
+                _viewModel,
+                _unsavedChangesDialogService,
+                SaveUiLayoutSettingsAsync,
+                () => this.Content.XamlRoot,
+                GetCurrentElementTheme,
+                GetLocalizedString,
+                () => EditorWorkspace.IsTerminalVisible,
+                () => TerminalPane.SuspendNativeWindows(),
+                () => TerminalPane.ResumeNativeWindows(),
+                SaveTabAsync,
+                this.Close);
             _explorerFileActionsController = new ExplorerFileActionsController(
                 LeftSidebarTabView,
                 _viewModel,
@@ -2101,104 +2153,12 @@ namespace TxtAIEditor
 
         private void OnMoveTabLeftClick(object sender, RoutedEventArgs e)
         {
-            var activeTabView = GetCurrentActiveTabView();
-            if (activeTabView == null || activeTabView.TabItems.Count <= 1) return;
-
-            int index = activeTabView.SelectedIndex;
-            if (index < 0) return;
-
-            var ctrl = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
-            var shift = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
-
-            if (ctrl || shift)
-            {
-                if (index > 0)
-                {
-                    var item = activeTabView.TabItems[index] as TabViewItem;
-                    if (item != null)
-                    {
-                        activeTabView.TabItems.RemoveAt(index);
-                        activeTabView.TabItems.Insert(index - 1, item);
-                        activeTabView.SelectedIndex = index - 1;
-
-                        if (item.Tag is string tabId)
-                        {
-                            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-                            if (tab != null)
-                            {
-                                int tabIdx = _viewModel.Tabs.IndexOf(tab);
-                                if (tabIdx > 0)
-                                {
-                                    _viewModel.Tabs.RemoveAt(tabIdx);
-                                    _viewModel.Tabs.Insert(tabIdx - 1, tab);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                if (index > 0)
-                {
-                    activeTabView.SelectedIndex = index - 1;
-                }
-                else
-                {
-                    activeTabView.SelectedIndex = activeTabView.TabItems.Count - 1;
-                }
-            }
+            _tabMoveController.MoveLeft();
         }
 
         private void OnMoveTabRightClick(object sender, RoutedEventArgs e)
         {
-            var activeTabView = GetCurrentActiveTabView();
-            if (activeTabView == null || activeTabView.TabItems.Count <= 1) return;
-
-            int index = activeTabView.SelectedIndex;
-            if (index < 0) return;
-
-            var ctrl = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
-            var shift = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
-
-            if (ctrl || shift)
-            {
-                if (index < activeTabView.TabItems.Count - 1)
-                {
-                    var item = activeTabView.TabItems[index] as TabViewItem;
-                    if (item != null)
-                    {
-                        activeTabView.TabItems.RemoveAt(index);
-                        activeTabView.TabItems.Insert(index + 1, item);
-                        activeTabView.SelectedIndex = index + 1;
-
-                        if (item.Tag is string tabId)
-                        {
-                            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-                            if (tab != null)
-                            {
-                                int tabIdx = _viewModel.Tabs.IndexOf(tab);
-                                if (tabIdx < _viewModel.Tabs.Count - 1)
-                                {
-                                    _viewModel.Tabs.RemoveAt(tabIdx);
-                                    _viewModel.Tabs.Insert(tabIdx + 1, tab);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                if (index < activeTabView.TabItems.Count - 1)
-                {
-                    activeTabView.SelectedIndex = index + 1;
-                }
-                else
-                {
-                    activeTabView.SelectedIndex = 0;
-                }
-            }
+            _tabMoveController.MoveRight();
         }
 
         #endregion
@@ -2212,83 +2172,17 @@ namespace TxtAIEditor
 
         private void OnEditorTabViewTabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
         {
-            if (args.Item is TabViewItem tabItem && tabItem.Tag is string tabId)
-            {
-                var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-                if (tab != null)
-                {
-                    if (tab.IsDirty)
-                    {
-                        // Unsaved warning
-                        WarnUnsavedAndClose(tab, tabItem);
-                        return;
-                    }
-
-                    CloseTabAndCleanup(tab, tabItem);
-                }
-            }
+            _tabCloseController.CloseRequested(args);
         }
 
-        private async void WarnUnsavedAndClose(OpenedTab tab, TabViewItem tabItem)
+        private void WarnUnsavedAndClose(OpenedTab tab, TabViewItem tabItem)
         {
-            bool terminalWasVisible = EditorWorkspace.IsTerminalVisible;
-            if (terminalWasVisible)
-                TerminalPane.SuspendNativeWindows();
-
-            var dialogTheme = GetCurrentElementTheme();
-            var result = await _unsavedChangesDialogService.ShowAsync(
-                GetLocalizedString("UnsavedChangesTabCloseTitle", "변경 내용 저장"),
-                string.Format(GetLocalizedString("UnsavedChangesTabCloseMessage", "파일 '{0}'의 변경 내용이 저장되지 않았습니다. 닫으시겠습니까?"), tab.Title),
-                GetLocalizedString("UnsavedChangesTabCloseDiscard", "저장하지 않고 닫기"),
-                GetLocalizedString("UnsavedChangesTabCloseSave", "저장"),
-                GetLocalizedString("UnsavedChangesCancel", "취소"),
-                this.Content.XamlRoot,
-                dialogTheme);
-
-            if (terminalWasVisible)
-                TerminalPane.ResumeNativeWindows();
-
-            if (result == UnsavedChangesDialogResult.Discard)
-            {
-                CloseTabAndCleanup(tab, tabItem);
-            }
-            else if (result == UnsavedChangesDialogResult.Save)
-            {
-                bool saved = await SaveTabAsync(tab);
-                if (saved)
-                {
-                    CloseTabAndCleanup(tab, tabItem);
-                }
-            }
+            _tabCloseController.WarnUnsavedAndClose(tab, tabItem);
         }
 
         private void CloseTabAndCleanup(OpenedTab tab, TabViewItem tabItem)
         {
-            ClearPendingSplitImeSync(tab.Id);
-            _viewModel.Tabs.Remove(tab);
-            _tabEncryptionController.ForgetPassword(tab);
-            if (EditorTabView.TabItems.Contains(tabItem))
-            {
-                EditorTabView.TabItems.Remove(tabItem);
-            }
-            else if (EditorTabView2.TabItems.Contains(tabItem))
-            {
-                EditorTabView2.TabItems.Remove(tabItem);
-            }
-
-            if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup))
-            {
-                _livePreviewController.ForgetEditorTab(tab.Id, bridgeGroup.WebView.CoreWebView2);
-                bridgeGroup.WebView.Close();
-                _tabBridges.Remove(tab.Id);
-            }
-            _editorSessions.Remove(tab.Id);
-
-            if (EditorTabView.TabItems.Count == 0 && EditorTabView2.TabItems.Count == 0)
-            {
-                OpenNewTab();
-            }
-            UpdateWindowTitle();
+            _tabCloseController.CloseAndCleanup(tab, tabItem);
         }
 
         #endregion
@@ -2311,94 +2205,7 @@ namespace TxtAIEditor
 
         private async Task ReloadTabWithEncodingAsync(OpenedTab tab, string encodingName)
         {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(tab.FilePath)) return;
-
-                bool isReadOnly = tab.FilePath.EndsWith(".diff", StringComparison.OrdinalIgnoreCase);
-
-                if (tab.IsEncrypted)
-                {
-                    string? password = tab.EncryptionPassword;
-                    if (string.IsNullOrWhiteSpace(password))
-                    {
-                        password = await _tabEncryptionController.PromptPasswordAsync(
-                            GetLocalizedString("EncryptionPasswordDialogTitle", "암호 입력"),
-                            GetLocalizedString("EncryptionOpenButton", "열기"));
-                        if (password == null)
-                        {
-                            return;
-                        }
-                    }
-
-                    string decryptedText = await _secureNoteEncryptionService.DecryptFileAsync(tab.FilePath, password);
-                    var encryptedModel = LineArrayTextModel.FromText(decryptedText);
-                    tab.EncryptionPassword = password;
-                    tab.EncodingName = "UTF-8";
-                    tab.EncodingWasAutoDetected = false;
-                    tab.IsDirty = false;
-                    tab.OriginalContent = decryptedText;
-                    tab.OriginalLineEnding = encryptedModel.LineEnding;
-                    tab.OriginalEncodingName = "UTF-8";
-                    var encryptedSession = new EditorDocumentSession(tab, encryptedModel);
-                    _editorSessions[tab.Id] = encryptedSession;
-
-                    if (_tabBridges.TryGetValue(tab.Id, out var encryptedBridgeGroup) && encryptedBridgeGroup.Bridge != null)
-                    {
-                        await encryptedBridgeGroup.Bridge.InitializeModelAsync(
-                            encryptedSession.Model.LineCount,
-                            tab.Language,
-                            _settingsService.CurrentSettings,
-                            isReadOnly: isReadOnly,
-                            initialLines: encryptedSession.GetLines(1, InitialEditorLineWarmupCount));
-                    }
-
-                    UpdateLivePreview(tab);
-                    _statusBarController.UpdateFileStats(tab);
-                    _statusBarController.UpdateTotalLines(tab);
-                    _statusBarController.UpdateSelectionStats(null);
-                    UpdateLanguageUI(tab);
-                    _statusBarController.SyncEncodingCombo(tab);
-                    _statusBarController.SyncLineEndingText(tab);
-                    UpdateWindowTitle();
-                    return;
-                }
-
-                var readResult = await LineArrayTextModel.LoadFromFileAsync(tab.FilePath, encodingName);
-                tab.EncodingName = readResult.EncodingName;
-                tab.EncodingWasAutoDetected = readResult.EncodingWasAutoDetected;
-                tab.IsDirty = false;
-                tab.OriginalContent = readResult.Model.GetText();
-                tab.OriginalLineEnding = readResult.Model.LineEnding;
-                tab.OriginalEncodingName = readResult.EncodingName;
-                var session = new EditorDocumentSession(tab, readResult.Model);
-                _editorSessions[tab.Id] = session;
-
-                if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-                {
-                    await bridgeGroup.Bridge.InitializeModelAsync(
-                        session.Model.LineCount,
-                        tab.Language,
-                        _settingsService.CurrentSettings,
-                        isReadOnly: isReadOnly,
-                        initialLines: session.GetLines(1, InitialEditorLineWarmupCount));
-                }
-
-                UpdateLivePreview(tab);
-                _statusBarController.UpdateFileStats(tab);
-                _statusBarController.UpdateTotalLines(tab);
-                _statusBarController.UpdateSelectionStats(null);
-                UpdateLanguageUI(tab);
-                _statusBarController.SyncEncodingCombo(tab);
-                _statusBarController.SyncLineEndingText(tab);
-                UpdateWindowTitle();
-            }
-            catch (Exception ex)
-            {
-                _dialogController.ShowErrorMessage("인코딩 변경 실패", ex.Message);
-                _statusBarController.SyncEncodingCombo(tab);
-                _statusBarController.SyncLineEndingText(tab);
-            }
+            await _tabReloadController.ReloadWithEncodingAsync(tab, encodingName);
         }
 
         private void OnGitFileRestored(object? sender, string filePath)
@@ -2816,80 +2623,12 @@ namespace TxtAIEditor
         private void OnCloseActiveTabShortcutInvoked(Microsoft.UI.Xaml.Input.KeyboardAccelerator sender, Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
         {
             if (args != null) args.Handled = true;
-            var activeTabView = GetCurrentActiveTabView();
-            if (activeTabView.SelectedItem is TabViewItem tabItem && tabItem.Tag is string tabId)
-            {
-                var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-                if (tab != null)
-                {
-                    if (tab.IsDirty)
-                    {
-                        WarnUnsavedAndClose(tab, tabItem);
-                    }
-                    else
-                    {
-                        CloseTabAndCleanup(tab, tabItem);
-                    }
-                }
-            }
+            _tabCloseController.CloseActive(GetCurrentActiveTabView());
         }
 
-        private bool _isClosingConfirmed = false;
         private async void OnAppWindowClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
-            if (_isClosingConfirmed)
-            {
-                await SaveUiLayoutSettingsAsync();
-                return;
-            }
-
-            if (_unsavedChangesDialogService.IsShowing)
-            {
-                args.Cancel = true;
-                return;
-            }
-
-            var dirtyTabs = _viewModel.Tabs.Where(t => t.IsDirty).ToList();
-            if (dirtyTabs.Count > 0)
-            {
-                args.Cancel = true; // Prevent immediate close before awaiting UI work
-            }
-
-            await SaveUiLayoutSettingsAsync();
-            if (dirtyTabs.Count == 0) return;
-
-            bool terminalWasVisible = EditorWorkspace.IsTerminalVisible;
-            if (terminalWasVisible)
-                TerminalPane.SuspendNativeWindows();
-
-            var dialogTheme = GetCurrentElementTheme();
-            var result = await _unsavedChangesDialogService.ShowAsync(
-                GetLocalizedString("UnsavedChangesAppCloseTitle", "저장되지 않은 변경 사항"),
-                string.Format(GetLocalizedString("UnsavedChangesAppCloseMessage", "저장되지 않은 탭이 {0}개 있습니다. 종료하기 전에 저장하시겠습니까?"), dirtyTabs.Count),
-                GetLocalizedString("UnsavedChangesAppCloseDiscard", "저장하지 않고 종료"),
-                GetLocalizedString("UnsavedChangesAppCloseSave", "저장하고 종료"),
-                GetLocalizedString("UnsavedChangesCancel", "취소"),
-                this.Content.XamlRoot,
-                dialogTheme);
-
-            if (terminalWasVisible)
-                TerminalPane.ResumeNativeWindows();
-
-            if (result == UnsavedChangesDialogResult.Discard)
-            {
-                _isClosingConfirmed = true;
-                this.Close();
-            }
-            else if (result == UnsavedChangesDialogResult.Save)
-            {
-                foreach (var tab in dirtyTabs)
-                {
-                    bool saved = await SaveTabAsync(tab);
-                    if (!saved) return; // Abort exit if save fails or cancels
-                }
-                _isClosingConfirmed = true;
-                this.Close();
-            }
+            await _windowCloseController.HandleClosingAsync(args);
         }
 
         private ElementTheme GetCurrentElementTheme()
@@ -3000,135 +2739,22 @@ namespace TxtAIEditor
 
         private async Task OnTabReloadAsync(OpenedTab tab, TabViewItem tabItem)
         {
-            if (string.IsNullOrEmpty(tab.FilePath) || !File.Exists(tab.FilePath)) return;
-            try
-            {
-                if (tab.IsEncrypted)
-                {
-                    string? password = tab.EncryptionPassword;
-                    if (string.IsNullOrWhiteSpace(password))
-                    {
-                        password = await _tabEncryptionController.PromptPasswordAsync(
-                            GetLocalizedString("EncryptionPasswordDialogTitle", "암호 입력"),
-                            GetLocalizedString("EncryptionOpenButton", "열기"));
-                        if (password == null)
-                        {
-                            return;
-                        }
-                    }
-
-                    string decryptedText = await _secureNoteEncryptionService.DecryptFileAsync(tab.FilePath, password);
-                    var encryptedModel = LineArrayTextModel.FromText(decryptedText);
-                    tab.EncryptionPassword = password;
-                    tab.EncodingName = "UTF-8";
-                    tab.EncodingWasAutoDetected = false;
-                    tab.IsDirty = false;
-                    tab.OriginalContent = decryptedText;
-                    tab.OriginalLineEnding = encryptedModel.LineEnding;
-                    tab.OriginalEncodingName = "UTF-8";
-
-                    if (_editorSessions.TryGetValue(tab.Id, out var encryptedSession))
-                    {
-                        encryptedSession.UpdateContentFromSync(decryptedText);
-                    }
-
-                    if (_tabBridges.TryGetValue(tab.Id, out var encryptedBridgeGroup) && encryptedBridgeGroup.Bridge != null)
-                    {
-                        await encryptedBridgeGroup.Bridge.SetTextAsync(decryptedText);
-                    }
-
-                    _statusBarController.UpdateFileStats(tab);
-                    _statusBarController.UpdateTotalLines(tab);
-                    _statusBarController.SyncEncodingCombo(tab);
-                    SchedulePreview(tab);
-                    return;
-                }
-
-                var readResult = await LineArrayTextModel.LoadFromFileAsync(tab.FilePath, "Auto");
-                string content = readResult.Model.GetText();
-
-                tab.EncodingName = readResult.EncodingName;
-                tab.EncodingWasAutoDetected = readResult.EncodingWasAutoDetected;
-                tab.IsDirty = false;
-                tab.OriginalContent = content;
-                tab.OriginalLineEnding = readResult.Model.LineEnding;
-                tab.OriginalEncodingName = readResult.EncodingName;
-
-                if (_editorSessions.TryGetValue(tab.Id, out var session))
-                {
-                    session.UpdateContentFromSync(content);
-                }
-
-                if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-                {
-                    await bridgeGroup.Bridge.SetTextAsync(content);
-                }
-
-                _statusBarController.UpdateFileStats(tab);
-                _statusBarController.UpdateTotalLines(tab);
-                _statusBarController.SyncEncodingCombo(tab);
-                SchedulePreview(tab);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to reload tab: {ex.Message}");
-            }
+            await _tabReloadController.ReloadFromDiskAsync(tab);
         }
 
         private void OnCloseOtherTabs(OpenedTab tab, TabViewItem tabItem, TabView tabView)
         {
-            var items = tabView.TabItems.Cast<TabViewItem>().ToList();
-            foreach (var item in items)
-            {
-                if (item == tabItem) continue;
-                if (item.Tag is string tabId)
-                {
-                    var t = _viewModel.Tabs.FirstOrDefault(x => x.Id == tabId);
-                    if (t != null)
-                    {
-                        if (t.IsDirty) WarnUnsavedAndClose(t, item);
-                        else CloseTabAndCleanup(t, item);
-                    }
-                }
-            }
+            _tabCloseController.CloseOtherTabs(tabItem, tabView);
         }
 
         private void OnCloseRightTabs(OpenedTab tab, TabViewItem tabItem, TabView tabView)
         {
-            var items = tabView.TabItems.Cast<TabViewItem>().ToList();
-            int currentIndex = items.IndexOf(tabItem);
-            if (currentIndex < 0) return;
-            for (int i = items.Count - 1; i > currentIndex; i--)
-            {
-                if (items[i].Tag is string tabId)
-                {
-                    var t = _viewModel.Tabs.FirstOrDefault(x => x.Id == tabId);
-                    if (t != null)
-                    {
-                        if (t.IsDirty) WarnUnsavedAndClose(t, items[i]);
-                        else CloseTabAndCleanup(t, items[i]);
-                    }
-                }
-            }
+            _tabCloseController.CloseRightTabs(tabItem, tabView);
         }
 
         private void OnCloseLeftTabs(OpenedTab tab, TabViewItem tabItem, TabView tabView)
         {
-            var items = tabView.TabItems.Cast<TabViewItem>().ToList();
-            int currentIndex = items.IndexOf(tabItem);
-            if (currentIndex < 0) return;
-            for (int i = currentIndex - 1; i >= 0; i--)
-            {
-                if (items[i].Tag is string tabId)
-                {
-                    var t = _viewModel.Tabs.FirstOrDefault(x => x.Id == tabId);
-                    if (t != null)
-                    {
-                        if (t.IsDirty) WarnUnsavedAndClose(t, items[i]);
-                        else CloseTabAndCleanup(t, items[i]);
-                    }
-                }
-            }
+            _tabCloseController.CloseLeftTabs(tabItem, tabView);
         }
 
         private async void OnPrintClick(object sender, RoutedEventArgs e)
