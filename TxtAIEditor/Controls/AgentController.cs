@@ -276,40 +276,64 @@ namespace TxtAIEditor.Controls
                                     if (isJsonToolCall.Value)
                                     {
                                         toolCallPlaceholderShown = true;
-                                        int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
-                                        string label = FormatPreparingToolLabel(tokenCount);
-                                        _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                        if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                         {
-                                            _agentPane.BeginThinkingActivity(label);
-                                            UpdateGeneratedTokenCount(tokenCount);
-                                        });
+                                            int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
+                                            string label = FormatPreparingToolLabel(tokenCount);
+                                            _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                            {
+                                                _agentPane.BeginThinkingActivity(label);
+                                                UpdateGeneratedTokenCount(tokenCount);
+                                            });
+                                        }
+                                        else
+                                        {
+                                            _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(streamedText));
+                                            printedLength = streamedText.Length;
+                                        }
                                     }
                                 }
                             }
 
                             if (isJsonToolCall == true)
                             {
-                                int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
-                                string label = FormatPreparingToolLabel(tokenCount);
-                                _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                 {
-                                    _agentPane.UpdateThinkingActivity(label);
-                                    UpdateGeneratedTokenCount(tokenCount);
-                                });
+                                    int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
+                                    string label = FormatPreparingToolLabel(tokenCount);
+                                    _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                    {
+                                        _agentPane.UpdateThinkingActivity(label);
+                                        UpdateGeneratedTokenCount(tokenCount);
+                                    });
+                                }
+                                else
+                                {
+                                    _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(chunk));
+                                    printedLength = streamedText.Length;
+                                }
                                 return;
                             }
 
                             if (hasToolCall)
                             {
-                                int idx = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
-                                string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
-                                int tokenCount = (int)Math.Round(EstimateTokenCount(toolCallText));
-                                string label = FormatPreparingToolLabel(tokenCount);
-                                _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                 {
-                                    _agentPane.UpdateThinkingActivity(label);
-                                    UpdateGeneratedTokenCount(tokenCount);
-                                });
+                                    int idx = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                                    string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
+                                    int tokenCount = (int)Math.Round(EstimateTokenCount(toolCallText));
+                                    string label = FormatPreparingToolLabel(tokenCount);
+                                    _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                    {
+                                        _agentPane.UpdateThinkingActivity(label);
+                                        UpdateGeneratedTokenCount(tokenCount);
+                                    });
+                                }
+                                else
+                                {
+                                    _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(chunk));
+                                    printedLength = streamedText.Length;
+                                }
                                 return;
                             }
 
@@ -326,16 +350,25 @@ namespace TxtAIEditor.Controls
                                     printedLength = toolCallIndex;
                                 }
 
-                                if (!toolCallPlaceholderShown)
+                                if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                 {
-                                    toolCallPlaceholderShown = true;
-                                    int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText.Substring(toolCallIndex)));
-                                    string label = FormatPreparingToolLabel(tokenCount);
-                                    _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                    if (!toolCallPlaceholderShown)
                                     {
-                                        _agentPane.BeginThinkingActivity(label);
-                                        UpdateGeneratedTokenCount(tokenCount);
-                                    });
+                                        toolCallPlaceholderShown = true;
+                                        int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText.Substring(toolCallIndex)));
+                                        string label = FormatPreparingToolLabel(tokenCount);
+                                        _agentPane.DispatcherQueue.TryEnqueue(() =>
+                                        {
+                                            _agentPane.BeginThinkingActivity(label);
+                                            UpdateGeneratedTokenCount(tokenCount);
+                                        });
+                                    }
+                                }
+                                else
+                                {
+                                    string toolCallText = streamedText.Substring(toolCallIndex);
+                                    _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(toolCallText));
+                                    printedLength = streamedText.Length;
                                 }
                             }
                             else
@@ -371,16 +404,21 @@ namespace TxtAIEditor.Controls
                     await RunOnUIThreadAsync(() =>
                     {
                         _agentPane.StopThinkingActivity();
-                        if (printedLength < response.Length)
+                        int endLength = response.Length;
+                        if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                         {
                             int toolCallIndex = response.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
-                            int endLength = toolCallIndex >= 0 ? toolCallIndex : response.Length;
-                            if (printedLength < endLength)
+                            if (toolCallIndex >= 0)
                             {
-                                string remainingText = response.Substring(printedLength, endLength - printedLength);
-                                visibleTextFlushed = true;
-                                _agentPane.AppendOutputText(remainingText);
+                                endLength = toolCallIndex;
                             }
+                        }
+
+                        if (printedLength < endLength)
+                        {
+                            string remainingText = response.Substring(printedLength, endLength - printedLength);
+                            visibleTextFlushed = true;
+                            _agentPane.AppendOutputText(remainingText);
                         }
                     });
 
