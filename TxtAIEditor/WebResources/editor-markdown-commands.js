@@ -411,6 +411,63 @@ function toggleMarkdownLink() {
     }
 }
 
+function parseMarkdownImageAt(line, bangIndex) {
+    if (bangIndex < 0 || line.slice(bangIndex, bangIndex + 2) !== '![') return null;
+    const textEnd = line.indexOf('](', bangIndex + 2);
+    if (textEnd < 0) return null;
+    const urlStart = textEnd + 2;
+    const fullEnd = line.indexOf(')', urlStart);
+    if (fullEnd < 0) return null;
+    return {
+        fullStart: bangIndex,
+        textStart: bangIndex + 2,
+        textEnd,
+        urlStart,
+        urlEnd: fullEnd,
+        fullEnd: fullEnd + 1
+    };
+}
+
+function findMarkdownImageRange(range) {
+    if (range.start.line !== range.end.line) return null;
+    const line = state.cache.get(range.start.line) ?? '';
+    for (let index = Math.min(range.start.column, line.length - 1); index >= 0; index--) {
+        if (line[index] !== '!') continue;
+        const image = parseMarkdownImageAt(line, index);
+        if (image && range.start.column >= image.fullStart && range.end.column <= image.fullEnd) {
+            return {
+                range: {
+                    start: { line: range.start.line, column: image.fullStart },
+                    end: { line: range.end.line, column: image.fullEnd }
+                },
+                text: line.slice(image.textStart, image.textEnd),
+                urlStartOffset: image.urlStart - image.fullStart,
+                urlEndOffset: image.urlEnd - image.fullStart
+            };
+        }
+    }
+    return null;
+}
+
+function toggleMarkdownImage() {
+    const range = activeMarkdownRange();
+    const image = findMarkdownImageRange(range);
+    if (image) {
+        replaceMarkdownRange(image.range, image.text, 0, image.text.length);
+        return;
+    }
+
+    const selected = textInRange(range);
+    const altText = selected || '이미지';
+    const replacement = `![${altText}](url)`;
+    if (selected) {
+        const urlStart = altText.length + 4;
+        replaceMarkdownRange(range, replacement, urlStart, urlStart + 3);
+    } else {
+        replaceMarkdownRange(range, replacement, 2, 2 + altText.length);
+    }
+}
+
 function nextMarkdownArrow(current) {
     const arrows = ['→', '←', '↑', '↓'];
     const index = arrows.indexOf(current);
@@ -634,6 +691,7 @@ function applyMarkdownCommand(command, color) {
         case 'quote': toggleLinePrefix('> '); break;
         case 'ul': toggleLinePrefix('- '); break;
         case 'task': toggleLinePrefix('- [ ] '); break;
+        case 'image': toggleMarkdownImage(); break;
         case 'link': toggleMarkdownLink(); break;
         case 'textColor': applyMarkdownTextColor(color); break;
         case 'heading': cycleHeadingPrefix(); break;

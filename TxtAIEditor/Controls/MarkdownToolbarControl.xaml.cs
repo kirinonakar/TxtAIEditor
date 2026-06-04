@@ -61,6 +61,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(MarkdownCharMapButton, getText("CharMap", "문자표"));
             ToolTipService.SetToolTip(MarkdownEmojiButton, getText("Emoji", "이모지"));
             ToolTipService.SetToolTip(MarkdownCurrentDateButton, getText("CurrentDate", "현재 날짜"));
+            ToolTipService.SetToolTip(MarkdownImageButton, getText("Image", "이미지"));
             ToolTipService.SetToolTip(MarkdownLinkButton, getText("Link", "링크"));
 
             TextColorPickerTitle.Text = getText("TextColorPickerTitle", "글자색 선택");

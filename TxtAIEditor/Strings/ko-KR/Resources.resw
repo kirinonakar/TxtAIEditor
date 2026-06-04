@@ -227,6 +227,9 @@
   <data name="Link" xml:space="preserve">
     <value>링크</value>
   </data>
+  <data name="Image" xml:space="preserve">
+    <value>이미지</value>
+  </data>
   <data name="CharMap" xml:space="preserve">
     <value>문자표</value>
   </data>

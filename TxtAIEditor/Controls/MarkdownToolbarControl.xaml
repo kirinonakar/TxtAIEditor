@@ -139,6 +139,9 @@
                 <Button x:Name="MarkdownCurrentDateButton" Tag="currentDate" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="현재 날짜">
                     <FontIcon Glyph="&#xE787;" FontSize="13"/>
                 </Button>
+                <Button x:Name="MarkdownImageButton" Tag="image" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="이미지">
+                    <FontIcon Glyph="&#xE8B9;" FontSize="13"/>
+                </Button>
                 <Button x:Name="MarkdownLinkButton" Tag="link" Style="{StaticResource MarkdownToolbarButtonStyle}" Click="OnCommandButtonClick" ToolTipService.ToolTip="링크">
                     <FontIcon Glyph="&#xE71B;" FontSize="13"/>
                 </Button>
