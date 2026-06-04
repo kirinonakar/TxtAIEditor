@@ -29,7 +29,7 @@ namespace TxtAIEditor.Core.Models
         public bool LeftSidebarVisible { get; set; } = true;
         public bool RightSidebarVisible { get; set; } = true;
         public bool DefaultMarkdownEnabled { get; set; } = true;
-        public bool DefaultMarkdownToolbarEnabled { get; set; } = false;
+        public bool DefaultMarkdownToolbarEnabled { get; set; } = true;
         public int WindowX { get; set; } = -1;
         public int WindowY { get; set; } = -1;
         public int WindowWidth { get; set; } = 1200;
