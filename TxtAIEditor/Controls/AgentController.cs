@@ -277,7 +277,7 @@ namespace TxtAIEditor.Controls
 
                 bool completed = false;
                 bool reachedToolStepLimit = false;
-                const int maxToolSteps = 8;
+                const int maxToolSteps = 15;
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
