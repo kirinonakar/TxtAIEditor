@@ -37,6 +37,7 @@ namespace TxtAIEditor.Controls
         private int _outputLength;
         private string _rawOutputText = string.Empty;
         private readonly List<string> _renderedLines = new List<string>();
+        private bool _outputScrollQueued;
 
         public string RawOutputText => _rawOutputText;
         public string SelectedOutputText => AgentOutputText.SelectedText;
@@ -169,6 +170,11 @@ namespace TxtAIEditor.Controls
             AgentIncludeActiveFileCheckBox.IsEnabled = !isBusy;
             AgentAddAttachmentButton.IsEnabled = !isBusy;
             AgentAttachmentsList.IsEnabled = !isBusy;
+
+            if (!isBusy)
+            {
+                ScrollOutputToEnd();
+            }
         }
 
         public void ClearActivity(string idleText)
@@ -322,7 +328,31 @@ namespace TxtAIEditor.Controls
             {
                 _outputLength = currentLength;
             }
-            AgentOutputScrollViewer.ChangeView(null, AgentOutputScrollViewer.ScrollableHeight, null);
+
+            ChangeOutputViewToEnd();
+            QueueOutputScrollToEnd();
+        }
+
+        private void QueueOutputScrollToEnd()
+        {
+            if (_outputScrollQueued)
+            {
+                return;
+            }
+
+            _outputScrollQueued = true;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                _outputScrollQueued = false;
+                AgentOutputText.UpdateLayout();
+                AgentOutputScrollViewer.UpdateLayout();
+                ChangeOutputViewToEnd();
+            });
+        }
+
+        private void ChangeOutputViewToEnd()
+        {
+            AgentOutputScrollViewer.ChangeView(null, double.MaxValue, null, true);
         }
 
         private DispatcherTimer CreateThinkingTimer()
