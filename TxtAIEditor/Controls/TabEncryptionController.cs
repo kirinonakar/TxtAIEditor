@@ -53,10 +53,14 @@ namespace TxtAIEditor.Controls
                 menu.Items.Add(encryptItem);
             }
 
+            CursorResetHelper.AttachToFlyout(menu, target);
+            CursorResetHelper.ResetToArrow(target);
+
             menu.ShowAt(target, new FlyoutShowOptions
             {
                 Position = args.GetPosition(target)
             });
+            CursorResetHelper.ResetToArrow(target);
         }
 
         public async Task EncryptAsync(OpenedTab tab)

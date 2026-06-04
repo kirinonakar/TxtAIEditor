@@ -2214,10 +2214,13 @@ namespace TxtAIEditor
 
             var ownerTabView = GetTabViewForTabItem(tabItem) ?? fallbackTabView;
             var flyout = _tabContextMenuController.CreateContextFlyout(tab, tabItem, ownerTabView);
+            CursorResetHelper.AttachToFlyout(flyout, target);
+            CursorResetHelper.ResetToArrow(target);
             flyout.ShowAt(target, new FlyoutShowOptions
             {
                 Position = args.GetPosition(target)
             });
+            CursorResetHelper.ResetToArrow(target);
         }
 
         private async void OnToggleTabLivePreview(OpenedTab tab, TabViewItem tabItem, bool enabled)

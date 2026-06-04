@@ -89,6 +89,8 @@ namespace TxtAIEditor.Controls
             if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 9)
             {
                 LocalizeContextFlyout(flyout);
+                CursorResetHelper.AttachToFlyout(flyout, element);
+                CursorResetHelper.ResetToArrow(element);
             }
 
             e.Handled = true;
