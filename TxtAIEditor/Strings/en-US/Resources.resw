@@ -525,7 +525,13 @@
     <value>Show/Hide Toolbar Buttons</value>
   </data>
   <data name="SettingsToolbarDragHint" xml:space="preserve">
-    <value>Drag to reorder (Settings button is fixed)</value>
+    <value>Drag within the left/right lists to reorder buttons, then use the middle buttons to move the selected button between alignments. The Settings button is fixed.</value>
+  </data>
+  <data name="SettingsToolbarLeftAligned" xml:space="preserve">
+    <value>Left Aligned</value>
+  </data>
+  <data name="SettingsToolbarRightAligned" xml:space="preserve">
+    <value>Right Aligned</value>
   </data>
   <data name="SettingsToolbarSettingsPinned" xml:space="preserve">
     <value>The Settings button is always shown.</value>

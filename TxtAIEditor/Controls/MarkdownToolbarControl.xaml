@@ -55,7 +55,7 @@
         </Border.Resources>
 
         <ScrollViewer Height="32"
-                      HorizontalAlignment="Right"
+                      HorizontalAlignment="Stretch"
                       HorizontalScrollBarVisibility="Auto"
                       HorizontalScrollMode="Auto"
                       VerticalScrollBarVisibility="Disabled"

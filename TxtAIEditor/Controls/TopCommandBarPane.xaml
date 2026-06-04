@@ -9,13 +9,22 @@
 
     <Border BorderBrush="{ThemeResource ToolbarBorderBrush}" BorderThickness="0,0,0,1">
         <CommandBar x:Name="TopCommandBar" Background="{ThemeResource ToolbarBackgroundBrush}" DefaultLabelPosition="Right">
-            <AppBarButton x:Name="OpenFileButton" Icon="OpenFile" Label="파일 열기" Click="OnOpenFileClick" AccessKey="O" ToolTipService.ToolTip="파일 열기 (Ctrl+O)"/>
-            <AppBarButton x:Name="SaveFileButton" Icon="Save" Label="저장" Click="OnSaveFileClick" AccessKey="S" ToolTipService.ToolTip="저장 (Ctrl+S)"/>
-            <AppBarButton x:Name="SaveAsFileButton" Label="다른 이름으로 저장" Click="OnSaveAsFileClick" ToolTipService.ToolTip="다른 이름으로 저장 (Ctrl+Shift+S)">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE792;"/>
-                </AppBarButton.Icon>
-            </AppBarButton>
+            <CommandBar.Content>
+                <StackPanel x:Name="LeftFileCommandPanel" Orientation="Horizontal" VerticalAlignment="Stretch">
+                    <AppBarButton x:Name="OpenFileButton" Icon="OpenFile" Label="파일 열기" Click="OnOpenFileClick" AccessKey="O" ToolTipService.ToolTip="파일 열기 (Ctrl+O)"/>
+                    <AppBarButton x:Name="SaveFileButton" Icon="Save" Label="저장" Click="OnSaveFileClick" AccessKey="S" ToolTipService.ToolTip="저장 (Ctrl+S)"/>
+                    <AppBarButton x:Name="SaveAsFileButton" Label="다른 이름으로 저장" Click="OnSaveAsFileClick" ToolTipService.ToolTip="다른 이름으로 저장 (Ctrl+Shift+S)">
+                        <AppBarButton.Icon>
+                            <FontIcon Glyph="&#xE792;"/>
+                        </AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton x:Name="PrintButton" Label="인쇄" Click="OnPrintClick" ToolTipService.ToolTip="인쇄 (Ctrl+P)">
+                        <AppBarButton.Icon>
+                            <FontIcon Glyph="&#xE749;"/>
+                        </AppBarButton.Icon>
+                    </AppBarButton>
+                </StackPanel>
+            </CommandBar.Content>
             <AppBarButton x:Name="CompareButton" Label="비교" Click="OnCompareFilesClick" ToolTipService.ToolTip="파일 비교 (Diff)">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE13C;"/>
@@ -28,11 +37,6 @@
                 </AppBarToggleButton.Icon>
                 <AppBarToggleButton.Label>터미널</AppBarToggleButton.Label>
             </AppBarToggleButton>
-            <AppBarButton x:Name="PrintButton" Label="인쇄" Click="OnPrintClick" ToolTipService.ToolTip="인쇄 (Ctrl+P)">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE749;"/>
-                </AppBarButton.Icon>
-            </AppBarButton>
             <AppBarToggleButton x:Name="TopMostToggleButton" Click="OnTopMostToggleClick" ToolTipService.ToolTip="항상 위 (F9)">
                 <AppBarToggleButton.Icon>
                     <FontIcon Glyph="&#xE840;"/>

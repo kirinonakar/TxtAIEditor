@@ -43,17 +43,29 @@
         <!-- 1. Top Command Toolbar (상단 툴바) -->
         <controls:TopCommandBarPane x:Name="TopToolbar" Grid.Row="1"/>
 
-        <controls:MarkdownToolbarControl x:Name="MarkdownToolbar"
-                                         Grid.Row="2"
-                                         Visibility="Collapsed"/>
+        <Grid Grid.Row="2"
+              Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding Width, ElementName=ExplorerColumn}"/>
+                <ColumnDefinition Width="{Binding Width, ElementName=LeftSplitterColumn}"/>
+                <ColumnDefinition Width="{Binding Width, ElementName=EditorColumn}"/>
+                <ColumnDefinition Width="{Binding Width, ElementName=RightSplitterColumn}"/>
+                <ColumnDefinition Width="{Binding Width, ElementName=PreviewColumn}"/>
+            </Grid.ColumnDefinitions>
+
+            <controls:MarkdownToolbarControl x:Name="MarkdownToolbar"
+                                             Grid.Column="2"
+                                             Grid.ColumnSpan="3"
+                                             Visibility="Collapsed"/>
+        </Grid>
 
         <!-- 2. Main Work Area -->
         <Grid x:Name="MainWorkGrid" Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="ExplorerColumn" Width="260" MinWidth="150" MaxWidth="500"/> <!-- Col 0: Left Side Explorer Panel -->
-                <ColumnDefinition Width="Auto"/>                                                      <!-- Col 1: Grid Splitter -->
-                <ColumnDefinition Width="*" MinWidth="300"/>                                          <!-- Col 2: Center Editor TabView -->
-                <ColumnDefinition Width="Auto"/>                                                      <!-- Col 3: Grid Splitter -->
+                <ColumnDefinition x:Name="LeftSplitterColumn" Width="Auto"/>                           <!-- Col 1: Grid Splitter -->
+                <ColumnDefinition x:Name="EditorColumn" Width="*" MinWidth="300"/>                     <!-- Col 2: Center Editor TabView -->
+                <ColumnDefinition x:Name="RightSplitterColumn" Width="Auto"/>                          <!-- Col 3: Grid Splitter -->
                 <ColumnDefinition x:Name="PreviewColumn" Width="400" MinWidth="150" MaxWidth="1500"/>  <!-- Col 4: Right Split Preview Panel -->
             </Grid.ColumnDefinitions>
 

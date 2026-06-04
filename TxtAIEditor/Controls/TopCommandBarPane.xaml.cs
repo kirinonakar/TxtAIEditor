@@ -122,11 +122,23 @@ namespace TxtAIEditor.Controls
             var hiddenSet = new HashSet<string>(
                 (settings.ToolbarHiddenButtons ?? new List<string>()).Select(ToolbarButtonCatalog.NormalizeId),
                 StringComparer.OrdinalIgnoreCase);
+            var leftAlignedSet = new HashSet<string>(
+                NormalizeToolbarLeftAlignedButtons(settings.ToolbarLeftAlignedButtons),
+                StringComparer.OrdinalIgnoreCase);
             var buttonsById = GetToolbarButtonsById();
             var orderedIds = NormalizeToolbarOrder(settings.ToolbarButtonOrder);
 
+            LeftFileCommandPanel.Children.Clear();
             TopCommandBar.PrimaryCommands.Clear();
-            AddToolbarCommandsInOriginalGroups(orderedIds, buttonsById, hiddenSet, showLabels);
+            AddToolbarCommandsToLeftPanel(
+                orderedIds.Where(id => leftAlignedSet.Contains(id)).ToList(),
+                buttonsById,
+                hiddenSet);
+            AddToolbarCommandsInOriginalGroups(
+                orderedIds.Where(id => !leftAlignedSet.Contains(id)).ToList(),
+                buttonsById,
+                hiddenSet,
+                showLabels);
 
             foreach (var (id, entry) in buttonsById)
             {
@@ -136,18 +148,31 @@ namespace TxtAIEditor.Controls
                 if (entry.Button is AppBarButton appBarButton)
                 {
                     appBarButton.Label = label;
-                    ApplyToolbarButtonWidth(appBarButton, showLabels);
+                    ApplyToolbarButtonPresentation(appBarButton, showLabels && !leftAlignedSet.Contains(id));
                 }
                 else if (entry.Button is AppBarToggleButton appBarToggleButton)
                 {
                     appBarToggleButton.Label = label;
-                    ApplyToolbarButtonWidth(appBarToggleButton, showLabels);
+                    ApplyToolbarButtonPresentation(appBarToggleButton, showLabels && !leftAlignedSet.Contains(id));
                 }
             }
         }
 
-        private static void ApplyToolbarButtonWidth(Control button, bool showLabels)
+        private static void ApplyToolbarButtonPresentation(Control button, bool showLabels)
         {
+            if (button is AppBarButton appBarButton)
+            {
+                appBarButton.LabelPosition = showLabels
+                    ? CommandBarLabelPosition.Default
+                    : CommandBarLabelPosition.Collapsed;
+            }
+            else if (button is AppBarToggleButton appBarToggleButton)
+            {
+                appBarToggleButton.LabelPosition = showLabels
+                    ? CommandBarLabelPosition.Default
+                    : CommandBarLabelPosition.Collapsed;
+            }
+
             if (showLabels)
             {
                 button.Width = double.NaN;
@@ -160,6 +185,33 @@ namespace TxtAIEditor.Controls
             button.Width = compactToolbarButtonWidth;
             button.MinWidth = compactToolbarButtonWidth;
             button.MaxWidth = compactToolbarButtonWidth;
+        }
+
+        private void AddToolbarCommandsToLeftPanel(
+            IReadOnlyList<string> orderedIds,
+            IReadOnlyDictionary<string, (FrameworkElement Button, string ResourceKey)> buttonsById,
+            ISet<string> hiddenSet)
+        {
+            var groupLookup = ToolbarButtonCatalog.DefaultGroups
+                .SelectMany((group, groupIndex) => group.Select(id => (id, groupIndex)))
+                .ToDictionary(item => item.id, item => item.groupIndex, StringComparer.OrdinalIgnoreCase);
+            int? lastGroupIndex = null;
+
+            foreach (string id in orderedIds)
+            {
+                if (!buttonsById.TryGetValue(id, out var entry) || hiddenSet.Contains(id))
+                {
+                    continue;
+                }
+
+                int groupIndex = groupLookup.TryGetValue(id, out int index) ? index : 0;
+                entry.Button.Margin = lastGroupIndex.HasValue && groupIndex != lastGroupIndex.Value
+                    ? new Thickness(8, 0, 0, 0)
+                    : new Thickness(0);
+
+                LeftFileCommandPanel.Children.Add(entry.Button);
+                lastGroupIndex = groupIndex;
+            }
         }
 
         private void AddToolbarCommandsInOriginalGroups(
@@ -256,6 +308,25 @@ namespace TxtAIEditor.Controls
             }
 
             return orderedIds;
+        }
+
+        private static List<string> NormalizeToolbarLeftAlignedButtons(IReadOnlyList<string>? savedLeftAlignedButtons)
+        {
+            var validIds = new HashSet<string>(
+                ToolbarButtonCatalog.DefaultOrder,
+                StringComparer.OrdinalIgnoreCase);
+            var leftAlignedIds = new List<string>();
+
+            foreach (string rawId in savedLeftAlignedButtons ?? ToolbarButtonCatalog.DefaultLeftAlignedButtons)
+            {
+                string id = ToolbarButtonCatalog.NormalizeId(rawId);
+                if (validIds.Contains(id) && !leftAlignedIds.Contains(id, StringComparer.OrdinalIgnoreCase))
+                {
+                    leftAlignedIds.Add(id);
+                }
+            }
+
+            return leftAlignedIds;
         }
 
         private void OnOpenFileClick(object sender, RoutedEventArgs e) => OpenFileClick?.Invoke(sender, e);

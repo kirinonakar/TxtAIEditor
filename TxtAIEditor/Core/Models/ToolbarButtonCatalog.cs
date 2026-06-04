@@ -13,9 +13,9 @@ namespace TxtAIEditor.Core.Models
             new ToolbarButtonOption("openFile", "OpenFile"),
             new ToolbarButtonOption("saveFile", "SaveFile"),
             new ToolbarButtonOption("saveAsFile", "SaveAsFile"),
+            new ToolbarButtonOption("print", "Print"),
             new ToolbarButtonOption("compare", "Compare"),
             new ToolbarButtonOption("terminal", "Terminal"),
-            new ToolbarButtonOption("print", "Print"),
             new ToolbarButtonOption("topMost", "TopMost"),
             new ToolbarButtonOption("stickyNote", "StickyNote"),
             new ToolbarButtonOption("wordWrap", "WordWrap"),
@@ -32,10 +32,18 @@ namespace TxtAIEditor.Core.Models
             .Select(option => option.Id)
             .ToList();
 
+        public static IReadOnlyList<string> DefaultLeftAlignedButtons { get; } = new[]
+        {
+            "openFile",
+            "saveFile",
+            "saveAsFile",
+            "print"
+        };
+
         public static IReadOnlyList<IReadOnlyList<string>> DefaultGroups { get; } = new[]
         {
-            new[] { "openFile", "saveFile", "saveAsFile", "compare" },
-            new[] { "terminal", "print", "topMost", "stickyNote" },
+            new[] { "openFile", "saveFile", "saveAsFile", "print" },
+            new[] { "compare", "terminal", "topMost", "stickyNote" },
             new[] { "wordWrap", "search" },
             new[] { "markdown", "csvTable" },
             new[] { "theme" },

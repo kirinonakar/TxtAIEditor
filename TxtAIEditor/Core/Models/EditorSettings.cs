@@ -64,6 +64,7 @@ namespace TxtAIEditor.Core.Models
 
         // Toolbar Customization
         public List<string> ToolbarButtonOrder { get; set; } = new List<string>();
+        public List<string> ToolbarLeftAlignedButtons { get; set; } = new List<string>(ToolbarButtonCatalog.DefaultLeftAlignedButtons);
         public bool ToolbarShowLabels { get; set; } = true;
         public List<string> ToolbarHiddenButtons { get; set; } = new List<string>();
 

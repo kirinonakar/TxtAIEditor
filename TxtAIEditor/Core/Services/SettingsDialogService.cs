@@ -541,40 +541,124 @@ namespace TxtAIEditor.Core.Services
 
             var reorderDesc = new TextBlock
             {
-                Text = getString("SettingsToolbarDragHint", "드래그하여 버튼 순서 변경 (설정 버튼은 고정)"),
+                Text = getString("SettingsToolbarDragHint", "왼쪽/오른쪽 목록에서 드래그하여 순서를 바꾸고, 선택한 버튼은 가운데 버튼으로 정렬 위치를 옮길 수 있습니다. 설정 버튼은 고정됩니다."),
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 11,
                 Margin = new Thickness(0, 8, 0, 4)
             };
             toolbarSection.Children.Add(reorderDesc);
             var defaultOrder = NormalizeToolbarOrder(settings.ToolbarButtonOrder);
-            var orderItems = new ObservableCollection<ToolbarOrderItem>(defaultOrder
+            var leftAlignedIds = new HashSet<string>(
+                NormalizeToolbarLeftAlignedButtons(settings.ToolbarLeftAlignedButtons),
+                StringComparer.OrdinalIgnoreCase);
+            var orderedOptions = defaultOrder
                 .Select(id => toolbarOptions.First(option => option.Id.Equals(id, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            var leftOrderItems = new ObservableCollection<ToolbarOrderItem>(orderedOptions
+                .Where(option => leftAlignedIds.Contains(option.Id))
                 .Select(option => new ToolbarOrderItem(option.Id, getString(option.ResourceKey, option.Id))));
-            var orderList = new ListView
+            var rightOrderItems = new ObservableCollection<ToolbarOrderItem>(orderedOptions
+                .Where(option => !leftAlignedIds.Contains(option.Id))
+                .Select(option => new ToolbarOrderItem(option.Id, getString(option.ResourceKey, option.Id))));
+
+            ListView CreateToolbarOrderList(ObservableCollection<ToolbarOrderItem> items)
             {
-                Height = 240,
-                SelectionMode = ListViewSelectionMode.None,
-                AllowDrop = true,
-                CanReorderItems = true,
-                ItemsSource = orderItems
+                var list = new ListView
+                {
+                    Height = 145,
+                    SelectionMode = ListViewSelectionMode.Single,
+                    AllowDrop = true,
+                    CanReorderItems = true,
+                    ItemsSource = items
+                };
+
+                list.ItemTemplate = (Microsoft.UI.Xaml.DataTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+                    @"<DataTemplate xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation"">
+                        <TextBlock Text=""{Binding Label}"" FontSize=""11"" Height=""18"" VerticalAlignment=""Center""/>
+                      </DataTemplate>"
+                );
+
+                list.ItemContainerStyle = (Microsoft.UI.Xaml.Style)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+                    @"<Style TargetType=""ListViewItem"" xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation"">
+                        <Setter Property=""MinHeight"" Value=""22""/>
+                        <Setter Property=""Height"" Value=""22""/>
+                        <Setter Property=""Padding"" Value=""8,1,8,1""/>
+                      </Style>"
+                );
+
+                return list;
+            }
+
+            var leftOrderList = CreateToolbarOrderList(leftOrderItems);
+            var rightOrderList = CreateToolbarOrderList(rightOrderItems);
+
+            var alignmentGrid = new Grid();
+            alignmentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            alignmentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            alignmentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var leftColumn = new StackPanel { Spacing = 4 };
+            leftColumn.Children.Add(new TextBlock
+            {
+                Text = getString("SettingsToolbarLeftAligned", "왼쪽 정렬"),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11
+            });
+            leftColumn.Children.Add(leftOrderList);
+
+            var movePanel = new StackPanel
+            {
+                Spacing = 6,
+                Width = 42,
+                VerticalAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(6, 20, 6, 0)
             };
+            var moveRightButton = new Button { Content = ">", HorizontalAlignment = HorizontalAlignment.Stretch };
+            var moveLeftButton = new Button { Content = "<", HorizontalAlignment = HorizontalAlignment.Stretch };
+            movePanel.Children.Add(moveRightButton);
+            movePanel.Children.Add(moveLeftButton);
 
-            orderList.ItemTemplate = (Microsoft.UI.Xaml.DataTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load(
-                @"<DataTemplate xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation"">
-                    <TextBlock Text=""{Binding Label}"" FontSize=""11"" Height=""18"" VerticalAlignment=""Center""/>
-                  </DataTemplate>"
-            );
+            var rightColumn = new StackPanel { Spacing = 4 };
+            rightColumn.Children.Add(new TextBlock
+            {
+                Text = getString("SettingsToolbarRightAligned", "오른쪽 정렬"),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11
+            });
+            rightColumn.Children.Add(rightOrderList);
 
-            orderList.ItemContainerStyle = (Microsoft.UI.Xaml.Style)Microsoft.UI.Xaml.Markup.XamlReader.Load(
-                @"<Style TargetType=""ListViewItem"" xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation"">
-                    <Setter Property=""MinHeight"" Value=""22""/>
-                    <Setter Property=""Height"" Value=""22""/>
-                    <Setter Property=""Padding"" Value=""8,1,8,1""/>
-                  </Style>"
-            );
+            Grid.SetColumn(leftColumn, 0);
+            Grid.SetColumn(movePanel, 1);
+            Grid.SetColumn(rightColumn, 2);
+            alignmentGrid.Children.Add(leftColumn);
+            alignmentGrid.Children.Add(movePanel);
+            alignmentGrid.Children.Add(rightColumn);
+            toolbarSection.Children.Add(alignmentGrid);
 
-            toolbarSection.Children.Add(orderList);
+            void MoveSelectedToolbarItem(
+                ListView sourceList,
+                ObservableCollection<ToolbarOrderItem> sourceItems,
+                ListView targetList,
+                ObservableCollection<ToolbarOrderItem> targetItems)
+            {
+                if (sourceList.SelectedItem is not ToolbarOrderItem item)
+                {
+                    return;
+                }
+
+                int sourceIndex = sourceItems.IndexOf(item);
+                if (sourceIndex < 0)
+                {
+                    return;
+                }
+
+                sourceItems.RemoveAt(sourceIndex);
+                targetItems.Add(item);
+                targetList.SelectedItem = item;
+            }
+
+            moveRightButton.Click += (_, __) => MoveSelectedToolbarItem(leftOrderList, leftOrderItems, rightOrderList, rightOrderItems);
+            moveLeftButton.Click += (_, __) => MoveSelectedToolbarItem(rightOrderList, rightOrderItems, leftOrderList, leftOrderItems);
 
             var resetToolbarButton = new Button
             {
@@ -593,12 +677,22 @@ namespace TxtAIEditor.Core.Services
                     chk.IsChecked = true;
                 }
 
-                orderItems.Clear();
                 var originalDefaultOrder = NormalizeToolbarOrder(null);
+                leftOrderItems.Clear();
+                rightOrderItems.Clear();
+                var defaultLeftSet = new HashSet<string>(ToolbarButtonCatalog.DefaultLeftAlignedButtons, StringComparer.OrdinalIgnoreCase);
                 foreach (var id in originalDefaultOrder)
                 {
                     var opt = toolbarOptions.First(o => o.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-                    orderItems.Add(new ToolbarOrderItem(opt.Id, getString(opt.ResourceKey, opt.Id)));
+                    var item = new ToolbarOrderItem(opt.Id, getString(opt.ResourceKey, opt.Id));
+                    if (defaultLeftSet.Contains(opt.Id))
+                    {
+                        leftOrderItems.Add(item);
+                    }
+                    else
+                    {
+                        rightOrderItems.Add(item);
+                    }
                 }
             };
 
@@ -950,10 +1044,13 @@ SOFTWARE.",
             settings.DefaultMarkdownToolbarEnabled = defaultMarkdownToolbarCheck.IsChecked == true;
 
             settings.ToolbarShowLabels = showLabelsCheck.IsChecked == true;
-            settings.ToolbarButtonOrder = (orderList.ItemsSource as ObservableCollection<ToolbarOrderItem>)?
+            settings.ToolbarButtonOrder = leftOrderItems
+                .Concat(rightOrderItems)
                 .Select(item => item.Id)
-                .ToList()
-                ?? ToolbarButtonCatalog.DefaultOrder.ToList();
+                .ToList();
+            settings.ToolbarLeftAlignedButtons = leftOrderItems
+                .Select(item => item.Id)
+                .ToList();
             settings.ToolbarHiddenButtons = visibilityChecks
                 .Where(check => check.IsChecked == false)
                 .Select(check => check.Tag as string ?? string.Empty)
@@ -1006,6 +1103,25 @@ SOFTWARE.",
             }
 
             return orderedIds;
+        }
+
+        private static List<string> NormalizeToolbarLeftAlignedButtons(IReadOnlyList<string>? savedLeftAlignedButtons)
+        {
+            var validIds = new HashSet<string>(
+                ToolbarButtonCatalog.DefaultOrder,
+                StringComparer.OrdinalIgnoreCase);
+            var leftAlignedIds = new List<string>();
+
+            foreach (string rawId in savedLeftAlignedButtons ?? ToolbarButtonCatalog.DefaultLeftAlignedButtons)
+            {
+                string id = ToolbarButtonCatalog.NormalizeId(rawId);
+                if (validIds.Contains(id) && !leftAlignedIds.Contains(id, StringComparer.OrdinalIgnoreCase))
+                {
+                    leftAlignedIds.Add(id);
+                }
+            }
+
+            return leftAlignedIds;
         }
 
         private static void AddLabel(StackPanel target, string text)

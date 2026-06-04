@@ -525,7 +525,13 @@
     <value>ツールバーボタンの表示/非表示</value>
   </data>
   <data name="SettingsToolbarDragHint" xml:space="preserve">
-    <value>ドラッグして順序変更 (設定ボタンは固定)</value>
+    <value>左/右の一覧内でドラッグして順序を変更し、中央のボタンで選択したボタンの配置を移動できます。設定ボタンは固定です。</value>
+  </data>
+  <data name="SettingsToolbarLeftAligned" xml:space="preserve">
+    <value>左揃え</value>
+  </data>
+  <data name="SettingsToolbarRightAligned" xml:space="preserve">
+    <value>右揃え</value>
   </data>
   <data name="SettingsToolbarSettingsPinned" xml:space="preserve">
     <value>設定ボタンは常に表示されます。</value>

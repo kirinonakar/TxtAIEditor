@@ -525,7 +525,13 @@
     <value>툴바 버튼 표시/숨기기</value>
   </data>
   <data name="SettingsToolbarDragHint" xml:space="preserve">
-    <value>드래그하여 버튼 순서 변경 (설정 버튼은 고정)</value>
+    <value>왼쪽/오른쪽 목록에서 드래그하여 순서를 바꾸고, 선택한 버튼은 가운데 버튼으로 정렬 위치를 옮길 수 있습니다. 설정 버튼은 고정됩니다.</value>
+  </data>
+  <data name="SettingsToolbarLeftAligned" xml:space="preserve">
+    <value>왼쪽 정렬</value>
+  </data>
+  <data name="SettingsToolbarRightAligned" xml:space="preserve">
+    <value>오른쪽 정렬</value>
   </data>
   <data name="SettingsToolbarSettingsPinned" xml:space="preserve">
     <value>설정 버튼은 항상 표시됩니다.</value>
