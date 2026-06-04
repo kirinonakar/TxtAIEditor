@@ -770,10 +770,13 @@ function printDocument(fullText) {
     var currentBg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fff';
     var currentFg = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() || '#000';
 
-    printContainer.style.cssText = 'display:block; font-family: ' + getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim() + '; font-size: ' + getComputedStyle(document.documentElement).getPropertyValue('--font-size').trim() + '; white-space: pre; padding: 20px; color: ' + currentFg + '; background: ' + currentBg + '; margin: 0; position: absolute; inset: 0; z-index: 1000; overflow: auto;';
+    var editorFontSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size').trim()) || 13;
+    var printFontSize = Math.max(16, editorFontSize * 1.2);
+
+    printContainer.style.cssText = 'display:block; font-family: ' + getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim() + '; font-size: ' + printFontSize + 'px; white-space: pre; padding: 20px; color: ' + currentFg + '; background: ' + currentBg + '; margin: 0; position: absolute; inset: 0; z-index: 1000; overflow: auto;';
     editorHost.style.display = 'none';
 
-    var baseFontSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size').trim()) || 13;
+    var baseFontSize = printFontSize;
     var currentZoom = 1.0;
     printContainer.style.fontSize = baseFontSize + 'px';
 
@@ -1527,6 +1530,11 @@ document.addEventListener('keydown', event => {
         if (key === 'w') {
             event.preventDefault();
             post({ type: 'shortcut', name: 'closeTab' });
+            return;
+        }
+        if (key === 'p') {
+            event.preventDefault();
+            post({ type: 'shortcut', name: 'print' });
             return;
         }
         if (key === 'f') {

@@ -874,6 +874,9 @@ namespace TxtAIEditor
                         case "closeTab":
                             OnCloseActiveTabShortcutInvoked(null!, null!);
                             break;
+                        case "print":
+                            OnPrintClick(this, new RoutedEventArgs());
+                            break;
                         case "searchAll":
                             EnsureLeftPanelVisible();
                             ShowLeftSidebarPage(3);
@@ -2142,6 +2145,10 @@ namespace TxtAIEditor
             else if (string.Equals(name, "f12", StringComparison.Ordinal))
             {
                 _stickyNoteModeController.ToggleMode();
+            }
+            else if (string.Equals(name, "print", StringComparison.Ordinal))
+            {
+                OnPrintClick(this, new RoutedEventArgs());
             }
         }
 
