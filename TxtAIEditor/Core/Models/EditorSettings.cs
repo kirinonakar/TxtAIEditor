@@ -25,6 +25,7 @@ namespace TxtAIEditor.Core.Models
         public string PreviewCustomBackgroundColor { get; set; } = string.Empty;
         public string PreviewCustomForegroundColor { get; set; } = string.Empty;
         public bool AutoSave { get; set; } = false;
+        public bool AutoSaveAllowNonGitFolders { get; set; } = false;
         public string PreviewMode { get; set; } = "Markdown";
         public bool LeftSidebarVisible { get; set; } = true;
         public bool RightSidebarVisible { get; set; } = true;
@@ -49,6 +50,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmModelLmStudio { get; set; } = "";
         public bool LlmConfirmBeforeSending { get; set; } = false;
         public bool LlmAgentVerbose { get; set; } = false;
+        public bool LlmAgentAllowNonGitFolders { get; set; } = false;
         public string LlmSourceLanguage { get; set; } = "Auto";
         public string LlmTargetLanguage { get; set; } = "Korean";
 

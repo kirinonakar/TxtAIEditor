@@ -13,6 +13,7 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowViewModel _viewModel;
         private readonly Func<EditorSettings?> _settingsProvider;
         private readonly Func<string> _repoPathProvider;
+        private readonly Func<string> _workspacePathProvider;
         private readonly Func<OpenedTab, Task<bool>> _saveTabAsync;
         private readonly DispatcherTimer _timer;
         private bool _enabled;
@@ -21,11 +22,13 @@ namespace TxtAIEditor.Controls
             MainWindowViewModel viewModel,
             Func<EditorSettings?> settingsProvider,
             Func<string> repoPathProvider,
+            Func<string> workspacePathProvider,
             Func<OpenedTab, Task<bool>> saveTabAsync)
         {
             _viewModel = viewModel;
             _settingsProvider = settingsProvider;
             _repoPathProvider = repoPathProvider;
+            _workspacePathProvider = workspacePathProvider;
             _saveTabAsync = saveTabAsync;
             _timer = new DispatcherTimer
             {
@@ -39,7 +42,7 @@ namespace TxtAIEditor.Controls
             var settings = _settingsProvider();
             if (settings == null) return;
 
-            _enabled = settings.AutoSave && !string.IsNullOrEmpty(_repoPathProvider());
+            _enabled = settings.AutoSave && !string.IsNullOrEmpty(GetAutoSaveRoot(settings));
             if (_enabled)
             {
                 _timer.Start();
@@ -59,13 +62,16 @@ namespace TxtAIEditor.Controls
         {
             if (!_enabled) return;
 
-            string currentRepoPath = _repoPathProvider();
-            if (string.IsNullOrEmpty(currentRepoPath)) return;
+            var settings = _settingsProvider();
+            if (settings == null) return;
 
-            string repoPath;
+            string autoSaveRoot = GetAutoSaveRoot(settings);
+            if (string.IsNullOrEmpty(autoSaveRoot)) return;
+
+            string rootPath;
             try
             {
-                repoPath = Path.GetFullPath(currentRepoPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                rootPath = Path.GetFullPath(autoSaveRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
             }
             catch
             {
@@ -78,7 +84,7 @@ namespace TxtAIEditor.Controls
                 try
                 {
                     string fullPath = Path.GetFullPath(t.FilePath);
-                    return fullPath.StartsWith(repoPath, StringComparison.OrdinalIgnoreCase);
+                    return fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase);
                 }
                 catch
                 {
@@ -90,6 +96,26 @@ namespace TxtAIEditor.Controls
             {
                 await _saveTabAsync(tab);
             }
+        }
+
+        private string GetAutoSaveRoot(EditorSettings settings)
+        {
+            string repoPath = _repoPathProvider();
+            if (!string.IsNullOrWhiteSpace(repoPath) && Directory.Exists(repoPath))
+            {
+                return repoPath;
+            }
+
+            if (settings.AutoSaveAllowNonGitFolders)
+            {
+                string workspacePath = _workspacePathProvider();
+                if (!string.IsNullOrWhiteSpace(workspacePath) && Directory.Exists(workspacePath))
+                {
+                    return workspacePath;
+                }
+            }
+
+            return string.Empty;
         }
     }
 }

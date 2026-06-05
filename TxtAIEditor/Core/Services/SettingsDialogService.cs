@@ -85,6 +85,7 @@ namespace TxtAIEditor.Core.Services
             var autocompleteEnterCheck = new CheckBox { Content = getString("SettingsAutocompleteEnter", "Enter로 자동완성"), IsChecked = settings.AutocompleteOnEnter };
             var autocompleteTabCheck = new CheckBox { Content = getString("SettingsAutocompleteTab", "Tab으로 자동완성"), IsChecked = settings.AutocompleteOnTab };
             var autoSaveCheck = new CheckBox { Content = getString("SettingsAutoSave", "Autosave 사용"), IsChecked = settings.AutoSave };
+            var autoSaveAllowNonGitCheck = new CheckBox { Content = getString("SettingsAutoSaveAllowNonGitFolders", "Git 폴더가 아니어도 Autosave 허용"), IsChecked = settings.AutoSaveAllowNonGitFolders };
             var defaultMarkdownCheck = new CheckBox { Content = getString("SettingsLivePreview", "실시간 미리보기 기본 활성화"), IsChecked = settings.DefaultMarkdownEnabled };
             var defaultMarkdownToolbarCheck = new CheckBox { Content = getString("SettingsMarkdownToolbar", "기본 마크다운 툴바 활성화"), IsChecked = settings.DefaultMarkdownToolbarEnabled };
             var tabSizeBox = new TextBox { PlaceholderText = "예: 4", Text = settings.TabSize.ToString(), HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -125,6 +126,7 @@ namespace TxtAIEditor.Core.Services
 
             var confirmBeforeSendingCheck = new CheckBox { Content = getString("SettingsLlmConfirmBeforeSending", "전송 전 확인"), IsChecked = settings.LlmConfirmBeforeSending };
             var agentVerboseCheck = new CheckBox { Content = getString("SettingsLlmAgentVerbose", "Agent 상세 출력 활성화 (Verbose)"), IsChecked = settings.LlmAgentVerbose };
+            var agentAllowNonGitCheck = new CheckBox { Content = getString("SettingsLlmAgentAllowNonGitFolders", "Git 폴더가 아니어도 Agent 허용"), IsChecked = settings.LlmAgentAllowNonGitFolders };
 
             var sourceLangCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             sourceLangCombo.Items.Add(getString("LlmLangAutoDetect", "자동 감지 (Auto Detect)"));
@@ -428,6 +430,7 @@ namespace TxtAIEditor.Core.Services
             editorSection.Children.Add(autocompleteEnterCheck);
             editorSection.Children.Add(autocompleteTabCheck);
             editorSection.Children.Add(autoSaveCheck);
+            editorSection.Children.Add(autoSaveAllowNonGitCheck);
             editorSection.Children.Add(defaultMarkdownCheck);
             editorSection.Children.Add(defaultMarkdownToolbarCheck);
             AddLabel(editorSection, getString("SettingsTabSize", "Tab size"));
@@ -483,6 +486,7 @@ namespace TxtAIEditor.Core.Services
 
             llmSection.Children.Add(confirmBeforeSendingCheck);
             llmSection.Children.Add(agentVerboseCheck);
+            llmSection.Children.Add(agentAllowNonGitCheck);
 
             AddLabel(llmSection, getString("SettingsLlmSourceLanguage", "번역 원본 언어 (Source Language)"));
             llmSection.Children.Add(sourceLangCombo);
@@ -986,6 +990,7 @@ SOFTWARE.",
             settings.AutocompleteOnEnter = autocompleteEnterCheck.IsChecked == true;
             settings.AutocompleteOnTab = autocompleteTabCheck.IsChecked == true;
             settings.AutoSave = autoSaveCheck.IsChecked == true;
+            settings.AutoSaveAllowNonGitFolders = autoSaveAllowNonGitCheck.IsChecked == true;
             if (int.TryParse(tabSizeBox.Text.Trim(), out int tabSize))
             {
                 settings.TabSize = Math.Clamp(tabSize, 1, 16);
@@ -998,6 +1003,7 @@ SOFTWARE.",
             settings.LlmModel = (!string.IsNullOrEmpty(selectedModelText) ? selectedModelText : (llmModelCombo.SelectedItem as string ?? settings.LlmModel)).Trim();
             settings.LlmConfirmBeforeSending = confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = agentVerboseCheck.IsChecked == true;
+            settings.LlmAgentAllowNonGitFolders = agentAllowNonGitCheck.IsChecked == true;
 
             settings.LlmSourceLanguage = sourceLangCombo.SelectedIndex switch
             {

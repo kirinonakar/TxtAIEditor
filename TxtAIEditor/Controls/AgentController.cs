@@ -258,7 +258,8 @@ namespace TxtAIEditor.Controls
             }
  
             string root = _fileTools.WorkspaceRoot;
-            if (!_isGitRepoProvider(root))
+            var settings = _settingsService.CurrentSettings;
+            if (!_isGitRepoProvider(root) && !settings.LlmAgentAllowNonGitFolders)
             {
                 _showError(
                     _getString("AgentErrorTitle", "Agent 오류"),

@@ -86,6 +86,19 @@ namespace TxtAIEditor
         private string _currentFolderPath = string.Empty;
         private string _currentRepoPath = string.Empty;
 
+        private string CurrentFolderPath
+        {
+            get => _currentFolderPath;
+            set
+            {
+                if (_currentFolderPath != value)
+                {
+                    _currentFolderPath = value;
+                    UpdateAutoSaveStatus();
+                }
+            }
+        }
+
         private string CurrentRepoPath
         {
             get => _currentRepoPath;
@@ -101,7 +114,7 @@ namespace TxtAIEditor
 
         private void UpdateAutoSaveStatus()
         {
-            _autoSaveController.UpdateStatus();
+            _autoSaveController?.UpdateStatus();
         }
 
         private bool _scrollSyncEnabled = true;
@@ -332,7 +345,7 @@ namespace TxtAIEditor
                 _explorerDirectoryService,
                 _gitService,
                 InitializePickerWindow,
-                path => _currentFolderPath = path,
+                path => CurrentFolderPath = path,
                 path => CurrentRepoPath = path,
                 RefreshGitStatusUIAsync,
                 EnsureLeftPanelVisible,
@@ -372,6 +385,7 @@ namespace TxtAIEditor
                 _viewModel,
                 () => _settingsService.CurrentSettings,
                 () => _currentRepoPath,
+                GetSearchRoot,
                 SaveTabAsync);
             _tabCloseController = new TabCloseController(
                 _viewModel,

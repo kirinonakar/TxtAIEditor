@@ -42,7 +42,8 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 💾 Auto-Save
 *   **Smart Background Auto-Save:** Automatically saves modified files within the active Git repository folder every 5 seconds.
-*   **Workspace-Aware:** Only triggers when a Git repository folder is opened in the editor.
+*   **Workspace-Aware:** By default, only triggers when a Git repository folder is opened in the editor.
+*   **Optional Non-Git Folders:** The Editor settings include an opt-in checkbox to allow Autosave in folders that are not Git repositories.
 
 ### 🔐 Encrypted Notes
 *   **Secure Note Compatibility:** Opens and saves `SECURE_NOTE_V1` encrypted note files compatible with the Simple Memo encryption format.
@@ -84,7 +85,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 🤖 AI Agent
 *   Solve complex, multi-step coding tasks automatically by allowing the AI assistant to run workspace tools (file search, read/write, terminal command execution, and web search/retrieval).
-    *   **Git Repository Requirement:** Agent mode can only be activated and used inside a directory containing a Git repository (`.git`).
+    *   **Git Repository Requirement:** Agent mode runs inside Git repositories (`.git`) by default, with an LLM settings option to allow Agent in non-Git folders.
     *   **Exa Web Search & Fetch:** Supports real-time web search and webpage content extraction powered by the Exa API or Exa MCP server, allowing the agent to find live documentation, code samples, and up-to-date information. (Configurable via Exa API Key and Endpoint in the settings).
     *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`) and [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`).
 
