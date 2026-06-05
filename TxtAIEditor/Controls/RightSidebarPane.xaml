@@ -214,6 +214,11 @@
                                         <TextBox x:Name="LlmCustomPromptInput" Grid.Column="0" PlaceholderText="질문이나 커스텀 지시사항 입력..." Height="32" FontSize="12" FontFamily="Segoe UI, Malgun Gothic" VerticalContentAlignment="Center" Padding="10,8,10,0" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" KeyDown="OnLlmCustomPromptInputKeyDown"/>
                                         <Button x:Name="LlmCustomRunButton" Grid.Column="1" Content="전송" Click="OnLlmCustomClick" Style="{StaticResource AccentButtonStyle}"/>
                                     </Grid>
+
+                                    <TextBlock x:Name="LlmModelNameText"
+                                               FontSize="11"
+                                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                               Margin="2,1,0,0"/>
                                 </StackPanel>
                             </Grid>
                         </TabViewItem>

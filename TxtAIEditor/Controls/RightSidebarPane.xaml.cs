@@ -60,6 +60,11 @@ namespace TxtAIEditor.Controls
         public Button LlmAddInstructionBtn => LlmAddInstructionButton;
         public ScrollViewer InstructionTabScroller => InstructionTabScrollViewer;
 
+        public void UpdateLlmModelName(string text)
+        {
+            LlmModelNameText.Text = text;
+        }
+
         public void Localize(Func<string, string, string> getString)
         {
             LivePreviewTab.Header = getString("LivePreviewTabHeader", "실시간 프리뷰");

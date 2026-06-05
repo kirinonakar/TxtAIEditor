@@ -84,6 +84,7 @@ namespace TxtAIEditor.Controls
 
             var initialTargetLang = _settingsService.CurrentSettings?.LlmTargetLanguage ?? "Korean";
             _rightSidebar.UpdateTranslateLanguage(initialTargetLang);
+            UpdateModelDisplay();
 
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
@@ -104,6 +105,18 @@ namespace TxtAIEditor.Controls
         public void SetOutput(string message)
         {
             _rightSidebar.LlmOutput.Text = message;
+        }
+
+        public void UpdateModelDisplay()
+        {
+            var settings = _settingsService.CurrentSettings;
+            if (settings != null)
+            {
+                string provider = settings.LlmProvider ?? string.Empty;
+                string model = settings.LlmModel ?? string.Empty;
+                string format = _getString("AgentModelFormat", "모델: {0} ({1})");
+                _rightSidebar.UpdateLlmModelName(string.Format(format, model, provider));
+            }
         }
 
         private void WireEvents()

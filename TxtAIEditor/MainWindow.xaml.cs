@@ -1453,6 +1453,7 @@ namespace TxtAIEditor
                     _statusBarController.UpdateTotalLines(activeTab);
                 }
 
+                _llmAssistantController?.UpdateModelDisplay();
                 _agentController?.UpdateModelDisplay();
             }
             catch (Exception ex)
@@ -1494,6 +1495,7 @@ namespace TxtAIEditor
             }
 
             await _settingsService.SaveSettingsAsync(settings);
+            _llmAssistantController.UpdateModelDisplay();
             _agentController.UpdateModelDisplay();
             ApplyResourceLanguage();
             ApplyPreviewVisibility(settings.DefaultMarkdownEnabled);
