@@ -81,6 +81,7 @@ namespace TxtAIEditor
         private readonly UnsavedChangesDialogService _unsavedChangesDialogService;
         private readonly WindowDialogController _dialogController;
         private readonly WindowCloseController _windowCloseController;
+        private readonly MainWindowSettingsController _settingsController;
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private string _currentFolderPath = string.Empty;
         private string _currentRepoPath = string.Empty;
@@ -580,6 +581,53 @@ namespace TxtAIEditor
                 _tabSelectionController.QueueChanged,
                 _tabSelectionController.ClearQueue,
                 UpdateWindowTitle);
+            _lifecycleController = new MainWindowLifecycleController(
+                this,
+                AppTitleBar,
+                _terminalShortcutService,
+                _functionKeyShortcutService,
+                _autoSaveController,
+                _gitAutoRefreshTimer,
+                _splitImeSyncController,
+                EditorWorkspace,
+                _tabBridges,
+                _livePreviewController);
+            _settingsController = new MainWindowSettingsController(
+                AppWindow,
+                () => Content as FrameworkElement,
+                () => Content.XamlRoot,
+                GetCurrentElementTheme,
+                _settingsService,
+                _settingsDialogService,
+                _uiPersonalizationService,
+                _localizationService,
+                TopToolbar,
+                MarkdownToolbar,
+                MarkdownToolbarHost,
+                EditorWorkspace,
+                TerminalPane,
+                LeftSidebarTabView,
+                StatusBarPane,
+                PreviewGrid,
+                StickyNoteBar,
+                LeftSplitter,
+                RightSplitter,
+                _tabBridges,
+                _statusBarController,
+                _livePreviewController,
+                _llmAssistantController,
+                _agentController,
+                GetActiveTab,
+                () => _currentFolderPath,
+                GetLocalizedString,
+                IsGitNotDetectedText,
+                () => EditorWorkspace.IsTerminalVisible,
+                () => TerminalPane.SuspendNativeWindows(),
+                () => TerminalPane.ResumeNativeWindows(),
+                ApplyPreviewVisibility,
+                UpdateAutoSaveStatus,
+                _lifecycleController.CleanupBeforeRestart,
+                EditorWorkspace.RefreshSplitters);
             _startupController = new MainWindowStartupController(
                 this,
                 _settingsService,
@@ -607,17 +655,6 @@ namespace TxtAIEditor
                 RefreshGitStatusUIAsync,
                 UpdateAutoSaveStatus,
                 _dialogController.ShowErrorMessage);
-            _lifecycleController = new MainWindowLifecycleController(
-                this,
-                AppTitleBar,
-                _terminalShortcutService,
-                _functionKeyShortcutService,
-                _autoSaveController,
-                _gitAutoRefreshTimer,
-                _splitImeSyncController,
-                EditorWorkspace,
-                _tabBridges,
-                _livePreviewController);
             _shellInteractionController = new MainWindowShellInteractionController(
                 RootGrid,
                 DragOverlay,
@@ -759,7 +796,7 @@ namespace TxtAIEditor
 
             var settings = _settingsService.CurrentSettings;
             var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
-            ApplyEditorSurfaceBackground(settings);
+            _settingsController.ApplyEditorSurfaceBackground(settings);
 
             var targetTabView = GetCurrentActiveTabView();
             var tabParts = _editorTabViewItemFactory.Create(
@@ -1298,7 +1335,7 @@ namespace TxtAIEditor
             settings.WordWrap = TopToolbar.WordWrapIsChecked;
             await _settingsService.SaveSettingsAsync(settings);
 
-            await ApplySettingsToOpenEditorsAsync(settings);
+            await _settingsController.ApplySettingsToOpenEditorsAsync(settings);
         }
 
         private async void OnFindClick(object sender, RoutedEventArgs e)
@@ -1366,58 +1403,7 @@ namespace TxtAIEditor
 
         private async void OnToggleThemeClick(object sender, RoutedEventArgs e)
         {
-            var settings = _settingsService.CurrentSettings;
-            settings.Theme = settings.Theme == "Light" ? "Dark" : "Light";
-            await _settingsService.SaveSettingsAsync(settings);
-            ApplyUiPersonalization(settings);
-            RefreshAllSplitters();
-
-            _livePreviewController.ApplyPreferredColorScheme(settings.Theme);
-            foreach (var grp in _tabBridges.Values)
-            {
-                WebViewAppearanceService.ApplyPreferredColorScheme(grp.WebView?.CoreWebView2, settings.Theme);
-            }
-
-            foreach (var grp in _tabBridges.Values)
-            {
-                if (grp.Bridge != null)
-                {
-                    await grp.Bridge.UpdateOptionsAsync(settings);
-                }
-                else if (grp.WebView?.CoreWebView2 != null)
-                {
-                    var updateMsg = new
-                    {
-                            action = "updateOptions",
-                            theme = settings.Theme,
-                            wordWrap = settings.WordWrap,
-                            bracketPairColorization = settings.BracketPairColorization,
-                            fontSize = settings.FontSize,
-                            fontFamily = settings.FontFamily,
-                            tabSize = settings.TabSize,
-                            customBackgroundColor = settings.CustomBackgroundColor,
-                            customForegroundColor = settings.CustomForegroundColor,
-                            autocompleteOnEnter = settings.AutocompleteOnEnter,
-                            autocompleteOnTab = settings.AutocompleteOnTab,
-                            readOnly = true
-                        };
-                    grp.WebView.CoreWebView2.PostWebMessageAsJson(System.Text.Json.JsonSerializer.Serialize(updateMsg));
-                }
-            }
-
-            if (EditorTabView.SelectedItem is TabViewItem activeTabItem &&
-                activeTabItem.Tag is string tabId)
-            {
-                var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-                if (tab != null) UpdateLivePreview(tab);
-            }
-        }
-
-        private void RefreshAllSplitters()
-        {
-            LeftSplitter.RefreshTheme();
-            RightSplitter.RefreshTheme();
-            EditorWorkspace.RefreshSplitters();
+            await _settingsController.ToggleThemeAsync();
         }
 
         private string GetLocalizedString(string key, string fallback)
@@ -1425,41 +1411,9 @@ namespace TxtAIEditor
             return _localizationService.GetString(key, fallback);
         }
 
-        private void ApplyResourceLanguage()
-        {
-            _localizationService.ApplyResourceLanguage();
-        }
-
         private void LocalizeUi()
         {
-            try
-            {
-                ApplyResourceLanguage();
-                string GetString(string key, string fallback) => GetLocalizedString(key, fallback);
-
-                TopToolbar.Localize(GetString);
-                EditorWorkspace.Localize(GetString);
-                LeftSidebarTabView.Localize(GetString, string.IsNullOrEmpty(_currentFolderPath), IsGitNotDetectedText);
-                StatusBarPane.Localize(GetString, IsGitNotDetectedText);
-                TerminalPane.Localize(GetString);
-                PreviewGrid.Localize(GetString);
-                PreviewGrid.UpdateTranslateLanguage(_settingsService.CurrentSettings?.LlmTargetLanguage ?? "Korean");
-                MarkdownToolbar.LocalizeTooltips(GetString);
-                StickyNoteBar.Localize(GetString);
-
-                var activeTab = GetActiveTab();
-                if (activeTab != null)
-                {
-                    _statusBarController.UpdateTotalLines(activeTab);
-                }
-
-                _llmAssistantController?.UpdateModelDisplay();
-                _agentController?.UpdateModelDisplay();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to localize UI: {ex.Message}");
-            }
+            _settingsController.LocalizeUi();
         }
 
         private static bool IsGitNotDetectedText(string text)
@@ -1471,106 +1425,7 @@ namespace TxtAIEditor
 
         private async void OnSettingsClick(object sender, RoutedEventArgs e)
         {
-            // Suspend native terminal windows so settings dialog is not hidden behind them
-            bool terminalWasVisible = EditorWorkspace.IsTerminalVisible;
-            if (terminalWasVisible)
-                TerminalPane.SuspendNativeWindows();
-
-            var settings = _settingsService.CurrentSettings;
-            string oldLanguage = settings.Language;
-
-            string GetSettingsString(string key, string fallback) => GetLocalizedString(key, fallback);
-
-            var result = await _settingsDialogService.ShowAsync(settings, this.Content.XamlRoot, GetSettingsString);
-            if (terminalWasVisible)
-                TerminalPane.ResumeNativeWindows();
-            if (!result.Saved)
-            {
-                return;
-            }
-
-            if (!string.IsNullOrWhiteSpace(result.ApiKeyStatusMessage))
-            {
-                _llmAssistantController.SetOutput(result.ApiKeyStatusMessage);
-            }
-
-            await _settingsService.SaveSettingsAsync(settings);
-            _llmAssistantController.UpdateModelDisplay();
-            _agentController.UpdateModelDisplay();
-            ApplyResourceLanguage();
-            ApplyPreviewVisibility(settings.DefaultMarkdownEnabled);
-            TopToolbar.MarkdownToolbarIsChecked = settings.DefaultMarkdownToolbarEnabled;
-            MarkdownToolbar.Visibility = settings.DefaultMarkdownToolbarEnabled ? Visibility.Visible : Visibility.Collapsed;
-
-            // Enable auto-save if setting is on and git is available
-            UpdateAutoSaveStatus();
-            TopToolbar.WordWrapIsChecked = settings.WordWrap;
-            ApplyUiPersonalization(settings);
-            TerminalPane.ApplySettings(settings);
-            LocalizeUi();
-            ApplyToolbarSettings(settings);
-
-            if (oldLanguage != settings.Language && await ConfirmRestartForLanguageChangeAsync(GetSettingsString))
-            {
-                _lifecycleController.CleanupBeforeRestart();
-                Microsoft.Windows.AppLifecycle.AppInstance.Restart("");
-                return;
-            }
-
-            await ApplySettingsToOpenEditorsAsync(settings);
-            RefreshActivePreview();
-        }
-
-        private async Task<bool> ConfirmRestartForLanguageChangeAsync(Func<string, string, string> getString)
-        {
-            bool terminalWasVisible = EditorWorkspace.IsTerminalVisible;
-            if (terminalWasVisible)
-                TerminalPane.SuspendNativeWindows();
-            var restartDialog = new ContentDialog
-            {
-                Title = getString("LanguageChangedTitle", "Language Change"),
-                Content = getString("LanguageChangedMessage", "You must restart the application to apply the language settings. Would you like to restart now?"),
-                PrimaryButtonText = getString("Restart", "Restart"),
-                CloseButtonText = getString("No", "Later"),
-                XamlRoot = this.Content.XamlRoot,
-                RequestedTheme = GetCurrentElementTheme()
-            };
-
-            var result = await restartDialog.ShowAsync() == ContentDialogResult.Primary;
-            if (terminalWasVisible)
-                TerminalPane.ResumeNativeWindows();
-            return result;
-        }
-
-        private async Task ApplySettingsToOpenEditorsAsync(EditorSettings settings)
-        {
-            foreach (var grp in _tabBridges.Values)
-            {
-                if (grp.Bridge != null)
-                {
-                    await grp.Bridge.UpdateOptionsAsync(settings);
-                }
-                else if (grp.WebView?.CoreWebView2 != null)
-                {
-                    var updateMsg = new
-                    {
-                        action = "updateOptions",
-                        theme = settings.Theme,
-                        wordWrap = settings.WordWrap,
-                        bracketPairColorization = settings.BracketPairColorization,
-                        fontSize = settings.FontSize,
-                        fontFamily = settings.FontFamily,
-                        tabSize = settings.TabSize,
-                        customBackgroundColor = settings.CustomBackgroundColor,
-                        customForegroundColor = settings.CustomForegroundColor,
-                        autocompleteOnEnter = settings.AutocompleteOnEnter,
-                        autocompleteOnTab = settings.AutocompleteOnTab,
-                        readOnly = true
-                    };
-                    string updateJson = System.Text.Json.JsonSerializer.Serialize(updateMsg);
-                    grp.WebView.CoreWebView2.PostWebMessageAsJson(updateJson);
-                }
-            }
+            await _settingsController.ShowSettingsAsync();
         }
 
         private async Task SyncSnippetsToOpenEditorsAsync()
@@ -2079,24 +1934,12 @@ namespace TxtAIEditor
         #region UI Personalization Helper
         private void ApplyUiPersonalization(EditorSettings settings)
         {
-            _uiPersonalizationService.Apply(
-                settings,
-                AppWindow,
-                Content as FrameworkElement,
-                ApplyMarkdownToolbarBackground);
-            ApplyEditorSurfaceBackground(settings);
-        }
-
-        private void ApplyMarkdownToolbarBackground(Windows.UI.Color color)
-        {
-            var brush = new Microsoft.UI.Xaml.Media.SolidColorBrush(color);
-            MarkdownToolbarHost.Background = brush;
-            MarkdownToolbar.SetToolbarBackground(color);
+            _settingsController.ApplyUiPersonalization(settings);
         }
 
         private void ApplyToolbarSettings(EditorSettings settings)
         {
-            TopToolbar.ApplySettings(settings, GetLocalizedString);
+            _settingsController.ApplyToolbarSettings(settings);
         }
         #endregion
 
@@ -2361,17 +2204,6 @@ namespace TxtAIEditor
                     var msg = new { action = "revealLine", lineNumber = targetLine, indexOfMatch = 0, matchLength = 0, query = "" };
                     bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(System.Text.Json.JsonSerializer.Serialize(msg));
                 }
-            }
-        }
-
-        private void ApplyEditorSurfaceBackground(EditorSettings settings)
-        {
-            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
-            EditorWorkspace.SetEditorSurfaceBackground(editorBgColor);
-
-            foreach (var grp in _tabBridges.Values)
-            {
-                WebViewAppearanceService.ApplyEditorHostBackground(grp.WebView, editorBgColor);
             }
         }
 
