@@ -491,6 +491,9 @@
   <data name="ExplorerOpenTerminalTooltip" xml:space="preserve">
     <value>このフォルダでターミナルを開く</value>
   </data>
+  <data name="ExplorerOpenInWindowsTooltip" xml:space="preserve">
+    <value>Windows エクスプローラーで開く</value>
+  </data>
   <data name="ExplorerAddToFavorites" xml:space="preserve">
     <value>お気に入りに追加</value>
   </data>

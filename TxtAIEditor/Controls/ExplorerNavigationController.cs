@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -99,6 +100,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerUpClick += OnExplorerUpClick;
             _leftSidebar.SelectFolderClick += OnSelectFolderClick;
             _leftSidebar.RefreshClick += OnExplorerRefreshClick;
+            _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
             _leftSidebar.FileListViewDoubleTapped += OnFileListViewDoubleTapped;
         }
 
@@ -125,6 +127,22 @@ namespace TxtAIEditor.Controls
         private void OnExplorerRefreshClick(object sender, RoutedEventArgs e)
         {
             RefreshCurrentFolder();
+        }
+
+        private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
+            {
+                return;
+            }
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                UseShellExecute = false
+            };
+            startInfo.ArgumentList.Add(CurrentFolderPath);
+            Process.Start(startInfo);
         }
 
         private void OnExplorerUpClick(object sender, RoutedEventArgs e)

@@ -491,6 +491,9 @@
   <data name="ExplorerOpenTerminalTooltip" xml:space="preserve">
     <value>Open Terminal Here</value>
   </data>
+  <data name="ExplorerOpenInWindowsTooltip" xml:space="preserve">
+    <value>Open in Windows Explorer</value>
+  </data>
   <data name="ExplorerAddToFavorites" xml:space="preserve">
     <value>Add to Favorites</value>
   </data>

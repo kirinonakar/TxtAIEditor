@@ -491,6 +491,9 @@
   <data name="ExplorerOpenTerminalTooltip" xml:space="preserve">
     <value>현재 폴더에서 터미널 열기</value>
   </data>
+  <data name="ExplorerOpenInWindowsTooltip" xml:space="preserve">
+    <value>Windows 탐색기에서 열기</value>
+  </data>
   <data name="ExplorerAddToFavorites" xml:space="preserve">
     <value>즐겨찾기에 추가</value>
   </data>

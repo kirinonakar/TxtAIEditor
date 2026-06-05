@@ -136,6 +136,8 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                     <Button x:Name="ExplorerUpButton" Click="OnExplorerUpClick" ToolTipService.ToolTip="상위 폴더" Padding="0" Width="32" MinWidth="32" Height="32">
                                             <FontIcon Glyph="&#xE74A;" FontSize="12"/>
@@ -148,6 +150,9 @@
                                         </Button>
                                     <Button x:Name="ExplorerRefreshButton" Grid.Column="3" Click="OnRefreshClick" ToolTipService.ToolTip="새로고침" Padding="8,0" Height="32">
                                             <FontIcon Glyph="&#xE72C;" FontSize="12"/>
+                                        </Button>
+                                    <Button x:Name="ExplorerOpenInWindowsButton" Grid.Column="5" Click="OnOpenInWindowsExplorerClick" ToolTipService.ToolTip="Windows 탐색기에서 열기" AutomationProperties.Name="Windows 탐색기에서 열기" Padding="0" Width="32" MinWidth="32" Height="32">
+                                            <FontIcon Glyph="&#xE8DA;" FontSize="12"/>
                                         </Button>
                                     </Grid>
                                     <TextBlock x:Name="ExplorerStatusText" Text="폴더를 선택하세요." FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
