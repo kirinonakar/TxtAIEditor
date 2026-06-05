@@ -1135,8 +1135,8 @@ namespace TxtAIEditor.Controls
                 "replace_range" => string.Format(
                     _getString("AgentActivityReplaceRangeFormat", "파일 범위 수정 중: {0} ({1}줄부터 {2}줄)"),
                     GetEditPathArgument(arguments),
-                    GetIntArgument(arguments, "startLine", 1),
-                    GetIntArgument(arguments, "endLine", 1)),
+                    GetReplaceRangeStartLineArgument(arguments, GetEditPathArgument(arguments)),
+                    GetReplaceRangeEndLineArgument(arguments, GetEditPathArgument(arguments))),
                 "apply_patch" => string.Format(
                     _getString("AgentActivityApplyPatchFormat", "파일 패치 적용 중: {0}"),
                     GetEditPathArgument(arguments)),
@@ -1670,6 +1670,58 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private bool ShouldUseActiveSelectionRangeForPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) ||
+                string.IsNullOrWhiteSpace(_lastSelectionSourcePath) ||
+                string.IsNullOrEmpty(GetActiveSelectionText()) ||
+                _lastSelectionStartLine <= 0 ||
+                _lastSelectionEndLine <= 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                string resolvedPath = Path.IsPathRooted(path)
+                    ? path
+                    : Path.Combine(_fileTools.WorkspaceRoot, path);
+                string resolvedSelectionPath = Path.IsPathRooted(_lastSelectionSourcePath)
+                    ? _lastSelectionSourcePath
+                    : Path.Combine(_fileTools.WorkspaceRoot, _lastSelectionSourcePath);
+
+                return string.Equals(
+                    Path.GetFullPath(resolvedPath),
+                    Path.GetFullPath(resolvedSelectionPath),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(path, _lastSelectionSourcePath, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private int GetReplaceRangeStartLineArgument(JsonElement arguments, string path)
+        {
+            return ShouldUseActiveSelectionRangeForPath(path)
+                ? _lastSelectionStartLine
+                : GetIntArgument(arguments, "startLine", 1);
+        }
+
+        private int GetReplaceRangeEndLineArgument(JsonElement arguments, string path)
+        {
+            return ShouldUseActiveSelectionRangeForPath(path)
+                ? _lastSelectionEndLine
+                : GetIntArgument(arguments, "endLine", 1);
+        }
+
+        private string GetReplaceRangeExpectedSnippetArgument(JsonElement arguments, string path)
+        {
+            return ShouldUseActiveSelectionRangeForPath(path)
+                ? GetActiveSelectionText()
+                : GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected");
+        }
+
         private static string GetFirstStringArgument(JsonElement arguments, params string[] names)
         {
             foreach (string name in names)
@@ -1768,10 +1820,10 @@ namespace TxtAIEditor.Controls
 
             return await _fileTools.ReplaceRangeAsync(
                 path,
-                GetIntArgument(arguments, "startLine", 1),
-                GetIntArgument(arguments, "endLine", 1),
+                GetReplaceRangeStartLineArgument(arguments, path),
+                GetReplaceRangeEndLineArgument(arguments, path),
                 GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
-                GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected"));
+                GetReplaceRangeExpectedSnippetArgument(arguments, path));
         }
 
         private async Task<string> ApplyPatchToolAsync(JsonElement arguments)

@@ -90,6 +90,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("4. Search the workspace only when the task requires files not present in the provided context.");
             builder.AppendLine("- When selected_text_context is present and the user says selected part/selection/this part/선택/선택한 부분/선택부위/이 부분, do not ask whether they mean the whole file. Apply the instruction to the selection.");
             builder.AppendLine("- For selected-text rewrite requests such as translate, fix, improve, polish, summarize in-place, or 고쳐줘/번역해줘, edit only the selected range in its source file. Prefer replace_range with the supplied source path and line range. Do not use overwrite_file unless the user explicitly asks for a full-file rewrite.");
+            builder.AppendLine("- If selected_text_context includes a source line range, copy that exact line range into replace_range. Do not recalculate or shift the line numbers from read_file output.");
             builder.AppendLine("- Treat active_tab_context as background when selected_text_context exists. Do not translate, rewrite, or otherwise modify unselected parts of the active file.");
             builder.AppendLine("- Do not claim a task was already done or already translated unless you have verified that the selected text already satisfied the user request before making any edit. After applying an edit, phrase the result as something you changed or applied now.");
             builder.AppendLine();
