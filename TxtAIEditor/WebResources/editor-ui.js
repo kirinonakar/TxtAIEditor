@@ -128,6 +128,7 @@ let lastCacheVersion = -1;
 let hoveredLineNumber = 0;
 let lastPointerClientX = null;
 let lastPointerClientY = null;
+let suppressNativePasteUntil = 0;
 
 function setHoveredLineNumber(lineNumber) {
     const nextLineNumber = Math.max(0, Number(lineNumber || 0));
@@ -517,6 +518,7 @@ function handleCsharpMessage(msg) {
             flushPendingEditForSave(msg.requestId || 0);
             break;
         case 'insertText':
+            suppressNativePasteUntil = performance.now() + 250;
             insertTextAtCaret(msg.text || '');
             break;
         case 'markdownCommand':
@@ -1891,6 +1893,10 @@ document.addEventListener('cut', event => {
 
 document.addEventListener('paste', event => {
     if (event.target && (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.closest('#find-panel'))) {
+        return;
+    }
+    if (performance.now() < suppressNativePasteUntil) {
+        event.preventDefault();
         return;
     }
     event.preventDefault();

@@ -1305,16 +1305,9 @@ namespace TxtAIEditor.Controls
 
             string argumentsText = ExtractLenientObjectProperty(json, "arguments") ?? "{}";
             var argumentValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var stringMatches = Regex.Matches(
-                argumentsText,
-                "\"(?<key>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"\\s*:\\s*\"(?<value>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"",
-                RegexOptions.Singleline);
-
-            foreach (Match match in stringMatches)
+            foreach (var property in ExtractLenientStringProperties(argumentsText))
             {
-                string key = DecodeLenientJsonString(match.Groups["key"].Value);
-                string value = DecodeLenientJsonString(match.Groups["value"].Value);
-                argumentValues[key] = value;
+                argumentValues[property.Key] = property.Value;
             }
 
             var numberMatches = Regex.Matches(
@@ -1336,6 +1329,159 @@ namespace TxtAIEditor.Controls
             toolName = DecodeLenientJsonString(name);
             arguments = argumentsDocument.RootElement.Clone();
             return !string.IsNullOrWhiteSpace(toolName);
+        }
+
+        private static IEnumerable<KeyValuePair<string, string>> ExtractLenientStringProperties(string objectText)
+        {
+            if (string.IsNullOrEmpty(objectText))
+            {
+                yield break;
+            }
+
+            int i = 0;
+            while (i < objectText.Length)
+            {
+                int keyQuoteIndex = objectText.IndexOf('"', i);
+                if (keyQuoteIndex < 0)
+                {
+                    yield break;
+                }
+
+                if (!TryReadQuotedToken(objectText, keyQuoteIndex, out string rawKey, out int keyEndIndex))
+                {
+                    yield break;
+                }
+
+                int colonIndex = SkipWhitespace(objectText, keyEndIndex + 1);
+                if (colonIndex >= objectText.Length || objectText[colonIndex] != ':')
+                {
+                    i = keyEndIndex + 1;
+                    continue;
+                }
+
+                int valueStartIndex = SkipWhitespace(objectText, colonIndex + 1);
+                if (valueStartIndex >= objectText.Length || objectText[valueStartIndex] != '"')
+                {
+                    i = valueStartIndex + 1;
+                    continue;
+                }
+
+                int valueContentStart = valueStartIndex + 1;
+                int valueEndIndex = FindLenientStringValueEnd(objectText, valueContentStart);
+                string rawValue = objectText.Substring(
+                    valueContentStart,
+                    Math.Max(0, valueEndIndex - valueContentStart));
+
+                yield return new KeyValuePair<string, string>(
+                    DecodeLenientJsonString(rawKey),
+                    DecodeLenientJsonString(rawValue));
+
+                i = Math.Min(objectText.Length, valueEndIndex + 1);
+            }
+        }
+
+        private static bool TryReadQuotedToken(string text, int quoteIndex, out string rawValue, out int endQuoteIndex)
+        {
+            rawValue = string.Empty;
+            endQuoteIndex = -1;
+            if (quoteIndex < 0 || quoteIndex >= text.Length || text[quoteIndex] != '"')
+            {
+                return false;
+            }
+
+            bool escaped = false;
+            for (int i = quoteIndex + 1; i < text.Length; i++)
+            {
+                char ch = text[i];
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+
+                if (ch == '\\')
+                {
+                    escaped = true;
+                    continue;
+                }
+
+                if (ch == '"')
+                {
+                    rawValue = text.Substring(quoteIndex + 1, i - quoteIndex - 1);
+                    endQuoteIndex = i;
+                    return true;
+                }
+            }
+
+            rawValue = text.Substring(quoteIndex + 1);
+            endQuoteIndex = text.Length;
+            return true;
+        }
+
+        private static int FindLenientStringValueEnd(string text, int valueStartIndex)
+        {
+            bool escaped = false;
+            for (int i = valueStartIndex; i < text.Length; i++)
+            {
+                char ch = text[i];
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+
+                if (ch == '\\')
+                {
+                    escaped = true;
+                    continue;
+                }
+
+                if (ch != '"')
+                {
+                    continue;
+                }
+
+                int nextIndex = SkipWhitespace(text, i + 1);
+                if (nextIndex >= text.Length ||
+                    text[nextIndex] == '}' ||
+                    text[nextIndex] == ']')
+                {
+                    return i;
+                }
+
+                if (text[nextIndex] == ',')
+                {
+                    int afterCommaIndex = SkipWhitespace(text, nextIndex + 1);
+                    if (LooksLikePropertyKeyAt(text, afterCommaIndex))
+                    {
+                        return i;
+                    }
+                }
+            }
+
+            return text.Length;
+        }
+
+        private static bool LooksLikePropertyKeyAt(string text, int quoteIndex)
+        {
+            if (!TryReadQuotedToken(text, quoteIndex, out _, out int keyEndIndex))
+            {
+                return false;
+            }
+
+            int colonIndex = SkipWhitespace(text, keyEndIndex + 1);
+            return colonIndex < text.Length && text[colonIndex] == ':';
+        }
+
+        private static int SkipWhitespace(string text, int startIndex)
+        {
+            int i = Math.Max(0, startIndex);
+            while (i < text.Length && char.IsWhiteSpace(text[i]))
+            {
+                i++;
+            }
+
+            return i;
         }
 
         private static string? ExtractLenientStringProperty(string text, string propertyName)
@@ -1997,11 +2143,11 @@ namespace TxtAIEditor.Controls
 
         private async Task InsertOutputAsync()
         {
-            string output = _agentPane.Output.SelectedText;
-            if (string.IsNullOrEmpty(output))
-            {
-                output = _agentPane.Output.Text;
-            }
+            string fullOutput = _agentPane.Output.Text;
+            string selectedOutput = _agentPane.Output.SelectedText;
+            string output = IsSelectionFromOutput(selectedOutput, fullOutput)
+                ? selectedOutput
+                : fullOutput;
 
             if (string.IsNullOrWhiteSpace(output) ||
                 _displayText.IsOutputPlaceholder(output))
@@ -2013,6 +2159,31 @@ namespace TxtAIEditor.Controls
             }
 
             await _insertIntoActiveEditorAsync(output);
+        }
+
+        private static bool IsSelectionFromOutput(string selectedText, string fullOutput)
+        {
+            if (string.IsNullOrEmpty(selectedText) || string.IsNullOrEmpty(fullOutput))
+            {
+                return false;
+            }
+
+            if (fullOutput.Contains(selectedText, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            string normalizedSelected = NormalizeLineEndings(selectedText);
+            string normalizedOutput = NormalizeLineEndings(fullOutput);
+            return normalizedSelected.Length > 0 &&
+                normalizedOutput.Contains(normalizedSelected, StringComparison.Ordinal);
+        }
+
+        private static string NormalizeLineEndings(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n');
         }
 
         private void UpdateContextStats()
