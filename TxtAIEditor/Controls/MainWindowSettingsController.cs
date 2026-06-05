@@ -153,11 +153,6 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(result.ApiKeyStatusMessage))
-            {
-                _llmAssistantController.SetOutput(result.ApiKeyStatusMessage);
-            }
-
             await _settingsService.SaveSettingsAsync(settings);
             _llmAssistantController.UpdateModelDisplay();
             _agentController.UpdateModelDisplay();
