@@ -598,7 +598,6 @@ namespace TxtAIEditor.Controls
 
                                     await RunOnUIThreadAsync(() =>
                                     {
-                                        AppendActivity(verifyMsg);
                                         _agentPane.AppendOutputLine(verifyMsg);
                                     });
 
