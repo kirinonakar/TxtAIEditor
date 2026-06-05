@@ -41,14 +41,41 @@ namespace TxtAIEditor.Controls
         private bool _outputScrollQueued;
         private DispatcherTimer? _outputFlushTimer;
         private AgentDisplayLocalizer _displayText = AgentDisplayLocalizer.CreateWithResourceLoader();
+        private string _explicitSelectedOutputText = string.Empty;
+        private Windows.Foundation.Point? _outputPointerDownPoint;
+        private bool _outputPointerSelectionGesture;
+        private bool _hasExplicitOutputSelection;
 
         public string RawOutputText => GetRawOutputText();
-        public string SelectedOutputText => AgentOutputText.SelectedText;
+        public string SelectedOutputText
+        {
+            get
+            {
+                if (_hasExplicitOutputSelection)
+                {
+                    CaptureExplicitOutputSelection();
+                }
+
+                return _explicitSelectedOutputText;
+            }
+        }
 
         public AgentPane()
         {
             InitializeComponent();
             AgentOutputText.SizeChanged += (_, _) => QueueOutputScrollToEnd();
+            AgentOutputText.AddHandler(
+                UIElement.PointerPressedEvent,
+                new PointerEventHandler(OnOutputPointerPressed),
+                true);
+            AgentOutputText.AddHandler(
+                UIElement.PointerMovedEvent,
+                new PointerEventHandler(OnOutputPointerMoved),
+                true);
+            AgentOutputText.AddHandler(
+                UIElement.PointerReleasedEvent,
+                new PointerEventHandler(OnOutputPointerReleased),
+                true);
 
             ResetOutput(_displayText.OutputPlaceholder);
             Localize(_displayText.GetString);
@@ -308,6 +335,7 @@ namespace TxtAIEditor.Controls
         public void ResetOutput(string text)
         {
             ClearPendingOutputText();
+            ClearExplicitOutputSelection();
             _rawOutputText = text ?? string.Empty;
             UpdateRichText(_rawOutputText);
             _outputLength = _rawOutputText.Length;
@@ -532,6 +560,110 @@ namespace TxtAIEditor.Controls
             InsertOutputRequested?.Invoke(sender, e);
         }
 
+        private void OnOutputPointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            _outputPointerDownPoint = e.GetCurrentPoint(AgentOutputText).Position;
+            _outputPointerSelectionGesture = false;
+        }
+
+        private void OnOutputPointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (_outputPointerDownPoint == null)
+            {
+                return;
+            }
+
+            var currentPoint = e.GetCurrentPoint(AgentOutputText);
+            if (!currentPoint.Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            var startPoint = _outputPointerDownPoint.Value;
+            double dx = currentPoint.Position.X - startPoint.X;
+            double dy = currentPoint.Position.Y - startPoint.Y;
+            if ((dx * dx) + (dy * dy) > 16)
+            {
+                _outputPointerSelectionGesture = true;
+            }
+        }
+
+        private void OnOutputPointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (_outputPointerSelectionGesture)
+            {
+                _hasExplicitOutputSelection = true;
+                QueueCaptureExplicitOutputSelection();
+            }
+            else
+            {
+                ClearExplicitOutputSelection();
+            }
+
+            _outputPointerDownPoint = null;
+            _outputPointerSelectionGesture = false;
+        }
+
+        private void OnOutputDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            _hasExplicitOutputSelection = true;
+            QueueCaptureExplicitOutputSelection();
+        }
+
+        private void QueueCaptureExplicitOutputSelection()
+        {
+            DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                CaptureExplicitOutputSelection);
+        }
+
+        private void CaptureExplicitOutputSelection()
+        {
+            if (!_hasExplicitOutputSelection)
+            {
+                _explicitSelectedOutputText = string.Empty;
+                return;
+            }
+
+            string selectedText = AgentOutputText.SelectedText;
+            _explicitSelectedOutputText = IsTextFromOutput(selectedText)
+                ? selectedText
+                : string.Empty;
+        }
+
+        private void ClearExplicitOutputSelection()
+        {
+            _explicitSelectedOutputText = string.Empty;
+            _hasExplicitOutputSelection = false;
+            _outputPointerDownPoint = null;
+            _outputPointerSelectionGesture = false;
+        }
+
+        private bool IsTextFromOutput(string selectedText)
+        {
+            if (string.IsNullOrEmpty(selectedText) || string.IsNullOrEmpty(_rawOutputText))
+            {
+                return false;
+            }
+
+            if (_rawOutputText.Contains(selectedText, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            string normalizedSelected = NormalizeLineEndings(selectedText);
+            string normalizedOutput = NormalizeLineEndings(_rawOutputText);
+            return normalizedSelected.Length > 0 &&
+                normalizedOutput.Contains(normalizedSelected, StringComparison.Ordinal);
+        }
+
+        private static string NormalizeLineEndings(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n');
+        }
+
         private void OnAddAttachmentClick(object sender, RoutedEventArgs e)
         {
             AddAttachmentRequested?.Invoke(sender, e);
@@ -581,7 +713,9 @@ namespace TxtAIEditor.Controls
         {
             if (e.Key == VirtualKey.C && IsControlDown())
             {
-                string textToCopy = AgentOutputText.SelectedText;
+                _hasExplicitOutputSelection = true;
+                CaptureExplicitOutputSelection();
+                string textToCopy = _explicitSelectedOutputText;
                 if (string.IsNullOrEmpty(textToCopy))
                 {
                     textToCopy = _rawOutputText;

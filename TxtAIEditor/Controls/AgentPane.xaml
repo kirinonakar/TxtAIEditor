@@ -86,6 +86,7 @@
                            Foreground="{ThemeResource AgentOutputForeground}"
                            IsTextSelectionEnabled="True"
                            Padding="0"
+                           DoubleTapped="OnOutputDoubleTapped"
                            KeyDown="OnOutputTextKeyDown"/>
         </ScrollViewer>
 
