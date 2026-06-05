@@ -290,7 +290,7 @@ namespace TxtAIEditor
                 _viewModel,
                 LeftSidebarTabView,
                 StatusGitBranch,
-                () => _currentRepoPath,
+                GetCurrentRepoPathForGitRefresh,
                 () => this.Content.XamlRoot,
                 GetLocalizedString,
                 IsGitNotDetectedText,
@@ -303,7 +303,7 @@ namespace TxtAIEditor
             _gitStatusRefreshController = new GitStatusRefreshController(
                 DispatcherQueue,
                 _gitAutoRefreshTimer,
-                () => _currentRepoPath,
+                GetCurrentRepoPathForGitRefresh,
                 _gitPanelController.RefreshAsync);
             _fileTabLoadController = new FileTabLoadController(
                 _gitService,
@@ -1947,12 +1947,50 @@ namespace TxtAIEditor
 
         private async Task RefreshGitStatusUIAsync()
         {
+            UpdateCurrentRepoPathFromWorkspace();
+            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
+            {
+                _gitAutoRefreshTimer.Start();
+            }
+
             await _gitStatusRefreshController.RefreshAsync();
         }
 
         private void QueueGitStatusRefresh()
         {
             _gitStatusRefreshController.QueueRefresh();
+        }
+
+        private string GetCurrentRepoPathForGitRefresh()
+        {
+            UpdateCurrentRepoPathFromWorkspace();
+            return _currentRepoPath;
+        }
+
+        private void UpdateCurrentRepoPathFromWorkspace()
+        {
+            string searchPath = string.Empty;
+            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
+            {
+                searchPath = _currentFolderPath;
+            }
+            else
+            {
+                string? activeFilePath = GetActiveTab()?.FilePath;
+                if (!string.IsNullOrWhiteSpace(activeFilePath))
+                {
+                    searchPath = File.Exists(activeFilePath)
+                        ? Path.GetDirectoryName(activeFilePath) ?? string.Empty
+                        : activeFilePath;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(searchPath))
+            {
+                return;
+            }
+
+            CurrentRepoPath = _gitService.FindRepositoryRoot(searchPath) ?? string.Empty;
         }
 
         #endregion

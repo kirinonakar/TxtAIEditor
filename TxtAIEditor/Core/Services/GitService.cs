@@ -52,10 +52,14 @@ namespace TxtAIEditor.Core.Services
                     return "Git: 감지 안됨";
                 }
 
-                string output = await RunGitCommandAsync(repoPath, "rev-parse --abbrev-ref HEAD");
+                string output = await RunGitCommandAsync(repoPath, "symbolic-ref --quiet --short HEAD");
                 if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                 {
-                    return "Git: 감지 안됨";
+                    output = await RunGitCommandAsync(repoPath, "rev-parse --abbrev-ref HEAD");
+                    if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return "Git: 감지 안됨";
+                    }
                 }
 
                 return $"Git: {output.Trim()}";
@@ -386,7 +390,20 @@ namespace TxtAIEditor.Core.Services
 
             string output = await RunGitCommandAsync(repoPath, "branch --all --no-color");
             if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
-                return Array.Empty<string>();
+            {
+                string currentBranch = await RunGitCommandAsync(repoPath, "symbolic-ref --quiet --short HEAD");
+                if (string.IsNullOrEmpty(currentBranch) || currentBranch.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+                {
+                    currentBranch = await RunGitCommandAsync(repoPath, "rev-parse --abbrev-ref HEAD");
+                }
+
+                if (string.IsNullOrEmpty(currentBranch) || currentBranch.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Array.Empty<string>();
+                }
+
+                return new[] { $"* {currentBranch.Trim()}" };
+            }
 
             return output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
         }
