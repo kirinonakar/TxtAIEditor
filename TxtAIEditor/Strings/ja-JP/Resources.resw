@@ -1440,6 +1440,9 @@
   <data name="AgentModeRun" xml:space="preserve">
     <value>実行</value>
   </data>
+  <data name="AgentLanguageCode" xml:space="preserve">
+    <value>ja-JP</value>
+  </data>
   <data name="AgentActivityListFilesFormat" xml:space="preserve">
     <value>ファイル一覧の取得中: {0}</value>
   </data>
@@ -1565,6 +1568,24 @@
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k トークン</value>
+  </data>
+  <data name="AgentInlineTokenCountFormat" xml:space="preserve">
+    <value>{0:N0} トークン</value>
+  </data>
+  <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="AgentAttachmentCountFormat" xml:space="preserve">
+    <value>添付 {0:N0}件</value>
+  </data>
+  <data name="AgentAttachmentCountSingularFormat" xml:space="preserve">
+    <value>添付 {0:N0}件</value>
+  </data>
+  <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
+    <value>대기 중...|Waiting...|待機中...</value>
+  </data>
+  <data name="AgentActivityIdleKnownValues" xml:space="preserve">
+    <value>대기 중|Idle|待機中</value>
   </data>
   <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
     <value>ファイル変更の確認</value>

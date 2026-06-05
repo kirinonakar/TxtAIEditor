@@ -1439,6 +1439,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentModeRun" xml:space="preserve">
     <value>Run</value>
   </data>
+  <data name="AgentLanguageCode" xml:space="preserve">
+    <value>en-US</value>
+  </data>
   <data name="AgentActivityListFilesFormat" xml:space="preserve">
     <value>Listing files: {0}</value>
   </data>
@@ -1564,6 +1567,24 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k tokens</value>
+  </data>
+  <data name="AgentInlineTokenCountFormat" xml:space="preserve">
+    <value>{0:N0} tokens</value>
+  </data>
+  <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="AgentAttachmentCountFormat" xml:space="preserve">
+    <value>{0:N0} attachments</value>
+  </data>
+  <data name="AgentAttachmentCountSingularFormat" xml:space="preserve">
+    <value>{0:N0} attachment</value>
+  </data>
+  <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
+    <value>대기 중...|Waiting...|待機中...</value>
+  </data>
+  <data name="AgentActivityIdleKnownValues" xml:space="preserve">
+    <value>대기 중|Idle|待機中</value>
   </data>
   <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
     <value>Confirm File Changes</value>

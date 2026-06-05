@@ -2,16 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Windows.Graphics.Imaging;
-using Windows.Storage;
-using Windows.Storage.Pickers;
-using Windows.Storage.Streams;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
@@ -23,8 +18,6 @@ namespace TxtAIEditor.Controls
     public sealed class AgentController
     {
         private const int MaxActiveFileContextChars = 120_000;
-        private const int MaxAttachmentTextChars = 120_000;
-        private const int MaxImageDimension = 1024;
 
         private readonly ILLMService _llmService;
         private readonly ISettingsService _settingsService;
@@ -42,8 +35,9 @@ namespace TxtAIEditor.Controls
         private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
+        private readonly AgentDisplayLocalizer _displayText;
+        private readonly AgentAttachmentController _attachmentController;
         private readonly List<AgentFileEditPreview> _sessionEdits = new();
-        private readonly List<AgentAttachmentState> _attachments = new();
 
         private string _lastSelectionText = string.Empty;
         private string? _lastSelectionTabId;
@@ -55,18 +49,6 @@ namespace TxtAIEditor.Controls
         private CancellationTokenSource? _runCancellation;
         private readonly StringBuilder _sessionHistory = new();
         private TaskCompletionSource<bool>? _diffApprovalTcs;
-
-        private sealed class AgentAttachmentState
-        {
-            public string Id { get; set; } = Guid.NewGuid().ToString("N");
-            public string Path { get; set; } = string.Empty;
-            public string DisplayName { get; set; } = string.Empty;
-            public string Detail { get; set; } = string.Empty;
-            public string? TextContent { get; set; }
-            public LlmMessageAttachment? ImageContent { get; set; }
-            public int EstimatedTokens { get; set; }
-            public bool IsImage => ImageContent != null;
-        }
 
         public AgentController(
             ILLMService llmService,
@@ -102,6 +84,18 @@ namespace TxtAIEditor.Controls
             _fileModifiedAsync = fileModifiedAsync;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
+            _displayText = new AgentDisplayLocalizer(_getString);
+            _attachmentController = new AgentAttachmentController(
+                _agentPane,
+                _initializePickerWindow,
+                _showError,
+                _getString,
+                _displayText,
+                () => _isRunning,
+                UpdateContextStats,
+                EstimateTokenCount,
+                _beforeDialog,
+                _afterDialog);
             _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
             _fileTools.ConfirmPowerShellAsync = ConfirmPowerShellAsync;
             if (_fileModifiedAsync != null)
@@ -211,8 +205,8 @@ namespace TxtAIEditor.Controls
             _agentPane.StopRequested += (_, _) => StopAgent();
             _agentPane.NewSessionRequested += (_, _) => ClearSession();
             _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
-            _agentPane.AddAttachmentRequested += async (_, _) => await AddAttachmentsAsync();
-            _agentPane.RemoveAttachmentRequested += (_, attachment) => RemoveAttachment(attachment.Id);
+            _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
+            _agentPane.RemoveAttachmentRequested += (_, attachment) => _attachmentController.RemoveAttachment(attachment.Id);
             
             _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
             _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
@@ -315,7 +309,7 @@ namespace TxtAIEditor.Controls
                                         if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                         {
                                             int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
-                                            string label = FormatPreparingToolLabel(tokenCount);
+                                            string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                             _agentPane.DispatcherQueue.TryEnqueue(() =>
                                             {
                                                 _agentPane.BeginThinkingActivity(label);
@@ -335,7 +329,7 @@ namespace TxtAIEditor.Controls
                                 if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                 {
                                     int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
-                                    string label = FormatPreparingToolLabel(tokenCount);
+                                    string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
                                     {
                                         _agentPane.UpdateThinkingActivity(label);
@@ -356,7 +350,7 @@ namespace TxtAIEditor.Controls
                                     int idx = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
                                     string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
                                     int tokenCount = (int)Math.Round(EstimateTokenCount(toolCallText));
-                                    string label = FormatPreparingToolLabel(tokenCount);
+                                    string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
                                     {
                                         _agentPane.UpdateThinkingActivity(label);
@@ -389,7 +383,7 @@ namespace TxtAIEditor.Controls
                                     {
                                         toolCallPlaceholderShown = true;
                                         int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText.Substring(toolCallIndex)));
-                                        string label = FormatPreparingToolLabel(tokenCount);
+                                        string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                         _agentPane.DispatcherQueue.TryEnqueue(() =>
                                         {
                                             _agentPane.BeginThinkingActivity(label);
@@ -656,13 +650,12 @@ namespace TxtAIEditor.Controls
         {
             _sessionHistory.Clear();
             _sessionEdits.Clear();
-            _attachments.Clear();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
-                _agentPane.ResetOutput(_getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요."));
-                _agentPane.ClearActivity(_getString("AgentActivityIdle", "대기 중"));
+                _agentPane.ResetOutput(_displayText.OutputPlaceholder);
+                _agentPane.ClearActivity(_displayText.ActivityIdle);
                 _agentPane.UpdateModifiedFiles(new List<AgentFileEditPreview>());
-                _agentPane.UpdateAttachments(new List<AgentAttachmentItem>());
+                _attachmentController.Clear();
                 UpdateContextStats();
             });
         }
@@ -793,11 +786,11 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (_attachments.Count > 0)
+            if (_attachmentController.Count > 0)
             {
                 context.Add("");
                 context.Add("[Agent attachments]");
-                foreach (var attachment in _attachments)
+                foreach (var attachment in _attachmentController.Attachments)
                 {
                     context.Add($"- {attachment.DisplayName} ({attachment.Detail}, approx {attachment.EstimatedTokens:N0} tokens)");
                     if (attachment.IsImage)
@@ -950,301 +943,7 @@ namespace TxtAIEditor.Controls
 
         private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForCurrentRun()
         {
-            return _attachments
-                .Select(a => a.ImageContent)
-                .Where(a => a != null)
-                .Cast<LlmMessageAttachment>()
-                .ToList();
-        }
-
-        private async Task AddAttachmentsAsync()
-        {
-            if (_isRunning)
-            {
-                return;
-            }
-
-            var picker = new FileOpenPicker
-            {
-                ViewMode = PickerViewMode.List,
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
-            };
-            _initializePickerWindow(picker);
-
-            foreach (string extension in GetAttachmentPickerExtensions())
-            {
-                picker.FileTypeFilter.Add(extension);
-            }
-
-            try
-            {
-                _beforeDialog?.Invoke();
-                var files = await picker.PickMultipleFilesAsync();
-                if (files == null || files.Count == 0)
-                {
-                    return;
-                }
-
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        var attachment = await CreateAttachmentAsync(file);
-                        if (attachment != null)
-                        {
-                            _attachments.RemoveAll(a => string.Equals(a.Path, attachment.Path, StringComparison.OrdinalIgnoreCase));
-                            _attachments.Add(attachment);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _showError(
-                            _getString("AgentAttachmentErrorTitle", "첨부 추가 오류"),
-                            string.Format(_getString("AgentAttachmentErrorFormat", "첨부를 추가하는 중 오류가 발생했습니다: {0}"), ex.Message));
-                    }
-                }
-
-                RefreshAttachments();
-                UpdateContextStats();
-            }
-            finally
-            {
-                _afterDialog?.Invoke();
-            }
-        }
-
-        private static IReadOnlyList<string> GetAttachmentPickerExtensions()
-        {
-            return new[] { "*" };
-        }
-
-        private async Task<AgentAttachmentState?> CreateAttachmentAsync(StorageFile file)
-        {
-            string displayName = file.Name;
-            string path = file.Path ?? displayName;
-            string mimeType = GetMimeType(file);
-
-            if (IsImageFile(file, mimeType))
-            {
-                var image = await CreateImageAttachmentAsync(file, displayName, mimeType);
-                return new AgentAttachmentState
-                {
-                    Path = path,
-                    DisplayName = displayName,
-                    Detail = $"{image.MimeType}, {image.Width}x{image.Height}",
-                    ImageContent = image,
-                    EstimatedTokens = image.EstimatedTokens
-                };
-            }
-
-            string text = await ReadAttachmentTextAsync(file);
-            int estimatedTokens = (int)Math.Round(EstimateTokenCount(text));
-            bool truncated = text.Length >= MaxAttachmentTextChars;
-            return new AgentAttachmentState
-            {
-                Path = path,
-                DisplayName = displayName,
-                Detail = truncated
-                    ? string.Format(_getString("AgentAttachmentFileTruncatedDetail", "파일, {0:N0}자까지 포함"), text.Length)
-                    : string.Format(_getString("AgentAttachmentFileDetail", "파일, {0:N0}자"), text.Length),
-                TextContent = text,
-                EstimatedTokens = estimatedTokens
-            };
-        }
-
-        private async Task<LlmMessageAttachment> CreateImageAttachmentAsync(StorageFile file, string displayName, string mimeType)
-        {
-            using IRandomAccessStream input = await file.OpenReadAsync();
-            BitmapDecoder decoder = await BitmapDecoder.CreateAsync(input);
-            uint originalWidth = decoder.PixelWidth;
-            uint originalHeight = decoder.PixelHeight;
-            uint outputWidth = originalWidth;
-            uint outputHeight = originalHeight;
-            string outputMimeType = string.IsNullOrWhiteSpace(mimeType) ? "image/png" : mimeType;
-            byte[] bytes;
-
-            if (Math.Max(originalWidth, originalHeight) > MaxImageDimension)
-            {
-                double scale = MaxImageDimension / (double)Math.Max(originalWidth, originalHeight);
-                outputWidth = Math.Max(1, (uint)Math.Round(originalWidth * scale));
-                outputHeight = Math.Max(1, (uint)Math.Round(originalHeight * scale));
-
-                var transform = new BitmapTransform
-                {
-                    ScaledWidth = outputWidth,
-                    ScaledHeight = outputHeight,
-                    InterpolationMode = BitmapInterpolationMode.Fant
-                };
-
-                PixelDataProvider pixelData = await decoder.GetPixelDataAsync(
-                    BitmapPixelFormat.Bgra8,
-                    BitmapAlphaMode.Premultiplied,
-                    transform,
-                    ExifOrientationMode.RespectExifOrientation,
-                    ColorManagementMode.ColorManageToSRgb);
-
-                using var output = new InMemoryRandomAccessStream();
-                BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, output);
-                encoder.SetPixelData(
-                    BitmapPixelFormat.Bgra8,
-                    BitmapAlphaMode.Premultiplied,
-                    outputWidth,
-                    outputHeight,
-                    96,
-                    96,
-                    pixelData.DetachPixelData());
-                await encoder.FlushAsync();
-                output.Seek(0);
-                bytes = await ReadRandomAccessStreamAsync(output);
-                outputMimeType = "image/jpeg";
-            }
-            else
-            {
-                input.Seek(0);
-                bytes = await ReadRandomAccessStreamAsync(input);
-            }
-
-            int estimatedTokens = EstimateImageTokens((int)outputWidth, (int)outputHeight);
-            return new LlmMessageAttachment
-            {
-                DisplayName = displayName,
-                MimeType = outputMimeType,
-                Base64Data = Convert.ToBase64String(bytes),
-                Width = (int)outputWidth,
-                Height = (int)outputHeight,
-                EstimatedTokens = estimatedTokens
-            };
-        }
-
-        private static async Task<byte[]> ReadRandomAccessStreamAsync(IRandomAccessStream stream)
-        {
-            using var managedStream = stream.AsStreamForRead();
-            using var memory = new MemoryStream();
-            await managedStream.CopyToAsync(memory);
-            return memory.ToArray();
-        }
-
-        private static async Task<string> ReadAttachmentTextAsync(StorageFile file)
-        {
-            if (!string.IsNullOrWhiteSpace(file.Path) && File.Exists(file.Path))
-            {
-                using var stream = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-                char[] buffer = new char[MaxAttachmentTextChars + 1];
-                int read = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
-                string text = new string(buffer, 0, Math.Min(read, MaxAttachmentTextChars));
-                return StripBinaryControlCharacters(text);
-            }
-
-            string fallback = await FileIO.ReadTextAsync(file);
-            if (fallback.Length > MaxAttachmentTextChars)
-            {
-                fallback = fallback.Substring(0, MaxAttachmentTextChars);
-            }
-            return StripBinaryControlCharacters(fallback);
-        }
-
-        private void RemoveAttachment(string id)
-        {
-            if (_isRunning)
-            {
-                return;
-            }
-
-            _attachments.RemoveAll(a => string.Equals(a.Id, id, StringComparison.Ordinal));
-            RefreshAttachments();
-            UpdateContextStats();
-        }
-
-        private void RefreshAttachments()
-        {
-            var items = _attachments
-                .Select(a => new AgentAttachmentItem
-                {
-                    Id = a.Id,
-                    DisplayName = a.DisplayName,
-                    Detail = a.Detail,
-                    TokenText = FormatAttachmentTokens(a.EstimatedTokens),
-                    RemoveTooltip = _getString("AgentRemoveAttachmentTooltip", "첨부 제거"),
-                    IconGlyph = a.IsImage ? "\uEB9F" : "\uE8A5"
-                })
-                .ToList();
-            _agentPane.UpdateAttachments(items);
-        }
-
-        private string FormatAttachmentTokens(int tokenCount)
-        {
-            string lang = GetActiveLanguageCode();
-            if (lang == "ko-KR")
-            {
-                return $"{tokenCount:N0} 토큰";
-            }
-            if (lang == "ja-JP")
-            {
-                return $"{tokenCount:N0} トークン";
-            }
-            return $"{tokenCount:N0} tokens";
-        }
-
-        private static int EstimateImageTokens(int width, int height)
-        {
-            int tilesWide = Math.Max(1, (int)Math.Ceiling(width / 512.0));
-            int tilesHigh = Math.Max(1, (int)Math.Ceiling(height / 512.0));
-            return 85 + (tilesWide * tilesHigh * 170);
-        }
-
-        private static string StripBinaryControlCharacters(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return string.Empty;
-            }
-
-            var builder = new StringBuilder(text.Length);
-            foreach (char ch in text)
-            {
-                if (ch == '\r' || ch == '\n' || ch == '\t' || ch >= ' ')
-                {
-                    builder.Append(ch);
-                }
-            }
-            return builder.ToString();
-        }
-
-        private static bool IsImageFile(StorageFile file, string mimeType)
-        {
-            if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            string extension = Path.GetExtension(file.Name);
-            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string GetMimeType(StorageFile file)
-        {
-            if (!string.IsNullOrWhiteSpace(file.ContentType) &&
-                !file.ContentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase))
-            {
-                return file.ContentType;
-            }
-
-            string extension = Path.GetExtension(file.Name).ToLowerInvariant();
-            return extension switch
-            {
-                ".png" => "image/png",
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".webp" => "image/webp",
-                ".bmp" => "image/bmp",
-                ".gif" => "image/gif",
-                _ => "text/plain"
-            };
+            return _attachmentController.GetImageAttachments();
         }
 
         private async Task<string> ExecuteToolAsync(string toolName, JsonElement arguments, CancellationToken cancellationToken)
@@ -2168,9 +1867,7 @@ namespace TxtAIEditor.Controls
             }
 
             if (string.IsNullOrWhiteSpace(output) ||
-                output.StartsWith("대기 중", StringComparison.Ordinal) ||
-                output.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                output.StartsWith("待機中...", StringComparison.Ordinal))
+                _displayText.IsOutputPlaceholder(output))
             {
                 _showError(
                     _getString("AgentInsertTitle", "Agent 응답 입력"),
@@ -2198,9 +1895,9 @@ namespace TxtAIEditor.Controls
                 ? _getString("AgentNoSelection", "선택 없음")
                 : string.Format(_getString("AgentSelectionStats", "선택 {0:N0}자"), activeSelectionText.Length);
 
-            if (_attachments.Count > 0)
+            if (_attachmentController.Count > 0)
             {
-                selectionPart = $"{selectionPart} · {FormatAttachmentCount(_attachments.Count)}";
+                selectionPart = $"{selectionPart} · {_displayText.FormatAttachmentCount(_attachmentController.Count)}";
             }
 
             _agentPane.ContextStats.Text = string.Format(
@@ -2229,17 +1926,9 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private string GetActiveLanguageCode()
-        {
-            string mode = _getString("AgentModeRun", "Run");
-            if (mode == "실행") return "ko-KR";
-            if (mode == "実行") return "ja-JP";
-            return "en-US";
-        }
-
         private double EstimateContextTokens()
         {
-            string langCode = GetActiveLanguageCode();
+            string langCode = _displayText.LanguageCode;
             string systemPrompt = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildSystemPrompt(langCode);
 
             string instruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
@@ -2260,21 +1949,7 @@ namespace TxtAIEditor.Controls
             string userContent = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildUserContent(instruction, initialTranscript, selectedText, string.Empty);
 
             return EstimateTokenCount(systemPrompt) + EstimateTokenCount(userContent) +
-                   _attachments.Where(a => a.IsImage).Sum(a => a.EstimatedTokens);
-        }
-
-        private string FormatAttachmentCount(int count)
-        {
-            string lang = GetActiveLanguageCode();
-            if (lang == "ko-KR")
-            {
-                return $"첨부 {count:N0}개";
-            }
-            if (lang == "ja-JP")
-            {
-                return $"添付 {count:N0}件";
-            }
-            return $"{count:N0} attachment{(count == 1 ? string.Empty : "s")}";
+                   _attachmentController.EstimatedImageTokens;
         }
 
         private static double EstimateTokenCount(string text)
@@ -2294,24 +1969,6 @@ namespace TxtAIEditor.Controls
                 }
             }
             return tokens;
-        }
-
-        private string FormatPreparingToolLabel(int tokenCount)
-        {
-            string baseLabel = _getString("AgentOutputPreparingTool", "도구 호출 준비 중");
-            string lang = GetActiveLanguageCode();
-            if (lang == "ko-KR")
-            {
-                return $"{baseLabel} ({tokenCount} 토큰)";
-            }
-            else if (lang == "ja-JP")
-            {
-                return $"{baseLabel} ({tokenCount} トークン)";
-            }
-            else
-            {
-                return $"{baseLabel} ({tokenCount} tokens)";
-            }
         }
 
     }

@@ -1439,6 +1439,9 @@
   <data name="AgentModeRun" xml:space="preserve">
     <value>실행</value>
   </data>
+  <data name="AgentLanguageCode" xml:space="preserve">
+    <value>ko-KR</value>
+  </data>
   <data name="AgentActivityListFilesFormat" xml:space="preserve">
     <value>파일 목록 조회 중: {0}</value>
   </data>
@@ -1564,6 +1567,24 @@
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k 토큰</value>
+  </data>
+  <data name="AgentInlineTokenCountFormat" xml:space="preserve">
+    <value>{0:N0} 토큰</value>
+  </data>
+  <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="AgentAttachmentCountFormat" xml:space="preserve">
+    <value>첨부 {0:N0}개</value>
+  </data>
+  <data name="AgentAttachmentCountSingularFormat" xml:space="preserve">
+    <value>첨부 {0:N0}개</value>
+  </data>
+  <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
+    <value>대기 중...|Waiting...|待機中...</value>
+  </data>
+  <data name="AgentActivityIdleKnownValues" xml:space="preserve">
+    <value>대기 중|Idle|待機中</value>
   </data>
   <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
     <value>파일 변경 확인</value>

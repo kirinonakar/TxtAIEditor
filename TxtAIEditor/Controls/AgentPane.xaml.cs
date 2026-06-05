@@ -38,6 +38,7 @@ namespace TxtAIEditor.Controls
         private string _rawOutputText = string.Empty;
         private readonly List<string> _renderedLines = new List<string>();
         private bool _outputScrollQueued;
+        private AgentDisplayLocalizer _displayText = AgentDisplayLocalizer.CreateWithResourceLoader();
 
         public string RawOutputText => _rawOutputText;
         public string SelectedOutputText => AgentOutputText.SelectedText;
@@ -45,24 +46,9 @@ namespace TxtAIEditor.Controls
         public AgentPane()
         {
             InitializeComponent();
-            
-            string placeholder = "대기 중... Agent에게 작업을 지시해 보세요.";
-            try
-            {
-                var loader = new Microsoft.Windows.ApplicationModel.Resources.ResourceLoader();
-                string localized = loader.GetString("AgentOutputPlaceholder");
-                if (!string.IsNullOrEmpty(localized))
-                {
-                    placeholder = localized;
-                }
-            }
-            catch
-            {
-            }
 
-            _rawOutputText = placeholder;
-            UpdateRichText(_rawOutputText);
-            _outputLength = _rawOutputText.Length;
+            ResetOutput(_displayText.OutputPlaceholder);
+            Localize(_displayText.GetString);
         }
 
         public event RoutedEventHandler? RunRequested;
@@ -85,8 +71,8 @@ namespace TxtAIEditor.Controls
         public bool IncludeActiveFile => AgentIncludeActiveFileCheckBox.IsChecked == true;
 
         private bool _isBusy;
-        private string _runButtonText = "실행";
-        private string _stopButtonText = "중단";
+        private string _runButtonText = string.Empty;
+        private string _stopButtonText = string.Empty;
         private const string OutputLineBreak = "\r\n";
         private DispatcherTimer? _thinkingTimer;
         private bool _thinkingLineActive;
@@ -109,30 +95,11 @@ namespace TxtAIEditor.Controls
 
         public void Localize(Func<string, string, string> getString)
         {
+            _displayText = new AgentDisplayLocalizer(getString);
             string outputText = _rawOutputText.TrimStart();
-            bool isPlaceholder = false;
-            try
+            if (_displayText.IsOutputPlaceholder(outputText))
             {
-                var loader = new Microsoft.Windows.ApplicationModel.Resources.ResourceLoader();
-                string localized = loader.GetString("AgentOutputPlaceholder")?.TrimStart() ?? string.Empty;
-                if (!string.IsNullOrEmpty(localized) && outputText.StartsWith(localized, System.StringComparison.Ordinal))
-                {
-                    isPlaceholder = true;
-                }
-            }
-            catch
-            {
-            }
-
-            if (isPlaceholder ||
-                outputText.StartsWith("대기 중...", StringComparison.Ordinal) ||
-                outputText.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                outputText.StartsWith("待機中...", StringComparison.Ordinal) ||
-                outputText.StartsWith("待機中...", StringComparison.Ordinal))
-            {
-                _rawOutputText = getString("AgentOutputPlaceholder", "대기 중... Agent에게 작업을 지시해 보세요.");
-                UpdateRichText(_rawOutputText);
-                _outputLength = _rawOutputText.Length;
+                ResetOutput(_displayText.OutputPlaceholder);
             }
 
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
@@ -145,9 +112,9 @@ namespace TxtAIEditor.Controls
             AgentNewSessionButton.Content = getString("AgentNewSessionButton", "새 세션");
             AgentInsertOutputButton.Content = getString("LlmInsertOutputButtonText", "입력");
             AgentActivityHeaderText.Text = getString("AgentActivityHeader", "진행 상황");
-            if (AgentActivityText.Text == "대기 중" || AgentActivityText.Text == "Idle")
+            if (_displayText.IsActivityIdle(AgentActivityText.Text))
             {
-                AgentActivityText.Text = getString("AgentActivityIdle", "대기 중");
+                AgentActivityText.Text = _displayText.ActivityIdle;
             }
             ToolTipService.SetToolTip(AgentInsertOutputButton, getString("AgentInsertOutputTooltip", "Agent 응답을 현재 커서에 입력"));
 
@@ -187,8 +154,7 @@ namespace TxtAIEditor.Controls
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             AppendOutputLine($"{timestamp}  {message}");
             if (string.IsNullOrWhiteSpace(AgentActivityText.Text) ||
-                AgentActivityText.Text == "대기 중" ||
-                AgentActivityText.Text == "Idle")
+                _displayText.IsActivityIdle(AgentActivityText.Text))
             {
                 AgentActivityText.Text = $"{timestamp}  {message}";
             }
@@ -300,9 +266,7 @@ namespace TxtAIEditor.Controls
             }
 
             string trimmed = text.TrimStart();
-            if (trimmed.StartsWith("대기 중...", StringComparison.Ordinal) ||
-                trimmed.StartsWith("Waiting...", StringComparison.Ordinal) ||
-                trimmed.StartsWith("待機中...", StringComparison.Ordinal))
+            if (_displayText.IsOutputPlaceholder(trimmed))
             {
                 _rawOutputText = string.Empty;
                 UpdateRichText(_rawOutputText);
