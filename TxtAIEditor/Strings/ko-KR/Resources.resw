@@ -1669,6 +1669,9 @@
   <data name="AgentSelectionEditVerified" xml:space="preserve">
     <value>방금 적용한 선택 영역 변경을 확인했습니다. 작업을 마칩니다.</value>
   </data>
+  <data name="AgentFileEditAlreadyComplete" xml:space="preserve">
+    <value>요청한 작업을 완료하였습니다.</value>
+  </data>
   <data name="AgentRevertErrorTitle" xml:space="preserve">
     <value>변경 취소 오류</value>
   </data>

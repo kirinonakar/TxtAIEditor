@@ -446,6 +446,11 @@ namespace TxtAIEditor.Controls
             }
 
             string updated = content.Remove(index, matchLength).Insert(index, normalizedNewText);
+            if (string.Equals(updated, content, StringComparison.Ordinal))
+            {
+                return BuildUnchangedEditResult("replace_in_file", fullPath);
+            }
+
             var preview = new AgentFileEditPreview
             {
                 ActionName = "replace_in_file",
@@ -519,6 +524,11 @@ namespace TxtAIEditor.Controls
             if (afterLines.Any())
             {
                 updated += "\n" + string.Join("\n", afterLines);
+            }
+
+            if (string.Equals(updated, content, StringComparison.Ordinal))
+            {
+                return BuildUnchangedEditResult("replace_range", fullPath);
             }
 
             var preview = new AgentFileEditPreview
@@ -639,6 +649,11 @@ namespace TxtAIEditor.Controls
             }
 
             string updated = string.Join("\n", lines);
+            if (string.Equals(updated, content, StringComparison.Ordinal))
+            {
+                return BuildUnchangedEditResult("apply_patch", fullPath);
+            }
+
             var preview = new AgentFileEditPreview
             {
                 ActionName = "apply_patch",
@@ -725,6 +740,11 @@ namespace TxtAIEditor.Controls
             
             string oldContent = NormalizeNewlines(rawText);
             string newContent = NormalizeNewlines(content);
+            bool isNewFile = !File.Exists(fullPath);
+            if (!isNewFile && string.Equals(newContent, oldContent, StringComparison.Ordinal))
+            {
+                return BuildUnchangedEditResult("overwrite_file", fullPath);
+            }
  
             var preview = new AgentFileEditPreview
             {
@@ -733,7 +753,7 @@ namespace TxtAIEditor.Controls
                 FullPath = fullPath,
                 OldContent = oldContent,
                 NewContent = newContent,
-                IsNewFile = !File.Exists(fullPath)
+                IsNewFile = isNewFile
             };
  
             if (!await ConfirmEditAsync(preview))
@@ -750,6 +770,11 @@ namespace TxtAIEditor.Controls
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(newContent, lineEnding));
             await NotifyFileModifiedAsync(fullPath);
             return $"overwritten: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
+        }
+
+        private string BuildUnchangedEditResult(string toolName, string fullPath)
+        {
+            return $"{toolName} unchanged: {RelativePath(ResolveWorkspaceRoot(), fullPath)} requested change is already applied; no additional edit was needed.";
         }
 
 

@@ -567,6 +567,31 @@ namespace TxtAIEditor.Controls
                     string verifyToolName = NormalizeToolName(toolName);
                     bool isFileEditTool = verifyToolName is "replace_in_file" or "replace_range"
                         or "apply_patch" or "overwrite_file";
+                    if (isFileEditTool && IsUnchangedEditCompletionResult(toolResult))
+                    {
+                        string completeMsg = _getString(
+                            "AgentFileEditAlreadyComplete",
+                            "요청한 작업을 완료하였습니다.");
+
+                        transcript += "\n\n[File edit verification: requested content already matches the current file. Task complete.]";
+
+                        await RunOnUIThreadAsync(() =>
+                        {
+                            _agentPane.AppendOutputLine(completeMsg);
+                        });
+
+                        _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                        string unchangedRunTranscript = transcript.Substring(initialTranscript.Length);
+                        if (!string.IsNullOrWhiteSpace(unchangedRunTranscript))
+                        {
+                            _sessionHistory.AppendLine(unchangedRunTranscript.Trim());
+                        }
+                        _sessionHistory.AppendLine();
+
+                        completed = true;
+                        break;
+                    }
+
                     if (isFileEditTool
                         && !toolResult.Contains("failed") && !toolResult.Contains("cancelled")
                         && selectionBeforeTool.HasLineRange)
@@ -1208,6 +1233,14 @@ namespace TxtAIEditor.Controls
             // selection even before any edit. Only treat it as changed when the original
             // selected text no longer appears in the affected line window.
             return !current.Contains(original, StringComparison.Ordinal);
+        }
+
+        private static bool IsUnchangedEditCompletionResult(string toolResult)
+        {
+            return !string.IsNullOrWhiteSpace(toolResult) &&
+                toolResult.Contains(" unchanged:", StringComparison.OrdinalIgnoreCase) &&
+                !toolResult.Contains("failed", StringComparison.OrdinalIgnoreCase) &&
+                !toolResult.Contains("cancelled", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string NormalizeForSelectionCompare(string value)

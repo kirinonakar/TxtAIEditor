@@ -1670,6 +1670,9 @@
   <data name="AgentSelectionEditVerified" xml:space="preserve">
     <value>いま適用した選択範囲の変更を確認しました。作業を終了します。</value>
   </data>
+  <data name="AgentFileEditAlreadyComplete" xml:space="preserve">
+    <value>要求された作業を完了しました。</value>
+  </data>
   <data name="AgentRevertErrorTitle" xml:space="preserve">
     <value>元に戻すエラー</value>
   </data>
