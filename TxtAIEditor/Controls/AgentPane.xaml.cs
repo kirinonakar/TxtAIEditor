@@ -18,7 +18,7 @@ namespace TxtAIEditor.Controls
             _pane = pane;
         }
 
-        public string Text => _pane.RawOutputText;
+        public string Text => _pane.GetRawOutputText();
         public string SelectedText => _pane.SelectedOutputText;
     }
 
@@ -37,10 +37,12 @@ namespace TxtAIEditor.Controls
         private int _outputLength;
         private string _rawOutputText = string.Empty;
         private readonly List<string> _renderedLines = new List<string>();
+        private readonly StringBuilder _pendingOutputText = new StringBuilder();
         private bool _outputScrollQueued;
+        private DispatcherTimer? _outputFlushTimer;
         private AgentDisplayLocalizer _displayText = AgentDisplayLocalizer.CreateWithResourceLoader();
 
-        public string RawOutputText => _rawOutputText;
+        public string RawOutputText => GetRawOutputText();
         public string SelectedOutputText => AgentOutputText.SelectedText;
 
         public AgentPane()
@@ -80,17 +82,34 @@ namespace TxtAIEditor.Controls
         private int _thinkingDotCount;
         private string _thinkingLinePrefix = string.Empty;
         private string _thinkingLineTimestamp = string.Empty;
+        private const int MaxOutputFlushChars = 20_000;
 
         private void AppendText(string text)
         {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
             int currentLength = _rawOutputText.Length;
             if (_outputLength < 0 || _outputLength > currentLength)
             {
                 _outputLength = currentLength;
             }
-            _rawOutputText = _rawOutputText.Insert(_outputLength, text);
-            _outputLength += text.Length;
-            UpdateRichText(_rawOutputText);
+
+            bool appendingAtEnd = _outputLength == currentLength;
+            if (appendingAtEnd)
+            {
+                _rawOutputText += text;
+                _outputLength += text.Length;
+                AppendRenderedText(text);
+            }
+            else
+            {
+                _rawOutputText = _rawOutputText.Insert(_outputLength, text);
+                _outputLength += text.Length;
+                UpdateRichText(_rawOutputText);
+            }
         }
 
         public void Localize(Func<string, string, string> getString)
@@ -129,6 +148,11 @@ namespace TxtAIEditor.Controls
 
         public void SetBusy(bool isBusy)
         {
+            if (!isBusy)
+            {
+                FlushAllPendingOutputText();
+            }
+
             _isBusy = isBusy;
             AgentRunButton.IsEnabled = true;
             AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
@@ -176,12 +200,12 @@ namespace TxtAIEditor.Controls
 
             CompleteThinkingLine();
             ClearOutputPlaceholder();
-            AppendText(text);
-            ScrollOutputToEnd();
+            QueueOutputText(text);
         }
 
         public void AppendOutputLine(string line)
         {
+            FlushAllPendingOutputText();
             CompleteThinkingLine();
             ClearOutputPlaceholder();
 
@@ -198,6 +222,7 @@ namespace TxtAIEditor.Controls
 
         public void BeginOutputBlock(string title)
         {
+            FlushAllPendingOutputText();
             CompleteThinkingLine();
             ClearOutputPlaceholder();
 
@@ -218,6 +243,7 @@ namespace TxtAIEditor.Controls
 
         public void BeginThinkingActivity(string label)
         {
+            FlushAllPendingOutputText();
             CompleteThinkingLine();
             ClearOutputPlaceholder();
 
@@ -280,9 +306,72 @@ namespace TxtAIEditor.Controls
 
         public void ResetOutput(string text)
         {
+            ClearPendingOutputText();
             _rawOutputText = text ?? string.Empty;
             UpdateRichText(_rawOutputText);
             _outputLength = _rawOutputText.Length;
+        }
+
+        public string GetRawOutputText()
+        {
+            FlushAllPendingOutputText();
+            return _rawOutputText;
+        }
+
+        private void QueueOutputText(string text)
+        {
+            _pendingOutputText.Append(text);
+            _outputFlushTimer ??= CreateOutputFlushTimer();
+
+            if (!_outputFlushTimer.IsEnabled)
+            {
+                _outputFlushTimer.Start();
+            }
+        }
+
+        private DispatcherTimer CreateOutputFlushTimer()
+        {
+            var timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(50)
+            };
+            timer.Tick += (_, _) => FlushPendingOutputText();
+            return timer;
+        }
+
+        private void FlushPendingOutputText()
+        {
+            if (_pendingOutputText.Length == 0)
+            {
+                _outputFlushTimer?.Stop();
+                return;
+            }
+
+            int take = Math.Min(_pendingOutputText.Length, MaxOutputFlushChars);
+            string text = _pendingOutputText.ToString(0, take);
+            _pendingOutputText.Remove(0, take);
+
+            AppendText(text);
+            ScrollOutputToEnd();
+
+            if (_pendingOutputText.Length == 0)
+            {
+                _outputFlushTimer?.Stop();
+            }
+        }
+
+        private void FlushAllPendingOutputText()
+        {
+            while (_pendingOutputText.Length > 0)
+            {
+                FlushPendingOutputText();
+            }
+        }
+
+        private void ClearPendingOutputText()
+        {
+            _pendingOutputText.Clear();
+            _outputFlushTimer?.Stop();
         }
 
         private void ScrollOutputToEnd()
@@ -308,8 +397,6 @@ namespace TxtAIEditor.Controls
             DispatcherQueue.TryEnqueue(() =>
             {
                 _outputScrollQueued = false;
-                AgentOutputText.UpdateLayout();
-                AgentOutputScrollViewer.UpdateLayout();
                 ChangeOutputViewToEnd();
             });
         }
@@ -368,7 +455,14 @@ namespace TxtAIEditor.Controls
 
             _rawOutputText = _rawOutputText.Substring(0, _thinkingLineStart) + text;
             _outputLength = _thinkingLineStart + text.Length;
-            UpdateRichText(_rawOutputText);
+            if (_renderedLines.Count > 0)
+            {
+                SetRenderedLine(_renderedLines.Count - 1, text);
+            }
+            else
+            {
+                UpdateRichText(_rawOutputText);
+            }
             ScrollOutputToEnd();
         }
 
@@ -533,6 +627,71 @@ namespace TxtAIEditor.Controls
                     _renderedLines[k] = line;
                 }
             }
+        }
+
+        private void AppendRenderedText(string text)
+        {
+            string normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
+            string[] parts = normalized.Split('\n');
+
+            EnsureRenderedLineExists();
+
+            int lastIndex = _renderedLines.Count - 1;
+            SetRenderedLine(lastIndex, _renderedLines[lastIndex] + parts[0]);
+
+            for (int i = 1; i < parts.Length; i++)
+            {
+                AddRenderedLine(parts[i]);
+            }
+        }
+
+        private void EnsureRenderedLineExists()
+        {
+            if (_renderedLines.Count > 0 && AgentOutputText.Blocks.Count > 0)
+            {
+                return;
+            }
+
+            _renderedLines.Clear();
+            AgentOutputText.Blocks.Clear();
+            AddRenderedLine(string.Empty);
+        }
+
+        private void AddRenderedLine(string line)
+        {
+            var paragraph = new Paragraph();
+            AgentOutputText.Blocks.Add(paragraph);
+            _renderedLines.Add(string.Empty);
+            SetRenderedLine(_renderedLines.Count - 1, line);
+        }
+
+        private void SetRenderedLine(int index, string line)
+        {
+            if (index < 0)
+            {
+                return;
+            }
+
+            while (AgentOutputText.Blocks.Count <= index)
+            {
+                AgentOutputText.Blocks.Add(new Paragraph());
+            }
+            while (_renderedLines.Count <= index)
+            {
+                _renderedLines.Add(string.Empty);
+            }
+
+            if (_renderedLines[index] == line)
+            {
+                return;
+            }
+
+            if (AgentOutputText.Blocks[index] is Paragraph paragraph)
+            {
+                paragraph.Inlines.Clear();
+                ParseLineToInlines(line, paragraph.Inlines);
+            }
+            _renderedLines[index] = line;
         }
 
         private void ParseLineToInlines(string line, InlineCollection inlines)
