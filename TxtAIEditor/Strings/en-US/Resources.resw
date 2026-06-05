@@ -1708,4 +1708,13 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
     <value>File, included first {0:N0} chars</value>
   </data>
+  <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
+    <value>Insert Markdown</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImageErrorTitle" xml:space="preserve">
+    <value>Markdown Insert Failed</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImageNoEditor" xml:space="preserve">
+    <value>Select a text editor tab to insert the Markdown image.</value>
+  </data>
 </root>

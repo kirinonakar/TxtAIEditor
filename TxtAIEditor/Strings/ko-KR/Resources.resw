@@ -1708,4 +1708,13 @@
   <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
     <value>파일, {0:N0}자까지 포함</value>
   </data>
+  <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
+    <value>마크다운 삽입</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImageErrorTitle" xml:space="preserve">
+    <value>마크다운 삽입 실패</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImageNoEditor" xml:space="preserve">
+    <value>마크다운을 삽입할 텍스트 편집기 탭을 선택해 주세요.</value>
+  </data>
 </root>

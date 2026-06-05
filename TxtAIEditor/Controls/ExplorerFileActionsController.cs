@@ -20,8 +20,10 @@ namespace TxtAIEditor.Controls
         private readonly TabView _primaryTabView;
         private readonly TabView _secondaryTabView;
         private readonly Func<string> _currentFolderProvider;
+        private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Action<string> _loadDirectoryRoot;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
+        private readonly Func<string, Task<bool>> _insertTextIntoActiveEditorAsync;
         private readonly Action<OpenedTab, TabViewItem> _closeTabAndCleanup;
         private readonly Func<XamlRoot> _xamlRootProvider;
         private readonly Func<ElementTheme> _themeProvider;
@@ -38,8 +40,10 @@ namespace TxtAIEditor.Controls
             TabView primaryTabView,
             TabView secondaryTabView,
             Func<string> currentFolderProvider,
+            Func<OpenedTab?> activeTabProvider,
             Action<string> loadDirectoryRoot,
             Func<string, Task> loadFileIntoTabAsync,
+            Func<string, Task<bool>> insertTextIntoActiveEditorAsync,
             Action<OpenedTab, TabViewItem> closeTabAndCleanup,
             Func<XamlRoot> xamlRootProvider,
             Func<ElementTheme> themeProvider,
@@ -54,8 +58,10 @@ namespace TxtAIEditor.Controls
             _primaryTabView = primaryTabView;
             _secondaryTabView = secondaryTabView;
             _currentFolderProvider = currentFolderProvider;
+            _activeTabProvider = activeTabProvider;
             _loadDirectoryRoot = loadDirectoryRoot;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
+            _insertTextIntoActiveEditorAsync = insertTextIntoActiveEditorAsync;
             _closeTabAndCleanup = closeTabAndCleanup;
             _xamlRootProvider = xamlRootProvider;
             _themeProvider = themeProvider;
@@ -72,6 +78,7 @@ namespace TxtAIEditor.Controls
         {
             _leftSidebar.FileListViewItemRightTapped += OnFileListViewItemRightTapped;
             _leftSidebar.CreateFolderClick += OnCreateFolderClick;
+            _leftSidebar.InsertMarkdownImageClick += OnInsertMarkdownImageClick;
             _leftSidebar.CopyFileNameClick += OnCopyFileNameClick;
             _leftSidebar.CopyFilePathClick += OnCopyFilePathClick;
             _leftSidebar.CopyFolderPathClick += OnCopyFolderPathClick;
@@ -86,9 +93,10 @@ namespace TxtAIEditor.Controls
                 _leftSidebar.FileList.SelectedItem = item;
             }
 
-            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 9)
+            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 10)
             {
                 LocalizeContextFlyout(flyout);
+                ConfigureContextFlyout(flyout, _leftSidebar.FileList.SelectedItem as ExplorerItem);
                 CursorResetHelper.AttachToFlyout(flyout, element);
                 CursorResetHelper.ResetToArrow(element);
             }
@@ -191,11 +199,84 @@ namespace TxtAIEditor.Controls
             _localizedFlyouts.Add(flyout, null!);
             ((MenuFlyoutItem)flyout.Items[0]).Text = _getString("ExplorerAddToFavorites", "즐겨찾기에 추가");
             ((MenuFlyoutItem)flyout.Items[1]).Text = _getString("ExplorerAddFolderToFavorites", "폴더를 즐겨찾기에 추가");
-            ((MenuFlyoutItem)flyout.Items[3]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
-            ((MenuFlyoutItem)flyout.Items[4]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
-            ((MenuFlyoutItem)flyout.Items[5]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
-            ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerRename", "이름 바꾸기");
-            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerDelete", "삭제");
+            ((MenuFlyoutItem)flyout.Items[2]).Text = _getString("ExplorerInsertMarkdownImage", "마크다운 삽입");
+            ((MenuFlyoutItem)flyout.Items[4]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
+            ((MenuFlyoutItem)flyout.Items[5]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
+            ((MenuFlyoutItem)flyout.Items[6]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
+            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerRename", "이름 바꾸기");
+            ((MenuFlyoutItem)flyout.Items[9]).Text = _getString("ExplorerDelete", "삭제");
+        }
+
+        private static void ConfigureContextFlyout(MenuFlyout flyout, ExplorerItem? item)
+        {
+            if (flyout.Items.Count > 2 && flyout.Items[2] is MenuFlyoutItem markdownItem)
+            {
+                markdownItem.Visibility = item != null && !item.IsFolder && IsSupportedImageFile(item.Path)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+        }
+
+        private async void OnInsertMarkdownImageClick(object sender, RoutedEventArgs e)
+        {
+            var item = GetExplorerItem(sender);
+            if (item == null || item.IsFolder || !IsSupportedImageFile(item.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                string markdown = CreateMarkdownImageText(item);
+                bool inserted = await _insertTextIntoActiveEditorAsync(markdown);
+                if (!inserted)
+                {
+                    _showError(
+                        _getString("ExplorerInsertMarkdownImageErrorTitle", "마크다운 삽입 실패"),
+                        _getString("ExplorerInsertMarkdownImageNoEditor", "마크다운을 삽입할 텍스트 편집기 탭을 선택해 주세요."));
+                }
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("ExplorerInsertMarkdownImageErrorTitle", "마크다운 삽입 실패"),
+                    ex.Message);
+            }
+        }
+
+        private string CreateMarkdownImageText(ExplorerItem item)
+        {
+            string baseDirectory = GetMarkdownBaseDirectory();
+            string imagePath = item.Path;
+            string relativePath = Path.GetRelativePath(baseDirectory, imagePath).Replace('\\', '/');
+            string altText = Path.GetFileNameWithoutExtension(item.Name)
+                .Replace("[", "\\[")
+                .Replace("]", "\\]");
+            return $"![{altText}]({relativePath})";
+        }
+
+        private string GetMarkdownBaseDirectory()
+        {
+            var activeTab = _activeTabProvider();
+            if (activeTab != null &&
+                !activeTab.IsImageViewer &&
+                !string.IsNullOrWhiteSpace(activeTab.FilePath) &&
+                File.Exists(activeTab.FilePath))
+            {
+                string? activeTabDirectory = Path.GetDirectoryName(activeTab.FilePath);
+                if (!string.IsNullOrWhiteSpace(activeTabDirectory) && Directory.Exists(activeTabDirectory))
+                {
+                    return activeTabDirectory;
+                }
+            }
+
+            string currentFolder = _currentFolderProvider();
+            if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
+            {
+                return currentFolder;
+            }
+
+            return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
 
         private void OnCopyFileNameClick(object sender, RoutedEventArgs e)
@@ -414,6 +495,17 @@ namespace TxtAIEditor.Controls
             var dp = new DataPackage();
             dp.SetText(text);
             Clipboard.SetContent(dp);
+        }
+
+        private static bool IsSupportedImageFile(string filePath)
+        {
+            string extension = Path.GetExtension(filePath);
+            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

@@ -1709,4 +1709,13 @@
   <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
     <value>ファイル、先頭 {0:N0} 文字まで含めました</value>
   </data>
+  <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
+    <value>Markdownを挿入</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImageErrorTitle" xml:space="preserve">
+    <value>Markdown挿入失敗</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImageNoEditor" xml:space="preserve">
+    <value>Markdown画像を挿入するテキスト編集タブを選択してください。</value>
+  </data>
 </root>

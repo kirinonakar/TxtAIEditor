@@ -160,6 +160,7 @@
                                                     <MenuFlyout>
                                                         <MenuFlyoutItem Text="즐겨찾기에 추가" Click="OnAddFileToFavoritesClick" Tag="{Binding}"/>
                                                         <MenuFlyoutItem Text="폴더를 즐겨찾기에 추가" Click="OnAddFolderToFavoritesClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem x:Name="ExplorerInsertMarkdownImageMenuItem" Text="마크다운 삽입" Click="OnInsertMarkdownImageClick" Tag="{Binding}"/>
                                                         <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem x:Name="ExplorerCopyFileNameMenuItem" Text="파일이름 복사" Click="OnCopyFileNameClick" Tag="{Binding}"/>
                                                         <MenuFlyoutItem x:Name="ExplorerCopyFilePathMenuItem" Text="경로 복사" Click="OnCopyFilePathClick" Tag="{Binding}"/>
