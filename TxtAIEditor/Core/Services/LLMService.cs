@@ -312,6 +312,7 @@ namespace TxtAIEditor.Core.Services
         // Exa Search Implementation
         // ----------------------------------------------------
         private static readonly HttpClient _exaHttpClient = new HttpClient();
+        private const string DefaultExaMcpEndpoint = "https://mcp.exa.ai/mcp";
         private const int NoKeyFetchMaxCharacters = 6000;
 
         private static bool IsExaMcpEndpoint(string endpoint)
@@ -333,8 +334,10 @@ namespace TxtAIEditor.Core.Services
                 apiKey = Environment.GetEnvironmentVariable("EXA_API_KEY") ?? string.Empty;
             }
 
-            string endpoint = _settingsService?.CurrentSettings?.ExaEndpoint ?? "https://mcp.exa.ai/mcp";
+            string endpoint = _settingsService?.CurrentSettings?.ExaEndpoint ?? DefaultExaMcpEndpoint;
             bool isMcpEndpoint = IsExaMcpEndpoint(endpoint);
+            bool triedDefaultMcpEndpoint = isMcpEndpoint &&
+                string.Equals(endpoint.TrimEnd('/'), DefaultExaMcpEndpoint, StringComparison.OrdinalIgnoreCase);
 
             // If it is configured as an MCP / SSE URL (e.g. contains '/mcp' or '/sse'), use the MCP SSE transport client.
             if (isMcpEndpoint)
@@ -359,6 +362,25 @@ namespace TxtAIEditor.Core.Services
 
             if (string.IsNullOrEmpty(apiKey))
             {
+                if (!triedDefaultMcpEndpoint)
+                {
+                    try
+                    {
+                        int mcpResultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
+                        var arguments = new
+                        {
+                            query = query,
+                            numResults = mcpResultsCount,
+                            highlights = true
+                        };
+                        return await CallMcpSseToolAsync(DefaultExaMcpEndpoint, apiKey, "web_search_exa", arguments, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Exa no-key MCP fallback failed, falling back to DuckDuckGo: {ex.Message}");
+                    }
+                }
+
                 return await SearchWebWithoutApiKeyAsync(query, numResults, cancellationToken);
             }
 
@@ -526,6 +548,23 @@ namespace TxtAIEditor.Core.Services
             object arguments,
             CancellationToken cancellationToken)
         {
+            if (endpointUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("MCP endpoint must use HTTPS.");
+            }
+
+            if (!endpointUrl.Contains("/sse", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    return await CallMcpHttpToolAsync(endpointUrl, apiKey, toolName, arguments, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"MCP HTTP transport failed, falling back to SSE transport: {ex.Message}");
+                }
+            }
+
             using (var sseClient = new HttpClient { Timeout = TimeSpan.FromMinutes(2) })
             {
                 using (var sseRequest = new HttpRequestMessage(HttpMethod.Get, endpointUrl))
@@ -798,6 +837,266 @@ namespace TxtAIEditor.Core.Services
             }
 
             throw new InvalidOperationException("MCP connection closed without response.");
+        }
+
+        private async Task<string> CallMcpHttpToolAsync(
+            string endpointUrl,
+            string apiKey,
+            string toolName,
+            object arguments,
+            CancellationToken cancellationToken)
+        {
+            if (!endpointUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("MCP endpoint must use HTTPS.");
+            }
+
+            using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) })
+            {
+                string initId = "init_" + Guid.NewGuid().ToString("N");
+                var initPayload = new
+                {
+                    jsonrpc = "2.0",
+                    method = "initialize",
+                    @params = new
+                    {
+                        protocolVersion = "2025-03-26",
+                        capabilities = new { },
+                        clientInfo = new
+                        {
+                            name = "TxtAIEditor",
+                            version = "1.0.0"
+                        }
+                    },
+                    id = initId
+                };
+
+                using (var initResponse = await SendMcpHttpRequestAsync(client, endpointUrl, apiKey, null, initPayload, cancellationToken))
+                {
+                    string initBody = await initResponse.Content.ReadAsStringAsync(cancellationToken);
+                    if (!initResponse.IsSuccessStatusCode)
+                    {
+                        throw new HttpRequestException($"MCP HTTP initialize failed: {initResponse.StatusCode}\n{initBody}");
+                    }
+
+                    JsonElement initRoot = ParseMcpHttpResponse(initBody, initId);
+                    if (initRoot.TryGetProperty("error", out var initErrorProp))
+                    {
+                        throw new InvalidOperationException($"MCP HTTP initialize failed: {initErrorProp.GetRawText()}");
+                    }
+
+                    string sessionId = GetMcpSessionId(initResponse);
+                    if (string.IsNullOrWhiteSpace(sessionId))
+                    {
+                        throw new InvalidOperationException("MCP HTTP server did not return Mcp-Session-Id.");
+                    }
+
+                    var initializedNotification = new
+                    {
+                        jsonrpc = "2.0",
+                        method = "notifications/initialized"
+                    };
+                    using (var notificationResponse = await SendMcpHttpRequestAsync(client, endpointUrl, apiKey, sessionId, initializedNotification, cancellationToken))
+                    {
+                        if (!notificationResponse.IsSuccessStatusCode)
+                        {
+                            string errBody = await notificationResponse.Content.ReadAsStringAsync(cancellationToken);
+                            throw new HttpRequestException($"MCP HTTP initialized notification failed: {notificationResponse.StatusCode}\n{errBody}");
+                        }
+                    }
+
+                    string callId = "call_" + Guid.NewGuid().ToString("N");
+                    var callPayload = new
+                    {
+                        jsonrpc = "2.0",
+                        method = "tools/call",
+                        @params = new
+                        {
+                            name = toolName,
+                            arguments = arguments
+                        },
+                        id = callId
+                    };
+
+                    using (var callResponse = await SendMcpHttpRequestAsync(client, endpointUrl, apiKey, sessionId, callPayload, cancellationToken))
+                    {
+                        string callBody = await callResponse.Content.ReadAsStringAsync(cancellationToken);
+                        if (!callResponse.IsSuccessStatusCode)
+                        {
+                            throw new HttpRequestException($"MCP HTTP tool call failed: {callResponse.StatusCode}\n{callBody}");
+                        }
+
+                        JsonElement callRoot = ParseMcpHttpResponse(callBody, callId);
+                        if (callRoot.TryGetProperty("error", out var callErrorProp))
+                        {
+                            throw new InvalidOperationException($"MCP HTTP tool execution failed: {callErrorProp.GetRawText()}");
+                        }
+
+                        if (callRoot.TryGetProperty("result", out var resultProp))
+                        {
+                            return FormatMcpSearchResult(resultProp);
+                        }
+
+                        return callRoot.GetRawText();
+                    }
+                }
+            }
+        }
+
+        private static async Task<HttpResponseMessage> SendMcpHttpRequestAsync(
+            HttpClient client,
+            string endpointUrl,
+            string apiKey,
+            string? sessionId,
+            object payload,
+            CancellationToken cancellationToken)
+        {
+            string jsonPayload = JsonSerializer.Serialize(payload);
+            var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl);
+            request.Headers.Accept.ParseAdd("application/json, text/event-stream");
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                request.Headers.Add("x-api-key", apiKey);
+            }
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                request.Headers.Add("Mcp-Session-Id", sessionId);
+            }
+            request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+            return await client.SendAsync(request, cancellationToken);
+        }
+
+        private static string GetMcpSessionId(HttpResponseMessage response)
+        {
+            if (response.Headers.TryGetValues("Mcp-Session-Id", out var values))
+            {
+                foreach (string value in values)
+                {
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        return value.Trim();
+                    }
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static JsonElement ParseMcpHttpResponse(string responseBody, string expectedId)
+        {
+            string json = ExtractMcpSseJson(responseBody, expectedId);
+            using (var doc = JsonDocument.Parse(json))
+            {
+                JsonElement root = doc.RootElement;
+                if (root.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in root.EnumerateArray())
+                    {
+                        if (JsonRpcIdMatches(item, expectedId))
+                        {
+                            return item.Clone();
+                        }
+                    }
+
+                    if (root.GetArrayLength() > 0)
+                    {
+                        return root[0].Clone();
+                    }
+                }
+
+                return root.Clone();
+            }
+        }
+
+        private static string ExtractMcpSseJson(string responseBody, string expectedId)
+        {
+            string trimmed = responseBody.Trim();
+            if (!trimmed.StartsWith("event:", StringComparison.OrdinalIgnoreCase) &&
+                !trimmed.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                return trimmed;
+            }
+
+            string? currentEvent = null;
+            var currentData = new StringBuilder();
+            string? firstData = null;
+
+            using (var reader = new System.IO.StringReader(responseBody))
+            {
+                while (true)
+                {
+                    string? line = reader.ReadLine();
+                    if (line == null || string.IsNullOrWhiteSpace(line))
+                    {
+                        string? dataValue = FlushMcpSseData(currentEvent, currentData);
+                        if (!string.IsNullOrWhiteSpace(dataValue))
+                        {
+                            firstData ??= dataValue;
+                            try
+                            {
+                                using (var doc = JsonDocument.Parse(dataValue))
+                                {
+                                    if (JsonRpcIdMatches(doc.RootElement, expectedId))
+                                    {
+                                        return dataValue;
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Keep looking for a JSON-RPC message.
+                            }
+                        }
+
+                        currentEvent = null;
+                        currentData.Clear();
+                        if (line == null)
+                        {
+                            break;
+                        }
+                        continue;
+                    }
+
+                    if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        currentEvent = line.Substring(6).Trim();
+                    }
+                    else if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (currentData.Length > 0)
+                        {
+                            currentData.Append("\n");
+                        }
+                        currentData.Append(line.Substring(5).Trim());
+                    }
+                }
+            }
+
+            return firstData ?? trimmed;
+        }
+
+        private static string? FlushMcpSseData(string? currentEvent, StringBuilder currentData)
+        {
+            if (currentData.Length == 0)
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(currentEvent) &&
+                !currentEvent.Equals("message", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return currentData.ToString().Trim();
+        }
+
+        private static bool JsonRpcIdMatches(JsonElement root, string expectedId)
+        {
+            return root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("id", out var idProp) &&
+                idProp.ValueKind == JsonValueKind.String &&
+                string.Equals(idProp.GetString(), expectedId, StringComparison.Ordinal);
         }
 
         private static string ParseEndpointUri(string data)
