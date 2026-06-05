@@ -48,6 +48,7 @@ namespace TxtAIEditor.Controls
         public AgentPane()
         {
             InitializeComponent();
+            AgentOutputText.SizeChanged += (_, _) => QueueOutputScrollToEnd();
 
             ResetOutput(_displayText.OutputPlaceholder);
             Localize(_displayText.GetString);
@@ -398,7 +399,15 @@ namespace TxtAIEditor.Controls
             {
                 _outputScrollQueued = false;
                 ChangeOutputViewToEnd();
+                QueueDeferredOutputScrollToEnd();
             });
+        }
+
+        private void QueueDeferredOutputScrollToEnd()
+        {
+            DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                ChangeOutputViewToEnd);
         }
 
         private void ChangeOutputViewToEnd()
