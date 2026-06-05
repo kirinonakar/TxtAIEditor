@@ -345,7 +345,8 @@ namespace TxtAIEditor.Core.Services
                     var arguments = new
                     {
                         query = query,
-                        numResults = mcpResultsCount
+                        numResults = mcpResultsCount,
+                        highlights = true
                     };
                     return await CallMcpSseToolAsync(endpoint, apiKey, "web_search_exa", arguments, cancellationToken);
                 }
