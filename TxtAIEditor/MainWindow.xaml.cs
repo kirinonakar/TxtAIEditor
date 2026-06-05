@@ -67,6 +67,7 @@ namespace TxtAIEditor
         private readonly TabSelectionController _tabSelectionController;
         private readonly EditorSplitLayoutController _editorSplitLayoutController;
         private readonly SplitImeSyncController _splitImeSyncController;
+        private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly TabSaveController _tabSaveController;
         private readonly TabCloseController _tabCloseController;
         private readonly TabMoveController _tabMoveController;
@@ -245,12 +246,17 @@ namespace TxtAIEditor
                 SchedulePreview,
                 UpdateWindowTitle,
                 _dialogController.ShowErrorMessage);
+            _tabDirtyStateController = new TabDirtyStateController(
+                _viewModel,
+                _tabBridges,
+                _editorSessions,
+                UpdateWindowTitle);
             _splitImeSyncController = new SplitImeSyncController(
                 _tabBridges,
                 _editorSessions,
-                GetTabsForSameFile,
+                _tabDirtyStateController.GetTabsForSameFile,
                 SchedulePreview,
-                SetDirtyStateForFileGroup);
+                _tabDirtyStateController.SetDirtyStateForFileGroup);
             _functionKeyShortcutService = new FunctionKeyShortcutService(WindowNative.GetWindowHandle(this));
             _functionKeyShortcutService.TopMostRequested += (_, _) => _stickyNoteModeController.ToggleTopMostFromShortcut();
             _functionKeyShortcutService.ThemeRequested += (_, _) => OnToggleThemeClick(this, new RoutedEventArgs());
@@ -352,7 +358,7 @@ namespace TxtAIEditor
                 tabId => _editorSessions.TryGetValue(tabId, out var session) ? session : null,
                 tabId => _tabBridges.TryGetValue(tabId, out var bridgeGroup) ? bridgeGroup : null,
                 FlushPendingSplitImeSyncAsync,
-                CleanDirtyStateOnOtherTabs,
+                _tabDirtyStateController.CleanDirtyStateOnOtherTabs,
                 UpdateLanguageUI,
                 RefreshGitStatusUIAsync,
                 UpdateWindowTitle,
@@ -566,8 +572,8 @@ namespace TxtAIEditor
                 () => OpenNewTab(),
                 (filePath, content, isReadOnly, encodingName, encodingWasAutoDetected, isEncrypted, encryptionPassword) =>
                     OpenNewTab(filePath, content, isReadOnly, encodingName, encodingWasAutoDetected, isEncrypted: isEncrypted, encryptionPassword: encryptionPassword),
-                IsAnySameFileTabDirty,
-                SetDirtyStateForFileGroup,
+                _tabDirtyStateController.IsAnySameFileTabDirty,
+                _tabDirtyStateController.SetDirtyStateForFileGroup,
                 tab => SyncEditsToOtherTabsAsync(tab),
                 CloseTabAndCleanup,
                 OnEditorTabViewTabCloseRequested,
@@ -891,8 +897,8 @@ namespace TxtAIEditor
                                 var text = currentSession.Undo();
                                 if (text != null)
                                 {
-                                    MarkTabDirty(tab, tabItem);
-                                    PropagateDirtyStateToOtherTabs(tab);
+                                    _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                                    _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                                     SchedulePreview(tab);
                                     _ = bridge.SetTextAsync(text);
                                     _ = SyncEditsToOtherTabsAsync(tab);
@@ -904,8 +910,8 @@ namespace TxtAIEditor
                                 var text = currentSession.Redo();
                                 if (text != null)
                                 {
-                                    MarkTabDirty(tab, tabItem);
-                                    PropagateDirtyStateToOtherTabs(tab);
+                                    _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                                    _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                                     SchedulePreview(tab);
                                     _ = bridge.SetTextAsync(text);
                                     _ = SyncEditsToOtherTabsAsync(tab);
@@ -966,8 +972,8 @@ namespace TxtAIEditor
 
                 if (!isComposing)
                 {
-                    MarkTabDirty(tab, tabItem);
-                    PropagateDirtyStateToOtherTabs(tab);
+                    _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                    _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                 }
 
                 SchedulePreview(tab);
@@ -994,8 +1000,8 @@ namespace TxtAIEditor
             {
                 var currentSession = getSession();
                 int lineCount = currentSession.InsertLine(lineNumber, text);
-                MarkTabDirty(tab, tabItem);
-                PropagateDirtyStateToOtherTabs(tab);
+                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                 await bridge.UpdateLineCountAsync(lineCount);
                 SchedulePreview(tab);
                 await SyncEditsToOtherTabsAsync(tab);
@@ -1006,8 +1012,8 @@ namespace TxtAIEditor
             {
                 var currentSession = getSession();
                 int lineCount = currentSession.SplitLine(lineNumber, before, after);
-                MarkTabDirty(tab, tabItem);
-                PropagateDirtyStateToOtherTabs(tab);
+                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                 await bridge.UpdateLineCountAsync(lineCount);
                 SchedulePreview(tab);
                 await SyncEditsToOtherTabsAsync(tab);
@@ -1018,8 +1024,8 @@ namespace TxtAIEditor
             {
                 var currentSession = getSession();
                 int lineCount = currentSession.MergeLineWithPrevious(lineNumber);
-                MarkTabDirty(tab, tabItem);
-                PropagateDirtyStateToOtherTabs(tab);
+                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                 await bridge.UpdateLineCountAsync(lineCount);
                 SchedulePreview(tab);
                 await SyncEditsToOtherTabsAsync(tab);
@@ -1030,8 +1036,8 @@ namespace TxtAIEditor
             {
                 var currentSession = getSession();
                 int lineCount = currentSession.DeleteLine(lineNumber);
-                MarkTabDirty(tab, tabItem);
-                PropagateDirtyStateToOtherTabs(tab);
+                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                 await bridge.UpdateLineCountAsync(lineCount);
                 SchedulePreview(tab);
                 await SyncEditsToOtherTabsAsync(tab);
@@ -1061,8 +1067,8 @@ namespace TxtAIEditor
                 await SyncEditsToOtherTabsAsync(tab);
                 await bridge.SendFindAllResultsAsync(currentSession.FindAll(query, matchCase, isRegex), query);
 
-                MarkTabDirty(tab, tabItem);
-                PropagateDirtyStateToOtherTabs(tab);
+                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                 SchedulePreview(tab);
                 _statusBarController.UpdateTotalLines(tab);
             };
@@ -1071,8 +1077,8 @@ namespace TxtAIEditor
             {
                 if (!isComposing)
                 {
-                    MarkTabDirty(tab, tabItem);
-                    PropagateDirtyStateToOtherTabs(tab);
+                    _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                    _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                     UpdateLanguageUI(tab);
                     _tocController?.RefreshToc(tab);
                     _statusBarController.UpdateTotalLines(tab);
@@ -1186,231 +1192,6 @@ namespace TxtAIEditor
                     _livePreviewController.PostScrollSyncState(enabled);
                 });
             };
-        }
-
-        private Dictionary<int, string> ComputeDirtyLines(OpenedTab tab, EditorDocumentSession session)
-        {
-            var markers = new Dictionary<int, string>();
-            if (tab.OriginalContent == null) return markers;
-
-            var orig = tab.OriginalLines;
-            var current = session.Model.GetLines(1, session.Model.LineCount);
-
-            // Find common prefix
-            int prefixMatchCount = 0;
-            int maxPrefix = Math.Min(orig.Length, current.Count);
-            while (prefixMatchCount < maxPrefix && orig[prefixMatchCount] == current[prefixMatchCount])
-            {
-                prefixMatchCount++;
-            }
-
-            // Find common suffix
-            int suffixMatchCount = 0;
-            int maxSuffix = Math.Min(orig.Length - prefixMatchCount, current.Count - prefixMatchCount);
-            while (suffixMatchCount < maxSuffix && 
-                   orig[orig.Length - 1 - suffixMatchCount] == current[current.Count - 1 - suffixMatchCount])
-            {
-                suffixMatchCount++;
-            }
-
-            int unmatchedOrigCount = orig.Length - prefixMatchCount - suffixMatchCount;
-            int unmatchedCurrentCount = current.Count - prefixMatchCount - suffixMatchCount;
-
-            int oi = prefixMatchCount;
-            int ci = prefixMatchCount;
-            int limitOrig = orig.Length - suffixMatchCount;
-            int limitCurr = current.Count - suffixMatchCount;
-
-            int scanLimit = Math.Max(100, Math.Abs(unmatchedOrigCount - unmatchedCurrentCount) + 10);
-
-            while (oi < limitOrig && ci < limitCurr)
-            {
-                if (orig[oi] == current[ci])
-                {
-                    oi++; ci++;
-                }
-                else
-                {
-                    int aheadOrig = -1;
-                    for (int s = oi + 1; s < Math.Min(oi + scanLimit, limitOrig); s++)
-                    {
-                        if (orig[s] == current[ci]) { aheadOrig = s; break; }
-                    }
-                    int aheadCurr = -1;
-                    for (int s = ci + 1; s < Math.Min(ci + scanLimit, limitCurr); s++)
-                    {
-                        if (current[s] == orig[oi]) { aheadCurr = s; break; }
-                    }
-
-                    if (aheadOrig >= 0 && (aheadCurr < 0 || (aheadOrig - oi) < (aheadCurr - ci)))
-                    {
-                        markers[ci + 1] = "del";
-                        oi = aheadOrig;
-                    }
-                    else if (aheadCurr >= 0)
-                    {
-                        for (int a = ci; a < aheadCurr; a++)
-                        {
-                            markers[a + 1] = "add";
-                        }
-                        ci = aheadCurr;
-                    }
-                    else
-                    {
-                        markers[ci + 1] = "mod";
-                        oi++; ci++;
-                    }
-                }
-            }
-
-            if (oi < limitOrig && limitCurr >= 1)
-            {
-                markers[limitCurr] = "del";
-            }
-
-            while (ci < limitCurr)
-            {
-                markers[ci + 1] = "add";
-                ci++;
-            }
-
-            return markers;
-        }
-
-        private void CheckAndUpdateDirtyState(OpenedTab tab)
-        {
-            if (_editorSessions.TryGetValue(tab.Id, out var session))
-            {
-                var dirtyLines = ComputeDirtyLines(tab, session);
-                bool isDirty = (dirtyLines.Count > 0) ||
-                               (tab.OriginalLineEnding != null && session.Model.LineEnding != tab.OriginalLineEnding) ||
-                               (tab.OriginalEncodingName != null && tab.EncodingName != tab.OriginalEncodingName);
-                SetDirtyStateForFileGroup(tab, isDirty);
-
-                foreach (var t in GetTabsForSameFile(tab))
-                {
-                    if (_tabBridges.TryGetValue(t.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-                    {
-                        _ = bridgeGroup.Bridge.UpdateDirtyLinesAsync(dirtyLines);
-                    }
-                }
-            }
-            else
-            {
-                SetDirtyStateForFileGroup(tab, true);
-            }
-        }
-
-        private void MarkTabDirty(OpenedTab tab, TabViewItem? tabItem = null)
-        {
-            CheckAndUpdateDirtyState(tab);
-        }
-
-        private List<OpenedTab> GetTabsForSameFile(OpenedTab sourceTab)
-        {
-            string? pathKey = NormalizeTabPath(sourceTab.FilePath);
-            if (pathKey == null)
-            {
-                return new List<OpenedTab> { sourceTab };
-            }
-
-            var tabs = _viewModel.Tabs
-                .Where(tab =>
-                {
-                    string? otherPathKey = NormalizeTabPath(tab.FilePath);
-                    return otherPathKey != null &&
-                           string.Equals(otherPathKey, pathKey, StringComparison.OrdinalIgnoreCase);
-                })
-                .ToList();
-
-            if (!tabs.Any(tab => tab.Id == sourceTab.Id))
-            {
-                tabs.Add(sourceTab);
-            }
-
-            return tabs;
-        }
-
-        private static string? NormalizeTabPath(string? filePath)
-        {
-            if (string.IsNullOrWhiteSpace(filePath)) return null;
-
-            try
-            {
-                return Path.GetFullPath(filePath);
-            }
-            catch
-            {
-                return filePath;
-            }
-        }
-
-        private bool IsAnySameFileTabDirty(OpenedTab sourceTab)
-        {
-            return GetTabsForSameFile(sourceTab).Any(tab => tab.IsDirty);
-        }
-
-        private void SetDirtyStateForFileGroup(OpenedTab sourceTab, bool isDirty)
-        {
-            bool changed = false;
-            string? savedContent = null;
-            if (!isDirty)
-            {
-                if (_editorSessions.TryGetValue(sourceTab.Id, out var session))
-                {
-                    savedContent = session.GetText();
-                }
-                else
-                {
-                    savedContent = sourceTab.Content;
-                }
-            }
-
-            foreach (var tab in GetTabsForSameFile(sourceTab))
-            {
-                if (savedContent != null)
-                {
-                    tab.OriginalContent = savedContent;
-                    bool hasSession = _editorSessions.TryGetValue(tab.Id, out var session);
-                    tab.OriginalLineEnding = hasSession ? session!.Model.LineEnding : LineArrayTextModel.FromText(savedContent).LineEnding;
-                    tab.OriginalEncodingName = tab.EncodingName;
-
-                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-                    {
-                        if (hasSession)
-                        {
-                            var lines = session!.GetLines(1, session.Model.LineCount);
-                            _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
-                        }
-                        else
-                        {
-                            var lines = savedContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-                            _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
-                        }
-                    }
-                }
-
-                if (tab.IsDirty != isDirty)
-                {
-                    tab.IsDirty = isDirty;
-                    changed = true;
-                }
-            }
-
-            if (changed)
-            {
-                UpdateWindowTitle();
-            }
-        }
-
-        private void PropagateDirtyStateToOtherTabs(OpenedTab sourceTab)
-        {
-            CheckAndUpdateDirtyState(sourceTab);
-        }
-
-        private void CleanDirtyStateOnOtherTabs(OpenedTab sourceTab)
-        {
-            SetDirtyStateForFileGroup(sourceTab, false);
         }
 
         private void SchedulePreview(OpenedTab tab)
@@ -1976,7 +1757,7 @@ namespace TxtAIEditor
                        ?? EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
             if (tabItem != null)
             {
-                MarkTabDirty(tab, tabItem);
+                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
             }
             else
             {
@@ -2255,8 +2036,8 @@ namespace TxtAIEditor
             var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
             if (tab != null)
             {
-                MarkTabDirty(tab, activeTabItem);
-                PropagateDirtyStateToOtherTabs(tab);
+                _tabDirtyStateController.MarkTabDirty(tab, activeTabItem);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
             }
 
             return true;
@@ -2381,7 +2162,7 @@ namespace TxtAIEditor
                                ?? EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
                     if (tabItem != null)
                     {
-                        CleanDirtyStateOnOtherTabs(tab);
+                        _tabDirtyStateController.CleanDirtyStateOnOtherTabs(tab);
                     }
 
                     if (tab == GetActiveTab())
