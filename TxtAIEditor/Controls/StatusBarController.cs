@@ -91,6 +91,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (tab.IsImageViewer)
+            {
+                _statusBar.TotalLinesText.Text = _getString("StatusImageViewer", "이미지");
+                return;
+            }
+
             int totalLines = _sessionProvider(tab.Id)?.Model.LineCount ?? 1;
             string format = _getString("StatusTotalLinesFormat", "전체 줄수: {0}");
             _statusBar.TotalLinesText.Text = string.Format(format, totalLines);
@@ -120,6 +126,11 @@ namespace TxtAIEditor.Controls
 
         public void SyncEncodingCombo(OpenedTab tab)
         {
+            if (tab.IsImageViewer)
+            {
+                return;
+            }
+
             try
             {
                 _isSyncingEncodingCombo = true;
@@ -142,6 +153,12 @@ namespace TxtAIEditor.Controls
 
         public void SyncLineEndingText(OpenedTab tab)
         {
+            if (tab.IsImageViewer)
+            {
+                _statusBar.LineEndingText.Text = "";
+                return;
+            }
+
             string lineEnding = _sessionProvider(tab.Id)?.Model.LineEnding == "\r\n" ? "CRLF" : "LF";
             _statusBar.LineEndingText.Text = lineEnding;
         }
@@ -161,6 +178,12 @@ namespace TxtAIEditor.Controls
             var tab = _activeTabProvider();
             if (tab == null)
             {
+                return;
+            }
+
+            if (tab.IsImageViewer)
+            {
+                SyncEncodingCombo(tab);
                 return;
             }
 
@@ -292,6 +315,11 @@ namespace TxtAIEditor.Controls
         {
             var tab = _activeTabProvider();
             if (tab == null)
+            {
+                return;
+            }
+
+            if (tab.IsImageViewer)
             {
                 return;
             }

@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Media.Imaging;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Editor;
@@ -70,6 +71,48 @@ namespace TxtAIEditor.Controls
 
             var bridge = new MonacoBridge(editorWebView, _localizationService);
             return new EditorTabViewItemParts(tabItem, editorWebView, editorLoadCover, bridge);
+        }
+
+        public TabViewItem CreateImageViewer(
+            OpenedTab tab,
+            Windows.UI.Color editorBackgroundColor,
+            string? uiFontFamily,
+            string encryptedTooltip,
+            Action<OpenedTab, FrameworkElement, RightTappedRoutedEventArgs> showEncryptionMenu,
+            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu)
+        {
+            var image = new Image
+            {
+                Source = new BitmapImage(new Uri(tab.FilePath!, UriKind.Absolute)),
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+
+            var imageHost = new Grid
+            {
+                Background = new SolidColorBrush(editorBackgroundColor)
+            };
+            imageHost.Children.Add(image);
+
+            var tabHeader = new TabHeaderControl();
+            tabHeader.Configure(tab, encryptedTooltip);
+            tabHeader.EncryptionMenuRequested += (_, args) =>
+                showEncryptionMenu(args.Tab, args.Target, args.RoutedArgs);
+
+            var tabItem = new TabViewItem
+            {
+                Content = imageHost,
+                Tag = tab.Id,
+                Header = tabHeader,
+                ContentTransitions = new TransitionCollection(),
+                Transitions = new TransitionCollection(),
+                Opacity = 1
+            };
+            tabItem.RightTapped += (_, args) => showTabContextMenu(tabItem, args);
+            ApplyUiFont(tabItem, uiFontFamily);
+
+            return tabItem;
         }
 
         private static void ApplyUiFont(TabViewItem tabItem, string? uiFontFamily)

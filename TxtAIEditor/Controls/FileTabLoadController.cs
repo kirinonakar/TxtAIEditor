@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Func<string, string, Task<string?>> _promptPasswordAsync;
         private readonly Func<FileTabOpenRequest, OpenedTab> _openNewTab;
+        private readonly Func<string, OpenedTab> _openImageTab;
         private readonly Action _queueGitStatusRefresh;
         private readonly Action<string, string> _showErrorMessage;
         private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
@@ -41,6 +42,7 @@ namespace TxtAIEditor.Controls
             Func<string, string, string> getString,
             Func<string, string, Task<string?>> promptPasswordAsync,
             Func<FileTabOpenRequest, OpenedTab> openNewTab,
+            Func<string, OpenedTab> openImageTab,
             Action queueGitStatusRefresh,
             Action<string, string> showErrorMessage)
         {
@@ -54,6 +56,7 @@ namespace TxtAIEditor.Controls
             _getString = getString;
             _promptPasswordAsync = promptPasswordAsync;
             _openNewTab = openNewTab;
+            _openImageTab = openImageTab;
             _queueGitStatusRefresh = queueGitStatusRefresh;
             _showErrorMessage = showErrorMessage;
         }
@@ -71,6 +74,13 @@ namespace TxtAIEditor.Controls
 
                 if (FocusExistingTab(filePath))
                 {
+                    QueueGitRefreshIfNeeded(repoRoot);
+                    return;
+                }
+
+                if (IsSupportedImageFile(filePath))
+                {
+                    _openImageTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return;
                 }
@@ -152,7 +162,7 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (tabItem != null && _tabBridges.TryGetValue(existingTab.Id, out var bridgeGroup))
+            if (tabItem != null && _tabBridges.TryGetValue(existingTab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
             {
                 bridgeGroup.WebView.Focus(FocusState.Programmatic);
                 _ = bridgeGroup.Bridge.FocusAsync();
@@ -166,6 +176,17 @@ namespace TxtAIEditor.Controls
             return tabView.TabItems
                 .Cast<TabViewItem>()
                 .FirstOrDefault(t => string.Equals(t.Tag as string, tabId, StringComparison.Ordinal));
+        }
+
+        private static bool IsSupportedImageFile(string filePath)
+        {
+            string extension = Path.GetExtension(filePath);
+            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
         }
 
         private void QueueGitRefreshIfNeeded(string? repoRoot)

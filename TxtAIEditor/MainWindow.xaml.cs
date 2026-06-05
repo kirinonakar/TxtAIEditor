@@ -337,6 +337,7 @@ namespace TxtAIEditor
                     request.TextModel,
                     request.IsEncrypted,
                     request.EncryptionPassword),
+                OpenImageTab,
                 QueueGitStatusRefresh,
                 _dialogController.ShowErrorMessage);
             _explorerNavigationController = new ExplorerNavigationController(
@@ -862,6 +863,54 @@ namespace TxtAIEditor
             {
                 InitializeEditorWebView(tabParts.WebView, tabParts.Bridge);
             }
+
+            return tab;
+        }
+
+        private OpenedTab OpenImageTab(string filePath)
+        {
+            var tab = new OpenedTab
+            {
+                FilePath = filePath,
+                Title = Path.GetFileName(filePath),
+                Content = string.Empty,
+                Language = "image",
+                EncodingName = string.Empty,
+                EncodingWasAutoDetected = false,
+                IsImageViewer = true
+            };
+
+            _viewModel.Tabs.Add(tab);
+            if (File.Exists(tab.FilePath))
+            {
+                _favoritesRecentController.AddRecentFile(tab.FilePath);
+            }
+
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+            _settingsController.ApplyEditorSurfaceBackground(settings);
+
+            var targetTabView = GetCurrentActiveTabView();
+            var tabItem = _editorTabViewItemFactory.CreateImageViewer(
+                tab,
+                editorBgColor,
+                settings.UiFontFamily,
+                GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                _tabEncryptionController.ShowMenu,
+                (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args));
+
+            EditorWorkspace.DisableTabItemTransitions();
+            targetTabView.TabItems.Add(tabItem);
+            targetTabView.SelectedItem = tabItem;
+            EditorWorkspace.SetEditorSurfaceBackground(editorBgColor);
+
+            _statusBarController.UpdateFileStats(tab);
+            _statusBarController.UpdateTotalLines(tab);
+            _statusBarController.UpdateSelectionStats(null);
+            _statusBarController.SyncEncodingCombo(tab);
+            _statusBarController.SyncLineEndingText(tab);
+            UpdateLanguageUI(tab);
+            UpdateWindowTitle();
 
             return tab;
         }
@@ -1638,6 +1687,16 @@ namespace TxtAIEditor
 
         private async Task ReloadTabWithEncodingAsync(OpenedTab tab, string encodingName)
         {
+            if (tab.IsImageViewer)
+            {
+                _statusBarController.UpdateFileStats(tab);
+                _statusBarController.UpdateTotalLines(tab);
+                _statusBarController.SyncLineEndingText(tab);
+                UpdateLanguageUI(tab);
+                UpdateWindowTitle();
+                return;
+            }
+
             await _tabReloadController.ReloadWithEncodingAsync(tab, encodingName);
         }
 
@@ -2124,6 +2183,15 @@ namespace TxtAIEditor
         private void UpdateLanguageUI(OpenedTab tab)
         {
             if (tab == null) return;
+            if (tab.IsImageViewer)
+            {
+                if (StatusLanguage != null)
+                {
+                    StatusLanguage.Text = "IMAGE";
+                }
+                return;
+            }
+
             string detected = tab.Language;
             if (detected == "plaintext" || string.IsNullOrEmpty(detected))
             {

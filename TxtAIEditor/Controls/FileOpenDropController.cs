@@ -57,7 +57,13 @@ namespace TxtAIEditor.Controls
             ".toml",
             ".ini",
             ".diff",
-            ".reg"
+            ".reg",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".bmp",
+            ".webp"
         };
 
         public FileOpenDropController(

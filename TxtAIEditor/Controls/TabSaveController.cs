@@ -81,6 +81,11 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
+            if (tab.IsImageViewer)
+            {
+                return false;
+            }
+
             if (string.IsNullOrEmpty(tab.FilePath) && !TryChooseSavePath(tab, GetSaveInitialDirectory()))
             {
                 return false;
@@ -104,6 +109,11 @@ namespace TxtAIEditor.Controls
         public async Task<bool> SaveAsAsync(OpenedTab tab)
         {
             if (!_isTabOpen(tab))
+            {
+                return false;
+            }
+
+            if (tab.IsImageViewer)
             {
                 return false;
             }

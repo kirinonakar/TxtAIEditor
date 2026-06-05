@@ -82,34 +82,37 @@ namespace TxtAIEditor.Controls
             reloadItem.Click += async (_, __) => await _reloadTabAsync(tab, tabItem);
             menu.Items.Add(reloadItem);
 
-            menu.Items.Add(new MenuFlyoutSeparator());
-
-            if (tab.IsEncrypted)
+            if (!tab.IsImageViewer)
             {
-                var changePasswordItem = new MenuFlyoutItem { Text = _getString("TabMenuChangeEncryptionPassword", "암호 변경") };
-                changePasswordItem.Click += async (_, __) => await _changeEncryptionPasswordAsync(tab);
-                menu.Items.Add(changePasswordItem);
+                menu.Items.Add(new MenuFlyoutSeparator());
 
-                var removeEncryptionItem = new MenuFlyoutItem { Text = _getString("TabMenuRemoveEncryption", "암호 해제") };
-                removeEncryptionItem.Click += async (_, __) => await _removeEncryptionAsync(tab);
-                menu.Items.Add(removeEncryptionItem);
+                if (tab.IsEncrypted)
+                {
+                    var changePasswordItem = new MenuFlyoutItem { Text = _getString("TabMenuChangeEncryptionPassword", "암호 변경") };
+                    changePasswordItem.Click += async (_, __) => await _changeEncryptionPasswordAsync(tab);
+                    menu.Items.Add(changePasswordItem);
+
+                    var removeEncryptionItem = new MenuFlyoutItem { Text = _getString("TabMenuRemoveEncryption", "암호 해제") };
+                    removeEncryptionItem.Click += async (_, __) => await _removeEncryptionAsync(tab);
+                    menu.Items.Add(removeEncryptionItem);
+                }
+                else
+                {
+                    var encryptItem = new MenuFlyoutItem { Text = _getString("TabMenuEncrypt", "암호화") };
+                    encryptItem.Click += async (_, __) => await _encryptTabAsync(tab);
+                    menu.Items.Add(encryptItem);
+                }
+
+                menu.Items.Add(new MenuFlyoutSeparator());
+
+                var livePreviewItem = new ToggleMenuFlyoutItem
+                {
+                    Text = _getString("TabMenuLivePreview", "라이브 프리뷰"),
+                    IsChecked = tab.InlineLivePreviewEnabled
+                };
+                livePreviewItem.Click += (_, __) => _toggleLivePreview(tab, tabItem, livePreviewItem.IsChecked);
+                menu.Items.Add(livePreviewItem);
             }
-            else
-            {
-                var encryptItem = new MenuFlyoutItem { Text = _getString("TabMenuEncrypt", "암호화") };
-                encryptItem.Click += async (_, __) => await _encryptTabAsync(tab);
-                menu.Items.Add(encryptItem);
-            }
-
-            menu.Items.Add(new MenuFlyoutSeparator());
-
-            var livePreviewItem = new ToggleMenuFlyoutItem
-            {
-                Text = _getString("TabMenuLivePreview", "라이브 프리뷰"),
-                IsChecked = tab.InlineLivePreviewEnabled
-            };
-            livePreviewItem.Click += (_, __) => _toggleLivePreview(tab, tabItem, livePreviewItem.IsChecked);
-            menu.Items.Add(livePreviewItem);
 
             menu.Items.Add(new MenuFlyoutSeparator());
 
