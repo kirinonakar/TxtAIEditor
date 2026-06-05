@@ -49,6 +49,7 @@ namespace TxtAIEditor.Controls
         private CancellationTokenSource? _runCancellation;
         private readonly StringBuilder _sessionHistory = new();
         private TaskCompletionSource<bool>? _diffApprovalTcs;
+        private string? _currentRunLastFilePath;
 
         private sealed class SelectionSnapshot
         {
@@ -275,6 +276,7 @@ namespace TxtAIEditor.Controls
             }
  
             _isRunning = true;
+            _currentRunLastFilePath = null;
             var cancellationSource = new CancellationTokenSource();
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
@@ -570,7 +572,7 @@ namespace TxtAIEditor.Controls
                     {
                         try
                         {
-                            string editedPath = GetPathArgument(arguments);
+                            string editedPath = GetEditPathArgument(arguments);
                             string resolvedEdited = Path.IsPathRooted(editedPath)
                                 ? editedPath
                                 : Path.Combine(_fileTools.WorkspaceRoot, editedPath);
@@ -992,7 +994,7 @@ namespace TxtAIEditor.Controls
                 {
                     try
                     {
-                        string editedPath = GetPathArgument(arguments);
+                        string editedPath = GetEditPathArgument(arguments);
                         string activePath = _activeTabProvider()?.FilePath ?? string.Empty;
                         if (!string.IsNullOrEmpty(editedPath) && !string.IsNullOrEmpty(activePath))
                         {
@@ -1014,10 +1016,10 @@ namespace TxtAIEditor.Controls
                 string result;
                 if (normalizedToolName == "replace_in_file")
                 {
-                    string path = GetPathArgument(arguments);
+                    string path = GetEditPathArgument(arguments);
                     if (string.IsNullOrWhiteSpace(path))
                     {
-                        return "replace_in_file failed: path is empty. Provide the exact file path from the user task; do not use the active tab title as a fallback.";
+                        return "replace_in_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
                     }
 
                     string oldText = GetFirstStringArgument(arguments, "oldText", "old_text", "find", "search", "target", "before");
@@ -1068,6 +1070,7 @@ namespace TxtAIEditor.Controls
                     };
                 }
                 cancellationToken.ThrowIfCancellationRequested();
+                TrackSuccessfulFileToolPath(normalizedToolName, arguments, result);
                 AppendActivity(string.Format(
                     _getString("AgentActivityToolDoneFormat", "도구 완료: {0}"),
                     normalizedToolName));
@@ -1128,18 +1131,18 @@ namespace TxtAIEditor.Controls
                     GetStringArgument(arguments, "path")),
                 "replace_in_file" => string.Format(
                     _getString("AgentActivityReplaceFileFormat", "파일 수정 중: {0}"),
-                    GetStringArgument(arguments, "path")),
+                    GetEditPathArgument(arguments)),
                 "replace_range" => string.Format(
                     _getString("AgentActivityReplaceRangeFormat", "파일 범위 수정 중: {0} ({1}줄부터 {2}줄)"),
-                    GetStringArgument(arguments, "path"),
+                    GetEditPathArgument(arguments),
                     GetIntArgument(arguments, "startLine", 1),
                     GetIntArgument(arguments, "endLine", 1)),
                 "apply_patch" => string.Format(
                     _getString("AgentActivityApplyPatchFormat", "파일 패치 적용 중: {0}"),
-                    GetStringArgument(arguments, "path")),
+                    GetEditPathArgument(arguments)),
                 "overwrite_file" => string.Format(
                     _getString("AgentActivityOverwriteFileFormat", "파일 덮어쓰는 중: {0}"),
-                    GetStringArgument(arguments, "path")),
+                    GetEditPathArgument(arguments)),
                 "insert_text" => _getString("AgentActivityInsertText", "현재 편집기에 입력 중"),
                 "web_search_exa" => string.Format(
                     _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
@@ -1616,6 +1619,57 @@ namespace TxtAIEditor.Controls
             return string.Empty;
         }
 
+        private string GetEditPathArgument(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                return path;
+            }
+
+            return InferEditPathFromContext();
+        }
+
+        private string InferEditPathFromContext()
+        {
+            if (!string.IsNullOrWhiteSpace(_lastSelectionSourcePath) &&
+                !string.IsNullOrEmpty(GetActiveSelectionText()))
+            {
+                return _lastSelectionSourcePath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_currentRunLastFilePath))
+            {
+                return _currentRunLastFilePath;
+            }
+
+            string activePath = _activeTabProvider()?.FilePath ?? string.Empty;
+            return string.IsNullOrWhiteSpace(activePath) ? string.Empty : activePath;
+        }
+
+        private void TrackSuccessfulFileToolPath(string normalizedToolName, JsonElement arguments, string result)
+        {
+            if (result.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+                result.Contains("cancelled", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (normalizedToolName is not ("read_file" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file"))
+            {
+                return;
+            }
+
+            string path = normalizedToolName == "read_file"
+                ? GetPathArgument(arguments)
+                : GetEditPathArgument(arguments);
+
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                _currentRunLastFilePath = path;
+            }
+        }
+
         private static string GetFirstStringArgument(JsonElement arguments, params string[] names)
         {
             foreach (string name in names)
@@ -1693,10 +1747,10 @@ namespace TxtAIEditor.Controls
 
         private async Task<string> OverwriteFileToolAsync(JsonElement arguments)
         {
-            string path = GetPathArgument(arguments);
+            string path = GetEditPathArgument(arguments);
             if (string.IsNullOrWhiteSpace(path))
             {
-                return "overwrite_file failed: path is empty. Provide the exact output file path requested by the user; do not use the active tab title as a fallback.";
+                return "overwrite_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
             }
 
             return await _fileTools.OverwriteFileAsync(
@@ -1706,10 +1760,10 @@ namespace TxtAIEditor.Controls
 
         private async Task<string> ReplaceRangeToolAsync(JsonElement arguments)
         {
-            string path = GetPathArgument(arguments);
+            string path = GetEditPathArgument(arguments);
             if (string.IsNullOrWhiteSpace(path))
             {
-                return "replace_range failed: path is empty. Provide the exact file path from the user task; do not use the active tab title as a fallback.";
+                return "replace_range failed: path is empty and no selected, recently read, or active file path could be inferred.";
             }
 
             return await _fileTools.ReplaceRangeAsync(
@@ -1722,10 +1776,10 @@ namespace TxtAIEditor.Controls
 
         private async Task<string> ApplyPatchToolAsync(JsonElement arguments)
         {
-            string path = GetPathArgument(arguments);
+            string path = GetEditPathArgument(arguments);
             if (string.IsNullOrWhiteSpace(path))
             {
-                return "apply_patch failed: path is empty. Provide the exact file path from the user task; do not use the active tab title as a fallback.";
+                return "apply_patch failed: path is empty and no selected, recently read, or active file path could be inferred.";
             }
 
             return await _fileTools.ApplyPatchAsync(

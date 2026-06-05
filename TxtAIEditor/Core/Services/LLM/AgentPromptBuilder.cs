@@ -74,6 +74,8 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- If the user says 자산.csv, use exactly 자산.csv, not assets.csv. If the user says 분석2.md, create or write exactly 분석2.md.");
             builder.AppendLine("- If a [User-referenced file names] section is present, prefer the listed workspace match for reads and the exact mentioned name for requested new output files.");
             builder.AppendLine("- File-writing tools require an explicit path argument. Do not omit path and rely on the active tab.");
+            builder.AppendLine("- If you read a file with read_file and then edit that same file, copy the exact same path into replace_in_file, replace_range, apply_patch, or overwrite_file.");
+            builder.AppendLine("- If [Active tab] has a Path and you are editing the active file, copy that Path exactly into the file-writing tool path.");
             builder.AppendLine();
             builder.AppendLine("Tool call protocol:");
             builder.AppendLine("- When you need a tool, output exactly one XML tag and nothing else:");
