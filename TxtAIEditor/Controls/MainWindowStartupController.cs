@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -41,6 +42,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<Task> _refreshGitStatusUiAsync;
         private readonly Action _updateAutoSaveStatus;
         private readonly Action<string, string> _showErrorMessage;
+        private bool _initializePreviewAfterStartup;
 
         public MainWindowStartupController(
             Window window,
@@ -117,7 +119,10 @@ namespace TxtAIEditor.Controls
                 }
 
                 _updateAutoSaveStatus();
-                await _livePreviewController.InitializeAsync();
+                if (_initializePreviewAfterStartup)
+                {
+                    QueuePreviewInitialization();
+                }
             }
             catch (Exception ex)
             {
@@ -154,6 +159,7 @@ namespace TxtAIEditor.Controls
             _applyLeftSidebarVisibility(settings.LeftSidebarVisible);
 
             bool rightPanelVisible = settings.RightSidebarVisible && settings.DefaultMarkdownEnabled;
+            _initializePreviewAfterStartup = rightPanelVisible;
             _rightPanelToggle.IsChecked = rightPanelVisible;
             _applyPreviewVisibility(rightPanelVisible);
 
@@ -170,14 +176,14 @@ namespace TxtAIEditor.Controls
         {
             if (startupPaths.Folders.Count > 0)
             {
-                await _navigateExplorerToFolderAsync(startupPaths.Folders[0]);
+                NavigateStartupFolderWithoutBlocking(startupPaths.Folders[0]);
             }
 
             if (startupPaths.Files.Count > 0)
             {
                 if (startupPaths.Folders.Count == 0)
                 {
-                    await NavigateToFirstFileFolderAsync(startupPaths.Files[0]);
+                    NavigateToFirstFileFolder(startupPaths.Files[0]);
                 }
 
                 foreach (string filePath in startupPaths.Files)
@@ -191,7 +197,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task NavigateToFirstFileFolderAsync(string filePath)
+        private void NavigateToFirstFileFolder(string filePath)
         {
             string? folderPath = Path.GetDirectoryName(filePath);
             if (string.IsNullOrEmpty(folderPath))
@@ -203,12 +209,50 @@ namespace TxtAIEditor.Controls
             {
                 if (Directory.Exists(folderPath))
                 {
-                    await _navigateExplorerToFolderAsync(folderPath);
+                    NavigateStartupFolderWithoutBlocking(folderPath);
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to navigate startup folder '{folderPath}': {ex.Message}");
+            }
+        }
+
+        private void NavigateStartupFolderWithoutBlocking(string folderPath)
+        {
+            async Task NavigateAsync()
+            {
+                try
+                {
+                    await _navigateExplorerToFolderAsync(folderPath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Startup folder navigation failed for '{folderPath}': {ex.Message}");
+                }
+            }
+
+            _ = NavigateAsync();
+        }
+
+        private void QueuePreviewInitialization()
+        {
+            async void InitializePreview()
+            {
+                try
+                {
+                    await Task.Delay(150);
+                    await _livePreviewController.InitializeAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Deferred preview initialization failed: {ex.Message}");
+                }
+            }
+
+            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, InitializePreview))
+            {
+                InitializePreview();
             }
         }
 

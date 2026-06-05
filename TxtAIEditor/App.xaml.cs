@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using TxtAIEditor.Core.Services;
 using Windows.ApplicationModel.Activation;
 
@@ -126,12 +127,13 @@ namespace TxtAIEditor
                 return;
             }
 
-            FileAssociationService.RegisterUnpackagedFileAssociations();
             StartIpcWatcher();
 
             _window = new MainWindow();
             _window.Closed += (_, _) => CleanupAppResources();
             _window.Activate();
+
+            _ = Task.Run(FileAssociationService.RegisterUnpackagedFileAssociations);
         }
 
         private void StartExplorerCommandServer()

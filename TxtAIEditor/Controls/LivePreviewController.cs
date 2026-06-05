@@ -38,6 +38,7 @@ namespace TxtAIEditor.Controls
 
         private OpenedTab? _activeTabForPreview;
         private string _mappedPreviewDocumentDirectory = string.Empty;
+        private Task? _initializeTask;
 
         public LivePreviewController(
             RightSidebarPane previewPane,
@@ -83,6 +84,18 @@ namespace TxtAIEditor.Controls
 
         public async Task InitializeAsync()
         {
+            if (_initializeTask != null)
+            {
+                await _initializeTask;
+                return;
+            }
+
+            _initializeTask = InitializeCoreAsync();
+            await _initializeTask;
+        }
+
+        private async Task InitializeCoreAsync()
+        {
             try
             {
                 PreviewWebView.DefaultBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
@@ -115,6 +128,7 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to init preview webview: {ex.Message}");
+                _initializeTask = null;
             }
         }
 

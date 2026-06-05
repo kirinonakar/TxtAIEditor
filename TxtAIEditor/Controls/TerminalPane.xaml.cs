@@ -34,7 +34,6 @@ namespace TxtAIEditor.Controls
             TerminalSessionsList.ItemsSource = _terminalSessions;
             Unloaded += OnUnloaded;
             ActualThemeChanged += OnActualThemeChanged;
-            Loaded += async (_, __) => await EnsureTerminalWebViewAsync();
         }
 
         public event EventHandler? SessionsEmptied;

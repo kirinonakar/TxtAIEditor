@@ -83,6 +83,7 @@ namespace TxtAIEditor
         private readonly WindowCloseController _windowCloseController;
         private readonly MainWindowSettingsController _settingsController;
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
+        private bool _startupInitializationComplete;
         private string _currentFolderPath = string.Empty;
         private string _currentRepoPath = string.Empty;
 
@@ -776,7 +777,14 @@ namespace TxtAIEditor
         private async void OnWindowActivated(object sender, WindowActivatedEventArgs e)
         {
             this.Activated -= OnWindowActivated;
-            await _startupController.InitializeAsync();
+            try
+            {
+                await _startupController.InitializeAsync();
+            }
+            finally
+            {
+                _startupInitializationComplete = true;
+            }
         }
 
         #region Tab Operations (탭 비즈니스 로직)
@@ -2255,6 +2263,10 @@ namespace TxtAIEditor
         private void ApplyPreviewVisibility(bool show)
         {
             _shellPaneController.ApplyPreviewVisibility(show);
+            if (show && _startupInitializationComplete)
+            {
+                _ = _livePreviewController.InitializeAsync();
+            }
         }
 
         private async void OnCompareFilesClick(object sender, RoutedEventArgs e)
