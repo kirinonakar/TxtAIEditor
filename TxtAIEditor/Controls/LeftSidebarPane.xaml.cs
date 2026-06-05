@@ -183,7 +183,9 @@ namespace TxtAIEditor.Controls
             SnippetDeleteTooltip = getString("SnippetDeleteTooltip", "삭제");
 
             ToolTipService.SetToolTip(ExplorerUpButton, getString("ExplorerUpTooltip", "상위 폴더"));
-            ExplorerSelectFolderButton.Content = getString("ExplorerSelectFolder", "폴더 선택...");
+            var selectFolderText = getString("ExplorerSelectFolder", "폴더 선택...");
+            ToolTipService.SetToolTip(ExplorerSelectFolderButton, selectFolderText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerSelectFolderButton, selectFolderText);
             ToolTipService.SetToolTip(ExplorerCreateFolderButton, getString("ExplorerCreateFolderTooltip", "새 폴더"));
             ToolTipService.SetToolTip(ExplorerRefreshButton, getString("ExplorerRefreshTooltip", "새로고침"));
 
