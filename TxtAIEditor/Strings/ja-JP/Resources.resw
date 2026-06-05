@@ -1661,6 +1661,9 @@
   <data name="AgentActivityFileReverted" xml:space="preserve">
     <value>ファイルの変更を元に戻しました: {0}</value>
   </data>
+  <data name="AgentSelectionEditVerified" xml:space="preserve">
+    <value>いま適用した選択範囲の変更を確認しました。作業を終了します。</value>
+  </data>
   <data name="AgentRevertErrorTitle" xml:space="preserve">
     <value>元に戻すエラー</value>
   </data>

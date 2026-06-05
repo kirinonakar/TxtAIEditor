@@ -1660,6 +1660,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityFileReverted" xml:space="preserve">
     <value>Reverted file changes: {0}</value>
   </data>
+  <data name="AgentSelectionEditVerified" xml:space="preserve">
+    <value>Confirmed the selected range change that was just applied. Finishing the task.</value>
+  </data>
   <data name="AgentRevertErrorTitle" xml:space="preserve">
     <value>Revert Error</value>
   </data>

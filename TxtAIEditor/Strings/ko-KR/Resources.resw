@@ -1660,6 +1660,9 @@
   <data name="AgentActivityFileReverted" xml:space="preserve">
     <value>파일 변경 취소 완료: {0}</value>
   </data>
+  <data name="AgentSelectionEditVerified" xml:space="preserve">
+    <value>방금 적용한 선택 영역 변경을 확인했습니다. 작업을 마칩니다.</value>
+  </data>
   <data name="AgentRevertErrorTitle" xml:space="preserve">
     <value>변경 취소 오류</value>
   </data>

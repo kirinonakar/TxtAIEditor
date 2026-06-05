@@ -50,6 +50,20 @@ namespace TxtAIEditor.Controls
         private readonly StringBuilder _sessionHistory = new();
         private TaskCompletionSource<bool>? _diffApprovalTcs;
 
+        private sealed class SelectionSnapshot
+        {
+            public string Text { get; init; } = string.Empty;
+            public string? SourcePath { get; init; }
+            public int StartLine { get; init; }
+            public int EndLine { get; init; }
+
+            public bool HasLineRange =>
+                !string.IsNullOrEmpty(Text) &&
+                !string.IsNullOrEmpty(SourcePath) &&
+                StartLine > 0 &&
+                EndLine > 0;
+        }
+
         public AgentController(
             ILLMService llmService,
             ISettingsService settingsService,
@@ -197,6 +211,23 @@ namespace TxtAIEditor.Controls
             builder.AppendLine("[Selection text]");
             builder.Append(selectedText);
             return builder.ToString();
+        }
+
+        private SelectionSnapshot CaptureActiveSelectionSnapshot()
+        {
+            string selectedText = GetActiveSelectionText();
+            if (string.IsNullOrEmpty(selectedText))
+            {
+                return new SelectionSnapshot();
+            }
+
+            return new SelectionSnapshot
+            {
+                Text = selectedText,
+                SourcePath = _lastSelectionSourcePath,
+                StartLine = _lastSelectionStartLine,
+                EndLine = _lastSelectionEndLine
+            };
         }
 
         private void WireEvents()
@@ -480,6 +511,7 @@ namespace TxtAIEditor.Controls
                         break;
                     }
 
+                    SelectionSnapshot selectionBeforeTool = CaptureActiveSelectionSnapshot();
                     string toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                     transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResult}";
@@ -534,8 +566,7 @@ namespace TxtAIEditor.Controls
                         or "apply_patch" or "overwrite_file";
                     if (isFileEditTool
                         && !toolResult.Contains("failed") && !toolResult.Contains("cancelled")
-                        && _lastSelectionStartLine > 0 && _lastSelectionEndLine > 0
-                        && !string.IsNullOrEmpty(_lastSelectionSourcePath))
+                        && selectionBeforeTool.HasLineRange)
                     {
                         try
                         {
@@ -543,9 +574,9 @@ namespace TxtAIEditor.Controls
                             string resolvedEdited = Path.IsPathRooted(editedPath)
                                 ? editedPath
                                 : Path.Combine(_fileTools.WorkspaceRoot, editedPath);
-                            string resolvedSelection = Path.IsPathRooted(_lastSelectionSourcePath)
-                                ? _lastSelectionSourcePath
-                                : Path.Combine(_fileTools.WorkspaceRoot, _lastSelectionSourcePath);
+                            string resolvedSelection = Path.IsPathRooted(selectionBeforeTool.SourcePath!)
+                                ? selectionBeforeTool.SourcePath!
+                                : Path.Combine(_fileTools.WorkspaceRoot, selectionBeforeTool.SourcePath!);
 
                             if (string.Equals(
                                 Path.GetFullPath(resolvedEdited),
@@ -554,16 +585,16 @@ namespace TxtAIEditor.Controls
                             {
                                 string verifyContent = await ReadRawLineRangeAsync(
                                     resolvedSelection,
-                                    _lastSelectionStartLine,
-                                    _lastSelectionEndLine);
+                                    selectionBeforeTool.StartLine,
+                                    selectionBeforeTool.EndLine);
 
-                                if (SelectionLineRangeChanged(verifyContent, _lastSelectionText))
+                                if (SelectionLineRangeChanged(verifyContent, selectionBeforeTool.Text))
                                 {
                                     string verifyMsg = _getString(
                                         "AgentSelectionEditVerified",
-                                        "선택 영역 수정이 확인되었습니다. 작업을 완료합니다.");
+                                        "방금 적용한 선택 영역 변경을 확인했습니다. 작업을 마칩니다.");
 
-                                    transcript += $"\n\n[Selection edit verification: lines {_lastSelectionStartLine}-{_lastSelectionEndLine} changed successfully. Task complete.]";
+                                    transcript += $"\n\n[Selection edit verification: lines {selectionBeforeTool.StartLine}-{selectionBeforeTool.EndLine} changed successfully. Task complete.]";
 
                                     await RunOnUIThreadAsync(() =>
                                     {
