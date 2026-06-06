@@ -15,10 +15,19 @@ namespace TxtAIEditor.Core.Services
 
         public SnippetService()
         {
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string folderPath = Path.Combine(appData, "TxtAIEditor");
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string folderPath = Path.Combine(userProfile, ".TxtAIEditor");
             Directory.CreateDirectory(folderPath);
             _filePath = Path.Combine(folderPath, "snippets.json");
+
+            // Migrate from old location (%LOCALAPPDATA%\TxtAIEditor\snippets.json) if needed
+            string oldAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string oldFilePath = Path.Combine(oldAppData, "TxtAIEditor", "snippets.json");
+            if (File.Exists(oldFilePath) && !File.Exists(_filePath))
+            {
+                try { File.Move(oldFilePath, _filePath); }
+                catch { /* ignore migration errors */ }
+            }
         }
 
         public async Task LoadSnippetsAsync()
