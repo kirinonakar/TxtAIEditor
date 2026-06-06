@@ -312,9 +312,16 @@ namespace TxtAIEditor.Controls
         {
             _searchResultsList.DispatcherQueue.TryEnqueue(() =>
             {
-                foreach (var item in results)
+                if (_viewModel.SearchResults is BulkObservableCollection<SearchResultItem> bulk)
                 {
-                    _viewModel.SearchResults.Add(item);
+                    bulk.AddRange(results);
+                }
+                else
+                {
+                    foreach (var item in results)
+                    {
+                        _viewModel.SearchResults.Add(item);
+                    }
                 }
             });
         }

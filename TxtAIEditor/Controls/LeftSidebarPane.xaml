@@ -7,6 +7,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="using:TxtAIEditor.Controls"
+    xmlns:models="using:TxtAIEditor.Core.Models"
     mc:Ignorable="d">
 
     <UserControl.Resources>
@@ -299,18 +300,18 @@
     
                                 <ListView x:Name="SearchResultsList" Grid.Row="1" SelectionMode="Single" DoubleTapped="OnSearchResultDoubleTapped">
                                     <ListView.ItemTemplate>
-                                        <DataTemplate>
+                                        <DataTemplate x:DataType="models:SearchResultItem">
                                             <Grid Padding="0,5,0,5">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding HeaderText}" FontWeight="Bold" FontSize="11" Foreground="{ThemeResource SystemControlForegroundAccentBrush}"/>
-                                                    <TextBlock Text="{Binding LineContent}" FontSize="12" TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding DisplayPath}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{x:Bind HeaderText}" FontWeight="Bold" FontSize="11" Foreground="{ThemeResource SystemControlForegroundAccentBrush}"/>
+                                                    <TextBlock Text="{x:Bind LineContent}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{x:Bind DisplayPath}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
-                                                <Button Grid.Column="1" Content="&#xE194;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnReplaceOneClick" Tag="{Binding}" Padding="4" Margin="5,0,0,0" VerticalAlignment="Center" ToolTipService.ToolTip="{Binding Path=ReplaceOneTooltip, Source={StaticResource LocBridge}}" FontSize="11"/>
+                                                <Button Grid.Column="1" Content="&#xE194;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnReplaceOneClick" Tag="{x:Bind}" Padding="4" Margin="5,0,0,0" VerticalAlignment="Center" ToolTipService.ToolTip="{Binding Path=ReplaceOneTooltip, Source={StaticResource LocBridge}}" FontSize="11"/>
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>

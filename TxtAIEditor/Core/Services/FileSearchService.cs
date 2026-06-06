@@ -170,47 +170,158 @@ namespace TxtAIEditor.Core.Services
 
         private static IEnumerable<string> EnumerateSearchFiles(string searchRoot)
         {
-            var options = new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                IgnoreInaccessible = true,
-                ReturnSpecialDirectories = false
-            };
+            var gitIgnoreStack = new List<GitIgnoreFile>();
 
-            IEnumerable<string> files;
             try
             {
-                files = Directory.EnumerateFiles(searchRoot, "*", options);
+                var dirs = new List<string>();
+                var parent = Directory.GetParent(searchRoot);
+                while (parent != null)
+                {
+                    dirs.Add(parent.FullName);
+                    parent = parent.Parent;
+                }
+                dirs.Reverse();
+
+                foreach (var dir in dirs)
+                {
+                    string path = Path.Combine(dir, ".gitignore");
+                    if (File.Exists(path))
+                    {
+                        try
+                        {
+                            gitIgnoreStack.Add(new GitIgnoreFile(path));
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Failed to load parent gitignore at {path}: {ex.Message}");
+                        }
+                    }
+                }
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException || ex is DirectoryNotFoundException)
+            catch (Exception ex)
             {
-                Debug.WriteLine($"Search root unavailable: {ex.Message}");
+                Debug.WriteLine($"Error resolving parent gitignores: {ex.Message}");
+            }
+
+            return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack);
+        }
+
+        private static bool ShouldSkipDirectoryName(string dirName)
+        {
+            string[] skippedNames = { ".git", ".vs", "bin", "obj", "node_modules", "packages", ".venv" };
+            return skippedNames.Any(name => dirName.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsPathIgnored(string absolutePath, List<GitIgnoreFile> gitIgnoreStack, bool isDir)
+        {
+            bool ignored = false;
+            foreach (var gitIgnoreFile in gitIgnoreStack)
+            {
+                if (!absolutePath.StartsWith(gitIgnoreFile.BaseDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string relPath = Path.GetRelativePath(gitIgnoreFile.BaseDir, absolutePath).Replace('\\', '/');
+
+                foreach (var rule in gitIgnoreFile.Rules)
+                {
+                    if (rule.TargetDirOnly && !isDir)
+                    {
+                        continue;
+                    }
+
+                    if (rule.Regex.IsMatch(relPath))
+                    {
+                        ignored = !rule.IsNegated;
+                    }
+                }
+            }
+            return ignored;
+        }
+
+        private static IEnumerable<string> EnumerateDirectoryRecursive(
+            string currentDir,
+            string searchRoot,
+            List<GitIgnoreFile> gitIgnoreStack)
+        {
+            string dirName = Path.GetFileName(currentDir);
+            if (string.IsNullOrEmpty(dirName))
+            {
+                dirName = currentDir;
+            }
+            if (ShouldSkipDirectoryName(dirName))
+            {
                 yield break;
+            }
+
+            if (currentDir != searchRoot)
+            {
+                if (IsPathIgnored(currentDir, gitIgnoreStack, isDir: true))
+                {
+                    yield break;
+                }
+            }
+
+            string gitignorePath = Path.Combine(currentDir, ".gitignore");
+            bool pushed = false;
+            if (File.Exists(gitignorePath))
+            {
+                try
+                {
+                    var localRules = new GitIgnoreFile(gitignorePath);
+                    gitIgnoreStack.Add(localRules);
+                    pushed = true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to load gitignore at {gitignorePath}: {ex.Message}");
+                }
+            }
+
+            string[] files = Array.Empty<string>();
+            try
+            {
+                files = Directory.GetFiles(currentDir);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException)
+            {
+                Debug.WriteLine($"Failed to list files in {currentDir}: {ex.Message}");
             }
 
             foreach (var file in files)
             {
-                if (!ShouldSkipSearchPath(file))
+                if (IsPathIgnored(file, gitIgnoreStack, isDir: false))
                 {
-                    yield return file;
+                    continue;
+                }
+
+                yield return file;
+            }
+
+            string[] subDirs = Array.Empty<string>();
+            try
+            {
+                subDirs = Directory.GetDirectories(currentDir);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException)
+            {
+                Debug.WriteLine($"Failed to list directories in {currentDir}: {ex.Message}");
+            }
+
+            foreach (var subDir in subDirs)
+            {
+                foreach (var f in EnumerateDirectoryRecursive(subDir, searchRoot, gitIgnoreStack))
+                {
+                    yield return f;
                 }
             }
-        }
 
-        private static bool ShouldSkipSearchPath(string filePath)
-        {
-            string normalized = filePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-            string[] skippedSegments =
+            if (pushed)
             {
-                $"{Path.DirectorySeparatorChar}.git{Path.DirectorySeparatorChar}",
-                $"{Path.DirectorySeparatorChar}.vs{Path.DirectorySeparatorChar}",
-                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
-                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
-                $"{Path.DirectorySeparatorChar}node_modules{Path.DirectorySeparatorChar}",
-                $"{Path.DirectorySeparatorChar}packages{Path.DirectorySeparatorChar}"
-            };
-
-            return skippedSegments.Any(segment => normalized.Contains(segment, StringComparison.OrdinalIgnoreCase));
+                gitIgnoreStack.RemoveAt(gitIgnoreStack.Count - 1);
+            }
         }
 
         private static void FlushSearchResultsIfNeeded(List<SearchResultItem> results, Action<IReadOnlyList<SearchResultItem>> publishResults)
@@ -231,6 +342,130 @@ namespace TxtAIEditor.Core.Services
             var batch = results.ToList();
             results.Clear();
             publishResults(batch);
+        }
+    }
+
+    internal class GitIgnoreRule
+    {
+        public string RawPattern { get; }
+        public bool IsNegated { get; }
+        public bool TargetDirOnly { get; }
+        public bool HasSlash { get; }
+        public Regex Regex { get; }
+
+        public GitIgnoreRule(string pattern, string baseDir)
+        {
+            RawPattern = pattern;
+            if (pattern.StartsWith("!"))
+            {
+                IsNegated = true;
+                pattern = pattern.Substring(1);
+            }
+
+            if (pattern.EndsWith("/"))
+            {
+                TargetDirOnly = true;
+                pattern = pattern.TrimEnd('/');
+            }
+
+            pattern = pattern.Replace('\\', '/');
+            HasSlash = pattern.Contains('/');
+
+            string regexPattern;
+            if (HasSlash)
+            {
+                if (pattern.StartsWith("/"))
+                {
+                    pattern = pattern.Substring(1);
+                }
+                string globRegex = GlobToRegex(pattern);
+                regexPattern = "^" + globRegex + "($|/)";
+            }
+            else
+            {
+                string globRegex = GlobToRegex(pattern);
+                regexPattern = "(^|/)" + globRegex + "($|/)";
+            }
+
+            Regex = new Regex(regexPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        }
+
+        private static string GlobToRegex(string glob)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < glob.Length; i++)
+            {
+                char c = glob[i];
+                if (c == '*')
+                {
+                    if (i + 1 < glob.Length && glob[i + 1] == '*')
+                    {
+                        i++;
+                        if (i + 1 < glob.Length && glob[i + 1] == '/')
+                        {
+                            i++;
+                            sb.Append("(.*/)?");
+                        }
+                        else
+                        {
+                            sb.Append(".*");
+                        }
+                    }
+                    else
+                    {
+                        sb.Append("[^/]*");
+                    }
+                }
+                else if (c == '?')
+                {
+                    sb.Append("[^/]");
+                }
+                else if (c == '[')
+                {
+                    sb.Append('[');
+                    i++;
+                    while (i < glob.Length && glob[i] != ']')
+                    {
+                        sb.Append(glob[i]);
+                        i++;
+                    }
+                    if (i < glob.Length)
+                    {
+                        sb.Append(']');
+                    }
+                }
+                else if (c == '.' || c == '+' || c == '(' || c == ')' || c == '^' || c == '$' || c == '{' || c == '}' || c == '|' || c == '\\')
+                {
+                    sb.Append('\\').Append(c);
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString();
+        }
+    }
+
+    internal class GitIgnoreFile
+    {
+        public string BaseDir { get; }
+        public List<GitIgnoreRule> Rules { get; } = new List<GitIgnoreRule>();
+
+        public GitIgnoreFile(string filePath)
+        {
+            BaseDir = Path.GetDirectoryName(filePath) ?? "";
+            if (File.Exists(filePath))
+            {
+                foreach (var line in File.ReadLines(filePath))
+                {
+                    string trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#"))
+                        continue;
+
+                    Rules.Add(new GitIgnoreRule(trimmed, BaseDir));
+                }
+            }
         }
     }
 }
