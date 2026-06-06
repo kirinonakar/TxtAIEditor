@@ -2582,13 +2582,8 @@ namespace TxtAIEditor.Controls
             contentBox.Text = NormalizeTextBoxLineEndings(text);
             ScrollViewer.SetVerticalScrollMode(contentBox, ScrollMode.Enabled);
             ScrollViewer.SetVerticalScrollBarVisibility(contentBox, ScrollBarVisibility.Auto);
-            contentBox.KeyDown += async (_, e) =>
+            contentBox.Paste += async (_, e) =>
             {
-                if (!IsPasteShortcut(e))
-                {
-                    return;
-                }
-
                 e.Handled = true;
                 await PasteClipboardTextAsync(contentBox);
             };
@@ -2627,25 +2622,6 @@ namespace TxtAIEditor.Controls
             return (value ?? string.Empty)
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
                 .Replace("\r", "\n", StringComparison.Ordinal);
-        }
-
-        private static bool IsPasteShortcut(Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
-        {
-            bool ctrlDown = IsKeyDown(Windows.System.VirtualKey.Control) ||
-                IsKeyDown(Windows.System.VirtualKey.LeftControl) ||
-                IsKeyDown(Windows.System.VirtualKey.RightControl);
-            bool shiftDown = IsKeyDown(Windows.System.VirtualKey.Shift) ||
-                IsKeyDown(Windows.System.VirtualKey.LeftShift) ||
-                IsKeyDown(Windows.System.VirtualKey.RightShift);
-
-            return (ctrlDown && e.Key == Windows.System.VirtualKey.V) ||
-                (shiftDown && e.Key == Windows.System.VirtualKey.Insert);
-        }
-
-        private static bool IsKeyDown(Windows.System.VirtualKey key)
-        {
-            return (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key) &
-                    Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
         }
 
         private static async Task PasteClipboardTextAsync(TextBox textBox)
