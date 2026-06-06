@@ -248,17 +248,35 @@ namespace TxtAIEditor.Controls
                     string folderPathWithSlash = item.Path.EndsWith(Path.DirectorySeparatorChar)
                         ? item.Path
                         : item.Path + Path.DirectorySeparatorChar;
+                    string folderPathNormalized = item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
                     foreach (var kvp in statuses)
                     {
-                        if (kvp.Key.StartsWith(folderPathWithSlash, StringComparison.OrdinalIgnoreCase))
+                        string keyNormalized = kvp.Key.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        if (keyNormalized.Equals(folderPathNormalized, StringComparison.OrdinalIgnoreCase))
                         {
-                            string status = kvp.Value;
-                            if (status == "??" || status.Trim() == "??")
+                            string status = kvp.Value.Trim();
+                            if (status == "!!")
+                            {
+                                hasIgnored = true;
+                            }
+                            else if (status == "??")
                             {
                                 hasAdded = true;
                             }
-                            else if (status == "!!" || status.Trim() == "!!")
+                            else
+                            {
+                                hasModified = true;
+                            }
+                        }
+                        else if (kvp.Key.StartsWith(folderPathWithSlash, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string status = kvp.Value.Trim();
+                            if (status == "??")
+                            {
+                                hasAdded = true;
+                            }
+                            else if (status == "!!")
                             {
                                 hasIgnored = true;
                             }

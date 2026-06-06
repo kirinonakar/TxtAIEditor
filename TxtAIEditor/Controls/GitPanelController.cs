@@ -135,9 +135,13 @@ namespace TxtAIEditor.Controls
             _viewModel.GitFiles.Clear();
             foreach (var kvp in fileStatuses)
             {
+                if (kvp.Value == "!!" || kvp.Value.Trim() == "!!")
+                {
+                    continue; // Do not show ignored files in Git panel changes list
+                }
                 _viewModel.GitFiles.Add(CreateGitFileItem(kvp.Key, kvp.Value));
             }
-
+            
             if (_refreshExplorerGitStatus != null)
             {
                 await _refreshExplorerGitStatus();

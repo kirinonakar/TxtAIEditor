@@ -78,7 +78,7 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                string output = await RunGitCommandAsync(repoPath, "status --porcelain=v1 -z");
+                string output = await RunGitCommandAsync(repoPath, "status --porcelain=v1 -z --ignored");
                 if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                     return statuses;
 
@@ -340,6 +340,10 @@ namespace TxtAIEditor.Core.Services
             var statuses = await GetFileStatusesAsync(repoPath);
             foreach (var kvp in statuses)
             {
+                if (kvp.Value == "!!" || kvp.Value.Trim() == "!!")
+                {
+                    continue; // Skip restoring ignored files
+                }
                 bool ok = await RestoreFileAsync(repoPath, kvp.Key);
                 if (!ok)
                 {
