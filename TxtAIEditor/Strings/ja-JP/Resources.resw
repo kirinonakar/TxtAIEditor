@@ -1509,6 +1509,12 @@
   <data name="AgentActivityRunRgFormat" xml:space="preserve">
     <value>rg実行中: {0}</value>
   </data>
+  <data name="AgentActivityRunRgaFormat" xml:space="preserve">
+    <value>rga実行中: {0}</value>
+  </data>
+  <data name="AgentActivityRunPdftotextFormat" xml:space="preserve">
+    <value>pdftotext実行中: {0}</value>
+  </data>
   <data name="AgentActivityRunPowerShellFormat" xml:space="preserve">
     <value>PowerShell実行중: {0}</value>
   </data>
@@ -1711,6 +1717,12 @@
   </data>
   <data name="AgentVerboseRunRgOnly" xml:space="preserve">
     <value>Ripgrep 検索を完了しました: {0}</value>
+  </data>
+  <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
+    <value>Ripgrep All 検索を完了しました: {0}</value>
+  </data>
+  <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
+    <value>PdfToText 変換を完了しました: {0}</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
     <value>ウェブ検索を完了しました: {0}</value>

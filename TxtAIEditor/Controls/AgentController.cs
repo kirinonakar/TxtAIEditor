@@ -651,6 +651,16 @@ namespace TxtAIEditor.Controls
                             string args = GetStringArgument(arguments, "arguments");
                             displayResult = string.Format(_getString("AgentVerboseRunRgOnly", "Ripgrep 검색을 완료했습니다: {0}"), args);
                         }
+                        else if (normalizedName == "run_rga")
+                        {
+                            string args = GetStringArgument(arguments, "arguments");
+                            displayResult = string.Format(_getString("AgentVerboseRunRgaOnly", "Ripgrep All 검색을 완료했습니다: {0}"), args);
+                        }
+                        else if (normalizedName == "run_pdftotext")
+                        {
+                            string args = GetStringArgument(arguments, "arguments");
+                            displayResult = string.Format(_getString("AgentVerboseRunPdftotextOnly", "PdfToText 변환을 완료했습니다: {0}"), args);
+                        }
                         else if (normalizedName == "web_search_exa")
                         {
                             string query = GetStringArgument(arguments, "query");
@@ -1182,6 +1192,14 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "arguments"),
                             GetIntArgument(arguments, "timeoutMs", 10000),
                             cancellationToken),
+                        "run_rga" => await _fileTools.RunRgaAsync(
+                            GetStringArgument(arguments, "arguments"),
+                            GetIntArgument(arguments, "timeoutMs", 10000),
+                            cancellationToken),
+                        "run_pdftotext" => await _fileTools.RunPdftotextAsync(
+                            GetStringArgument(arguments, "arguments"),
+                            GetIntArgument(arguments, "timeoutMs", 10000),
+                            cancellationToken),
                         "run_powershell" => await _fileTools.RunPowerShellAsync(
                             GetStringArgument(arguments, "command"),
                             GetIntArgument(arguments, "timeoutMs", 10000),
@@ -1250,6 +1268,12 @@ namespace TxtAIEditor.Controls
                     GetStringArgument(arguments, "query")),
                 "run_rg" => string.Format(
                     _getString("AgentActivityRunRgFormat", "rg 실행 중: {0}"),
+                    TruncateForActivity(GetStringArgument(arguments, "arguments"))),
+                "run_rga" => string.Format(
+                    _getString("AgentActivityRunRgaFormat", "rga 실행 중: {0}"),
+                    TruncateForActivity(GetStringArgument(arguments, "arguments"))),
+                "run_pdftotext" => string.Format(
+                    _getString("AgentActivityRunPdftotextFormat", "pdftotext 실행 중: {0}"),
                     TruncateForActivity(GetStringArgument(arguments, "arguments"))),
                 "run_powershell" => string.Format(
                     _getString("AgentActivityRunPowerShellFormat", "PowerShell 실행 중: {0}"),
@@ -1910,6 +1934,8 @@ namespace TxtAIEditor.Controls
             return normalizedToolName is "read_file"
                 or "run_powershell"
                 or "run_rg"
+                or "run_rga"
+                or "run_pdftotext"
                 or "search_text"
                 or "create_file"
                 or "overwrite_file"
@@ -2344,6 +2370,8 @@ namespace TxtAIEditor.Controls
                 "search" => "search_text",
                 "powershell" => "run_powershell",
                 "rg" => "run_rg",
+                "rga" => "run_rga",
+                "pdftotext" => "run_pdftotext",
                 "search_exa" => "web_search_exa",
                 "exa_search" => "web_search_exa",
                 "exa" => "web_search_exa",

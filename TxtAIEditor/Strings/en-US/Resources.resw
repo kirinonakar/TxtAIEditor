@@ -1508,6 +1508,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityRunRgFormat" xml:space="preserve">
     <value>Running rg: {0}</value>
   </data>
+  <data name="AgentActivityRunRgaFormat" xml:space="preserve">
+    <value>Running rga: {0}</value>
+  </data>
+  <data name="AgentActivityRunPdftotextFormat" xml:space="preserve">
+    <value>Running pdftotext: {0}</value>
+  </data>
   <data name="AgentActivityRunPowerShellFormat" xml:space="preserve">
     <value>Running PowerShell: {0}</value>
   </data>
@@ -1710,6 +1716,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="AgentVerboseRunRgOnly" xml:space="preserve">
     <value>Completed Ripgrep search: {0}</value>
+  </data>
+  <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
+    <value>Completed Ripgrep All search: {0}</value>
+  </data>
+  <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
+    <value>Completed pdftotext conversion: {0}</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
     <value>Completed web search for: {0}</value>

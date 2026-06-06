@@ -42,6 +42,8 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- list_files: list workspace files by an internal glob pattern. args: {\"glob\":\"**/*.cs\",\"maxResults\":80}");
             builder.AppendLine("- search_text: text search implemented by the host with an internal glob filter. args: {\"query\":\"needle\",\"glob\":\"**/*.cs\",\"maxResults\":80}");
             builder.AppendLine("- run_rg: run ripgrep from the workspace root. args: {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}");
+            builder.AppendLine("- run_rga: run ripgrep-all (rga) from the workspace root to search document formats like PDF, docx, etc. args: {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}");
+            builder.AppendLine("- run_pdftotext: run pdftotext on a PDF file to extract text with layout preserved. args: {\"arguments\":\"-layout doc.pdf doc.txt\",\"timeoutMs\":10000}");
             builder.AppendLine("- read_file: read a file's content. You can read a line window or larger segments by specifying lineCount (up to 5000 lines). args: {\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":1,\"lineCount\":80}");
             builder.AppendLine("- create_file: create a new file under the workspace root. args: {\"path\":\"relative/path.txt\",\"content\":\"...\"}");
             builder.AppendLine("- replace_in_file: exact text replacement under the workspace root. Prefer replace_range or apply_patch for better reliability. args: {\"path\":\"relative/path.cs\",\"oldText\":\"...\",\"newText\":\"...\"}");
@@ -68,6 +70,9 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("Tool preference:");
             builder.AppendLine("- Use search_text for simple workspace text search.");
             builder.AppendLine("- Use run_rg for regex, case-sensitive, context lines, or large workspace search.");
+            builder.AppendLine("- Use run_rga for searching PDF, docx, etc. document formats first.");
+            builder.AppendLine("- When analyzing PDF files, do not summarize based solely on run_rga results. Convert the relevant PDF to text using run_pdftotext with -layout, and then check the surrounding context with run_rg on the generated text.");
+            builder.AppendLine("- For scanned image PDFs where text extraction is not possible, report the potential need for OCR.");
             builder.AppendLine("- Use run_powershell only when no internal tool can do the job.");
             builder.AppendLine();
             builder.AppendLine("Path rules:");

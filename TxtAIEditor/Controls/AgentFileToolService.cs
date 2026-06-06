@@ -241,6 +241,48 @@ namespace TxtAIEditor.Controls
             return result;
         }
 
+        public async Task<string> RunRgaAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                return "run_rga failed: arguments are empty.";
+            }
+
+            string resolvedRga = ResolveExecutablePath("rga");
+            string workspaceRoot = ResolveWorkspaceRoot();
+
+            string result = await RunProcessAsync(resolvedRga, arguments, workspaceRoot, timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
+
+            if (result.Contains("failed to start"))
+            {
+                return $"{result}\nNote: Make sure 'ripgrep-all' (rga) is installed and available in the system PATH.";
+            }
+
+            return result;
+        }
+
+        public async Task<string> RunPdftotextAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                return "run_pdftotext failed: arguments are empty.";
+            }
+
+            string resolvedPdftotext = ResolveExecutablePath("pdftotext");
+            string workspaceRoot = ResolveWorkspaceRoot();
+
+            string result = await RunProcessAsync(resolvedPdftotext, arguments, workspaceRoot, timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
+
+            if (result.Contains("failed to start"))
+            {
+                return $"{result}\nNote: Make sure 'pdftotext' is installed and available in the system PATH.";
+            }
+
+            return result;
+        }
+
         public async Task<string> RunPowerShellAsync(string command, int timeoutMs, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();

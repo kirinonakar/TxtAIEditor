@@ -1508,6 +1508,12 @@
   <data name="AgentActivityRunRgFormat" xml:space="preserve">
     <value>rg 실행 중: {0}</value>
   </data>
+  <data name="AgentActivityRunRgaFormat" xml:space="preserve">
+    <value>rga 실행 중: {0}</value>
+  </data>
+  <data name="AgentActivityRunPdftotextFormat" xml:space="preserve">
+    <value>pdftotext 실행 중: {0}</value>
+  </data>
   <data name="AgentActivityRunPowerShellFormat" xml:space="preserve">
     <value>PowerShell 실행 중: {0}</value>
   </data>
@@ -1710,6 +1716,12 @@
   </data>
   <data name="AgentVerboseRunRgOnly" xml:space="preserve">
     <value>Ripgrep 검색을 완료했습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
+    <value>Ripgrep All 검색을 완료했습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
+    <value>PdfToText 변환을 완료했습니다: {0}</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
     <value>웹 검색을 완료했습니다: {0}</value>
