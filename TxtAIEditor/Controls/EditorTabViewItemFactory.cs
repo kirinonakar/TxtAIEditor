@@ -33,7 +33,8 @@ namespace TxtAIEditor.Controls
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 DefaultBackgroundColor = editorBackgroundColor,
-                Opacity = 0
+                Opacity = 0,
+                UseSystemFocusVisuals = false
             };
 
             var editorLoadCover = new Border
@@ -128,7 +129,8 @@ namespace TxtAIEditor.Controls
                 Source = new Uri(tab.FilePath!, UriKind.Absolute),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                DefaultBackgroundColor = editorBackgroundColor
+                DefaultBackgroundColor = editorBackgroundColor,
+                UseSystemFocusVisuals = false
             };
 
             var pdfHost = new Grid

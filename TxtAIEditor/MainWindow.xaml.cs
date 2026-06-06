@@ -656,6 +656,7 @@ namespace TxtAIEditor
                 LeftSplitter,
                 RightSplitter,
                 _tabBridges,
+                _pdfViewerWebViews,
                 _statusBarController,
                 _livePreviewController,
                 _llmAssistantController,
@@ -1559,6 +1560,9 @@ namespace TxtAIEditor
             pdfWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
             pdfWebView.CoreWebView2.Settings.IsStatusBarEnabled = true;
             pdfWebView.CoreWebView2.WebMessageReceived += (_, args) => OnPdfWebMessageReceived(tab, args);
+            
+            WebViewAppearanceService.ApplyPreferredColorScheme(pdfWebView.CoreWebView2, _settingsService.CurrentSettings.Theme);
+
             _ = InstallPdfSelectionBridgeAsync(pdfWebView);
         }
 

@@ -125,6 +125,7 @@
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch"
                   DefaultBackgroundColor="Black"
+                  UseSystemFocusVisuals="False"
                   SizeChanged="OnTerminalWebViewSizeChanged"/>
 
         <Border Grid.Row="1"
