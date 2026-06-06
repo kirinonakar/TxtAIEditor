@@ -316,7 +316,14 @@ namespace TxtAIEditor
                 () => _gitAutoRefreshTimer.Start(),
                 _compareTabController.OpenCompareTabAsync,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
-                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
+                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
+                refreshExplorerGitStatus: async () =>
+                {
+                    if (_explorerNavigationController != null)
+                    {
+                        await _explorerNavigationController.UpdateGitStatusesAsync();
+                    }
+                });
             _gitPanelController.FileRestored += OnGitFileRestored;
             _gitStatusRefreshController = new GitStatusRefreshController(
                 DispatcherQueue,

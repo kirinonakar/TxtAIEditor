@@ -32,6 +32,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string?, string?, string?, string?, string?, Task> _openCompareTabAsync;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
+        private readonly Func<Task>? _refreshExplorerGitStatus;
 
         public GitPanelController(
             IGitService gitService,
@@ -47,7 +48,8 @@ namespace TxtAIEditor.Controls
             Action startAutoRefresh,
             Func<string, string, string?, string?, string?, string?, string?, Task> openCompareTabAsync,
             Action? beforeDialog = null,
-            Action? afterDialog = null)
+            Action? afterDialog = null,
+            Func<Task>? refreshExplorerGitStatus = null)
         {
             _gitService = gitService;
             _fileService = fileService;
@@ -63,6 +65,7 @@ namespace TxtAIEditor.Controls
             _openCompareTabAsync = openCompareTabAsync;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
+            _refreshExplorerGitStatus = refreshExplorerGitStatus;
 
             _leftSidebar.GitChangedFiles.ItemsSource = _viewModel.GitFiles;
             WireEvents();
@@ -133,6 +136,11 @@ namespace TxtAIEditor.Controls
             foreach (var kvp in fileStatuses)
             {
                 _viewModel.GitFiles.Add(CreateGitFileItem(kvp.Key, kvp.Value));
+            }
+
+            if (_refreshExplorerGitStatus != null)
+            {
+                await _refreshExplorerGitStatus();
             }
         }
 
