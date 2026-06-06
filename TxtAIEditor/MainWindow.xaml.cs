@@ -40,6 +40,7 @@ namespace TxtAIEditor
         private readonly TerminalShortcutService _terminalShortcutService;
         private readonly FunctionKeyShortcutService _functionKeyShortcutService;
         private readonly ExplorerDirectoryService _explorerDirectoryService;
+        private readonly PdfTextExtractionService _pdfTextExtractionService;
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
         private readonly CompareSelectionDialogService _compareSelectionDialogService;
         private readonly SearchReplaceController _searchReplaceController;
@@ -171,6 +172,7 @@ namespace TxtAIEditor
             _settingsDialogService = new SettingsDialogService(_llmService);
             _uiPersonalizationService = new UiPersonalizationService();
             _localizationService = new ResourceLocalizationService(_settingsService);
+            _pdfTextExtractionService = new PdfTextExtractionService();
             _editorTabViewItemFactory = new EditorTabViewItemFactory(_localizationService);
             _editorTabDocumentFactory = new EditorTabDocumentFactory(_languageDetectionService, GetLocalizedString);
             _explorerDirectoryService = new ExplorerDirectoryService();
@@ -527,6 +529,7 @@ namespace TxtAIEditor
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString,
                 new AgentFileToolService(GetAgentWorkspaceRoot),
+                _pdfTextExtractionService,
                 InitializePickerWindow,
                 path => _gitService.FindRepositoryRoot(path) != null,
                 OpenAgentDiffViewAsync,
@@ -916,7 +919,7 @@ namespace TxtAIEditor
                 (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args));
 
             _pdfViewerWebViews[tab.Id] = tabParts.WebView;
-            tabParts.WebView.CoreWebView2Initialized += (_, _) => ConfigurePdfViewer(tabParts.WebView);
+            tabParts.WebView.CoreWebView2Initialized += (_, _) => ConfigurePdfViewer(tab, tabParts.WebView);
 
             EditorWorkspace.DisableTabItemTransitions();
             targetTabView.TabItems.Add(tabParts.TabItem);
@@ -1288,18 +1291,7 @@ namespace TxtAIEditor
 
                 if (GetActiveTab() == tab)
                 {
-                    _llmAssistantController.SetSelectionText(selectedText);
-                    _agentController.SetSelectionText(selectedText, tab, selStartLine, selEndLine);
-                    if (string.IsNullOrEmpty(selectedText))
-                    {
-                        SelectionStatsText.Text = GetLocalizedString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");
-                    }
-                    else
-                    {
-                        string fmt = GetLocalizedString("SelectionStats", "선택 영역: {0} 글자 수 (약 {1} 토큰)");
-                        SelectionStatsText.Text = string.Format(fmt, selectedText.Length.ToString("N0"), (selectedText.Length / 4).ToString("N0"));
-                    }
-                    _statusBarController.UpdateSelectionStats(selectedText);
+                    UpdateRightPanelSelectionContext(selectedText, tab, selStartLine, selEndLine);
                 }
             };
 
@@ -1518,7 +1510,7 @@ namespace TxtAIEditor
             return false;
         }
 
-        private static void ConfigurePdfViewer(WebView2 pdfWebView)
+        private void ConfigurePdfViewer(OpenedTab tab, WebView2 pdfWebView)
         {
             if (pdfWebView.CoreWebView2 == null)
             {
@@ -1528,7 +1520,123 @@ namespace TxtAIEditor
             pdfWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             pdfWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
             pdfWebView.CoreWebView2.Settings.IsStatusBarEnabled = true;
+            pdfWebView.CoreWebView2.WebMessageReceived += (_, args) => OnPdfWebMessageReceived(tab, args);
+            _ = InstallPdfSelectionBridgeAsync(pdfWebView);
         }
+
+        private static async Task InstallPdfSelectionBridgeAsync(WebView2 pdfWebView)
+        {
+            if (pdfWebView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await pdfWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PdfSelectionBridgeScript);
+                await pdfWebView.CoreWebView2.ExecuteScriptAsync(PdfSelectionBridgeScript);
+            }
+            catch
+            {
+            }
+        }
+
+        private void OnPdfWebMessageReceived(OpenedTab tab, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(args.WebMessageAsJson);
+                var root = document.RootElement;
+                if (!root.TryGetProperty("type", out var typeProp) ||
+                    !string.Equals(typeProp.GetString(), "pdfSelection", StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                string selectedText = root.TryGetProperty("text", out var textProp)
+                    ? textProp.GetString() ?? string.Empty
+                    : string.Empty;
+
+                if (GetActiveTab() == tab)
+                {
+                    UpdateRightPanelSelectionContext(selectedText, tab, 0, 0);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private void UpdateRightPanelSelectionContext(string selectedText, OpenedTab tab, int startLine, int endLine)
+        {
+            _llmAssistantController.SetSelectionText(selectedText);
+            _agentController.SetSelectionText(selectedText, tab, startLine, endLine);
+            if (string.IsNullOrEmpty(selectedText))
+            {
+                SelectionStatsText.Text = GetLocalizedString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");
+            }
+            else
+            {
+                string fmt = GetLocalizedString("SelectionStats", "선택 영역: {0} 글자 수 (약 {1} 토큰)");
+                SelectionStatsText.Text = string.Format(fmt, selectedText.Length.ToString("N0"), (selectedText.Length / 4).ToString("N0"));
+            }
+            _statusBarController.UpdateSelectionStats(selectedText);
+        }
+
+        private const string PdfSelectionBridgeScript = @"
+(() => {
+    if (window.__txtAiEditorPdfSelectionBridge) return;
+    window.__txtAiEditorPdfSelectionBridge = true;
+    let lastText = '';
+    let timer = 0;
+
+    function selectedTextFromRoot(root) {
+        try {
+            const selection = root && root.getSelection ? root.getSelection() : null;
+            const text = selection ? String(selection.toString() || '') : '';
+            if (text) return text;
+        } catch {}
+
+        try {
+            const active = root && root.activeElement;
+            if (active && active.shadowRoot) {
+                return selectedTextFromRoot(active.shadowRoot);
+            }
+        } catch {}
+
+        return '';
+    }
+
+    function readSelection() {
+        let text = selectedTextFromRoot(window);
+        if (!text) {
+            try {
+                const viewer = document.querySelector('pdf-viewer');
+                if (viewer && viewer.shadowRoot) text = selectedTextFromRoot(viewer.shadowRoot);
+            } catch {}
+        }
+
+        if (text !== lastText) {
+            lastText = text;
+            try {
+                chrome.webview.postMessage({ type: 'pdfSelection', text });
+            } catch {}
+        }
+    }
+
+    function scheduleRead() {
+        clearTimeout(timer);
+        timer = setTimeout(readSelection, 80);
+    }
+
+    document.addEventListener('selectionchange', scheduleRead, true);
+    document.addEventListener('mouseup', scheduleRead, true);
+    document.addEventListener('pointerup', scheduleRead, true);
+    document.addEventListener('keyup', scheduleRead, true);
+    window.addEventListener('focus', scheduleRead, true);
+    scheduleRead();
+})();
+";
 
         private static async Task TryTriggerPdfFindAsync(WebView2 pdfWebView)
         {
@@ -2113,6 +2221,23 @@ namespace TxtAIEditor
 
         private string GetTabTextForLlmContext(OpenedTab tab, int maxChars)
         {
+            if (tab.IsPdfViewer && !string.IsNullOrWhiteSpace(tab.FilePath))
+            {
+                string cached = tab.Content ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(cached))
+                {
+                    return cached.Length > maxChars ? cached.Substring(0, maxChars) : cached;
+                }
+
+                string extracted = _pdfTextExtractionService
+                    .ExtractTextAsync(tab.FilePath, maxChars)
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
+                tab.Content = extracted;
+                return extracted;
+            }
+
             if (_editorSessions.TryGetValue(tab.Id, out var session))
             {
                 return session.GetText(maxChars);

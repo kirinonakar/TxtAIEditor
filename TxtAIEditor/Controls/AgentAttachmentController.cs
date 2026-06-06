@@ -9,6 +9,7 @@ using Windows.Graphics.Imaging;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Controls
@@ -38,6 +39,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isRunningProvider;
         private readonly Action _contextChanged;
         private readonly Func<string, double> _estimateTokenCount;
+        private readonly PdfTextExtractionService _pdfTextExtractionService;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
         private readonly List<AgentAttachmentState> _attachments = new();
@@ -51,6 +53,7 @@ namespace TxtAIEditor.Controls
             Func<bool> isRunningProvider,
             Action contextChanged,
             Func<string, double> estimateTokenCount,
+            PdfTextExtractionService pdfTextExtractionService,
             Action? beforeDialog,
             Action? afterDialog)
         {
@@ -62,6 +65,7 @@ namespace TxtAIEditor.Controls
             _isRunningProvider = isRunningProvider;
             _contextChanged = contextChanged;
             _estimateTokenCount = estimateTokenCount;
+            _pdfTextExtractionService = pdfTextExtractionService;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
         }
@@ -183,7 +187,9 @@ namespace TxtAIEditor.Controls
                 };
             }
 
-            string text = await ReadAttachmentTextAsync(file);
+            string text = IsPdfFile(file)
+                ? await ReadAttachmentPdfTextAsync(file)
+                : await ReadAttachmentTextAsync(file);
             int estimatedTokens = (int)Math.Round(_estimateTokenCount(text));
             bool truncated = text.Length >= MaxAttachmentTextChars;
             return new AgentAttachmentState
@@ -307,6 +313,16 @@ namespace TxtAIEditor.Controls
             return StripBinaryControlCharacters(fallback);
         }
 
+        private async Task<string> ReadAttachmentPdfTextAsync(StorageFile file)
+        {
+            if (string.IsNullOrWhiteSpace(file.Path) || !File.Exists(file.Path))
+            {
+                return string.Empty;
+            }
+
+            return await _pdfTextExtractionService.ExtractTextAsync(file.Path, MaxAttachmentTextChars);
+        }
+
         private static int EstimateImageTokens(int width, int height)
         {
             int tilesWide = Math.Max(1, (int)Math.Ceiling(width / 512.0));
@@ -348,6 +364,11 @@ namespace TxtAIEditor.Controls
                    extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool IsPdfFile(StorageFile file)
+        {
+            return Path.GetExtension(file.Name).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string GetMimeType(StorageFile file)
         {
             if (!string.IsNullOrWhiteSpace(file.ContentType) &&
@@ -364,6 +385,7 @@ namespace TxtAIEditor.Controls
                 ".webp" => "image/webp",
                 ".bmp" => "image/bmp",
                 ".gif" => "image/gif",
+                ".pdf" => "application/pdf",
                 _ => "text/plain"
             };
         }

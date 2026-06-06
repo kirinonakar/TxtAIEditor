@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Core.Services.LLM;
 using Windows.Storage.Pickers;
 
@@ -86,6 +87,7 @@ namespace TxtAIEditor.Controls
             Action<string, string> showError,
             Func<string, string, string> getString,
             AgentFileToolService fileTools,
+            PdfTextExtractionService pdfTextExtractionService,
             Action<object> initializePickerWindow,
             Func<string, bool> isGitRepoProvider,
             Func<AgentFileEditPreview, Task> openDiffViewAsync,
@@ -119,6 +121,7 @@ namespace TxtAIEditor.Controls
                 () => _isRunning,
                 UpdateContextStats,
                 EstimateTokenCount,
+                pdfTextExtractionService,
                 _beforeDialog,
                 _afterDialog);
             _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
