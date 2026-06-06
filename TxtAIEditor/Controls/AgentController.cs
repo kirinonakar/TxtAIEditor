@@ -2515,32 +2515,39 @@ namespace TxtAIEditor.Controls
 
         private async Task<string> CreateTabToolAsync(JsonElement arguments)
         {
-            string content = GetFirstStringArgument(arguments, "content", "text", "newText", "new_text");
-            if (string.IsNullOrEmpty(content))
+            try
             {
-                return "create_tab failed: content is empty.";
+                string content = GetFirstStringArgument(arguments, "content", "text", "newText", "new_text");
+                if (string.IsNullOrEmpty(content))
+                {
+                    return "create_tab failed: content is empty.";
+                }
+
+                string title = GetFirstStringArgument(arguments, "title", "name", "fileName", "file_name");
+                OpenedTab tab = await RunOnUIThreadAsync(() => _openNewTabWithContent(
+                    string.IsNullOrWhiteSpace(title) ? null : title,
+                    content));
+
+                string displayTitle = string.IsNullOrWhiteSpace(tab.Title) ? "Untitled" : tab.Title;
+
+                var preview = new AgentFileEditPreview
+                {
+                    ActionName = "create_tab",
+                    RelativePath = displayTitle,
+                    FullPath = tab.Id,
+                    OldContent = string.Empty,
+                    NewContent = content,
+                    IsNewFile = true
+                };
+
+                await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
+
+                return $"created new tab: {displayTitle} ({content.Length:N0} chars)";
             }
-
-            string title = GetFirstStringArgument(arguments, "title", "name", "fileName", "file_name");
-            OpenedTab tab = await RunOnUIThreadAsync(() => _openNewTabWithContent(
-                string.IsNullOrWhiteSpace(title) ? null : title,
-                content));
-
-            string displayTitle = string.IsNullOrWhiteSpace(tab.Title) ? "Untitled" : tab.Title;
-
-            var preview = new AgentFileEditPreview
+            catch (Exception ex)
             {
-                ActionName = "create_tab",
-                RelativePath = displayTitle,
-                FullPath = tab.Id,
-                OldContent = string.Empty,
-                NewContent = content,
-                IsNewFile = true
-            };
-
-            await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
-
-            return $"created new tab: {displayTitle} ({content.Length:N0} chars)";
+                return $"create_tab failed with exception: {ex}";
+            }
         }
 
         private async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)

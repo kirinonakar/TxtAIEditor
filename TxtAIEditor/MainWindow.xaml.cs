@@ -528,11 +528,37 @@ namespace TxtAIEditor
                 InsertTextIntoActiveEditorAsync,
                 (title, content) =>
                 {
-                    var tab = OpenNewTab(null, content);
+                    string uniqueTitle = string.IsNullOrWhiteSpace(title) ? GetLocalizedString("UntitledNewTab", "제목 없음") : title;
                     if (!string.IsNullOrWhiteSpace(title))
                     {
-                        tab.Title = title;
+                        string extension = "";
+                        string baseName = title;
+                        int lastDot = title.LastIndexOf('.');
+                        if (lastDot >= 0)
+                        {
+                            baseName = title.Substring(0, lastDot);
+                            extension = title.Substring(lastDot);
+                        }
+
+                        int counter = 1;
+                        while (_viewModel.Tabs.Any(t =>
+                            string.IsNullOrEmpty(t.FilePath) &&
+                            string.Equals(t.Title, uniqueTitle, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            counter++;
+                            uniqueTitle = $"{baseName} ({counter}){extension}";
+                        }
+                    }
+
+                    var tab = OpenNewTab(null, content);
+                    tab.Title = uniqueTitle;
+                    if (!string.IsNullOrWhiteSpace(title))
+                    {
                         tab.Language = _languageDetectionService.GetMonacoLanguageName(title);
+                    }
+                    else
+                    {
+                        tab.Language = "plaintext";
                     }
 
                     tab.OriginalContent = string.Empty;
