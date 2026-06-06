@@ -694,6 +694,33 @@ namespace TxtAIEditor.Controls
                         _agentPane.AppendOutputText(displayResult.TrimEnd() + Environment.NewLine);
                     });
 
+                    if (!skippedDuplicateTool &&
+                        IsSuccessfulSelectedRangeEdit(normalizedToolName, arguments, toolResult))
+                    {
+                        string completeMsg = _getString(
+                            "AgentSelectedRangeEditComplete",
+                            "선택 영역 변경을 적용했습니다.");
+
+                        transcript += "\n\n[Selected-range edit completed successfully. The host finalized the run to avoid extra edits outside the requested selection.]";
+
+                        await RunOnUIThreadAsync(() =>
+                        {
+                            AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
+                            _agentPane.AppendOutputLine(completeMsg);
+                        });
+
+                        _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                        string selectedEditRunTranscript = transcript.Substring(initialTranscript.Length);
+                        if (!string.IsNullOrWhiteSpace(selectedEditRunTranscript))
+                        {
+                            _sessionHistory.AppendLine(selectedEditRunTranscript.Trim());
+                        }
+                        _sessionHistory.AppendLine();
+
+                        completed = true;
+                        break;
+                    }
+
                     string verifyToolName = NormalizeToolName(toolName);
                     bool isFileEditTool = verifyToolName is "replace_in_file" or "replace_range"
                         or "apply_patch" or "overwrite_file";
@@ -1927,22 +1954,66 @@ namespace TxtAIEditor.Controls
 
             if (!PathsReferToSameFile(path, selection.SourcePath!))
             {
-                return $"{normalizedToolName} failed: selected_range_context limits edits to {FormatSelectionScope(selection)}, but the requested edit targets {path}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer.";
+                return string.Format(
+                    _getString(
+                        "AgentSelectionEditDifferentFileBlockedFormat",
+                        "{0} failed: selected_range_context limits edits to {1}, but the requested edit targets {2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
+                    normalizedToolName,
+                    FormatSelectionScope(selection),
+                    path);
             }
 
             if (normalizedToolName != "replace_range")
             {
-                return $"{normalizedToolName} failed: selected_range_context limits file edits to {FormatSelectionScope(selection)}. Use replace_range within the selected line range for selected-range edits. If the selected-range task is already complete, write the final answer.";
+                return string.Format(
+                    _getString(
+                        "AgentSelectionEditToolBlockedFormat",
+                        "{0} failed: selected_range_context limits file edits to {1}. Use replace_range within the selected line range for selected-range edits. If the selected-range task is already complete, write the final answer."),
+                    normalizedToolName,
+                    FormatSelectionScope(selection));
             }
 
             int startLine = GetReplaceRangeStartLineArgument(arguments, path);
             int endLine = GetReplaceRangeEndLineArgument(arguments, path);
             if (startLine < selection.StartLine || endLine > selection.EndLine)
             {
-                return $"replace_range failed: selected_range_context limits edits to {FormatSelectionScope(selection)}, but the requested edit targets lines {startLine}-{endLine}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer.";
+                return string.Format(
+                    _getString(
+                        "AgentSelectionEditRangeBlockedFormat",
+                        "replace_range failed: selected_range_context limits edits to {0}, but the requested edit targets lines {1}-{2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
+                    FormatSelectionScope(selection),
+                    startLine,
+                    endLine);
             }
 
             return null;
+        }
+
+        private bool IsSuccessfulSelectedRangeEdit(string normalizedToolName, JsonElement arguments, string toolResult)
+        {
+            if (!_currentRunRestrictEditsToSelection ||
+                normalizedToolName != "replace_range" ||
+                !IsSuccessfulToolResult(toolResult))
+            {
+                return false;
+            }
+
+            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            if (!selection.HasLineRange)
+            {
+                return false;
+            }
+
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path) ||
+                !PathsReferToSameFile(path, selection.SourcePath!))
+            {
+                return false;
+            }
+
+            int startLine = GetReplaceRangeStartLineArgument(arguments, path);
+            int endLine = GetReplaceRangeEndLineArgument(arguments, path);
+            return startLine >= selection.StartLine && endLine <= selection.EndLine;
         }
 
         private static bool IsFileEditingTool(string normalizedToolName)
