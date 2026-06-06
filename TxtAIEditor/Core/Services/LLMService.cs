@@ -251,7 +251,7 @@ namespace TxtAIEditor.Core.Services
 
             ILLMProvider provider = providerName.ToLower() switch
             {
-                "gemini" => new GeminiProvider(),
+                "gemini" => new GeminiProvider(settings.LlmAgentVerbose),
                 "openrouter" => new OpenRouterProvider(),
                 "lm studio" => new LMStudioProvider(),
                 "lmstudio" => new LMStudioProvider(),

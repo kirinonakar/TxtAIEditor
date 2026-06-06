@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,6 +13,252 @@ namespace TxtAIEditor.Core.Services.LLM
     public class GeminiProvider : ILLMProvider
     {
         private static readonly HttpClient _httpClient = new HttpClient();
+
+        private readonly bool _verbose;
+        private string _accumulatedText = string.Empty;
+        private int _lastProcessedIndex = 0;
+        private bool _inThought = false;
+        private string _thoughtBuffer = string.Empty;
+        private string _nativeThoughtBuffer = string.Empty;
+
+        private static readonly Regex[] ThoughtRegexes = new[]
+        {
+            new Regex(@"<thought>(.*?)(?:</thought>|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase),
+            new Regex(@"<think>(.*?)(?:</think>|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase),
+            new Regex(@"<\|channel\>thought(.*?)(?:<channel\|>|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase)
+        };
+
+        public GeminiProvider(bool verbose = false)
+        {
+            _verbose = verbose;
+        }
+
+        private static bool IsGemma4(string model)
+        {
+            return !string.IsNullOrEmpty(model) && model.Contains("gemma-4", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int EstimateTokenCount(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return 0;
+
+            int cjkCount = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if ((c >= 0x3000 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7AF))
+                {
+                    cjkCount++;
+                }
+            }
+
+            int nonCjkLength = text.Length - cjkCount;
+            double estimatedTokens = (cjkCount * 1.2) + (nonCjkLength / 4.0);
+            return Math.Max(1, (int)Math.Round(estimatedTokens));
+        }
+
+        private string ProcessGemma4Thoughts(string text)
+        {
+            if (_verbose) return text;
+
+            string result = text;
+            foreach (var regex in ThoughtRegexes)
+            {
+                result = regex.Replace(result, match =>
+                {
+                    string thoughtContent = match.Groups[1].Value;
+                    int tokenCount = EstimateTokenCount(thoughtContent);
+                    return $"[Thinking: {tokenCount} tokens]\n\n";
+                });
+            }
+            return result;
+        }
+
+        private async Task ProcessGemma4StreamChunkAsync(string chunkText, Func<string, Task> onChunk)
+        {
+            if (_verbose)
+            {
+                await onChunk(chunkText);
+                return;
+            }
+
+            _accumulatedText += chunkText;
+
+            string[] startTags = { "<thought>", "<think>", "<|channel>thought" };
+            string[] endTags = { "</thought>", "</think>", "<channel|>" };
+
+            while (_lastProcessedIndex < _accumulatedText.Length)
+            {
+                if (!_inThought)
+                {
+                    int earliestStartPos = -1;
+                    int matchingTagLength = 0;
+
+                    foreach (var tag in startTags)
+                    {
+                        int pos = _accumulatedText.IndexOf(tag, _lastProcessedIndex, StringComparison.OrdinalIgnoreCase);
+                        if (pos >= 0)
+                        {
+                            if (earliestStartPos == -1 || pos < earliestStartPos)
+                            {
+                                earliestStartPos = pos;
+                                matchingTagLength = tag.Length;
+                            }
+                        }
+                    }
+
+                    if (earliestStartPos >= 0)
+                    {
+                        if (earliestStartPos > _lastProcessedIndex)
+                        {
+                            string normalText = _accumulatedText.Substring(_lastProcessedIndex, earliestStartPos - _lastProcessedIndex);
+                            await onChunk(normalText);
+                        }
+
+                        _inThought = true;
+                        _thoughtBuffer = string.Empty;
+                        _lastProcessedIndex = earliestStartPos + matchingTagLength;
+                    }
+                    else
+                    {
+                        int safeLength = _accumulatedText.Length - _lastProcessedIndex;
+                        int holdBack = 0;
+                        for (int i = 1; i <= Math.Min(17, safeLength); i++)
+                        {
+                            string endSubstring = _accumulatedText.Substring(_accumulatedText.Length - i);
+                            if (startTags.Any(tag => tag.StartsWith(endSubstring, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                holdBack = i;
+                            }
+                        }
+
+                        int processEnd = _accumulatedText.Length - holdBack;
+                        if (processEnd > _lastProcessedIndex)
+                        {
+                            string normalText = _accumulatedText.Substring(_lastProcessedIndex, processEnd - _lastProcessedIndex);
+                            await onChunk(normalText);
+                            _lastProcessedIndex = processEnd;
+                        }
+                        break;
+                    }
+                }
+                else
+                {
+                    int earliestEndPos = -1;
+                    int matchingTagLength = 0;
+
+                    foreach (var tag in endTags)
+                    {
+                        int pos = _accumulatedText.IndexOf(tag, _lastProcessedIndex, StringComparison.OrdinalIgnoreCase);
+                        if (pos >= 0)
+                        {
+                            if (earliestEndPos == -1 || pos < earliestEndPos)
+                            {
+                                earliestEndPos = pos;
+                                matchingTagLength = tag.Length;
+                            }
+                        }
+                    }
+
+                    if (earliestEndPos >= 0)
+                    {
+                        _thoughtBuffer += _accumulatedText.Substring(_lastProcessedIndex, earliestEndPos - _lastProcessedIndex);
+                        
+                        int tokenCount = EstimateTokenCount(_thoughtBuffer);
+                        await onChunk($"[Thinking: {tokenCount} tokens]\n\n");
+
+                        _inThought = false;
+                        _thoughtBuffer = string.Empty;
+                        _lastProcessedIndex = earliestEndPos + matchingTagLength;
+                    }
+                    else
+                    {
+                        int safeLength = _accumulatedText.Length - _lastProcessedIndex;
+                        int holdBack = 0;
+                        for (int i = 1; i <= Math.Min(11, safeLength); i++)
+                        {
+                            string endSubstring = _accumulatedText.Substring(_accumulatedText.Length - i);
+                            if (endTags.Any(tag => tag.StartsWith(endSubstring, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                holdBack = i;
+                            }
+                        }
+
+                        int processEnd = _accumulatedText.Length - holdBack;
+                        if (processEnd > _lastProcessedIndex)
+                        {
+                            _thoughtBuffer += _accumulatedText.Substring(_lastProcessedIndex, processEnd - _lastProcessedIndex);
+                            _lastProcessedIndex = processEnd;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        private async Task ProcessGemma4StreamPartsAsync(JsonElement parts, Func<string, Task> onChunk)
+        {
+            foreach (var part in parts.EnumerateArray())
+            {
+                bool isThoughtPart = part.TryGetProperty("thought", out var thoughtProp) && thoughtProp.ValueKind == JsonValueKind.True;
+                string partText = part.TryGetProperty("text", out var textProp) ? textProp.GetString() ?? string.Empty : string.Empty;
+
+                if (string.IsNullOrEmpty(partText)) continue;
+
+                if (isThoughtPart)
+                {
+                    if (_verbose)
+                    {
+                        await onChunk(partText);
+                    }
+                    else
+                    {
+                        _nativeThoughtBuffer += partText;
+                    }
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(_nativeThoughtBuffer))
+                    {
+                        int tokenCount = EstimateTokenCount(_nativeThoughtBuffer);
+                        await onChunk($"[Thinking: {tokenCount} tokens]\n\n");
+                        _nativeThoughtBuffer = string.Empty;
+                    }
+
+                    await ProcessGemma4StreamChunkAsync(partText, onChunk);
+                }
+            }
+        }
+
+        private async Task FlushGemma4StreamAsync(Func<string, Task> onChunk)
+        {
+            if (_verbose) return;
+
+            if (!string.IsNullOrEmpty(_nativeThoughtBuffer))
+            {
+                int tokenCount = EstimateTokenCount(_nativeThoughtBuffer);
+                await onChunk($"[Thinking: {tokenCount} tokens]\n\n");
+                _nativeThoughtBuffer = string.Empty;
+            }
+
+            if (_inThought)
+            {
+                if (_lastProcessedIndex < _accumulatedText.Length)
+                {
+                    _thoughtBuffer += _accumulatedText.Substring(_lastProcessedIndex);
+                }
+                int tokenCount = EstimateTokenCount(_thoughtBuffer);
+                await onChunk($"[Thinking: {tokenCount} tokens]\n\n");
+            }
+            else
+            {
+                if (_lastProcessedIndex < _accumulatedText.Length)
+                {
+                    string normalText = _accumulatedText.Substring(_lastProcessedIndex);
+                    await onChunk(normalText);
+                }
+            }
+        }
 
         private string BuildGeminiUrl(string baseUrl, string model, bool stream)
         {
@@ -88,10 +335,51 @@ namespace TxtAIEditor.Core.Services.LLM
                             if (firstCandidate.TryGetProperty("content", out var candidateContent) &&
                                 candidateContent.TryGetProperty("parts", out var parts) && parts.GetArrayLength() > 0)
                             {
-                                var firstPart = parts[0];
-                                if (firstPart.TryGetProperty("text", out var text))
+                                if (IsGemma4(model))
                                 {
-                                    return text.GetString() ?? string.Empty;
+                                    var sb = new StringBuilder();
+                                    var nativeThoughtSb = new StringBuilder();
+                                    foreach (var part in parts.EnumerateArray())
+                                    {
+                                        bool isThoughtPart = part.TryGetProperty("thought", out var thoughtProp) && thoughtProp.ValueKind == JsonValueKind.True;
+                                        string partText = part.TryGetProperty("text", out var textProp) ? textProp.GetString() ?? string.Empty : string.Empty;
+
+                                        if (isThoughtPart)
+                                        {
+                                            if (_verbose)
+                                            {
+                                                sb.Append(partText);
+                                            }
+                                            else
+                                            {
+                                                nativeThoughtSb.Append(partText);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (nativeThoughtSb.Length > 0)
+                                            {
+                                                int tokenCount = EstimateTokenCount(nativeThoughtSb.ToString());
+                                                sb.Append($"[Thinking: {tokenCount} tokens]\n\n");
+                                                nativeThoughtSb.Clear();
+                                            }
+                                            sb.Append(partText);
+                                        }
+                                    }
+                                    if (nativeThoughtSb.Length > 0)
+                                    {
+                                        int tokenCount = EstimateTokenCount(nativeThoughtSb.ToString());
+                                        sb.Append($"[Thinking: {tokenCount} tokens]\n\n");
+                                    }
+                                    return ProcessGemma4Thoughts(sb.ToString());
+                                }
+                                else
+                                {
+                                    var firstPart = parts[0];
+                                    if (firstPart.TryGetProperty("text", out var text))
+                                    {
+                                        return text.GetString() ?? string.Empty;
+                                    }
                                 }
                             }
                         }
@@ -172,14 +460,22 @@ namespace TxtAIEditor.Core.Services.LLM
                                         if (firstCandidate.TryGetProperty("content", out var candidateContent) &&
                                             candidateContent.TryGetProperty("parts", out var parts) && parts.GetArrayLength() > 0)
                                         {
-                                            var firstPart = parts[0];
-                                            if (firstPart.TryGetProperty("text", out var text))
+                                            if (IsGemma4(model))
                                             {
-                                                string? chunk = text.GetString();
-                                                if (!string.IsNullOrEmpty(chunk))
+                                                cancellationToken.ThrowIfCancellationRequested();
+                                                await ProcessGemma4StreamPartsAsync(parts, onChunk);
+                                            }
+                                            else
+                                            {
+                                                var firstPart = parts[0];
+                                                if (firstPart.TryGetProperty("text", out var text))
                                                 {
-                                                    cancellationToken.ThrowIfCancellationRequested();
-                                                    await onChunk(chunk);
+                                                    string? chunk = text.GetString();
+                                                    if (!string.IsNullOrEmpty(chunk))
+                                                    {
+                                                        cancellationToken.ThrowIfCancellationRequested();
+                                                        await onChunk(chunk);
+                                                    }
                                                 }
                                             }
                                         }
@@ -189,6 +485,12 @@ namespace TxtAIEditor.Core.Services.LLM
                             catch (JsonException)
                             {
                             }
+                        }
+
+                        if (IsGemma4(model))
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            await FlushGemma4StreamAsync(onChunk);
                         }
                     }
                 }
