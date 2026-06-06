@@ -334,8 +334,9 @@
             </Border>
         </StackPanel>
 
-        <Grid Grid.Row="5" ColumnSpacing="8" RowSpacing="2">
+        <Grid Grid.Row="5" ColumnSpacing="8" RowSpacing="6">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
@@ -343,8 +344,18 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <ScrollViewer x:Name="AgentSelectedPresetScrollViewer"
+                          Grid.Row="0" Grid.Column="0"
+                          HorizontalScrollMode="Auto"
+                          VerticalScrollMode="Disabled"
+                          HorizontalScrollBarVisibility="Hidden"
+                          Visibility="Collapsed">
+                <StackPanel x:Name="AgentSelectedPresetPanel"
+                            Orientation="Horizontal"
+                            Spacing="4"/>
+            </ScrollViewer>
             <TextBox x:Name="AgentPromptInput"
-                     Grid.Row="0" Grid.Column="0"
+                     Grid.Row="1" Grid.Column="0"
                      PlaceholderText="Agent에게 맡길 작업 입력..."
                      MinHeight="72"
                      MaxHeight="120"
@@ -363,15 +374,50 @@
                                          Invoked="OnPromptRunKeyboardAcceleratorInvoked"/>
                 </TextBox.KeyboardAccelerators>
             </TextBox>
-            <Button x:Name="AgentRunButton"
+            <Button x:Name="AgentPresetButton"
                     Grid.Row="0" Grid.Column="1"
+                    Content="+"
+                    Width="64"
+                    Height="26"
+                    Padding="0"
+                    FontSize="14"
+                    Style="{StaticResource AgentButtonStyle}">
+                <Button.Flyout>
+                    <Flyout x:Name="AgentPresetFlyout" Opened="OnAgentPresetFlyoutOpened">
+                        <Grid Width="220" RowSpacing="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Button x:Name="AgentAddPresetButton"
+                                    Grid.Row="0"
+                                    HorizontalAlignment="Stretch"
+                                    Click="OnAgentAddPresetClickInPanel"
+                                    Style="{StaticResource AgentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE109;" FontSize="12"/>
+                                    <TextBlock x:Name="AgentAddPresetText" Text="프리셋 추가" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <MenuFlyoutSeparator Grid.Row="1"/>
+                            <ScrollViewer Grid.Row="2" MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="AgentPresetListPanel" Spacing="4"/>
+                            </ScrollViewer>
+                        </Grid>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+            <Button x:Name="AgentRunButton"
+                    Grid.Row="1" Grid.Column="1"
                     Content="실행"
                     Width="64"
-                    VerticalAlignment="Stretch"
+                    Height="34"
+                    VerticalAlignment="Bottom"
                     Click="OnRunClick"
                     Style="{StaticResource AccentButtonStyle}"/>
             <TextBlock x:Name="AgentModelNameText"
-                       Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                       Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                        FontSize="11"
                        Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                        Margin="2,1,0,-12"/>

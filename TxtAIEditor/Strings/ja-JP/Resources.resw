@@ -1712,6 +1712,60 @@
   <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
     <value>ファイル、先頭 {0:N0} 文字まで含めました</value>
   </data>
+  <data name="AgentPresetButtonTooltip" xml:space="preserve">
+    <value>ペルソナ/指示プリセット</value>
+  </data>
+  <data name="AgentPresetAddText" xml:space="preserve">
+    <value>プリセットを追加</value>
+  </data>
+  <data name="AgentPresetEditText" xml:space="preserve">
+    <value>編集</value>
+  </data>
+  <data name="AgentPresetDeleteText" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="AgentPresetEmptyText" xml:space="preserve">
+    <value>プリセットなし</value>
+  </data>
+  <data name="AgentPresetRemoveTooltip" xml:space="preserve">
+    <value>選択解除</value>
+  </data>
+  <data name="AgentPresetSavePlaceholder" xml:space="preserve">
+    <value>プリセット名を入力...</value>
+  </data>
+  <data name="AgentPresetContentPlaceholder" xml:space="preserve">
+    <value>ペルソナ/指示の内容...</value>
+  </data>
+  <data name="AgentPresetSaveLabel" xml:space="preserve">
+    <value>プリセット名</value>
+  </data>
+  <data name="AgentPresetContentLabel" xml:space="preserve">
+    <value>ペルソナ/指示</value>
+  </data>
+  <data name="AgentPresetSaveAddButton" xml:space="preserve">
+    <value>追加</value>
+  </data>
+  <data name="AgentPresetSaveCancelButton" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="AgentPresetEditTitle" xml:space="preserve">
+    <value>プリセットを編集</value>
+  </data>
+  <data name="AgentPresetEditSaveButton" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="AgentPresetNameEmptyTitle" xml:space="preserve">
+    <value>プリセット追加エラー</value>
+  </data>
+  <data name="AgentPresetNameEmptyMessage" xml:space="preserve">
+    <value>プリセット名を入力してください。</value>
+  </data>
+  <data name="AgentPresetDuplicateTitle" xml:space="preserve">
+    <value>プリセットの重複</value>
+  </data>
+  <data name="AgentPresetDuplicateMessage" xml:space="preserve">
+    <value>同じ名前のプリセットが既に存在します。上書きしますか?</value>
+  </data>
   <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
     <value>Markdownを挿入</value>
   </data>

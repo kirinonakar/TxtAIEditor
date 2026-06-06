@@ -1711,6 +1711,60 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
     <value>File, included first {0:N0} chars</value>
   </data>
+  <data name="AgentPresetButtonTooltip" xml:space="preserve">
+    <value>Persona/instruction presets</value>
+  </data>
+  <data name="AgentPresetAddText" xml:space="preserve">
+    <value>Add Preset</value>
+  </data>
+  <data name="AgentPresetEditText" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="AgentPresetDeleteText" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="AgentPresetEmptyText" xml:space="preserve">
+    <value>No presets</value>
+  </data>
+  <data name="AgentPresetRemoveTooltip" xml:space="preserve">
+    <value>Deselect</value>
+  </data>
+  <data name="AgentPresetSavePlaceholder" xml:space="preserve">
+    <value>Enter preset name...</value>
+  </data>
+  <data name="AgentPresetContentPlaceholder" xml:space="preserve">
+    <value>Persona/instruction content...</value>
+  </data>
+  <data name="AgentPresetSaveLabel" xml:space="preserve">
+    <value>Preset Name</value>
+  </data>
+  <data name="AgentPresetContentLabel" xml:space="preserve">
+    <value>Persona/Instructions</value>
+  </data>
+  <data name="AgentPresetSaveAddButton" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="AgentPresetSaveCancelButton" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="AgentPresetEditTitle" xml:space="preserve">
+    <value>Edit Preset</value>
+  </data>
+  <data name="AgentPresetEditSaveButton" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="AgentPresetNameEmptyTitle" xml:space="preserve">
+    <value>Add Preset Error</value>
+  </data>
+  <data name="AgentPresetNameEmptyMessage" xml:space="preserve">
+    <value>Please enter a preset name.</value>
+  </data>
+  <data name="AgentPresetDuplicateTitle" xml:space="preserve">
+    <value>Duplicate Preset</value>
+  </data>
+  <data name="AgentPresetDuplicateMessage" xml:space="preserve">
+    <value>A preset with this name already exists. Do you want to overwrite it?</value>
+  </data>
   <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
     <value>Insert Markdown</value>
   </data>

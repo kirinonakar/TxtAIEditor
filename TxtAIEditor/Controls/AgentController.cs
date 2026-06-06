@@ -38,6 +38,9 @@ namespace TxtAIEditor.Controls
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly List<AgentFileEditPreview> _sessionEdits = new();
+        private readonly string _agentPresetsFilePath;
+        private readonly List<AgentPresetItem> _agentPresets = new();
+        private readonly HashSet<string> _selectedAgentPresetNames = new(StringComparer.OrdinalIgnoreCase);
 
         private string _lastSelectionText = string.Empty;
         private string? _lastSelectionTabId;
@@ -63,6 +66,12 @@ namespace TxtAIEditor.Controls
                 !string.IsNullOrEmpty(SourcePath) &&
                 StartLine > 0 &&
                 EndLine > 0;
+        }
+
+        private sealed class AgentPresetItem
+        {
+            public string Name { get; set; } = string.Empty;
+            public string Content { get; set; } = string.Empty;
         }
 
         public AgentController(
@@ -118,8 +127,13 @@ namespace TxtAIEditor.Controls
                 _fileTools.FileModifiedAsync = _fileModifiedAsync;
             }
 
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
+            _agentPresetsFilePath = Path.Combine(settingsDir, "agent-presets.json");
+
             WireEvents();
             UpdateContextStats();
+            _ = LoadAgentPresetsAsync();
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
@@ -239,6 +253,11 @@ namespace TxtAIEditor.Controls
             _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
             _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
             _agentPane.RemoveAttachmentRequested += (_, attachment) => _attachmentController.RemoveAttachment(attachment.Id);
+            _agentPane.AgentPresetAddRequested += (_, _) => OnAddAgentPresetClick();
+            _agentPane.AgentPresetToggled += (_, presetName) => ToggleAgentPreset(presetName);
+            _agentPane.AgentPresetEdited += (_, presetName) => OnAgentPresetEdited(presetName);
+            _agentPane.AgentPresetDeleted += (_, presetName) => OnAgentPresetDeleted(presetName);
+            _agentPane.AgentPresetRemoved += (_, presetName) => RemoveSelectedAgentPreset(presetName);
             
             _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
             _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
@@ -267,7 +286,8 @@ namespace TxtAIEditor.Controls
                 return;
             }
  
-            string instruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
+            string userInstruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
+            string instruction = BuildAgentInstruction(userInstruction);
             if (string.IsNullOrWhiteSpace(instruction))
             {
                 _showError(
@@ -283,7 +303,7 @@ namespace TxtAIEditor.Controls
             CancellationToken cancellationToken = cancellationSource.Token;
             _agentPane.SetBusy(true);
             _agentPane.ClearActivity(_getString("AgentActivityStarting", "시작 중"));
-            _agentPane.BeginOutputBlock(BuildRunHeader(instruction));
+            _agentPane.BeginOutputBlock(BuildRunHeader(BuildInstructionDisplay(userInstruction)));
             AppendActivity(_getString("AgentActivityCollectingContext", "맥락 수집 중"));
 
             try
@@ -799,6 +819,56 @@ namespace TxtAIEditor.Controls
             string modeText = _getString("AgentModeRun", "실행");
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             return $"{timestamp}  Agent {modeText}: {TruncateForActivity(instruction)}";
+        }
+
+        private string BuildInstructionDisplay(string userInstruction)
+        {
+            var selectedPresets = GetSelectedAgentPresets();
+            if (selectedPresets.Count == 0)
+            {
+                return userInstruction;
+            }
+
+            string presetLabel = string.Join(", ", selectedPresets.Select(p => p.Name));
+            if (string.IsNullOrWhiteSpace(userInstruction))
+            {
+                return $"[{presetLabel}]";
+            }
+
+            return $"[{presetLabel}] {userInstruction}";
+        }
+
+        private string BuildAgentInstruction(string userInstruction)
+        {
+            var selectedPresets = GetSelectedAgentPresets();
+            if (selectedPresets.Count == 0)
+            {
+                return userInstruction;
+            }
+
+            var builder = new StringBuilder();
+            builder.AppendLine("[Agent persona/instruction presets]");
+            foreach (var preset in selectedPresets)
+            {
+                builder.AppendLine($"## {preset.Name}");
+                builder.AppendLine(preset.Content);
+                builder.AppendLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(userInstruction))
+            {
+                builder.AppendLine("[User request]");
+                builder.Append(userInstruction);
+            }
+
+            return builder.ToString().Trim();
+        }
+
+        private List<AgentPresetItem> GetSelectedAgentPresets()
+        {
+            return _agentPresets
+                .Where(p => _selectedAgentPresetNames.Contains(p.Name))
+                .ToList();
         }
 
         private string BuildWorkspaceContext(string instruction)
@@ -2280,12 +2350,279 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private async Task LoadAgentPresetsAsync()
+        {
+            try
+            {
+                if (File.Exists(_agentPresetsFilePath))
+                {
+                    string json = await File.ReadAllTextAsync(_agentPresetsFilePath);
+                    var loaded = JsonSerializer.Deserialize<List<AgentPresetItem>>(json);
+                    if (loaded != null)
+                    {
+                        _agentPresets.Clear();
+                        _agentPresets.AddRange(loaded.Where(p => !string.IsNullOrWhiteSpace(p.Name)));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load agent presets: {ex.Message}");
+            }
+
+            UpdateAgentPresetsUI();
+        }
+
+        private async Task SaveAgentPresetsAsync()
+        {
+            try
+            {
+                string? dir = Path.GetDirectoryName(_agentPresetsFilePath);
+                if (dir != null && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                string json = JsonSerializer.Serialize(_agentPresets, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_agentPresetsFilePath, json);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to save agent presets: {ex.Message}");
+            }
+
+            UpdateAgentPresetsUI();
+        }
+
+        private void UpdateAgentPresetsUI()
+        {
+            var presetNames = _agentPresets.Select(p => p.Name).ToList();
+            var selectedNames = _selectedAgentPresetNames.ToList();
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                _agentPane.UpdateAgentPresetsMenu(presetNames, selectedNames, _getString);
+                UpdateContextStats();
+            });
+        }
+
+        private async void OnAddAgentPresetClick()
+        {
+            var nameBox = CreateAgentPresetNameBox();
+            var contentBox = CreateAgentPresetContentBox();
+            var stack = CreateAgentPresetDialogContent(nameBox, contentBox);
+
+            _beforeDialog?.Invoke();
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AgentPresetAddText", "프리셋 추가"),
+                Content = stack,
+                PrimaryButtonText = _getString("AgentPresetSaveAddButton", "추가"),
+                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+
+            var result = await dialog.ShowAsync();
+            _afterDialog?.Invoke();
+            if (result != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            string presetName = nameBox.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(presetName))
+            {
+                _showError(_getString("AgentPresetNameEmptyTitle", "프리셋 추가 오류"), _getString("AgentPresetNameEmptyMessage", "프리셋 이름을 입력해주세요."));
+                return;
+            }
+
+            var existing = _agentPresets.FirstOrDefault(p => p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
+            if (existing != null && !await ConfirmAgentPresetOverwriteAsync())
+            {
+                return;
+            }
+
+            if (existing != null)
+            {
+                _agentPresets.Remove(existing);
+            }
+
+            _agentPresets.Add(new AgentPresetItem
+            {
+                Name = presetName,
+                Content = NormalizePresetContent(contentBox.Text)
+            });
+            await SaveAgentPresetsAsync();
+        }
+
+        private async void OnAgentPresetEdited(string presetName)
+        {
+            var preset = _agentPresets.FirstOrDefault(p => p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
+            if (preset == null)
+            {
+                return;
+            }
+
+            var nameBox = CreateAgentPresetNameBox(preset.Name);
+            var contentBox = CreateAgentPresetContentBox(preset.Content);
+            var stack = CreateAgentPresetDialogContent(nameBox, contentBox);
+
+            _beforeDialog?.Invoke();
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AgentPresetEditTitle", "프리셋 수정"),
+                Content = stack,
+                PrimaryButtonText = _getString("AgentPresetEditSaveButton", "저장"),
+                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+
+            var result = await dialog.ShowAsync();
+            _afterDialog?.Invoke();
+            if (result != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            string newName = nameBox.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                _showError(_getString("AgentPresetNameEmptyTitle", "프리셋 수정 오류"), _getString("AgentPresetNameEmptyMessage", "프리셋 이름을 입력해주세요."));
+                return;
+            }
+
+            if (!newName.Equals(presetName, StringComparison.OrdinalIgnoreCase))
+            {
+                var existing = _agentPresets.FirstOrDefault(p => p.Name.Equals(newName, StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    if (!await ConfirmAgentPresetOverwriteAsync())
+                    {
+                        return;
+                    }
+                    _agentPresets.Remove(existing);
+                    _selectedAgentPresetNames.Remove(existing.Name);
+                }
+            }
+
+            bool wasSelected = _selectedAgentPresetNames.Remove(preset.Name);
+            preset.Name = newName;
+            preset.Content = NormalizePresetContent(contentBox.Text);
+            if (wasSelected)
+            {
+                _selectedAgentPresetNames.Add(preset.Name);
+            }
+
+            await SaveAgentPresetsAsync();
+        }
+
+        private async void OnAgentPresetDeleted(string presetName)
+        {
+            var preset = _agentPresets.FirstOrDefault(p => p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
+            if (preset == null)
+            {
+                return;
+            }
+
+            _agentPresets.Remove(preset);
+            _selectedAgentPresetNames.Remove(preset.Name);
+            await SaveAgentPresetsAsync();
+        }
+
+        private void ToggleAgentPreset(string presetName)
+        {
+            if (!_agentPresets.Any(p => p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            if (!_selectedAgentPresetNames.Add(presetName))
+            {
+                _selectedAgentPresetNames.Remove(presetName);
+            }
+
+            UpdateAgentPresetsUI();
+        }
+
+        private void RemoveSelectedAgentPreset(string presetName)
+        {
+            _selectedAgentPresetNames.Remove(presetName);
+            UpdateAgentPresetsUI();
+        }
+
+        private TextBox CreateAgentPresetNameBox(string text = "")
+        {
+            return new TextBox
+            {
+                PlaceholderText = _getString("AgentPresetSavePlaceholder", "프리셋 이름 입력..."),
+                Text = text,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = 32,
+                IsSpellCheckEnabled = false,
+                IsTextPredictionEnabled = false,
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI, Malgun Gothic"),
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private TextBox CreateAgentPresetContentBox(string text = "")
+        {
+            var contentBox = new TextBox
+            {
+                PlaceholderText = _getString("AgentPresetContentPlaceholder", "페르소나/지침 내용..."),
+                Text = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 150,
+                MaxHeight = 300,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Segoe UI, Malgun Gothic")
+            };
+            ScrollViewer.SetVerticalScrollBarVisibility(contentBox, ScrollBarVisibility.Auto);
+            return contentBox;
+        }
+
+        private StackPanel CreateAgentPresetDialogContent(TextBox nameBox, TextBox contentBox)
+        {
+            var stack = new StackPanel { Spacing = 10, Width = 400 };
+            stack.Children.Add(new TextBlock { Text = _getString("AgentPresetSaveLabel", "프리셋 이름") });
+            stack.Children.Add(nameBox);
+            stack.Children.Add(new TextBlock { Text = _getString("AgentPresetContentLabel", "페르소나/지침") });
+            stack.Children.Add(contentBox);
+            return stack;
+        }
+
+        private async Task<bool> ConfirmAgentPresetOverwriteAsync()
+        {
+            _beforeDialog?.Invoke();
+            var confirmDialog = new ContentDialog
+            {
+                Title = _getString("AgentPresetDuplicateTitle", "프리셋 중복"),
+                Content = _getString("AgentPresetDuplicateMessage", "이미 동일한 이름의 프리셋이 존재합니다. 덮어쓰시겠습니까?"),
+                PrimaryButtonText = _getString("Yes", "예"),
+                CloseButtonText = _getString("No", "아니오"),
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+            var confirmResult = await confirmDialog.ShowAsync();
+            _afterDialog?.Invoke();
+            return confirmResult == ContentDialogResult.Primary;
+        }
+
+        private static string NormalizePresetContent(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace("\r", "\n", StringComparison.Ordinal);
+        }
+
         private double EstimateContextTokens()
         {
             string langCode = _displayText.LanguageCode;
             string systemPrompt = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildSystemPrompt(langCode);
 
-            string instruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
+            string instruction = BuildAgentInstruction(_agentPane.Prompt.Text?.Trim() ?? string.Empty);
             string workspaceContext = BuildWorkspaceContext(instruction);
             string selectedText = BuildActiveSelectionContext();
 

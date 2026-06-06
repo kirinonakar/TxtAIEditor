@@ -45,6 +45,9 @@ namespace TxtAIEditor.Controls
         private Windows.Foundation.Point? _outputPointerDownPoint;
         private bool _outputPointerSelectionGesture;
         private bool _hasExplicitOutputSelection;
+        private List<string> _agentPresetNames = new List<string>();
+        private HashSet<string> _selectedAgentPresetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private Func<string, string, string>? _getString;
 
         public string RawOutputText => GetRawOutputText();
         public string SelectedOutputText
@@ -87,6 +90,11 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? InsertOutputRequested;
         public event RoutedEventHandler? AddAttachmentRequested;
         public event EventHandler<AgentAttachmentItem>? RemoveAttachmentRequested;
+        public event RoutedEventHandler? AgentPresetAddRequested;
+        public event EventHandler<string>? AgentPresetToggled;
+        public event EventHandler<string>? AgentPresetEdited;
+        public event EventHandler<string>? AgentPresetDeleted;
+        public event EventHandler<string>? AgentPresetRemoved;
         public event RoutedEventHandler? DiffApproved;
         public event RoutedEventHandler? DiffCancelled;
         public event EventHandler<AgentFileEditPreview>? FileRevertRequested;
@@ -142,6 +150,7 @@ namespace TxtAIEditor.Controls
 
         public void Localize(Func<string, string, string> getString)
         {
+            _getString = getString;
             _displayText = new AgentDisplayLocalizer(getString);
             string outputText = _rawOutputText.TrimStart();
             if (_displayText.IsOutputPlaceholder(outputText))
@@ -153,6 +162,8 @@ namespace TxtAIEditor.Controls
             AgentIncludeActiveFileCheckBox.Content = getString("AgentIncludeActiveFile", "현재 탭 포함");
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
+            ToolTipService.SetToolTip(AgentPresetButton, getString("AgentPresetButtonTooltip", "페르소나/지침 프리셋"));
+            AgentAddPresetText.Text = getString("AgentPresetAddText", "프리셋 추가");
             _runButtonText = getString("AgentRunButton", "실행");
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
@@ -172,6 +183,8 @@ namespace TxtAIEditor.Controls
             AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (더블클릭 시 비교)");
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
             ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
+            RebuildAgentPresetMenu();
+            RebuildSelectedAgentPresetChips();
         }
 
         public void SetBusy(bool isBusy)
@@ -189,6 +202,9 @@ namespace TxtAIEditor.Controls
             AgentIncludeActiveFileCheckBox.IsEnabled = !isBusy;
             AgentAddAttachmentButton.IsEnabled = !isBusy;
             AgentAttachmentsList.IsEnabled = !isBusy;
+            AgentPresetButton.IsEnabled = !isBusy;
+            AgentSelectedPresetScrollViewer.IsHitTestVisible = !isBusy;
+            AgentSelectedPresetScrollViewer.Opacity = isBusy ? 0.65 : 1.0;
 
             if (!isBusy)
             {
@@ -669,6 +685,17 @@ namespace TxtAIEditor.Controls
             AddAttachmentRequested?.Invoke(sender, e);
         }
 
+        private void OnAgentAddPresetClickInPanel(object sender, RoutedEventArgs e)
+        {
+            AgentPresetAddRequested?.Invoke(sender, e);
+            AgentPresetFlyout.Hide();
+        }
+
+        private void OnAgentPresetFlyoutOpened(object sender, object e)
+        {
+            RebuildAgentPresetMenu();
+        }
+
         private void OnRemoveAttachmentClick(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is AgentAttachmentItem item)
@@ -975,6 +1002,162 @@ namespace TxtAIEditor.Controls
             }
 
             return new SolidColorBrush(fallbackColor);
+        }
+
+        public void UpdateAgentPresetsMenu(
+            IReadOnlyList<string> presetNames,
+            IReadOnlyCollection<string> selectedPresetNames,
+            Func<string, string, string> getString)
+        {
+            _getString = getString;
+            _agentPresetNames = new List<string>(presetNames);
+            _selectedAgentPresetNames = new HashSet<string>(selectedPresetNames, StringComparer.OrdinalIgnoreCase);
+            RebuildAgentPresetMenu();
+            RebuildSelectedAgentPresetChips();
+        }
+
+        private void RebuildAgentPresetMenu()
+        {
+            if (AgentPresetListPanel == null)
+            {
+                return;
+            }
+
+            AgentPresetListPanel.Children.Clear();
+            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
+            Func<string, string, string> getString = _getString ?? _displayText.GetString;
+
+            if (_agentPresetNames.Count == 0)
+            {
+                AgentPresetListPanel.Children.Add(new TextBlock
+                {
+                    Text = getString("AgentPresetEmptyText", "프리셋 없음"),
+                    FontSize = 11,
+                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
+                    Margin = new Thickness(4, 2, 4, 2)
+                });
+                return;
+            }
+
+            foreach (string presetName in _agentPresetNames)
+            {
+                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 0, 2) };
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                bool isSelected = _selectedAgentPresetNames.Contains(presetName);
+                var selectBtn = new Button
+                {
+                    Content = isSelected ? $"✓ {presetName}" : presetName,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    Height = 28,
+                    FontSize = 11,
+                    Padding = new Thickness(8, 0, 8, 0),
+                    Style = buttonStyle
+                };
+                string currentName = presetName;
+                selectBtn.Click += (_, _) => AgentPresetToggled?.Invoke(this, currentName);
+                Grid.SetColumn(selectBtn, 0);
+                rowGrid.Children.Add(selectBtn);
+
+                var editBtn = new Button
+                {
+                    Content = new FontIcon { Glyph = "\uE70F", FontSize = 10 },
+                    Width = 28,
+                    Height = 28,
+                    Padding = new Thickness(0),
+                    Style = buttonStyle
+                };
+                ToolTipService.SetToolTip(editBtn, getString("AgentPresetEditText", "수정"));
+                editBtn.Click += (_, _) =>
+                {
+                    AgentPresetEdited?.Invoke(this, currentName);
+                    AgentPresetFlyout.Hide();
+                };
+                Grid.SetColumn(editBtn, 1);
+                rowGrid.Children.Add(editBtn);
+
+                var deleteBtn = new Button
+                {
+                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
+                    Width = 28,
+                    Height = 28,
+                    Padding = new Thickness(0),
+                    Style = buttonStyle
+                };
+                ToolTipService.SetToolTip(deleteBtn, getString("AgentPresetDeleteText", "삭제"));
+                deleteBtn.Click += (_, _) => AgentPresetDeleted?.Invoke(this, currentName);
+                Grid.SetColumn(deleteBtn, 2);
+                rowGrid.Children.Add(deleteBtn);
+
+                AgentPresetListPanel.Children.Add(rowGrid);
+            }
+        }
+
+        private void RebuildSelectedAgentPresetChips()
+        {
+            if (AgentSelectedPresetPanel == null)
+            {
+                return;
+            }
+
+            AgentSelectedPresetPanel.Children.Clear();
+            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
+            Func<string, string, string> getString = _getString ?? _displayText.GetString;
+
+            foreach (string presetName in _agentPresetNames)
+            {
+                if (!_selectedAgentPresetNames.Contains(presetName))
+                {
+                    continue;
+                }
+
+                var chip = new Border
+                {
+                    Background = (Brush)Application.Current.Resources["SystemControlBackgroundAltMediumLowBrush"],
+                    BorderBrush = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 2, 2, 2)
+                };
+
+                var chipContent = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 4,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                chipContent.Children.Add(new TextBlock
+                {
+                    Text = presetName,
+                    FontSize = 11,
+                    MaxWidth = 120,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+                var removeBtn = new Button
+                {
+                    Content = "x",
+                    Tag = presetName,
+                    Width = 20,
+                    Height = 20,
+                    Padding = new Thickness(0),
+                    FontSize = 10,
+                    Style = buttonStyle
+                };
+                ToolTipService.SetToolTip(removeBtn, getString("AgentPresetRemoveTooltip", "선택 해제"));
+                removeBtn.Click += (_, _) => AgentPresetRemoved?.Invoke(this, presetName);
+                chipContent.Children.Add(removeBtn);
+
+                chip.Child = chipContent;
+                AgentSelectedPresetPanel.Children.Add(chip);
+            }
+
+            AgentSelectedPresetScrollViewer.Visibility =
+                AgentSelectedPresetPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public void ShowDiffConfirm(string header, string description)
