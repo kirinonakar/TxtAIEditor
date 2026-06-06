@@ -661,32 +661,7 @@ namespace TxtAIEditor.Controls
                         _agentPane.AppendOutputText(displayResult.TrimEnd() + Environment.NewLine);
                     });
 
-                    if (!skippedDuplicateTool &&
-                        IsSuccessfulSelectedRangeEdit(normalizedToolName, arguments, toolResult))
-                    {
-                        string completeMsg = _getString(
-                            "AgentSelectedRangeEditComplete",
-                            "선택 영역 변경을 적용했습니다.");
 
-                        transcript += "\n\n[Selected-range edit completed successfully. The host finalized the run to avoid extra edits outside the requested selection.]";
-
-                        await RunOnUIThreadAsync(() =>
-                        {
-                            AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
-                            _agentPane.AppendOutputLine(completeMsg);
-                        });
-
-                        _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
-                        string selectedEditRunTranscript = transcript.Substring(initialTranscript.Length);
-                        if (!string.IsNullOrWhiteSpace(selectedEditRunTranscript))
-                        {
-                            _sessionHistory.AppendLine(selectedEditRunTranscript.Trim());
-                        }
-                        _sessionHistory.AppendLine();
-
-                        completed = true;
-                        break;
-                    }
 
                     string verifyToolName = NormalizeToolName(toolName);
                     bool isFileEditTool = verifyToolName is "replace_in_file" or "replace_range"
@@ -1956,32 +1931,7 @@ namespace TxtAIEditor.Controls
             return null;
         }
 
-        private bool IsSuccessfulSelectedRangeEdit(string normalizedToolName, JsonElement arguments, string toolResult)
-        {
-            if (!_currentRunRestrictEditsToSelection ||
-                normalizedToolName != "replace_range" ||
-                !IsSuccessfulToolResult(toolResult))
-            {
-                return false;
-            }
 
-            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            if (!selection.HasLineRange)
-            {
-                return false;
-            }
-
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path) ||
-                !PathsReferToSameFile(path, selection.SourcePath!))
-            {
-                return false;
-            }
-
-            int startLine = GetReplaceRangeStartLineArgument(arguments, path);
-            int endLine = GetReplaceRangeEndLineArgument(arguments, path);
-            return startLine >= selection.StartLine && endLine <= selection.EndLine;
-        }
 
         private static bool IsFileEditingTool(string normalizedToolName)
         {
