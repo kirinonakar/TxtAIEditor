@@ -651,6 +651,38 @@ namespace TxtAIEditor.Controls
                         _agentPane.AppendOutputText(displayResult.TrimEnd() + Environment.NewLine);
                     });
 
+                    if (!skippedDuplicateTool &&
+                        !string.IsNullOrEmpty(selectionBeforeTool.Text) &&
+                        IsSelectionCompletionTool(normalizedToolName) &&
+                        IsSuccessfulToolResult(toolResult))
+                    {
+                        string selectionCompleteMsg = _getString(
+                            "AgentSelectionToolSucceededCleared",
+                            "선택 영역 작업이 성공하여 선택 컨텍스트를 지웠습니다. 작업을 종료합니다.");
+
+                        _currentRunSelectionSnapshot = null;
+                        _clearSelectionAfterRun = false;
+                        ClearSelectionIfMatches(selectionBeforeTool);
+                        transcript += "\n\n[Selection task completion: action tool succeeded, selection context was cleared, and the task is complete. Do not call another tool.]";
+
+                        await RunOnUIThreadAsync(() =>
+                        {
+                            AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
+                            _agentPane.AppendOutputLine(selectionCompleteMsg);
+                        });
+
+                        _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                        string selectionCompleteRunTranscript = transcript.Substring(initialTranscript.Length);
+                        if (!string.IsNullOrWhiteSpace(selectionCompleteRunTranscript))
+                        {
+                            _sessionHistory.AppendLine(selectionCompleteRunTranscript.Trim());
+                        }
+                        _sessionHistory.AppendLine();
+
+                        completed = true;
+                        break;
+                    }
+
                     // Selection-edit verification: after a file-edit tool succeeds on the
                     // selection's file, inspect the raw affected lines. Do not use read_file
                     // here because its headers/line numbers would make every comparison differ.
@@ -2001,6 +2033,17 @@ namespace TxtAIEditor.Controls
                 or "create_tab"
                 or "web_search_exa"
                 or "web_fetch_exa";
+        }
+
+        private static bool IsSelectionCompletionTool(string normalizedToolName)
+        {
+            return normalizedToolName is "create_file"
+                or "overwrite_file"
+                or "replace_in_file"
+                or "replace_range"
+                or "apply_patch"
+                or "insert_text"
+                or "create_tab";
         }
 
         private static bool IsSuccessfulToolResult(string result)

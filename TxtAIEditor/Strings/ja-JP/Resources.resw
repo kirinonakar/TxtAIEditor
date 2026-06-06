@@ -1446,6 +1446,9 @@
   <data name="AgentToolSuccessContinue" xml:space="preserve">
     <value>作業は成功しました。次のステップへ進みます。</value>
   </data>
+  <data name="AgentSelectionToolSucceededCleared" xml:space="preserve">
+    <value>選択範囲の作業が成功したため、選択コンテキストをクリアしました。作業を終了します。</value>
+  </data>
   <data name="AgentDuplicateToolSkipped" xml:space="preserve">
     <value>重複したツール呼び出しをスキップ</value>
   </data>
