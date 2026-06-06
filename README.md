@@ -74,20 +74,17 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Multi-Provider:** Connect with Gemini, OpenAI, or local LM Studio endpoints.
 *   **Secure Storage:** API keys are securely saved via native Windows Credential Manager.
 *   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Chinese, French, Spanish, German, etc. while safely preserving code structure, markdown formatting, and commands.
+*   **Context Actions:** Quick AI actions (Explain, Refactor, Summarize, Fix) on selected text.
 *   **AI Custom Commands:** Ask questions or give instructions to the AI.
     *   **Direct Input:** Type a short prompt in the input box and press Send.
-    *   **Instruction Tabs (up to 4):** Type your instruction in the editor, then click the **＋** button to save it as a reusable tab. After creating a tab, click **Add File Context** to attach the current file's content to that tab. Each tab stores its own instruction text and optional file context. Click a tab to switch, click **×** to delete.
-    *   **Instruction Presets:** Save and load reusable prompt templates (Presets) stored under `%USERPROFILE%\.TxtAIEditor\presets.json`.
-        *   **Tab-Based Loading:** Selecting a preset automatically maps it to a new dedicated instruction tab without overwriting your active typing area.
-        *   **Dynamic Prompt Merging:** Combines the active preset content with any manual additional instructions typed in the custom text box during transmission.
-        *   **CRUD Management:** Directly create new custom presets, edit existing ones via multiline dialog popups (optimized with fixed heights to prevent composition flickering), or delete them directly from the preset list.
-*   **Context Actions:** Quick AI actions (Explain, Refactor, Summarize, Fix) on selected text.
+    *   **Instruction Presets:** Save instructions as custom prompt presets for quick access.
 
 ### 🤖 AI Agent
-*   Solve complex, multi-step coding tasks automatically by allowing the AI assistant to run workspace tools (file search, read/write, terminal command execution, and web search/retrieval).
+*   **Autonomous Problem Solving:** Solve complex, multi-step editing tasks automatically by allowing the AI agent to run workspace tools (file search, read/write, terminal command execution, and web search/retrieval).
     *   **Git Repository Requirement:** Agent mode runs inside Git repositories (`.git`) by default, with an LLM settings option to allow Agent in non-Git folders.
-    *   **Exa Web Search & Fetch:** Supports real-time web search and webpage content extraction powered by the Exa API or Exa MCP server, allowing the agent to find live documentation, code samples, and up-to-date information. (Configurable via Exa API Key and Endpoint in the settings).
-    *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`) and [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`).
+    *   **Web Search & Fetch:** Supports real-time web search and webpage content extraction powered by the Exa API or Exa MCP server, allowing the agent to find live documentation, code samples, and up-to-date information. (Configurable via Exa API Key and Endpoint in the settings).   
+*   **Persona & System Instructions:** You can specify custom personas and system instructions for the AI agent.
+ *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`) and [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`).
 
 ### 💻 Terminal
 *   **Shell Profiles:** Launch PowerShell, Command Prompt, Git Bash, or WSL sessions directly beneath your editor canvas.
@@ -101,10 +98,6 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ### ⭐ Favorites
 *   **File & Folder Bookmarks:** Pin any file or folder to your Favorites panel for instant one-click access — no more digging through deep directory trees.
 *   **Right-Click to Add:** Simply **right-click** any file or folder in the Explorer panel and select **"Add to Favorites"** from the context menu.
-
-### 🔍 Advanced Search
-*   **Global Lookup:** Folder-wide multi-file search with Match Case, Whole Word, and Regex filtering.
-*   **Jump-to-Source:** Double-click search results to open the file and focus the exact line.
 
 ### 📑 Table of Contents (TOC) & Document Outline
 *   **Smart Outline Generator:** Automatically parses and generates a structural document outline based on the active file:
