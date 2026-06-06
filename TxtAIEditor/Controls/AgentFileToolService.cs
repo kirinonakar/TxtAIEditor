@@ -260,34 +260,31 @@ namespace TxtAIEditor.Controls
             // Normalize command line endings to CRLF for Windows PowerShell compatibility
             string normalizedCommand = command.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n");
 
-            // Set $OutputEncoding to UTF-8. Wrap [Console]::OutputEncoding in a try-catch 
-            // since it can throw "The handle is invalid" in headless/GUI-only environments.
-            string utf8Command = $"$OutputEncoding = [System.Text.Encoding]::UTF8; try {{ [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 }} catch {{}}; {normalizedCommand}";
+            // Force UTF-8 for PowerShell and Python subprocesses so Korean text printed
+            // through redirected stdout/stderr is decoded consistently by the agent pane.
+            string utf8Command = "$OutputEncoding = [System.Text.Encoding]::UTF8; " +
+                "try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::UTF8 } catch {}; " +
+                "$env:PYTHONUTF8 = '1'; $env:PYTHONIOENCODING = 'utf-8'; " +
+                normalizedCommand;
             string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(utf8Command));
             
             var profile = TerminalShellProfile.Resolve("PowerShell");
             string shellPath = profile.ExecutablePath;
 
-            // If running legacy Windows PowerShell (powershell.exe) instead of PowerShell 7 (pwsh.exe),
-            // and no console handle is present, attempts to set output encoding to UTF-8 might fail.
-            // In Windows PowerShell, it defaults to the system's active OEM encoding (e.g. CP949 on Korean Windows).
-            // So we use the culture's OEM code page (or fallback to UTF-8) to read stdout.
-            bool isPowerShell7 = shellPath.Contains("pwsh.exe", StringComparison.OrdinalIgnoreCase);
-            Encoding outputEncoding = Encoding.UTF8;
-            if (!isPowerShell7)
+            var environmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                try
-                {
-                    int oemCodePage = System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage;
-                    outputEncoding = Encoding.GetEncoding(oemCodePage);
-                }
-                catch
-                {
-                    outputEncoding = Encoding.UTF8;
-                }
-            }
+                ["PYTHONUTF8"] = "1",
+                ["PYTHONIOENCODING"] = "utf-8"
+            };
 
-            return await RunProcessAsync(shellPath, $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}", ResolveWorkspaceRoot(), timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken, outputEncoding);
+            return await RunProcessAsync(
+                shellPath,
+                $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
+                ResolveWorkspaceRoot(),
+                timeoutMs <= 0 ? 10000 : timeoutMs,
+                cancellationToken,
+                Encoding.UTF8,
+                environmentVariables);
         }
 
         public async Task<string> CreateFileAsync(string path, string content)
@@ -802,12 +799,13 @@ namespace TxtAIEditor.Controls
             string workingDirectory, 
             int timeoutMs, 
             CancellationToken cancellationToken,
-            Encoding? outputEncoding = null)
+            Encoding? outputEncoding = null,
+            IReadOnlyDictionary<string, string>? environmentVariables = null)
         {
             var output = new StringBuilder();
             using var process = new Process();
             var encoding = outputEncoding ?? Encoding.UTF8;
-            process.StartInfo = new ProcessStartInfo
+            var startInfo = new ProcessStartInfo
             {
                 FileName = fileName,
                 Arguments = arguments,
@@ -819,6 +817,16 @@ namespace TxtAIEditor.Controls
                 StandardOutputEncoding = encoding,
                 StandardErrorEncoding = encoding
             };
+
+            if (environmentVariables != null)
+            {
+                foreach (var pair in environmentVariables)
+                {
+                    startInfo.Environment[pair.Key] = pair.Value;
+                }
+            }
+
+            process.StartInfo = startInfo;
 
             try
             {
@@ -834,8 +842,8 @@ namespace TxtAIEditor.Controls
                 return $"{fileName} failed to start: {ex.Message}";
             }
 
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync();
+            Task<byte[]> stdoutTask = ReadAllBytesAsync(process.StandardOutput.BaseStream, cancellationToken);
+            Task<byte[]> stderrTask = ReadAllBytesAsync(process.StandardError.BaseStream, cancellationToken);
             Task exitTask = process.WaitForExitAsync(cancellationToken);
 
             try
@@ -872,8 +880,8 @@ namespace TxtAIEditor.Controls
                 throw;
             }
 
-            string stdout = await stdoutTask;
-            string stderr = await stderrTask;
+            string stdout = encoding.GetString(await stdoutTask);
+            string stderr = encoding.GetString(await stderrTask);
             if (!string.IsNullOrWhiteSpace(stdout))
             {
                 output.AppendLine(stdout.TrimEnd());
@@ -889,6 +897,13 @@ namespace TxtAIEditor.Controls
 
             string text = output.ToString();
             return text.Length > 20000 ? text.Substring(0, 20000) + "\n[output truncated]" : text;
+        }
+
+        private static async Task<byte[]> ReadAllBytesAsync(Stream stream, CancellationToken cancellationToken)
+        {
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream, cancellationToken);
+            return memoryStream.ToArray();
         }
 
         private string ResolveWorkspaceRoot()
