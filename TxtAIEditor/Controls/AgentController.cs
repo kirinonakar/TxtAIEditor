@@ -1262,6 +1262,18 @@ namespace TxtAIEditor.Controls
             return value.Length > 120 ? value.Substring(0, 120) + "..." : value;
         }
 
+        private static string TruncateForConfirmation(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "(empty)";
+            }
+
+            value = value.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\n', ' ').Replace('\r', ' ');
+            const int maxConfirmationChars = 20;
+            return value.Length > maxConfirmationChars ? value.Substring(0, maxConfirmationChars) + "..." : value;
+        }
+
         private static bool TryParseToolCall(string response, out string toolName, out JsonElement arguments)
         {
             toolName = string.Empty;
@@ -2147,7 +2159,8 @@ namespace TxtAIEditor.Controls
             return await RunOnUIThreadAsync(async () =>
             {
                 string headerText = _getString("AgentPowerShellConfirmHeader", "PowerShell 실행 확인");
-                string summaryText = string.Format(_getString("AgentPowerShellConfirmSummaryFormat", "아래 명령을 실행하시겠습니까?\n\n{0}"), command);
+                string displayCommand = TruncateForConfirmation(command);
+                string summaryText = string.Format(_getString("AgentPowerShellConfirmSummaryFormat", "아래 명령을 실행하시겠습니까?\n\n{0}"), displayCommand);
 
                 _agentPane.ShowDiffConfirm(headerText, summaryText);
 
