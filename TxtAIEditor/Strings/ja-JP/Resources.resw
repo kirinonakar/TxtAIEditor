@@ -1443,6 +1443,9 @@
   <data name="AgentToolRunning" xml:space="preserve">
     <value>ツール実行中</value>
   </data>
+  <data name="AgentToolSuccessContinue" xml:space="preserve">
+    <value>作業は成功しました。次のステップへ進みます。</value>
+  </data>
   <data name="AgentDuplicateToolSkipped" xml:space="preserve">
     <value>重複したツール呼び出しをスキップ</value>
   </data>

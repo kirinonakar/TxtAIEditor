@@ -1442,6 +1442,9 @@
   <data name="AgentToolRunning" xml:space="preserve">
     <value>도구 실행 중</value>
   </data>
+  <data name="AgentToolSuccessContinue" xml:space="preserve">
+    <value>작업이 성공하였습니다. 다음 단계로 진행합니다.</value>
+  </data>
   <data name="AgentDuplicateToolSkipped" xml:space="preserve">
     <value>도구 중복 호출 건너뜀</value>
   </data>

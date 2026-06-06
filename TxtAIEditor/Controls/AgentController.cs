@@ -569,10 +569,19 @@ namespace TxtAIEditor.Controls
                     {
                         toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
                         toolResultForTranscript = toolResult;
-                        if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) && IsSuccessfulToolResult(toolResult))
+                        if (IsSuccessfulToolResult(toolResult))
                         {
-                            successfulToolResults[toolInvocationKey] = toolResult;
-                            toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success. Continue from this result; do not repeat this same tool call unless the user explicitly asks to rerun it or the previous result is incomplete.]";
+                            string successContinueMessage = _getString(
+                                "AgentToolSuccessContinue",
+                                "작업이 성공하였습니다. 다음 단계로 진행합니다.");
+                            toolResult = AppendToolStatusMessage(toolResult, successContinueMessage);
+                            toolResultForTranscript = toolResult;
+
+                            if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
+                            {
+                                successfulToolResults[toolInvocationKey] = toolResult;
+                                toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success. Continue from this result; do not repeat this same tool call unless the user explicitly asks to rerun it or the previous result is incomplete.]";
+                            }
                         }
                     }
 
@@ -1960,6 +1969,18 @@ namespace TxtAIEditor.Controls
             var exitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
             return !exitCodeMatch.Success ||
                 (int.TryParse(exitCodeMatch.Groups[1].Value, out int exitCode) && exitCode == 0);
+        }
+
+        private static string AppendToolStatusMessage(string result, string message)
+        {
+            string trimmedResult = (result ?? string.Empty).TrimEnd();
+            if (string.IsNullOrWhiteSpace(message) ||
+                trimmedResult.EndsWith(message, StringComparison.Ordinal))
+            {
+                return trimmedResult;
+            }
+
+            return $"{trimmedResult}\n{message}";
         }
 
         private static string BuildToolInvocationKey(string normalizedToolName, JsonElement arguments)
