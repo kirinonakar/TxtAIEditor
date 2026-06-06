@@ -898,7 +898,7 @@ namespace TxtAIEditor.Controls
             }
 
             var activeTab = _activeTabProvider();
-            if (activeTab != null && _agentPane.IncludeActiveFile)
+            if (activeTab != null && _agentPane.IncludeActiveFile && !IsPdfTab(activeTab))
             {
                 string title = string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath;
                 string content = _getTabText(activeTab, MaxActiveFileContextChars);
@@ -944,6 +944,14 @@ namespace TxtAIEditor.Controls
             }
 
             return string.Join(Environment.NewLine, context);
+        }
+
+        private static bool IsPdfTab(OpenedTab tab)
+        {
+            return tab.IsPdfViewer ||
+                   string.Equals(tab.Language, "pdf", StringComparison.OrdinalIgnoreCase) ||
+                   (!string.IsNullOrWhiteSpace(tab.FilePath) &&
+                    string.Equals(Path.GetExtension(tab.FilePath), ".pdf", StringComparison.OrdinalIgnoreCase));
         }
 
         private void AddReferencedPathContext(List<string> context, string instruction)
@@ -2316,9 +2324,19 @@ namespace TxtAIEditor.Controls
             }
 
             var activeTab = _activeTabProvider();
-            string tabPart = activeTab == null
-                ? _getString("AgentNoActiveTab", "활성 탭 없음")
-                : Path.GetFileName(string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath);
+            string tabPart;
+            if (activeTab == null)
+            {
+                tabPart = _getString("AgentNoActiveTab", "활성 탭 없음");
+            }
+            else
+            {
+                tabPart = Path.GetFileName(string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath);
+                if (_agentPane.IncludeActiveFile && IsPdfTab(activeTab))
+                {
+                    tabPart = string.Format(_getString("AgentPdfActiveTabExcluded", "{0} (PDF 제외)"), tabPart);
+                }
+            }
 
             string activeSelectionText = GetActiveSelectionText();
             string selectionPart = string.IsNullOrEmpty(activeSelectionText)

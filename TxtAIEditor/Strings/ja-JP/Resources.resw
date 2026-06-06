@@ -666,6 +666,9 @@
   <data name="LlmNoActiveTabForFileContext" xml:space="preserve">
     <value>ファイルコンテキストとして追加するアクティブなタブがありません。</value>
   </data>
+  <data name="LlmPdfFileContextExcluded" xml:space="preserve">
+    <value>PDF タブはファイルコンテキストに含まれません。</value>
+  </data>
   <data name="LlmInsertTitle" xml:space="preserve">
     <value>AI 応答入力</value>
   </data>
@@ -1575,6 +1578,9 @@
   <data name="AgentIncludeActiveFile" xml:space="preserve">
     <value>アクティブなタブを含める</value>
   </data>
+  <data name="AgentPdfActiveTabExcluded" xml:space="preserve">
+    <value>{0} (PDF 除外)</value>
+  </data>
   <data name="AgentPromptPlaceholder" xml:space="preserve">
     <value>Agentに指示する作業を入力...</value>
   </data>
@@ -1726,6 +1732,9 @@
   </data>
   <data name="AgentAttachmentErrorFormat" xml:space="preserve">
     <value>添付の追加中にエラーが発生しました: {0}</value>
+  </data>
+  <data name="AgentPdfAttachmentExcluded" xml:space="preserve">
+    <value>PDF ファイルは添付に含まれません。</value>
   </data>
   <data name="AgentAttachmentFileDetail" xml:space="preserve">
     <value>ファイル、{0:N0} 文字</value>

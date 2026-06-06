@@ -114,8 +114,15 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
+                int skippedPdfCount = 0;
                 foreach (var file in files)
                 {
+                    if (IsPdfFile(file))
+                    {
+                        skippedPdfCount++;
+                        continue;
+                    }
+
                     try
                     {
                         var attachment = await CreateAttachmentAsync(file);
@@ -134,6 +141,13 @@ namespace TxtAIEditor.Controls
                                 _getString("AgentAttachmentErrorFormat", "An error occurred while adding the attachment: {0}"),
                                 ex.Message));
                     }
+                }
+
+                if (skippedPdfCount > 0)
+                {
+                    _showError(
+                        _getString("AgentAttachmentErrorTitle", "Attachment Error"),
+                        _getString("AgentPdfAttachmentExcluded", "PDF files are not included as attachments."));
                 }
 
                 RefreshAttachments();
@@ -174,6 +188,11 @@ namespace TxtAIEditor.Controls
             string path = file.Path ?? displayName;
             string mimeType = GetMimeType(file);
 
+            if (IsPdfFile(file))
+            {
+                return null;
+            }
+
             if (IsImageFile(file, mimeType))
             {
                 var image = await CreateImageAttachmentAsync(file, displayName, mimeType);
@@ -187,9 +206,7 @@ namespace TxtAIEditor.Controls
                 };
             }
 
-            string text = IsPdfFile(file)
-                ? await ReadAttachmentPdfTextAsync(file)
-                : await ReadAttachmentTextAsync(file);
+            string text = await ReadAttachmentTextAsync(file);
             int estimatedTokens = (int)Math.Round(_estimateTokenCount(text));
             bool truncated = text.Length >= MaxAttachmentTextChars;
             return new AgentAttachmentState

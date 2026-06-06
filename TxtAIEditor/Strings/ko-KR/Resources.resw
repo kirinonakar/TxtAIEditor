@@ -665,6 +665,9 @@
   <data name="LlmNoActiveTabForFileContext" xml:space="preserve">
     <value>파일 맥락으로 추가할 활성 탭이 없습니다.</value>
   </data>
+  <data name="LlmPdfFileContextExcluded" xml:space="preserve">
+    <value>PDF 탭은 파일 맥락에 포함되지 않습니다.</value>
+  </data>
   <data name="LlmInsertTitle" xml:space="preserve">
     <value>AI 응답 입력</value>
   </data>
@@ -1574,6 +1577,9 @@
   <data name="AgentIncludeActiveFile" xml:space="preserve">
     <value>현재 탭 포함</value>
   </data>
+  <data name="AgentPdfActiveTabExcluded" xml:space="preserve">
+    <value>{0} (PDF 제외)</value>
+  </data>
   <data name="AgentPromptPlaceholder" xml:space="preserve">
     <value>Agent에게 맡길 작업 입력...</value>
   </data>
@@ -1725,6 +1731,9 @@
   </data>
   <data name="AgentAttachmentErrorFormat" xml:space="preserve">
     <value>첨부를 추가하는 중 오류가 발생했습니다: {0}</value>
+  </data>
+  <data name="AgentPdfAttachmentExcluded" xml:space="preserve">
+    <value>PDF 파일은 첨부에 포함되지 않습니다.</value>
   </data>
   <data name="AgentAttachmentFileDetail" xml:space="preserve">
     <value>파일, {0:N0}자</value>

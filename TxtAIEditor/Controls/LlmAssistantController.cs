@@ -241,6 +241,14 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (IsPdfTab(tab))
+            {
+                _showError(
+                    _getString("LlmFileContextTitle", "AI 파일 맥락"),
+                    _getString("LlmPdfFileContextExcluded", "PDF 탭은 파일 맥락에 포함되지 않습니다."));
+                return;
+            }
+
             string title = string.IsNullOrWhiteSpace(tab.FilePath) ? tab.Title : tab.FilePath;
             const int maxChars = 120_000;
             string content = _getTabText(tab, maxChars);
@@ -264,6 +272,14 @@ namespace TxtAIEditor.Controls
             }
 
             _rightSidebar.LlmFileContext.Text = display;
+        }
+
+        private static bool IsPdfTab(OpenedTab tab)
+        {
+            return tab.IsPdfViewer ||
+                   string.Equals(tab.Language, "pdf", StringComparison.OrdinalIgnoreCase) ||
+                   (!string.IsNullOrWhiteSpace(tab.FilePath) &&
+                    string.Equals(Path.GetExtension(tab.FilePath), ".pdf", StringComparison.OrdinalIgnoreCase));
         }
 
         private void OnLlmRemoveFileContextClick(object sender, RoutedEventArgs e)
