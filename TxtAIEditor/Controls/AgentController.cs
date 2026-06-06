@@ -1340,7 +1340,7 @@ namespace TxtAIEditor.Controls
             }
 
             value = value.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\n', ' ').Replace('\r', ' ');
-            const int maxConfirmationChars = 20;
+            const int maxConfirmationChars = 40;
             return value.Length > maxConfirmationChars ? value.Substring(0, maxConfirmationChars) + "..." : value;
         }
 
