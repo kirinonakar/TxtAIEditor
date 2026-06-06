@@ -54,6 +54,10 @@ namespace TxtAIEditor.Controls
             _localizationService = localizationService;
 
             WireEvents();
+            _leftSidebar.ActualThemeChanged += (sender, args) =>
+            {
+                _ = UpdateGitStatusesAsync();
+            };
         }
 
         public string CurrentFolderPath { get; private set; } = string.Empty;
@@ -63,12 +67,17 @@ namespace TxtAIEditor.Controls
             _viewModel.ExplorerItems.Clear();
             SetCurrentFolderPath(folderPath);
 
+            bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
             foreach (var item in _directoryService.CreateDirectoryItems(folderPath))
             {
+                item.IsDark = isDark;
                 _viewModel.ExplorerItems.Add(item);
             }
 
             _leftSidebar.ExplorerStatus.Text = $"{folderPath}\n{FormatExplorerItemCount(_viewModel.ExplorerItems.Count)}";
+
+            // Trigger Git status update in the background
+            _ = UpdateGitStatusesAsync();
         }
 
         public async Task NavigateToFolderAsync(string folderPath)
@@ -199,6 +208,108 @@ namespace TxtAIEditor.Controls
             string fallback = itemCount == 1 ? "{0:N0}개 항목" : "{0:N0}개 항목";
             string format = _localizationService.GetString(key, fallback);
             return string.Format(format, itemCount);
+        }
+
+        public async Task UpdateGitStatusesAsync()
+        {
+            bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+            string repoPath = _gitService.FindRepositoryRoot(CurrentFolderPath) ?? string.Empty;
+            if (string.IsNullOrEmpty(repoPath))
+            {
+                _leftSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    foreach (var item in _viewModel.ExplorerItems)
+                    {
+                        item.IsDark = isDark;
+                        item.GitStatus = ExplorerItem.GitStatusType.Clean;
+                    }
+                });
+                return;
+            }
+
+            var statuses = await _gitService.GetFileStatusesAsync(repoPath);
+            _leftSidebar.DispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateItemsGitStatus(statuses, isDark);
+            });
+        }
+
+        private void UpdateItemsGitStatus(System.Collections.Generic.Dictionary<string, string> statuses, bool isDark)
+        {
+            foreach (var item in _viewModel.ExplorerItems)
+            {
+                item.IsDark = isDark;
+                if (item.IsFolder)
+                {
+                    bool hasModified = false;
+                    bool hasAdded = false;
+                    bool hasIgnored = false;
+
+                    string folderPathWithSlash = item.Path.EndsWith(Path.DirectorySeparatorChar)
+                        ? item.Path
+                        : item.Path + Path.DirectorySeparatorChar;
+
+                    foreach (var kvp in statuses)
+                    {
+                        if (kvp.Key.StartsWith(folderPathWithSlash, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string status = kvp.Value;
+                            if (status == "??" || status.Trim() == "??")
+                            {
+                                hasAdded = true;
+                            }
+                            else if (status == "!!" || status.Trim() == "!!")
+                            {
+                                hasIgnored = true;
+                            }
+                            else
+                            {
+                                hasModified = true;
+                            }
+                        }
+                    }
+
+                    if (hasModified)
+                    {
+                        item.GitStatus = ExplorerItem.GitStatusType.Modified;
+                    }
+                    else if (hasAdded)
+                    {
+                        item.GitStatus = ExplorerItem.GitStatusType.Added;
+                    }
+                    else if (hasIgnored)
+                    {
+                        item.GitStatus = ExplorerItem.GitStatusType.Ignored;
+                    }
+                    else
+                    {
+                        item.GitStatus = ExplorerItem.GitStatusType.Clean;
+                    }
+                }
+                else
+                {
+                    if (statuses.TryGetValue(item.Path, out string? status))
+                    {
+                        string trimmedStatus = status.Trim();
+                        if (trimmedStatus == "??")
+                        {
+                            item.GitStatus = ExplorerItem.GitStatusType.Added;
+                        }
+                        else if (trimmedStatus == "!!")
+                        {
+                            item.GitStatus = ExplorerItem.GitStatusType.Ignored;
+                        }
+                        else
+                        {
+                            item.GitStatus = ExplorerItem.GitStatusType.Modified;
+                        }
+                    }
+                    else
+                    {
+                        item.GitStatus = ExplorerItem.GitStatusType.Clean;
+                    }
+                }
+            }
         }
     }
 }

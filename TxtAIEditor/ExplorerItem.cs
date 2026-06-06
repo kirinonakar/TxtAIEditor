@@ -1,14 +1,92 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace TxtAIEditor
 {
-    public class ExplorerItem
+    public class ExplorerItem : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public string Name { get; set; } = string.Empty;
         public string Path { get; set; } = string.Empty;
         public bool IsFolder { get; set; } = false;
+
+        public enum GitStatusType
+        {
+            Clean,
+            Modified,
+            Added,
+            Ignored
+        }
+
+        private GitStatusType _gitStatus = GitStatusType.Clean;
+        public GitStatusType GitStatus
+        {
+            get => _gitStatus;
+            set
+            {
+                if (_gitStatus != value)
+                {
+                    _gitStatus = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(ForegroundColor));
+                    OnPropertyChanged(nameof(GitBadge));
+                    OnPropertyChanged(nameof(GitBadgeVisibility));
+                }
+            }
+        }
+
+        private bool _isDark = false;
+        public bool IsDark
+        {
+            get => _isDark;
+            set
+            {
+                if (_isDark != value)
+                {
+                    _isDark = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(ForegroundColor));
+                }
+            }
+        }
+
+        public Microsoft.UI.Xaml.Media.Brush ForegroundColor
+        {
+            get
+            {
+                return _gitStatus switch
+                {
+                    GitStatusType.Modified => new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        _isDark ? Windows.UI.Color.FromArgb(255, 226, 192, 141) : Windows.UI.Color.FromArgb(255, 176, 125, 5)),
+                    GitStatusType.Added => new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        _isDark ? Windows.UI.Color.FromArgb(255, 129, 184, 139) : Windows.UI.Color.FromArgb(255, 40, 167, 69)),
+                    GitStatusType.Ignored => new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        _isDark ? Windows.UI.Color.FromArgb(255, 106, 115, 125) : Windows.UI.Color.FromArgb(255, 149, 157, 165)),
+                    _ => new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        _isDark ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Black)
+                };
+            }
+        }
+
+        public string GitBadge => _gitStatus switch
+        {
+            GitStatusType.Modified => "M",
+            GitStatusType.Added => "U",
+            GitStatusType.Ignored => "I",
+            _ => string.Empty
+        };
+
+        public Microsoft.UI.Xaml.Visibility GitBadgeVisibility =>
+            _gitStatus == GitStatusType.Clean ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 
         public string IconGlyph => IsFolder ? "\uED41" : GetFileIconGlyph(Name);
 

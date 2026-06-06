@@ -2423,6 +2423,7 @@ namespace TxtAIEditor
             }
 
             await _gitStatusRefreshController.RefreshAsync();
+            await _explorerNavigationController.UpdateGitStatusesAsync();
         }
 
         private void QueueGitStatusRefresh()

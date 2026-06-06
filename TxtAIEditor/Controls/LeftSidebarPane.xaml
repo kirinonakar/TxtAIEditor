@@ -179,13 +179,15 @@
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center">
                                                     <FontIcon.Foreground>
                                                         <SolidColorBrush Color="{Binding IconColor}"/>
                                                     </FontIcon.Foreground>
                                                 </FontIcon>
-                                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Path}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{Binding ForegroundColor}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Path}"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding GitBadge}" Foreground="{Binding ForegroundColor}" FontSize="10" FontWeight="Bold" Margin="5,0,8,0" VerticalAlignment="Center" Visibility="{Binding GitBadgeVisibility}"/>
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>
