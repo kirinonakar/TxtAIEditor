@@ -38,6 +38,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
+        private readonly Func<string, string, bool, Task>? _revertTabOrFileAsync;
+        private readonly Action<string>? _closeTabById;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly List<AgentFileEditPreview> _sessionEdits = new();
@@ -97,7 +99,9 @@ namespace TxtAIEditor.Controls
             Func<AgentFileEditPreview, Task> openDiffViewAsync,
             Func<string, Task>? fileModifiedAsync = null,
             Action? beforeDialog = null,
-            Action? afterDialog = null)
+            Action? afterDialog = null,
+            Func<string, string, bool, Task>? revertTabOrFileAsync = null,
+            Action<string>? closeTabById = null)
         {
             _llmService = llmService;
             _settingsService = settingsService;
@@ -116,6 +120,8 @@ namespace TxtAIEditor.Controls
             _fileModifiedAsync = fileModifiedAsync;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
+            _revertTabOrFileAsync = revertTabOrFileAsync;
+            _closeTabById = closeTabById;
             _displayText = new AgentDisplayLocalizer(_getString);
             _attachmentController = new AgentAttachmentController(
                 _agentPane,
@@ -388,9 +394,16 @@ namespace TxtAIEditor.Controls
                     bool? isJsonToolCall = null;
                     bool hasToolCall = false;
 
+                    string currentTranscript = transcript;
+                    string sessionDiffLog = BuildSessionDiffLog();
+                    if (!string.IsNullOrEmpty(sessionDiffLog))
+                    {
+                        currentTranscript = $"{transcript}\n\n[Diff log of changes made in this session]\n{sessionDiffLog}";
+                    }
+
                     response = await _llmService.RunAgentAsync(
                         instruction,
-                        transcript,
+                        currentTranscript,
                         runSelectionContext,
                         "run",
                         async chunk =>
@@ -2414,10 +2427,45 @@ namespace TxtAIEditor.Controls
                 return "insert_text failed: content is empty.";
             }
 
+            var activeTab = _activeTabProvider();
+            if (activeTab == null)
+            {
+                return "insert_text failed: no active tab.";
+            }
+
+            string oldContent = _getTabText(activeTab, int.MaxValue);
+
             bool inserted = await RunOnUIThreadAsync(async () => await _insertIntoActiveEditorAsync(content));
-            return inserted
-                ? $"inserted into active editor: {content.Length:N0} chars"
-                : "insert_text failed: active editor did not accept the text.";
+            if (!inserted)
+            {
+                return "insert_text failed: active editor did not accept the text.";
+            }
+
+            // Wait 200ms for WebView2/Monaco content sync
+            await Task.Delay(200);
+
+            string newContent = _getTabText(activeTab, int.MaxValue);
+
+            string relPath = string.IsNullOrEmpty(activeTab.FilePath)
+                ? activeTab.Title
+                : Path.GetRelativePath(_fileTools.WorkspaceRoot, activeTab.FilePath).Replace('\\', '/');
+            string fullPath = string.IsNullOrEmpty(activeTab.FilePath)
+                ? activeTab.Id
+                : activeTab.FilePath;
+
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "insert_text",
+                RelativePath = relPath,
+                FullPath = fullPath,
+                OldContent = oldContent,
+                NewContent = newContent,
+                IsNewFile = false
+            };
+
+            await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
+
+            return $"inserted into active editor: {content.Length:N0} chars";
         }
 
         private async Task<string> CreateTabToolAsync(JsonElement arguments)
@@ -2434,6 +2482,19 @@ namespace TxtAIEditor.Controls
                 content));
 
             string displayTitle = string.IsNullOrWhiteSpace(tab.Title) ? "Untitled" : tab.Title;
+
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "create_tab",
+                RelativePath = displayTitle,
+                FullPath = tab.Id,
+                OldContent = string.Empty,
+                NewContent = content,
+                IsNewFile = true
+            };
+
+            await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
+
             return $"created new tab: {displayTitle} ({content.Length:N0} chars)";
         }
 
@@ -2515,22 +2576,33 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                if (preview.IsNewFile)
+                if (_revertTabOrFileAsync != null)
                 {
-                    if (File.Exists(preview.FullPath))
+                    await RunOnUIThreadAsync<bool>(async () =>
                     {
-                        File.Delete(preview.FullPath);
-                    }
+                        await _revertTabOrFileAsync(preview.FullPath, preview.OldContent, preview.IsNewFile);
+                        return true;
+                    });
                 }
                 else
                 {
-                    await File.WriteAllTextAsync(preview.FullPath, preview.OldContent);
+                    if (preview.IsNewFile)
+                    {
+                        if (File.Exists(preview.FullPath))
+                        {
+                            File.Delete(preview.FullPath);
+                        }
+                    }
+                    else
+                    {
+                        await File.WriteAllTextAsync(preview.FullPath, preview.OldContent);
+                    }
                 }
 
                 _sessionEdits.Remove(preview);
                 _agentPane.UpdateModifiedFiles(_sessionEdits.ToList());
 
-                if (_fileModifiedAsync != null)
+                if (_fileModifiedAsync != null && !string.IsNullOrEmpty(preview.FullPath) && (Path.IsPathRooted(preview.FullPath) || File.Exists(preview.FullPath)))
                 {
                     await _fileModifiedAsync(preview.FullPath);
                 }
@@ -3134,6 +3206,97 @@ namespace TxtAIEditor.Controls
                 }
             }
             return tokens;
+        }
+
+        private string BuildSessionDiffLog()
+        {
+            if (_sessionEdits.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder();
+            foreach (var edit in _sessionEdits)
+            {
+                builder.AppendLine($"--- File: {edit.RelativePath} (Action: {edit.ActionName}) ---");
+                if (edit.IsNewFile)
+                {
+                    builder.AppendLine("[New File Content]");
+                    builder.AppendLine(edit.NewContent);
+                }
+                else
+                {
+                    string diff = GenerateDiff(edit.OldContent, edit.NewContent);
+                    builder.AppendLine(diff);
+                }
+                builder.AppendLine();
+            }
+
+            return builder.ToString().TrimEnd();
+        }
+
+        private static string GenerateDiff(string oldText, string newText)
+        {
+            if (string.IsNullOrEmpty(oldText))
+            {
+                return "+ " + newText.Replace("\r", "").Replace("\n", "\n+ ");
+            }
+            if (string.IsNullOrEmpty(newText))
+            {
+                return "- " + oldText.Replace("\r", "").Replace("\n", "\n- ");
+            }
+
+            var oldLines = oldText.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+            var newLines = newText.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+            int n = oldLines.Length;
+            int m = newLines.Length;
+
+            if ((long)n * m > 500_000)
+            {
+                return "[Diff too large to display line-by-line]";
+            }
+
+            int[,] lcs = new int[n + 1, m + 1];
+
+            for (int i = 1; i <= n; i++)
+            {
+                for (int j = 1; j <= m; j++)
+                {
+                    if (oldLines[i - 1] == newLines[j - 1])
+                    {
+                        lcs[i, j] = lcs[i - 1, j - 1] + 1;
+                    }
+                    else
+                    {
+                        lcs[i, j] = Math.Max(lcs[i - 1, j], lcs[i, j - 1]);
+                    }
+                }
+            }
+
+            var diffResult = new List<string>();
+            int x = n, y = m;
+            while (x > 0 || y > 0)
+            {
+                if (x > 0 && y > 0 && oldLines[x - 1] == newLines[y - 1])
+                {
+                    diffResult.Add("  " + oldLines[x - 1]);
+                    x--;
+                    y--;
+                }
+                else if (y > 0 && (x == 0 || lcs[x, y - 1] >= lcs[x - 1, y]))
+                {
+                    diffResult.Add("+ " + newLines[y - 1]);
+                    y--;
+                }
+                else if (x > 0 && (y == 0 || lcs[x, y - 1] < lcs[x - 1, y]))
+                {
+                    diffResult.Add("- " + oldLines[x - 1]);
+                    x--;
+                }
+            }
+
+            diffResult.Reverse();
+            return string.Join("\n", diffResult);
         }
 
     }

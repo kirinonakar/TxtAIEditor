@@ -83,6 +83,10 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("<tool_call>{\"name\":\"read_file\",\"arguments\":{\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":1,\"lineCount\":120}}</tool_call>");
             builder.AppendLine("- After the host returns a tool result, continue reasoning from that result.");
             builder.AppendLine("- If a tool result indicates success, do not repeat the same tool call with the same arguments. Continue to the next needed step or final answer.");
+            builder.AppendLine("- After any file edit (e.g. replace_in_file, replace_range, apply_patch, overwrite_file, create_file) or editor input (e.g. insert_text, create_tab), you must read the [Diff log of changes made in this session] section provided in the prompt.");
+            builder.AppendLine("- Carefully review the diff log to ensure that the edits conform exactly to the user's instructions and contain no errors, omissions, or syntax issues.");
+            builder.AppendLine("- If the diff log shows that the changes satisfy the user's instructions, write the final answer and conclude the run (this will end the loop).");
+            builder.AppendLine("- If the changes are insufficient, incorrect, or contain bugs, make additional tool calls to modify the files/tabs to correct the errors.");
             builder.AppendLine("- If a tool result indicates failure, cancellation, timeout, or a non-zero exit code, you may retry after changing the command, arguments, or approach.");
             builder.AppendLine("- When no more tools are needed, output the final answer without a tool_call tag.");
             builder.AppendLine();

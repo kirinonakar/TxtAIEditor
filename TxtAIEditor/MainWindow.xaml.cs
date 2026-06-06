@@ -549,7 +549,9 @@ namespace TxtAIEditor
                 OpenAgentDiffViewAsync,
                 OnAgentFileModifiedAsync,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
-                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
+                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
+                revertTabOrFileAsync: RevertTabOrFileAsync,
+                closeTabById: CloseTabById);
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,
@@ -1865,6 +1867,71 @@ namespace TxtAIEditor
                 labelA: GetLocalizedString("DiffOriginalLabel", "원본"),
                 labelB: GetLocalizedString("DiffModifiedLabel", "수정본"));
         }
+
+        private void CloseTabById(string tabId)
+        {
+            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
+            if (tab != null)
+            {
+                var tabItem = EditorTabView.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id)
+                           ?? EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
+                if (tabItem != null)
+                {
+                    _tabCloseController.CloseAndCleanup(tab, tabItem);
+                }
+            }
+        }
+
+        private async Task RevertTabOrFileAsync(string pathOrId, string oldContent, bool isNewFile)
+        {
+            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == pathOrId || string.Equals(t.FilePath, pathOrId, StringComparison.OrdinalIgnoreCase));
+            if (tab != null)
+            {
+                if (isNewFile)
+                {
+                    var tabItem = EditorTabView.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id)
+                               ?? EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
+                    if (tabItem != null)
+                    {
+                        _tabCloseController.CloseAndCleanup(tab, tabItem);
+                    }
+                    if (File.Exists(tab.FilePath))
+                    {
+                        try { File.Delete(tab.FilePath); } catch { }
+                    }
+                }
+                else
+                {
+                    tab.Content = oldContent;
+                    if (_editorSessions.TryGetValue(tab.Id, out var session))
+                    {
+                        session.UpdateContentFromSync(oldContent);
+                    }
+                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                    {
+                        await bridgeGroup.Bridge.SetTextAsync(oldContent, shouldFocus: false);
+                    }
+                }
+            }
+            else
+            {
+                if (isNewFile)
+                {
+                    if (File.Exists(pathOrId))
+                    {
+                        try { File.Delete(pathOrId); } catch { }
+                    }
+                }
+                else
+                {
+                    if (Path.IsPathRooted(pathOrId))
+                    {
+                        await File.WriteAllTextAsync(pathOrId, oldContent);
+                    }
+                }
+            }
+        }
+
 
         private string GetAgentWorkspaceRoot()
         {
