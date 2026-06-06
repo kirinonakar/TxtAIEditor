@@ -526,6 +526,20 @@ namespace TxtAIEditor
                 () => _viewModel.Tabs.ToList(),
                 GetTabTextForLlmContext,
                 InsertTextIntoActiveEditorAsync,
+                (title, content) =>
+                {
+                    var tab = OpenNewTab(null, content);
+                    if (!string.IsNullOrWhiteSpace(title))
+                    {
+                        tab.Title = title;
+                        tab.Language = _languageDetectionService.GetMonacoLanguageName(title);
+                    }
+
+                    tab.OriginalContent = string.Empty;
+                    _tabDirtyStateController.MarkTabDirty(tab);
+                    UpdateWindowTitle();
+                    return tab;
+                },
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString,
                 new AgentFileToolService(GetAgentWorkspaceRoot),

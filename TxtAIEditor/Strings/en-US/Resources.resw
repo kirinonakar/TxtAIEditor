@@ -1505,6 +1505,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityInsertText" xml:space="preserve">
     <value>Inserting into current editor</value>
   </data>
+  <data name="AgentActivityCreateTabFormat" xml:space="preserve">
+    <value>Inserting into new tab: {0}</value>
+  </data>
   <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
     <value>Running tool: {0}</value>
   </data>

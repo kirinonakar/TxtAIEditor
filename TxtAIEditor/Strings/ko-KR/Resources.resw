@@ -1505,6 +1505,9 @@
   <data name="AgentActivityInsertText" xml:space="preserve">
     <value>현재 편집기에 입력 중</value>
   </data>
+  <data name="AgentActivityCreateTabFormat" xml:space="preserve">
+    <value>새 탭에 입력 중: {0}</value>
+  </data>
   <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
     <value>도구 실행 중: {0}</value>
   </data>

@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<IReadOnlyList<OpenedTab>> _openTabsProvider;
         private readonly Func<OpenedTab, int, string> _getTabText;
         private readonly Func<string, Task<bool>> _insertIntoActiveEditorAsync;
+        private readonly Func<string?, string, OpenedTab> _openNewTabWithContent;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
@@ -84,6 +85,7 @@ namespace TxtAIEditor.Controls
             Func<IReadOnlyList<OpenedTab>> openTabsProvider,
             Func<OpenedTab, int, string> getTabText,
             Func<string, Task<bool>> insertIntoActiveEditorAsync,
+            Func<string?, string, OpenedTab> openNewTabWithContent,
             Action<string, string> showError,
             Func<string, string, string> getString,
             AgentFileToolService fileTools,
@@ -102,6 +104,7 @@ namespace TxtAIEditor.Controls
             _openTabsProvider = openTabsProvider;
             _getTabText = getTabText;
             _insertIntoActiveEditorAsync = insertIntoActiveEditorAsync;
+            _openNewTabWithContent = openNewTabWithContent;
             _showError = showError;
             _getString = getString;
             _fileTools = fileTools;
@@ -1118,7 +1121,8 @@ namespace TxtAIEditor.Controls
                     }
                     catch {}
                 }
-                else if (normalizedToolName == "insert_text")
+                else if (normalizedToolName == "insert_text" ||
+                         normalizedToolName == "create_tab")
                 {
                     isEditingActiveFile = true;
                 }
@@ -1169,6 +1173,7 @@ namespace TxtAIEditor.Controls
                         "apply_patch" => await ApplyPatchToolAsync(arguments),
                         "insert_text" => await InsertTextToolAsync(
                             GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
+                        "create_tab" => await CreateTabToolAsync(arguments),
                         "web_search_exa" => await _llmService.SearchExaAsync(
                             GetStringArgument(arguments, "query"),
                             GetIntArgument(arguments, "numResults", 5),
@@ -1254,6 +1259,9 @@ namespace TxtAIEditor.Controls
                     _getString("AgentActivityOverwriteFileFormat", "파일 덮어쓰는 중: {0}"),
                     GetEditPathArgument(arguments)),
                 "insert_text" => _getString("AgentActivityInsertText", "현재 편집기에 입력 중"),
+                "create_tab" => string.Format(
+                    _getString("AgentActivityCreateTabFormat", "새 탭에 입력 중: {0}"),
+                    TruncateForActivity(GetFirstStringArgument(arguments, "title", "name", "fileName", "file_name"))),
                 "web_search_exa" => string.Format(
                     _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
                     GetStringArgument(arguments, "query")),
@@ -2031,6 +2039,12 @@ namespace TxtAIEditor.Controls
                 "insert_into_editor" => "insert_text",
                 "insert_text_into_editor" => "insert_text",
                 "paste_text" => "insert_text",
+                "new_tab" => "create_tab",
+                "open_new_tab" => "create_tab",
+                "create_new_tab" => "create_tab",
+                "insert_text_new_tab" => "create_tab",
+                "insert_into_new_tab" => "create_tab",
+                "paste_text_new_tab" => "create_tab",
                 "read" => "read_file",
                 "search" => "search_text",
                 "powershell" => "run_powershell",
@@ -2126,6 +2140,23 @@ namespace TxtAIEditor.Controls
             return inserted
                 ? $"inserted into active editor: {content.Length:N0} chars"
                 : "insert_text failed: active editor did not accept the text.";
+        }
+
+        private async Task<string> CreateTabToolAsync(JsonElement arguments)
+        {
+            string content = GetFirstStringArgument(arguments, "content", "text", "newText", "new_text");
+            if (string.IsNullOrEmpty(content))
+            {
+                return "create_tab failed: content is empty.";
+            }
+
+            string title = GetFirstStringArgument(arguments, "title", "name", "fileName", "file_name");
+            OpenedTab tab = await RunOnUIThreadAsync(() => _openNewTabWithContent(
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                content));
+
+            string displayTitle = string.IsNullOrWhiteSpace(tab.Title) ? "Untitled" : tab.Title;
+            return $"created new tab: {displayTitle} ({content.Length:N0} chars)";
         }
 
         private async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)

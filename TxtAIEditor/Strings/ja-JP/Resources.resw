@@ -1506,6 +1506,9 @@
   <data name="AgentActivityInsertText" xml:space="preserve">
     <value>現在のエディタに入力中</value>
   </data>
+  <data name="AgentActivityCreateTabFormat" xml:space="preserve">
+    <value>新しいタブに入力中: {0}</value>
+  </data>
   <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
     <value>ツール実行中: {0}</value>
   </data>

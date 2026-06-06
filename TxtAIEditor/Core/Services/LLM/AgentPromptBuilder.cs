@@ -49,6 +49,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- apply_patch: apply a unified diff patch to a file. Extremely useful for multiple or complex code modifications. args: {\"path\":\"relative/path.cs\",\"patch\":\"unified diff...\"}");
             builder.AppendLine("- overwrite_file: overwrite a workspace file. Use only when the user explicitly requested a full rewrite. args: {\"path\":\"relative/path.cs\",\"content\":\"...\"}");
             builder.AppendLine("- insert_text: insert text into the active editor at the current cursor/selection. Use this when the user says to input, insert, paste, or place generated text into the editor. args: {\"content\":\"...\"}");
+            builder.AppendLine("- create_tab: open a new unsaved editor tab and fill it with text. Use this when the user asks to open a new tab/window/document and input, draft, paste, or place generated text there instead of the active editor. args: {\"title\":\"optional display title.md\",\"content\":\"...\"}");
             builder.AppendLine("- web_search_exa: search the web using Exa search engine to find real-time info, news, facts, code examples, or documentation. args: {\"query\":\"search query\",\"numResults\":5}");
             builder.AppendLine("- web_fetch_exa: fetch the full text content of one or more webpages by their URLs using Exa content extraction. args: {\"urls\":[\"https://example.com/page\"]}");
             builder.AppendLine("- Always use these exact tool names.");
