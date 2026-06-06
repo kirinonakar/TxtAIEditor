@@ -50,7 +50,7 @@ namespace TxtAIEditor.Controls
             else
             {
                 tab.Title = _getString("UntitledNewTab", "제목 없음");
-                tab.Content = "";
+                tab.Content = content;
             }
 
             var documentModel = textModel ?? LineArrayTextModel.FromText(content);

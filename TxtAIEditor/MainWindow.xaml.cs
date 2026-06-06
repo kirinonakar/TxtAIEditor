@@ -1899,7 +1899,7 @@ namespace TxtAIEditor
                     {
                         _tabCloseController.CloseAndCleanup(tab, tabItem);
                     }
-                    if (File.Exists(tab.FilePath))
+                    if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
                     {
                         try { File.Delete(tab.FilePath); } catch { }
                     }
