@@ -588,53 +588,13 @@ namespace TxtAIEditor.Controls
                     string toolResult;
                     string toolResultForTranscript;
 
-                    if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
-                        successfulToolResults.TryGetValue(toolInvocationKey, out string? previousToolResult))
+                    toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
+                    toolResultForTranscript = toolResult;
+                    if (IsSuccessfulToolResult(toolResult))
                     {
-                        skippedDuplicateTool = true;
-                        toolResult = string.Format(
-                            _getString(
-                                "AgentDuplicateToolSkippedFormat",
-                                "동일한 {0} 도구 호출이 이미 성공해서 다시 실행하지 않았습니다. 이전 결과를 바탕으로 다음 단계로 진행하세요."),
-                            normalizedToolName);
-                        toolResultForTranscript = $"{toolResult}\n\n[Previous successful result]\n{previousToolResult ?? string.Empty}";
-                        AppendActivity(string.Format(
-                            _getString("AgentActivityDuplicateToolSkippedFormat", "중복 도구 호출 건너뜀: {0}"),
-                            normalizedToolName));
-                    }
-                    else if (failedToolResults.TryGetValue(toolInvocationKey, out string? previousFailedToolResult))
-                    {
-                        skippedDuplicateTool = true;
-                        toolResult = string.Format(
-                            _getString(
-                                "AgentDuplicateFailedToolSkippedFormat",
-                                "동일한 {0} 도구 호출이 이미 실패해서 다시 실행하지 않았습니다. 인자를 바꾸거나 현재 결과를 바탕으로 최종 응답을 작성하세요."),
-                            normalizedToolName);
-                        toolResultForTranscript = $"{toolResult}\n\n[Previous failed result]\n{previousFailedToolResult ?? string.Empty}";
-                        AppendActivity(string.Format(
-                            _getString("AgentActivityDuplicateToolSkippedFormat", "중복 도구 호출 건너뜀: {0}"),
-                            normalizedToolName));
-                    }
-                    else
-                    {
-                        toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
-                        toolResultForTranscript = toolResult;
-                        if (IsSuccessfulToolResult(toolResult))
+                        if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                         {
-                            if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
-                            {
-                                if (IsMutatingTool(normalizedToolName))
-                                {
-                                    ClearCachedToolResults(successfulToolResults, "read_file");
-                                }
-
-                                successfulToolResults[toolInvocationKey] = toolResult;
-                                toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success. If the user's request is satisfied, write the final answer now. Continue only for a necessary next step, and do not repeat this same tool call unless the user explicitly asks to rerun it or the previous result is incomplete.]";
-                            }
-                        }
-                        else
-                        {
-                            failedToolResults[toolInvocationKey] = toolResult;
+                            toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success. If the user's request is satisfied, write the final answer now. Continue only for a necessary next step, and do not repeat this same tool call unless the user explicitly asks to rerun it or the previous result is incomplete.]";
                         }
                     }
 

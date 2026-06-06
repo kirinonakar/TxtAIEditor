@@ -835,6 +835,82 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private static string ParseCliXml(string clixml)
+        {
+            if (string.IsNullOrWhiteSpace(clixml) || !clixml.StartsWith("#< CLIXML"))
+            {
+                return clixml;
+            }
+
+            try
+            {
+                string xmlContent = clixml.Substring("#< CLIXML".Length).Trim();
+                var doc = System.Xml.Linq.XDocument.Parse(xmlContent);
+                var ns = doc.Root?.Name.Namespace ?? System.Xml.Linq.XNamespace.None;
+                
+                var lines = new List<string>();
+
+                var sElements = doc.Descendants(ns + "S").ToList();
+                foreach (var s in sElements)
+                {
+                    string? sAttr = s.Attribute("S")?.Value;
+                    string? nAttr = s.Attribute("N")?.Value;
+
+                    if (sAttr == "Error" || sAttr == "Warning")
+                    {
+                        lines.Add(DecodeCliXmlString(s.Value));
+                    }
+                    else if (nAttr == "Message")
+                    {
+                        lines.Add(DecodeCliXmlString(s.Value));
+                    }
+                }
+
+                if (lines.Count > 0)
+                {
+                    return string.Join("", lines).Trim();
+                }
+
+                var toStrings = doc.Descendants(ns + "ToString").Select(x => x.Value).ToList();
+                if (toStrings.Count > 0)
+                {
+                    return string.Join(Environment.NewLine, toStrings.Select(DecodeCliXmlString)).Trim();
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                var matches = Regex.Matches(clixml, @"<S\b[^>]*>([^<]*)</S>");
+                var fallbackLines = new List<string>();
+                foreach (Match m in matches)
+                {
+                    string val = m.Groups[1].Value;
+                    fallbackLines.Add(DecodeCliXmlString(val));
+                }
+                if (fallbackLines.Count > 0)
+                {
+                    return string.Join("", fallbackLines).Trim();
+                }
+            }
+            catch {}
+
+            return clixml;
+        }
+
+        private static string DecodeCliXmlString(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+            string decoded = Regex.Replace(input, @"_x([0-9a-fA-F]{4})_", m => 
+            {
+                return ((char)Convert.ToUInt16(m.Groups[1].Value, 16)).ToString();
+            });
+            decoded = Regex.Replace(decoded, @"\x1B\[[0-9;]*[a-zA-Z]", "");
+            return decoded;
+        }
+
         private static async Task<string> RunProcessAsync(
             string fileName, 
             string arguments, 
@@ -923,7 +999,7 @@ namespace TxtAIEditor.Controls
             }
 
             string stdout = DecodeBytes(await stdoutTask, encoding);
-            string stderr = DecodeBytes(await stderrTask, encoding);
+            string stderr = ParseCliXml(DecodeBytes(await stderrTask, encoding));
 
             if (!string.IsNullOrWhiteSpace(stdout))
             {
