@@ -1311,6 +1311,60 @@ namespace TxtAIEditor.Controls
             return value.Length > maxConfirmationChars ? value.Substring(0, maxConfirmationChars) + "..." : value;
         }
 
+        private static string FixJsonCarriageReturnEscapes(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+            {
+                return json;
+            }
+
+            var sb = new StringBuilder(json.Length);
+            int len = json.Length;
+            for (int i = 0; i < len; i++)
+            {
+                if (json[i] == '\\')
+                {
+                    if (i + 1 >= len)
+                    {
+                        sb.Append('\\');
+                        break;
+                    }
+
+                    if (json[i + 1] == 'r')
+                    {
+                        bool isFollowedByNewline = false;
+                        if (i + 3 < len && json[i + 2] == '\\' && json[i + 3] == 'n')
+                        {
+                            isFollowedByNewline = true;
+                        }
+                        else if (i + 2 < len && (json[i + 2] == '\n' || json[i + 2] == '\r'))
+                        {
+                            isFollowedByNewline = true;
+                        }
+
+                        if (!isFollowedByNewline)
+                        {
+                            sb.Append("\\\\r");
+                        }
+                        else
+                        {
+                            sb.Append('\\').Append('r');
+                        }
+                        i++; // Skip 'r'
+                        continue;
+                    }
+                    else
+                    {
+                        sb.Append('\\').Append(json[i + 1]);
+                        i++; // Skip the escaped character
+                        continue;
+                    }
+                }
+                sb.Append(json[i]);
+            }
+            return sb.ToString();
+        }
+
         private static bool TryParseToolCall(string response, out string toolName, out JsonElement arguments)
         {
             toolName = string.Empty;
@@ -1321,7 +1375,8 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            string trimmedPayload = payload.Trim();
+            string fixedPayload = FixJsonCarriageReturnEscapes(payload);
+            string trimmedPayload = fixedPayload.Trim();
 
             // Check if the payload starts with a tool name, followed by JSON arguments.
             // e.g. create_file\n{"arguments":{"path":"test/fire.html","content":"..."}}
@@ -1351,9 +1406,10 @@ namespace TxtAIEditor.Controls
 
             if (TryExtractToolCallJson(response, out string json))
             {
+                string fixedJson = FixJsonCarriageReturnEscapes(json);
                 try
                 {
-                    using var document = JsonDocument.Parse(json);
+                    using var document = JsonDocument.Parse(fixedJson);
                     var root = document.RootElement.Clone();
                     if (root.TryGetProperty("name", out var nameProp))
                     {
@@ -1371,7 +1427,7 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            return TryParseToolCallLenient(payload, out toolName, out arguments);
+            return TryParseToolCallLenient(trimmedPayload, out toolName, out arguments);
         }
 
         private static bool TryParseToolCallLenient(string json, out string toolName, out JsonElement arguments)
