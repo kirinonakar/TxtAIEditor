@@ -1442,9 +1442,6 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentToolRunning" xml:space="preserve">
     <value>Running tool</value>
   </data>
-  <data name="AgentToolSuccessContinue" xml:space="preserve">
-    <value>The tool succeeded. Write the final answer if no necessary next step remains.</value>
-  </data>
   <data name="AgentDuplicateFailedToolSkippedFormat" xml:space="preserve">
     <value>The same {0} tool call already failed, so it was not run again. Change the arguments or write the final answer from the current result.</value>
   </data>

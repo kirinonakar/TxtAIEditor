@@ -621,12 +621,6 @@ namespace TxtAIEditor.Controls
                         toolResultForTranscript = toolResult;
                         if (IsSuccessfulToolResult(toolResult))
                         {
-                            string successContinueMessage = _getString(
-                                "AgentToolSuccessContinue",
-                                "도구가 성공했습니다. 필요한 다음 단계가 없으면 최종 응답을 작성하세요.");
-                            toolResult = AppendToolStatusMessage(toolResult, successContinueMessage);
-                            toolResultForTranscript = toolResult;
-
                             if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                             {
                                 if (IsMutatingTool(normalizedToolName))
