@@ -71,7 +71,7 @@ namespace TxtAIEditor
                 ".gif" => "\uEB9F",
                 ".bmp" => "\uEB9F",
                 ".webp" => "\uEB9F",
-                ".pdf" => "\uE72A",
+                ".pdf" => "\uE12A",
                 _ => "\uE160"       // Generic file icon
             };
         }
