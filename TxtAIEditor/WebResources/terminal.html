@@ -174,7 +174,7 @@
       vscodeBridge?.postMessage({ type: 'input', sessionId: activeSessionId, data: text });
     });
 
-    const terminalPathPattern = /(?:file:\/\/\/[^\s<>"']+|[A-Za-z]:\\[^\s<>"|?*]+|\\\\[^\s<>"|?*]+|\/[^\s<>"']+|(?:\.{1,2}[\\/])?(?:[^\s:<>"'|?*]+[\\/])*[^\s:<>"'|?*]+\.[A-Za-z0-9_+~-]{1,12}(?::\d+(?::\d+)?)?)/g;
+    const terminalPathPattern = /(?:file:\/\/\/[^\s<>"']+|[A-Za-z]:\\[^\s<>"|?*]+|\\\\[^\s<>"|?*]+|\/[^\s<>"']+|(?:\.{1,2}[\\/])?(?:[^\s:<>"'|?*]+[\\/])*[^\s:<>"'|?*]+(?:\.[A-Za-z0-9_+~-]{1,12})*(?::\d+(?::\d+)?)?)/g;
 
     function trimTerminalPath(value) {
       return (value || '').replace(/[.,;)\]}]+$/g, '');
@@ -183,6 +183,7 @@
     function isTerminalPathCandidate(value) {
       return /^(?:file:\/\/\/|[A-Za-z]:\\|\\\\|\/)/.test(value) ||
         /[\\/]/.test(value) ||
+        /\.[A-Za-z0-9_+~-]{1,12}$/.test(value) ||
         /:\d+(?::\d+)?$/.test(value);
     }
 

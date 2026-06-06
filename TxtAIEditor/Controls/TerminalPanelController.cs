@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 
@@ -14,7 +15,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<TxtAIEditor.ExplorerItem?> _selectedExplorerItemProvider;
         private readonly Func<string> _currentFolderProvider;
         private readonly Func<string> _currentRepoProvider;
-        private readonly Func<string, Task> _openFileAsync;
+        private readonly Func<string, int, Task> _openFileAsync;
         private readonly Func<string, Task> _navigateFolderAsync;
 
         public TerminalPanelController(
@@ -25,7 +26,7 @@ namespace TxtAIEditor.Controls
             Func<TxtAIEditor.ExplorerItem?> selectedExplorerItemProvider,
             Func<string> currentFolderProvider,
             Func<string> currentRepoProvider,
-            Func<string, Task> openFileAsync,
+            Func<string, int, Task> openFileAsync,
             Func<string, Task> navigateFolderAsync)
         {
             _editorWorkspace = editorWorkspace;
@@ -97,15 +98,24 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                if (File.Exists(path))
+                string filePath = path;
+                int lineNumber = 1;
+                var match = Regex.Match(path, @"^(?<path>.+?):(?<line>\d+)(?::\d+)?$");
+                if (match.Success)
                 {
-                    await _openFileAsync(path);
+                    filePath = match.Groups["path"].Value;
+                    int.TryParse(match.Groups["line"].Value, out lineNumber);
+                }
+
+                if (File.Exists(filePath))
+                {
+                    await _openFileAsync(filePath, lineNumber);
                     return;
                 }
 
-                if (Directory.Exists(path))
+                if (Directory.Exists(filePath))
                 {
-                    await _navigateFolderAsync(path);
+                    await _navigateFolderAsync(filePath);
                     return;
                 }
 

@@ -490,7 +490,7 @@ namespace TxtAIEditor
                 () => FileListView.SelectedItem as ExplorerItem,
                 () => _currentFolderPath,
                 () => _currentRepoPath,
-                LoadFileIntoTabAsync,
+                async (filePath, line) => await LoadFileIntoTabAsync(filePath, line),
                 NavigateExplorerToFolderAsync);
             _snippetsController = new SnippetsController(
                 _snippetService,
@@ -1432,9 +1432,31 @@ namespace TxtAIEditor
             await _fileOpenDropController.OpenFileAsync();
         }
 
-        internal async Task LoadFileIntoTabAsync(string filePath)
+        internal Task LoadFileIntoTabAsync(string filePath) => LoadFileIntoTabAsync(filePath, 0);
+
+        internal async Task LoadFileIntoTabAsync(string filePath, int lineNumber)
         {
             await _fileTabLoadController.LoadAsync(filePath);
+            if (lineNumber >= 1)
+            {
+                await Task.Delay(250);
+                string? targetTabId = null;
+                foreach (var tab in _viewModel.Tabs)
+                {
+                    if (string.Equals(tab.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetTabId = tab.Id;
+                        break;
+                    }
+                }
+
+                if (targetTabId != null && _tabBridges.TryGetValue(targetTabId, out var bridgeGroup) && bridgeGroup.WebView?.CoreWebView2 != null)
+                {
+                    var revealMsg = new { action = "revealLine", lineNumber = lineNumber, indexOfMatch = 0, matchLength = 0, query = "" };
+                    string json = System.Text.Json.JsonSerializer.Serialize(revealMsg);
+                    try { bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(json); } catch { }
+                }
+            }
         }
 
         private async void OnSaveFileClick(object sender, RoutedEventArgs e)

@@ -571,10 +571,12 @@ namespace TxtAIEditor.Controls
                 value = fileUri.LocalPath;
             }
 
-            var lineSuffix = Regex.Match(value, @"^(?<path>.+?)(?::(?<line>\d+)(?::\d+)?)$");
-            if (lineSuffix.Success)
+            string lineSuffix = "";
+            var lineMatch = Regex.Match(value, @"^(?<path>.+?)(?<suffix>:(?<line>\d+)(?::\d+)?)$");
+            if (lineMatch.Success)
             {
-                value = lineSuffix.Groups["path"].Value;
+                value = lineMatch.Groups["path"].Value;
+                lineSuffix = lineMatch.Groups["suffix"].Value;
             }
 
             if (!Path.IsPathRooted(value) &&
@@ -584,7 +586,7 @@ namespace TxtAIEditor.Controls
                 value = Path.GetFullPath(Path.Combine(baseDirectory, value));
             }
 
-            return value;
+            return value + lineSuffix;
         }
 
         private void OnActualThemeChanged(FrameworkElement sender, object args)
