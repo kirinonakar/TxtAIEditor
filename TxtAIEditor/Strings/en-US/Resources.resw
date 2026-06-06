@@ -1388,6 +1388,27 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
     <value>[{0}] Preset applied. Enter additional instructions...</value>
   </data>
+  <data name="PresetExportText" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="PresetImportText" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="PresetExportErrorTitle" xml:space="preserve">
+    <value>Preset Export Error</value>
+  </data>
+  <data name="PresetExportErrorMessage" xml:space="preserve">
+    <value>An error occurred while exporting presets: {0}</value>
+  </data>
+  <data name="PresetImportErrorTitle" xml:space="preserve">
+    <value>Preset Import Error</value>
+  </data>
+  <data name="PresetImportErrorMessage" xml:space="preserve">
+    <value>An error occurred while importing presets: {0}</value>
+  </data>
+  <data name="PresetImportInvalidFile" xml:space="preserve">
+    <value>This is not an importable preset JSON file.</value>
+  </data>
   <data name="AgentActivityThinkingStepFormat" xml:space="preserve">
     <value>Thinking (Step {0}/8)</value>
   </data>

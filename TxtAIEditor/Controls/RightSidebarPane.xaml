@@ -152,6 +152,7 @@
                                                             </Grid.Resources>
                                                             <Grid.RowDefinitions>
                                                                 <RowDefinition Height="Auto"/> <!-- Add -->
+                                                                <RowDefinition Height="Auto"/> <!-- Import / Export -->
                                                                 <RowDefinition Height="Auto"/> <!-- Separator -->
                                                                 <RowDefinition Height="*"/>    <!-- List -->
                                                             </Grid.RowDefinitions>
@@ -161,8 +162,26 @@
                                                                     <TextBlock x:Name="LlmAddPresetText" Text="프리셋 추가" FontSize="11" VerticalAlignment="Center"/>
                                                                 </StackPanel>
                                                             </Button>
-                                                            <MenuFlyoutSeparator Grid.Row="1"/>
-                                                            <ScrollViewer Grid.Row="2" MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                                                            <Grid Grid.Row="1" ColumnSpacing="8">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <Button x:Name="LlmExportPresetBtn" Grid.Column="0" HorizontalAlignment="Stretch" Click="OnExportPresetClickInPanel" Style="{StaticResource RightSidebarButtonStyle}">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                                                        <FontIcon Glyph="&#xE118;" FontSize="12"/>
+                                                                        <TextBlock x:Name="LlmExportPresetText" Text="내보내기" FontSize="11" VerticalAlignment="Center"/>
+                                                                    </StackPanel>
+                                                                </Button>
+                                                                <Button x:Name="LlmImportPresetBtn" Grid.Column="1" HorizontalAlignment="Stretch" Click="OnImportPresetClickInPanel" Style="{StaticResource RightSidebarButtonStyle}">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                                                        <FontIcon Glyph="&#xE8B5;" FontSize="12"/>
+                                                                        <TextBlock x:Name="LlmImportPresetText" Text="가져오기" FontSize="11" VerticalAlignment="Center"/>
+                                                                    </StackPanel>
+                                                                </Button>
+                                                            </Grid>
+                                                            <MenuFlyoutSeparator Grid.Row="2"/>
+                                                            <ScrollViewer Grid.Row="3" MaxHeight="250" VerticalScrollBarVisibility="Auto">
                                                                 <StackPanel x:Name="LlmPresetListPanel" Spacing="4"/>
                                                             </ScrollViewer>
                                                         </Grid>

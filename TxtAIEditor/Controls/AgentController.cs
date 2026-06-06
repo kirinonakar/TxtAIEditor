@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services.LLM;
+using Windows.Storage.Pickers;
 
 namespace TxtAIEditor.Controls
 {
@@ -258,6 +259,8 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentPresetEdited += (_, presetName) => OnAgentPresetEdited(presetName);
             _agentPane.AgentPresetDeleted += (_, presetName) => OnAgentPresetDeleted(presetName);
             _agentPane.AgentPresetRemoved += (_, presetName) => RemoveSelectedAgentPreset(presetName);
+            _agentPane.AgentPresetExportRequested += (_, _) => OnExportAgentPresetsClick();
+            _agentPane.AgentPresetImportRequested += (_, _) => OnImportAgentPresetsClick();
             
             _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
             _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
@@ -2454,6 +2457,95 @@ namespace TxtAIEditor.Controls
                 Content = NormalizePresetContent(contentBox.Text)
             });
             await SaveAgentPresetsAsync();
+        }
+
+        private async void OnExportAgentPresetsClick()
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                SuggestedFileName = "agent-presets.json"
+            };
+            _initializePickerWindow(picker);
+            picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
+
+            var file = await picker.PickSaveFileAsync();
+            if (file == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string json = JsonSerializer.Serialize(_agentPresets, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(file.Path, json);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("PresetExportErrorTitle", "프리셋 내보내기 오류"),
+                    string.Format(_getString("PresetExportErrorMessage", "프리셋을 내보내는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
+        }
+
+        private async void OnImportAgentPresetsClick()
+        {
+            var picker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.List,
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+            };
+            _initializePickerWindow(picker);
+            picker.FileTypeFilter.Add(".json");
+
+            var file = await picker.PickSingleFileAsync();
+            if (file == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string json = await File.ReadAllTextAsync(file.Path);
+                var imported = JsonSerializer.Deserialize<List<AgentPresetItem>>(json);
+                if (imported == null)
+                {
+                    throw new InvalidDataException(_getString("PresetImportInvalidFile", "가져올 수 있는 프리셋 JSON이 아닙니다."));
+                }
+
+                foreach (var item in imported.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
+                {
+                    string name = item.Name.Trim();
+                    string content = NormalizePresetContent(item.Content);
+                    var existing = _agentPresets.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                    if (existing != null)
+                    {
+                        bool wasSelected = _selectedAgentPresetNames.Remove(existing.Name);
+                        existing.Name = name;
+                        existing.Content = content;
+                        if (wasSelected)
+                        {
+                            _selectedAgentPresetNames.Add(existing.Name);
+                        }
+                    }
+                    else
+                    {
+                        _agentPresets.Add(new AgentPresetItem
+                        {
+                            Name = name,
+                            Content = content
+                        });
+                    }
+                }
+
+                await SaveAgentPresetsAsync();
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("PresetImportErrorTitle", "프리셋 가져오기 오류"),
+                    string.Format(_getString("PresetImportErrorMessage", "프리셋을 가져오는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
         }
 
         private async void OnAgentPresetEdited(string presetName)

@@ -1389,6 +1389,27 @@
   <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
     <value>[{0}] プリセット適用。追加の指示事項を入力...</value>
   </data>
+  <data name="PresetExportText" xml:space="preserve">
+    <value>エクスポート</value>
+  </data>
+  <data name="PresetImportText" xml:space="preserve">
+    <value>インポート</value>
+  </data>
+  <data name="PresetExportErrorTitle" xml:space="preserve">
+    <value>プリセットのエクスポートエラー</value>
+  </data>
+  <data name="PresetExportErrorMessage" xml:space="preserve">
+    <value>プリセットのエクスポート中にエラーが発生しました: {0}</value>
+  </data>
+  <data name="PresetImportErrorTitle" xml:space="preserve">
+    <value>プリセットのインポートエラー</value>
+  </data>
+  <data name="PresetImportErrorMessage" xml:space="preserve">
+    <value>プリセットのインポート中にエラーが発生しました: {0}</value>
+  </data>
+  <data name="PresetImportInvalidFile" xml:space="preserve">
+    <value>インポート可能なプリセットJSONではありません。</value>
+  </data>
   <data name="AgentActivityThinkingStepFormat" xml:space="preserve">
     <value>思考中 (ステップ {0}/8)</value>
   </data>

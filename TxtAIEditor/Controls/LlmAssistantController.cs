@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using Windows.Storage.Pickers;
 
 namespace TxtAIEditor.Controls
 {
@@ -22,6 +23,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task<bool>> _insertIntoActiveEditorAsync;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
+        private readonly Action<object> _initializePickerWindow;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
 
@@ -64,6 +66,7 @@ namespace TxtAIEditor.Controls
             Func<string, Task<bool>> insertIntoActiveEditorAsync,
             Action<string, string> showError,
             Func<string, string, string> getString,
+            Action<object> initializePickerWindow,
             Action? beforeDialog = null,
             Action? afterDialog = null)
         {
@@ -77,6 +80,7 @@ namespace TxtAIEditor.Controls
             _insertIntoActiveEditorAsync = insertIntoActiveEditorAsync;
             _showError = showError;
             _getString = getString;
+            _initializePickerWindow = initializePickerWindow;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
 
@@ -564,8 +568,106 @@ namespace TxtAIEditor.Controls
             dispatcher?.TryEnqueue(() =>
             {
                 var presetNames = _presets.Select(p => p.Name).ToList();
-                _rightSidebar.UpdatePresetsMenu(presetNames, OnAddPresetClick, OnPresetSelected, OnPresetEdited, OnPresetDeleted, _getString);
+                _rightSidebar.UpdatePresetsMenu(
+                    presetNames,
+                    OnAddPresetClick,
+                    OnPresetSelected,
+                    OnPresetEdited,
+                    OnPresetDeleted,
+                    OnExportPresetsClick,
+                    OnImportPresetsClick,
+                    _getString);
             });
+        }
+
+        private async void OnExportPresetsClick()
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                SuggestedFileName = "ai-assistant-presets.json"
+            };
+            _initializePickerWindow(picker);
+            picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
+
+            var file = await picker.PickSaveFileAsync();
+            if (file == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string json = System.Text.Json.JsonSerializer.Serialize(
+                    _presets,
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(file.Path, json);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("PresetExportErrorTitle", "프리셋 내보내기 오류"),
+                    string.Format(_getString("PresetExportErrorMessage", "프리셋을 내보내는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
+        }
+
+        private async void OnImportPresetsClick()
+        {
+            var picker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.List,
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+            };
+            _initializePickerWindow(picker);
+            picker.FileTypeFilter.Add(".json");
+
+            var file = await picker.PickSingleFileAsync();
+            if (file == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string json = await File.ReadAllTextAsync(file.Path);
+                var imported = System.Text.Json.JsonSerializer.Deserialize<List<PresetItem>>(json);
+                if (imported == null)
+                {
+                    throw new InvalidDataException(_getString("PresetImportInvalidFile", "가져올 수 있는 프리셋 JSON이 아닙니다."));
+                }
+
+                foreach (var item in imported.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
+                {
+                    string name = item.Name.Trim();
+                    string content = NormalizePresetContent(item.Content);
+                    var existing = _presets.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                    if (existing != null)
+                    {
+                        existing.Name = name;
+                        existing.Title = string.IsNullOrWhiteSpace(item.Title) ? name : item.Title.Trim();
+                        existing.Content = content;
+                        existing.FilePath = item.FilePath ?? string.Empty;
+                    }
+                    else
+                    {
+                        _presets.Add(new PresetItem
+                        {
+                            Name = name,
+                            Title = string.IsNullOrWhiteSpace(item.Title) ? name : item.Title.Trim(),
+                            Content = content,
+                            FilePath = item.FilePath ?? string.Empty
+                        });
+                    }
+                }
+
+                await SavePresetsAsync();
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("PresetImportErrorTitle", "프리셋 가져오기 오류"),
+                    string.Format(_getString("PresetImportErrorMessage", "프리셋을 가져오는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
         }
 
         private async void OnAddPresetClick()
@@ -798,6 +900,13 @@ namespace TxtAIEditor.Controls
             preset.Name = newName;
             preset.Content = contentBox.Text.Replace("\r\n", "\n").Replace("\r", "\n");
             await SavePresetsAsync();
+        }
+
+        private static string NormalizePresetContent(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace("\r", "\n", StringComparison.Ordinal);
         }
 
         private TextBox CreatePresetContentBox(string text = "")

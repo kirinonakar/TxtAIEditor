@@ -508,6 +508,7 @@ namespace TxtAIEditor
                 InsertTextIntoActiveEditorAsync,
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString,
+                InitializePickerWindow,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
             _agentController = new AgentController(

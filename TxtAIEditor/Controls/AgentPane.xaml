@@ -400,6 +400,7 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
                                 <Button x:Name="AgentAddPresetButton"
@@ -412,8 +413,34 @@
                                         <TextBlock x:Name="AgentAddPresetText" Text="프리셋 추가" FontSize="11" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
-                                <MenuFlyoutSeparator Grid.Row="1"/>
-                                <ScrollViewer Grid.Row="2" MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                                <Grid Grid.Row="1" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="AgentExportPresetButton"
+                                            Grid.Column="0"
+                                            HorizontalAlignment="Stretch"
+                                            Click="OnAgentExportPresetClickInPanel"
+                                            Style="{StaticResource AgentButtonStyle}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                            <FontIcon Glyph="&#xE118;" FontSize="12"/>
+                                            <TextBlock x:Name="AgentExportPresetText" Text="내보내기" FontSize="11" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="AgentImportPresetButton"
+                                            Grid.Column="1"
+                                            HorizontalAlignment="Stretch"
+                                            Click="OnAgentImportPresetClickInPanel"
+                                            Style="{StaticResource AgentButtonStyle}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                            <FontIcon Glyph="&#xE8B5;" FontSize="12"/>
+                                            <TextBlock x:Name="AgentImportPresetText" Text="가져오기" FontSize="11" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <MenuFlyoutSeparator Grid.Row="2"/>
+                                <ScrollViewer Grid.Row="3" MaxHeight="250" VerticalScrollBarVisibility="Auto">
                                     <StackPanel x:Name="AgentPresetListPanel" Spacing="4"/>
                                 </ScrollViewer>
                             </Grid>

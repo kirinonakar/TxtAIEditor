@@ -119,6 +119,14 @@ namespace TxtAIEditor.Controls
             {
                 LlmAddPresetText.Text = getString("LlmPresetAddText", "프리셋 추가");
             }
+            if (LlmExportPresetText != null)
+            {
+                LlmExportPresetText.Text = getString("PresetExportText", "내보내기");
+            }
+            if (LlmImportPresetText != null)
+            {
+                LlmImportPresetText.Text = getString("PresetImportText", "가져오기");
+            }
             _getString = getString;
             RebuildPresetsMenu();
         }
@@ -318,14 +326,26 @@ namespace TxtAIEditor.Controls
         private Action<string>? _onPresetSelected;
         private Action<string>? _onPresetEdited;
         private Action<string>? _onPresetDeleted;
+        private Action? _onExportPresetClick;
+        private Action? _onImportPresetClick;
 
-        public void UpdatePresetsMenu(List<string> presetNames, Action onAddPresetClick, Action<string> onPresetSelected, Action<string> onPresetEdited, Action<string> onPresetDeleted, Func<string, string, string> getString)
+        public void UpdatePresetsMenu(
+            List<string> presetNames,
+            Action onAddPresetClick,
+            Action<string> onPresetSelected,
+            Action<string> onPresetEdited,
+            Action<string> onPresetDeleted,
+            Action onExportPresetClick,
+            Action onImportPresetClick,
+            Func<string, string, string> getString)
         {
             _presetNames = presetNames;
             _onAddPresetClick = onAddPresetClick;
             _onPresetSelected = onPresetSelected;
             _onPresetEdited = onPresetEdited;
             _onPresetDeleted = onPresetDeleted;
+            _onExportPresetClick = onExportPresetClick;
+            _onImportPresetClick = onImportPresetClick;
             _getString = getString;
 
             RebuildPresetsMenu();
@@ -334,6 +354,18 @@ namespace TxtAIEditor.Controls
         private void OnAddPresetClickInPanel(object sender, RoutedEventArgs e)
         {
             _onAddPresetClick?.Invoke();
+            LlmPresetFlyout.Hide();
+        }
+
+        private void OnExportPresetClickInPanel(object sender, RoutedEventArgs e)
+        {
+            _onExportPresetClick?.Invoke();
+            LlmPresetFlyout.Hide();
+        }
+
+        private void OnImportPresetClickInPanel(object sender, RoutedEventArgs e)
+        {
+            _onImportPresetClick?.Invoke();
             LlmPresetFlyout.Hide();
         }
 

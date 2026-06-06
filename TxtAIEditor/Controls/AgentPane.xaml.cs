@@ -95,6 +95,8 @@ namespace TxtAIEditor.Controls
         public event EventHandler<string>? AgentPresetEdited;
         public event EventHandler<string>? AgentPresetDeleted;
         public event EventHandler<string>? AgentPresetRemoved;
+        public event RoutedEventHandler? AgentPresetExportRequested;
+        public event RoutedEventHandler? AgentPresetImportRequested;
         public event RoutedEventHandler? DiffApproved;
         public event RoutedEventHandler? DiffCancelled;
         public event EventHandler<AgentFileEditPreview>? FileRevertRequested;
@@ -164,6 +166,8 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
             ToolTipService.SetToolTip(AgentPresetButton, getString("AgentPresetButtonTooltip", "페르소나/지침 프리셋"));
             AgentAddPresetText.Text = getString("AgentPresetAddText", "프리셋 추가");
+            AgentExportPresetText.Text = getString("PresetExportText", "내보내기");
+            AgentImportPresetText.Text = getString("PresetImportText", "가져오기");
             _runButtonText = getString("AgentRunButton", "실행");
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
@@ -688,6 +692,18 @@ namespace TxtAIEditor.Controls
         private void OnAgentAddPresetClickInPanel(object sender, RoutedEventArgs e)
         {
             AgentPresetAddRequested?.Invoke(sender, e);
+            AgentPresetFlyout.Hide();
+        }
+
+        private void OnAgentExportPresetClickInPanel(object sender, RoutedEventArgs e)
+        {
+            AgentPresetExportRequested?.Invoke(sender, e);
+            AgentPresetFlyout.Hide();
+        }
+
+        private void OnAgentImportPresetClickInPanel(object sender, RoutedEventArgs e)
+        {
+            AgentPresetImportRequested?.Invoke(sender, e);
             AgentPresetFlyout.Hide();
         }
 

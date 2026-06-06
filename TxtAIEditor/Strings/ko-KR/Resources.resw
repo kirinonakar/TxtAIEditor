@@ -1388,6 +1388,27 @@
   <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
     <value>[{0}] 프리셋 적용됨. 추가 지시사항 입력...</value>
   </data>
+  <data name="PresetExportText" xml:space="preserve">
+    <value>내보내기</value>
+  </data>
+  <data name="PresetImportText" xml:space="preserve">
+    <value>가져오기</value>
+  </data>
+  <data name="PresetExportErrorTitle" xml:space="preserve">
+    <value>프리셋 내보내기 오류</value>
+  </data>
+  <data name="PresetExportErrorMessage" xml:space="preserve">
+    <value>프리셋을 내보내는 중 오류가 발생했습니다: {0}</value>
+  </data>
+  <data name="PresetImportErrorTitle" xml:space="preserve">
+    <value>프리셋 가져오기 오류</value>
+  </data>
+  <data name="PresetImportErrorMessage" xml:space="preserve">
+    <value>프리셋을 가져오는 중 오류가 발생했습니다: {0}</value>
+  </data>
+  <data name="PresetImportInvalidFile" xml:space="preserve">
+    <value>가져올 수 있는 프리셋 JSON이 아닙니다.</value>
+  </data>
   <data name="AgentActivityThinkingStepFormat" xml:space="preserve">
     <value>생각중 (단계 {0}/8)</value>
   </data>
