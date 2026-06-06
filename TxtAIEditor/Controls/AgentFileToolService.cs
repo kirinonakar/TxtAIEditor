@@ -793,6 +793,48 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern uint GetACP();
+
+        private static Encoding GetSystemAnsiEncoding()
+        {
+            try
+            {
+                int acp = (int)GetACP();
+                if (acp > 0)
+                {
+                    return Encoding.GetEncoding(acp);
+                }
+            }
+            catch
+            {
+            }
+            return Encoding.UTF8;
+        }
+
+        private static string DecodeBytes(byte[] bytes, Encoding preferredEncoding)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            if (TextEncodingService.IsValidUtf8(bytes))
+            {
+                return Encoding.UTF8.GetString(bytes);
+            }
+
+            try
+            {
+                var systemEncoding = GetSystemAnsiEncoding();
+                return systemEncoding.GetString(bytes);
+            }
+            catch
+            {
+                return preferredEncoding.GetString(bytes);
+            }
+        }
+
         private static async Task<string> RunProcessAsync(
             string fileName, 
             string arguments, 
@@ -880,8 +922,9 @@ namespace TxtAIEditor.Controls
                 throw;
             }
 
-            string stdout = encoding.GetString(await stdoutTask);
-            string stderr = encoding.GetString(await stderrTask);
+            string stdout = DecodeBytes(await stdoutTask, encoding);
+            string stderr = DecodeBytes(await stderrTask, encoding);
+
             if (!string.IsNullOrWhiteSpace(stdout))
             {
                 output.AppendLine(stdout.TrimEnd());
