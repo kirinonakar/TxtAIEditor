@@ -48,6 +48,11 @@ namespace TxtAIEditor.Core.Services
                 {
                     if (!string.IsNullOrWhiteSpace(item.Path))
                     {
+                        if (string.IsNullOrWhiteSpace(item.Name))
+                        {
+                            item.Name = Path.GetFileName(item.Path);
+                        }
+
                         recentFiles.Add(item);
                     }
                 }
@@ -81,7 +86,7 @@ namespace TxtAIEditor.Core.Services
 
         public void Add(ObservableCollection<RecentFileItem> recentFiles, string filePath)
         {
-            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            if (string.IsNullOrWhiteSpace(filePath))
             {
                 return;
             }
