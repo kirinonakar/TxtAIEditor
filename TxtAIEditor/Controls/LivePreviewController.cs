@@ -170,6 +170,18 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
+                if (IsReadOnlyViewerTab(tab))
+                {
+                    _tabPreviewModes[tab.Id] = 0;
+                    if (PreviewModeCombo.SelectedIndex != 0)
+                    {
+                        PreviewModeCombo.SelectedIndex = 0;
+                    }
+
+                    PostEmptyVirtualPreview();
+                    return;
+                }
+
                 int selectedMode;
                 if (string.Equals(tab.Language, "html", StringComparison.OrdinalIgnoreCase))
                 {
@@ -264,6 +276,52 @@ namespace TxtAIEditor.Controls
             {
                 Debug.WriteLine($"Failed sending live preview rendering data: {ex.Message}");
             }
+        }
+
+        private void PostEmptyVirtualPreview()
+        {
+            var renderMsg = new
+            {
+                action = "initVirtualPreview",
+                lineCount = 1,
+                initialStartLine = 1,
+                initialLines = new[] { string.Empty },
+                mode = "markdown",
+                baseHref = string.Empty,
+                wordWrap = _settingsService.CurrentSettings.WordWrap,
+                tabSize = _settingsService.CurrentSettings.TabSize,
+                theme = _settingsService.CurrentSettings.Theme,
+                customBackgroundColor = _settingsService.CurrentSettings.CustomBackgroundColor,
+                customForegroundColor = _settingsService.CurrentSettings.CustomForegroundColor,
+                uiFontFamily = _settingsService.CurrentSettings.UiFontFamily,
+                previewFontFamily = _settingsService.CurrentSettings.PreviewFontFamily,
+                previewFontSize = _settingsService.CurrentSettings.PreviewFontSize,
+                previewCustomBackgroundColor = _settingsService.CurrentSettings.PreviewCustomBackgroundColor,
+                previewCustomForegroundColor = _settingsService.CurrentSettings.PreviewCustomForegroundColor,
+                scrollSyncEnabled = _isScrollSyncEnabled()
+            };
+
+            PreviewWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(renderMsg));
+        }
+
+        private static bool IsReadOnlyViewerTab(OpenedTab tab)
+        {
+            return tab.IsReadOnlyViewer ||
+                   string.Equals(tab.Language, "pdf", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(tab.Language, "image", StringComparison.OrdinalIgnoreCase) ||
+                   (!string.IsNullOrWhiteSpace(tab.FilePath) &&
+                    (Path.GetExtension(tab.FilePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase) ||
+                     IsImageFileExtension(Path.GetExtension(tab.FilePath))));
+        }
+
+        private static bool IsImageFileExtension(string extension)
+        {
+            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
         }
 
         public string GetPreviewBaseHref(OpenedTab tab)
