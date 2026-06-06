@@ -23,6 +23,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task> _navigateExplorerToFolderAsync;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Action<string, string> _showError;
+        private readonly Dictionary<string, bool> _favoriteFolderHints = new(StringComparer.OrdinalIgnoreCase);
 
         public FavoritesRecentController(
             ISettingsService settingsService,
@@ -60,14 +61,24 @@ namespace TxtAIEditor.Controls
 
         public Task AddFavoritePathAsync(string path)
         {
-            return AddFavoritePathAsync(path, refreshFilterFiles: null);
+            return AddFavoritePathAsync(path, refreshFilterFiles: null, isFolderHint: null);
         }
 
         public async Task AddFavoritePathAsync(string path, bool? refreshFilterFiles)
         {
+            await AddFavoritePathAsync(path, refreshFilterFiles, isFolderHint: null);
+        }
+
+        private async Task AddFavoritePathAsync(string path, bool? refreshFilterFiles, bool? isFolderHint)
+        {
             if (string.IsNullOrWhiteSpace(path))
             {
                 return;
+            }
+
+            if (isFolderHint.HasValue)
+            {
+                _favoriteFolderHints[path] = isFolderHint.Value;
             }
 
             var settings = _settingsService.CurrentSettings;
@@ -92,22 +103,8 @@ namespace TxtAIEditor.Controls
 
             foreach (var path in settings.FavoritePaths)
             {
-                bool isFolder = Directory.Exists(path);
-                bool isFile = !isFolder && File.Exists(path);
-                if (!isFolder && !isFile)
-                {
-                    continue;
-                }
-
-                items.Add(new FavoriteItem
-                {
-                    Name = isFolder
-                        ? Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-                        : Path.GetFileName(path),
-                    Path = path,
-                    IsFolder = isFolder,
-                    IsPinned = settings.PinnedFavoritePaths.Contains(path)
-                });
+                var item = CreateFavoriteItem(path, settings.PinnedFavoritePaths.Contains(path));
+                items.Add(item);
             }
 
             var sorted = items
@@ -162,7 +159,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            await AddFavoritePathAsync(folderPath);
+            await AddFavoritePathAsync(folderPath, refreshFilterFiles: null, isFolderHint: true);
         }
 
         private async void OnAddFileToFavoritesClick(object sender, RoutedEventArgs e)
@@ -180,7 +177,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            await AddFavoritePathAsync(explorerItem.Path);
+            await AddFavoritePathAsync(explorerItem.Path, refreshFilterFiles: null, isFolderHint: false);
         }
 
         private async void OnRemoveFavoriteClick(object sender, RoutedEventArgs e)
@@ -193,10 +190,47 @@ namespace TxtAIEditor.Controls
             var settings = _settingsService.CurrentSettings;
             settings.FavoritePaths.Remove(path);
             settings.PinnedFavoritePaths.Remove(path);
+            _favoriteFolderHints.Remove(path);
             await _settingsService.SaveSettingsAsync(settings);
             
             bool showFiles = _leftSidebar.FavoritesFileTabButton.IsChecked == true;
             RefreshFavorites(showFiles);
+        }
+
+        private FavoriteItem CreateFavoriteItem(string path, bool isPinned)
+        {
+            bool isFolder = _favoriteFolderHints.TryGetValue(path, out bool hintedIsFolder)
+                ? hintedIsFolder
+                : InferFolderWithoutTouchingFileSystem(path);
+
+            return new FavoriteItem
+            {
+                Name = GetFavoriteDisplayName(path, isFolder),
+                Path = path,
+                IsFolder = isFolder,
+                IsPinned = isPinned
+            };
+        }
+
+        private static bool InferFolderWithoutTouchingFileSystem(string path)
+        {
+            string trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (trimmed.Length != path.Length)
+            {
+                return true;
+            }
+
+            return !Path.HasExtension(trimmed);
+        }
+
+        private static string GetFavoriteDisplayName(string path, bool isFolder)
+        {
+            string displayPath = isFolder
+                ? path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : path;
+
+            string name = Path.GetFileName(displayPath);
+            return string.IsNullOrWhiteSpace(name) ? displayPath : name;
         }
 
         private async void OnFavoriteItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
