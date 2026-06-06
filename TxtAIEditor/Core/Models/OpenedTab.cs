@@ -115,6 +115,8 @@ namespace TxtAIEditor.Core.Models
         public bool EncodingWasAutoDetected { get; set; } = true;
         public bool InlineLivePreviewEnabled { get; set; } = false;
         public bool IsImageViewer { get; set; } = false;
+        public bool IsPdfViewer { get; set; } = false;
+        public bool IsReadOnlyViewer => IsImageViewer || IsPdfViewer;
         public string? EncryptionPassword { get; set; }
 
         private bool _isEncrypted = false;

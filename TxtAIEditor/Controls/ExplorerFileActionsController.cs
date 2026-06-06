@@ -259,7 +259,7 @@ namespace TxtAIEditor.Controls
         {
             var activeTab = _activeTabProvider();
             if (activeTab != null &&
-                !activeTab.IsImageViewer &&
+                !activeTab.IsReadOnlyViewer &&
                 !string.IsNullOrWhiteSpace(activeTab.FilePath) &&
                 File.Exists(activeTab.FilePath))
             {

@@ -756,45 +756,87 @@ function reportCursorAndSelection(element = document.activeElement) {
 function selectionInfo() {
     const selection = runtime.normalizeSelection();
     if (selection && runtime.hasCustomSelection()) {
-        const parts = [];
-        for (let line = selection.start.line; line <= selection.end.line; line++) {
-            const text = state.cache.get(line) || '';
-            if (selection.isColumn) {
-                const start = Math.min(selection.start.column, selection.end.column);
-                const end = Math.max(selection.start.column, selection.end.column);
-                parts.push(text.slice(Math.max(0, start), Math.max(0, end)));
-            } else {
-                const start = line === selection.start.line ? selection.start.column : 0;
-                const end = line === selection.end.line ? selection.end.column : text.length;
-                parts.push(text.slice(Math.max(0, start), Math.max(0, end)));
-            }
-        }
-        return { text: parts.join('\n'), startLine: selection.start.line, endLine: selection.end.line };
+        return selectionTextFromModel(selection);
     }
 
-    return { text: window.getSelection()?.toString() || '', startLine: 0, endLine: 0 };
+    return nativeSelectionTextFromModel() ?? { text: window.getSelection()?.toString() || '', startLine: 0, endLine: 0 };
 }
 
 function selectedText() {
     const selection = runtime.normalizeSelection();
     if (selection && runtime.hasCustomSelection()) {
-        const parts = [];
-        for (let line = selection.start.line; line <= selection.end.line; line++) {
-            const text = state.cache.get(line) || '';
-            if (selection.isColumn) {
-                const start = Math.min(selection.start.column, selection.end.column);
-                const end = Math.max(selection.start.column, selection.end.column);
-                parts.push(text.slice(Math.max(0, start), Math.max(0, end)));
-            } else {
-                const start = line === selection.start.line ? selection.start.column : 0;
-                const end = line === selection.end.line ? selection.end.column : text.length;
-                parts.push(text.slice(Math.max(0, start), Math.max(0, end)));
-            }
-        }
-        return parts.join('\n');
+        return selectionTextFromModel(selection).text;
     }
 
-    return window.getSelection()?.toString() || '';
+    return nativeSelectionTextFromModel()?.text ?? window.getSelection()?.toString() ?? '';
+}
+
+function selectionTextFromModel(selection) {
+    const parts = [];
+    for (let line = selection.start.line; line <= selection.end.line; line++) {
+        const text = state.cache.get(line) ?? '';
+        if (selection.isColumn) {
+            const start = Math.min(selection.start.column, selection.end.column);
+            const end = Math.max(selection.start.column, selection.end.column);
+            parts.push(text.slice(Math.max(0, start), Math.max(0, end)));
+        } else {
+            const start = line === selection.start.line ? selection.start.column : 0;
+            const end = line === selection.end.line ? selection.end.column : text.length;
+            parts.push(text.slice(Math.max(0, start), Math.max(0, end)));
+        }
+    }
+    return { text: parts.join('\n'), startLine: selection.start.line, endLine: selection.end.line };
+}
+
+function nativeSelectionTextFromModel() {
+    const domSelection = window.getSelection();
+    if (!domSelection || domSelection.rangeCount === 0 || domSelection.isCollapsed) return null;
+
+    const range = domSelection.getRangeAt(0);
+    const start = editorPositionFromDomPosition(range.startContainer, range.startOffset);
+    const end = editorPositionFromDomPosition(range.endContainer, range.endOffset);
+    if (!start || !end) return null;
+
+    const ordered = orderedRange({ start, end });
+    if (ordered.start.line === ordered.end.line && ordered.start.column === ordered.end.column) {
+        return null;
+    }
+
+    return selectionTextFromModel(ordered);
+}
+
+function editorPositionFromDomPosition(node, offset) {
+    const element = lineElementFromDomNode(node);
+    if (!element) return null;
+
+    const line = Number(element.dataset.line || 0);
+    if (!line) return null;
+
+    const text = state.cache.get(line) ?? element.textContent ?? '';
+    const column = Math.max(0, Math.min(offsetFromNodeInElement(element, node, offset), text.length));
+    return { line, column };
+}
+
+function lineElementFromDomNode(node) {
+    if (!node) return null;
+    if (node.nodeType === Node.ELEMENT_NODE && node.closest) {
+        return node.closest('.line-text');
+    }
+    return node.parentElement?.closest?.('.line-text') || null;
+}
+
+function offsetFromNodeInElement(element, node, offset) {
+    if (!element || !node || !element.contains(node)) return 0;
+    const before = document.createRange();
+    before.selectNodeContents(element);
+    try {
+        before.setEnd(node, offset);
+        return before.toString().length;
+    } catch {
+        return 0;
+    } finally {
+        before.detach?.();
+    }
 }
 
 function activeEditableElement() {

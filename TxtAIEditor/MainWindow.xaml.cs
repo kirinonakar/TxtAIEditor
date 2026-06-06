@@ -124,6 +124,8 @@ namespace TxtAIEditor
         // Dynamic tabs collection
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges = 
             new Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)>();
+        private readonly Dictionary<string, WebView2> _pdfViewerWebViews =
+            new Dictionary<string, WebView2>();
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions =
             new Dictionary<string, EditorDocumentSession>();
 
@@ -339,6 +341,7 @@ namespace TxtAIEditor
                     request.IsEncrypted,
                     request.EncryptionPassword),
                 OpenImageTab,
+                OpenPdfTab,
                 QueueGitStatusRefresh,
                 _dialogController.ShowErrorMessage);
             _explorerNavigationController = new ExplorerNavigationController(
@@ -407,6 +410,7 @@ namespace TxtAIEditor
                 _tabEncryptionController.ForgetPassword,
                 SaveTabAsync,
                 () => OpenNewTab(),
+                CloseReadOnlyViewer,
                 UpdateWindowTitle);
             _tabMoveController = new TabMoveController(
                 _viewModel,
@@ -471,6 +475,7 @@ namespace TxtAIEditor
                 () => OnOpenFileClick(this, new RoutedEventArgs()),
                 () => OnFindClick(this, new RoutedEventArgs()),
                 () => OnPrintClick(this, new RoutedEventArgs()),
+                IsActiveTabPdfViewer,
                 _stickyNoteModeController.ToggleTopMostFromShortcut,
                 () => OnToggleThemeClick(this, new RoutedEventArgs()),
                 _stickyNoteModeController.ToggleMode,
@@ -874,6 +879,57 @@ namespace TxtAIEditor
             {
                 InitializeEditorWebView(tabParts.WebView, tabParts.Bridge);
             }
+
+            return tab;
+        }
+
+        private OpenedTab OpenPdfTab(string filePath)
+        {
+            var tab = new OpenedTab
+            {
+                FilePath = filePath,
+                Title = Path.GetFileName(filePath),
+                Content = string.Empty,
+                Language = "pdf",
+                EncodingName = string.Empty,
+                EncodingWasAutoDetected = false,
+                IsPdfViewer = true
+            };
+
+            _viewModel.Tabs.Add(tab);
+            if (File.Exists(tab.FilePath))
+            {
+                _favoritesRecentController.AddRecentFile(tab.FilePath);
+            }
+
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+            _settingsController.ApplyEditorSurfaceBackground(settings);
+
+            var targetTabView = GetCurrentActiveTabView();
+            var tabParts = _editorTabViewItemFactory.CreatePdfViewer(
+                tab,
+                editorBgColor,
+                settings.UiFontFamily,
+                GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                _tabEncryptionController.ShowMenu,
+                (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args));
+
+            _pdfViewerWebViews[tab.Id] = tabParts.WebView;
+            tabParts.WebView.CoreWebView2Initialized += (_, _) => ConfigurePdfViewer(tabParts.WebView);
+
+            EditorWorkspace.DisableTabItemTransitions();
+            targetTabView.TabItems.Add(tabParts.TabItem);
+            targetTabView.SelectedItem = tabParts.TabItem;
+            EditorWorkspace.SetEditorSurfaceBackground(editorBgColor);
+
+            _statusBarController.UpdateFileStats(tab);
+            _statusBarController.UpdateTotalLines(tab);
+            _statusBarController.UpdateSelectionStats(null);
+            _statusBarController.SyncEncodingCombo(tab);
+            _statusBarController.SyncLineEndingText(tab);
+            UpdateLanguageUI(tab);
+            UpdateWindowTitle();
 
             return tab;
         }
@@ -1414,6 +1470,13 @@ namespace TxtAIEditor
 
         private async void OnFindClick(object sender, RoutedEventArgs e)
         {
+            if (TryGetActivePdfWebView(out var pdfWebView))
+            {
+                pdfWebView.Focus(FocusState.Programmatic);
+                await TryTriggerPdfFindAsync(pdfWebView);
+                return;
+            }
+
             if (EditorTabView.SelectedItem is TabViewItem activeTabItem &&
                 activeTabItem.Tag is string tabId &&
                 _tabBridges.TryGetValue(tabId, out var bridgeGroup))
@@ -1430,6 +1493,61 @@ namespace TxtAIEditor
             ShowLeftSidebarPage(3);
             SearchQueryInput.Focus(FocusState.Programmatic);
             SearchQueryInput.Focus(FocusState.Keyboard);
+        }
+
+        private bool IsActiveTabPdfViewer()
+        {
+            return GetActiveTab()?.IsPdfViewer == true;
+        }
+
+        private bool TryGetActivePdfWebView(out WebView2 pdfWebView)
+        {
+            pdfWebView = null!;
+            var activeTab = GetActiveTab();
+            if (activeTab?.IsPdfViewer != true)
+            {
+                return false;
+            }
+
+            if (_pdfViewerWebViews.TryGetValue(activeTab.Id, out var viewer) && viewer != null)
+            {
+                pdfWebView = viewer;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void ConfigurePdfViewer(WebView2 pdfWebView)
+        {
+            if (pdfWebView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            pdfWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+            pdfWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
+            pdfWebView.CoreWebView2.Settings.IsStatusBarEnabled = true;
+        }
+
+        private static async Task TryTriggerPdfFindAsync(WebView2 pdfWebView)
+        {
+            if (pdfWebView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            const string keyDown = "{\"type\":\"keyDown\",\"modifiers\":2,\"windowsVirtualKeyCode\":70,\"nativeVirtualKeyCode\":70,\"code\":\"KeyF\",\"key\":\"f\"}";
+            const string keyUp = "{\"type\":\"keyUp\",\"modifiers\":2,\"windowsVirtualKeyCode\":70,\"nativeVirtualKeyCode\":70,\"code\":\"KeyF\",\"key\":\"f\"}";
+
+            try
+            {
+                await pdfWebView.CoreWebView2.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", keyDown);
+                await pdfWebView.CoreWebView2.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", keyUp);
+            }
+            catch
+            {
+            }
         }
 
         private async void OnToggleCsvTableClick(object sender, RoutedEventArgs e)
@@ -1678,6 +1796,15 @@ namespace TxtAIEditor
             _tabCloseController.CloseAndCleanup(tab, tabItem);
         }
 
+        private void CloseReadOnlyViewer(string tabId)
+        {
+            if (_pdfViewerWebViews.TryGetValue(tabId, out var pdfWebView))
+            {
+                pdfWebView.Close();
+                _pdfViewerWebViews.Remove(tabId);
+            }
+        }
+
         #endregion
 
         #region Helpers & UI Triggers
@@ -1698,7 +1825,7 @@ namespace TxtAIEditor
 
         private async Task ReloadTabWithEncodingAsync(OpenedTab tab, string encodingName)
         {
-            if (tab.IsImageViewer)
+            if (tab.IsReadOnlyViewer)
             {
                 _statusBarController.UpdateFileStats(tab);
                 _statusBarController.UpdateTotalLines(tab);
@@ -2203,6 +2330,15 @@ namespace TxtAIEditor
                 return;
             }
 
+            if (tab.IsPdfViewer)
+            {
+                if (StatusLanguage != null)
+                {
+                    StatusLanguage.Text = "PDF";
+                }
+                return;
+            }
+
             string detected = tab.Language;
             if (detected == "plaintext" || string.IsNullOrEmpty(detected))
             {
@@ -2295,6 +2431,16 @@ namespace TxtAIEditor
 
         private async Task OnTabReloadAsync(OpenedTab tab, TabViewItem tabItem)
         {
+            if (tab.IsPdfViewer && _pdfViewerWebViews.TryGetValue(tab.Id, out var pdfWebView))
+            {
+                pdfWebView.Reload();
+                _statusBarController.UpdateFileStats(tab);
+                _statusBarController.UpdateTotalLines(tab);
+                UpdateLanguageUI(tab);
+                UpdateWindowTitle();
+                return;
+            }
+
             await _tabReloadController.ReloadFromDiskAsync(tab);
         }
 

@@ -30,6 +30,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab> _forgetEncryptionPassword;
         private readonly Func<OpenedTab, Task<bool>> _saveTabAsync;
         private readonly Func<OpenedTab> _openNewTab;
+        private readonly Action<string> _closeReadOnlyViewer;
         private readonly Action _updateWindowTitle;
 
         public TabCloseController(
@@ -50,6 +51,7 @@ namespace TxtAIEditor.Controls
             Action<OpenedTab> forgetEncryptionPassword,
             Func<OpenedTab, Task<bool>> saveTabAsync,
             Func<OpenedTab> openNewTab,
+            Action<string> closeReadOnlyViewer,
             Action updateWindowTitle)
         {
             _viewModel = viewModel;
@@ -69,6 +71,7 @@ namespace TxtAIEditor.Controls
             _forgetEncryptionPassword = forgetEncryptionPassword;
             _saveTabAsync = saveTabAsync;
             _openNewTab = openNewTab;
+            _closeReadOnlyViewer = closeReadOnlyViewer;
             _updateWindowTitle = updateWindowTitle;
         }
 
@@ -213,6 +216,7 @@ namespace TxtAIEditor.Controls
             }
 
             _editorSessions.Remove(tab.Id);
+            _closeReadOnlyViewer(tab.Id);
 
             if (_editorTabView.TabItems.Count == 0 && _editorTabView2.TabItems.Count == 0)
             {

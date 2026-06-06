@@ -27,6 +27,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, Task<string?>> _promptPasswordAsync;
         private readonly Func<FileTabOpenRequest, OpenedTab> _openNewTab;
         private readonly Func<string, OpenedTab> _openImageTab;
+        private readonly Func<string, OpenedTab> _openPdfTab;
         private readonly Action _queueGitStatusRefresh;
         private readonly Action<string, string> _showErrorMessage;
         private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
@@ -43,6 +44,7 @@ namespace TxtAIEditor.Controls
             Func<string, string, Task<string?>> promptPasswordAsync,
             Func<FileTabOpenRequest, OpenedTab> openNewTab,
             Func<string, OpenedTab> openImageTab,
+            Func<string, OpenedTab> openPdfTab,
             Action queueGitStatusRefresh,
             Action<string, string> showErrorMessage)
         {
@@ -57,6 +59,7 @@ namespace TxtAIEditor.Controls
             _promptPasswordAsync = promptPasswordAsync;
             _openNewTab = openNewTab;
             _openImageTab = openImageTab;
+            _openPdfTab = openPdfTab;
             _queueGitStatusRefresh = queueGitStatusRefresh;
             _showErrorMessage = showErrorMessage;
         }
@@ -81,6 +84,13 @@ namespace TxtAIEditor.Controls
                 if (IsSupportedImageFile(filePath))
                 {
                     _openImageTab(filePath);
+                    QueueGitRefreshIfNeeded(repoRoot);
+                    return;
+                }
+
+                if (IsPdfFile(filePath))
+                {
+                    _openPdfTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return;
                 }
@@ -187,6 +197,11 @@ namespace TxtAIEditor.Controls
                    extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsPdfFile(string filePath)
+        {
+            return Path.GetExtension(filePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
         }
 
         private void QueueGitRefreshIfNeeded(string? repoRoot)

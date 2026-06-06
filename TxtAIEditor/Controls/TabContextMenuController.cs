@@ -82,7 +82,7 @@ namespace TxtAIEditor.Controls
             reloadItem.Click += async (_, __) => await _reloadTabAsync(tab, tabItem);
             menu.Items.Add(reloadItem);
 
-            if (!tab.IsImageViewer)
+            if (!tab.IsReadOnlyViewer)
             {
                 menu.Items.Add(new MenuFlyoutSeparator());
 

@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _openFile;
         private readonly Action _find;
         private readonly Action _print;
+        private readonly Func<bool> _letActiveContentHandleFind;
         private readonly Action _toggleTopMost;
         private readonly Action _toggleTheme;
         private readonly Action _toggleStickyNote;
@@ -33,6 +34,7 @@ namespace TxtAIEditor.Controls
             Action openFile,
             Action find,
             Action print,
+            Func<bool> letActiveContentHandleFind,
             Action toggleTopMost,
             Action toggleTheme,
             Action toggleStickyNote,
@@ -48,6 +50,7 @@ namespace TxtAIEditor.Controls
             _openFile = openFile;
             _find = find;
             _print = print;
+            _letActiveContentHandleFind = letActiveContentHandleFind;
             _toggleTopMost = toggleTopMost;
             _toggleTheme = toggleTheme;
             _toggleStickyNote = toggleStickyNote;
@@ -114,6 +117,11 @@ namespace TxtAIEditor.Controls
             }
             else if (e.Key == Windows.System.VirtualKey.F)
             {
+                if (!shift && _letActiveContentHandleFind())
+                {
+                    return;
+                }
+
                 e.Handled = true;
                 _find();
             }

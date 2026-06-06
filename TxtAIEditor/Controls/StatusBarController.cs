@@ -97,6 +97,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (tab.IsPdfViewer)
+            {
+                _statusBar.TotalLinesText.Text = "PDF";
+                return;
+            }
+
             int totalLines = _sessionProvider(tab.Id)?.Model.LineCount ?? 1;
             string format = _getString("StatusTotalLinesFormat", "전체 줄수: {0}");
             _statusBar.TotalLinesText.Text = string.Format(format, totalLines);
@@ -126,7 +132,7 @@ namespace TxtAIEditor.Controls
 
         public void SyncEncodingCombo(OpenedTab tab)
         {
-            if (tab.IsImageViewer)
+            if (tab.IsReadOnlyViewer)
             {
                 return;
             }
@@ -153,7 +159,7 @@ namespace TxtAIEditor.Controls
 
         public void SyncLineEndingText(OpenedTab tab)
         {
-            if (tab.IsImageViewer)
+            if (tab.IsReadOnlyViewer)
             {
                 _statusBar.LineEndingText.Text = "";
                 return;
@@ -181,7 +187,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (tab.IsImageViewer)
+            if (tab.IsReadOnlyViewer)
             {
                 SyncEncodingCombo(tab);
                 return;
@@ -319,7 +325,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (tab.IsImageViewer)
+            if (tab.IsReadOnlyViewer)
             {
                 return;
             }

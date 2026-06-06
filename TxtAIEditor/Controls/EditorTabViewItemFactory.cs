@@ -115,6 +115,48 @@ namespace TxtAIEditor.Controls
             return tabItem;
         }
 
+        public PdfViewerTabParts CreatePdfViewer(
+            OpenedTab tab,
+            Windows.UI.Color editorBackgroundColor,
+            string? uiFontFamily,
+            string encryptedTooltip,
+            Action<OpenedTab, FrameworkElement, RightTappedRoutedEventArgs> showEncryptionMenu,
+            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu)
+        {
+            var pdfWebView = new WebView2
+            {
+                Source = new Uri(tab.FilePath!, UriKind.Absolute),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                DefaultBackgroundColor = editorBackgroundColor
+            };
+
+            var pdfHost = new Grid
+            {
+                Background = new SolidColorBrush(editorBackgroundColor)
+            };
+            pdfHost.Children.Add(pdfWebView);
+
+            var tabHeader = new TabHeaderControl();
+            tabHeader.Configure(tab, encryptedTooltip);
+            tabHeader.EncryptionMenuRequested += (_, args) =>
+                showEncryptionMenu(args.Tab, args.Target, args.RoutedArgs);
+
+            var tabItem = new TabViewItem
+            {
+                Content = pdfHost,
+                Tag = tab.Id,
+                Header = tabHeader,
+                ContentTransitions = new TransitionCollection(),
+                Transitions = new TransitionCollection(),
+                Opacity = 1
+            };
+            tabItem.RightTapped += (_, args) => showTabContextMenu(tabItem, args);
+            ApplyUiFont(tabItem, uiFontFamily);
+
+            return new PdfViewerTabParts(tabItem, pdfWebView);
+        }
+
         private static void ApplyUiFont(TabViewItem tabItem, string? uiFontFamily)
         {
             try
@@ -148,5 +190,17 @@ namespace TxtAIEditor.Controls
         public WebView2 WebView { get; }
         public Border LoadCover { get; }
         public MonacoBridge Bridge { get; }
+    }
+
+    public sealed class PdfViewerTabParts
+    {
+        public PdfViewerTabParts(TabViewItem tabItem, WebView2 webView)
+        {
+            TabItem = tabItem;
+            WebView = webView;
+        }
+
+        public TabViewItem TabItem { get; }
+        public WebView2 WebView { get; }
     }
 }

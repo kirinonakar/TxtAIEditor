@@ -31,6 +31,7 @@ namespace TxtAIEditor.Core.Services
                 changed |= RegisterFileType(".csv", "TxtAIEditor.csv", "CSV Document", executablePath);
                 changed |= RegisterFileType(".yaml", "TxtAIEditor.yaml", "YAML Document", executablePath);
                 changed |= RegisterFileType(".yml", "TxtAIEditor.yml", "YAML Document", executablePath);
+                changed |= RegisterFileType(".pdf", "TxtAIEditor.pdf", "PDF Document", executablePath);
 
                 if (IsRunningPackaged())
                 {
@@ -77,6 +78,7 @@ namespace TxtAIEditor.Core.Services
             changed |= SetValueIfDifferent(supportedTypesKey, ".csv", string.Empty, RegistryValueKind.String);
             changed |= SetValueIfDifferent(supportedTypesKey, ".yaml", string.Empty, RegistryValueKind.String);
             changed |= SetValueIfDifferent(supportedTypesKey, ".yml", string.Empty, RegistryValueKind.String);
+            changed |= SetValueIfDifferent(supportedTypesKey, ".pdf", string.Empty, RegistryValueKind.String);
 
             using RegistryKey capabilitiesKey = appKey.CreateSubKey("Capabilities");
             changed |= SetValueIfDifferent(capabilitiesKey, "ApplicationName", AppName, RegistryValueKind.String);
@@ -88,6 +90,7 @@ namespace TxtAIEditor.Core.Services
             changed |= SetValueIfDifferent(fileAssociationsKey, ".csv", "TxtAIEditor.csv", RegistryValueKind.String);
             changed |= SetValueIfDifferent(fileAssociationsKey, ".yaml", "TxtAIEditor.yaml", RegistryValueKind.String);
             changed |= SetValueIfDifferent(fileAssociationsKey, ".yml", "TxtAIEditor.yml", RegistryValueKind.String);
+            changed |= SetValueIfDifferent(fileAssociationsKey, ".pdf", "TxtAIEditor.pdf", RegistryValueKind.String);
 
             using RegistryKey registeredAppsKey = Registry.CurrentUser.CreateSubKey(RegisteredApplicationsPath);
             changed |= SetValueIfDifferent(registeredAppsKey, AppName, ApplicationRegistryPath + @"\Capabilities", RegistryValueKind.String);

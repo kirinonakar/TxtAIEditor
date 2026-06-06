@@ -81,7 +81,7 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (tab.IsImageViewer)
+            if (tab.IsReadOnlyViewer)
             {
                 return false;
             }
@@ -113,7 +113,7 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (tab.IsImageViewer)
+            if (tab.IsReadOnlyViewer)
             {
                 return false;
             }
