@@ -66,6 +66,11 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
+                if (tab.IsDocxViewer)
+                {
+                    return; // Prevent encoding change updates since encoding is managed internally by the XML parser.
+                }
+
                 bool isReadOnly = tab.FilePath.EndsWith(".diff", StringComparison.OrdinalIgnoreCase);
 
                 if (tab.IsEncrypted)
@@ -118,6 +123,23 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                if (tab.IsDocxViewer)
+                {
+                    var docxService = new DocxTextExtractionService();
+                    string extractedText = await docxService.ExtractTextAsync(tab.FilePath);
+                    var docxModel = LineArrayTextModel.FromText(extractedText);
+                    ApplyTabReloadState(tab, docxModel, "UTF-8", false, extractedText);
+
+                    if (_editorSessions.TryGetValue(tab.Id, out var docxSession))
+                    {
+                        docxSession.UpdateContentFromSync(extractedText);
+                    }
+
+                    await SetBridgeTextAsync(tab, extractedText);
+                    CompleteDiskReload(tab);
+                    return;
+                }
+
                 if (tab.IsEncrypted)
                 {
                     string? password = await GetEncryptionPasswordAsync(tab);

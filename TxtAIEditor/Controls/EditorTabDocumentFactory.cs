@@ -38,7 +38,8 @@ namespace TxtAIEditor.Controls
             };
 
             bool effectiveReadOnly = isReadOnly ||
-                filePath?.EndsWith(".diff", StringComparison.OrdinalIgnoreCase) == true;
+                filePath?.EndsWith(".diff", StringComparison.OrdinalIgnoreCase) == true ||
+                filePath?.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) == true;
 
             if (filePath != null)
             {
@@ -46,6 +47,10 @@ namespace TxtAIEditor.Controls
                 tab.Title = Path.GetFileName(filePath);
                 tab.Content = content;
                 tab.Language = _languageDetectionService.GetMonacoLanguageName(filePath);
+                if (filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+                {
+                    tab.IsDocxViewer = true;
+                }
             }
             else
             {

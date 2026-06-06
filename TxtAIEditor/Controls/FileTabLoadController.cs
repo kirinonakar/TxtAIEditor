@@ -95,6 +95,13 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
+                if (IsDocxFile(filePath))
+                {
+                    await OpenDocxFileAsync(filePath, repoRoot);
+                    QueueGitRefreshIfNeeded(repoRoot);
+                    return;
+                }
+
                 bool isEncrypted = await _secureNoteEncryptionService.IsSecureNoteFileAsync(filePath);
                 if (isEncrypted)
                 {
@@ -202,6 +209,26 @@ namespace TxtAIEditor.Controls
         private static bool IsPdfFile(string filePath)
         {
             return Path.GetExtension(filePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsDocxFile(string filePath)
+        {
+            return Path.GetExtension(filePath).Equals(".docx", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task OpenDocxFileAsync(string filePath, string? repoRoot)
+        {
+            var docxService = new DocxTextExtractionService();
+            string extractedText = await docxService.ExtractTextAsync(filePath);
+            _openNewTab(new FileTabOpenRequest
+            {
+                FilePath = filePath,
+                Content = extractedText,
+                EncodingName = "UTF-8",
+                EncodingWasAutoDetected = false,
+                TextModel = LineArrayTextModel.FromText(extractedText),
+                IsReadOnly = true
+            });
         }
 
         private void QueueGitRefreshIfNeeded(string? repoRoot)

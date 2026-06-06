@@ -2597,6 +2597,15 @@ namespace TxtAIEditor
                 return;
             }
 
+            if (tab.IsDocxViewer)
+            {
+                if (StatusLanguage != null)
+                {
+                    StatusLanguage.Text = "DOCX";
+                }
+                return;
+            }
+
             string detected = tab.Language;
             if (detected == "plaintext" || string.IsNullOrEmpty(detected))
             {
