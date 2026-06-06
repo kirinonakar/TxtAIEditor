@@ -91,6 +91,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("2. If no selection exists, use active_tab_context.");
             builder.AppendLine("3. Use open_tabs_context only for orientation.");
             builder.AppendLine("4. Search the workspace only when the task requires files not present in the provided context.");
+            builder.AppendLine("- selected_text_context is a frozen snapshot captured when the Agent run started. It remains the target even if a later tool result or editor update clears the current UI selection.");
             builder.AppendLine("- When selected_text_context is present and the user says selected part/selection/this part/선택/선택한 부분/선택부위/이 부분, do not ask whether they mean the whole file. Apply the instruction to the selection.");
             builder.AppendLine("- For selected-text rewrite requests such as translate, fix, improve, polish, summarize in-place, or 고쳐줘/번역해줘, edit only the selected range in its source file. Prefer replace_range with the supplied source path and line range. Do not use overwrite_file unless the user explicitly asks for a full-file rewrite.");
             builder.AppendLine("- If selected_text_context includes a source line range, copy that exact line range into replace_range. Do not recalculate or shift the line numbers from read_file output.");
@@ -151,7 +152,7 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 builder.AppendLine();
                 builder.AppendLine("[selected_text_context]");
-                builder.AppendLine("This is the current editor selection. If the user asks to edit, translate, fix, or rewrite the selected part, this is the target scope.");
+                builder.AppendLine("This is the editor selection captured when the Agent run started. If the user asks to edit, translate, fix, summarize, or rewrite the selected part, this frozen selection is the target scope even if later tool execution clears the live UI selection.");
                 builder.AppendLine(selectedText);
             }
 

@@ -56,6 +56,8 @@ namespace TxtAIEditor.Controls
         private readonly StringBuilder _sessionHistory = new();
         private TaskCompletionSource<bool>? _diffApprovalTcs;
         private string? _currentRunLastFilePath;
+        private SelectionSnapshot? _currentRunSelectionSnapshot;
+        private bool _clearSelectionAfterRun;
 
         private sealed class SelectionSnapshot
         {
@@ -237,6 +239,18 @@ namespace TxtAIEditor.Controls
 
         private SelectionSnapshot CaptureActiveSelectionSnapshot()
         {
+            if (_isRunning &&
+                _currentRunSelectionSnapshot != null &&
+                !string.IsNullOrEmpty(_currentRunSelectionSnapshot.Text))
+            {
+                return _currentRunSelectionSnapshot;
+            }
+
+            return CaptureLiveSelectionSnapshot();
+        }
+
+        private SelectionSnapshot CaptureLiveSelectionSnapshot()
+        {
             string selectedText = GetActiveSelectionText();
             if (string.IsNullOrEmpty(selectedText))
             {
@@ -307,6 +321,8 @@ namespace TxtAIEditor.Controls
  
             _isRunning = true;
             _currentRunLastFilePath = null;
+            _currentRunSelectionSnapshot = null;
+            _clearSelectionAfterRun = false;
             var cancellationSource = new CancellationTokenSource();
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
@@ -330,6 +346,8 @@ namespace TxtAIEditor.Controls
                 string initialTranscript = initialTranscriptBuilder.ToString();
 
                 string transcript = initialTranscript;
+                _currentRunSelectionSnapshot = CaptureLiveSelectionSnapshot();
+                string runSelectionContext = BuildActiveSelectionContext();
                 string response = string.Empty;
 
                 bool completed = false;
@@ -353,7 +371,7 @@ namespace TxtAIEditor.Controls
                     response = await _llmService.RunAgentAsync(
                         instruction,
                         transcript,
-                        BuildActiveSelectionContext(),
+                        runSelectionContext,
                         "run",
                         async chunk =>
                         {
@@ -765,14 +783,41 @@ namespace TxtAIEditor.Controls
             finally
             {
                 _isRunning = false;
+                SelectionSnapshot? runSelectionSnapshot = _currentRunSelectionSnapshot;
+                _currentRunSelectionSnapshot = null;
                 if (ReferenceEquals(_runCancellation, cancellationSource))
                 {
                     _runCancellation = null;
                 }
 
                 cancellationSource.Dispose();
+                if (_clearSelectionAfterRun)
+                {
+                    _clearSelectionAfterRun = false;
+                    ClearSelectionIfMatches(runSelectionSnapshot);
+                }
                 _agentPane.SetBusy(false);
                 UpdateContextStats();
+            }
+        }
+
+        private void ClearSelectionIfMatches(SelectionSnapshot? snapshot)
+        {
+            if (snapshot == null || string.IsNullOrEmpty(snapshot.Text))
+            {
+                ClearSelection();
+                return;
+            }
+
+            bool isSameSelection =
+                string.Equals(_lastSelectionText, snapshot.Text, StringComparison.Ordinal) &&
+                string.Equals(_lastSelectionSourcePath, snapshot.SourcePath, StringComparison.OrdinalIgnoreCase) &&
+                _lastSelectionStartLine == snapshot.StartLine &&
+                _lastSelectionEndLine == snapshot.EndLine;
+
+            if (isSameSelection)
+            {
+                ClearSelection();
             }
         }
 
@@ -1235,7 +1280,14 @@ namespace TxtAIEditor.Controls
 
                 if (isEditingActiveFile && !result.Contains("failed") && !result.Contains("cancelled"))
                 {
-                    ClearSelection();
+                    if (_isRunning)
+                    {
+                        _clearSelectionAfterRun = true;
+                    }
+                    else
+                    {
+                        ClearSelection();
+                    }
                 }
 
                 return result;
@@ -2075,10 +2127,11 @@ namespace TxtAIEditor.Controls
 
         private string InferEditPathFromContext()
         {
-            if (!string.IsNullOrWhiteSpace(_lastSelectionSourcePath) &&
-                !string.IsNullOrEmpty(GetActiveSelectionText()))
+            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            if (!string.IsNullOrWhiteSpace(selection.SourcePath) &&
+                !string.IsNullOrEmpty(selection.Text))
             {
-                return _lastSelectionSourcePath;
+                return selection.SourcePath;
             }
 
             if (!string.IsNullOrWhiteSpace(_currentRunLastFilePath))
@@ -2115,11 +2168,12 @@ namespace TxtAIEditor.Controls
 
         private bool ShouldUseActiveSelectionRangeForPath(string path)
         {
+            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
             if (string.IsNullOrWhiteSpace(path) ||
-                string.IsNullOrWhiteSpace(_lastSelectionSourcePath) ||
-                string.IsNullOrEmpty(GetActiveSelectionText()) ||
-                _lastSelectionStartLine <= 0 ||
-                _lastSelectionEndLine <= 0)
+                string.IsNullOrWhiteSpace(selection.SourcePath) ||
+                string.IsNullOrEmpty(selection.Text) ||
+                selection.StartLine <= 0 ||
+                selection.EndLine <= 0)
             {
                 return false;
             }
@@ -2129,9 +2183,9 @@ namespace TxtAIEditor.Controls
                 string resolvedPath = Path.IsPathRooted(path)
                     ? path
                     : Path.Combine(_fileTools.WorkspaceRoot, path);
-                string resolvedSelectionPath = Path.IsPathRooted(_lastSelectionSourcePath)
-                    ? _lastSelectionSourcePath
-                    : Path.Combine(_fileTools.WorkspaceRoot, _lastSelectionSourcePath);
+                string resolvedSelectionPath = Path.IsPathRooted(selection.SourcePath)
+                    ? selection.SourcePath
+                    : Path.Combine(_fileTools.WorkspaceRoot, selection.SourcePath);
 
                 return string.Equals(
                     Path.GetFullPath(resolvedPath),
@@ -2140,28 +2194,31 @@ namespace TxtAIEditor.Controls
             }
             catch
             {
-                return string.Equals(path, _lastSelectionSourcePath, StringComparison.OrdinalIgnoreCase);
+                return string.Equals(path, selection.SourcePath, StringComparison.OrdinalIgnoreCase);
             }
         }
 
         private int GetReplaceRangeStartLineArgument(JsonElement arguments, string path)
         {
+            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
             return ShouldUseActiveSelectionRangeForPath(path)
-                ? _lastSelectionStartLine
+                ? selection.StartLine
                 : GetIntArgument(arguments, "startLine", 1);
         }
 
         private int GetReplaceRangeEndLineArgument(JsonElement arguments, string path)
         {
+            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
             return ShouldUseActiveSelectionRangeForPath(path)
-                ? _lastSelectionEndLine
+                ? selection.EndLine
                 : GetIntArgument(arguments, "endLine", 1);
         }
 
         private string GetReplaceRangeExpectedSnippetArgument(JsonElement arguments, string path)
         {
+            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
             return ShouldUseActiveSelectionRangeForPath(path)
-                ? GetActiveSelectionText()
+                ? selection.Text
                 : GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected");
         }
 
