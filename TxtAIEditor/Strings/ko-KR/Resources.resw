@@ -1466,6 +1466,9 @@
   <data name="AgentActivityToolFailedFormat" xml:space="preserve">
     <value>도구 실패: {0}</value>
   </data>
+  <data name="AgentActivityToolBlockedFormat" xml:space="preserve">
+    <value>도구 차단: {0}</value>
+  </data>
   <data name="AgentActivityStopRequested" xml:space="preserve">
     <value>중단 요청됨</value>
   </data>

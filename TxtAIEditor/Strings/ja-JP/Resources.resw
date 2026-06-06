@@ -1467,6 +1467,9 @@
   <data name="AgentActivityToolFailedFormat" xml:space="preserve">
     <value>ツール失敗: {0}</value>
   </data>
+  <data name="AgentActivityToolBlockedFormat" xml:space="preserve">
+    <value>ツールをブロック: {0}</value>
+  </data>
   <data name="AgentActivityStopRequested" xml:space="preserve">
     <value>中止が要求されました</value>
   </data>

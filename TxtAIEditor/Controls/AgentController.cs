@@ -57,6 +57,7 @@ namespace TxtAIEditor.Controls
         private TaskCompletionSource<bool>? _diffApprovalTcs;
         private string? _currentRunLastFilePath;
         private SelectionSnapshot? _currentRunSelectionSnapshot;
+        private bool _currentRunRestrictEditsToSelection;
 
         private sealed class SelectionSnapshot
         {
@@ -337,6 +338,7 @@ namespace TxtAIEditor.Controls
             _isRunning = true;
             _currentRunLastFilePath = null;
             _currentRunSelectionSnapshot = null;
+            _currentRunRestrictEditsToSelection = false;
             var cancellationSource = new CancellationTokenSource();
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
@@ -348,6 +350,9 @@ namespace TxtAIEditor.Controls
             try
             {
                 _currentRunSelectionSnapshot = CaptureLiveSelectionSnapshot();
+                _currentRunRestrictEditsToSelection =
+                    _currentRunSelectionSnapshot.HasLineRange &&
+                    !UserRequestAllowsEditsOutsideSelection(instruction);
                 string workspaceContext = BuildWorkspaceContext(instruction);
                 var initialTranscriptBuilder = new StringBuilder();
                 if (_sessionHistory.Length > 0)
@@ -766,6 +771,7 @@ namespace TxtAIEditor.Controls
             {
                 _isRunning = false;
                 _currentRunSelectionSnapshot = null;
+                _currentRunRestrictEditsToSelection = false;
                 if (ReferenceEquals(_runCancellation, cancellationSource))
                 {
                     _runCancellation = null;
@@ -1152,6 +1158,15 @@ namespace TxtAIEditor.Controls
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string normalizedToolName = NormalizeToolName(toolName);
+                string? selectionScopeError = ValidateSelectionEditScope(normalizedToolName, arguments);
+                if (!string.IsNullOrEmpty(selectionScopeError))
+                {
+                    AppendActivity(string.Format(
+                        _getString("AgentActivityToolBlockedFormat", "도구 차단: {0}"),
+                        normalizedToolName));
+                    return selectionScopeError;
+                }
+
                 AppendActivity(GetToolStartMessage(normalizedToolName, arguments));
 
                 string result;
@@ -1888,6 +1903,100 @@ namespace TxtAIEditor.Controls
             {
                 toolResults.Remove(key);
             }
+        }
+
+        private string? ValidateSelectionEditScope(string normalizedToolName, JsonElement arguments)
+        {
+            if (!_currentRunRestrictEditsToSelection ||
+                !IsFileEditingTool(normalizedToolName))
+            {
+                return null;
+            }
+
+            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            if (!selection.HasLineRange)
+            {
+                return null;
+            }
+
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            if (!PathsReferToSameFile(path, selection.SourcePath!))
+            {
+                return $"{normalizedToolName} failed: selected_range_context limits edits to {FormatSelectionScope(selection)}, but the requested edit targets {path}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer.";
+            }
+
+            if (normalizedToolName != "replace_range")
+            {
+                return $"{normalizedToolName} failed: selected_range_context limits file edits to {FormatSelectionScope(selection)}. Use replace_range within the selected line range for selected-range edits. If the selected-range task is already complete, write the final answer.";
+            }
+
+            int startLine = GetReplaceRangeStartLineArgument(arguments, path);
+            int endLine = GetReplaceRangeEndLineArgument(arguments, path);
+            if (startLine < selection.StartLine || endLine > selection.EndLine)
+            {
+                return $"replace_range failed: selected_range_context limits edits to {FormatSelectionScope(selection)}, but the requested edit targets lines {startLine}-{endLine}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer.";
+            }
+
+            return null;
+        }
+
+        private static bool IsFileEditingTool(string normalizedToolName)
+        {
+            return normalizedToolName is "overwrite_file"
+                or "replace_in_file"
+                or "replace_range"
+                or "apply_patch";
+        }
+
+        private bool PathsReferToSameFile(string path, string selectionPath)
+        {
+            try
+            {
+                string resolvedPath = Path.IsPathRooted(path)
+                    ? path
+                    : Path.Combine(_fileTools.WorkspaceRoot, path);
+                string resolvedSelectionPath = Path.IsPathRooted(selectionPath)
+                    ? selectionPath
+                    : Path.Combine(_fileTools.WorkspaceRoot, selectionPath);
+
+                return string.Equals(
+                    Path.GetFullPath(resolvedPath),
+                    Path.GetFullPath(resolvedSelectionPath),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(path, selectionPath, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private string FormatSelectionScope(SelectionSnapshot selection)
+        {
+            string source = FormatSelectionSourceForPrompt(selection.SourcePath, _lastSelectionSourceTitle);
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                source = selection.SourcePath ?? "the selected file";
+            }
+
+            return $"{source} lines {selection.StartLine}-{selection.EndLine}";
+        }
+
+        private static bool UserRequestAllowsEditsOutsideSelection(string instruction)
+        {
+            if (string.IsNullOrWhiteSpace(instruction))
+            {
+                return false;
+            }
+
+            return Regex.IsMatch(
+                instruction,
+                @"\b(whole|entire|full)\s+(file|document|workspace|project|repository)\b|\b(all|every)\s+(file|document)\b|전체\s*(파일|문서|워크스페이스|작업공간|프로젝트|저장소)|(?:파일|문서|프로젝트|저장소)\s*전체|すべての(?:ファイル|文書)|(?:ファイル|文書|ワークスペース|プロジェクト|リポジトリ)全体",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
 
         private static bool IsSuccessfulToolResult(string result)

@@ -1466,6 +1466,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityToolFailedFormat" xml:space="preserve">
     <value>Tool failed: {0}</value>
   </data>
+  <data name="AgentActivityToolBlockedFormat" xml:space="preserve">
+    <value>Tool blocked: {0}</value>
+  </data>
   <data name="AgentActivityStopRequested" xml:space="preserve">
     <value>Stop requested</value>
   </data>
