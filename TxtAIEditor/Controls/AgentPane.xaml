@@ -79,7 +79,8 @@
                       BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                       BorderThickness="1"
                       Padding="10"
-                      CornerRadius="4">
+                      CornerRadius="4"
+                      ViewChanged="OnAgentOutputScrollViewerViewChanged">
             <RichTextBlock x:Name="AgentOutputText"
                            TextWrapping="Wrap"
                            FontSize="13"

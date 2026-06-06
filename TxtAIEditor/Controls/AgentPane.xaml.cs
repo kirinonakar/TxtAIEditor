@@ -39,6 +39,8 @@ namespace TxtAIEditor.Controls
         private readonly List<string> _renderedLines = new List<string>();
         private readonly StringBuilder _pendingOutputText = new StringBuilder();
         private bool _outputScrollQueued;
+        private bool _userScrolledUp;
+        private double _lastVerticalOffset;
         private DispatcherTimer? _outputFlushTimer;
         private AgentDisplayLocalizer _displayText = AgentDisplayLocalizer.CreateWithResourceLoader();
         private string _explicitSelectedOutputText = string.Empty;
@@ -212,7 +214,7 @@ namespace TxtAIEditor.Controls
 
             if (!isBusy)
             {
-                ScrollOutputToEnd();
+                ScrollOutputToEnd(true);
             }
         }
 
@@ -286,7 +288,7 @@ namespace TxtAIEditor.Controls
             }
 
             AppendText(title + OutputLineBreak);
-            ScrollOutputToEnd();
+            ScrollOutputToEnd(true);
         }
 
         public void BeginThinkingActivity(string label)
@@ -310,7 +312,7 @@ namespace TxtAIEditor.Controls
             _thinkingDotCount = 0;
             _thinkingLineActive = true;
             AppendText(_thinkingLinePrefix);
-            ScrollOutputToEnd();
+            ScrollOutputToEnd(true);
 
             _thinkingTimer ??= CreateThinkingTimer();
             _thinkingTimer.Start();
@@ -423,16 +425,24 @@ namespace TxtAIEditor.Controls
             _outputFlushTimer?.Stop();
         }
 
-        private void ScrollOutputToEnd()
+        private void ScrollOutputToEnd(bool force = false)
         {
+            if (force)
+            {
+                _userScrolledUp = false;
+            }
+
             int currentLength = _rawOutputText.Length;
             if (_outputLength < 0 || _outputLength > currentLength)
             {
                 _outputLength = currentLength;
             }
 
-            ChangeOutputViewToEnd();
-            QueueOutputScrollToEnd();
+            if (!_userScrolledUp)
+            {
+                ChangeOutputViewToEnd();
+                QueueOutputScrollToEnd();
+            }
         }
 
         private void QueueOutputScrollToEnd()
@@ -461,6 +471,23 @@ namespace TxtAIEditor.Controls
         private void ChangeOutputViewToEnd()
         {
             AgentOutputScrollViewer.ChangeView(null, double.MaxValue, null, true);
+        }
+
+        private void OnAgentOutputScrollViewerViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+        {
+            double offset = AgentOutputScrollViewer.VerticalOffset;
+            double maxOffset = AgentOutputScrollViewer.ScrollableHeight;
+
+            if (offset < _lastVerticalOffset - 1.0)
+            {
+                _userScrolledUp = true;
+            }
+            else if (offset >= maxOffset - 5.0)
+            {
+                _userScrolledUp = false;
+            }
+
+            _lastVerticalOffset = offset;
         }
 
         private DispatcherTimer CreateThinkingTimer()
