@@ -1444,7 +1444,10 @@
     <value>ツール実行中</value>
   </data>
   <data name="AgentToolSuccessContinue" xml:space="preserve">
-    <value>作業は成功しました。次のステップへ進みます。</value>
+    <value>ツールは成功しました。必要な次のステップがなければ最終回答を作成してください。</value>
+  </data>
+  <data name="AgentDuplicateFailedToolSkippedFormat" xml:space="preserve">
+    <value>同じ {0} ツール呼び出しはすでに失敗しているため、再実行しませんでした。引数を変更するか、現在の結果をもとに最終回答を作成してください。</value>
   </data>
   <data name="AgentDuplicateToolSkipped" xml:space="preserve">
     <value>重複したツール呼び出しをスキップ</value>

@@ -97,6 +97,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- For selected-range rewrite requests such as translate, fix, improve, polish, summarize in-place, or 고쳐줘/번역해줘, edit only the selected range in its source file. Prefer replace_range with the supplied source path and line range. Do not use overwrite_file unless the user explicitly asks for a full-file rewrite.");
             builder.AppendLine("- If selected_range_context includes a source line range, copy that exact line range into read_file and replace_range. Do not recalculate or shift the line numbers from read_file output.");
             builder.AppendLine("- Treat active_tab_context as background when selected_range_context exists. Do not translate, rewrite, or otherwise modify unselected parts of the active file.");
+            builder.AppendLine("- After a selected-range edit tool succeeds, write the final answer if the user's requested change is complete. Do not keep polishing, removing blank lines, or making extra formatting edits unless the user explicitly requested them or the previous result is clearly incomplete.");
             builder.AppendLine("- Do not claim a task was already done or already translated unless you have read the referenced range and verified that it already satisfied the user request before making any edit. After applying an edit, phrase the result as something you changed or applied now.");
             builder.AppendLine();
             builder.AppendLine("Security rules:");

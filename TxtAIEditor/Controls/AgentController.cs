@@ -368,6 +368,7 @@ namespace TxtAIEditor.Controls
                 bool reachedToolStepLimit = false;
                 const int maxToolSteps = 15;
                 var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
+                var failedToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
@@ -596,6 +597,19 @@ namespace TxtAIEditor.Controls
                             _getString("AgentActivityDuplicateToolSkippedFormat", "중복 도구 호출 건너뜀: {0}"),
                             normalizedToolName));
                     }
+                    else if (failedToolResults.TryGetValue(toolInvocationKey, out string? previousFailedToolResult))
+                    {
+                        skippedDuplicateTool = true;
+                        toolResult = string.Format(
+                            _getString(
+                                "AgentDuplicateFailedToolSkippedFormat",
+                                "동일한 {0} 도구 호출이 이미 실패해서 다시 실행하지 않았습니다. 인자를 바꾸거나 현재 결과를 바탕으로 최종 응답을 작성하세요."),
+                            normalizedToolName);
+                        toolResultForTranscript = $"{toolResult}\n\n[Previous failed result]\n{previousFailedToolResult ?? string.Empty}";
+                        AppendActivity(string.Format(
+                            _getString("AgentActivityDuplicateToolSkippedFormat", "중복 도구 호출 건너뜀: {0}"),
+                            normalizedToolName));
+                    }
                     else
                     {
                         toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
@@ -604,15 +618,24 @@ namespace TxtAIEditor.Controls
                         {
                             string successContinueMessage = _getString(
                                 "AgentToolSuccessContinue",
-                                "작업이 성공하였습니다. 다음 단계로 진행합니다.");
+                                "도구가 성공했습니다. 필요한 다음 단계가 없으면 최종 응답을 작성하세요.");
                             toolResult = AppendToolStatusMessage(toolResult, successContinueMessage);
                             toolResultForTranscript = toolResult;
 
                             if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                             {
+                                if (IsMutatingTool(normalizedToolName))
+                                {
+                                    ClearCachedToolResults(successfulToolResults, "read_file");
+                                }
+
                                 successfulToolResults[toolInvocationKey] = toolResult;
-                                toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success. Continue from this result; do not repeat this same tool call unless the user explicitly asks to rerun it or the previous result is incomplete.]";
+                                toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success. If the user's request is satisfied, write the final answer now. Continue only for a necessary next step, and do not repeat this same tool call unless the user explicitly asks to rerun it or the previous result is incomplete.]";
                             }
+                        }
+                        else
+                        {
+                            failedToolResults[toolInvocationKey] = toolResult;
                         }
                     }
 
@@ -620,7 +643,9 @@ namespace TxtAIEditor.Controls
                     transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResultForTranscript}";
                     
                     string displayResult = toolResult;
-                    if (!_settingsService.CurrentSettings.LlmAgentVerbose && !toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
+                    if (!skippedDuplicateTool &&
+                        !_settingsService.CurrentSettings.LlmAgentVerbose &&
+                        !toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
                     {
                         string normalizedName = normalizedToolName;
                         if (normalizedName == "read_file")
@@ -1830,7 +1855,8 @@ namespace TxtAIEditor.Controls
 
         private static bool ShouldSkipDuplicateSuccessfulTool(string normalizedToolName)
         {
-            return normalizedToolName is "run_powershell"
+            return normalizedToolName is "read_file"
+                or "run_powershell"
                 or "run_rg"
                 or "search_text"
                 or "create_file"
@@ -1842,6 +1868,26 @@ namespace TxtAIEditor.Controls
                 or "create_tab"
                 or "web_search_exa"
                 or "web_fetch_exa";
+        }
+
+        private static bool IsMutatingTool(string normalizedToolName)
+        {
+            return normalizedToolName is "create_file"
+                or "overwrite_file"
+                or "replace_in_file"
+                or "replace_range"
+                or "apply_patch"
+                or "insert_text"
+                or "create_tab";
+        }
+
+        private static void ClearCachedToolResults(Dictionary<string, string> toolResults, string normalizedToolName)
+        {
+            string prefix = normalizedToolName + ":";
+            foreach (string key in toolResults.Keys.Where(key => key.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+            {
+                toolResults.Remove(key);
+            }
         }
 
         private static bool IsSuccessfulToolResult(string result)
@@ -2041,26 +2087,53 @@ namespace TxtAIEditor.Controls
 
         private int GetReplaceRangeStartLineArgument(JsonElement arguments, string path)
         {
+            if (TryGetIntArgument(arguments, "startLine", out int explicitStartLine) && explicitStartLine > 0)
+            {
+                return explicitStartLine;
+            }
+
             SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
             return ShouldUseActiveSelectionRangeForPath(path)
                 ? selection.StartLine
-                : GetIntArgument(arguments, "startLine", 1);
+                : 1;
         }
 
         private int GetReplaceRangeEndLineArgument(JsonElement arguments, string path)
         {
+            if (TryGetIntArgument(arguments, "endLine", out int explicitEndLine) && explicitEndLine > 0)
+            {
+                return explicitEndLine;
+            }
+
+            if (TryGetIntArgument(arguments, "startLine", out int explicitStartLine) && explicitStartLine > 0)
+            {
+                return explicitStartLine;
+            }
+
             SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
             return ShouldUseActiveSelectionRangeForPath(path)
                 ? selection.EndLine
-                : GetIntArgument(arguments, "endLine", 1);
+                : 1;
         }
 
         private string GetReplaceRangeExpectedSnippetArgument(JsonElement arguments, string path)
         {
+            string explicitExpected = GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected");
+            if (!string.IsNullOrEmpty(explicitExpected))
+            {
+                return explicitExpected;
+            }
+
+            if (TryGetIntArgument(arguments, "startLine", out _) ||
+                TryGetIntArgument(arguments, "endLine", out _))
+            {
+                return string.Empty;
+            }
+
             SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
             return ShouldUseActiveSelectionRangeForPath(path)
                 ? selection.Text
-                : GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected");
+                : string.Empty;
         }
 
         private static string GetFirstStringArgument(JsonElement arguments, params string[] names)
@@ -2120,17 +2193,31 @@ namespace TxtAIEditor.Controls
 
         private static int GetIntArgument(JsonElement arguments, string name, int fallback)
         {
-            if (!arguments.TryGetProperty(name, out var value))
+            return TryGetIntArgument(arguments, name, out int value) ? value : fallback;
+        }
+
+        private static bool TryGetIntArgument(JsonElement arguments, string name, out int value)
+        {
+            value = 0;
+            if (!arguments.TryGetProperty(name, out var propertyValue))
             {
-                return fallback;
+                return false;
             }
 
-            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number))
+            if (propertyValue.ValueKind == JsonValueKind.Number && propertyValue.TryGetInt32(out int number))
             {
-                return number;
+                value = number;
+                return true;
             }
 
-            return int.TryParse(value.GetString(), out int parsed) ? parsed : fallback;
+            if (propertyValue.ValueKind == JsonValueKind.String &&
+                int.TryParse(propertyValue.GetString(), out int parsed))
+            {
+                value = parsed;
+                return true;
+            }
+
+            return false;
         }
 
         private async Task<string> CreateFileToolAsync(JsonElement arguments)
