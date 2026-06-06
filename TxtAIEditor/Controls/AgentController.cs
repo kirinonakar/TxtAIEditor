@@ -56,6 +56,8 @@ namespace TxtAIEditor.Controls
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
         private readonly StringBuilder _sessionHistory = new();
+        private double _sessionHistoryTokenCount;
+        private readonly DispatcherTimer _statsDebounceTimer;
         private TaskCompletionSource<bool>? _diffApprovalTcs;
         private string? _currentRunLastFilePath;
         private SelectionSnapshot? _currentRunSelectionSnapshot;
@@ -145,9 +147,18 @@ namespace TxtAIEditor.Controls
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
             _agentPresetsFilePath = Path.Combine(settingsDir, "agent-presets.json");
+            _statsDebounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            _statsDebounceTimer.Tick += (s, e) =>
+            {
+                _statsDebounceTimer.Stop();
+                UpdateContextStatsImmediate();
+            };
 
             WireEvents();
-            UpdateContextStats();
+            UpdateContextStatsImmediate();
             _ = LoadAgentPresetsAsync();
         }
 
@@ -582,14 +593,14 @@ namespace TxtAIEditor.Controls
                             AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                         });
 
-                        _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                        AppendSessionHistoryLine($"[User Prompt]: {instruction}");
                         string runTranscript = transcript.Substring(initialTranscript.Length);
                         if (!string.IsNullOrWhiteSpace(runTranscript))
                         {
-                            _sessionHistory.AppendLine(runTranscript.Trim());
+                            AppendSessionHistoryLine(runTranscript.Trim());
                         }
-                        _sessionHistory.AppendLine($"[Agent Response]: {response.Trim()}");
-                        _sessionHistory.AppendLine();
+                        AppendSessionHistoryLine($"[Agent Response]: {response.Trim()}");
+                        AppendSessionHistoryLine();
 
                         completed = true;
                         break;
@@ -679,13 +690,13 @@ namespace TxtAIEditor.Controls
                             _agentPane.AppendOutputLine(completeMsg);
                         });
 
-                        _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                        AppendSessionHistoryLine($"[User Prompt]: {instruction}");
                         string unchangedRunTranscript = transcript.Substring(initialTranscript.Length);
                         if (!string.IsNullOrWhiteSpace(unchangedRunTranscript))
                         {
-                            _sessionHistory.AppendLine(unchangedRunTranscript.Trim());
+                            AppendSessionHistoryLine(unchangedRunTranscript.Trim());
                         }
-                        _sessionHistory.AppendLine();
+                        AppendSessionHistoryLine();
 
                         completed = true;
                         break;
@@ -709,14 +720,14 @@ namespace TxtAIEditor.Controls
                         _agentPane.AppendOutputLine(limitMsg);
                     });
 
-                    _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
+                    AppendSessionHistoryLine($"[User Prompt]: {instruction}");
                     string runTranscript = transcript.Substring(initialTranscript.Length);
                     if (!string.IsNullOrWhiteSpace(runTranscript))
                     {
-                        _sessionHistory.AppendLine(runTranscript.Trim());
+                        AppendSessionHistoryLine(runTranscript.Trim());
                     }
-                    _sessionHistory.AppendLine("[Agent Response]: Tool step limit reached before a final answer.");
-                    _sessionHistory.AppendLine();
+                    AppendSessionHistoryLine("[Agent Response]: Tool step limit reached before a final answer.");
+                    AppendSessionHistoryLine();
                 }
             }
             catch (OperationCanceledException)
@@ -748,13 +759,14 @@ namespace TxtAIEditor.Controls
 
                 cancellationSource.Dispose();
                 _agentPane.SetBusy(false);
-                UpdateContextStats();
+                UpdateContextStatsImmediate();
             }
         }
 
         private void ClearSession()
         {
             _sessionHistory.Clear();
+            _sessionHistoryTokenCount = 0;
             _sessionEdits.Clear();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
@@ -762,7 +774,7 @@ namespace TxtAIEditor.Controls
                 _agentPane.ClearActivity(_displayText.ActivityIdle);
                 _agentPane.UpdateModifiedFiles(new List<AgentFileEditPreview>());
                 _attachmentController.Clear();
-                UpdateContextStats();
+                UpdateContextStatsImmediate();
             });
         }
 
@@ -2710,6 +2722,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            _statsDebounceTimer.Stop();
+            _statsDebounceTimer.Start();
+        }
+
+        private void UpdateContextStatsImmediate()
+        {
+            if (_isRunning)
+            {
+                return;
+            }
+
             var activeTab = _activeTabProvider();
             string tabPart;
             if (activeTab == null)
@@ -2812,7 +2835,7 @@ namespace TxtAIEditor.Controls
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 _agentPane.UpdateAgentPresetsMenu(presetNames, selectedNames, _getString);
-                UpdateContextStats();
+                UpdateContextStatsImmediate();
             });
         }
 
@@ -3169,6 +3192,19 @@ namespace TxtAIEditor.Controls
                 .Replace("\n", "\r\n", StringComparison.Ordinal);
         }
 
+        private void AppendSessionHistory(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            _sessionHistory.Append(text);
+            _sessionHistoryTokenCount += EstimateTokenCount(text);
+        }
+
+        private void AppendSessionHistoryLine(string line = "")
+        {
+            _sessionHistory.AppendLine(line);
+            _sessionHistoryTokenCount += EstimateTokenCount(line + Environment.NewLine);
+        }
+
         private double EstimateContextTokens()
         {
             string langCode = _displayText.LanguageCode;
@@ -3178,21 +3214,30 @@ namespace TxtAIEditor.Controls
             string workspaceContext = BuildWorkspaceContext(instruction);
             string selectedText = BuildActiveSelectionContext();
 
-            var initialTranscriptBuilder = new StringBuilder();
+            // Calculate base user content tokens (excluding the initial transcript)
+            string baseUserContent = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildUserContent(
+                instruction,
+                string.Empty,
+                selectedText,
+                string.Empty);
+            double tokens = EstimateTokenCount(systemPrompt) + EstimateTokenCount(baseUserContent);
+
+            // Add the active tab context header tokens that BuildUserContent inserts
+            tokens += EstimateTokenCount(Environment.NewLine + "[Active tab context]" + Environment.NewLine);
+
             if (_sessionHistory.Length > 0)
             {
-                initialTranscriptBuilder.AppendLine("[Session History]");
-                initialTranscriptBuilder.AppendLine(_sessionHistory.ToString());
-                initialTranscriptBuilder.AppendLine("=================================");
-                initialTranscriptBuilder.AppendLine();
+                tokens += EstimateTokenCount("[Session History]" + Environment.NewLine);
+                tokens += _sessionHistoryTokenCount + EstimateTokenCount(Environment.NewLine);
+                tokens += EstimateTokenCount("=================================" + Environment.NewLine + Environment.NewLine);
+                tokens += EstimateTokenCount(workspaceContext + Environment.NewLine + Environment.NewLine);
             }
-            initialTranscriptBuilder.AppendLine(workspaceContext);
-            string initialTranscript = initialTranscriptBuilder.ToString();
+            else
+            {
+                tokens += EstimateTokenCount(workspaceContext + Environment.NewLine + Environment.NewLine);
+            }
 
-            string userContent = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildUserContent(instruction, initialTranscript, selectedText, string.Empty);
-
-            return EstimateTokenCount(systemPrompt) + EstimateTokenCount(userContent) +
-                   _attachmentController.EstimatedImageTokens;
+            return tokens + _attachmentController.EstimatedImageTokens;
         }
 
         private static double EstimateTokenCount(string text)
