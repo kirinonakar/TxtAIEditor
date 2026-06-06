@@ -2418,6 +2418,7 @@ namespace TxtAIEditor.Controls
                 Content = stack,
                 PrimaryButtonText = _getString("AgentPresetSaveAddButton", "추가"),
                 CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.None,
                 XamlRoot = _agentPane.XamlRoot,
                 RequestedTheme = _agentPane.ActualTheme
             };
@@ -2474,6 +2475,7 @@ namespace TxtAIEditor.Controls
                 Content = stack,
                 PrimaryButtonText = _getString("AgentPresetEditSaveButton", "저장"),
                 CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.None,
                 XamlRoot = _agentPane.XamlRoot,
                 RequestedTheme = _agentPane.ActualTheme
             };
@@ -2571,15 +2573,25 @@ namespace TxtAIEditor.Controls
             var contentBox = new TextBox
             {
                 PlaceholderText = _getString("AgentPresetContentPlaceholder", "페르소나/지침 내용..."),
-                Text = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal),
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap,
-                MinHeight = 150,
-                MaxHeight = 300,
+                Height = 280,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Segoe UI, Malgun Gothic")
             };
+            contentBox.Text = NormalizeTextBoxLineEndings(text);
+            ScrollViewer.SetVerticalScrollMode(contentBox, ScrollMode.Enabled);
             ScrollViewer.SetVerticalScrollBarVisibility(contentBox, ScrollBarVisibility.Auto);
+            contentBox.KeyDown += async (_, e) =>
+            {
+                if (!IsPasteShortcut(e))
+                {
+                    return;
+                }
+
+                e.Handled = true;
+                await PasteClipboardTextAsync(contentBox);
+            };
             return contentBox;
         }
 
@@ -2615,6 +2627,70 @@ namespace TxtAIEditor.Controls
             return (value ?? string.Empty)
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
                 .Replace("\r", "\n", StringComparison.Ordinal);
+        }
+
+        private static bool IsPasteShortcut(Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            bool ctrlDown = IsKeyDown(Windows.System.VirtualKey.Control) ||
+                IsKeyDown(Windows.System.VirtualKey.LeftControl) ||
+                IsKeyDown(Windows.System.VirtualKey.RightControl);
+            bool shiftDown = IsKeyDown(Windows.System.VirtualKey.Shift) ||
+                IsKeyDown(Windows.System.VirtualKey.LeftShift) ||
+                IsKeyDown(Windows.System.VirtualKey.RightShift);
+
+            return (ctrlDown && e.Key == Windows.System.VirtualKey.V) ||
+                (shiftDown && e.Key == Windows.System.VirtualKey.Insert);
+        }
+
+        private static bool IsKeyDown(Windows.System.VirtualKey key)
+        {
+            return (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key) &
+                    Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+        }
+
+        private static async Task PasteClipboardTextAsync(TextBox textBox)
+        {
+            try
+            {
+                var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+                if (!content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Text))
+                {
+                    return;
+                }
+
+                string clipboardText = await content.GetTextAsync();
+                InsertTextAtSelection(textBox, NormalizeTextBoxLineEndings(clipboardText));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to paste agent preset content: {ex.Message}");
+            }
+        }
+
+        private static void InsertTextAtSelection(TextBox textBox, string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            string current = textBox.Text ?? string.Empty;
+            int selectionStart = Math.Max(0, Math.Min(textBox.SelectionStart, current.Length));
+            int selectionLength = Math.Max(0, Math.Min(textBox.SelectionLength, current.Length - selectionStart));
+
+            textBox.Text = current.Substring(0, selectionStart) +
+                text +
+                current.Substring(selectionStart + selectionLength);
+            textBox.SelectionStart = selectionStart + text.Length;
+            textBox.SelectionLength = 0;
+        }
+
+        private static string NormalizeTextBoxLineEndings(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace("\r", "\n", StringComparison.Ordinal)
+                .Replace("\n", "\r\n", StringComparison.Ordinal);
         }
 
         private double EstimateContextTokens()

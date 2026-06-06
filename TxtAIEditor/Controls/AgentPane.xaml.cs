@@ -1165,17 +1165,20 @@ namespace TxtAIEditor.Controls
             AgentDiffConfirmHeader.Text = header;
             AgentDiffConfirmDescription.Text = description;
             AgentDiffConfirmPanel.Visibility = Visibility.Visible;
+            UpdateReviewPanelsHostVisibility();
         }
 
         public void HideDiffConfirm()
         {
             AgentDiffConfirmPanel.Visibility = Visibility.Collapsed;
+            UpdateReviewPanelsHostVisibility();
         }
 
         public void UpdateModifiedFiles(IReadOnlyList<AgentFileEditPreview> edits)
         {
             AgentModifiedFilesList.ItemsSource = edits;
             AgentModifiedFilesPanel.Visibility = edits.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            UpdateReviewPanelsHostVisibility();
         }
 
         public void UpdateAttachments(IReadOnlyList<AgentAttachmentItem> attachments)
@@ -1203,6 +1206,15 @@ namespace TxtAIEditor.Controls
         private void OnModifiedFilesCloseClick(object sender, RoutedEventArgs e)
         {
             AgentModifiedFilesPanel.Visibility = Visibility.Collapsed;
+            UpdateReviewPanelsHostVisibility();
+        }
+
+        private void UpdateReviewPanelsHostVisibility()
+        {
+            bool hasVisiblePanel =
+                AgentDiffConfirmPanel.Visibility == Visibility.Visible ||
+                AgentModifiedFilesPanel.Visibility == Visibility.Visible;
+            AgentReviewPanelsHost.Visibility = hasVisiblePanel ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public void UpdateModelName(string text)

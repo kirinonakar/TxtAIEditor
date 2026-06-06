@@ -580,16 +580,7 @@ namespace TxtAIEditor.Controls
                 FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI, Malgun Gothic"),
                 VerticalContentAlignment = VerticalAlignment.Center
             };
-            var contentBox = new TextBox
-            {
-                PlaceholderText = _getString("LlmPresetContentPlaceholder", "프리셋 내용..."),
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.NoWrap,
-                MinHeight = 150,
-                MaxHeight = 300,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
-            };
+            var contentBox = CreatePresetContentBox();
 
             var stack = new StackPanel { Spacing = 10, Width = 400 };
             stack.Children.Add(new TextBlock { Text = _getString("LlmPresetSaveLabel", "프리셋 이름") });
@@ -604,6 +595,7 @@ namespace TxtAIEditor.Controls
                 Content = stack,
                 PrimaryButtonText = _getString("LlmPresetSaveAddButton", "추가"),
                 CloseButtonText = _getString("LlmPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.None,
                 XamlRoot = _xamlRootProvider(),
                 RequestedTheme = _rightSidebar.ActualTheme
             };
@@ -742,19 +734,7 @@ namespace TxtAIEditor.Controls
                 FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI, Malgun Gothic"),
                 VerticalContentAlignment = VerticalAlignment.Center
             };
-            var contentBox = new TextBox
-            {
-                PlaceholderText = _getString("LlmPresetContentPlaceholder", "프리셋 내용..."),
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.NoWrap,
-                MinHeight = 150,
-                MaxHeight = 300,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas")
-            };
-            contentBox.Text = preset.Content.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\r\n");
-            ScrollViewer.SetVerticalScrollBarVisibility(contentBox, ScrollBarVisibility.Auto);
-            ScrollViewer.SetHorizontalScrollBarVisibility(contentBox, ScrollBarVisibility.Auto);
+            var contentBox = CreatePresetContentBox(preset.Content);
 
             var stack = new StackPanel { Spacing = 10, Width = 400 };
             stack.Children.Add(new TextBlock { Text = _getString("LlmPresetSaveLabel", "프리셋 이름") });
@@ -769,6 +749,7 @@ namespace TxtAIEditor.Controls
                 Content = stack,
                 PrimaryButtonText = _getString("LlmPresetEditSaveButton", "저장"),
                 CloseButtonText = _getString("LlmPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.None,
                 XamlRoot = _xamlRootProvider(),
                 RequestedTheme = _rightSidebar.ActualTheme
             };
@@ -817,6 +798,97 @@ namespace TxtAIEditor.Controls
             preset.Name = newName;
             preset.Content = contentBox.Text.Replace("\r\n", "\n").Replace("\r", "\n");
             await SavePresetsAsync();
+        }
+
+        private TextBox CreatePresetContentBox(string text = "")
+        {
+            var contentBox = new TextBox
+            {
+                PlaceholderText = _getString("LlmPresetContentPlaceholder", "프리셋 내용..."),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                Height = 280,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Segoe UI, Malgun Gothic")
+            };
+            contentBox.Text = NormalizeTextBoxLineEndings(text);
+            ScrollViewer.SetVerticalScrollMode(contentBox, ScrollMode.Enabled);
+            ScrollViewer.SetVerticalScrollBarVisibility(contentBox, ScrollBarVisibility.Auto);
+            contentBox.KeyDown += async (_, e) =>
+            {
+                if (!IsPasteShortcut(e))
+                {
+                    return;
+                }
+
+                e.Handled = true;
+                await PasteClipboardTextAsync(contentBox);
+            };
+            return contentBox;
+        }
+
+        private static bool IsPasteShortcut(Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            bool ctrlDown = IsKeyDown(Windows.System.VirtualKey.Control) ||
+                IsKeyDown(Windows.System.VirtualKey.LeftControl) ||
+                IsKeyDown(Windows.System.VirtualKey.RightControl);
+            bool shiftDown = IsKeyDown(Windows.System.VirtualKey.Shift) ||
+                IsKeyDown(Windows.System.VirtualKey.LeftShift) ||
+                IsKeyDown(Windows.System.VirtualKey.RightShift);
+
+            return (ctrlDown && e.Key == Windows.System.VirtualKey.V) ||
+                (shiftDown && e.Key == Windows.System.VirtualKey.Insert);
+        }
+
+        private static bool IsKeyDown(Windows.System.VirtualKey key)
+        {
+            return (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key) &
+                    Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+        }
+
+        private static async Task PasteClipboardTextAsync(TextBox textBox)
+        {
+            try
+            {
+                var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+                if (!content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Text))
+                {
+                    return;
+                }
+
+                string clipboardText = await content.GetTextAsync();
+                InsertTextAtSelection(textBox, NormalizeTextBoxLineEndings(clipboardText));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to paste LLM preset content: {ex.Message}");
+            }
+        }
+
+        private static void InsertTextAtSelection(TextBox textBox, string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            string current = textBox.Text ?? string.Empty;
+            int selectionStart = Math.Max(0, Math.Min(textBox.SelectionStart, current.Length));
+            int selectionLength = Math.Max(0, Math.Min(textBox.SelectionLength, current.Length - selectionStart));
+
+            textBox.Text = current.Substring(0, selectionStart) +
+                text +
+                current.Substring(selectionStart + selectionLength);
+            textBox.SelectionStart = selectionStart + text.Length;
+            textBox.SelectionLength = 0;
+        }
+
+        private static string NormalizeTextBoxLineEndings(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace("\r", "\n", StringComparison.Ordinal)
+                .Replace("\n", "\r\n", StringComparison.Ordinal);
         }
     }
 }

@@ -41,7 +41,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid Padding="15" RowSpacing="12">
+    <Grid Padding="15" RowSpacing="6">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -99,8 +99,8 @@
                 ToolTipService.ToolTip="Agent 응답을 현재 커서에 입력"
                 Style="{StaticResource AccentButtonStyle}"/>
 
-        <Border Grid.Row="3" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="8" CornerRadius="4">
-            <Grid RowSpacing="6" ColumnSpacing="8">
+        <Border Grid.Row="3" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="6" CornerRadius="4">
+            <Grid RowSpacing="4" ColumnSpacing="8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -110,7 +110,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="6">
+                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <FontIcon Glyph="&#xE946;" FontSize="14" VerticalAlignment="Center"/>
                         <TextBlock x:Name="AgentContextStatsText"
@@ -202,7 +202,10 @@
             </Grid>
         </Border>
 
-        <StackPanel Grid.Row="4" Spacing="12">
+        <StackPanel x:Name="AgentReviewPanelsHost"
+                    Grid.Row="4"
+                    Spacing="12"
+                    Visibility="Collapsed">
             <Border x:Name="AgentDiffConfirmPanel"
                     Background="{ThemeResource ToolbarBackgroundBrush}"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
@@ -334,7 +337,7 @@
             </Border>
         </StackPanel>
 
-        <Grid Grid.Row="5" ColumnSpacing="8" RowSpacing="6">
+        <Grid Grid.Row="5" ColumnSpacing="8" RowSpacing="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -346,6 +349,7 @@
             </Grid.ColumnDefinitions>
             <ScrollViewer x:Name="AgentSelectedPresetScrollViewer"
                           Grid.Row="0" Grid.Column="0"
+                          Margin="0,0,0,4"
                           HorizontalScrollMode="Auto"
                           VerticalScrollMode="Disabled"
                           HorizontalScrollBarVisibility="Hidden"
@@ -374,48 +378,58 @@
                                          Invoked="OnPromptRunKeyboardAcceleratorInvoked"/>
                 </TextBox.KeyboardAccelerators>
             </TextBox>
-            <Button x:Name="AgentPresetButton"
-                    Grid.Row="0" Grid.Column="1"
-                    Content="+"
-                    Width="64"
-                    Height="26"
-                    Padding="0"
-                    FontSize="14"
-                    Style="{StaticResource AgentButtonStyle}">
-                <Button.Flyout>
-                    <Flyout x:Name="AgentPresetFlyout" Opened="OnAgentPresetFlyoutOpened">
-                        <Grid Width="220" RowSpacing="8">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Button x:Name="AgentAddPresetButton"
-                                    Grid.Row="0"
-                                    HorizontalAlignment="Stretch"
-                                    Click="OnAgentAddPresetClickInPanel"
-                                    Style="{StaticResource AgentButtonStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                                    <FontIcon Glyph="&#xE109;" FontSize="12"/>
-                                    <TextBlock x:Name="AgentAddPresetText" Text="프리셋 추가" FontSize="11" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <MenuFlyoutSeparator Grid.Row="1"/>
-                            <ScrollViewer Grid.Row="2" MaxHeight="250" VerticalScrollBarVisibility="Auto">
-                                <StackPanel x:Name="AgentPresetListPanel" Spacing="4"/>
-                            </ScrollViewer>
-                        </Grid>
-                    </Flyout>
-                </Button.Flyout>
-            </Button>
-            <Button x:Name="AgentRunButton"
-                    Grid.Row="1" Grid.Column="1"
-                    Content="실행"
-                    Width="64"
-                    Height="34"
-                    VerticalAlignment="Bottom"
-                    Click="OnRunClick"
-                    Style="{StaticResource AccentButtonStyle}"/>
+            <Grid Grid.Row="1" Grid.Column="1"
+                  Width="64"
+                  VerticalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Button x:Name="AgentPresetButton"
+                        Grid.Row="0"
+                        Content="+"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        MinHeight="0"
+                        Padding="0"
+                        FontSize="14"
+                        Style="{StaticResource AgentButtonStyle}">
+                    <Button.Flyout>
+                        <Flyout x:Name="AgentPresetFlyout" Opened="OnAgentPresetFlyoutOpened">
+                            <Grid Width="220" RowSpacing="8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Button x:Name="AgentAddPresetButton"
+                                        Grid.Row="0"
+                                        HorizontalAlignment="Stretch"
+                                        Click="OnAgentAddPresetClickInPanel"
+                                        Style="{StaticResource AgentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE109;" FontSize="12"/>
+                                        <TextBlock x:Name="AgentAddPresetText" Text="프리셋 추가" FontSize="11" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <MenuFlyoutSeparator Grid.Row="1"/>
+                                <ScrollViewer Grid.Row="2" MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="AgentPresetListPanel" Spacing="4"/>
+                                </ScrollViewer>
+                            </Grid>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+                <Button x:Name="AgentRunButton"
+                        Grid.Row="1"
+                        Content="실행"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        MinHeight="0"
+                        Padding="0"
+                        Click="OnRunClick"
+                        Style="{StaticResource AccentButtonStyle}"/>
+            </Grid>
             <TextBlock x:Name="AgentModelNameText"
                        Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                        FontSize="11"
