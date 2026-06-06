@@ -1943,7 +1943,6 @@ namespace TxtAIEditor.Controls
                 or "replace_range"
                 or "apply_patch"
                 or "insert_text"
-                or "create_tab"
                 or "web_search_exa"
                 or "web_fetch_exa";
         }
