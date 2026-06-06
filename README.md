@@ -84,7 +84,11 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   **Git Repository Requirement:** Agent mode runs inside Git repositories (`.git`) by default, with an LLM settings option to allow Agent in non-Git folders.
     *   **Web Search & Fetch:** Supports real-time web search and webpage content extraction powered by the Exa API or Exa MCP server, allowing the agent to find live documentation, code samples, and up-to-date information. (Configurable via Exa API Key and Endpoint in the settings).   
 *   **Persona & System Instructions:** You can specify custom personas and system instructions for the AI agent.
- *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`) and [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`).
+ *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install:
+     *   [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`)
+     *   [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) for plain text and source code search.
+     *   [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`) for searching document formats (PDF, docx, etc.).
+     *   [pdftotext](https://poppler.freedesktop.org/) (Xpdf/Poppler tools) for converting PDF files to text.
 
 ### 💻 Terminal
 *   **Shell Profiles:** Launch PowerShell, Command Prompt, Git Bash, or WSL sessions directly beneath your editor canvas.
