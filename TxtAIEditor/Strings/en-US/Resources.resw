@@ -1442,6 +1442,15 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentToolRunning" xml:space="preserve">
     <value>Running tool</value>
   </data>
+  <data name="AgentDuplicateToolSkipped" xml:space="preserve">
+    <value>Skipped duplicate tool call</value>
+  </data>
+  <data name="AgentDuplicateToolSkippedFormat" xml:space="preserve">
+    <value>The same {0} tool call already succeeded, so it was not run again. Continue from the previous result.</value>
+  </data>
+  <data name="AgentActivityDuplicateToolSkippedFormat" xml:space="preserve">
+    <value>Skipped duplicate tool call: {0}</value>
+  </data>
   <data name="AgentActivityToolDoneFormat" xml:space="preserve">
     <value>Tool completed: {0}</value>
   </data>

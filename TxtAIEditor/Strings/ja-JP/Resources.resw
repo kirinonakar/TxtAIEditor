@@ -1443,6 +1443,15 @@
   <data name="AgentToolRunning" xml:space="preserve">
     <value>ツール実行中</value>
   </data>
+  <data name="AgentDuplicateToolSkipped" xml:space="preserve">
+    <value>重複したツール呼び出しをスキップ</value>
+  </data>
+  <data name="AgentDuplicateToolSkippedFormat" xml:space="preserve">
+    <value>同じ {0} ツール呼び出しはすでに成功しているため、再実行しませんでした。前回の結果をもとに次へ進んでください。</value>
+  </data>
+  <data name="AgentActivityDuplicateToolSkippedFormat" xml:space="preserve">
+    <value>重複したツール呼び出しをスキップ: {0}</value>
+  </data>
   <data name="AgentActivityToolDoneFormat" xml:space="preserve">
     <value>ツール完了: {0}</value>
   </data>

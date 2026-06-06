@@ -335,6 +335,7 @@ namespace TxtAIEditor.Controls
                 bool completed = false;
                 bool reachedToolStepLimit = false;
                 const int maxToolSteps = 15;
+                var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
@@ -543,15 +544,45 @@ namespace TxtAIEditor.Controls
                         break;
                     }
 
+                    string normalizedToolName = NormalizeToolName(toolName);
+                    string toolInvocationKey = BuildToolInvocationKey(normalizedToolName, arguments);
+                    bool skippedDuplicateTool = false;
+                    string toolResult;
+                    string toolResultForTranscript;
                     SelectionSnapshot selectionBeforeTool = CaptureActiveSelectionSnapshot();
-                    string toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
+
+                    if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
+                        successfulToolResults.TryGetValue(toolInvocationKey, out string? previousToolResult))
+                    {
+                        skippedDuplicateTool = true;
+                        toolResult = string.Format(
+                            _getString(
+                                "AgentDuplicateToolSkippedFormat",
+                                "동일한 {0} 도구 호출이 이미 성공해서 다시 실행하지 않았습니다. 이전 결과를 바탕으로 다음 단계로 진행하세요."),
+                            normalizedToolName);
+                        toolResultForTranscript = $"{toolResult}\n\n[Previous successful result]\n{previousToolResult ?? string.Empty}";
+                        AppendActivity(string.Format(
+                            _getString("AgentActivityDuplicateToolSkippedFormat", "중복 도구 호출 건너뜀: {0}"),
+                            normalizedToolName));
+                    }
+                    else
+                    {
+                        toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
+                        toolResultForTranscript = toolResult;
+                        if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) && IsSuccessfulToolResult(toolResult))
+                        {
+                            successfulToolResults[toolInvocationKey] = toolResult;
+                            toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success. Continue from this result; do not repeat this same tool call unless the user explicitly asks to rerun it or the previous result is incomplete.]";
+                        }
+                    }
+
                     cancellationToken.ThrowIfCancellationRequested();
-                    transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResult}";
+                    transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResultForTranscript}";
                     
                     string displayResult = toolResult;
                     if (!_settingsService.CurrentSettings.LlmAgentVerbose && !toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
                     {
-                        string normalizedName = NormalizeToolName(toolName);
+                        string normalizedName = normalizedToolName;
                         if (normalizedName == "read_file")
                         {
                             string path = GetStringArgument(arguments, "path");
@@ -586,7 +617,10 @@ namespace TxtAIEditor.Controls
 
                     await RunOnUIThreadAsync(() =>
                     {
-                        _agentPane.AppendOutputLine($"{_getString("AgentToolRunning", "도구 실행 중")}: {toolName}");
+                        string outputHeader = skippedDuplicateTool
+                            ? _getString("AgentDuplicateToolSkipped", "도구 중복 호출 건너뜀")
+                            : _getString("AgentToolRunning", "도구 실행 중");
+                        _agentPane.AppendOutputLine($"{outputHeader}: {toolName}");
                         _agentPane.AppendOutputText(displayResult.TrimEnd() + Environment.NewLine);
                     });
 
@@ -1890,6 +1924,110 @@ namespace TxtAIEditor.Controls
             }
 
             return System.Array.Empty<string>();
+        }
+
+        private static bool ShouldSkipDuplicateSuccessfulTool(string normalizedToolName)
+        {
+            return normalizedToolName is "run_powershell"
+                or "run_rg"
+                or "search_text"
+                or "create_file"
+                or "overwrite_file"
+                or "replace_in_file"
+                or "replace_range"
+                or "apply_patch"
+                or "insert_text"
+                or "create_tab"
+                or "web_search_exa"
+                or "web_fetch_exa";
+        }
+
+        private static bool IsSuccessfulToolResult(string result)
+        {
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                return false;
+            }
+
+            if (result.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase) ||
+                result.Contains(" failed:", StringComparison.OrdinalIgnoreCase) ||
+                result.Contains(" cancelled", StringComparison.OrdinalIgnoreCase) ||
+                result.Contains(" timed out", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var exitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
+            return !exitCodeMatch.Success ||
+                (int.TryParse(exitCodeMatch.Groups[1].Value, out int exitCode) && exitCode == 0);
+        }
+
+        private static string BuildToolInvocationKey(string normalizedToolName, JsonElement arguments)
+        {
+            if (normalizedToolName == "run_powershell")
+            {
+                return normalizedToolName + ":" + NormalizePowerShellForDuplicateCheck(GetStringArgument(arguments, "command"));
+            }
+
+            var builder = new StringBuilder(normalizedToolName);
+            builder.Append(':');
+            AppendCanonicalJson(builder, arguments);
+            return builder.ToString();
+        }
+
+        private static string NormalizePowerShellForDuplicateCheck(string command)
+        {
+            string normalized = Regex.Replace(command ?? string.Empty, @"\s+", " ").Trim();
+            normalized = Regex.Replace(normalized, @"\s+2>\s*&\s*1\s*$", string.Empty, RegexOptions.IgnoreCase).Trim();
+            return normalized.ToLowerInvariant();
+        }
+
+        private static void AppendCanonicalJson(StringBuilder builder, JsonElement element)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    builder.Append('{');
+                    bool firstProperty = true;
+                    foreach (var property in element.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
+                    {
+                        if (!firstProperty)
+                        {
+                            builder.Append(',');
+                        }
+
+                        firstProperty = false;
+                        builder.Append(JsonSerializer.Serialize(property.Name));
+                        builder.Append(':');
+                        AppendCanonicalJson(builder, property.Value);
+                    }
+                    builder.Append('}');
+                    break;
+
+                case JsonValueKind.Array:
+                    builder.Append('[');
+                    bool firstItem = true;
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        if (!firstItem)
+                        {
+                            builder.Append(',');
+                        }
+
+                        firstItem = false;
+                        AppendCanonicalJson(builder, item);
+                    }
+                    builder.Append(']');
+                    break;
+
+                case JsonValueKind.String:
+                    builder.Append(JsonSerializer.Serialize(element.GetString() ?? string.Empty));
+                    break;
+
+                default:
+                    builder.Append(element.GetRawText());
+                    break;
+            }
         }
 
         private string GetPathArgument(JsonElement arguments)

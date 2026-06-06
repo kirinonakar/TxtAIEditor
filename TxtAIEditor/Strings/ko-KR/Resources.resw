@@ -1442,6 +1442,15 @@
   <data name="AgentToolRunning" xml:space="preserve">
     <value>도구 실행 중</value>
   </data>
+  <data name="AgentDuplicateToolSkipped" xml:space="preserve">
+    <value>도구 중복 호출 건너뜀</value>
+  </data>
+  <data name="AgentDuplicateToolSkippedFormat" xml:space="preserve">
+    <value>동일한 {0} 도구 호출이 이미 성공해서 다시 실행하지 않았습니다. 이전 결과를 바탕으로 다음 단계로 진행하세요.</value>
+  </data>
+  <data name="AgentActivityDuplicateToolSkippedFormat" xml:space="preserve">
+    <value>중복 도구 호출 건너뜀: {0}</value>
+  </data>
   <data name="AgentActivityToolDoneFormat" xml:space="preserve">
     <value>도구 완료: {0}</value>
   </data>

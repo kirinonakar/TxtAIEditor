@@ -82,6 +82,8 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- When you need a tool, output exactly one XML tag and nothing else:");
             builder.AppendLine("<tool_call>{\"name\":\"read_file\",\"arguments\":{\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":1,\"lineCount\":120}}</tool_call>");
             builder.AppendLine("- After the host returns a tool result, continue reasoning from that result.");
+            builder.AppendLine("- If a tool result indicates success, do not repeat the same tool call with the same arguments. Continue to the next needed step or final answer.");
+            builder.AppendLine("- If a tool result indicates failure, cancellation, timeout, or a non-zero exit code, you may retry after changing the command, arguments, or approach.");
             builder.AppendLine("- When no more tools are needed, output the final answer without a tool_call tag.");
             builder.AppendLine();
             builder.AppendLine("Context priority:");
