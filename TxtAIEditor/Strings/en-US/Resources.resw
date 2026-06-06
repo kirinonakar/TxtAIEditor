@@ -1445,9 +1445,6 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentToolSuccessContinue" xml:space="preserve">
     <value>The task completed successfully. Continue to the next step.</value>
   </data>
-  <data name="AgentSelectionToolSucceededCleared" xml:space="preserve">
-    <value>The selected-text task succeeded, so the selection context was cleared. Ending the task.</value>
-  </data>
   <data name="AgentDuplicateToolSkipped" xml:space="preserve">
     <value>Skipped duplicate tool call</value>
   </data>
@@ -1713,9 +1710,6 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="AgentActivityFileReverted" xml:space="preserve">
     <value>Reverted file changes: {0}</value>
-  </data>
-  <data name="AgentSelectionEditVerified" xml:space="preserve">
-    <value>Confirmed the selected range change that was just applied. Finishing the task.</value>
   </data>
   <data name="AgentFileEditAlreadyComplete" xml:space="preserve">
     <value>The requested task has been completed.</value>

@@ -1446,9 +1446,6 @@
   <data name="AgentToolSuccessContinue" xml:space="preserve">
     <value>作業は成功しました。次のステップへ進みます。</value>
   </data>
-  <data name="AgentSelectionToolSucceededCleared" xml:space="preserve">
-    <value>選択範囲の作業が成功したため、選択コンテキストをクリアしました。作業を終了します。</value>
-  </data>
   <data name="AgentDuplicateToolSkipped" xml:space="preserve">
     <value>重複したツール呼び出しをスキップ</value>
   </data>
@@ -1714,9 +1711,6 @@
   </data>
   <data name="AgentActivityFileReverted" xml:space="preserve">
     <value>ファイルの変更を元に戻しました: {0}</value>
-  </data>
-  <data name="AgentSelectionEditVerified" xml:space="preserve">
-    <value>いま適用した選択範囲の変更を確認しました。作業を終了します。</value>
   </data>
   <data name="AgentFileEditAlreadyComplete" xml:space="preserve">
     <value>要求された作業を完了しました。</value>

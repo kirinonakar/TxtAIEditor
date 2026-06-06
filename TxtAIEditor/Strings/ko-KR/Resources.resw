@@ -1445,9 +1445,6 @@
   <data name="AgentToolSuccessContinue" xml:space="preserve">
     <value>작업이 성공하였습니다. 다음 단계로 진행합니다.</value>
   </data>
-  <data name="AgentSelectionToolSucceededCleared" xml:space="preserve">
-    <value>선택 영역 작업이 성공하여 선택 컨텍스트를 지웠습니다. 작업을 종료합니다.</value>
-  </data>
   <data name="AgentDuplicateToolSkipped" xml:space="preserve">
     <value>도구 중복 호출 건너뜀</value>
   </data>
@@ -1713,9 +1710,6 @@
   </data>
   <data name="AgentActivityFileReverted" xml:space="preserve">
     <value>파일 변경 취소 완료: {0}</value>
-  </data>
-  <data name="AgentSelectionEditVerified" xml:space="preserve">
-    <value>방금 적용한 선택 영역 변경을 확인했습니다. 작업을 마칩니다.</value>
   </data>
   <data name="AgentFileEditAlreadyComplete" xml:space="preserve">
     <value>요청한 작업을 완료하였습니다.</value>

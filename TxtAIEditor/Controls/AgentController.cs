@@ -57,7 +57,6 @@ namespace TxtAIEditor.Controls
         private TaskCompletionSource<bool>? _diffApprovalTcs;
         private string? _currentRunLastFilePath;
         private SelectionSnapshot? _currentRunSelectionSnapshot;
-        private bool _clearSelectionAfterRun;
 
         private sealed class SelectionSnapshot
         {
@@ -205,36 +204,52 @@ namespace TxtAIEditor.Controls
 
         private string BuildActiveSelectionContext()
         {
-            string selectedText = GetActiveSelectionText();
-            if (string.IsNullOrEmpty(selectedText))
+            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            if (string.IsNullOrEmpty(selection.Text))
             {
                 return string.Empty;
             }
 
-            if (string.IsNullOrWhiteSpace(_lastSelectionSourceTitle) &&
-                string.IsNullOrWhiteSpace(_lastSelectionSourcePath))
+            string source = FormatSelectionSourceForPrompt(selection.SourcePath, _lastSelectionSourceTitle);
+            if (string.IsNullOrWhiteSpace(source))
             {
-                return selectedText;
+                return string.Empty;
             }
 
-            var builder = new StringBuilder();
-            builder.AppendLine("[Selection source]");
-            if (!string.IsNullOrWhiteSpace(_lastSelectionSourceTitle))
+            if (selection.StartLine > 0 && selection.EndLine > 0)
             {
-                builder.AppendLine($"Title: {_lastSelectionSourceTitle}");
+                string linePart = selection.StartLine == selection.EndLine
+                    ? $"line {selection.StartLine}"
+                    : $"line {selection.StartLine}-{selection.EndLine}";
+                return $"{source} - {linePart}";
             }
-            if (!string.IsNullOrWhiteSpace(_lastSelectionSourcePath))
+
+            return source;
+        }
+
+        private string FormatSelectionSourceForPrompt(string? sourcePath, string? sourceTitle)
+        {
+            if (!string.IsNullOrWhiteSpace(sourcePath))
             {
-                builder.AppendLine($"Path: {_lastSelectionSourcePath}");
+                try
+                {
+                    string root = _fileTools.WorkspaceRoot;
+                    if (!string.IsNullOrWhiteSpace(root))
+                    {
+                        string fullRoot = Path.GetFullPath(root);
+                        string fullSource = Path.GetFullPath(sourcePath);
+                        if (fullSource.StartsWith(fullRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return Path.GetRelativePath(fullRoot, fullSource).Replace('\\', '/');
+                        }
+                    }
+                }
+                catch {}
+
+                return sourcePath.Replace('\\', '/');
             }
-            if (_lastSelectionStartLine > 0 && _lastSelectionEndLine > 0)
-            {
-                builder.AppendLine($"Lines: {_lastSelectionStartLine}-{_lastSelectionEndLine}");
-            }
-            builder.AppendLine();
-            builder.AppendLine("[Selection text]");
-            builder.Append(selectedText);
-            return builder.ToString();
+
+            return sourceTitle ?? string.Empty;
         }
 
         private SelectionSnapshot CaptureActiveSelectionSnapshot()
@@ -322,7 +337,6 @@ namespace TxtAIEditor.Controls
             _isRunning = true;
             _currentRunLastFilePath = null;
             _currentRunSelectionSnapshot = null;
-            _clearSelectionAfterRun = false;
             var cancellationSource = new CancellationTokenSource();
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
@@ -333,6 +347,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                _currentRunSelectionSnapshot = CaptureLiveSelectionSnapshot();
                 string workspaceContext = BuildWorkspaceContext(instruction);
                 var initialTranscriptBuilder = new StringBuilder();
                 if (_sessionHistory.Length > 0)
@@ -346,7 +361,6 @@ namespace TxtAIEditor.Controls
                 string initialTranscript = initialTranscriptBuilder.ToString();
 
                 string transcript = initialTranscript;
-                _currentRunSelectionSnapshot = CaptureLiveSelectionSnapshot();
                 string runSelectionContext = BuildActiveSelectionContext();
                 string response = string.Empty;
 
@@ -567,7 +581,6 @@ namespace TxtAIEditor.Controls
                     bool skippedDuplicateTool = false;
                     string toolResult;
                     string toolResultForTranscript;
-                    SelectionSnapshot selectionBeforeTool = CaptureActiveSelectionSnapshot();
 
                     if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
                         successfulToolResults.TryGetValue(toolInvocationKey, out string? previousToolResult))
@@ -651,41 +664,6 @@ namespace TxtAIEditor.Controls
                         _agentPane.AppendOutputText(displayResult.TrimEnd() + Environment.NewLine);
                     });
 
-                    if (!skippedDuplicateTool &&
-                        !string.IsNullOrEmpty(selectionBeforeTool.Text) &&
-                        IsSelectionCompletionTool(normalizedToolName) &&
-                        IsSuccessfulToolResult(toolResult))
-                    {
-                        string selectionCompleteMsg = _getString(
-                            "AgentSelectionToolSucceededCleared",
-                            "선택 영역 작업이 성공하여 선택 컨텍스트를 지웠습니다. 작업을 종료합니다.");
-
-                        _currentRunSelectionSnapshot = null;
-                        _clearSelectionAfterRun = false;
-                        ClearSelectionIfMatches(selectionBeforeTool);
-                        transcript += "\n\n[Selection task completion: action tool succeeded, selection context was cleared, and the task is complete. Do not call another tool.]";
-
-                        await RunOnUIThreadAsync(() =>
-                        {
-                            AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
-                            _agentPane.AppendOutputLine(selectionCompleteMsg);
-                        });
-
-                        _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
-                        string selectionCompleteRunTranscript = transcript.Substring(initialTranscript.Length);
-                        if (!string.IsNullOrWhiteSpace(selectionCompleteRunTranscript))
-                        {
-                            _sessionHistory.AppendLine(selectionCompleteRunTranscript.Trim());
-                        }
-                        _sessionHistory.AppendLine();
-
-                        completed = true;
-                        break;
-                    }
-
-                    // Selection-edit verification: after a file-edit tool succeeds on the
-                    // selection's file, inspect the raw affected lines. Do not use read_file
-                    // here because its headers/line numbers would make every comparison differ.
                     string verifyToolName = NormalizeToolName(toolName);
                     bool isFileEditTool = verifyToolName is "replace_in_file" or "replace_range"
                         or "apply_patch" or "overwrite_file";
@@ -712,59 +690,6 @@ namespace TxtAIEditor.Controls
 
                         completed = true;
                         break;
-                    }
-
-                    if (isFileEditTool
-                        && !toolResult.Contains("failed") && !toolResult.Contains("cancelled")
-                        && selectionBeforeTool.HasLineRange)
-                    {
-                        try
-                        {
-                            string editedPath = GetEditPathArgument(arguments);
-                            string resolvedEdited = Path.IsPathRooted(editedPath)
-                                ? editedPath
-                                : Path.Combine(_fileTools.WorkspaceRoot, editedPath);
-                            string resolvedSelection = Path.IsPathRooted(selectionBeforeTool.SourcePath!)
-                                ? selectionBeforeTool.SourcePath!
-                                : Path.Combine(_fileTools.WorkspaceRoot, selectionBeforeTool.SourcePath!);
-
-                            if (string.Equals(
-                                Path.GetFullPath(resolvedEdited),
-                                Path.GetFullPath(resolvedSelection),
-                                StringComparison.OrdinalIgnoreCase))
-                            {
-                                string verifyContent = await ReadRawLineRangeAsync(
-                                    resolvedSelection,
-                                    selectionBeforeTool.StartLine,
-                                    selectionBeforeTool.EndLine);
-
-                                if (SelectionLineRangeChanged(verifyContent, selectionBeforeTool.Text))
-                                {
-                                    string verifyMsg = _getString(
-                                        "AgentSelectionEditVerified",
-                                        "방금 적용한 선택 영역 변경을 확인했습니다. 작업을 마칩니다.");
-
-                                    transcript += $"\n\n[Selection edit verification: lines {selectionBeforeTool.StartLine}-{selectionBeforeTool.EndLine} changed successfully. Task complete.]";
-
-                                    await RunOnUIThreadAsync(() =>
-                                    {
-                                        _agentPane.AppendOutputLine(verifyMsg);
-                                    });
-
-                                    _sessionHistory.AppendLine($"[User Prompt]: {instruction}");
-                                    string verifyRunTranscript = transcript.Substring(initialTranscript.Length);
-                                    if (!string.IsNullOrWhiteSpace(verifyRunTranscript))
-                                    {
-                                        _sessionHistory.AppendLine(verifyRunTranscript.Trim());
-                                    }
-                                    _sessionHistory.AppendLine();
-
-                                    completed = true;
-                                    break;
-                                }
-                            }
-                        }
-                        catch { /* verification is best-effort; continue the loop on failure */ }
                     }
 
                     if (step == maxToolSteps - 1)
@@ -815,7 +740,6 @@ namespace TxtAIEditor.Controls
             finally
             {
                 _isRunning = false;
-                SelectionSnapshot? runSelectionSnapshot = _currentRunSelectionSnapshot;
                 _currentRunSelectionSnapshot = null;
                 if (ReferenceEquals(_runCancellation, cancellationSource))
                 {
@@ -823,33 +747,8 @@ namespace TxtAIEditor.Controls
                 }
 
                 cancellationSource.Dispose();
-                if (_clearSelectionAfterRun)
-                {
-                    _clearSelectionAfterRun = false;
-                    ClearSelectionIfMatches(runSelectionSnapshot);
-                }
                 _agentPane.SetBusy(false);
                 UpdateContextStats();
-            }
-        }
-
-        private void ClearSelectionIfMatches(SelectionSnapshot? snapshot)
-        {
-            if (snapshot == null || string.IsNullOrEmpty(snapshot.Text))
-            {
-                ClearSelection();
-                return;
-            }
-
-            bool isSameSelection =
-                string.Equals(_lastSelectionText, snapshot.Text, StringComparison.Ordinal) &&
-                string.Equals(_lastSelectionSourcePath, snapshot.SourcePath, StringComparison.OrdinalIgnoreCase) &&
-                _lastSelectionStartLine == snapshot.StartLine &&
-                _lastSelectionEndLine == snapshot.EndLine;
-
-            if (isSameSelection)
-            {
-                ClearSelection();
             }
         }
 
@@ -1024,8 +923,7 @@ namespace TxtAIEditor.Controls
             if (activeTab != null && _agentPane.IncludeActiveFile && !IsPdfTab(activeTab))
             {
                 string title = string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath;
-                string content = _getTabText(activeTab, MaxActiveFileContextChars);
-                bool truncated = content.Length >= MaxActiveFileContextChars;
+                bool hasSelectionRangeContext = CaptureActiveSelectionSnapshot().HasLineRange;
 
                 context.Add("");
                 context.Add("[Active tab]");
@@ -1033,13 +931,25 @@ namespace TxtAIEditor.Controls
                 context.Add($"Path: {title}");
                 context.Add($"Language: {activeTab.Language ?? "plaintext"}");
                 context.Add($"Dirty: {activeTab.IsDirty}");
-                context.Add("");
-                context.Add("[Active tab content]");
-                context.Add(content);
-                if (truncated)
+
+                if (hasSelectionRangeContext)
                 {
                     context.Add("");
-                    context.Add("[Context truncated: active tab exceeded the maximum included length]");
+                    context.Add("[Active tab content omitted: selected_range_context provides the target line range; use read_file to inspect it.]");
+                }
+                else
+                {
+                    string content = _getTabText(activeTab, MaxActiveFileContextChars);
+                    bool truncated = content.Length >= MaxActiveFileContextChars;
+
+                    context.Add("");
+                    context.Add("[Active tab content]");
+                    context.Add(content);
+                    if (truncated)
+                    {
+                        context.Add("");
+                        context.Add("[Context truncated: active tab exceeded the maximum included length]");
+                    }
                 }
             }
 
@@ -1219,34 +1129,6 @@ namespace TxtAIEditor.Controls
                 string normalizedToolName = NormalizeToolName(toolName);
                 AppendActivity(GetToolStartMessage(normalizedToolName, arguments));
 
-                bool isEditingActiveFile = false;
-                if (normalizedToolName == "replace_in_file" ||
-                    normalizedToolName == "replace_range" ||
-                    normalizedToolName == "apply_patch" ||
-                    normalizedToolName == "overwrite_file")
-                {
-                    try
-                    {
-                        string editedPath = GetEditPathArgument(arguments);
-                        string activePath = _activeTabProvider()?.FilePath ?? string.Empty;
-                        if (!string.IsNullOrEmpty(editedPath) && !string.IsNullOrEmpty(activePath))
-                        {
-                            string resolvedEdited = Path.IsPathRooted(editedPath) ? editedPath : Path.Combine(_fileTools.WorkspaceRoot, editedPath);
-                            string resolvedActive = Path.IsPathRooted(activePath) ? activePath : Path.Combine(_fileTools.WorkspaceRoot, activePath);
-                            if (string.Equals(Path.GetFullPath(resolvedEdited), Path.GetFullPath(resolvedActive), StringComparison.OrdinalIgnoreCase))
-                            {
-                                isEditingActiveFile = true;
-                            }
-                        }
-                    }
-                    catch {}
-                }
-                else if (normalizedToolName == "insert_text" ||
-                         normalizedToolName == "create_tab")
-                {
-                    isEditingActiveFile = true;
-                }
-
                 string result;
                 if (normalizedToolName == "replace_in_file")
                 {
@@ -1309,18 +1191,6 @@ namespace TxtAIEditor.Controls
                 AppendActivity(string.Format(
                     _getString("AgentActivityToolDoneFormat", "도구 완료: {0}"),
                     normalizedToolName));
-
-                if (isEditingActiveFile && !result.Contains("failed") && !result.Contains("cancelled"))
-                {
-                    if (_isRunning)
-                    {
-                        _clearSelectionAfterRun = true;
-                    }
-                    else
-                    {
-                        ClearSelection();
-                    }
-                }
 
                 return result;
             }
@@ -1401,73 +1271,12 @@ namespace TxtAIEditor.Controls
             };
         }
 
-        private static async Task<string> ReadRawLineRangeAsync(string fullPath, int startLine, int endLine)
-        {
-            if (string.IsNullOrWhiteSpace(fullPath) || !File.Exists(fullPath))
-            {
-                return string.Empty;
-            }
-
-            int start = Math.Max(1, startLine);
-            int end = Math.Max(start, endLine);
-            var lines = new List<string>();
-            int currentLine = 0;
-
-            using (var reader = new StreamReader(fullPath, Encoding.UTF8))
-            {
-                string? line;
-                while ((line = await reader.ReadLineAsync()) != null)
-                {
-                    currentLine++;
-                    if (currentLine >= start && currentLine <= end)
-                    {
-                        lines.Add(line);
-                    }
-
-                    if (currentLine > end)
-                    {
-                        break;
-                    }
-                }
-            }
-
-            return string.Join("\n", lines);
-        }
-
-        private static bool SelectionLineRangeChanged(string currentLineRange, string originalSelection)
-        {
-            string current = NormalizeForSelectionCompare(currentLineRange);
-            string original = NormalizeForSelectionCompare(originalSelection);
-            if (string.IsNullOrEmpty(current) || string.IsNullOrEmpty(original))
-            {
-                return false;
-            }
-
-            if (string.Equals(current, original, StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            // For partial-line selections, the raw line range can differ from the exact
-            // selection even before any edit. Only treat it as changed when the original
-            // selected text no longer appears in the affected line window.
-            return !current.Contains(original, StringComparison.Ordinal);
-        }
-
         private static bool IsUnchangedEditCompletionResult(string toolResult)
         {
             return !string.IsNullOrWhiteSpace(toolResult) &&
                 toolResult.Contains(" unchanged:", StringComparison.OrdinalIgnoreCase) &&
                 !toolResult.Contains("failed", StringComparison.OrdinalIgnoreCase) &&
                 !toolResult.Contains("cancelled", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string NormalizeForSelectionCompare(string value)
-        {
-            return (value ?? string.Empty)
-                .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Replace('\r', '\n')
-                .Trim();
         }
 
         private static string TruncateForActivity(string value)
@@ -2033,17 +1842,6 @@ namespace TxtAIEditor.Controls
                 or "create_tab"
                 or "web_search_exa"
                 or "web_fetch_exa";
-        }
-
-        private static bool IsSelectionCompletionTool(string normalizedToolName)
-        {
-            return normalizedToolName is "create_file"
-                or "overwrite_file"
-                or "replace_in_file"
-                or "replace_range"
-                or "apply_patch"
-                or "insert_text"
-                or "create_tab";
         }
 
         private static bool IsSuccessfulToolResult(string result)
