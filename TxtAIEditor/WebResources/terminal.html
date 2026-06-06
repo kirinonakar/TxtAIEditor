@@ -174,7 +174,7 @@
       vscodeBridge?.postMessage({ type: 'input', sessionId: activeSessionId, data: text });
     });
 
-    const terminalPathPattern = /(?:file:\/\/\/[^\s<>"']+|[A-Za-z]:\\[^\s<>"|?*]+|\\\\[^\s<>"|?*]+|\/[^\s<>"']+|(?:\.{1,2}[\\/])?(?:[^\s:<>"'|?*]+[\\/])*[^\s:<>"'|?*]+(?:\.[A-Za-z0-9_+~-]{1,12})*(?::\d+(?::\d+)?)?)/g;
+    const terminalPathPattern = /(?:file:\/\/\/[^\s<>"']+|file:\/\/\/[^<>"'|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|[A-Za-z]:\\[^\s<>"|?*]+|[A-Za-z]:\\[^<>"|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|\\\\[^\s<>"|?*]+|\\\\[^<>"|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|\/[^\s<>"']+|\/[^<>"'|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|(?:\.{1,2}[\\/])?(?:[^\s:<>"'|?*]+[\\/])+[^\s:<>"'|?*]*(?:\.[A-Za-z0-9_+~-]{1,12})*(?::\d+(?::\d+)?)?|[^\s:<>"'|?*]+\.[A-Za-z0-9_+~-]{1,12}(?::\d+(?::\d+)?)?|(?:\.{1,2}[\\/])?(?:[^<>"'|?*\r\n]+?[\\/])+[^<>"'|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|(?:\s|^)([^<>"'|?*\r\n\s]+(?:\s[^<>"'|?*\r\n\s]+)+\.[A-Za-z0-9_+~-]{1,12}(?::\d+(?::\d+)?)?))/g;
 
     function trimTerminalPath(value) {
       return (value || '').replace(/[.,;)\]}]+$/g, '');
@@ -194,7 +194,12 @@
         terminalPathPattern.lastIndex = 0;
         let match;
         while ((match = terminalPathPattern.exec(line)) !== null) {
-          const text = trimTerminalPath(match[0]);
+          let text = match[1] || match[0];
+          let start = match.index + 1;
+          if (match[1]) {
+            start += match[0].length - match[1].length;
+          }
+          text = trimTerminalPath(text);
           if (!text) {
             continue;
           }
@@ -202,7 +207,6 @@
             continue;
           }
 
-          const start = match.index + 1;
           const end = start + text.length - 1;
           links.push({
             text,
