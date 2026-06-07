@@ -22,6 +22,25 @@ namespace TxtAIEditor.Core.Services
                 fileNameBuffer = suggestedName + fileNameBuffer.Substring(suggestedName.Length);
             }
 
+            int filterIndex = 1;
+            if (!string.IsNullOrEmpty(suggestedName))
+            {
+                if (suggestedName.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
+                    suggestedName.EndsWith(".markdown", StringComparison.OrdinalIgnoreCase))
+                {
+                    filterIndex = 2;
+                }
+                else if (suggestedName.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+                         suggestedName.EndsWith(".htm", StringComparison.OrdinalIgnoreCase))
+                {
+                    filterIndex = 3;
+                }
+                else if (suggestedName.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                {
+                    filterIndex = 4;
+                }
+            }
+
             var ofn = new OPENFILENAME
             {
                 lStructSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(OPENFILENAME)),
@@ -31,7 +50,7 @@ namespace TxtAIEditor.Core.Services
                 nMaxFile = 1024,
                 lpstrInitialDir = initialDirectory,
                 Flags = OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
-                nFilterIndex = 1
+                nFilterIndex = filterIndex
             };
 
             if (!GetSaveFileNameW(ref ofn))
