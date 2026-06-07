@@ -1049,6 +1049,12 @@
   <data name="TabMenuLivePreview" xml:space="preserve">
     <value>라이브 프리뷰</value>
   </data>
+  <data name="LivePreview" xml:space="preserve">
+    <value>라이브</value>
+  </data>
+  <data name="LivePreviewTooltip" xml:space="preserve">
+    <value>라이브 프리뷰</value>
+  </data>
   <data name="TabMenuAddToFavorites" xml:space="preserve">
     <value>즐겨찾기 추가</value>
   </data>

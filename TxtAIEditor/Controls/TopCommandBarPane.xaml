@@ -62,6 +62,12 @@
                 </AppBarToggleButton.Icon>
                 <AppBarToggleButton.Label>Markdown</AppBarToggleButton.Label>
             </AppBarToggleButton>
+            <AppBarToggleButton x:Name="LivePreviewToggle" Click="OnToggleLivePreviewClick" ToolTipService.ToolTip="라이브 프리뷰">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE890;"/>
+                </AppBarToggleButton.Icon>
+                <AppBarToggleButton.Label>라이브</AppBarToggleButton.Label>
+            </AppBarToggleButton>
             <AppBarToggleButton x:Name="CsvTableToggle" Click="OnToggleCsvTableClick" ToolTipService.ToolTip="CSV 테이블 보기">
                 <AppBarToggleButton.Icon>
                     <FontIcon Glyph="&#xE80A;"/>

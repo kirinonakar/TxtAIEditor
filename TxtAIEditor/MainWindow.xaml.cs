@@ -121,6 +121,7 @@ namespace TxtAIEditor
 
         private bool _scrollSyncEnabled = true;
         private bool _csvTableModeEnabled = false;
+        private bool _livePreviewEnabled = false;
         
         // Dynamic tabs collection
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges = 
@@ -460,7 +461,6 @@ namespace TxtAIEditor
                 ShowLeftSidebarPage,
                 NavigateExplorerToFolderAsync,
                 OnTabReloadAsync,
-                OnToggleTabLivePreview,
                 _tabEncryptionController.EncryptAsync,
                 _tabEncryptionController.ChangePasswordAsync,
                 _tabEncryptionController.RemoveEncryptionAsync,
@@ -786,6 +786,7 @@ namespace TxtAIEditor
             TopToolbar.StickyNoteClick += (_, _) => _stickyNoteModeController.ToggleMode();
             TopToolbar.WordWrapToggleClick += OnWordWrapToggleClick;
             TopToolbar.FindClick += OnFindClick;
+            TopToolbar.ToggleLivePreviewClick += OnToggleLivePreviewClick;
             TopToolbar.ToggleCsvTableClick += OnToggleCsvTableClick;
             TopToolbar.ToggleThemeClick += OnToggleThemeClick;
             TopToolbar.SettingsClick += OnSettingsClick;
@@ -868,6 +869,7 @@ namespace TxtAIEditor
                 isEncrypted,
                 encryptionPassword);
             var tab = documentParts.Tab;
+            tab.InlineLivePreviewEnabled = _livePreviewEnabled;
             var session = documentParts.Session;
             isReadOnly = documentParts.IsReadOnly;
             _editorSessions[tab.Id] = session;
@@ -1153,7 +1155,7 @@ namespace TxtAIEditor
                     currentSession.GetLines(1, InitialEditorLineWarmupCount));
                 await bridge.UpdateSnippetsAsync(_snippetService.GetSnippets());
                 await bridge.UpdateScrollSyncStateAsync(_scrollSyncEnabled);
-                await bridge.SetInlineLivePreviewAsync(tab.InlineLivePreviewEnabled, GetPreviewBaseHref(tab));
+                await bridge.SetInlineLivePreviewAsync(_livePreviewEnabled, GetPreviewBaseHref(tab));
                 await bridge.SetCsvTableModeAsync(_csvTableModeEnabled);
             };
 
@@ -2375,10 +2377,15 @@ namespace TxtAIEditor
             CursorResetHelper.ResetToArrow(target);
         }
 
-        private async void OnToggleTabLivePreview(OpenedTab tab, TabViewItem tabItem, bool enabled)
+        private async void OnToggleLivePreviewClick(object sender, RoutedEventArgs e)
         {
-            tab.InlineLivePreviewEnabled = enabled;
-            await ApplyInlineLivePreviewAsync(tab);
+            _livePreviewEnabled = TopToolbar.LivePreviewIsChecked;
+
+            foreach (var tab in _viewModel.Tabs)
+            {
+                tab.InlineLivePreviewEnabled = _livePreviewEnabled;
+                await ApplyInlineLivePreviewAsync(tab);
+            }
         }
 
         private async Task ApplyInlineLivePreviewAsync(OpenedTab tab)

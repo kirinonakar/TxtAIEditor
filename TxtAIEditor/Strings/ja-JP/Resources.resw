@@ -1050,6 +1050,12 @@
   <data name="TabMenuLivePreview" xml:space="preserve">
     <value>ライブプレビュー</value>
   </data>
+  <data name="LivePreview" xml:space="preserve">
+    <value>ライブ</value>
+  </data>
+  <data name="LivePreviewTooltip" xml:space="preserve">
+    <value>ライブプレビュー</value>
+  </data>
   <data name="TabMenuAddToFavorites" xml:space="preserve">
     <value>お気に入りに追加</value>
   </data>

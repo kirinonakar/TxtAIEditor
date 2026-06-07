@@ -1049,6 +1049,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="TabMenuLivePreview" xml:space="preserve">
     <value>Live Preview</value>
   </data>
+  <data name="LivePreview" xml:space="preserve">
+    <value>Live</value>
+  </data>
+  <data name="LivePreviewTooltip" xml:space="preserve">
+    <value>Live Preview</value>
+  </data>
   <data name="TabMenuAddToFavorites" xml:space="preserve">
     <value>Add to Favorites</value>
   </data>

@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? WordWrapToggleClick;
         public event RoutedEventHandler? FindClick;
         public event RoutedEventHandler? ToggleMarkdownToolbarClick;
+        public event RoutedEventHandler? ToggleLivePreviewClick;
         public event RoutedEventHandler? ToggleCsvTableClick;
         public event RoutedEventHandler? ToggleThemeClick;
         public event RoutedEventHandler? SplitNoneClick;
@@ -42,6 +43,12 @@ namespace TxtAIEditor.Controls
         {
             get => MarkdownToolbarToggle.IsChecked == true;
             set => MarkdownToolbarToggle.IsChecked = value;
+        }
+
+        public bool LivePreviewIsChecked
+        {
+            get => LivePreviewToggle.IsChecked == true;
+            set => LivePreviewToggle.IsChecked = value;
         }
 
         public bool CsvTableIsChecked
@@ -92,6 +99,9 @@ namespace TxtAIEditor.Controls
 
             MarkdownToolbarToggle.Label = getString("Markdown", "Markdown");
             ToolTipService.SetToolTip(MarkdownToolbarToggle, getString("Markdown", "마크다운 툴바 토글"));
+
+            LivePreviewToggle.Label = getString("LivePreview", "라이브");
+            ToolTipService.SetToolTip(LivePreviewToggle, getString("LivePreviewTooltip", "라이브 프리뷰"));
 
             CsvTableToggle.Label = getString("CsvTable", "CSV 테이블");
             ToolTipService.SetToolTip(CsvTableToggle, getString("CsvTable", "CSV 테이블"));
@@ -276,6 +286,7 @@ namespace TxtAIEditor.Controls
                 ["wordWrap"] = (WordWrapToggle, "WordWrap"),
                 ["search"] = (SearchButton, "Search"),
                 ["markdown"] = (MarkdownToolbarToggle, "Markdown"),
+                ["livePreview"] = (LivePreviewToggle, "LivePreview"),
                 ["csvTable"] = (CsvTableToggle, "CsvTable"),
                 ["theme"] = (ThemeButton, "Theme"),
                 ["split"] = (SplitButton, "Split"),
@@ -340,6 +351,7 @@ namespace TxtAIEditor.Controls
         private void OnWordWrapToggleClick(object sender, RoutedEventArgs e) => WordWrapToggleClick?.Invoke(sender, e);
         private void OnFindClick(object sender, RoutedEventArgs e) => FindClick?.Invoke(sender, e);
         private void OnToggleMarkdownToolbarClick(object sender, RoutedEventArgs e) => ToggleMarkdownToolbarClick?.Invoke(sender, e);
+        private void OnToggleLivePreviewClick(object sender, RoutedEventArgs e) => ToggleLivePreviewClick?.Invoke(sender, e);
         private void OnToggleCsvTableClick(object sender, RoutedEventArgs e) => ToggleCsvTableClick?.Invoke(sender, e);
         private void OnToggleThemeClick(object sender, RoutedEventArgs e) => ToggleThemeClick?.Invoke(sender, e);
         private void OnSplitNoneClick(object sender, RoutedEventArgs e) => SplitNoneClick?.Invoke(sender, e);

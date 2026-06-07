@@ -14,7 +14,6 @@ namespace TxtAIEditor.Controls
         private readonly Action<int> _showLeftSidebarPage;
         private readonly Func<string, Task> _navigateExplorerToFolderAsync;
         private readonly Func<OpenedTab, TabViewItem, Task> _reloadTabAsync;
-        private readonly Action<OpenedTab, TabViewItem, bool> _toggleLivePreview;
         private readonly Func<OpenedTab, Task> _encryptTabAsync;
         private readonly Func<OpenedTab, Task> _changeEncryptionPasswordAsync;
         private readonly Func<OpenedTab, Task> _removeEncryptionAsync;
@@ -28,7 +27,6 @@ namespace TxtAIEditor.Controls
             Action<int> showLeftSidebarPage,
             Func<string, Task> navigateExplorerToFolderAsync,
             Func<OpenedTab, TabViewItem, Task> reloadTabAsync,
-            Action<OpenedTab, TabViewItem, bool> toggleLivePreview,
             Func<OpenedTab, Task> encryptTabAsync,
             Func<OpenedTab, Task> changeEncryptionPasswordAsync,
             Func<OpenedTab, Task> removeEncryptionAsync,
@@ -41,7 +39,6 @@ namespace TxtAIEditor.Controls
             _showLeftSidebarPage = showLeftSidebarPage;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
             _reloadTabAsync = reloadTabAsync;
-            _toggleLivePreview = toggleLivePreview;
             _encryptTabAsync = encryptTabAsync;
             _changeEncryptionPasswordAsync = changeEncryptionPasswordAsync;
             _removeEncryptionAsync = removeEncryptionAsync;
@@ -102,16 +99,6 @@ namespace TxtAIEditor.Controls
                     encryptItem.Click += async (_, __) => await _encryptTabAsync(tab);
                     menu.Items.Add(encryptItem);
                 }
-
-                menu.Items.Add(new MenuFlyoutSeparator());
-
-                var livePreviewItem = new ToggleMenuFlyoutItem
-                {
-                    Text = _getString("TabMenuLivePreview", "라이브 프리뷰"),
-                    IsChecked = tab.InlineLivePreviewEnabled
-                };
-                livePreviewItem.Click += (_, __) => _toggleLivePreview(tab, tabItem, livePreviewItem.IsChecked);
-                menu.Items.Add(livePreviewItem);
             }
 
             menu.Items.Add(new MenuFlyoutSeparator());
