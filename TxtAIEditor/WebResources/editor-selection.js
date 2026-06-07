@@ -82,7 +82,7 @@ function drawEditableSelectionOverlays() {
     const selection = normalizeSelection();
     if (!selection || !hasCustomSelection()) return;
 
-    for (const element of viewport.querySelectorAll('.line-text[contenteditable="true"]')) {
+    for (const element of viewport.querySelectorAll('.line-text')) {
         const lineNumber = Number(element.dataset.line || 0);
         if (!lineNumber) continue;
 
