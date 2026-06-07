@@ -353,9 +353,9 @@ namespace TxtAIEditor.Controls
             {
                 return;
             }
- 
+  
             var settings = _settingsService.CurrentSettings;
- 
+
             string userInstruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
             string instruction = BuildAgentInstruction(userInstruction);
             if (string.IsNullOrWhiteSpace(instruction))
@@ -365,7 +365,7 @@ namespace TxtAIEditor.Controls
                     _getString("AgentEmptyPrompt", "Agent에게 맡길 작업을 입력해 주세요."));
                 return;
             }
- 
+  
             _isRunning = true;
             _currentRunLastFilePath = null;
             _currentRunSelectionSnapshot = null;
@@ -377,6 +377,8 @@ namespace TxtAIEditor.Controls
             _agentPane.ClearActivity(_getString("AgentActivityStarting", "시작 중"));
             _agentPane.BeginOutputBlock(BuildRunHeader(BuildInstructionDisplay(userInstruction)));
             AppendActivity(_getString("AgentActivityCollectingContext", "맥락 수집 중"));
+
+            await RunOnUIThreadAsync(() => { });
 
             try
             {
@@ -2760,6 +2762,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            await RunOnUIThreadAsync(() => { });
             await _insertIntoActiveEditorAsync(output);
         }
 
