@@ -659,7 +659,7 @@ namespace TxtAIEditor.Controls
                             string query = GetStringArgument(arguments, "query");
                             displayResult = string.Format(_getString("AgentVerboseWebSearchOnly", "웹 검색을 완료했습니다: {0}"), query);
                         }
-                        else if (normalizedName == "web_fetch_exa")
+                        else if (normalizedName == "web_fetch" || normalizedName == "web_fetch_exa")
                         {
                             string[] urls = GetUrlsArgument(arguments);
                             displayResult = string.Format(_getString("AgentVerboseWebFetchOnly", "웹페이지를 읽었습니다: {0}"), string.Join(", ", urls));
@@ -1212,6 +1212,9 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "query"),
                             GetIntArgument(arguments, "numResults", 5),
                             cancellationToken),
+                        "web_fetch" => await _llmService.FetchExaAsync(
+                            GetUrlsArgument(arguments),
+                            cancellationToken),
                         "web_fetch_exa" => await _llmService.FetchExaAsync(
                             GetUrlsArgument(arguments),
                             cancellationToken),
@@ -1300,6 +1303,9 @@ namespace TxtAIEditor.Controls
                 "web_search_exa" => string.Format(
                     _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
                     GetStringArgument(arguments, "query")),
+                "web_fetch" => string.Format(
+                    _getString("AgentActivityWebFetchFormat", "웹 페이지 읽는 중: {0}"),
+                    string.Join(", ", GetUrlsArgument(arguments))),
                 "web_fetch_exa" => string.Format(
                     _getString("AgentActivityWebFetchExaFormat", "Exa 웹 페이지 읽는 중: {0}"),
                     string.Join(", ", GetUrlsArgument(arguments))),
@@ -1937,6 +1943,7 @@ namespace TxtAIEditor.Controls
                 or "apply_patch"
                 or "insert_text"
                 or "web_search_exa"
+                or "web_fetch"
                 or "web_fetch_exa";
         }
 
@@ -2369,7 +2376,8 @@ namespace TxtAIEditor.Controls
                 "exa" => "web_search_exa",
                 "fetch_exa" => "web_fetch_exa",
                 "exa_fetch" => "web_fetch_exa",
-                "fetch" => "web_fetch_exa",
+                "fetch" => "web_fetch",
+                "web_fetch" => "web_fetch",
                 "patch" => "apply_patch",
                 "apply_diff" => "apply_patch",
                 _ => normalized

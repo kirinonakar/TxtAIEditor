@@ -1674,6 +1674,9 @@
   <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
     <value>Exaウェブ検索中: {0}</value>
   </data>
+  <data name="AgentActivityWebFetchFormat" xml:space="preserve">
+    <value>ウェブページ読込中: {0}</value>
+  </data>
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exaウェブページ読込中: {0}</value>
   </data>

@@ -1673,6 +1673,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
     <value>Exa web searching: {0}</value>
   </data>
+  <data name="AgentActivityWebFetchFormat" xml:space="preserve">
+    <value>Reading web page: {0}</value>
+  </data>
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exa fetching web content: {0}</value>
   </data>
