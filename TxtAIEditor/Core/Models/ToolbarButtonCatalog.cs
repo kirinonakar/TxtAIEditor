@@ -14,12 +14,12 @@ namespace TxtAIEditor.Core.Models
             new ToolbarButtonOption("saveFile", "SaveFile"),
             new ToolbarButtonOption("saveAsFile", "SaveAsFile"),
             new ToolbarButtonOption("print", "Print"),
+            new ToolbarButtonOption("search", "Search"),
             new ToolbarButtonOption("compare", "Compare"),
             new ToolbarButtonOption("terminal", "Terminal"),
             new ToolbarButtonOption("topMost", "TopMost"),
             new ToolbarButtonOption("stickyNote", "StickyNote"),
             new ToolbarButtonOption("wordWrap", "WordWrap"),
-            new ToolbarButtonOption("search", "Search"),
             new ToolbarButtonOption("markdown", "Markdown"),
             new ToolbarButtonOption("livePreview", "LivePreview"),
             new ToolbarButtonOption("csvTable", "CsvTable"),
@@ -38,14 +38,16 @@ namespace TxtAIEditor.Core.Models
             "openFile",
             "saveFile",
             "saveAsFile",
-            "print"
+            "print",
+            "search"
         };
 
         public static IReadOnlyList<IReadOnlyList<string>> DefaultGroups { get; } = new[]
         {
             new[] { "openFile", "saveFile", "saveAsFile", "print" },
+            new[] { "search" },
             new[] { "compare", "terminal", "topMost", "stickyNote" },
-            new[] { "wordWrap", "search" },
+            new[] { "wordWrap" },
             new[] { "markdown", "livePreview", "csvTable" },
             new[] { "theme" },
             new[] { "split" },

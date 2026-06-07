@@ -23,6 +23,7 @@
                             <FontIcon Glyph="&#xE749;"/>
                         </AppBarButton.Icon>
                     </AppBarButton>
+                    <AppBarButton x:Name="SearchButton" Icon="Find" Label="검색" Click="OnFindClick" ToolTipService.ToolTip="검색 (Ctrl+F)"/>
                 </StackPanel>
             </CommandBar.Content>
             <AppBarButton x:Name="CompareButton" Label="비교" Click="OnCompareFilesClick" ToolTipService.ToolTip="파일 비교 (Diff)">
@@ -54,7 +55,6 @@
                     <FontIcon Glyph="&#xE751;"/>
                 </AppBarToggleButton.Icon>
             </AppBarToggleButton>
-            <AppBarButton x:Name="SearchButton" Icon="Find" Label="검색" Click="OnFindClick" ToolTipService.ToolTip="검색 (Ctrl+F)"/>
             <AppBarSeparator/>
             <AppBarToggleButton x:Name="MarkdownToolbarToggle" Click="OnToggleMarkdownToolbarClick" ToolTipService.ToolTip="마크다운 툴바 토글">
                 <AppBarToggleButton.Icon>
