@@ -920,12 +920,68 @@ viewport.addEventListener('compositionend', event => {
     }
 });
 
+function getUrlOrPathAtColumn(text, column) {
+    const value = String(text ?? '');
+    if (!value || column < 0) return null;
+
+    const separators = /[\s\"\'\(\)\[\]\{\}\<\>\`]/;
+    
+    let col = Math.min(column, value.length - 1);
+    if (col >= 0 && separators.test(value[col])) {
+        if (col > 0 && !separators.test(value[col - 1])) {
+            col--;
+        } else {
+            return null;
+        }
+    }
+
+    let start = col;
+    let end = col;
+
+    while (start > 0 && !separators.test(value[start - 1])) {
+        start--;
+    }
+    while (end < value.length && !separators.test(value[end])) {
+        end++;
+    }
+
+    if (start >= end) return null;
+    return value.slice(start, end).trim();
+}
+
 let lastPointerDownTime = 0;
 let lastPointerDownPosition = null;
 
 scrollContainer.addEventListener('pointerdown', event => {
     if (state.csvTableEnabled) return;
     if (event.button !== 0 || findPanel.contains(event.target)) return;
+
+    if (event.ctrlKey) {
+        const position = positionFromPointer(event);
+        if (position) {
+            const text = state.cache.get(position.line) ?? lineTextFromElement(position.element);
+            const token = getUrlOrPathAtColumn(text, position.column);
+            if (token) {
+                const isUrl = /^https?:\/\/[^\s\)\(\]\[\}\{\>\<\"\']+/i.test(token);
+                const isPath = /^[a-zA-Z]:[\/\\]/.test(token) || 
+                               /^[\/\\]/.test(token) || 
+                               /^\.\.?[\/\\]/.test(token) ||
+                               ((token.includes('/') || token.includes('\\')) && !isUrl);
+
+                if (isUrl || isPath) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    post({
+                        type: 'ctrlClick',
+                        text: token,
+                        isUrl: isUrl,
+                        isPath: isPath
+                    });
+                    return;
+                }
+            }
+        }
+    }
 
     const lineNumEl = event.target.closest('.line-number');
     if (lineNumEl) {

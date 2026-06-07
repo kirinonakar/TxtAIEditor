@@ -39,6 +39,7 @@ namespace TxtAIEditor.Editor
         public event Action<int, double>? ScrollChanged;
         public event Action<bool>? ScrollSyncChanged;
         public event Action? EditorRendered;
+        public event Action<string, bool, bool>? CtrlClicked;
 
         public MonacoBridge(WebView2 webView, ILocalizationService? localizationService = null)
         {
@@ -790,6 +791,15 @@ namespace TxtAIEditor.Editor
                                     ? clipboardRequestIdProp.GetInt32()
                                     : 0;
                                 _ = SendClipboardReadResultAsync(clipboardRequestId);
+                            }
+                            break;
+
+                        case "ctrlClick":
+                            if (root.TryGetProperty("text", out JsonElement ctrlClickTextProp))
+                            {
+                                bool isUrl = root.TryGetProperty("isUrl", out JsonElement isUrlProp) && isUrlProp.GetBoolean();
+                                bool isPath = root.TryGetProperty("isPath", out JsonElement isPathProp) && isPathProp.GetBoolean();
+                                CtrlClicked?.Invoke(ctrlClickTextProp.GetString() ?? string.Empty, isUrl, isPath);
                             }
                             break;
                     }

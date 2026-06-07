@@ -1401,6 +1401,61 @@ namespace TxtAIEditor
                     _livePreviewController.PostScrollSyncState(enabled);
                 });
             };
+
+            bridge.CtrlClicked += (text, isUrl, isPath) =>
+            {
+                this.DispatcherQueue.TryEnqueue(async () =>
+                {
+                    if (isUrl)
+                    {
+                        try
+                        {
+                            if (Uri.TryCreate(text, UriKind.Absolute, out var uri))
+                            {
+                                _ = await Windows.System.Launcher.LaunchUriAsync(uri);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Failed to open URL in browser: {ex.Message}");
+                        }
+                    }
+                    else if (isPath)
+                    {
+                        try
+                        {
+                            string resolvedPath = text;
+                            var activeTab = GetActiveTab();
+                            if (!System.IO.Path.IsPathRooted(resolvedPath) && activeTab != null && !string.IsNullOrEmpty(activeTab.FilePath))
+                            {
+                                string? currentDir = System.IO.Path.GetDirectoryName(activeTab.FilePath);
+                                if (!string.IsNullOrEmpty(currentDir))
+                                {
+                                    resolvedPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(currentDir, resolvedPath));
+                                }
+                            }
+
+                            if (System.IO.File.Exists(resolvedPath) || System.IO.Directory.Exists(resolvedPath))
+                            {
+                                string targetFolder = resolvedPath;
+                                if (System.IO.File.Exists(resolvedPath))
+                                {
+                                    targetFolder = System.IO.Path.GetDirectoryName(resolvedPath) ?? resolvedPath;
+                                }
+
+                                if (System.IO.Directory.Exists(targetFolder))
+                                {
+                                    await NavigateExplorerToFolderAsync(targetFolder);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Failed to resolve and open path: {ex.Message}");
+                        }
+                    }
+                });
+            };
         }
 
         private void SchedulePreview(OpenedTab tab)
