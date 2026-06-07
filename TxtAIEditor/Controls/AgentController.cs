@@ -33,7 +33,6 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
         private readonly Action<object> _initializePickerWindow;
-        private readonly Func<string, bool> _isGitRepoProvider;
         private readonly Func<string, Task>? _fileModifiedAsync;
         private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
         private readonly Action? _beforeDialog;
@@ -97,7 +96,6 @@ namespace TxtAIEditor.Controls
             AgentFileToolService fileTools,
             PdfTextExtractionService pdfTextExtractionService,
             Action<object> initializePickerWindow,
-            Func<string, bool> isGitRepoProvider,
             Func<AgentFileEditPreview, Task> openDiffViewAsync,
             Func<string, Task>? fileModifiedAsync = null,
             Action? beforeDialog = null,
@@ -117,7 +115,6 @@ namespace TxtAIEditor.Controls
             _getString = getString;
             _fileTools = fileTools;
             _initializePickerWindow = initializePickerWindow;
-            _isGitRepoProvider = isGitRepoProvider;
             _openDiffViewAsync = openDiffViewAsync;
             _fileModifiedAsync = fileModifiedAsync;
             _beforeDialog = beforeDialog;
@@ -332,15 +329,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
  
-            string root = _fileTools.WorkspaceRoot;
             var settings = _settingsService.CurrentSettings;
-            if (!_isGitRepoProvider(root) && !settings.LlmAgentAllowNonGitFolders)
-            {
-                _showError(
-                    _getString("AgentErrorTitle", "Agent 오류"),
-                    _getString("AgentGitRequired", "Agent는 Git 저장소로 지정된 폴더 내에서만 실행할 수 있습니다."));
-                return;
-            }
  
             string userInstruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
             string instruction = BuildAgentInstruction(userInstruction);

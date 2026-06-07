@@ -81,7 +81,6 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 🤖 AI Agent
 *   **Autonomous Problem Solving:** Solve complex, multi-step editing tasks automatically by allowing the AI agent to run workspace tools (file search, read/write, terminal command execution, and web search/retrieval).
-    *   **Git Repository Requirement:** Agent mode runs inside Git repositories (`.git`) by default, with an LLM settings option to allow Agent in non-Git folders.
     *   **Web Search & Fetch:** Supports real-time web search and webpage content extraction powered by the Exa API or Exa MCP server, allowing the agent to find live documentation, code samples, and up-to-date information. (Configurable via Exa API Key and Endpoint in the settings).   
 *   **Persona & System Instructions:** You can specify custom personas and system instructions for the AI agent.
  *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install:

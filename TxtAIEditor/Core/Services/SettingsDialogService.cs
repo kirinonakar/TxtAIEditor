@@ -126,7 +126,6 @@ namespace TxtAIEditor.Core.Services
 
             var confirmBeforeSendingCheck = new CheckBox { Content = getString("SettingsLlmConfirmBeforeSending", "전송 전 확인"), IsChecked = settings.LlmConfirmBeforeSending };
             var agentVerboseCheck = new CheckBox { Content = getString("SettingsLlmAgentVerbose", "Agent 상세 출력 활성화 (Verbose)"), IsChecked = settings.LlmAgentVerbose };
-            var agentAllowNonGitCheck = new CheckBox { Content = getString("SettingsLlmAgentAllowNonGitFolders", "Git 폴더가 아니어도 Agent 허용"), IsChecked = settings.LlmAgentAllowNonGitFolders };
 
             var sourceLangCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             sourceLangCombo.Items.Add(getString("LlmLangAutoDetect", "자동 감지 (Auto Detect)"));
@@ -486,7 +485,6 @@ namespace TxtAIEditor.Core.Services
 
             llmSection.Children.Add(confirmBeforeSendingCheck);
             llmSection.Children.Add(agentVerboseCheck);
-            llmSection.Children.Add(agentAllowNonGitCheck);
 
             AddLabel(llmSection, getString("SettingsLlmSourceLanguage", "번역 원본 언어 (Source Language)"));
             llmSection.Children.Add(sourceLangCombo);
@@ -1003,7 +1001,6 @@ SOFTWARE.",
             settings.LlmModel = (!string.IsNullOrEmpty(selectedModelText) ? selectedModelText : (llmModelCombo.SelectedItem as string ?? settings.LlmModel)).Trim();
             settings.LlmConfirmBeforeSending = confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = agentVerboseCheck.IsChecked == true;
-            settings.LlmAgentAllowNonGitFolders = agentAllowNonGitCheck.IsChecked == true;
 
             settings.LlmSourceLanguage = sourceLangCombo.SelectedIndex switch
             {
