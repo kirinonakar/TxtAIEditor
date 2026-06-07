@@ -59,6 +59,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 👁️ Real-Time Preview
 *   **Live Renderer:** View Markdown, HTML, Aozora or LaTeX (powered by KaTeX) in a split view or an external browser.
+*   **Inline Live Preview:** Renders Markdown elements (headers, lists, tables, code blocks, images) directly within the editor area. Non-active lines transition into their styled preview form, and automatically revert to raw source text when focused or edited for a seamless WYSIWYG-like experience.
 
 ### 📊 Interactive CSV Table Mode
 *   **Grid Editor Shell:** Automatically renders `.csv` files into a premium, highly responsive interactive spreadsheet-like grid instead of raw comma-separated text.
