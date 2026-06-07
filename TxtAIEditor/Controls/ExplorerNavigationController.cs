@@ -419,8 +419,8 @@ namespace TxtAIEditor.Controls
             switch (_currentSortMode)
             {
                 case ExplorerSortMode.Name:
-                    folderList.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
-                    fileList.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
+                    folderList.Sort((a, b) => StrCmpLogicalW(a.Name, b.Name));
+                    fileList.Sort((a, b) => StrCmpLogicalW(a.Name, b.Name));
                     break;
                 case ExplorerSortMode.Newest:
                     folderList.Sort((a, b) => b.ModifiedTime.CompareTo(a.ModifiedTime));
@@ -437,5 +437,8 @@ namespace TxtAIEditor.Controls
             sorted.AddRange(fileList);
             return sorted;
         }
+
+        [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, ExactSpelling = true)]
+        private static extern int StrCmpLogicalW(string x, string y);
     }
 }
