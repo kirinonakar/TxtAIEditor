@@ -480,7 +480,7 @@ namespace TxtAIEditor.Controls
                     _settingsService.CurrentSettings.LlmProvider,
                     _settingsService.CurrentSettings.LlmModel,
                     previewText.Length,
-                    previewText.Length / 4,
+                    StatusBarController.EstimateTokenCount(previewText),
                     textPreview);
 
                 _beforeDialog?.Invoke();

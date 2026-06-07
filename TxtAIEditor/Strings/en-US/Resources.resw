@@ -843,7 +843,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Total Lines: {0}</value>
   </data>
   <data name="StatusSelectionStatsFormat" xml:space="preserve">
-    <value>Selected: {0} chars / {1} words / {2} lines</value>
+    <value>Selected: {0} chars / {1} tokens / {2} words / {3} lines</value>
   </data>
   <data name="UnsavedChangesAppCloseTitle" xml:space="preserve">
     <value>Unsaved Changes</value>

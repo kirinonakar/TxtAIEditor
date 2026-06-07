@@ -103,9 +103,16 @@ namespace TxtAIEditor.Controls
             var historyList = await historyTask;
             var fileStatuses = await fileStatusesTask;
 
+            int changedCount = fileStatuses.Count(kvp => kvp.Value != "!!" && kvp.Value.Trim() != "!!");
+            string branchText = localizedBranch;
+            if (!_isGitNotDetected(branch))
+            {
+                branchText = $"{localizedBranch} ({changedCount})";
+            }
+
             // Update UI components in a single synchronous block to prevent duplicate display and empty states
-            _leftSidebar.GitPanelBranch.Text = localizedBranch;
-            _statusGitBranch.Text = localizedBranch;
+            _leftSidebar.GitPanelBranch.Text = branchText;
+            _statusGitBranch.Text = branchText;
             _startAutoRefresh();
 
             _leftSidebar.GitBranches.Items.Clear();

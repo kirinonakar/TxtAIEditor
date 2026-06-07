@@ -844,7 +844,7 @@
     <value>総行数: {0}</value>
   </data>
   <data name="StatusSelectionStatsFormat" xml:space="preserve">
-    <value>選択済: {0}文字 / {1}単語 / {2}行</value>
+    <value>選択済: {0}文字 / {1}トークン / {2}単語 / {3}行</value>
   </data>
   <data name="UnsavedChangesAppCloseTitle" xml:space="preserve">
     <value>保存されていない変更</value>

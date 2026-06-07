@@ -843,7 +843,7 @@
     <value>전체 줄수: {0}</value>
   </data>
   <data name="StatusSelectionStatsFormat" xml:space="preserve">
-    <value>선택됨: {0}자 / {1}단어 / {2}줄</value>
+    <value>선택됨: {0}자 / {1}토큰 / {2}단어 / {3}줄</value>
   </data>
   <data name="UnsavedChangesAppCloseTitle" xml:space="preserve">
     <value>저장되지 않은 변경 사항</value>

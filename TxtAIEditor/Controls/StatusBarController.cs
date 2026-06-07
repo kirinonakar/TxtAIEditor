@@ -118,13 +118,15 @@ namespace TxtAIEditor.Controls
             }
 
             int charCount = selectedText.Length;
+            int tokenCount = EstimateTokenCount(selectedText);
             int wordCount = selectedText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
             int lineCount = selectedText.Replace("\r\n", "\n").Split('\n').Length;
 
-            string format = _getString("StatusSelectionStatsFormat", "선택됨: {0}자 / {1}단어 / {2}줄");
+            string format = _getString("StatusSelectionStatsFormat", "선택됨: {0}자 / {1}토큰 / {2}단어 / {3}줄");
             _statusBar.StatusSelectionStatsText.Text = string.Format(
                 format,
                 charCount.ToString("N0"),
+                tokenCount.ToString("N0"),
                 wordCount.ToString("N0"),
                 lineCount.ToString("N0"));
             _statusBar.StatusSelectionStatsText.Visibility = Visibility.Visible;
@@ -405,6 +407,40 @@ namespace TxtAIEditor.Controls
 
             _markTabDirty(tab);
             _statusBar.LineEndingText.Text = targetEnding;
+        }
+
+        public static int EstimateTokenCount(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return 0;
+            }
+
+            int words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+            int cjkCount = 0;
+            int spaceCount = 0;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if ((c >= 0xAC00 && c <= 0xD7A3) || // Hangul Syllables
+                    (c >= 0x1100 && c <= 0x11FF) || // Hangul Jamo
+                    (c >= 0x3130 && c <= 0x318F) || // Hangul Compatibility Jamo
+                    (c >= 0x4E00 && c <= 0x9FFF) || // CJK Unified Ideographs
+                    (c >= 0x3040 && c <= 0x309F) || // Hiragana
+                    (c >= 0x30A0 && c <= 0x30FF))   // Katakana
+                {
+                    cjkCount++;
+                }
+                else if (char.IsWhiteSpace(c))
+                {
+                    spaceCount++;
+                }
+            }
+
+            double estLr = cjkCount * 0.418 + spaceCount * 3.95 - words * 2.67;
+            int minBound = Math.Max(words, (int)Math.Round(cjkCount * 0.5));
+            return Math.Max(minBound, (int)Math.Round(estLr));
         }
     }
 }
