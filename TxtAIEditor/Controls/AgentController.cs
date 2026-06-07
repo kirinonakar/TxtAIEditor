@@ -33,6 +33,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
         private readonly Action<object> _initializePickerWindow;
+        private readonly Func<string, bool> _isGitRepoProvider;
         private readonly Func<string, Task>? _fileModifiedAsync;
         private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
         private readonly Action? _beforeDialog;
@@ -96,6 +97,7 @@ namespace TxtAIEditor.Controls
             AgentFileToolService fileTools,
             PdfTextExtractionService pdfTextExtractionService,
             Action<object> initializePickerWindow,
+            Func<string, bool> isGitRepoProvider,
             Func<AgentFileEditPreview, Task> openDiffViewAsync,
             Func<string, Task>? fileModifiedAsync = null,
             Action? beforeDialog = null,
@@ -115,6 +117,7 @@ namespace TxtAIEditor.Controls
             _getString = getString;
             _fileTools = fileTools;
             _initializePickerWindow = initializePickerWindow;
+            _isGitRepoProvider = isGitRepoProvider;
             _openDiffViewAsync = openDiffViewAsync;
             _fileModifiedAsync = fileModifiedAsync;
             _beforeDialog = beforeDialog;
@@ -2541,6 +2544,17 @@ namespace TxtAIEditor.Controls
 
         private async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)
         {
+            var settings = _settingsService.CurrentSettings;
+            string root = _fileTools.WorkspaceRoot;
+            if (settings.LlmAgentAutoApproveGitEdits && _isGitRepoProvider(root))
+            {
+                AppendActivity(string.Format(
+                    _getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"),
+                    preview.RelativePath));
+                await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
+                return true;
+            }
+
             AppendActivity(string.Format(
                 _getString("AgentActivityDiffReviewFormat", "파일 변경 승인 대기 중: {0}"),
                 preview.RelativePath));

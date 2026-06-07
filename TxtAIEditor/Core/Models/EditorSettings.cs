@@ -50,6 +50,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmModelLmStudio { get; set; } = "";
         public bool LlmConfirmBeforeSending { get; set; } = false;
         public bool LlmAgentVerbose { get; set; } = false;
+        public bool LlmAgentAutoApproveGitEdits { get; set; } = false;
         public string LlmSourceLanguage { get; set; } = "Auto";
         public string LlmTargetLanguage { get; set; } = "Korean";
 

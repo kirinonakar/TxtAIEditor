@@ -578,6 +578,7 @@ namespace TxtAIEditor
                 new AgentFileToolService(GetAgentWorkspaceRoot),
                 _pdfTextExtractionService,
                 InitializePickerWindow,
+                path => _gitService.FindRepositoryRoot(path) != null,
                 OpenAgentDiffViewAsync,
                 OnAgentFileModifiedAsync,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },

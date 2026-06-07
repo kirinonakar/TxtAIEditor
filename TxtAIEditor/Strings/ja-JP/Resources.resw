@@ -1703,6 +1703,9 @@
   <data name="SettingsLlmAgentVerbose" xml:space="preserve">
     <value>Agentの詳細出力を有効にする (Verbose)</value>
   </data>
+  <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
+    <value>Gitフォルダー内でのファイル変更・作成を自動承認する</value>
+  </data>
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
     <value>ファイルを読み込みました: {0}</value>
   </data>
