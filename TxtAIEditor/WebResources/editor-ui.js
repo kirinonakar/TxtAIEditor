@@ -742,16 +742,25 @@ function focusPendingInlineLivePreviewLine() {
     focusLineWithRetry(pending.line, pending.column, 20, pending.token);
 }
 
+const livePreviewProcessedImages = new Set();
+
 function watchLivePreviewImages() {
     if (!state.inlineLivePreviewEnabled) return;
     viewport.querySelectorAll('.live-preview-row img').forEach(img => {
         if (img.dataset.livePreviewImageWatch === '1') return;
         img.dataset.livePreviewImageWatch = '1';
+        const src = img.getAttribute('src');
+        if (!src) return;
+        if (livePreviewProcessedImages.has(src)) return;
+
         const update = () => {
+            livePreviewProcessedImages.add(src);
             state.lastRangeKey = '';
             measureRenderedRows();
         };
-        if (!img.complete) {
+        if (img.complete) {
+            livePreviewProcessedImages.add(src);
+        } else {
             img.addEventListener('load', update, { once: true });
             img.addEventListener('error', update, { once: true });
         }

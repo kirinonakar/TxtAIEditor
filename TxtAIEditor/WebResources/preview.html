@@ -897,13 +897,21 @@
             measureRenderedRows();
         }
 
+        const previewProcessedImages = new Set();
+
         function watchRenderedImages() {
             viewport.querySelectorAll('img').forEach(img => {
+                const src = img.getAttribute('src');
+                if (!src) return;
+                if (previewProcessedImages.has(src)) return;
+
                 const update = () => {
+                    previewProcessedImages.add(src);
                     state.lastRangeKey = '';
                     measureRenderedRows();
                 };
                 if (img.complete) {
+                    previewProcessedImages.add(src);
                     requestAnimationFrame(update);
                 } else {
                     img.addEventListener('load', update, { once: true });
