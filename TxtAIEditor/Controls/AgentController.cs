@@ -3617,35 +3617,61 @@ namespace TxtAIEditor.Controls
             var result = new StringBuilder();
             bool inToolCall = false;
             bool inToolResult = false;
+            bool inUserPromptPresets = false;
+            bool afterUserRequest = false;
 
             foreach (var line in lines)
             {
-                if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase))
+                if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inToolCall = false;
+                    inToolResult = false;
+                    inUserPromptPresets = line.Contains("[Agent persona/instruction presets]");
+                    afterUserRequest = false;
+                    result.AppendLine(line);
+                }
+                else if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = true;
                     inToolResult = false;
+                    inUserPromptPresets = false;
+                    afterUserRequest = false;
                     continue;
                 }
                 else if (line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
                     inToolResult = true;
+                    inUserPromptPresets = false;
+                    afterUserRequest = false;
                     
                     string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
                     result.AppendLine($"[도구 실행 완료: {toolName}]");
                     continue;
                 }
-                else if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
-                {
-                    inToolCall = false;
-                    inToolResult = false;
-                    result.AppendLine(line);
-                }
                 else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
                     inToolResult = false;
+                    inUserPromptPresets = false;
+                    afterUserRequest = false;
                     result.AppendLine(line);
+                }
+                else if (inUserPromptPresets)
+                {
+                    if (line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        afterUserRequest = true;
+                        result.AppendLine(line);
+                    }
+                    else if (afterUserRequest)
+                    {
+                        result.AppendLine(line);
+                    }
+                    else if (line.StartsWith("## ", StringComparison.Ordinal))
+                    {
+                        result.AppendLine(line);
+                    }
                 }
                 else
                 {
