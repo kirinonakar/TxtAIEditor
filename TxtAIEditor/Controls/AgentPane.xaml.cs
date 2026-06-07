@@ -32,6 +32,13 @@ namespace TxtAIEditor.Controls
         public string IconGlyph { get; set; } = "\uE8A5";
     }
 
+    public sealed class AgentHistoryItemViewModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string TimeText { get; set; } = string.Empty;
+    }
+
     public sealed partial class AgentPane : UserControl
     {
         private int _outputLength;
@@ -104,6 +111,13 @@ namespace TxtAIEditor.Controls
         public event EventHandler<AgentFileEditPreview>? FileRevertRequested;
         public event EventHandler<AgentFileEditPreview>? FileDiffRequested;
 
+        public event EventHandler<string>? HistorySelected;
+        public event EventHandler<string>? HistoryDeleted;
+        public event RoutedEventHandler? HistoryToolbarDeleteClicked;
+
+        private List<AgentHistoryItemViewModel> _historyItems = new List<AgentHistoryItemViewModel>();
+        private string? _selectedHistoryId;
+
         public AgentOutputWrapper Output => new AgentOutputWrapper(this);
         public TextBox Prompt => AgentPromptInput;
         public TextBox Activity => AgentActivityText;
@@ -174,6 +188,8 @@ namespace TxtAIEditor.Controls
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
             AgentNewSessionButton.Content = getString("AgentNewSessionButton", "새 세션");
+            ToolTipService.SetToolTip(AgentHistoryButton, getString("AgentHistoryTooltip", "세션 히스토리"));
+            ToolTipService.SetToolTip(AgentDeleteHistoryButton, getString("AgentDeleteHistoryTooltip", "히스토리 삭제"));
             AgentInsertOutputButton.Content = getString("LlmInsertOutputButtonText", "입력");
             AgentActivityHeaderText.Text = getString("AgentActivityHeader", "진행 상황");
             if (_displayText.IsActivityIdle(AgentActivityText.Text))
@@ -204,6 +220,8 @@ namespace TxtAIEditor.Controls
             AgentRunButton.IsEnabled = true;
             AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
             AgentNewSessionButton.IsEnabled = !isBusy;
+            AgentHistoryButton.IsEnabled = !isBusy;
+            AgentDeleteHistoryButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
             AgentIncludeActiveFileCheckBox.IsEnabled = !isBusy;
             AgentAddAttachmentButton.IsEnabled = !isBusy;
@@ -600,6 +618,16 @@ namespace TxtAIEditor.Controls
         private void OnNewSessionClick(object sender, RoutedEventArgs e)
         {
             NewSessionRequested?.Invoke(sender, e);
+        }
+
+        private void OnAgentHistoryFlyoutOpened(object sender, object e)
+        {
+            RebuildHistoryMenu();
+        }
+
+        private void OnDeleteHistoryClick(object sender, RoutedEventArgs e)
+        {
+            HistoryToolbarDeleteClicked?.Invoke(this, e);
         }
 
         private void OnInsertOutputClick(object sender, RoutedEventArgs e)
@@ -1263,6 +1291,87 @@ namespace TxtAIEditor.Controls
         public void UpdateModelName(string text)
         {
             AgentModelNameText.Text = text;
+        }
+
+        public void UpdateHistoryItems(List<AgentHistoryItemViewModel> items, string? selectedId)
+        {
+            _historyItems = items;
+            _selectedHistoryId = selectedId;
+            RebuildHistoryMenu();
+        }
+
+        private void RebuildHistoryMenu()
+        {
+            if (AgentHistoryListPanel == null)
+            {
+                return;
+            }
+
+            AgentHistoryListPanel.Children.Clear();
+            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
+            Func<string, string, string> getString = _getString ?? _displayText.GetString;
+
+            if (_historyItems.Count == 0)
+            {
+                AgentHistoryListPanel.Children.Add(new TextBlock
+                {
+                    Text = getString("AgentHistoryEmptyText", "히스토리 없음"),
+                    FontSize = 11,
+                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
+                    Margin = new Thickness(4, 2, 4, 2)
+                });
+                return;
+            }
+
+            foreach (var item in _historyItems)
+            {
+                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 0, 2) };
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                bool isSelected = string.Equals(_selectedHistoryId, item.Id, StringComparison.Ordinal);
+                var selectBtn = new Button
+                {
+                    Content = isSelected ? $"✓ {item.Title} ({item.TimeText})" : $"{item.Title} ({item.TimeText})",
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    Height = 28,
+                    FontSize = 11,
+                    Padding = new Thickness(8, 0, 8, 0),
+                    Style = buttonStyle
+                };
+                if (isSelected)
+                {
+                    selectBtn.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+                }
+
+                string currentId = item.Id;
+                selectBtn.Click += (_, _) =>
+                {
+                    HistorySelected?.Invoke(this, currentId);
+                    AgentHistoryFlyout.Hide();
+                };
+                Grid.SetColumn(selectBtn, 0);
+                rowGrid.Children.Add(selectBtn);
+
+                var deleteBtn = new Button
+                {
+                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
+                    Width = 28,
+                    Height = 28,
+                    Padding = new Thickness(0),
+                    Style = buttonStyle
+                };
+                ToolTipService.SetToolTip(deleteBtn, getString("AgentHistoryDeleteText", "삭제"));
+                deleteBtn.Click += (_, _) =>
+                {
+                    HistoryDeleted?.Invoke(this, currentId);
+                };
+                Grid.SetColumn(deleteBtn, 1);
+                rowGrid.Children.Add(deleteBtn);
+
+                AgentHistoryListPanel.Children.Add(rowGrid);
+            }
         }
     }
 }

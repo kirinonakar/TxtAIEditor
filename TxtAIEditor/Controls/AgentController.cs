@@ -44,8 +44,21 @@ namespace TxtAIEditor.Controls
         private readonly AgentAttachmentController _attachmentController;
         private readonly List<AgentFileEditPreview> _sessionEdits = new();
         private readonly string _agentPresetsFilePath;
+        private readonly string _agentHistoryFilePath;
         private readonly List<AgentPresetItem> _agentPresets = new();
         private readonly HashSet<string> _selectedAgentPresetNames = new(StringComparer.OrdinalIgnoreCase);
+        private string _currentSessionId = Guid.NewGuid().ToString();
+        private readonly List<AgentHistoryItem> _agentHistory = new();
+
+        private sealed class AgentHistoryItem
+        {
+            public string Id { get; set; } = string.Empty;
+            public DateTime Timestamp { get; set; }
+            public string Title { get; set; } = string.Empty;
+            public string SessionHistoryText { get; set; } = string.Empty;
+            public double SessionHistoryTokenCount { get; set; }
+            public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
+        }
 
         private string _lastSelectionText = string.Empty;
         private string? _lastSelectionTabId;
@@ -147,6 +160,7 @@ namespace TxtAIEditor.Controls
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
             _agentPresetsFilePath = Path.Combine(settingsDir, "agent-presets.json");
+            _agentHistoryFilePath = Path.Combine(settingsDir, "agent-history.json");
             _statsDebounceTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(250)
@@ -160,6 +174,7 @@ namespace TxtAIEditor.Controls
             WireEvents();
             UpdateContextStatsImmediate();
             _ = LoadAgentPresetsAsync();
+            _ = LoadAgentHistoryAsync();
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
@@ -304,6 +319,9 @@ namespace TxtAIEditor.Controls
             _agentPane.RunRequested += async (_, _) => await RunAgentAsync();
             _agentPane.StopRequested += (_, _) => StopAgent();
             _agentPane.NewSessionRequested += (_, _) => ClearSession();
+            _agentPane.HistorySelected += (_, historyId) => LoadHistorySession(historyId);
+            _agentPane.HistoryDeleted += async (_, historyId) => await DeleteHistorySessionAsync(historyId);
+            _agentPane.HistoryToolbarDeleteClicked += async (_, _) => await ClearAllHistoryAsync();
             _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
             _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
             _agentPane.RemoveAttachmentRequested += (_, attachment) => _attachmentController.RemoveAttachment(attachment.Id);
@@ -594,6 +612,7 @@ namespace TxtAIEditor.Controls
                         }
                         AppendSessionHistoryLine($"[Agent Response]: {response.Trim()}");
                         AppendSessionHistoryLine();
+                        _ = SaveCurrentSessionToHistoryAsync(userInstruction);
 
                         completed = true;
                         break;
@@ -700,6 +719,7 @@ namespace TxtAIEditor.Controls
                             AppendSessionHistoryLine(unchangedRunTranscript.Trim());
                         }
                         AppendSessionHistoryLine();
+                        _ = SaveCurrentSessionToHistoryAsync(userInstruction);
 
                         completed = true;
                         break;
@@ -731,6 +751,7 @@ namespace TxtAIEditor.Controls
                     }
                     AppendSessionHistoryLine("[Agent Response]: Tool step limit reached before a final answer.");
                     AppendSessionHistoryLine();
+                    _ = SaveCurrentSessionToHistoryAsync(userInstruction);
                 }
             }
             catch (OperationCanceledException)
@@ -768,6 +789,7 @@ namespace TxtAIEditor.Controls
 
         private void ClearSession()
         {
+            _currentSessionId = Guid.NewGuid().ToString();
             _sessionHistory.Clear();
             _sessionHistoryTokenCount = 0;
             _sessionEdits.Clear();
@@ -778,6 +800,7 @@ namespace TxtAIEditor.Controls
                 _agentPane.UpdateModifiedFiles(new List<AgentFileEditPreview>());
                 _attachmentController.Clear();
                 UpdateContextStatsImmediate();
+                UpdateHistoryUI();
             });
         }
 
@@ -2827,6 +2850,7 @@ namespace TxtAIEditor.Controls
                 string model = settings.LlmModel ?? string.Empty;
                 string format = _getString("AgentModelFormat", "모델: {0} ({1})");
                 _agentPane.UpdateModelName(string.Format(format, model, provider));
+                RefreshOutputDisplay();
             }
         }
 
@@ -3394,6 +3418,256 @@ namespace TxtAIEditor.Controls
 
             diffResult.Reverse();
             return string.Join("\n", diffResult);
+        }
+
+        private async Task LoadAgentHistoryAsync()
+        {
+            try
+            {
+                if (File.Exists(_agentHistoryFilePath))
+                {
+                    string json = await File.ReadAllTextAsync(_agentHistoryFilePath);
+                    var loaded = JsonSerializer.Deserialize<List<AgentHistoryItem>>(json);
+                    if (loaded != null)
+                    {
+                        _agentHistory.Clear();
+                        _agentHistory.AddRange(loaded.Where(h => !string.IsNullOrWhiteSpace(h.Id)));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load agent history: {ex.Message}");
+            }
+
+            UpdateHistoryUI();
+        }
+
+        private async Task SaveAgentHistoryAsync()
+        {
+            try
+            {
+                string? dir = Path.GetDirectoryName(_agentHistoryFilePath);
+                if (dir != null && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                string json = JsonSerializer.Serialize(_agentHistory, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_agentHistoryFilePath, json);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to save agent history: {ex.Message}");
+            }
+
+            UpdateHistoryUI();
+        }
+
+        private void UpdateHistoryUI()
+        {
+            var viewModels = _agentHistory
+                .OrderByDescending(h => h.Timestamp)
+                .Select(h => new AgentHistoryItemViewModel
+                {
+                    Id = h.Id,
+                    Title = h.Title,
+                    TimeText = h.Timestamp.ToString("MM-dd HH:mm")
+                })
+                .ToList();
+
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                _agentPane.UpdateHistoryItems(viewModels, _currentSessionId);
+            });
+        }
+
+        private async Task SaveCurrentSessionToHistoryAsync(string userInstruction)
+        {
+            if (_sessionHistory.Length == 0)
+            {
+                return;
+            }
+
+            var existing = _agentHistory.FirstOrDefault(h => h.Id == _currentSessionId);
+            if (existing != null)
+            {
+                existing.Timestamp = DateTime.Now;
+                existing.SessionHistoryText = _sessionHistory.ToString();
+                existing.SessionHistoryTokenCount = _sessionHistoryTokenCount;
+                existing.SessionEdits = _sessionEdits.ToList();
+                
+                // Move to top of the list
+                _agentHistory.Remove(existing);
+                _agentHistory.Insert(0, existing);
+            }
+            else
+            {
+                var item = new AgentHistoryItem
+                {
+                    Id = _currentSessionId,
+                    Timestamp = DateTime.Now,
+                    Title = GetSessionTitle(userInstruction),
+                    SessionHistoryText = _sessionHistory.ToString(),
+                    SessionHistoryTokenCount = _sessionHistoryTokenCount,
+                    SessionEdits = _sessionEdits.ToList()
+                };
+                _agentHistory.Insert(0, item);
+            }
+
+            // Limit history to 10 items
+            while (_agentHistory.Count > 10)
+            {
+                _agentHistory.RemoveAt(_agentHistory.Count - 1);
+            }
+
+            await SaveAgentHistoryAsync();
+        }
+
+        private void LoadHistorySession(string historyId)
+        {
+            if (_isRunning) return;
+
+            var item = _agentHistory.FirstOrDefault(h => h.Id == historyId);
+            if (item == null) return;
+
+            _currentSessionId = item.Id;
+            _sessionHistory.Clear();
+            _sessionHistory.Append(item.SessionHistoryText);
+            _sessionHistoryTokenCount = item.SessionHistoryTokenCount;
+
+            _sessionEdits.Clear();
+            if (item.SessionEdits != null)
+            {
+                _sessionEdits.AddRange(item.SessionEdits);
+            }
+
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                string formatted = FormatHistoryForDisplay(item.SessionHistoryText, _settingsService.CurrentSettings.LlmAgentVerbose);
+                _agentPane.ResetOutput(formatted);
+                _agentPane.ClearActivity(_getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨"));
+                _agentPane.UpdateModifiedFiles(_sessionEdits.ToList());
+                _attachmentController.Clear();
+                UpdateContextStatsImmediate();
+                UpdateHistoryUI();
+            });
+        }
+
+        private async Task DeleteHistorySessionAsync(string historyId)
+        {
+            if (string.IsNullOrEmpty(historyId)) return;
+
+            var item = _agentHistory.FirstOrDefault(h => h.Id == historyId);
+            if (item != null)
+            {
+                _agentHistory.Remove(item);
+                await SaveAgentHistoryAsync();
+            }
+
+            if (string.Equals(_currentSessionId, historyId, StringComparison.Ordinal))
+            {
+                ClearSession();
+            }
+            else
+            {
+                UpdateHistoryUI();
+            }
+        }
+
+        private async Task ClearAllHistoryAsync()
+        {
+            _agentHistory.Clear();
+            await SaveAgentHistoryAsync();
+            ClearSession();
+        }
+
+        private string FormatHistoryForDisplay(string historyText, bool verbose)
+        {
+            if (string.IsNullOrEmpty(historyText))
+            {
+                return string.Empty;
+            }
+
+            if (verbose)
+            {
+                return historyText;
+            }
+
+            var lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var result = new StringBuilder();
+            bool inToolCall = false;
+            bool inToolResult = false;
+
+            foreach (var line in lines)
+            {
+                if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase))
+                {
+                    inToolCall = true;
+                    inToolResult = false;
+                    continue;
+                }
+                else if (line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inToolCall = false;
+                    inToolResult = true;
+                    
+                    string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
+                    result.AppendLine($"[도구 실행 완료: {toolName}]");
+                    continue;
+                }
+                else if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inToolCall = false;
+                    inToolResult = false;
+                    result.AppendLine(line);
+                }
+                else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inToolCall = false;
+                    inToolResult = false;
+                    result.AppendLine(line);
+                }
+                else
+                {
+                    if (!inToolCall && !inToolResult)
+                    {
+                        result.AppendLine(line);
+                    }
+                }
+            }
+
+            return result.ToString().TrimEnd();
+        }
+
+        private void RefreshOutputDisplay()
+        {
+            if (_isRunning) return;
+
+            string text = _sessionHistory.ToString();
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            string formatted = FormatHistoryForDisplay(text, _settingsService.CurrentSettings.LlmAgentVerbose);
+            _agentPane.ResetOutput(formatted);
+        }
+
+        private string GetSessionTitle(string instruction)
+        {
+            if (string.IsNullOrWhiteSpace(instruction))
+            {
+                return "Untitled Session";
+            }
+
+            string firstLine = instruction.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? instruction;
+            firstLine = firstLine.Trim();
+            if (firstLine.Length > 20)
+            {
+                return firstLine.Substring(0, 17) + "...";
+            }
+            return firstLine;
         }
 
     }

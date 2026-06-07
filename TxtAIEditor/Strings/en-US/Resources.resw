@@ -1861,4 +1861,19 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExplorerSortOldest" xml:space="preserve">
     <value>Sort: Oldest Modified</value>
   </data>
+  <data name="AgentHistoryTooltip" xml:space="preserve">
+    <value>Session History</value>
+  </data>
+  <data name="AgentDeleteHistoryTooltip" xml:space="preserve">
+    <value>Clear All History</value>
+  </data>
+  <data name="AgentHistoryDeleteText" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="AgentHistoryEmptyText" xml:space="preserve">
+    <value>No History</value>
+  </data>
+  <data name="AgentHistoryLoadedActivity" xml:space="preserve">
+    <value>Session history loaded</value>
+  </data>
 </root>

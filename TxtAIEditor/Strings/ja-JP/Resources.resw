@@ -1862,4 +1862,19 @@
   <data name="ExplorerSortOldest" xml:space="preserve">
     <value>並べ替え: 更新日時 (古い順)</value>
   </data>
+  <data name="AgentHistoryTooltip" xml:space="preserve">
+    <value>セッション履歴</value>
+  </data>
+  <data name="AgentDeleteHistoryTooltip" xml:space="preserve">
+    <value>すべての履歴を削除</value>
+  </data>
+  <data name="AgentHistoryDeleteText" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="AgentHistoryEmptyText" xml:space="preserve">
+    <value>履歴なし</value>
+  </data>
+  <data name="AgentHistoryLoadedActivity" xml:space="preserve">
+    <value>セッション履歴がロードされました</value>
+  </data>
 </root>

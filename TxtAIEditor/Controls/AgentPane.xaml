@@ -55,7 +55,9 @@
         <Grid Grid.Row="0" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="90"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Name="AgentNewSessionButton"
                     Grid.Column="0"
@@ -63,8 +65,41 @@
                     HorizontalAlignment="Stretch"
                     Click="OnNewSessionClick"
                     Style="{StaticResource AgentButtonStyle}"/>
+            <Button x:Name="AgentHistoryButton"
+                    Grid.Column="1"
+                    Width="36"
+                    Height="32"
+                    Padding="0"
+                    ToolTipService.ToolTip="세션 히스토리"
+                    Style="{StaticResource AgentButtonStyle}">
+                <FontIcon Glyph="&#xE81C;" FontSize="14"/>
+                <Button.Flyout>
+                    <Flyout x:Name="AgentHistoryFlyout" Opened="OnAgentHistoryFlyoutOpened">
+                        <Grid Width="280" RowSpacing="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="세션 히스토리 (최근 10개)" FontWeight="SemiBold" FontSize="12" Grid.Row="0"/>
+                            <ScrollViewer Grid.Row="1" MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="AgentHistoryListPanel" Spacing="4"/>
+                            </ScrollViewer>
+                        </Grid>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+            <Button x:Name="AgentDeleteHistoryButton"
+                    Grid.Column="2"
+                    Width="36"
+                    Height="32"
+                    Padding="0"
+                    Click="OnDeleteHistoryClick"
+                    ToolTipService.ToolTip="히스토리 삭제"
+                    Style="{StaticResource AgentButtonStyle}">
+                <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+            </Button>
             <TextBlock x:Name="AgentTokenCountText"
-                       Grid.Column="1"
+                       Grid.Column="3"
                        Text="0.0k tokens"
                        VerticalAlignment="Center"
                        HorizontalAlignment="Right"

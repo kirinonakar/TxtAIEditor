@@ -1861,4 +1861,19 @@
   <data name="ExplorerSortOldest" xml:space="preserve">
     <value>정렬: 수정한 날짜 오래된순</value>
   </data>
+  <data name="AgentHistoryTooltip" xml:space="preserve">
+    <value>세션 히스토리</value>
+  </data>
+  <data name="AgentDeleteHistoryTooltip" xml:space="preserve">
+    <value>전체 히스토리 삭제</value>
+  </data>
+  <data name="AgentHistoryDeleteText" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="AgentHistoryEmptyText" xml:space="preserve">
+    <value>히스토리 없음</value>
+  </data>
+  <data name="AgentHistoryLoadedActivity" xml:space="preserve">
+    <value>세션 히스토리 로드됨</value>
+  </data>
 </root>
