@@ -584,7 +584,8 @@ namespace TxtAIEditor
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
                 revertTabOrFileAsync: RevertTabOrFileAsync,
-                closeTabById: CloseTabById);
+                closeTabById: CloseTabById,
+                navigateToFolderAsync: NavigateExplorerToFolderAsync);
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,

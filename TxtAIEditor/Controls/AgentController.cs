@@ -40,6 +40,7 @@ namespace TxtAIEditor.Controls
         private readonly Action? _afterDialog;
         private readonly Func<string, string, bool, Task>? _revertTabOrFileAsync;
         private readonly Action<string>? _closeTabById;
+        private readonly Func<string, Task>? _navigateToFolderAsync;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly List<AgentFileEditPreview> _sessionEdits = new();
@@ -58,6 +59,7 @@ namespace TxtAIEditor.Controls
             public string SessionHistoryText { get; set; } = string.Empty;
             public double SessionHistoryTokenCount { get; set; }
             public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
+            public string WorkspaceRoot { get; set; } = string.Empty;
         }
 
         private string _lastSelectionText = string.Empty;
@@ -116,7 +118,8 @@ namespace TxtAIEditor.Controls
             Action? beforeDialog = null,
             Action? afterDialog = null,
             Func<string, string, bool, Task>? revertTabOrFileAsync = null,
-            Action<string>? closeTabById = null)
+            Action<string>? closeTabById = null,
+            Func<string, Task>? navigateToFolderAsync = null)
         {
             _llmService = llmService;
             _settingsService = settingsService;
@@ -137,6 +140,7 @@ namespace TxtAIEditor.Controls
             _afterDialog = afterDialog;
             _revertTabOrFileAsync = revertTabOrFileAsync;
             _closeTabById = closeTabById;
+            _navigateToFolderAsync = navigateToFolderAsync;
             _displayText = new AgentDisplayLocalizer(_getString);
             _attachmentController = new AgentAttachmentController(
                 _agentPane,
@@ -3489,6 +3493,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            string currentWorkspaceRoot = _fileTools.WorkspaceRoot;
             var existing = _agentHistory.FirstOrDefault(h => h.Id == _currentSessionId);
             if (existing != null)
             {
@@ -3496,7 +3501,8 @@ namespace TxtAIEditor.Controls
                 existing.SessionHistoryText = _sessionHistory.ToString();
                 existing.SessionHistoryTokenCount = _sessionHistoryTokenCount;
                 existing.SessionEdits = _sessionEdits.ToList();
-                
+                existing.WorkspaceRoot = currentWorkspaceRoot;
+
                 // Move to top of the list
                 _agentHistory.Remove(existing);
                 _agentHistory.Insert(0, existing);
@@ -3510,7 +3516,8 @@ namespace TxtAIEditor.Controls
                     Title = GetSessionTitle(userInstruction),
                     SessionHistoryText = _sessionHistory.ToString(),
                     SessionHistoryTokenCount = _sessionHistoryTokenCount,
-                    SessionEdits = _sessionEdits.ToList()
+                    SessionEdits = _sessionEdits.ToList(),
+                    WorkspaceRoot = currentWorkspaceRoot
                 };
                 _agentHistory.Insert(0, item);
             }
@@ -3540,6 +3547,15 @@ namespace TxtAIEditor.Controls
             if (item.SessionEdits != null)
             {
                 _sessionEdits.AddRange(item.SessionEdits);
+            }
+
+            // Restore workspace folder if it was saved and still exists
+            string savedWorkspaceRoot = item.WorkspaceRoot ?? string.Empty;
+            if (_navigateToFolderAsync != null &&
+                !string.IsNullOrWhiteSpace(savedWorkspaceRoot) &&
+                Directory.Exists(savedWorkspaceRoot))
+            {
+                _ = _navigateToFolderAsync(savedWorkspaceRoot);
             }
 
             _agentPane.DispatcherQueue.TryEnqueue(() =>
