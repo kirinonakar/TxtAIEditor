@@ -399,10 +399,11 @@ namespace TxtAIEditor.Controls
 
                     string currentTranscript = transcript;
                     string sessionDiffLog = BuildSessionDiffLog();
-                    if (!string.IsNullOrEmpty(sessionDiffLog))
+                    if (string.IsNullOrEmpty(sessionDiffLog))
                     {
-                        currentTranscript = $"{transcript}\n\n[Diff log of changes made in this session]\n{sessionDiffLog}";
+                        sessionDiffLog = "(No changes have been made in this session yet.)";
                     }
+                    currentTranscript = $"{transcript}\n\n[Diff log of changes made in this session]\n{sessionDiffLog}";
 
                     response = await _llmService.RunAgentAsync(
                         instruction,
