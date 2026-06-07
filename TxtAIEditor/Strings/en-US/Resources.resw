@@ -1846,4 +1846,13 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExplorerInsertMarkdownImageNoEditor" xml:space="preserve">
     <value>Select a text editor tab to insert the Markdown image.</value>
   </data>
+  <data name="ExplorerSortName" xml:space="preserve">
+    <value>Sort: Name</value>
+  </data>
+  <data name="ExplorerSortNewest" xml:space="preserve">
+    <value>Sort: Newest Modified</value>
+  </data>
+  <data name="ExplorerSortOldest" xml:space="preserve">
+    <value>Sort: Oldest Modified</value>
+  </data>
 </root>

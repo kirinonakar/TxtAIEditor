@@ -18,6 +18,7 @@ namespace TxtAIEditor
         public string Name { get; set; } = string.Empty;
         public string Path { get; set; } = string.Empty;
         public bool IsFolder { get; set; } = false;
+        public DateTime ModifiedTime { get; set; } = DateTime.MinValue;
 
         public enum GitStatusType
         {

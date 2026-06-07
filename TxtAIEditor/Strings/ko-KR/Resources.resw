@@ -1846,4 +1846,13 @@
   <data name="ExplorerInsertMarkdownImageNoEditor" xml:space="preserve">
     <value>마크다운을 삽입할 텍스트 편집기 탭을 선택해 주세요.</value>
   </data>
+  <data name="ExplorerSortName" xml:space="preserve">
+    <value>정렬: 이름순</value>
+  </data>
+  <data name="ExplorerSortNewest" xml:space="preserve">
+    <value>정렬: 수정한 날짜 최신순</value>
+  </data>
+  <data name="ExplorerSortOldest" xml:space="preserve">
+    <value>정렬: 수정한 날짜 오래된순</value>
+  </data>
 </root>

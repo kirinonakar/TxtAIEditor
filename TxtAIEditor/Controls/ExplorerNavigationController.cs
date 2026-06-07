@@ -26,6 +26,15 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly ILocalizationService _localizationService;
 
+        public enum ExplorerSortMode
+        {
+            Name,
+            Newest,
+            Oldest
+        }
+
+        private ExplorerSortMode _currentSortMode = ExplorerSortMode.Name;
+
         public ExplorerNavigationController(
             LeftSidebarPane leftSidebar,
             MainWindowViewModel viewModel,
@@ -54,6 +63,7 @@ namespace TxtAIEditor.Controls
             _localizationService = localizationService;
 
             WireEvents();
+            UpdateSortButtonVisuals();
             _leftSidebar.ActualThemeChanged += (sender, args) =>
             {
                 _ = UpdateGitStatusesAsync();
@@ -68,7 +78,7 @@ namespace TxtAIEditor.Controls
             SetCurrentFolderPath(folderPath);
 
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-            foreach (var item in _directoryService.CreateDirectoryItems(folderPath))
+            foreach (var item in SortItems(_directoryService.CreateDirectoryItems(folderPath)))
             {
                 item.IsDark = isDark;
                 _viewModel.ExplorerItems.Add(item);
@@ -109,6 +119,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerUpClick += OnExplorerUpClick;
             _leftSidebar.SelectFolderClick += OnSelectFolderClick;
             _leftSidebar.RefreshClick += OnExplorerRefreshClick;
+            _leftSidebar.SortClick += OnExplorerSortClick;
             _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
             _leftSidebar.FileListViewDoubleTapped += OnFileListViewDoubleTapped;
         }
@@ -328,6 +339,103 @@ namespace TxtAIEditor.Controls
                     }
                 }
             }
+        }
+
+        private void OnExplorerSortClick(object sender, RoutedEventArgs e)
+        {
+            _currentSortMode = _currentSortMode switch
+            {
+                ExplorerSortMode.Name => ExplorerSortMode.Newest,
+                ExplorerSortMode.Newest => ExplorerSortMode.Oldest,
+                ExplorerSortMode.Oldest => ExplorerSortMode.Name,
+                _ => ExplorerSortMode.Name
+            };
+
+            UpdateSortButtonVisuals();
+
+            if (_viewModel.ExplorerItems.Count > 0)
+            {
+                var sorted = SortItems(_viewModel.ExplorerItems);
+                _viewModel.ExplorerItems.Clear();
+                foreach (var item in sorted)
+                {
+                    _viewModel.ExplorerItems.Add(item);
+                }
+            }
+        }
+
+        private void UpdateSortButtonVisuals()
+        {
+            string key;
+            string fallback;
+            string glyph;
+
+            switch (_currentSortMode)
+            {
+                case ExplorerSortMode.Name:
+                    key = "ExplorerSortName";
+                    fallback = "이름순 정렬";
+                    glyph = "\uE8CB"; // Standard sort glyph
+                    break;
+                case ExplorerSortMode.Newest:
+                    key = "ExplorerSortNewest";
+                    fallback = "수정한 날짜 최신순 정렬";
+                    glyph = "\uE74B"; // Down arrow
+                    break;
+                case ExplorerSortMode.Oldest:
+                    key = "ExplorerSortOldest";
+                    fallback = "수정한 날짜 오래된순 정렬";
+                    glyph = "\uE74A"; // Up arrow
+                    break;
+                default:
+                    key = "ExplorerSortName";
+                    fallback = "이름순 정렬";
+                    glyph = "\uE8CB";
+                    break;
+            }
+
+            string tooltipText = _localizationService.GetString(key, fallback);
+            Microsoft.UI.Xaml.Controls.ToolTipService.SetToolTip(_leftSidebar.ExplorerSortBtn, tooltipText);
+
+            if (_leftSidebar.ExplorerSortBtn.Content is Microsoft.UI.Xaml.Controls.FontIcon fontIcon)
+            {
+                fontIcon.Glyph = glyph;
+            }
+        }
+
+        private System.Collections.Generic.IEnumerable<ExplorerItem> SortItems(System.Collections.Generic.IEnumerable<ExplorerItem> items)
+        {
+            var folderList = new System.Collections.Generic.List<ExplorerItem>();
+            var fileList = new System.Collections.Generic.List<ExplorerItem>();
+
+            foreach (var item in items)
+            {
+                if (item.IsFolder)
+                    folderList.Add(item);
+                else
+                    fileList.Add(item);
+            }
+
+            switch (_currentSortMode)
+            {
+                case ExplorerSortMode.Name:
+                    folderList.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
+                    fileList.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
+                    break;
+                case ExplorerSortMode.Newest:
+                    folderList.Sort((a, b) => b.ModifiedTime.CompareTo(a.ModifiedTime));
+                    fileList.Sort((a, b) => b.ModifiedTime.CompareTo(a.ModifiedTime));
+                    break;
+                case ExplorerSortMode.Oldest:
+                    folderList.Sort((a, b) => a.ModifiedTime.CompareTo(b.ModifiedTime));
+                    fileList.Sort((a, b) => a.ModifiedTime.CompareTo(b.ModifiedTime));
+                    break;
+            }
+
+            var sorted = new System.Collections.Generic.List<ExplorerItem>(folderList.Count + fileList.Count);
+            sorted.AddRange(folderList);
+            sorted.AddRange(fileList);
+            return sorted;
         }
     }
 }

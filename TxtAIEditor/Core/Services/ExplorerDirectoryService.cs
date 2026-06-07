@@ -26,7 +26,7 @@ namespace TxtAIEditor.Core.Services
                         continue;
                     }
 
-                    items.Add(new ExplorerItem { Name = dir.Name, Path = dir.FullName, IsFolder = true });
+                    items.Add(new ExplorerItem { Name = dir.Name, Path = dir.FullName, IsFolder = true, ModifiedTime = dir.LastWriteTime });
                 }
 
                 foreach (var file in dirInfo.EnumerateFiles("*", enumerationOptions))
@@ -36,7 +36,7 @@ namespace TxtAIEditor.Core.Services
                         continue;
                     }
 
-                    items.Add(new ExplorerItem { Name = file.Name, Path = file.FullName, IsFolder = false });
+                    items.Add(new ExplorerItem { Name = file.Name, Path = file.FullName, IsFolder = false, ModifiedTime = file.LastWriteTime });
                 }
             }
             catch (Exception ex)
