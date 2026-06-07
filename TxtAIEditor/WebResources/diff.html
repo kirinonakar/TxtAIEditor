@@ -140,7 +140,9 @@
             padding-right: 10px;
             color: var(--gutter-fg);
             background: var(--gutter-bg);
+            -webkit-user-select: none;
             user-select: none;
+            pointer-events: none;
             border-right: 1px solid var(--border);
         }
 
@@ -149,6 +151,12 @@
             padding-left: 12px;
             white-space: pre-wrap;
             word-break: break-all;
+        }
+
+        .diff-sign {
+            -webkit-user-select: none;
+            user-select: none;
+            pointer-events: none;
         }
 
         /* Diff styling states */
@@ -449,22 +457,22 @@
 
                 // Left row
                 if (itemA.type === 'removed') {
-                    leftHtml += `<div class="diff-row row-removed"><div class="line-number">${itemA.lineNum}</div><div class="line-content">- ${escapeHtml(itemA.text)}</div></div>`;
+                    leftHtml += `<div class="diff-row row-removed"><div class="line-number">${itemA.lineNum}</div><div class="line-content"><span class="diff-sign">- </span>${escapeHtml(itemA.text)}</div></div>`;
                     deletions++;
                 } else if (itemA.type === 'empty') {
                     leftHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
                 } else {
-                    leftHtml += `<div class="diff-row"><div class="line-number">${itemA.lineNum}</div><div class="line-content">  ${escapeHtml(itemA.text)}</div></div>`;
+                    leftHtml += `<div class="diff-row"><div class="line-number">${itemA.lineNum}</div><div class="line-content"><span class="diff-sign">  </span>${escapeHtml(itemA.text)}</div></div>`;
                 }
 
                 // Right row
                 if (itemB.type === 'added') {
-                    rightHtml += `<div class="diff-row row-added"><div class="line-number">${itemB.lineNum}</div><div class="line-content">+ ${escapeHtml(itemB.text)}</div></div>`;
+                    rightHtml += `<div class="diff-row row-added"><div class="line-number">${itemB.lineNum}</div><div class="line-content"><span class="diff-sign">+ </span>${escapeHtml(itemB.text)}</div></div>`;
                     additions++;
                 } else if (itemB.type === 'empty') {
                     rightHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
                 } else {
-                    rightHtml += `<div class="diff-row"><div class="line-number">${itemB.lineNum}</div><div class="line-content">  ${escapeHtml(itemB.text)}</div></div>`;
+                    rightHtml += `<div class="diff-row"><div class="line-number">${itemB.lineNum}</div><div class="line-content"><span class="diff-sign">  </span>${escapeHtml(itemB.text)}</div></div>`;
                 }
             }
 
