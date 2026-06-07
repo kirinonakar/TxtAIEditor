@@ -1151,6 +1151,63 @@ namespace TxtAIEditor.Core.Services
                 return "Exa fetch failed: urls list is empty.";
             }
 
+            // 1. Try custom WebFetchService first
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("Attempting custom WebFetchService...");
+                var fetchService = new WebFetchService();
+                var sb = new StringBuilder();
+                int index = 1;
+                bool allSuccessful = true;
+
+                foreach (string rawUrl in urls)
+                {
+                    string url = (rawUrl ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(url))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        string markdown = await fetchService.FetchUrlAsMarkdownAsync(url, cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(markdown))
+                        {
+                            sb.AppendLine($"[{index}] URL: {url}");
+                            sb.AppendLine("Content:");
+                            sb.AppendLine(markdown);
+                            sb.AppendLine();
+                        }
+                        else
+                        {
+                            // If returned markdown is empty, treat as failure to fallback to Exa
+                            allSuccessful = false;
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Custom WebFetchService failed for {url}: {ex.Message}");
+                        allSuccessful = false;
+                        break;
+                    }
+                    index++;
+                }
+
+                if (allSuccessful && sb.Length > 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("Custom WebFetchService succeeded for all URLs.");
+                    return sb.ToString().TrimEnd();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error during custom WebFetchService execution: {ex.Message}");
+            }
+
+            System.Diagnostics.Debug.WriteLine("Falling back to Exa content fetch...");
+
+            // 2. Fallback to Exa content fetch
             string apiKey = await GetApiKeyAsync("Exa");
             if (string.IsNullOrEmpty(apiKey))
             {
