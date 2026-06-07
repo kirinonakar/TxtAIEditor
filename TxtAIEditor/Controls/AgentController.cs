@@ -75,6 +75,9 @@ namespace TxtAIEditor.Controls
         private readonly DispatcherTimer _statsDebounceTimer;
         private TaskCompletionSource<bool>? _diffApprovalTcs;
         private string? _currentRunLastFilePath;
+        private OpenedTab? _lastKnownActiveTab;
+        private bool _lastKnownActiveTabFromTabSelection;
+        private OpenedTab? _currentRunActiveTabSnapshot;
         private SelectionSnapshot? _currentRunSelectionSnapshot;
         private bool _currentRunRestrictEditsToSelection;
 
@@ -183,6 +186,14 @@ namespace TxtAIEditor.Controls
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
 
+        public void SetActiveTab(OpenedTab? activeTab)
+        {
+            _lastKnownActiveTab = activeTab;
+            _lastKnownActiveTabFromTabSelection = true;
+            ClearSelectionIfItBelongsToAnotherTab(activeTab);
+            UpdateContextStats();
+        }
+
         public void SetSelectionText(string selectedText, OpenedTab? sourceTab = null, int startLine = 0, int endLine = 0)
         {
             _lastSelectionText = selectedText ?? string.Empty;
@@ -216,9 +227,75 @@ namespace TxtAIEditor.Controls
             UpdateContextStats();
         }
 
+        private void ClearSelectionIfItBelongsToAnotherTab(OpenedTab? activeTab)
+        {
+            if (string.IsNullOrEmpty(_lastSelectionText) || string.IsNullOrEmpty(_lastSelectionTabId))
+            {
+                return;
+            }
+
+            if (activeTab != null &&
+                string.Equals(_lastSelectionTabId, activeTab.Id, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastSelectionText = string.Empty;
+            _lastSelectionTabId = null;
+            _lastSelectionSourceTitle = null;
+            _lastSelectionSourcePath = null;
+            _lastSelectionStartLine = 0;
+            _lastSelectionEndLine = 0;
+        }
+
+        private OpenedTab? GetActiveTabForContext()
+        {
+            if (_isRunning && _currentRunActiveTabSnapshot != null)
+            {
+                return _currentRunActiveTabSnapshot;
+            }
+
+            var liveActiveTab = _activeTabProvider();
+            if (!_lastKnownActiveTabFromTabSelection)
+            {
+                _lastKnownActiveTab = liveActiveTab;
+                return liveActiveTab;
+            }
+
+            if (_lastKnownActiveTab == null)
+            {
+                return null;
+            }
+
+            if (liveActiveTab == null)
+            {
+                return _lastKnownActiveTab;
+            }
+
+            if (string.Equals(liveActiveTab.Id, _lastKnownActiveTab.Id, StringComparison.Ordinal))
+            {
+                _lastKnownActiveTab = liveActiveTab;
+                return liveActiveTab;
+            }
+
+            // Prefer the explicit tab-selection snapshot when the editor focus provider still
+            // points at the previously focused editor after the user switched tabs.
+            return _lastKnownActiveTab;
+        }
+
+        private Task<OpenedTab?> CaptureActiveTabForRunAsync()
+        {
+            return RunOnUIThreadAsync(() =>
+            {
+                var activeTab = GetActiveTabForContext();
+                _lastKnownActiveTab = activeTab;
+                return activeTab;
+            });
+        }
+
         private string GetActiveSelectionText()
         {
-            var activeTab = _activeTabProvider();
+            var activeTab = GetActiveTabForContext();
             if (string.IsNullOrEmpty(_lastSelectionText))
             {
                 return string.Empty;
@@ -368,6 +445,7 @@ namespace TxtAIEditor.Controls
   
             _isRunning = true;
             _currentRunLastFilePath = null;
+            _currentRunActiveTabSnapshot = null;
             _currentRunSelectionSnapshot = null;
             _currentRunRestrictEditsToSelection = false;
             var cancellationSource = new CancellationTokenSource();
@@ -382,6 +460,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                _currentRunActiveTabSnapshot = await CaptureActiveTabForRunAsync();
                 _currentRunSelectionSnapshot = CaptureLiveSelectionSnapshot();
                 _currentRunRestrictEditsToSelection =
                     _currentRunSelectionSnapshot.HasLineRange &&
@@ -780,6 +859,7 @@ namespace TxtAIEditor.Controls
             finally
             {
                 _isRunning = false;
+                _currentRunActiveTabSnapshot = null;
                 _currentRunSelectionSnapshot = null;
                 _currentRunRestrictEditsToSelection = false;
                 if (ReferenceEquals(_runCancellation, cancellationSource))
@@ -952,6 +1032,7 @@ namespace TxtAIEditor.Controls
 
             AddReferencedPathContext(context, instruction);
 
+            var activeTab = GetActiveTabForContext();
             var openTabs = _openTabsProvider();
             if (openTabs.Count > 0)
             {
@@ -959,11 +1040,14 @@ namespace TxtAIEditor.Controls
                 foreach (var tab in openTabs.Take(30))
                 {
                     string tabName = string.IsNullOrWhiteSpace(tab.FilePath) ? tab.Title : tab.FilePath;
-                    context.Add($"- {tabName}");
+                    string activeMarker = activeTab != null &&
+                        string.Equals(tab.Id, activeTab.Id, StringComparison.Ordinal)
+                            ? " (active)"
+                            : string.Empty;
+                    context.Add($"- {tabName}{activeMarker}");
                 }
             }
 
-            var activeTab = _activeTabProvider();
             if (activeTab != null && _agentPane.IncludeActiveFile && !IsPdfTab(activeTab))
             {
                 string title = string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath;
@@ -2245,7 +2329,7 @@ namespace TxtAIEditor.Controls
                 return _currentRunLastFilePath;
             }
 
-            string activePath = _activeTabProvider()?.FilePath ?? string.Empty;
+            string activePath = GetActiveTabForContext()?.FilePath ?? string.Empty;
             return string.IsNullOrWhiteSpace(activePath) ? string.Empty : activePath;
         }
 
@@ -2502,7 +2586,7 @@ namespace TxtAIEditor.Controls
                 return "insert_text failed: content is empty.";
             }
 
-            var activeTab = _activeTabProvider();
+            var activeTab = GetActiveTabForContext();
             if (activeTab == null)
             {
                 return "insert_text failed: no active tab.";
@@ -2809,7 +2893,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var activeTab = _activeTabProvider();
+            var activeTab = GetActiveTabForContext();
             string tabPart;
             if (activeTab == null)
             {
