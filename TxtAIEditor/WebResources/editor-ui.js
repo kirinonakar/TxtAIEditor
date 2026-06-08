@@ -1469,6 +1469,89 @@ window.addEventListener('pointercancel', event => {
     reportCursorAndSelection(document.activeElement);
 });
 
+function focusOrSelectHome(extendSelection) {
+    const targetLine = 1;
+    const targetColumn = 0;
+
+    const element = activeEditableElement();
+    const lineNumber = element ? Number(element.dataset.line || state.currentLine || 1) : state.currentLine;
+    const caret = element ? getCaretOffset(element) : (state.currentColumn - 1);
+
+    if (extendSelection) {
+        const anchor = state.selectionAnchor || { line: lineNumber, column: caret };
+        state.selectionAnchor = anchor;
+        state.selection = (anchor.line === targetLine && anchor.column === targetColumn)
+            ? null
+            : { start: anchor, end: { line: targetLine, column: targetColumn } };
+        state.currentLine = targetLine;
+        state.currentColumn = targetColumn + 1;
+        syncCustomSelectionClass();
+        queueRender(true);
+        setTimeout(() => focusLine(targetLine, targetColumn), 0);
+        reportCursorAndSelection();
+    } else {
+        state.selection = null;
+        state.selectionAnchor = { line: targetLine, column: targetColumn };
+        state.currentLine = targetLine;
+        state.currentColumn = targetColumn + 1;
+        syncCustomSelectionClass();
+        focusLine(targetLine, targetColumn);
+        reportCursorAndSelection();
+    }
+}
+
+function focusOrSelectEnd(extendSelection) {
+    const targetLine = state.lineCount;
+
+    function proceed() {
+        const targetText = state.cache.get(targetLine) || '';
+        const targetColumn = targetText.length;
+
+        const element = activeEditableElement();
+        const lineNumber = element ? Number(element.dataset.line || state.currentLine || 1) : state.currentLine;
+        const caret = element ? getCaretOffset(element) : (state.currentColumn - 1);
+
+        if (extendSelection) {
+            const anchor = state.selectionAnchor || { line: lineNumber, column: caret };
+            state.selectionAnchor = anchor;
+            state.selection = (anchor.line === targetLine && anchor.column === targetColumn)
+                ? null
+                : { start: anchor, end: { line: targetLine, column: targetColumn } };
+            state.currentLine = targetLine;
+            state.currentColumn = targetColumn + 1;
+            syncCustomSelectionClass();
+            queueRender(true);
+            setTimeout(() => focusLine(targetLine, targetColumn), 0);
+            reportCursorAndSelection();
+        } else {
+            state.selection = null;
+            state.selectionAnchor = { line: targetLine, column: targetColumn };
+            state.currentLine = targetLine;
+            state.currentColumn = targetColumn + 1;
+            syncCustomSelectionClass();
+            focusLine(targetLine, targetColumn);
+            reportCursorAndSelection();
+        }
+    }
+
+    if (state.cache.has(targetLine)) {
+        proceed();
+    } else {
+        const wrappedTargetTop = lineTop(targetLine);
+        scrollContainer.scrollTop = Math.max(0, wrappedTargetTop - Math.floor(scrollContainer.clientHeight / 2));
+        requestLines(targetLine, 1);
+
+        let attempts = 0;
+        const interval = setInterval(() => {
+            attempts++;
+            if (state.cache.has(targetLine) || attempts > 50) {
+                clearInterval(interval);
+                proceed();
+            }
+        }, 20);
+    }
+}
+
 document.addEventListener('keydown', event => {
     const earlyCtrl = event.ctrlKey || event.metaKey;
     const earlyKey = event.key ? event.key.toLowerCase() : '';
@@ -1643,6 +1726,16 @@ document.addEventListener('keydown', event => {
     if (columnSelection && isPlainTextKey(event)) {
         event.preventDefault();
         replaceSelectionWith(columnSelection, event.key);
+        return;
+    }
+
+    if ((event.key === 'Home' || event.key === 'End') && event.ctrlKey) {
+        event.preventDefault();
+        if (event.key === 'Home') {
+            focusOrSelectHome(event.shiftKey);
+        } else {
+            focusOrSelectEnd(event.shiftKey);
+        }
         return;
     }
 
