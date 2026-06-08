@@ -85,7 +85,7 @@ namespace TxtAIEditor
         private readonly MainWindowSettingsController _settingsController;
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private bool _startupInitializationComplete;
-        private string _currentFolderPath = string.Empty;
+        private string _currentFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         private string _currentRepoPath = string.Empty;
 
         private string CurrentFolderPath
