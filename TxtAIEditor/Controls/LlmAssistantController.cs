@@ -661,6 +661,24 @@ namespace TxtAIEditor.Controls
             return fileContent;
         }
 
+        // 파일에서 모든 진행 마커를 제거한 내용을 반환
+        private static string StripAllProgressMarkers(string fileContent)
+        {
+            if (string.IsNullOrEmpty(fileContent)) return fileContent;
+            var lines = fileContent.Split('\n');
+            var result = new System.Text.StringBuilder();
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string trimmed = lines[i].TrimStart();
+                if (!trimmed.StartsWith(TranslationProgressMarkerPrefix, StringComparison.Ordinal))
+                {
+                    if (result.Length > 0) result.Append('\n');
+                    result.Append(lines[i]);
+                }
+            }
+            return result.ToString();
+        }
+
         private async Task ProcessChunkedTranslationAsync(string fileContext)
         {
             _assistantCts = new CancellationTokenSource();
@@ -697,11 +715,12 @@ namespace TxtAIEditor.Controls
                         int markerChunkIndex = TryReadProgressMarker(existingContent, totalChunks);
                         if (markerChunkIndex >= 0 && markerChunkIndex + 1 < totalChunks)
                         {
+                            // 모든 이전 마커 제거 후 깨끗한 내용 + resume 마커 기록
+                            string cleaned = StripAllProgressMarkers(existingContent);
+                            string resumeMarker = BuildProgressMarker(markerChunkIndex, totalChunks);
+                            await File.WriteAllTextAsync(outputPath, cleaned + resumeMarker);
                             startChunkIndex = markerChunkIndex + 1;
                             isResuming = true;
-                            // 마커를 그대로 유지한다. resume 후 첫 chunk가 완료되면
-                            // 그때 이전 마커를 새 내용+새 마커로 교체하여,
-                            // 중간에 중단되어도 마커가 사라지지 않도록 한다.
                         }
                     }
                 }
@@ -746,19 +765,9 @@ namespace TxtAIEditor.Controls
 
                         // chunk 완료 후 즉시 번역문 저장, 그 뒤에 진행 마커 기록
                         bool isFirstWrite = (i == 0 && !isResuming);
-                        if (isResuming && i == startChunkIndex)
-                        {
-                            // resume 후 첫 chunk: 파일 끝의 이전 마커를 새 내용+새 마커로 교체
-                            string existingContent = await File.ReadAllTextAsync(outputPath);
-                            string stripped = StripProgressMarker(existingContent);
-                            await File.WriteAllTextAsync(outputPath, stripped + "\n" + translated + BuildProgressMarker(i, totalChunks));
-                        }
-                        else
-                        {
-                            string translationToAppend = isFirstWrite ? translated : "\n" + translated;
-                            string marker = BuildProgressMarker(i, totalChunks);
-                            await File.AppendAllTextAsync(outputPath, translationToAppend + marker);
-                        }
+                        string translationToAppend = isFirstWrite ? translated : "\n" + translated;
+                        string marker = BuildProgressMarker(i, totalChunks);
+                        await File.AppendAllTextAsync(outputPath, translationToAppend + marker);
                     }
                     catch (Exception ex)
                     {
@@ -785,9 +794,9 @@ namespace TxtAIEditor.Controls
 
                 if (hasError) return;
 
-                // 모든 chunk 완료 — 마커 줄 제거 후 최종 파일 저장
+                // 모든 chunk 완료 — 모든 마커 제거 후 최종 파일 저장
                 string finalContent = await File.ReadAllTextAsync(outputPath);
-                await File.WriteAllTextAsync(outputPath, StripProgressMarker(finalContent));
+                await File.WriteAllTextAsync(outputPath, StripAllProgressMarkers(finalContent));
 
                 string completeMsg = string.Format(
                     _getString("LlmTranslateComplete", "{0} 완료. {1} 로 저장하였습니다."),
