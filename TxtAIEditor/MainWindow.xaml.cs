@@ -97,6 +97,25 @@ namespace TxtAIEditor
                 {
                     _currentFolderPath = value;
                     UpdateAutoSaveStatus();
+                    UpdateAllTabWorkspaceIndicators();
+                }
+            }
+        }
+
+        private void UpdateAllTabWorkspaceIndicators()
+        {
+            var folderPath = _currentFolderPath;
+            UpdateTabViewWorkspaceIndicators(EditorTabView, folderPath);
+            UpdateTabViewWorkspaceIndicators(EditorTabView2, folderPath);
+        }
+
+        private static void UpdateTabViewWorkspaceIndicators(TabView tabView, string folderPath)
+        {
+            foreach (var item in tabView.TabItems)
+            {
+                if (item is TabViewItem tabItem && tabItem.Header is TabHeaderControl header)
+                {
+                    header.SetWorkspaceFolderPath(folderPath);
                 }
             }
         }
@@ -892,7 +911,8 @@ namespace TxtAIEditor
                 settings.UiFontFamily,
                 GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
                 _tabEncryptionController.ShowMenu,
-                (tabItem, args) => ShowTabContextMenu(tab, tabItem, targetTabView, tabItem, args));
+                (tabItem, args) => ShowTabContextMenu(tab, tabItem, targetTabView, tabItem, args),
+                _currentFolderPath);
             _tabBridges[tab.Id] = (tabParts.WebView, tabParts.Bridge);
 
             WireEditorBridge(tabParts.Bridge, tabParts.WebView, tabParts.LoadCover, tab, tabParts.TabItem, session, isReadOnly);
@@ -969,7 +989,8 @@ namespace TxtAIEditor
                 settings.UiFontFamily,
                 GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
                 _tabEncryptionController.ShowMenu,
-                (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args));
+                (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args),
+                _currentFolderPath);
 
             _pdfViewerWebViews[tab.Id] = tabParts.WebView;
             tabParts.WebView.CoreWebView2Initialized += (_, _) => ConfigurePdfViewer(tab, tabParts.WebView);
@@ -1020,7 +1041,8 @@ namespace TxtAIEditor
                 settings.UiFontFamily,
                 GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
                 _tabEncryptionController.ShowMenu,
-                (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args));
+                (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args),
+                _currentFolderPath);
 
             EditorWorkspace.DisableTabItemTransitions();
             targetTabView.TabItems.Add(tabItem);

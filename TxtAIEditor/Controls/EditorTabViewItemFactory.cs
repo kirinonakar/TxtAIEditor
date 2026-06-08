@@ -26,7 +26,8 @@ namespace TxtAIEditor.Controls
             string? uiFontFamily,
             string encryptedTooltip,
             Action<OpenedTab, FrameworkElement, RightTappedRoutedEventArgs> showEncryptionMenu,
-            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu)
+            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu,
+            string? workspaceFolderPath = null)
         {
             var editorWebView = new WebView2
             {
@@ -54,7 +55,7 @@ namespace TxtAIEditor.Controls
             editorHost.Children.Add(editorLoadCover);
 
             var tabHeader = new TabHeaderControl();
-            tabHeader.Configure(tab, encryptedTooltip);
+            tabHeader.Configure(tab, encryptedTooltip, workspaceFolderPath);
             tabHeader.EncryptionMenuRequested += (_, args) =>
                 showEncryptionMenu(args.Tab, args.Target, args.RoutedArgs);
 
@@ -80,7 +81,8 @@ namespace TxtAIEditor.Controls
             string? uiFontFamily,
             string encryptedTooltip,
             Action<OpenedTab, FrameworkElement, RightTappedRoutedEventArgs> showEncryptionMenu,
-            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu)
+            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu,
+            string? workspaceFolderPath = null)
         {
             var image = new Image
             {
@@ -97,7 +99,7 @@ namespace TxtAIEditor.Controls
             imageHost.Children.Add(image);
 
             var tabHeader = new TabHeaderControl();
-            tabHeader.Configure(tab, encryptedTooltip);
+            tabHeader.Configure(tab, encryptedTooltip, workspaceFolderPath);
             tabHeader.EncryptionMenuRequested += (_, args) =>
                 showEncryptionMenu(args.Tab, args.Target, args.RoutedArgs);
 
@@ -122,7 +124,8 @@ namespace TxtAIEditor.Controls
             string? uiFontFamily,
             string encryptedTooltip,
             Action<OpenedTab, FrameworkElement, RightTappedRoutedEventArgs> showEncryptionMenu,
-            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu)
+            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu,
+            string? workspaceFolderPath = null)
         {
             var pdfWebView = new WebView2
             {
@@ -140,7 +143,7 @@ namespace TxtAIEditor.Controls
             pdfHost.Children.Add(pdfWebView);
 
             var tabHeader = new TabHeaderControl();
-            tabHeader.Configure(tab, encryptedTooltip);
+            tabHeader.Configure(tab, encryptedTooltip, workspaceFolderPath);
             tabHeader.EncryptionMenuRequested += (_, args) =>
                 showEncryptionMenu(args.Tab, args.Target, args.RoutedArgs);
 
