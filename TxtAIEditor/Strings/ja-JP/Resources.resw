@@ -1542,6 +1542,9 @@
   <data name="AgentActivityOverwriteFileFormat" xml:space="preserve">
     <value>ファイルの上書き中: {0}</value>
   </data>
+  <data name="AgentActivityAppendFileFormat" xml:space="preserve">
+    <value>ファイルに追加中: {0}</value>
+  </data>
   <data name="AgentActivityInsertText" xml:space="preserve">
     <value>現在のエディタに入力中</value>
   </data>
@@ -1717,6 +1720,9 @@
   </data>
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
     <value>ファイルを読み込みました: {0}</value>
+  </data>
+  <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
+    <value>ファイルに内容を追加しました: {0}</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
     <value>フォルダを読み込みました: {0}</value>

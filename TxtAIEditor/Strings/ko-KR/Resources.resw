@@ -1541,6 +1541,9 @@
   <data name="AgentActivityOverwriteFileFormat" xml:space="preserve">
     <value>파일 덮어쓰는 중: {0}</value>
   </data>
+  <data name="AgentActivityAppendFileFormat" xml:space="preserve">
+    <value>파일 덧붙이는 중: {0}</value>
+  </data>
   <data name="AgentActivityInsertText" xml:space="preserve">
     <value>현재 편집기에 입력 중</value>
   </data>
@@ -1716,6 +1719,9 @@
   </data>
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
     <value>파일을 읽었습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
+    <value>파일에 내용을 덧붙였습니다: {0}</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
     <value>폴더를 읽었습니다: {0}</value>

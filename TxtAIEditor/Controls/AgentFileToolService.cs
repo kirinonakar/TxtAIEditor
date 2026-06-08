@@ -811,6 +811,54 @@ namespace TxtAIEditor.Controls
             return $"overwritten: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
 
+        public async Task<string> AppendToFileAsync(string path, string content)
+        {
+            string fullPath = ResolveInsideWorkspace(path);
+            string rawText = File.Exists(fullPath)
+                ? await File.ReadAllTextAsync(fullPath)
+                : string.Empty;
+            string lineEnding = DetectLineEnding(rawText);
+            
+            string oldContent = NormalizeNewlines(rawText);
+            string newContent = oldContent;
+            if (!string.IsNullOrEmpty(oldContent) && !oldContent.EndsWith("\n"))
+            {
+                newContent += "\n";
+            }
+            newContent += NormalizeNewlines(content);
+
+            bool isNewFile = !File.Exists(fullPath);
+            if (!isNewFile && string.Equals(newContent, oldContent, StringComparison.Ordinal))
+            {
+                return BuildUnchangedEditResult("append_to_file", fullPath);
+            }
+ 
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "append_to_file",
+                RelativePath = RelativePath(ResolveWorkspaceRoot(), fullPath),
+                FullPath = fullPath,
+                OldContent = oldContent,
+                NewContent = newContent,
+                IsNewFile = isNewFile
+            };
+ 
+            if (!await ConfirmEditAsync(preview))
+            {
+                return $"append_to_file cancelled: {path}";
+            }
+ 
+            string? dir = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+ 
+            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(newContent, lineEnding));
+            await NotifyFileModifiedAsync(fullPath);
+            return $"appended: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
+        }
+
         private string BuildUnchangedEditResult(string toolName, string fullPath)
         {
             return $"{toolName} unchanged: {RelativePath(ResolveWorkspaceRoot(), fullPath)} requested change is already applied; no additional edit was needed.";

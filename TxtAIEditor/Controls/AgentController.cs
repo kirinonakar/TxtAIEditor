@@ -733,6 +733,11 @@ namespace TxtAIEditor.Controls
                             string path = GetStringArgument(arguments, "path");
                             displayResult = string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
                         }
+                        else if (normalizedName == "append_to_file")
+                        {
+                            string path = GetEditPathArgument(arguments);
+                            displayResult = string.Format(_getString("AgentVerboseAppendFileOnly", "파일에 내용을 덧붙였습니다: {0}"), path);
+                        }
                         else if (normalizedName == "list_files")
                         {
                             string glob = GetStringArgument(arguments, "glob");
@@ -783,7 +788,7 @@ namespace TxtAIEditor.Controls
 
                     string verifyToolName = NormalizeToolName(toolName);
                     bool isFileEditTool = verifyToolName is "replace_in_file" or "replace_range"
-                        or "apply_patch" or "overwrite_file";
+                        or "apply_patch" or "overwrite_file" or "append_to_file";
                     if (isFileEditTool && IsUnchangedEditCompletionResult(toolResult))
                     {
                         string completeMsg = _getString(
@@ -1317,6 +1322,7 @@ namespace TxtAIEditor.Controls
                             GetIntArgument(arguments, "lineCount", 160)),
                         "create_file" => await CreateFileToolAsync(arguments),
                         "overwrite_file" => await OverwriteFileToolAsync(arguments),
+                        "append_to_file" => await AppendToFileToolAsync(arguments),
                         "replace_range" => await ReplaceRangeToolAsync(arguments),
                         "apply_patch" => await ApplyPatchToolAsync(arguments),
                         "insert_text" => await InsertTextToolAsync(
@@ -1409,6 +1415,9 @@ namespace TxtAIEditor.Controls
                     GetEditPathArgument(arguments)),
                 "overwrite_file" => string.Format(
                     _getString("AgentActivityOverwriteFileFormat", "파일 덮어쓰는 중: {0}"),
+                    GetEditPathArgument(arguments)),
+                "append_to_file" => string.Format(
+                    _getString("AgentActivityAppendFileFormat", "파일 덧붙이는 중: {0}"),
                     GetEditPathArgument(arguments)),
                 "insert_text" => _getString("AgentActivityInsertText", "현재 편집기에 입력 중"),
                 "create_tab" => string.Format(
@@ -2054,6 +2063,7 @@ namespace TxtAIEditor.Controls
                 or "overwrite_file"
                 or "replace_in_file"
                 or "replace_range"
+                or "append_to_file"
                 or "apply_patch"
                 or "insert_text"
                 or "web_search_exa"
@@ -2069,7 +2079,8 @@ namespace TxtAIEditor.Controls
                 or "replace_range"
                 or "apply_patch"
                 or "insert_text"
-                or "create_tab";
+                or "create_tab"
+                or "append_to_file";
         }
 
         private static void ClearCachedToolResults(Dictionary<string, string> toolResults, string normalizedToolName)
@@ -2145,7 +2156,8 @@ namespace TxtAIEditor.Controls
             return normalizedToolName is "overwrite_file"
                 or "replace_in_file"
                 or "replace_range"
-                or "apply_patch";
+                or "apply_patch"
+                or "append_to_file";
         }
 
         private bool PathsReferToSameFile(string path, string selectionPath)
@@ -2342,7 +2354,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (normalizedToolName is not ("read_file" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file"))
+            if (normalizedToolName is not ("read_file" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file"))
             {
                 return;
             }
@@ -2468,6 +2480,9 @@ namespace TxtAIEditor.Controls
                 "replace" => "replace_in_file",
                 "edit_file" => "replace_in_file",
                 "write_file" => "overwrite_file",
+                "append" => "append_to_file",
+                "append_file" => "append_to_file",
+                "append_to_file" => "append_to_file",
                 "write_text" => "overwrite_file",
                 "insert" => "insert_text",
                 "insert_into_editor" => "insert_text",
@@ -2547,6 +2562,19 @@ namespace TxtAIEditor.Controls
             }
 
             return await _fileTools.OverwriteFileAsync(
+                path,
+                GetFirstStringArgument(arguments, "content", "newText", "new_text", "text"));
+        }
+
+        private async Task<string> AppendToFileToolAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "append_to_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            return await _fileTools.AppendToFileAsync(
                 path,
                 GetFirstStringArgument(arguments, "content", "newText", "new_text", "text"));
         }
