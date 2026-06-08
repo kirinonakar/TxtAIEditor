@@ -554,7 +554,7 @@ namespace TxtAIEditor.Controls
                 var results = new List<string>();
                 bool hasError = false;
 
-                string progressFormat = _getString("LlmChunkProgressFormat", "{0} 진행 중: {1}/{2} 청크 완료");
+                string progressFormat = _getString("LlmChunkProgressFormat", "{0} 진행 중: {1}/{2} 청크 진행중...");
 
                 for (int i = 0; i < totalChunks; i++)
                 {
@@ -679,7 +679,7 @@ namespace TxtAIEditor.Controls
                 _rightSidebar.RightTabs.SelectedIndex = 1;
 
                 string actionName = _getString("LlmActionTranslate", "번역");
-                string progressFormat = _getString("LlmChunkProgressFormat", "{0} 진행 중: {1}/{2} 청크 완료");
+                string progressFormat = _getString("LlmChunkProgressFormat", "{0} 진행 중: {1}/{2} 청크 진행중...");
 
                 string outputPath = GetOutputFilePath("_translation");
                 string? dir = Path.GetDirectoryName(outputPath);
@@ -697,12 +697,11 @@ namespace TxtAIEditor.Controls
                         int markerChunkIndex = TryReadProgressMarker(existingContent, totalChunks);
                         if (markerChunkIndex >= 0 && markerChunkIndex + 1 < totalChunks)
                         {
-                            // 마커가 있으면 그 다음 chunk부터 이어서 시작
-                            // 마커 줄을 제거하여 다음 append와 충돌 방지
-                            string stripped = StripProgressMarker(existingContent);
-                            await File.WriteAllTextAsync(outputPath, stripped);
                             startChunkIndex = markerChunkIndex + 1;
                             isResuming = true;
+                            // 마커를 그대로 유지한다. resume 후 첫 chunk가 완료되면
+                            // 그때 이전 마커를 새 내용+새 마커로 교체하여,
+                            // 중간에 중단되어도 마커가 사라지지 않도록 한다.
                         }
                     }
                 }
@@ -747,9 +746,19 @@ namespace TxtAIEditor.Controls
 
                         // chunk 완료 후 즉시 번역문 저장, 그 뒤에 진행 마커 기록
                         bool isFirstWrite = (i == 0 && !isResuming);
-                        string translationToAppend = isFirstWrite ? translated : "\n" + translated;
-                        string marker = BuildProgressMarker(i, totalChunks);
-                        await File.AppendAllTextAsync(outputPath, translationToAppend + marker);
+                        if (isResuming && i == startChunkIndex)
+                        {
+                            // resume 후 첫 chunk: 파일 끝의 이전 마커를 새 내용+새 마커로 교체
+                            string existingContent = await File.ReadAllTextAsync(outputPath);
+                            string stripped = StripProgressMarker(existingContent);
+                            await File.WriteAllTextAsync(outputPath, stripped + "\n" + translated + BuildProgressMarker(i, totalChunks));
+                        }
+                        else
+                        {
+                            string translationToAppend = isFirstWrite ? translated : "\n" + translated;
+                            string marker = BuildProgressMarker(i, totalChunks);
+                            await File.AppendAllTextAsync(outputPath, translationToAppend + marker);
+                        }
                     }
                     catch (Exception ex)
                     {

@@ -673,7 +673,7 @@
     <value>中断</value>
   </data>
   <data name="LlmChunkProgressFormat" xml:space="preserve">
-    <value>{0} 進行中: {1}/{2} チャンク完了</value>
+    <value>{0} 進行中: {1}/{2} チャンク進行中...</value>
   </data>
   <data name="LlmFileContextDisplayFormat" xml:space="preserve">
     <value>{0} · 約 {1:N0} トークン</value>

@@ -672,7 +672,7 @@
     <value>Cancel</value>
   </data>
   <data name="LlmChunkProgressFormat" xml:space="preserve">
-    <value>{0} in progress: {1}/{2} chunks completed</value>
+    <value>{0} in progress: {1}/{2} chunks...</value>
   </data>
   <data name="LlmFileContextDisplayFormat" xml:space="preserve">
     <value>{0} · Approx. {1:N0} tokens</value>
