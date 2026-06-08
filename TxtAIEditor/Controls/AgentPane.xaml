@@ -436,7 +436,7 @@
                 </Grid.RowDefinitions>
                 <Button x:Name="AgentPresetButton"
                         Grid.Row="0"
-                        Content="+"
+                        Content="&#x2795;"
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         MinHeight="0"
