@@ -64,7 +64,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- run_powershell: run a real, non-destructive PowerShell command from the workspace root. Only the command argument is PowerShell.");
             builder.AppendLine("- run_powershell is read-only by default.");
             builder.AppendLine("- Prefer internal tools over PowerShell.");
-            builder.AppendLine("- Use run_powershell only for inspection commands such as Get-ChildItem, Get-Content, Select-String, git status, git diff, dotnet build, or dotnet test.");
+            builder.AppendLine("- Use run_powershell only for inspection commands such as Get-ChildItem, Get-Content, Select-String, git status, git diff");
             builder.AppendLine("- Never use PowerShell to create, delete, overwrite, move, rename, download, install, execute downloaded scripts, change permissions, change git history, or modify system settings unless the user explicitly asks.");
             builder.AppendLine("- Valid PowerShell examples: {\"command\":\"Get-ChildItem -Recurse -Filter *.cs | Select-Object -First 20\",\"timeoutMs\":10000}");
             builder.AppendLine("- Valid PowerShell examples: {\"command\":\"Select-String -Path TxtAIEditor\\\\**\\\\*.cs -Pattern \\\"AgentController\\\"\",\"timeoutMs\":10000}");
@@ -130,9 +130,9 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- Do not ask clarifying questions when the selection source path and line range provide enough information to inspect and perform the requested selected-range edit.");
             builder.AppendLine("- Prefer concrete edits over vague advice. For code, preserve existing style and minimize unrelated changes.");
             builder.AppendLine("- For multi-step work, present a short checklist and then the result or patch.");
-            builder.AppendLine("- Before reading or processing any file, always check its size or total line count first (e.g., by calling read_file with lineCount: 1 to inspect the total line count in the header, or by running a PowerShell command like Get-Item). Never read a large amount of lines before you know the file's scale.");
+            builder.AppendLine("- Before reading an entire file or a large segment, check the file size or total line count first. For a known small selected range or a targeted line window, read that range directly.");
             builder.AppendLine("- For very large files, avoid reading the whole file at once. Use search tools (like search_text, run_rg) first to locate target line numbers, then read only the needed segment using read_file. If you need to read more, you can query subsequent parts by adjusting startLine and lineCount (which supports up to 5000 lines).");
-            builder.AppendLine("- For translation or summarization tasks on large files (e.g., over 200 lines), split the file into chunks of 200 lines using split_file (with linesPerFile = 200), translate/summarize each chunk file individually, and then merge the processed chunk files back into a single output file using merge_files.");
+            builder.AppendLine("- For large translation or summarization tasks, process the file in read windows unless the user explicitly asked to create output files. Use split_file/merge_files only when the user requests file output.");
             builder.AppendLine("- When analyzing, processing, or modifying a file, ensure you read all relevant parts of the file. If a file is small (under 5000 lines), you can read it entirely in one read_file call by setting a larger lineCount. If the tool output indicates there are more lines (e.g., '[... more lines ...]') and you need that content to complete the task, you MUST make subsequent read_file calls to read the rest of the file before giving your final answer.");
             builder.AppendLine("- Do not use file-writing tools unless the user asked you to create or modify files.");
             builder.AppendLine("- File-writing tools show the user a diff confirmation dialog before changes are applied.");
