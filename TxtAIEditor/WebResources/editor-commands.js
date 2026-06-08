@@ -454,61 +454,79 @@ function offsetFromPointInElement(element, clientX, clientY, referenceRect = nul
     return bestOffset;
 }
 
-function moveCaretVertical(element, direction) {
+function moveCaretVertical(element, direction, extendSelection = false) {
     if (!element || element.getAttribute('contenteditable') !== 'true') return false;
 
     const lineNumber = Number(element.dataset.line || state.currentLine || 1);
     const text = lineTextFromElement(element);
     const caret = Math.max(0, Math.min(getCaretOffset(element), text.length));
+
+    const anchor = extendSelection
+        ? (state.selectionAnchor || { line: lineNumber, column: caret })
+        : null;
+
+    let target = null;
+
     const caretRect = caretRectForOffset(element, caret);
     if (!caretRect) {
-        state.selection = null;
-        syncCustomSelectionClass();
         if (direction < 0 && lineNumber > 1) {
             const prevText = state.cache.get(lineNumber - 1) || '';
-            focusLine(lineNumber - 1, Math.min(caret, prevText.length));
-            return true;
-        }
-        if (direction > 0 && lineNumber < state.lineCount) {
+            target = { line: lineNumber - 1, column: Math.min(caret, prevText.length) };
+        } else if (direction > 0 && lineNumber < state.lineCount) {
             const nextText = state.cache.get(lineNumber + 1) || '';
-            focusLine(lineNumber + 1, Math.min(caret, nextText.length));
-            return true;
+            target = { line: lineNumber + 1, column: Math.min(caret, nextText.length) };
         }
-        return false;
+    } else {
+        const elementRect = element.getBoundingClientRect();
+        const styles = window.getComputedStyle(element);
+        const parsedLineHeight = Number.parseFloat(styles.lineHeight);
+        const lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || state.lineHeight));
+        const targetX = Math.max(elementRect.left + 1, Math.min(caretRect.left, elementRect.right - 1));
+        const targetY = direction < 0
+            ? caretRect.top - lineStep / 2
+            : caretRect.bottom + lineStep / 2;
+
+        if (targetY >= elementRect.top && targetY <= elementRect.bottom) {
+            const targetColumn = offsetFromPointInElement(element, targetX, targetY, caretRect, direction, lineStep);
+            if (targetColumn !== null) {
+                target = { line: lineNumber, column: targetColumn };
+            }
+        }
+
+        if (!target) {
+            if (direction < 0 && lineNumber > 1) {
+                const prevText = state.cache.get(lineNumber - 1) || '';
+                target = { line: lineNumber - 1, column: Math.min(caret, prevText.length) };
+            } else if (direction > 0 && lineNumber < state.lineCount) {
+                const nextText = state.cache.get(lineNumber + 1) || '';
+                target = { line: lineNumber + 1, column: Math.min(caret, nextText.length) };
+            }
+        }
     }
 
-    const elementRect = element.getBoundingClientRect();
-    const styles = window.getComputedStyle(element);
-    const parsedLineHeight = Number.parseFloat(styles.lineHeight);
-    const lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || state.lineHeight));
-    const targetX = Math.max(elementRect.left + 1, Math.min(caretRect.left, elementRect.right - 1));
-    const targetY = direction < 0
-        ? caretRect.top - lineStep / 2
-        : caretRect.bottom + lineStep / 2;
-
-    if (targetY >= elementRect.top && targetY <= elementRect.bottom) {
-        const targetColumn = offsetFromPointInElement(element, targetX, targetY, caretRect, direction, lineStep);
-        if (targetColumn !== null) {
-            state.selection = null;
+    if (target) {
+        if (extendSelection) {
+            state.selectionAnchor = anchor;
+            state.selection = (anchor.line === target.line && anchor.column === target.column)
+                ? null
+                : { start: anchor, end: target };
+            state.currentLine = target.line;
+            state.currentColumn = target.column + 1;
             syncCustomSelectionClass();
-            state.selectionAnchor = { line: lineNumber, column: targetColumn };
-            state.currentLine = lineNumber;
-            state.currentColumn = targetColumn + 1;
-            setCaret(element, targetColumn);
-            return true;
+            queueRender(true);
+            setTimeout(() => focusLine(target.line, target.column), 0);
+        } else {
+            state.selection = null;
+            state.selectionAnchor = { line: target.line, column: target.column };
+            state.currentLine = target.line;
+            state.currentColumn = target.column + 1;
+            syncCustomSelectionClass();
+            if (target.line === lineNumber) {
+                setCaret(element, target.column);
+            } else {
+                focusLine(target.line, target.column);
+            }
         }
-    }
-
-    state.selection = null;
-    syncCustomSelectionClass();
-    if (direction < 0 && lineNumber > 1) {
-        const prevText = state.cache.get(lineNumber - 1) || '';
-        focusLine(lineNumber - 1, Math.min(caret, prevText.length));
-        return true;
-    }
-    if (direction > 0 && lineNumber < state.lineCount) {
-        const nextText = state.cache.get(lineNumber + 1) || '';
-        focusLine(lineNumber + 1, Math.min(caret, nextText.length));
         return true;
     }
 

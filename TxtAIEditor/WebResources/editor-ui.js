@@ -1747,13 +1747,13 @@ document.addEventListener('keydown', event => {
 
     if (event.key === 'ArrowUp') {
         event.preventDefault();
-        moveCaretVertical(element, -1);
+        moveCaretVertical(element, -1, event.shiftKey);
         return;
     }
 
     if (event.key === 'ArrowDown') {
         event.preventDefault();
-        moveCaretVertical(element, 1);
+        moveCaretVertical(element, 1, event.shiftKey);
         return;
     }
 
