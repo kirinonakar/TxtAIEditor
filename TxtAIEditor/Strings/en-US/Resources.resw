@@ -572,6 +572,42 @@
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>Select file encoding</value>
   </data>
+  <data name="StatusImageViewer" xml:space="preserve">
+    <value>Image</value>
+  </data>
+  <data name="EncodingChangeTitle" xml:space="preserve">
+    <value>Encoding Change</value>
+  </data>
+  <data name="EncodingChangeContentFormat" xml:space="preserve">
+    <value>Change the encoding of the currently open file to '{0}'?
+
+- Convert: Keep the current text and convert the file encoding format.
+- Reopen: Reload the saved file with this encoding.{1}</value>
+  </data>
+  <data name="EncodingChangeConvert" xml:space="preserve">
+    <value>Convert</value>
+  </data>
+  <data name="EncodingChangeReopen" xml:space="preserve">
+    <value>Reopen</value>
+  </data>
+  <data name="EncodingChangeCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="EncodingChangeDirtyWarning" xml:space="preserve">
+    <value>&#10;&#10;(Note: Choosing 'Reopen' will lose unsaved changes!)</value>
+  </data>
+  <data name="LineEndingChangeTitle" xml:space="preserve">
+    <value>Line Ending Change</value>
+  </data>
+  <data name="LineEndingChangeContentFormat" xml:space="preserve">
+    <value>Convert the line ending of the currently open file to '{0}'?</value>
+  </data>
+  <data name="LineEndingChangeConvert" xml:space="preserve">
+    <value>Convert</value>
+  </data>
+  <data name="LineEndingChangeCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
   <data name="LivePreviewTabHeader" xml:space="preserve">
     <value>Live Preview</value>
   </data>

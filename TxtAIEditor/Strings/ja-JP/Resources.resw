@@ -573,6 +573,42 @@
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>ファイルエンコーディングを選択</value>
   </data>
+  <data name="StatusImageViewer" xml:space="preserve">
+    <value>画像</value>
+  </data>
+  <data name="EncodingChangeTitle" xml:space="preserve">
+    <value>エンコーディング変更</value>
+  </data>
+  <data name="EncodingChangeContentFormat" xml:space="preserve">
+    <value>現在開いているファイルのエンコーディングを '{0}' に変更しますか？
+
+- 変換: 現在編集中のテキストを維持し、ファイルのエンコーディング形式を変換して保存します。
+- 再読み込み: 保存されているファイルをこのエンコーディングで再読み込みします。{1}</value>
+  </data>
+  <data name="EncodingChangeConvert" xml:space="preserve">
+    <value>変換</value>
+  </data>
+  <data name="EncodingChangeReopen" xml:space="preserve">
+    <value>再読み込み</value>
+  </data>
+  <data name="EncodingChangeCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="EncodingChangeDirtyWarning" xml:space="preserve">
+    <value>&#10;&#10;(注意: '再読み込み' を選択すると保存していない変更は失われます!)</value>
+  </data>
+  <data name="LineEndingChangeTitle" xml:space="preserve">
+    <value>改行コード変更</value>
+  </data>
+  <data name="LineEndingChangeContentFormat" xml:space="preserve">
+    <value>現在開いているファイルの改行コードを '{0}' に変換しますか？</value>
+  </data>
+  <data name="LineEndingChangeConvert" xml:space="preserve">
+    <value>変換</value>
+  </data>
+  <data name="LineEndingChangeCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
   <data name="LivePreviewTabHeader" xml:space="preserve">
     <value>リアルタイムプレビュー</value>
   </data>
