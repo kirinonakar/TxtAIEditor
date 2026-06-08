@@ -1544,6 +1544,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityAppendFileFormat" xml:space="preserve">
     <value>Appending to file: {0}</value>
   </data>
+  <data name="AgentActivityMergeFilesFormat" xml:space="preserve">
+    <value>Merging files: {0}</value>
+  </data>
+  <data name="AgentActivitySplitFileFormat" xml:space="preserve">
+    <value>Splitting file: {0}</value>
+  </data>
   <data name="AgentActivityInsertText" xml:space="preserve">
     <value>Inserting into current editor</value>
   </data>
@@ -1722,6 +1728,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
     <value>Appended content to file: {0}</value>
+  </data>
+  <data name="AgentVerboseMergeFilesOnly" xml:space="preserve">
+    <value>Merged files into: {0}</value>
+  </data>
+  <data name="AgentVerboseSplitFileOnly" xml:space="preserve">
+    <value>Split file: {0}</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
     <value>Read directory: {0}</value>

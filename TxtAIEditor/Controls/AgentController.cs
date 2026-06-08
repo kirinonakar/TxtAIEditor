@@ -738,6 +738,16 @@ namespace TxtAIEditor.Controls
                             string path = GetEditPathArgument(arguments);
                             displayResult = string.Format(_getString("AgentVerboseAppendFileOnly", "파일에 내용을 덧붙였습니다: {0}"), path);
                         }
+                        else if (normalizedName == "merge_files")
+                        {
+                            string target = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
+                            displayResult = string.Format(_getString("AgentVerboseMergeFilesOnly", "파일들을 합쳤습니다: {0}"), target);
+                        }
+                        else if (normalizedName == "split_file")
+                        {
+                            string source = GetEditPathArgument(arguments);
+                            displayResult = string.Format(_getString("AgentVerboseSplitFileOnly", "파일을 분리했습니다: {0}"), source);
+                        }
                         else if (normalizedName == "list_files")
                         {
                             string glob = GetStringArgument(arguments, "glob");
@@ -1323,6 +1333,8 @@ namespace TxtAIEditor.Controls
                         "create_file" => await CreateFileToolAsync(arguments),
                         "overwrite_file" => await OverwriteFileToolAsync(arguments),
                         "append_to_file" => await AppendToFileToolAsync(arguments),
+                        "merge_files" => await MergeFilesToolAsync(arguments),
+                        "split_file" => await SplitFileToolAsync(arguments),
                         "replace_range" => await ReplaceRangeToolAsync(arguments),
                         "apply_patch" => await ApplyPatchToolAsync(arguments),
                         "insert_text" => await InsertTextToolAsync(
@@ -1418,6 +1430,12 @@ namespace TxtAIEditor.Controls
                     GetEditPathArgument(arguments)),
                 "append_to_file" => string.Format(
                     _getString("AgentActivityAppendFileFormat", "파일 덧붙이는 중: {0}"),
+                    GetEditPathArgument(arguments)),
+                "merge_files" => string.Format(
+                    _getString("AgentActivityMergeFilesFormat", "파일 합치는 중: {0}"),
+                    GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target")),
+                "split_file" => string.Format(
+                    _getString("AgentActivitySplitFileFormat", "파일 분리하는 중: {0}"),
                     GetEditPathArgument(arguments)),
                 "insert_text" => _getString("AgentActivityInsertText", "현재 편집기에 입력 중"),
                 "create_tab" => string.Format(
@@ -2064,6 +2082,8 @@ namespace TxtAIEditor.Controls
                 or "replace_in_file"
                 or "replace_range"
                 or "append_to_file"
+                or "merge_files"
+                or "split_file"
                 or "apply_patch"
                 or "insert_text"
                 or "web_search_exa"
@@ -2080,7 +2100,9 @@ namespace TxtAIEditor.Controls
                 or "apply_patch"
                 or "insert_text"
                 or "create_tab"
-                or "append_to_file";
+                or "append_to_file"
+                or "merge_files"
+                or "split_file";
         }
 
         private static void ClearCachedToolResults(Dictionary<string, string> toolResults, string normalizedToolName)
@@ -2157,7 +2179,9 @@ namespace TxtAIEditor.Controls
                 or "replace_in_file"
                 or "replace_range"
                 or "apply_patch"
-                or "append_to_file";
+                or "append_to_file"
+                or "merge_files"
+                or "split_file";
         }
 
         private bool PathsReferToSameFile(string path, string selectionPath)
@@ -2354,14 +2378,22 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (normalizedToolName is not ("read_file" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file"))
+            if (normalizedToolName is not ("read_file" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
             {
                 return;
             }
 
-            string path = normalizedToolName == "read_file"
-                ? GetPathArgument(arguments)
-                : GetEditPathArgument(arguments);
+            string path;
+            if (normalizedToolName == "merge_files")
+            {
+                path = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
+            }
+            else
+            {
+                path = normalizedToolName == "read_file"
+                    ? GetPathArgument(arguments)
+                    : GetEditPathArgument(arguments);
+            }
 
             if (!string.IsNullOrWhiteSpace(path))
             {
@@ -2483,6 +2515,12 @@ namespace TxtAIEditor.Controls
                 "append" => "append_to_file",
                 "append_file" => "append_to_file",
                 "append_to_file" => "append_to_file",
+                "merge" => "merge_files",
+                "merge_file" => "merge_files",
+                "merge_files" => "merge_files",
+                "split" => "split_file",
+                "split_file" => "split_file",
+                "split_files" => "split_file",
                 "write_text" => "overwrite_file",
                 "insert" => "insert_text",
                 "insert_into_editor" => "insert_text",
@@ -2577,6 +2615,113 @@ namespace TxtAIEditor.Controls
             return await _fileTools.AppendToFileAsync(
                 path,
                 GetFirstStringArgument(arguments, "content", "newText", "new_text", "text"));
+        }
+
+        private async Task<string> MergeFilesToolAsync(JsonElement arguments)
+        {
+            string targetPath = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
+            if (string.IsNullOrWhiteSpace(targetPath))
+            {
+                return "merge_files failed: targetPath is empty.";
+            }
+
+            var pathsList = new List<string>();
+            if (arguments.TryGetProperty("paths", out var pathsProp))
+            {
+                if (pathsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in pathsProp.EnumerateArray())
+                    {
+                        string p = item.GetString() ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(p))
+                        {
+                            pathsList.Add(p);
+                        }
+                    }
+                }
+                else if (pathsProp.ValueKind == JsonValueKind.String)
+                {
+                    string singlePath = pathsProp.GetString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(singlePath))
+                    {
+                        pathsList.Add(singlePath);
+                    }
+                }
+            }
+            
+            // Check other potential keys
+            if (pathsList.Count == 0 && arguments.TryGetProperty("sources", out var sourcesProp) && sourcesProp.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in sourcesProp.EnumerateArray())
+                {
+                    string p = item.GetString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(p))
+                    {
+                        pathsList.Add(p);
+                    }
+                }
+            }
+
+            if (pathsList.Count == 0 && arguments.TryGetProperty("files", out var filesProp) && filesProp.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in filesProp.EnumerateArray())
+                {
+                    string p = item.GetString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(p))
+                    {
+                        pathsList.Add(p);
+                    }
+                }
+            }
+
+            return await _fileTools.MergeFilesAsync(pathsList.ToArray(), targetPath);
+        }
+
+        private async Task<string> SplitFileToolAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "split_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            int linesPerFile = GetIntArgument(arguments, "linesPerFile", 0);
+            if (linesPerFile == 0)
+            {
+                linesPerFile = GetIntArgument(arguments, "lines_per_file", 0);
+            }
+            if (linesPerFile == 0)
+            {
+                linesPerFile = GetIntArgument(arguments, "lines", 0);
+            }
+
+            var rangesList = new List<AgentFileToolService.SplitRange>();
+            if (arguments.TryGetProperty("ranges", out var rangesProp) && rangesProp.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in rangesProp.EnumerateArray())
+                {
+                    string targetPath = GetFirstStringArgument(item, "path", "targetPath", "target_path", "file");
+                    int startLine = GetIntArgument(item, "startLine", 0);
+                    if (startLine == 0) startLine = GetIntArgument(item, "start_line", 0);
+                    
+                    int endLine = GetIntArgument(item, "endLine", 0);
+                    if (endLine == 0) endLine = GetIntArgument(item, "end_line", 0);
+                    
+                    int lineCount = GetIntArgument(item, "lineCount", 0);
+                    if (lineCount == 0) lineCount = GetIntArgument(item, "line_count", 0);
+                    if (lineCount == 0) lineCount = GetIntArgument(item, "count", 0);
+
+                    rangesList.Add(new AgentFileToolService.SplitRange
+                    {
+                        Path = targetPath,
+                        StartLine = startLine,
+                        EndLine = endLine,
+                        LineCount = lineCount
+                    });
+                }
+            }
+
+            return await _fileTools.SplitFileAsync(path, rangesList, linesPerFile);
         }
 
         private async Task<string> ReplaceRangeToolAsync(JsonElement arguments)

@@ -1544,6 +1544,12 @@
   <data name="AgentActivityAppendFileFormat" xml:space="preserve">
     <value>파일 덧붙이는 중: {0}</value>
   </data>
+  <data name="AgentActivityMergeFilesFormat" xml:space="preserve">
+    <value>파일 합치는 중: {0}</value>
+  </data>
+  <data name="AgentActivitySplitFileFormat" xml:space="preserve">
+    <value>파일 분리하는 중: {0}</value>
+  </data>
   <data name="AgentActivityInsertText" xml:space="preserve">
     <value>현재 편집기에 입력 중</value>
   </data>
@@ -1722,6 +1728,12 @@
   </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
     <value>파일에 내용을 덧붙였습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseMergeFilesOnly" xml:space="preserve">
+    <value>파일들을 합쳤습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseSplitFileOnly" xml:space="preserve">
+    <value>파일을 분리했습니다: {0}</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
     <value>폴더를 읽었습니다: {0}</value>

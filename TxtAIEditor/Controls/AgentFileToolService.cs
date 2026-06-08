@@ -859,6 +859,248 @@ namespace TxtAIEditor.Controls
             return $"appended: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
 
+        public class SplitRange
+        {
+            public string Path { get; set; } = string.Empty;
+            public int StartLine { get; set; }
+            public int EndLine { get; set; }
+            public int LineCount { get; set; }
+        }
+
+        public async Task<string> MergeFilesAsync(string[] paths, string targetPath)
+        {
+            if (paths == null || paths.Length == 0)
+            {
+                return "merge_files failed: no source paths provided.";
+            }
+            if (string.IsNullOrWhiteSpace(targetPath))
+            {
+                return "merge_files failed: targetPath is empty.";
+            }
+
+            var mergedLines = new List<string>();
+            string lineEnding = "\r\n"; // default
+            bool firstFile = true;
+
+            string targetFullPath = ResolveInsideWorkspace(targetPath);
+
+            foreach (string path in paths)
+            {
+                string fullPath = ResolveInsideWorkspace(path, allowOutside: true);
+                if (!File.Exists(fullPath))
+                {
+                    return $"merge_files failed: source file not found: {path}";
+                }
+
+                string rawText = await File.ReadAllTextAsync(fullPath);
+                if (firstFile)
+                {
+                    lineEnding = DetectLineEnding(rawText);
+                    firstFile = false;
+                }
+
+                string normalized = NormalizeNewlines(rawText);
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    mergedLines.Add(normalized);
+                }
+            }
+
+            string newContent = string.Join("\n", mergedLines);
+            string oldContent = File.Exists(targetFullPath)
+                ? NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath))
+                : string.Empty;
+
+            bool isNewFile = !File.Exists(targetFullPath);
+            if (!isNewFile && string.Equals(newContent, oldContent, StringComparison.Ordinal))
+            {
+                return BuildUnchangedEditResult("merge_files", targetFullPath);
+            }
+
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "merge_files",
+                RelativePath = RelativePath(ResolveWorkspaceRoot(), targetFullPath),
+                FullPath = targetFullPath,
+                OldContent = oldContent,
+                NewContent = newContent,
+                IsNewFile = isNewFile
+            };
+
+            if (!await ConfirmEditAsync(preview))
+            {
+                return $"merge_files cancelled: {targetPath}";
+            }
+
+            string? dir = Path.GetDirectoryName(targetFullPath);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+            await NotifyFileModifiedAsync(targetFullPath);
+            return $"merged: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)}";
+        }
+
+        public async Task<string> SplitFileAsync(string path, List<SplitRange> ranges, int linesPerFile)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "split_file failed: path is empty.";
+            }
+
+            string fullPath = ResolveInsideWorkspace(path, allowOutside: true);
+            if (!File.Exists(fullPath))
+            {
+                return BuildMissingFileMessage("split_file", path);
+            }
+
+            string rawText = await File.ReadAllTextAsync(fullPath);
+            string lineEnding = DetectLineEnding(rawText);
+            string content = NormalizeNewlines(rawText);
+            string[] lines = content.Split('\n');
+
+            var outputResults = new List<string>();
+
+            if (ranges != null && ranges.Count > 0)
+            {
+                // Split by precise ranges
+                foreach (var range in ranges)
+                {
+                    if (string.IsNullOrWhiteSpace(range.Path))
+                    {
+                        return "split_file failed: one of the ranges is missing a target path.";
+                    }
+
+                    int start = Math.Max(1, range.StartLine);
+                    int end = range.EndLine > 0 ? range.EndLine : (range.LineCount > 0 ? start + range.LineCount - 1 : lines.Length);
+                    
+                    if (start > lines.Length)
+                    {
+                        return $"split_file failed: startLine {start} is out of bounds (1-{lines.Length}).";
+                    }
+                    if (end < start)
+                    {
+                        return $"split_file failed: endLine/lineCount is invalid for range targeting {range.Path}.";
+                    }
+
+                    int endIdx = Math.Min(end, lines.Length);
+                    var rangeLines = new List<string>();
+                    for (int i = start - 1; i < endIdx; i++)
+                    {
+                        rangeLines.Add(lines[i]);
+                    }
+
+                    string newContent = string.Join("\n", rangeLines);
+                    string targetFullPath = ResolveInsideWorkspace(range.Path);
+                    string oldContent = File.Exists(targetFullPath)
+                        ? NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath))
+                        : string.Empty;
+
+                    bool isNewFile = !File.Exists(targetFullPath);
+                    if (isNewFile || !string.Equals(newContent, oldContent, StringComparison.Ordinal))
+                    {
+                        var preview = new AgentFileEditPreview
+                        {
+                            ActionName = "split_file",
+                            RelativePath = RelativePath(ResolveWorkspaceRoot(), targetFullPath),
+                            FullPath = targetFullPath,
+                            OldContent = oldContent,
+                            NewContent = newContent,
+                            IsNewFile = isNewFile
+                        };
+
+                        if (!await ConfirmEditAsync(preview))
+                        {
+                            outputResults.Add($"skipped (cancelled by user): {range.Path}");
+                            continue;
+                        }
+
+                        string? dir = Path.GetDirectoryName(targetFullPath);
+                        if (!string.IsNullOrWhiteSpace(dir))
+                        {
+                            Directory.CreateDirectory(dir);
+                        }
+
+                        await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+                        await NotifyFileModifiedAsync(targetFullPath);
+                        outputResults.Add($"created: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)} (lines {start}-{endIdx})");
+                    }
+                    else
+                    {
+                        outputResults.Add($"unchanged: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)}");
+                    }
+                }
+            }
+            else if (linesPerFile > 0)
+            {
+                // Split sequentially by line count
+                int partNumber = 1;
+                string baseDir = Path.GetDirectoryName(fullPath) ?? string.Empty;
+                string filenameWithoutExt = Path.GetFileNameWithoutExtension(fullPath);
+                string ext = Path.GetExtension(fullPath);
+
+                for (int i = 0; i < lines.Length; i += linesPerFile)
+                {
+                    int chunkCount = Math.Min(linesPerFile, lines.Length - i);
+                    var chunkLines = new List<string>();
+                    for (int j = 0; j < chunkCount; j++)
+                    {
+                        chunkLines.Add(lines[i + j]);
+                    }
+
+                    string partFileName = $"{filenameWithoutExt}_part{partNumber}{ext}";
+                    string partRelativePath = string.IsNullOrEmpty(baseDir)
+                        ? partFileName
+                        : Path.Combine(RelativePath(ResolveWorkspaceRoot(), baseDir), partFileName).Replace('\\', '/');
+
+                    string targetFullPath = ResolveInsideWorkspace(partRelativePath);
+                    string newContent = string.Join("\n", chunkLines);
+                    string oldContent = File.Exists(targetFullPath)
+                        ? NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath))
+                        : string.Empty;
+
+                    bool isNewFile = !File.Exists(targetFullPath);
+                    if (isNewFile || !string.Equals(newContent, oldContent, StringComparison.Ordinal))
+                    {
+                        var preview = new AgentFileEditPreview
+                        {
+                            ActionName = "split_file",
+                            RelativePath = partRelativePath,
+                            FullPath = targetFullPath,
+                            OldContent = oldContent,
+                            NewContent = newContent,
+                            IsNewFile = isNewFile
+                        };
+
+                        if (!await ConfirmEditAsync(preview))
+                        {
+                            outputResults.Add($"skipped (cancelled by user): {partRelativePath}");
+                            partNumber++;
+                            continue;
+                        }
+
+                        await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+                        await NotifyFileModifiedAsync(targetFullPath);
+                        outputResults.Add($"created: {partRelativePath} (lines {i + 1}-{i + chunkCount})");
+                    }
+                    else
+                    {
+                        outputResults.Add($"unchanged: {partRelativePath}");
+                    }
+
+                    partNumber++;
+                }
+            }
+            else
+            {
+                return "split_file failed: must provide either ranges or linesPerFile argument.";
+            }
+
+            return "Split results:\n" + string.Join("\n", outputResults);
+        }
+
         private string BuildUnchangedEditResult(string toolName, string fullPath)
         {
             return $"{toolName} unchanged: {RelativePath(ResolveWorkspaceRoot(), fullPath)} requested change is already applied; no additional edit was needed.";

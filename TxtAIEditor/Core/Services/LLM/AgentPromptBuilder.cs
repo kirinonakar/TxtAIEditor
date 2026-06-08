@@ -51,6 +51,8 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- apply_patch: apply a unified diff patch to a file. Extremely useful for multiple or complex code modifications. args: {\"path\":\"relative/path.cs\",\"patch\":\"unified diff...\"}");
             builder.AppendLine("- overwrite_file: overwrite a workspace file. Use only when the user explicitly requested a full rewrite. args: {\"path\":\"relative/path.cs\",\"content\":\"...\"}");
             builder.AppendLine("- append_to_file: append text content to the end of a file under the workspace root. args: {\"path\":\"relative/path.txt\",\"content\":\"...\"}");
+            builder.AppendLine("- merge_files: merge multiple text files into a single target file. args: {\"paths\":[\"part1.txt\",\"part2.txt\"],\"targetPath\":\"merged.txt\"}");
+            builder.AppendLine("- split_file: split a single text file into multiple files. You can split either precisely by line ranges or automatically by specifying linesPerFile. args: {\"path\":\"huge.txt\",\"ranges\":[{\"path\":\"part1.txt\",\"startLine\":1,\"endLine\":500},{\"path\":\"part2.txt\",\"startLine\":501,\"endLine\":1000}]} or {\"path\":\"huge.txt\",\"linesPerFile\":100}");
             builder.AppendLine("- insert_text: insert text into the active editor at the current cursor/selection. Use this when the user says to input, insert, paste, or place generated text into the editor. args: {\"content\":\"...\"}");
             builder.AppendLine("- create_tab: open a new unsaved editor tab and fill it with text. Use this when the user asks to open a new tab/window/document and input, draft, paste, or place generated text there instead of the active editor. args: {\"title\":\"optional display title.md\",\"content\":\"...\"}");
             builder.AppendLine("- web_search_exa: search the web using Exa search engine to find real-time info, news, facts, code examples, or documentation. args: {\"query\":\"search query\",\"numResults\":5}");
@@ -81,7 +83,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- If the user says 자산.csv, use exactly 자산.csv, not assets.csv. If the user says 분석2.md, create or write exactly 분석2.md.");
             builder.AppendLine("- If a [User-referenced file names] section is present, prefer the listed workspace match for reads and the exact mentioned name for requested new output files.");
             builder.AppendLine("- File-writing tools require an explicit path argument. Do not omit path and rely on the active tab.");
-            builder.AppendLine("- If you read a file with read_file and then edit that same file, copy the exact same path into replace_in_file, replace_range, apply_patch, overwrite_file, or append_to_file.");
+            builder.AppendLine("- If you read a file with read_file and then edit that same file, copy the exact same path into replace_in_file, replace_range, apply_patch, overwrite_file, append_to_file, merge_files, or split_file.");
             builder.AppendLine("- If [Active tab] has a Path and you are editing the active file, copy that Path exactly into the file-writing tool path.");
             builder.AppendLine();
             builder.AppendLine("Tool call protocol:");
@@ -89,7 +91,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("<tool_call>{\"name\":\"read_file\",\"arguments\":{\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":1,\"lineCount\":120}}</tool_call>");
             builder.AppendLine("- After the host returns a tool result, continue reasoning from that result.");
             builder.AppendLine("- If a tool result indicates success, do not repeat the same tool call with the same arguments. Continue to the next needed step or final answer.");
-            builder.AppendLine("- After any file edit (e.g. replace_in_file, replace_range, apply_patch, overwrite_file, create_file, append_to_file) or editor input (e.g. insert_text, create_tab), you must read the [Diff log of changes made in this session] section provided in the prompt.");
+            builder.AppendLine("- After any file edit (e.g. replace_in_file, replace_range, apply_patch, overwrite_file, create_file, append_to_file, merge_files, split_file) or editor input (e.g. insert_text, create_tab), you must read the [Diff log of changes made in this session] section provided in the prompt.");
             builder.AppendLine("- Carefully review the diff log to ensure that the edits conform exactly to the user's instructions and contain no errors, omissions, or syntax issues.");
             builder.AppendLine("- If the diff log shows that the changes satisfy the user's instructions, write the final answer and conclude the run (this will end the loop).");
             builder.AppendLine("- If the changes are insufficient, incorrect, or contain bugs, make additional tool calls to modify the files/tabs to correct the errors.");

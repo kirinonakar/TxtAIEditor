@@ -1545,6 +1545,12 @@
   <data name="AgentActivityAppendFileFormat" xml:space="preserve">
     <value>ファイルに追加中: {0}</value>
   </data>
+  <data name="AgentActivityMergeFilesFormat" xml:space="preserve">
+    <value>ファイルを結合中: {0}</value>
+  </data>
+  <data name="AgentActivitySplitFileFormat" xml:space="preserve">
+    <value>ファイルを分割中: {0}</value>
+  </data>
   <data name="AgentActivityInsertText" xml:space="preserve">
     <value>現在のエディタに入力中</value>
   </data>
@@ -1723,6 +1729,12 @@
   </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
     <value>ファイルに内容を追加しました: {0}</value>
+  </data>
+  <data name="AgentVerboseMergeFilesOnly" xml:space="preserve">
+    <value>ファイルを結合しました: {0}</value>
+  </data>
+  <data name="AgentVerboseSplitFileOnly" xml:space="preserve">
+    <value>ファイルを分割しました: {0}</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
     <value>フォルダを読み込みました: {0}</value>
