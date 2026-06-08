@@ -624,6 +624,39 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        // 번역 진행 마커 형식: 파일 마지막 줄에 기록되어 resume 시 정확한 chunk 인덱스 파악에 사용
+        private const string TranslationProgressMarkerPrefix = "<!-- CHUNK:";
+        private const string TranslationProgressMarkerSuffix = " -->";
+
+        private static string BuildProgressMarker(int chunkIndex, int totalChunks)
+            => $"\n{TranslationProgressMarkerPrefix}{chunkIndex + 1}/{totalChunks}{TranslationProgressMarkerSuffix}";
+
+        // 파일에서 마커를 읽어 완료된 마지막 chunk 인덱스(0-based)를 반환. 마커 없으면 -1.
+        private static int TryReadProgressMarker(string fileContent, int totalChunks)
+        {
+            int lastNewline = fileContent.LastIndexOf('\n');
+            if (lastNewline < 0) return -1;
+            string lastLine = fileContent.Substring(lastNewline + 1).Trim();
+            if (!lastLine.StartsWith(TranslationProgressMarkerPrefix, StringComparison.Ordinal)) return -1;
+            int slashIdx = lastLine.IndexOf('/', TranslationProgressMarkerPrefix.Length);
+            if (slashIdx < 0) return -1;
+            string chunkNumStr = lastLine.Substring(TranslationProgressMarkerPrefix.Length, slashIdx - TranslationProgressMarkerPrefix.Length);
+            if (!int.TryParse(chunkNumStr, out int chunkNum)) return -1;
+            if (chunkNum < 1 || chunkNum > totalChunks) return -1;
+            return chunkNum - 1; // 0-based 인덱스로 변환
+        }
+
+        // 파일에서 마커 줄을 제거한 내용을 반환
+        private static string StripProgressMarker(string fileContent)
+        {
+            int lastNewline = fileContent.LastIndexOf('\n');
+            if (lastNewline < 0) return fileContent;
+            string lastLine = fileContent.Substring(lastNewline + 1).Trim();
+            if (lastLine.StartsWith(TranslationProgressMarkerPrefix, StringComparison.Ordinal))
+                return fileContent.Substring(0, lastNewline);
+            return fileContent;
+        }
+
         private async Task ProcessChunkedTranslationAsync(string fileContext)
         {
             _assistantCts = new CancellationTokenSource();
@@ -639,16 +672,55 @@ namespace TxtAIEditor.Controls
 
                 if (totalChunks == 0) return;
 
-                _rightSidebar.LlmOutput.Text = "";
                 _rightSidebar.RightTabs.SelectedIndex = 1;
 
                 string actionName = _getString("LlmActionTranslate", "번역");
-                var results = new List<string>();
-                bool hasError = false;
-
                 string progressFormat = _getString("LlmChunkProgressFormat", "{0} 진행 중: {1}/{2} 청크 완료");
 
-                for (int i = 0; i < totalChunks; i++)
+                string outputPath = GetOutputFilePath("_translation");
+                string? dir = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                // 이전 번역 파일의 마커에서 정확한 완료 chunk 인덱스를 읽어 resume 처리
+                int startChunkIndex = 0;
+                bool isResuming = false;
+                if (File.Exists(outputPath))
+                {
+                    string existingContent = await File.ReadAllTextAsync(outputPath);
+                    if (!string.IsNullOrEmpty(existingContent))
+                    {
+                        int markerChunkIndex = TryReadProgressMarker(existingContent, totalChunks);
+                        if (markerChunkIndex >= 0 && markerChunkIndex + 1 < totalChunks)
+                        {
+                            // 마커가 있으면 그 다음 chunk부터 이어서 시작
+                            // 마커 줄을 제거하여 다음 append와 충돌 방지
+                            string stripped = StripProgressMarker(existingContent);
+                            await File.WriteAllTextAsync(outputPath, stripped);
+                            startChunkIndex = markerChunkIndex + 1;
+                            isResuming = true;
+                        }
+                    }
+                }
+
+                // 이어쓰기가 아닌 경우(처음 시작) 파일 초기화
+                if (!isResuming)
+                {
+                    await File.WriteAllTextAsync(outputPath, string.Empty);
+                }
+
+                string resumeMsg = isResuming
+                    ? string.Format(_getString("LlmTranslateResuming", "{0} 이어서 번역 중 (청크 {1}/{2}부터)..."), actionName, startChunkIndex + 1, totalChunks)
+                    : string.Format(progressFormat, actionName, 1, totalChunks);
+
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _rightSidebar.LlmOutput.Text = resumeMsg;
+                });
+
+                bool hasError = false;
+
+                for (int i = startChunkIndex; i < totalChunks; i++)
                 {
                     _assistantCts.Token.ThrowIfCancellationRequested();
 
@@ -668,13 +740,25 @@ namespace TxtAIEditor.Controls
                     try
                     {
                         string translated = await _llmService.TranslateTextAsync(chunkText, cancellationToken: _assistantCts.Token);
-                        results.Add(translated);
+
+                        // chunk 완료 후 즉시 번역문 저장, 그 뒤에 진행 마커 기록
+                        bool isFirstWrite = (i == 0 && !isResuming);
+                        string translationToAppend = isFirstWrite ? translated : "\n" + translated;
+                        string marker = BuildProgressMarker(i, totalChunks);
+                        await File.AppendAllTextAsync(outputPath, translationToAppend + marker);
                     }
                     catch (Exception ex)
                     {
                         if (ex is OperationCanceledException || _assistantCts.IsCancellationRequested)
                         {
-                            throw;
+                            string cancelledWithSaveMsg = string.Format(
+                                _getString("LlmTranslateCancelledWithSave", "작업이 중단되었습니다. 현재까지 번역된 내용이 저장되었습니다: {0}"),
+                                outputPath);
+                            _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                            {
+                                _rightSidebar.LlmOutput.Text = cancelledWithSaveMsg;
+                            });
+                            return;
                         }
                         hasError = true;
                         string errorFormat = _getString("LlmChunkErrorFormat", "청크 {0} 처리 중 오류: {1}");
@@ -686,15 +770,11 @@ namespace TxtAIEditor.Controls
                     }
                 }
 
-                if (hasError || results.Count == 0) return;
+                if (hasError) return;
 
-                string combined = string.Join("\n", results);
-                string outputPath = GetOutputFilePath("_translation");
-                string? dir = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-
-                await File.WriteAllTextAsync(outputPath, combined);
+                // 모든 chunk 완료 — 마커 줄 제거 후 최종 파일 저장
+                string finalContent = await File.ReadAllTextAsync(outputPath);
+                await File.WriteAllTextAsync(outputPath, StripProgressMarker(finalContent));
 
                 string completeMsg = string.Format(
                     _getString("LlmTranslateComplete", "{0} 완료. {1} 로 저장하였습니다."),
@@ -706,9 +786,15 @@ namespace TxtAIEditor.Controls
             }
             catch (OperationCanceledException)
             {
+                string outputPath = GetOutputFilePath("_translation");
+                string cancelMsg = File.Exists(outputPath)
+                    ? string.Format(
+                        _getString("LlmTranslateCancelledWithSave", "작업이 중단되었습니다. 현재까지 번역된 내용이 저장되었습니다: {0}"),
+                        outputPath)
+                    : _getString("LlmOperationCanceled", "작업이 중단되었습니다.");
                 _rightSidebar.DispatcherQueue.TryEnqueue(() =>
                 {
-                    _rightSidebar.LlmOutput.Text = _getString("LlmOperationCanceled", "작업이 중단되었습니다.");
+                    _rightSidebar.LlmOutput.Text = cancelMsg;
                 });
             }
             finally

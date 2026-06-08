@@ -707,6 +707,12 @@
   <data name="LlmTranslateComplete" xml:space="preserve">
     <value>{0} 완료. {1} 로 저장하였습니다.</value>
   </data>
+  <data name="LlmTranslateResuming" xml:space="preserve">
+    <value>{0} 이어서 번역 중 (청크 {1}/{2}부터)...</value>
+  </data>
+  <data name="LlmTranslateCancelledWithSave" xml:space="preserve">
+    <value>작업이 중단되었습니다. 현재까지 번역된 내용이 저장되었습니다: {0}</value>
+  </data>
   <data name="LlmChunkErrorFormat" xml:space="preserve">
     <value>청크 {0} 처리 중 오류: {1}</value>
   </data>
