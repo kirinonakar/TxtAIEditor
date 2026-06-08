@@ -180,6 +180,13 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            string fileContext = GetActiveFileContext();
+            if (!string.IsNullOrEmpty(fileContext))
+            {
+                await ProcessChunkedSummarizationAsync(fileContext);
+                return;
+            }
+
             string context = BuildLlmContext(_lastSelectionText);
             await PreflightCheckAndRunAsync(_getString("LlmActionSummarize", "선택 영역 요약 (Summarize)"), context,
                 onChunk => _llmService.SummarizeTextAsync(context, onChunk));
@@ -190,6 +197,13 @@ namespace TxtAIEditor.Controls
             if (string.IsNullOrEmpty(_lastSelectionText) && string.IsNullOrEmpty(GetActiveFileContext()))
             {
                 _showError(_getString("LlmErrorTitle", "AI 오류"), _getString("LlmNoSelectionCustom", "선택 영역이나 파일 맥락이 없습니다. 텍스트를 선택하거나 파일 맥락을 추가하십시오."));
+                return;
+            }
+
+            string fileContext = GetActiveFileContext();
+            if (!string.IsNullOrEmpty(fileContext))
+            {
+                await ProcessChunkedTranslationAsync(fileContext);
                 return;
             }
 
@@ -461,6 +475,176 @@ namespace TxtAIEditor.Controls
             }
 
             return $"{fileContext}\n\n[선택 영역]\n{selectedText}";
+        }
+
+        private static string ExtractContentFromFileContext(string fileContext)
+        {
+            int idx = fileContext.IndexOf('\n');
+            if (idx >= 0 && idx < fileContext.Length - 1)
+                return fileContext.Substring(idx + 1);
+            return fileContext;
+        }
+
+        private string GetOutputFilePath(string suffix)
+        {
+            var tab = _activeTabProvider();
+            if (tab != null && !string.IsNullOrWhiteSpace(tab.FilePath))
+            {
+                string dir = Path.GetDirectoryName(tab.FilePath) ?? ".";
+                string nameWithoutExt = Path.GetFileNameWithoutExtension(tab.FilePath);
+                return Path.Combine(dir, $"{nameWithoutExt}{suffix}.txt");
+            }
+
+            string fileContext = GetActiveFileContext();
+            string displayName = "untitled";
+            if (!string.IsNullOrEmpty(fileContext))
+            {
+                int endOfHeader = fileContext.IndexOf(']');
+                if (endOfHeader > 0)
+                {
+                    int colonIdx = fileContext.IndexOf(':');
+                    if (colonIdx > 0 && colonIdx < endOfHeader)
+                    {
+                        displayName = fileContext.Substring(colonIdx + 1, endOfHeader - colonIdx - 1).Trim();
+                        displayName = Path.GetFileNameWithoutExtension(displayName);
+                    }
+                }
+            }
+            return $"{displayName}{suffix}.txt";
+        }
+
+        private async Task ProcessChunkedSummarizationAsync(string fileContext)
+        {
+            string content = ExtractContentFromFileContext(fileContext);
+            string[] lines = content.Split('\n');
+            const int chunkSize = 500;
+            int totalChunks = (int)Math.Ceiling((double)lines.Length / chunkSize);
+
+            if (totalChunks == 0) return;
+
+            _rightSidebar.LlmOutput.Text = "";
+            _rightSidebar.RightTabs.SelectedIndex = 1;
+
+            string actionName = _getString("LlmActionSummarize", "요약");
+            var results = new List<string>();
+            bool hasError = false;
+
+            for (int i = 0; i < totalChunks; i++)
+            {
+                if (hasError) break;
+
+                int current = i + 1;
+                string progressText = $"{actionName} 진행 중: {current}/{totalChunks} 청크 완료";
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _rightSidebar.LlmOutput.Text = progressText;
+                });
+
+                int start = i * chunkSize;
+                int count = Math.Min(chunkSize, lines.Length - start);
+                string chunkText = string.Join("\n", lines, start, count);
+
+                try
+                {
+                    string summary = await _llmService.SummarizeTextAsync(chunkText);
+                    results.Add(summary);
+                }
+                catch (Exception ex)
+                {
+                    hasError = true;
+                    string errorFormat = _getString("LlmChunkErrorFormat", "청크 {0} 처리 중 오류: {1}");
+                    _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                    {
+                        _rightSidebar.LlmOutput.Text = string.Format(errorFormat, current, ex.Message);
+                    });
+                    return;
+                }
+            }
+
+            if (hasError || results.Count == 0) return;
+
+            string combined = string.Join("\n\n---\n\n", results);
+            string outputPath = GetOutputFilePath("_summary");
+            string dir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            await File.WriteAllTextAsync(outputPath, combined);
+
+            string completeMsg = string.Format(
+                _getString("LlmSummarizeComplete", "{0} 완료. {1} 로 저장하였습니다."),
+                actionName, outputPath);
+            _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+            {
+                _rightSidebar.LlmOutput.Text = completeMsg;
+            });
+        }
+
+        private async Task ProcessChunkedTranslationAsync(string fileContext)
+        {
+            string content = ExtractContentFromFileContext(fileContext);
+            string[] lines = content.Split('\n');
+            const int chunkSize = 200;
+            int totalChunks = (int)Math.Ceiling((double)lines.Length / chunkSize);
+
+            if (totalChunks == 0) return;
+
+            _rightSidebar.LlmOutput.Text = "";
+            _rightSidebar.RightTabs.SelectedIndex = 1;
+
+            string actionName = _getString("LlmActionTranslate", "번역");
+            var results = new List<string>();
+            bool hasError = false;
+
+            for (int i = 0; i < totalChunks; i++)
+            {
+                if (hasError) break;
+
+                int current = i + 1;
+                string progressText = $"{actionName} 진행 중: {current}/{totalChunks} 청크 완료";
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _rightSidebar.LlmOutput.Text = progressText;
+                });
+
+                int start = i * chunkSize;
+                int count = Math.Min(chunkSize, lines.Length - start);
+                string chunkText = string.Join("\n", lines, start, count);
+
+                try
+                {
+                    string translated = await _llmService.TranslateTextAsync(chunkText);
+                    results.Add(translated);
+                }
+                catch (Exception ex)
+                {
+                    hasError = true;
+                    string errorFormat = _getString("LlmChunkErrorFormat", "청크 {0} 처리 중 오류: {1}");
+                    _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                    {
+                        _rightSidebar.LlmOutput.Text = string.Format(errorFormat, current, ex.Message);
+                    });
+                    return;
+                }
+            }
+
+            if (hasError || results.Count == 0) return;
+
+            string combined = string.Join("\n", results);
+            string outputPath = GetOutputFilePath("_translation");
+            string dir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            await File.WriteAllTextAsync(outputPath, combined);
+
+            string completeMsg = string.Format(
+                _getString("LlmTranslateComplete", "{0} 완료. {1} 로 저장하였습니다."),
+                actionName, outputPath);
+            _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+            {
+                _rightSidebar.LlmOutput.Text = completeMsg;
+            });
         }
 
         private async Task PreflightCheckAndRunAsync(string actionName, string contentText, Func<Func<string, Task>, Task<string>> streamingCall, string customInstruction = "")

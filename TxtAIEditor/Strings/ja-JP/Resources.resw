@@ -690,6 +690,15 @@
   <data name="LlmActionCustom" xml:space="preserve">
     <value>カスタム送信</value>
   </data>
+  <data name="LlmSummarizeComplete" xml:space="preserve">
+    <value>{0} 完了。{1} に保存しました。</value>
+  </data>
+  <data name="LlmTranslateComplete" xml:space="preserve">
+    <value>{0} 完了。{1} に保存しました。</value>
+  </data>
+  <data name="LlmChunkErrorFormat" xml:space="preserve">
+    <value>チャンク {0} 処理エラー: {1}</value>
+  </data>
   <data name="LlmPreflightTitle" xml:space="preserve">
     <value>AI送信前の確認 (Pre-flight Check)</value>
   </data>

@@ -689,6 +689,15 @@
   <data name="LlmActionCustom" xml:space="preserve">
     <value>Custom Send</value>
   </data>
+  <data name="LlmSummarizeComplete" xml:space="preserve">
+    <value>{0} complete. Saved to {1}.</value>
+  </data>
+  <data name="LlmTranslateComplete" xml:space="preserve">
+    <value>{0} complete. Saved to {1}.</value>
+  </data>
+  <data name="LlmChunkErrorFormat" xml:space="preserve">
+    <value>Chunk {0} processing error: {1}</value>
+  </data>
   <data name="LlmPreflightTitle" xml:space="preserve">
     <value>AI Pre-flight Check</value>
   </data>

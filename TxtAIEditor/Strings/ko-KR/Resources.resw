@@ -689,6 +689,15 @@
   <data name="LlmActionCustom" xml:space="preserve">
     <value>커스텀 전송</value>
   </data>
+  <data name="LlmSummarizeComplete" xml:space="preserve">
+    <value>{0} 완료. {1} 로 저장하였습니다.</value>
+  </data>
+  <data name="LlmTranslateComplete" xml:space="preserve">
+    <value>{0} 완료. {1} 로 저장하였습니다.</value>
+  </data>
+  <data name="LlmChunkErrorFormat" xml:space="preserve">
+    <value>청크 {0} 처리 중 오류: {1}</value>
+  </data>
   <data name="LlmPreflightTitle" xml:space="preserve">
     <value>AI 전송 사전 확인 (Pre-flight Check)</value>
   </data>
