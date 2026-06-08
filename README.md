@@ -74,8 +74,8 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ### 🤖 AI Assistant
 *   **Multi-Provider:** Connect with Gemini, OpenAI, or local LM Studio endpoints.
 *   **Secure Storage:** API keys are securely saved via native Windows Credential Manager.
-*   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Chinese, French, Spanish, German, etc. while safely preserving code structure, markdown formatting, and commands.
-*   **Context Actions:** Quick AI actions (Explain, Refactor, Summarize, Fix) on selected text.
+*   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Chinese, French, Spanish, German, etc. while safely preserving code structure, markdown formatting, and commands. *(When translating with file context, it automatically performs chunk processing).*
+*   **Context Actions:** Quick AI actions (Explain, Refactor, Summarize, Fix) on selected text. *(When summarizing with file context, it automatically performs chunk processing to handle large documents).*
 *   **AI Custom Commands:** Ask questions or give instructions to the AI.
     *   **Direct Input:** Type a short prompt in the input box and press Send.
     *   **Instruction Presets:** Save instructions as custom prompt presets for quick access.
