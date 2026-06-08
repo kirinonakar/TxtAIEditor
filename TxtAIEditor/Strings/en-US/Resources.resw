@@ -707,6 +707,12 @@
   <data name="LlmTranslateComplete" xml:space="preserve">
     <value>{0} complete. Saved to {1}.</value>
   </data>
+  <data name="LlmTranslateResuming" xml:space="preserve">
+    <value>{0} Continuing translation (from chunk {1}/{2})...</value>
+  </data>
+  <data name="LlmTranslateCancelledWithSave" xml:space="preserve">
+    <value>Operation cancelled. Translated content up to now has been saved: {0}</value>
+  </data>
   <data name="LlmChunkErrorFormat" xml:space="preserve">
     <value>Chunk {0} processing error: {1}</value>
   </data>

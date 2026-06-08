@@ -708,6 +708,12 @@
   <data name="LlmTranslateComplete" xml:space="preserve">
     <value>{0} 完了。{1} に保存しました。</value>
   </data>
+  <data name="LlmTranslateResuming" xml:space="preserve">
+    <value>{0} 翻訳を続行中 (チャンク {1}/{2} から)...</value>
+  </data>
+  <data name="LlmTranslateCancelledWithSave" xml:space="preserve">
+    <value>操作が中断されました。現在までの翻訳内容が保存されました: {0}</value>
+  </data>
   <data name="LlmChunkErrorFormat" xml:space="preserve">
     <value>チャンク {0} 処理エラー: {1}</value>
   </data>
