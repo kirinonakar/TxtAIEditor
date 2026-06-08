@@ -120,17 +120,27 @@
             display: none; /* Chrome/WebView2 */
         }
 
+        .scroll-spacer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
         .diff-view {
+            position: absolute;
+            top: 0;
+            left: 0;
             display: table;
-            width: 100%;
             border-collapse: collapse;
             font-family: var(--font-family);
             font-size: 13px;
-            line-height: 1.5;
+            line-height: 20px;
         }
 
         .diff-row {
             display: table-row;
+            height: 20px;
         }
 
         .line-number {
@@ -144,13 +154,18 @@
             user-select: none;
             pointer-events: none;
             border-right: 1px solid var(--border);
+            height: 20px;
+            box-sizing: border-box;
         }
 
         .line-content {
             display: table-cell;
             padding-left: 12px;
-            white-space: pre-wrap;
-            word-break: break-all;
+            white-space: pre;
+            overflow: visible;
+            height: 20px;
+            box-sizing: border-box;
+            vertical-align: middle;
         }
 
         .diff-sign {
@@ -243,6 +258,7 @@
                 <div class="panel-header" id="left-header">원본 파일 (Original)</div>
                 <div class="panel-body">
                     <div class="view-wrapper" id="left-wrapper">
+                        <div class="scroll-spacer" id="left-spacer"></div>
                         <div class="diff-view" id="left-view"></div>
                     </div>
                     <div class="scrollmap" id="left-scrollmap">
@@ -255,6 +271,7 @@
                 <div class="panel-header" id="right-header">비교 대상 파일 (Modified)</div>
                 <div class="panel-body">
                     <div class="view-wrapper" id="right-wrapper">
+                        <div class="scroll-spacer" id="right-spacer"></div>
                         <div class="diff-view" id="right-view"></div>
                     </div>
                     <div class="scrollmap" id="right-scrollmap">
@@ -268,12 +285,21 @@
     <script>
         const leftWrapper  = document.getElementById('left-wrapper');
         const rightWrapper = document.getElementById('right-wrapper');
+        const leftSpacer   = document.getElementById('left-spacer');
+        const rightSpacer  = document.getElementById('right-spacer');
         const leftView     = document.getElementById('left-view');
         const rightView    = document.getElementById('right-view');
         const leftScrollmap  = document.getElementById('left-scrollmap');
         const rightScrollmap = document.getElementById('right-scrollmap');
         const leftThumb  = document.getElementById('left-thumb');
         const rightThumb = document.getElementById('right-thumb');
+
+        // Virtual scroll parameters
+        const rowHeight = 20;
+        let globalDiffA = [];
+        let globalDiffB = [];
+        let maxLineLength = 0;
+        const charWidth = 8.5;
 
         // Prevent dragging duplicate windows
         window.addEventListener('dragover', e => e.preventDefault());
@@ -299,98 +325,183 @@
             }
         });
 
-        // ── LCS diff comparison logic ──────────────────────────────────────
+        // ── Myers' diff comparison logic ──────────────────────────────────
         function computeLineDiff(textA, textB) {
-            const linesA = textA.split(/\r?\n/);
-            const linesB = textB.split(/\r?\n/);
+            const linesA = textA === "" ? [] : textA.split(/\r?\n/);
+            const linesB = textB === "" ? [] : textB.split(/\r?\n/);
 
-            const dp = Array(linesA.length + 1).fill(null).map(() => Array(linesB.length + 1).fill(0));
-            for (let i = 1; i <= linesA.length; i++) {
-                for (let j = 1; j <= linesB.length; j++) {
-                    if (linesA[i - 1] === linesB[j - 1]) {
-                        dp[i][j] = dp[i - 1][j - 1] + 1;
+            const N = linesA.length;
+            const M = linesB.length;
+
+            const max = N + M;
+            const v = { 1: 0 };
+            const history = [];
+
+            let found = false;
+            let x, y;
+
+            const maxD = Math.min(2000, max); 
+
+            for (let d = 0; d <= maxD; d++) {
+                history.push(Object.assign({}, v));
+                for (let k = -d; k <= d; k += 2) {
+                    if (k === -d || (k !== d && v[k - 1] < v[k + 1])) {
+                        x = v[k + 1];
                     } else {
-                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                        x = v[k - 1] + 1;
                     }
+                    y = x - k;
+
+                    while (x < N && y < M && linesA[x] === linesB[y]) {
+                        x++;
+                        y++;
+                    }
+
+                    v[k] = x;
+
+                    if (x >= N && y >= M) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    history.push(Object.assign({}, v));
+                    break;
                 }
             }
 
-            let i = linesA.length;
-            let j = linesB.length;
             const diffA = [];
             const diffB = [];
 
-            while (i > 0 || j > 0) {
-                if (i > 0 && j > 0 && linesA[i - 1] === linesB[j - 1]) {
-                    diffA.unshift({ type: 'unchanged', text: linesA[i - 1], lineNum: i });
-                    diffB.unshift({ type: 'unchanged', text: linesB[j - 1], lineNum: j });
-                    i--; j--;
-                } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-                    diffA.unshift({ type: 'empty', text: '', lineNum: null });
-                    diffB.unshift({ type: 'added', text: linesB[j - 1], lineNum: j });
-                    j--;
-                } else {
-                    diffA.unshift({ type: 'removed', text: linesA[i - 1], lineNum: i });
-                    diffB.unshift({ type: 'empty', text: '', lineNum: null });
-                    i--;
+            if (!found) {
+                let i = 0;
+                let j = 0;
+                while (i < N || j < M) {
+                    if (i < N && j < M) {
+                        if (linesA[i] === linesB[j]) {
+                            diffA.push({ type: 'unchanged', text: linesA[i], lineNum: i + 1 });
+                            diffB.push({ type: 'unchanged', text: linesB[j], lineNum: j + 1 });
+                            i++; j++;
+                        } else {
+                            diffA.push({ type: 'removed', text: linesA[i], lineNum: i + 1 });
+                            diffB.push({ type: 'empty', text: '', lineNum: null });
+                            diffA.push({ type: 'empty', text: '', lineNum: null });
+                            diffB.push({ type: 'added', text: linesB[j], lineNum: j + 1 });
+                            i++; j++;
+                        }
+                    } else if (i < N) {
+                        diffA.push({ type: 'removed', text: linesA[i], lineNum: i + 1 });
+                        diffB.push({ type: 'empty', text: '', lineNum: null });
+                        i++;
+                    } else if (j < M) {
+                        diffA.push({ type: 'empty', text: '', lineNum: null });
+                        diffB.push({ type: 'added', text: linesB[j], lineNum: j + 1 });
+                        j++;
+                    }
                 }
+                return { diffA, diffB };
+            }
+
+            let currX = N;
+            let currY = M;
+            const depth = history.length - 2;
+
+            for (let d = depth; d >= 1; d--) {
+                const vAtD = history[d]; 
+                const k = currX - currY;
+
+                const dVal = d - 1;
+                const getV = (kVal) => (vAtD[kVal] !== undefined ? vAtD[kVal] : -1);
+
+                let prevK;
+                if (k === -dVal || (k !== dVal && getV(k - 1) < getV(k + 1))) {
+                    prevK = k + 1;
+                } else {
+                    prevK = k - 1;
+                }
+
+                const prevX = getV(prevK);
+                const prevY = prevX - prevK;
+
+                while (currX > prevX && currY > prevY) {
+                    diffA.unshift({ type: 'unchanged', text: linesA[currX - 1], lineNum: currX });
+                    diffB.unshift({ type: 'unchanged', text: linesB[currY - 1], lineNum: currY });
+                    currX--;
+                    currY--;
+                }
+
+                if (currX > prevX) {
+                    diffA.unshift({ type: 'removed', text: linesA[currX - 1], lineNum: currX });
+                    diffB.unshift({ type: 'empty', text: '', lineNum: null });
+                    currX--;
+                } else if (currY > prevY) {
+                    diffA.unshift({ type: 'empty', text: '', lineNum: null });
+                    diffB.unshift({ type: 'added', text: linesB[currY - 1], lineNum: currY });
+                    currY--;
+                }
+            }
+
+            while (currX > 0 && currY > 0) {
+                diffA.unshift({ type: 'unchanged', text: linesA[currX - 1], lineNum: currX });
+                diffB.unshift({ type: 'unchanged', text: linesB[currY - 1], lineNum: currY });
+                currX--;
+                currY--;
             }
 
             return { diffA, diffB };
         }
 
         // ── Scrollmap helpers ──────────────────────────────────────────────
-
-        /**
-         * Build coloured diff markers for a scrollmap.
-         * @param {HTMLElement} scrollmap  - the scrollmap container
-         * @param {HTMLElement} view       - the diff-view table element
-         * @param {'removed'|'added'} markerClass - CSS class for the markers
-         */
-        function buildScrollmapMarkers(scrollmap, wrapper, view, markerClass) {
-            // Remove old markers (but keep the thumb)
+        function buildScrollmapMarkers(scrollmap, diffArray, markerClass) {
             scrollmap.querySelectorAll('.scrollmap-marker').forEach(el => el.remove());
 
-            const mapH   = scrollmap.clientHeight;
-            const totalH = wrapper.scrollHeight;   // full scrollable height of the wrapper
+            const mapH = scrollmap.clientHeight;
+            const totalH = diffArray.length * rowHeight;
             if (totalH === 0 || mapH === 0) return;
 
             const scale = mapH / totalH;
-
-            // Gather all changed rows
-            const selector = markerClass === 'added' ? '.row-added' : '.row-removed';
-            const rows = view.querySelectorAll(selector);
-
-            // Collapse adjacent rows into bands
             const bands = [];
-            rows.forEach(row => {
-                const top    = row.offsetTop  * scale;
-                const height = Math.max(row.offsetHeight * scale, 2);
-                const bottom = top + height;
+            let currentBand = null;
 
-                if (bands.length > 0 && top <= bands[bands.length - 1].bottom + 1) {
-                    bands[bands.length - 1].bottom = Math.max(bands[bands.length - 1].bottom, bottom);
+            for (let k = 0; k < diffArray.length; k++) {
+                const item = diffArray[k];
+                if (item.type === markerClass) {
+                    const top = k * rowHeight * scale;
+                    const height = Math.max(rowHeight * scale, 1.5);
+                    const bottom = top + height;
+
+                    if (currentBand && top <= currentBand.bottom + 1) {
+                        currentBand.bottom = Math.max(currentBand.bottom, bottom);
+                    } else {
+                        if (currentBand) {
+                            bands.push(currentBand);
+                        }
+                        currentBand = { top, bottom };
+                    }
                 } else {
-                    bands.push({ top, bottom });
+                    if (currentBand) {
+                        bands.push(currentBand);
+                        currentBand = null;
+                    }
                 }
-            });
+            }
+            if (currentBand) {
+                bands.push(currentBand);
+            }
 
             const thumb = scrollmap.querySelector('.scrollmap-thumb');
             bands.forEach(band => {
                 const marker = document.createElement('div');
                 marker.className = `scrollmap-marker ${markerClass}`;
-                marker.style.top    = `${band.top}px`;
+                marker.style.top = `${band.top}px`;
                 marker.style.height = `${Math.max(band.bottom - band.top, 2)}px`;
                 scrollmap.insertBefore(marker, thumb);
             });
         }
 
-        /**
-         * Update the viewport thumb position inside a scrollmap.
-         */
         function updateScrollmapThumb(wrapper, scrollmap, thumb) {
             const mapH   = scrollmap.clientHeight;
-            const totalH = wrapper.scrollHeight;   // full scrollable height
+            const totalH = globalDiffA.length * rowHeight;
             if (totalH === 0 || mapH === 0) return;
 
             const scale   = mapH / totalH;
@@ -398,21 +509,18 @@
             const scrollY = wrapper.scrollTop;
 
             const thumbTop = scrollY * scale;
-            // If content fits entirely, thumb fills the whole map
             const thumbH   = totalH <= viewH ? mapH : Math.max(viewH * scale, 8);
 
             thumb.style.top    = `${thumbTop}px`;
             thumb.style.height = `${thumbH}px`;
         }
 
-        /**
-         * Attach click/drag scrolling on a scrollmap.
-         */
-        function attachScrollmapInput(scrollmap, wrapper, view, thumb) {
+        function attachScrollmapInput(scrollmap, wrapper, thumb) {
             function scrollToRatio(clientY) {
                 const rect   = scrollmap.getBoundingClientRect();
                 const ratio  = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
-                const maxSc  = view.scrollHeight - wrapper.clientHeight;
+                const totalH = globalDiffA.length * rowHeight;
+                const maxSc  = totalH - wrapper.clientHeight;
                 wrapper.scrollTop = ratio * maxSc;
             }
 
@@ -428,9 +536,72 @@
             window.addEventListener('mouseup', () => { dragging = false; });
         }
 
+        // ── List Virtualization Logic ──────────────────────────────────────
+        function renderVisibleRows() {
+            const totalRows = globalDiffA.length;
+            const viewHeight = leftWrapper.clientHeight;
+            const scrollTop = leftWrapper.scrollTop;
+
+            const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 5);
+            const endIndex = Math.min(totalRows - 1, Math.ceil((scrollTop + viewHeight) / rowHeight) + 5);
+
+            let leftHtml = '';
+            let rightHtml = '';
+
+            for (let k = startIndex; k <= endIndex; k++) {
+                const itemA = globalDiffA[k];
+                const itemB = globalDiffB[k];
+
+                // Left row
+                if (itemA.type === 'removed') {
+                    leftHtml += `<div class="diff-row row-removed"><div class="line-number">${itemA.lineNum}</div><div class="line-content"><span class="diff-sign">- </span>${escapeHtml(itemA.text)}</div></div>`;
+                } else if (itemA.type === 'empty') {
+                    leftHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
+                } else {
+                    leftHtml += `<div class="diff-row"><div class="line-number">${itemA.lineNum}</div><div class="line-content"><span class="diff-sign">  </span>${escapeHtml(itemA.text)}</div></div>`;
+                }
+
+                // Right row
+                if (itemB.type === 'added') {
+                    rightHtml += `<div class="diff-row row-added"><div class="line-number">${itemB.lineNum}</div><div class="line-content"><span class="diff-sign">+ </span>${escapeHtml(itemB.text)}</div></div>`;
+                } else if (itemB.type === 'empty') {
+                    rightHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
+                } else {
+                    rightHtml += `<div class="diff-row"><div class="line-number">${itemB.lineNum}</div><div class="line-content"><span class="diff-sign">  </span>${escapeHtml(itemB.text)}</div></div>`;
+                }
+            }
+
+            leftView.innerHTML = leftHtml;
+            rightView.innerHTML = rightHtml;
+
+            const offset = startIndex * rowHeight;
+            leftView.style.transform = `translateY(${offset}px)`;
+            rightView.style.transform = `translateY(${offset}px)`;
+        }
+
+        function updateSpacerWidths() {
+            const minWidth = leftWrapper.clientWidth;
+            const finalWidth = Math.max(minWidth, maxLineLength * charWidth + 100);
+            const widthPx = `${finalWidth}px`;
+            
+            leftSpacer.style.width = widthPx;
+            rightSpacer.style.width = widthPx;
+            leftView.style.width = widthPx;
+            rightView.style.width = widthPx;
+        }
+
         // ── Render ─────────────────────────────────────────────────────────
         function renderDiff(data) {
             const { diffA, diffB } = computeLineDiff(data.textA, data.textB);
+            globalDiffA = diffA;
+            globalDiffB = diffB;
+
+            // Compute maximum line length
+            maxLineLength = 0;
+            for (let k = 0; k < diffA.length; k++) {
+                if (diffA[k].text.length > maxLineLength) maxLineLength = diffA[k].text.length;
+                if (diffB[k].text.length > maxLineLength) maxLineLength = diffB[k].text.length;
+            }
 
             // Update title
             const diffTitleEl = document.getElementById('diff-title');
@@ -446,48 +617,32 @@
             document.getElementById('left-header').textContent  = `${prefixA}${data.titleA || defaultLabelA}`;
             document.getElementById('right-header').textContent = `${prefixB}${data.titleB || defaultLabelB}`;
 
-            let leftHtml  = '';
-            let rightHtml = '';
+            // Set spacer height
+            const totalHeight = diffA.length * rowHeight;
+            leftSpacer.style.height = `${totalHeight}px`;
+            rightSpacer.style.height = `${totalHeight}px`;
+
+            updateSpacerWidths();
+
+            // Calculate diff stats
             let additions = 0;
             let deletions = 0;
-
             for (let k = 0; k < diffA.length; k++) {
-                const itemA = diffA[k];
-                const itemB = diffB[k];
-
-                // Left row
-                if (itemA.type === 'removed') {
-                    leftHtml += `<div class="diff-row row-removed"><div class="line-number">${itemA.lineNum}</div><div class="line-content"><span class="diff-sign">- </span>${escapeHtml(itemA.text)}</div></div>`;
-                    deletions++;
-                } else if (itemA.type === 'empty') {
-                    leftHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
-                } else {
-                    leftHtml += `<div class="diff-row"><div class="line-number">${itemA.lineNum}</div><div class="line-content"><span class="diff-sign">  </span>${escapeHtml(itemA.text)}</div></div>`;
-                }
-
-                // Right row
-                if (itemB.type === 'added') {
-                    rightHtml += `<div class="diff-row row-added"><div class="line-number">${itemB.lineNum}</div><div class="line-content"><span class="diff-sign">+ </span>${escapeHtml(itemB.text)}</div></div>`;
-                    additions++;
-                } else if (itemB.type === 'empty') {
-                    rightHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
-                } else {
-                    rightHtml += `<div class="diff-row"><div class="line-number">${itemB.lineNum}</div><div class="line-content"><span class="diff-sign">  </span>${escapeHtml(itemB.text)}</div></div>`;
-                }
+                if (diffA[k].type === 'removed') deletions++;
+                if (diffB[k].type === 'added') additions++;
             }
-
-            leftView.innerHTML  = leftHtml;
-            rightView.innerHTML = rightHtml;
 
             const formatStr = data.diffStatsFormat || '변경사항: 추가 {0}줄, 삭제 {1}줄';
             document.getElementById('diff-stats').textContent = formatStr
                 .replace('{0}', additions)
                 .replace('{1}', deletions);
 
-            // Build scrollmaps after a paint cycle so offsetTop values are ready
+            // Initial render
+            renderVisibleRows();
+
             requestAnimationFrame(() => {
-                buildScrollmapMarkers(leftScrollmap,  leftWrapper,  leftView,  'removed');
-                buildScrollmapMarkers(rightScrollmap, rightWrapper, rightView, 'added');
+                buildScrollmapMarkers(leftScrollmap,  globalDiffA,  'removed');
+                buildScrollmapMarkers(rightScrollmap, globalDiffB, 'added');
                 updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
                 updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
             });
@@ -506,37 +661,44 @@
         let isSyncingLeftScroll  = false;
         let isSyncingRightScroll = false;
 
-        leftWrapper.addEventListener('scroll', () => {
+        function onScroll() {
+            renderVisibleRows();
             updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
             updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
+        }
+
+        leftWrapper.addEventListener('scroll', () => {
             if (isSyncingLeftScroll) { isSyncingLeftScroll = false; return; }
             isSyncingRightScroll = true;
             rightWrapper.scrollTop  = leftWrapper.scrollTop;
             rightWrapper.scrollLeft = leftWrapper.scrollLeft;
+            onScroll();
         });
 
         rightWrapper.addEventListener('scroll', () => {
-            updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
-            updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
             if (isSyncingRightScroll) { isSyncingRightScroll = false; return; }
             isSyncingLeftScroll = true;
             leftWrapper.scrollTop  = rightWrapper.scrollTop;
             leftWrapper.scrollLeft = rightWrapper.scrollLeft;
+            onScroll();
         });
 
         // Scrollmap click/drag
-        attachScrollmapInput(leftScrollmap,  leftWrapper,  leftView,  leftThumb);
-        attachScrollmapInput(rightScrollmap, rightWrapper, rightView, rightThumb);
+        attachScrollmapInput(leftScrollmap,  leftWrapper,  leftThumb);
+        attachScrollmapInput(rightScrollmap, rightWrapper, rightThumb);
 
         // Rebuild on resize
         const resizeObs = new ResizeObserver(() => {
-            buildScrollmapMarkers(leftScrollmap,  leftWrapper,  leftView,  'removed');
-            buildScrollmapMarkers(rightScrollmap, rightWrapper, rightView, 'added');
+            updateSpacerWidths();
+            renderVisibleRows();
+            buildScrollmapMarkers(leftScrollmap,  globalDiffA,  'removed');
+            buildScrollmapMarkers(rightScrollmap, globalDiffB, 'added');
             updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
             updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
         });
         resizeObs.observe(leftScrollmap);
         resizeObs.observe(rightScrollmap);
+        resizeObs.observe(leftWrapper);
 
         function applyThemeSettings(theme, uiFontFamily, editorFontFamily) {
             const bg    = theme === 'Light' ? '#ffffff' : '#1e1e1e';
