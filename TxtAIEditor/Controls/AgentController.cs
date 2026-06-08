@@ -899,7 +899,7 @@ namespace TxtAIEditor.Controls
                 _agentPane.Prompt.Text = string.Empty;
                 _agentPane.ResetOutput(_displayText.OutputPlaceholder);
                 _agentPane.ClearActivity(_displayText.ActivityIdle);
-                _agentPane.UpdateModifiedFiles(new List<AgentFileEditPreview>());
+                UpdateModifiedFilesList();
                 _attachmentController.Clear();
                 UpdateContextStatsImmediate();
                 UpdateHistoryUI();
@@ -2900,65 +2900,66 @@ namespace TxtAIEditor.Controls
 
         private void TrackSessionEdit(AgentFileEditPreview preview)
         {
-            var existing = _sessionEdits.FirstOrDefault(e => string.Equals(e.FullPath, preview.FullPath, StringComparison.OrdinalIgnoreCase));
-            if (existing != null)
-            {
-                var updatedEdit = new AgentFileEditPreview
-                {
-                    ActionName = preview.ActionName,
-                    RelativePath = preview.RelativePath,
-                    FullPath = preview.FullPath,
-                    OldContent = preview.OldContent, // Immediately preceding content
-                    NewContent = preview.NewContent,   // Latest version
-                    IsNewFile = existing.IsNewFile     // Keep original flag
-                };
-                _sessionEdits.Remove(existing);
-                _sessionEdits.Add(updatedEdit);
-            }
-            else
-            {
-                _sessionEdits.Add(preview);
-            }
-
-            _agentPane.UpdateModifiedFiles(_sessionEdits.ToList());
+            // Keep every accepted edit as a chronological undo stack.
+            // Do not merge by file here: if A -> B -> C is collapsed into a single
+            // entry and the original IsNewFile flag is kept, restore can jump to the
+            // wrong state, especially for files created and then edited in the same
+            // agent session.
+            _sessionEdits.Add(CloneSessionEdit(preview));
+            UpdateModifiedFilesList();
         }
 
         private async Task RevertFileChangeAsync(AgentFileEditPreview preview)
         {
             try
             {
+                int editIndex = FindLatestSessionEditIndex(preview.FullPath);
+                if (editIndex < 0)
+                {
+                    return;
+                }
+
+                AgentFileEditPreview editToRevert = _sessionEdits[editIndex];
+                bool isFileBackedPath = IsFileBackedSessionPath(editToRevert.FullPath);
+
+                // Important: make the durable source match the restored state before
+                // notifying the editor/file refresh pipeline. Otherwise the editor can
+                // briefly show OldContent and then be refreshed from the still-modified
+                // file on disk, which makes the revert appear to undo itself.
+                if (editToRevert.IsNewFile)
+                {
+                    if (isFileBackedPath && File.Exists(editToRevert.FullPath))
+                    {
+                        File.Delete(editToRevert.FullPath);
+                    }
+                }
+                else if (isFileBackedPath)
+                {
+                    await File.WriteAllTextAsync(editToRevert.FullPath, editToRevert.OldContent);
+                }
+
+                if (_fileModifiedAsync != null && isFileBackedPath)
+                {
+                    await _fileModifiedAsync(editToRevert.FullPath);
+                }
+
                 if (_revertTabOrFileAsync != null)
                 {
                     await RunOnUIThreadAsync<bool>(async () =>
                     {
-                        await _revertTabOrFileAsync(preview.FullPath, preview.OldContent, preview.IsNewFile);
+                        await _revertTabOrFileAsync(editToRevert.FullPath, editToRevert.OldContent, editToRevert.IsNewFile);
                         return true;
                     });
                 }
-                else
+                else if (editToRevert.IsNewFile && !isFileBackedPath && _closeTabById != null)
                 {
-                    if (preview.IsNewFile)
-                    {
-                        if (File.Exists(preview.FullPath))
-                        {
-                            File.Delete(preview.FullPath);
-                        }
-                    }
-                    else
-                    {
-                        await File.WriteAllTextAsync(preview.FullPath, preview.OldContent);
-                    }
+                    await RunOnUIThreadAsync(() => _closeTabById(editToRevert.FullPath));
                 }
 
-                _sessionEdits.Remove(preview);
-                _agentPane.UpdateModifiedFiles(_sessionEdits.ToList());
+                _sessionEdits.RemoveAt(editIndex);
+                UpdateModifiedFilesList();
 
-                if (_fileModifiedAsync != null && !string.IsNullOrEmpty(preview.FullPath) && (Path.IsPathRooted(preview.FullPath) || File.Exists(preview.FullPath)))
-                {
-                    await _fileModifiedAsync(preview.FullPath);
-                }
-
-                AppendActivity(string.Format(_getString("AgentActivityFileReverted", "파일 변경 취소 완료: {0}"), preview.RelativePath));
+                AppendActivity(string.Format(_getString("AgentActivityFileReverted", "파일 변경 취소 완료: {0}"), editToRevert.RelativePath));
             }
             catch (Exception ex)
             {
@@ -2966,6 +2967,80 @@ namespace TxtAIEditor.Controls
                     _getString("AgentRevertErrorTitle", "변경 취소 오류"),
                     string.Format(_getString("AgentRevertErrorFormat", "파일을 되돌리는 중 오류가 발생했습니다: {0}"), ex.Message));
             }
+        }
+
+        private AgentFileEditPreview CloneSessionEdit(AgentFileEditPreview preview)
+        {
+            return new AgentFileEditPreview
+            {
+                ActionName = preview.ActionName,
+                RelativePath = preview.RelativePath,
+                FullPath = preview.FullPath,
+                OldContent = preview.OldContent,
+                NewContent = preview.NewContent,
+                IsNewFile = preview.IsNewFile
+            };
+        }
+
+        private int FindLatestSessionEditIndex(string fullPath)
+        {
+            string targetKey = GetSessionEditKey(fullPath, string.Empty);
+            for (int i = _sessionEdits.Count - 1; i >= 0; i--)
+            {
+                AgentFileEditPreview edit = _sessionEdits[i];
+                if (string.Equals(GetSessionEditKey(edit.FullPath, edit.RelativePath), targetKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private List<AgentFileEditPreview> GetLatestSessionEditsForDisplay()
+        {
+            var latestByPath = new Dictionary<string, AgentFileEditPreview>(StringComparer.OrdinalIgnoreCase);
+            foreach (AgentFileEditPreview edit in _sessionEdits)
+            {
+                latestByPath[GetSessionEditKey(edit.FullPath, edit.RelativePath)] = edit;
+            }
+
+            return latestByPath.Values.ToList();
+        }
+
+        private static string GetSessionEditKey(string fullPath, string relativePath)
+        {
+            return !string.IsNullOrWhiteSpace(fullPath)
+                ? fullPath
+                : relativePath ?? string.Empty;
+        }
+
+        private static bool IsFileBackedSessionPath(string? fullPath)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                if (File.Exists(fullPath))
+                {
+                    return true;
+                }
+
+                return Path.IsPathRooted(fullPath);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
+        private void UpdateModifiedFilesList()
+        {
+            _agentPane.UpdateModifiedFiles(GetLatestSessionEditsForDisplay());
         }
 
         private async Task<bool> ConfirmPowerShellAsync(string command)
@@ -3824,7 +3899,7 @@ namespace TxtAIEditor.Controls
                 string formatted = FormatHistoryForDisplay(item.SessionHistoryText, _settingsService.CurrentSettings.LlmAgentVerbose);
                 _agentPane.ResetOutput(formatted);
                 _agentPane.ClearActivity(_getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨"));
-                _agentPane.UpdateModifiedFiles(_sessionEdits.ToList());
+                UpdateModifiedFilesList();
                 _attachmentController.Clear();
                 UpdateContextStatsImmediate();
                 UpdateHistoryUI();
