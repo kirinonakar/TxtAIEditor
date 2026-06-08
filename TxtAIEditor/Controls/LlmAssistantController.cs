@@ -507,6 +507,10 @@ namespace TxtAIEditor.Controls
             {
                 string dir = Path.GetDirectoryName(tab.FilePath) ?? ".";
                 string nameWithoutExt = Path.GetFileNameWithoutExtension(tab.FilePath);
+                if (nameWithoutExt.EndsWith(suffix, StringComparison.Ordinal))
+                {
+                    nameWithoutExt = nameWithoutExt.Substring(0, nameWithoutExt.Length - suffix.Length);
+                }
                 return Path.Combine(dir, $"{nameWithoutExt}{suffix}.txt");
             }
 
