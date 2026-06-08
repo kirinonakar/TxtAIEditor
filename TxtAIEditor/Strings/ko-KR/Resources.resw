@@ -632,6 +632,18 @@
   <data name="LlmCustomRunButtonText" xml:space="preserve">
     <value>전송</value>
   </data>
+  <data name="LlmCustomCancelButtonText" xml:space="preserve">
+    <value>중단</value>
+  </data>
+  <data name="LlmChunkProgressFormat" xml:space="preserve">
+    <value>{0} 진행 중: {1}/{2} 청크 완료</value>
+  </data>
+  <data name="LlmFileContextDisplayFormat" xml:space="preserve">
+    <value>{0} · 약 {1:N0} 토큰</value>
+  </data>
+  <data name="LlmOperationCanceled" xml:space="preserve">
+    <value>작업이 중단되었습니다.</value>
+  </data>
   <data name="LlmInsertOutputButtonText" xml:space="preserve">
     <value>입력</value>
   </data>

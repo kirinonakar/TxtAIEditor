@@ -46,7 +46,7 @@ namespace TxtAIEditor.Core.Services
             return "en-US";
         }
 
-        public async Task<string> ExplainCodeAsync(string code, string language, Func<string, Task>? onChunk = null)
+        public async Task<string> ExplainCodeAsync(string code, string language, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
             string langCode = GetActiveLanguage();
             string systemPrompt = langCode switch
@@ -63,10 +63,10 @@ namespace TxtAIEditor.Core.Services
                 _ => $"[선택 영역 언어 또는 파일 유형]\n{language}\n\n[선택 영역]\n{code}"
             };
 
-            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk);
+            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }
 
-        public async Task<string> SummarizeTextAsync(string text, Func<string, Task>? onChunk = null)
+        public async Task<string> SummarizeTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
             string langCode = GetActiveLanguage();
             string systemPrompt = langCode switch
@@ -83,10 +83,10 @@ namespace TxtAIEditor.Core.Services
                 _ => $"[중요 지침: 반드시 아래의 '요약할 선택 영역'의 텍스트가 작성된 실제 언어와 '동일한 언어'로만 요약 결과를 출력하십시오. 절대 다른 언어로 번역하지 마십시오.]\n\n[요약할 선택 영역]\n{text}"
             };
 
-            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk);
+            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }
 
-        public async Task<string> TranslateTextAsync(string text, Func<string, Task>? onChunk = null)
+        public async Task<string> TranslateTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
             var settings = _settingsService.CurrentSettings;
             string srcLang = settings.LlmSourceLanguage ?? "Auto";
@@ -130,10 +130,10 @@ namespace TxtAIEditor.Core.Services
                 _ => $"[번역할 선택 영역]\n{text}"
             };
 
-            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk);
+            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }
 
-        public async Task<string> ImproveTextAsync(string text, Func<string, Task>? onChunk = null)
+        public async Task<string> ImproveTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
             string langCode = GetActiveLanguage();
             string systemPrompt = langCode switch
@@ -150,10 +150,10 @@ namespace TxtAIEditor.Core.Services
                 _ => $"[중요 지침: 반드시 아래의 '개선할 선택 영역'의 텍스트가 작성된 실제 언어와 '동일한 언어'로만 정제된 결과물을 출력하십시오. 절대 다른 언어로 번역하지 마십시오.]\n\n[개선할 선택 영역]\n{text}"
             };
 
-            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk);
+            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }
 
-        public async Task<string> CustomPromptAsync(string prompt, string fileContext, string selectedText, Func<string, Task>? onChunk = null)
+        public async Task<string> CustomPromptAsync(string prompt, string fileContext, string selectedText, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
             string langCode = GetActiveLanguage();
             string systemPrompt = langCode switch
@@ -178,7 +178,7 @@ namespace TxtAIEditor.Core.Services
 
             string userContent = userContentBuilder.ToString();
 
-            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk);
+            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }
 
         public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)

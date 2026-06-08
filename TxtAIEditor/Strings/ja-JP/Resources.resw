@@ -633,6 +633,18 @@
   <data name="LlmCustomRunButtonText" xml:space="preserve">
     <value>送信</value>
   </data>
+  <data name="LlmCustomCancelButtonText" xml:space="preserve">
+    <value>中断</value>
+  </data>
+  <data name="LlmChunkProgressFormat" xml:space="preserve">
+    <value>{0} 進行中: {1}/{2} チャンク完了</value>
+  </data>
+  <data name="LlmFileContextDisplayFormat" xml:space="preserve">
+    <value>{0} · 約 {1:N0} トークン</value>
+  </data>
+  <data name="LlmOperationCanceled" xml:space="preserve">
+    <value>操作が中断されました。</value>
+  </data>
   <data name="LlmInsertOutputButtonText" xml:space="preserve">
     <value>入力</value>
   </data>

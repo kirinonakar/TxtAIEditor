@@ -632,6 +632,18 @@
   <data name="LlmCustomRunButtonText" xml:space="preserve">
     <value>Send</value>
   </data>
+  <data name="LlmCustomCancelButtonText" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="LlmChunkProgressFormat" xml:space="preserve">
+    <value>{0} in progress: {1}/{2} chunks completed</value>
+  </data>
+  <data name="LlmFileContextDisplayFormat" xml:space="preserve">
+    <value>{0} · Approx. {1:N0} tokens</value>
+  </data>
+  <data name="LlmOperationCanceled" xml:space="preserve">
+    <value>Operation canceled.</value>
+  </data>
   <data name="LlmInsertOutputButtonText" xml:space="preserve">
     <value>Insert</value>
   </data>

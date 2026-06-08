@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -30,6 +31,8 @@ namespace TxtAIEditor.Controls
         private string _lastSelectionText = string.Empty;
         private string _fileContextText = string.Empty;
         private string _fileContextDisplay = string.Empty;
+        private System.Threading.CancellationTokenSource? _assistantCts = null;
+        private bool _isAssistantRunning = false;
 
         private class CustomInstruction
         {
@@ -160,6 +163,7 @@ namespace TxtAIEditor.Controls
 
         private async void OnLlmExplainClick(object sender, RoutedEventArgs e)
         {
+            if (_isAssistantRunning) return;
             if (string.IsNullOrEmpty(_lastSelectionText) && string.IsNullOrEmpty(GetActiveFileContext()))
             {
                 _showError(_getString("LlmErrorTitle", "AI 오류"), _getString("LlmNoSelectionCustom", "선택 영역이나 파일 맥락이 없습니다. 텍스트를 선택하거나 파일 맥락을 추가하십시오."));
@@ -169,11 +173,12 @@ namespace TxtAIEditor.Controls
             string language = GetActiveSelectionLanguage();
             string context = BuildLlmContext(_lastSelectionText);
             await PreflightCheckAndRunAsync(_getString("LlmActionExplain", "선택 영역 설명 (Explain)"), context,
-                onChunk => _llmService.ExplainCodeAsync(context, language, onChunk));
+                (onChunk, ct) => _llmService.ExplainCodeAsync(context, language, onChunk, ct));
         }
 
         private async void OnLlmSummarizeClick(object sender, RoutedEventArgs e)
         {
+            if (_isAssistantRunning) return;
             if (string.IsNullOrEmpty(_lastSelectionText) && string.IsNullOrEmpty(GetActiveFileContext()))
             {
                 _showError(_getString("LlmErrorTitle", "AI 오류"), _getString("LlmNoSelectionCustom", "선택 영역이나 파일 맥락이 없습니다. 텍스트를 선택하거나 파일 맥락을 추가하십시오."));
@@ -189,11 +194,12 @@ namespace TxtAIEditor.Controls
 
             string context = BuildLlmContext(_lastSelectionText);
             await PreflightCheckAndRunAsync(_getString("LlmActionSummarize", "선택 영역 요약 (Summarize)"), context,
-                onChunk => _llmService.SummarizeTextAsync(context, onChunk));
+                (onChunk, ct) => _llmService.SummarizeTextAsync(context, onChunk, ct));
         }
 
         private async void OnLlmTranslateClick(object sender, RoutedEventArgs e)
         {
+            if (_isAssistantRunning) return;
             if (string.IsNullOrEmpty(_lastSelectionText) && string.IsNullOrEmpty(GetActiveFileContext()))
             {
                 _showError(_getString("LlmErrorTitle", "AI 오류"), _getString("LlmNoSelectionCustom", "선택 영역이나 파일 맥락이 없습니다. 텍스트를 선택하거나 파일 맥락을 추가하십시오."));
@@ -209,11 +215,12 @@ namespace TxtAIEditor.Controls
 
             string context = BuildLlmContext(_lastSelectionText);
             await PreflightCheckAndRunAsync(_getString("LlmActionTranslate", "선택 영역 번역 (Translate)"), context,
-                onChunk => _llmService.TranslateTextAsync(context, onChunk));
+                (onChunk, ct) => _llmService.TranslateTextAsync(context, onChunk, ct));
         }
 
         private async void OnLlmImproveClick(object sender, RoutedEventArgs e)
         {
+            if (_isAssistantRunning) return;
             if (string.IsNullOrEmpty(_lastSelectionText) && string.IsNullOrEmpty(GetActiveFileContext()))
             {
                 _showError(_getString("LlmErrorTitle", "AI 오류"), _getString("LlmNoSelectionCustom", "선택 영역이나 파일 맥락이 없습니다. 텍스트를 선택하거나 파일 맥락을 추가하십시오."));
@@ -222,11 +229,17 @@ namespace TxtAIEditor.Controls
 
             string context = BuildLlmContext(_lastSelectionText);
             await PreflightCheckAndRunAsync(_getString("LlmActionImprove", "수식 및 마크다운 개선"), context,
-                onChunk => _llmService.ImproveTextAsync(context, onChunk));
+                (onChunk, ct) => _llmService.ImproveTextAsync(context, onChunk, ct));
         }
 
         private async void OnLlmCustomClick(object sender, RoutedEventArgs e)
         {
+            if (_isAssistantRunning)
+            {
+                _assistantCts?.Cancel();
+                return;
+            }
+
             SaveActivePrompt();
 
             string prompt = GetActivePrompt();
@@ -242,7 +255,7 @@ namespace TxtAIEditor.Controls
             string actionName = _getString("LlmActionCustom", "커스텀 지시사항 실행");
 
             await PreflightCheckAndRunAsync(actionName, $"{fileContext}\n\n{selectedText}",
-                onChunk => _llmService.CustomPromptAsync(prompt, fileContext, selectedText, onChunk),
+                (onChunk, ct) => _llmService.CustomPromptAsync(prompt, fileContext, selectedText, onChunk, ct),
                 customInstruction: prompt);
         }
 
@@ -272,7 +285,9 @@ namespace TxtAIEditor.Controls
             }
 
             string fileContext = $"[파일 맥락: {title}]\n{content}";
-            string display = $"{Path.GetFileName(title)} · {fileContext.Length:N0} 글자";
+            int estimatedTokens = StatusBarController.EstimateTokenCount(fileContext);
+            string format = _getString("LlmFileContextDisplayFormat", "{0} · 약 {1:N0} 토큰");
+            string display = string.Format(format, Path.GetFileName(title), estimatedTokens);
 
             if (_activeInstructionIndex >= 0 && _activeInstructionIndex < _instructions.Count)
             {
@@ -515,140 +530,204 @@ namespace TxtAIEditor.Controls
 
         private async Task ProcessChunkedSummarizationAsync(string fileContext)
         {
-            string content = ExtractContentFromFileContext(fileContext);
-            string[] lines = content.Split('\n');
-            const int chunkSize = 500;
-            int totalChunks = (int)Math.Ceiling((double)lines.Length / chunkSize);
+            _assistantCts = new CancellationTokenSource();
+            _isAssistantRunning = true;
+            _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomCancelButtonText", "중단");
 
-            if (totalChunks == 0) return;
-
-            _rightSidebar.LlmOutput.Text = "";
-            _rightSidebar.RightTabs.SelectedIndex = 1;
-
-            string actionName = _getString("LlmActionSummarize", "요약");
-            var results = new List<string>();
-            bool hasError = false;
-
-            for (int i = 0; i < totalChunks; i++)
+            try
             {
-                if (hasError) break;
+                string content = ExtractContentFromFileContext(fileContext);
+                string[] lines = content.Split('\n');
+                const int chunkSize = 500;
+                int totalChunks = (int)Math.Ceiling((double)lines.Length / chunkSize);
 
-                int current = i + 1;
-                string progressText = $"{actionName} 진행 중: {current}/{totalChunks} 청크 완료";
-                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
-                {
-                    _rightSidebar.LlmOutput.Text = progressText;
-                });
+                if (totalChunks == 0) return;
 
-                int start = i * chunkSize;
-                int count = Math.Min(chunkSize, lines.Length - start);
-                string chunkText = string.Join("\n", lines, start, count);
+                _rightSidebar.LlmOutput.Text = "";
+                _rightSidebar.RightTabs.SelectedIndex = 1;
 
-                try
+                string actionName = _getString("LlmActionSummarize", "요약");
+                var results = new List<string>();
+                bool hasError = false;
+
+                string progressFormat = _getString("LlmChunkProgressFormat", "{0} 진행 중: {1}/{2} 청크 완료");
+
+                for (int i = 0; i < totalChunks; i++)
                 {
-                    string summary = await _llmService.SummarizeTextAsync(chunkText);
-                    results.Add(summary);
-                }
-                catch (Exception ex)
-                {
-                    hasError = true;
-                    string errorFormat = _getString("LlmChunkErrorFormat", "청크 {0} 처리 중 오류: {1}");
+                    _assistantCts.Token.ThrowIfCancellationRequested();
+
+                    if (hasError) break;
+
+                    int current = i + 1;
+                    string progressText = string.Format(progressFormat, actionName, current, totalChunks);
                     _rightSidebar.DispatcherQueue.TryEnqueue(() =>
                     {
-                        _rightSidebar.LlmOutput.Text = string.Format(errorFormat, current, ex.Message);
+                        _rightSidebar.LlmOutput.Text = progressText;
                     });
-                    return;
+
+                    int start = i * chunkSize;
+                    int count = Math.Min(chunkSize, lines.Length - start);
+                    string chunkText = string.Join("\n", lines, start, count);
+
+                    try
+                    {
+                        string summary = await _llmService.SummarizeTextAsync(chunkText, cancellationToken: _assistantCts.Token);
+                        results.Add(summary);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex is OperationCanceledException || _assistantCts.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        hasError = true;
+                        string errorFormat = _getString("LlmChunkErrorFormat", "청크 {0} 처리 중 오류: {1}");
+                        _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                        {
+                            _rightSidebar.LlmOutput.Text = string.Format(errorFormat, current, ex.Message);
+                        });
+                        return;
+                    }
                 }
+
+                if (hasError || results.Count == 0) return;
+
+                string combined = string.Join("\n\n---\n\n", results);
+                string outputPath = GetOutputFilePath("_summary");
+                string? dir = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                await File.WriteAllTextAsync(outputPath, combined);
+
+                string completeMsg = string.Format(
+                    _getString("LlmSummarizeComplete", "{0} 완료. {1} 로 저장하였습니다."),
+                    actionName, outputPath);
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _rightSidebar.LlmOutput.Text = completeMsg;
+                });
             }
-
-            if (hasError || results.Count == 0) return;
-
-            string combined = string.Join("\n\n---\n\n", results);
-            string outputPath = GetOutputFilePath("_summary");
-            string dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-
-            await File.WriteAllTextAsync(outputPath, combined);
-
-            string completeMsg = string.Format(
-                _getString("LlmSummarizeComplete", "{0} 완료. {1} 로 저장하였습니다."),
-                actionName, outputPath);
-            _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+            catch (OperationCanceledException)
             {
-                _rightSidebar.LlmOutput.Text = completeMsg;
-            });
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _rightSidebar.LlmOutput.Text = _getString("LlmOperationCanceled", "작업이 중단되었습니다.");
+                });
+            }
+            finally
+            {
+                _isAssistantRunning = false;
+                _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomRunButtonText", "전송");
+                _assistantCts?.Dispose();
+                _assistantCts = null;
+            }
         }
 
         private async Task ProcessChunkedTranslationAsync(string fileContext)
         {
-            string content = ExtractContentFromFileContext(fileContext);
-            string[] lines = content.Split('\n');
-            const int chunkSize = 200;
-            int totalChunks = (int)Math.Ceiling((double)lines.Length / chunkSize);
+            _assistantCts = new CancellationTokenSource();
+            _isAssistantRunning = true;
+            _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomCancelButtonText", "중단");
 
-            if (totalChunks == 0) return;
-
-            _rightSidebar.LlmOutput.Text = "";
-            _rightSidebar.RightTabs.SelectedIndex = 1;
-
-            string actionName = _getString("LlmActionTranslate", "번역");
-            var results = new List<string>();
-            bool hasError = false;
-
-            for (int i = 0; i < totalChunks; i++)
+            try
             {
-                if (hasError) break;
+                string content = ExtractContentFromFileContext(fileContext);
+                string[] lines = content.Split('\n');
+                const int chunkSize = 200;
+                int totalChunks = (int)Math.Ceiling((double)lines.Length / chunkSize);
 
-                int current = i + 1;
-                string progressText = $"{actionName} 진행 중: {current}/{totalChunks} 청크 완료";
-                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
-                {
-                    _rightSidebar.LlmOutput.Text = progressText;
-                });
+                if (totalChunks == 0) return;
 
-                int start = i * chunkSize;
-                int count = Math.Min(chunkSize, lines.Length - start);
-                string chunkText = string.Join("\n", lines, start, count);
+                _rightSidebar.LlmOutput.Text = "";
+                _rightSidebar.RightTabs.SelectedIndex = 1;
 
-                try
+                string actionName = _getString("LlmActionTranslate", "번역");
+                var results = new List<string>();
+                bool hasError = false;
+
+                string progressFormat = _getString("LlmChunkProgressFormat", "{0} 진행 중: {1}/{2} 청크 완료");
+
+                for (int i = 0; i < totalChunks; i++)
                 {
-                    string translated = await _llmService.TranslateTextAsync(chunkText);
-                    results.Add(translated);
-                }
-                catch (Exception ex)
-                {
-                    hasError = true;
-                    string errorFormat = _getString("LlmChunkErrorFormat", "청크 {0} 처리 중 오류: {1}");
+                    _assistantCts.Token.ThrowIfCancellationRequested();
+
+                    if (hasError) break;
+
+                    int current = i + 1;
+                    string progressText = string.Format(progressFormat, actionName, current, totalChunks);
                     _rightSidebar.DispatcherQueue.TryEnqueue(() =>
                     {
-                        _rightSidebar.LlmOutput.Text = string.Format(errorFormat, current, ex.Message);
+                        _rightSidebar.LlmOutput.Text = progressText;
                     });
-                    return;
+
+                    int start = i * chunkSize;
+                    int count = Math.Min(chunkSize, lines.Length - start);
+                    string chunkText = string.Join("\n", lines, start, count);
+
+                    try
+                    {
+                        string translated = await _llmService.TranslateTextAsync(chunkText, cancellationToken: _assistantCts.Token);
+                        results.Add(translated);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex is OperationCanceledException || _assistantCts.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        hasError = true;
+                        string errorFormat = _getString("LlmChunkErrorFormat", "청크 {0} 처리 중 오류: {1}");
+                        _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                        {
+                            _rightSidebar.LlmOutput.Text = string.Format(errorFormat, current, ex.Message);
+                        });
+                        return;
+                    }
                 }
+
+                if (hasError || results.Count == 0) return;
+
+                string combined = string.Join("\n", results);
+                string outputPath = GetOutputFilePath("_translation");
+                string? dir = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                await File.WriteAllTextAsync(outputPath, combined);
+
+                string completeMsg = string.Format(
+                    _getString("LlmTranslateComplete", "{0} 완료. {1} 로 저장하였습니다."),
+                    actionName, outputPath);
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _rightSidebar.LlmOutput.Text = completeMsg;
+                });
             }
-
-            if (hasError || results.Count == 0) return;
-
-            string combined = string.Join("\n", results);
-            string outputPath = GetOutputFilePath("_translation");
-            string dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-
-            await File.WriteAllTextAsync(outputPath, combined);
-
-            string completeMsg = string.Format(
-                _getString("LlmTranslateComplete", "{0} 완료. {1} 로 저장하였습니다."),
-                actionName, outputPath);
-            _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+            catch (OperationCanceledException)
             {
-                _rightSidebar.LlmOutput.Text = completeMsg;
-            });
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _rightSidebar.LlmOutput.Text = _getString("LlmOperationCanceled", "작업이 중단되었습니다.");
+                });
+            }
+            finally
+            {
+                _isAssistantRunning = false;
+                _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomRunButtonText", "전송");
+                _assistantCts?.Dispose();
+                _assistantCts = null;
+            }
         }
 
-        private async Task PreflightCheckAndRunAsync(string actionName, string contentText, Func<Func<string, Task>, Task<string>> streamingCall, string customInstruction = "")
+        private async Task PreflightCheckAndRunAsync(
+            string actionName,
+            string contentText,
+            Func<Func<string, Task>, CancellationToken, Task<string>> streamingCall,
+            string customInstruction = "")
         {
+            if (_isAssistantRunning) return;
+
             if (_settingsService.CurrentSettings.LlmConfirmBeforeSending)
             {
                 string previewText = contentText;
@@ -685,6 +764,10 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            _assistantCts = new CancellationTokenSource();
+            _isAssistantRunning = true;
+            _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomCancelButtonText", "중단");
+
             _rightSidebar.LlmOutput.Text = "";
             _rightSidebar.RightTabs.SelectedIndex = 1;
 
@@ -699,12 +782,36 @@ namespace TxtAIEditor.Controls
                         _rightSidebar.LlmOutput.SelectionLength = 0;
                     });
                     await Task.CompletedTask;
+                }, _assistantCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _rightSidebar.LlmOutput.Text = _getString("LlmOperationCanceled", "작업이 중단되었습니다.");
                 });
             }
             catch (Exception ex)
             {
-                string exceptionFormat = _getString("LlmExceptionFormat", "AI 실행 도중 예외가 터졌습니다: {0}");
-                _rightSidebar.LlmOutput.Text = string.Format(exceptionFormat, ex.Message);
+                if (ex is OperationCanceledException || _assistantCts.IsCancellationRequested)
+                {
+                    _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                    {
+                        _rightSidebar.LlmOutput.Text = _getString("LlmOperationCanceled", "작업이 중단되었습니다.");
+                    });
+                }
+                else
+                {
+                    string exceptionFormat = _getString("LlmExceptionFormat", "AI 실행 도중 예외가 터졌습니다: {0}");
+                    _rightSidebar.LlmOutput.Text = string.Format(exceptionFormat, ex.Message);
+                }
+            }
+            finally
+            {
+                _isAssistantRunning = false;
+                _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomRunButtonText", "전송");
+                _assistantCts?.Dispose();
+                _assistantCts = null;
             }
         }
 
