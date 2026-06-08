@@ -79,7 +79,7 @@
             <controls:EditorWorkspacePane x:Name="EditorWorkspace" Grid.Column="2"/>
 
             <!-- D. Preview Splitter -->
-            <local:CustomSplitter x:Name="RightSplitter" Grid.Column="3" Width="12" VisualThickness="2" Margin="-5,0,-5,0" HorizontalAlignment="Stretch"/>
+            <local:CustomSplitter x:Name="RightSplitter" Grid.Column="3" Width="12" VisualThickness="2" Margin="0,0,-10,0" HorizontalAlignment="Stretch"/>
 
             <!-- E. Right Tabbed Panel (Live Preview & AI Assistant) -->
             <controls:RightSidebarPane x:Name="PreviewGrid" Grid.Column="4" />
