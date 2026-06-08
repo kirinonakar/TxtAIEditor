@@ -715,7 +715,7 @@ namespace TxtAIEditor.Controls
                     {
                         if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                         {
-                            toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success. If the user's request is satisfied, write the final answer now. Continue only for a necessary next step, and do not repeat this same tool call unless the user explicitly asks to rerun it or the previous result is incomplete.]";
+                            toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
                         }
                     }
 
