@@ -620,6 +620,19 @@ namespace TxtAIEditor.Controls
             NewSessionRequested?.Invoke(sender, e);
         }
 
+        private void OnClearPromptClick(object sender, RoutedEventArgs e)
+        {
+            AgentPromptInput.Text = string.Empty;
+            AgentPromptInput.Focus(FocusState.Programmatic);
+        }
+
+        private void OnPromptTextChanged(object sender, TextChangedEventArgs e)
+        {
+            AgentClearPromptButton.Visibility = string.IsNullOrEmpty(AgentPromptInput.Text)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+
         private void OnAgentHistoryFlyoutOpened(object sender, object e)
         {
             RebuildHistoryMenu();

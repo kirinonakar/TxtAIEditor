@@ -394,26 +394,39 @@
                             Orientation="Horizontal"
                             Spacing="4"/>
             </ScrollViewer>
-            <TextBox x:Name="AgentPromptInput"
-                     Grid.Row="1" Grid.Column="0"
-                     PlaceholderText="Agent에게 맡길 작업 입력..."
-                     MinHeight="72"
-                     MaxHeight="120"
-                     FontSize="12"
-                     FontFamily="Segoe UI, Malgun Gothic"
-                     TextWrapping="Wrap"
-                     AcceptsReturn="True"
-                     Padding="10,8,10,8"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                     IsSpellCheckEnabled="False"
-                     IsTextPredictionEnabled="False"
-                     KeyDown="OnPromptInputKeyDown">
-                <TextBox.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="Enter"
-                                         Modifiers="Control"
-                                         Invoked="OnPromptRunKeyboardAcceleratorInvoked"/>
-                </TextBox.KeyboardAccelerators>
-            </TextBox>
+            <Grid Grid.Row="1" Grid.Column="0">
+                <TextBox x:Name="AgentPromptInput"
+                         PlaceholderText="Agent에게 맡길 작업 입력..."
+                         MinHeight="72"
+                         MaxHeight="120"
+                         FontSize="12"
+                         FontFamily="Segoe UI, Malgun Gothic"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         Padding="10,8,26,8"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         IsSpellCheckEnabled="False"
+                         IsTextPredictionEnabled="False"
+                         KeyDown="OnPromptInputKeyDown"
+                         TextChanged="OnPromptTextChanged">
+                    <TextBox.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="Enter"
+                                             Modifiers="Control"
+                                             Invoked="OnPromptRunKeyboardAcceleratorInvoked"/>
+                    </TextBox.KeyboardAccelerators>
+                </TextBox>
+                <Button x:Name="AgentClearPromptButton"
+                        Content="&#x2715;"
+                        Width="20" Height="20"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,6,6,0"
+                        FontSize="10"
+                        Padding="2"
+                        Visibility="Collapsed"
+                        Click="OnClearPromptClick"
+                        Style="{StaticResource AgentButtonStyle}"/>
+            </Grid>
             <Grid Grid.Row="1" Grid.Column="1"
                   Width="64"
                   VerticalAlignment="Stretch">

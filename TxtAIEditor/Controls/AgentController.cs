@@ -881,6 +881,7 @@ namespace TxtAIEditor.Controls
             _sessionEdits.Clear();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
+                _agentPane.Prompt.Text = string.Empty;
                 _agentPane.ResetOutput(_displayText.OutputPlaceholder);
                 _agentPane.ClearActivity(_displayText.ActivityIdle);
                 _agentPane.UpdateModifiedFiles(new List<AgentFileEditPreview>());
