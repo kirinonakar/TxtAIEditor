@@ -1112,7 +1112,7 @@ namespace TxtAIEditor.Controls
 
             foreach (string presetName in _agentPresetNames)
             {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 0, 2) };
+                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1325,7 +1325,7 @@ namespace TxtAIEditor.Controls
 
             foreach (var item in _historyItems)
             {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 0, 2) };
+                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 

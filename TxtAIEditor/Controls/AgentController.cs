@@ -3785,13 +3785,25 @@ namespace TxtAIEditor.Controls
 
         private string GetSessionTitle(string instruction)
         {
+            string firstLine;
             if (string.IsNullOrWhiteSpace(instruction))
             {
-                return "Untitled Session";
+                var selected = GetSelectedAgentPresets();
+                if (selected.Count > 0)
+                {
+                    firstLine = string.Join(", ", selected.Select(p => p.Name));
+                }
+                else
+                {
+                    return "Untitled Session";
+                }
+            }
+            else
+            {
+                firstLine = instruction.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? instruction;
+                firstLine = firstLine.Trim();
             }
 
-            string firstLine = instruction.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? instruction;
-            firstLine = firstLine.Trim();
             if (firstLine.Length > 20)
             {
                 return firstLine.Substring(0, 17) + "...";
