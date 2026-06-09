@@ -60,16 +60,14 @@ namespace TxtAIEditor.Controls
 
         private bool IsPathUnderWorkspace(string filePath)
         {
-            var normalizedFolder = _workspaceFolderPath.TrimEnd(Path.DirectorySeparatorChar);
-            var normalizedFile = filePath.TrimEnd(Path.DirectorySeparatorChar);
+            var fileDirectory = Path.GetDirectoryName(filePath);
+            if (fileDirectory == null)
+                return false;
 
-            if (normalizedFile.Length > normalizedFolder.Length)
-            {
-                return normalizedFile.StartsWith(
-                    normalizedFolder + Path.DirectorySeparatorChar,
-                    StringComparison.OrdinalIgnoreCase);
-            }
-            return string.Equals(normalizedFile, normalizedFolder, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(
+                fileDirectory.TrimEnd(Path.DirectorySeparatorChar),
+                _workspaceFolderPath.TrimEnd(Path.DirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private void UpdateExternalPathIndicator()
