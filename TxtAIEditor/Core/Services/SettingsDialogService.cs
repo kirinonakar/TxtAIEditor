@@ -108,7 +108,7 @@ namespace TxtAIEditor.Core.Services
                 .FirstOrDefault(choice => choice.Id.Equals(selectedTerminalProfile, StringComparison.OrdinalIgnoreCase))
                 ?? terminalProfileCombo.Items.OfType<TerminalProfileChoice>().FirstOrDefault();
 
-            string[] providerNames = { "Gemini", "OpenAI", "OpenRouter", "LM Studio", "OpenCode Go" };
+            string[] providerNames = { "Gemini", "OpenAI", "OpenRouter", "LM Studio", "OpenCode Go", "OpenCode Zen" };
             int providerIndex = Array.FindIndex(providerNames, p => p.Equals(settings.LlmProvider, StringComparison.OrdinalIgnoreCase));
             if (providerIndex < 0) providerIndex = 1;
 
@@ -286,6 +286,38 @@ namespace TxtAIEditor.Core.Services
                     }
                     SelectModelChoice(target);
                 }
+                else if (provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddModelChoice("gpt-5.5");
+                    AddModelChoice("gpt-5.5-pro");
+                    AddModelChoice("gpt-5.4");
+                    AddModelChoice("gpt-5.4-pro");
+                    AddModelChoice("gpt-5.4-mini");
+                    AddModelChoice("gpt-5.4-nano");
+                    AddModelChoice("gpt-5-codex");
+                    AddModelChoice("gpt-5-nano");
+                    AddModelChoice("claude-opus-4-7");
+                    AddModelChoice("claude-sonnet-4-6");
+                    AddModelChoice("claude-haiku-4-5");
+                    AddModelChoice("gemini-3.5-flash");
+                    AddModelChoice("gemini-3.1-pro");
+                    AddModelChoice("gemini-3-flash");
+                    AddModelChoice("deepseek-v4-flash");
+                    AddModelChoice("glm-5.1");
+                    AddModelChoice("kimi-k2.6");
+                    AddModelChoice("minimax-m2.7");
+                    AddModelChoice("grok-build-0.1");
+                    AddModelChoice("qwen3.7-max");
+                    AddModelChoice("qwen3.7-plus");
+                    AddModelChoice("qwen3.6-plus");
+
+                    string target = !string.IsNullOrEmpty(settings.LlmModelOpenCodeZen) ? settings.LlmModelOpenCodeZen : selectedModel;
+                    if (string.IsNullOrEmpty(target) || !llmModelCombo.Items.Contains(target))
+                    {
+                        target = "gpt-5.5";
+                    }
+                    SelectModelChoice(target);
+                }
             }
 
             bool IsKnownDefaultEndpoint(string endpoint)
@@ -295,7 +327,8 @@ namespace TxtAIEditor.Core.Services
                    endpoint.Equals("https://openrouter.ai/api/v1", StringComparison.OrdinalIgnoreCase) ||
                    endpoint.Equals("http://localhost:1234/v1", StringComparison.OrdinalIgnoreCase) ||
                    endpoint.Equals("https://generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
-                   endpoint.Equals("https://opencode.ai/zen/go/v1", StringComparison.OrdinalIgnoreCase);
+                   endpoint.Equals("https://opencode.ai/zen/go/v1", StringComparison.OrdinalIgnoreCase) ||
+                   endpoint.Equals("https://opencode.ai/zen/v1", StringComparison.OrdinalIgnoreCase);
             }
 
             void ApplyProviderDefaults(string provider)
@@ -312,6 +345,7 @@ namespace TxtAIEditor.Core.Services
                     "OpenRouter" => "https://openrouter.ai/api/v1",
                     "Gemini" => "https://generativelanguage.googleapis.com",
                     "OpenCode Go" => "https://opencode.ai/zen/go/v1",
+                    "OpenCode Zen" => "https://opencode.ai/zen/v1",
                     _ => llmEndpointBox.Text
                 };
             }
@@ -322,8 +356,9 @@ namespace TxtAIEditor.Core.Services
                 bool isLmStudio = provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase);
                 bool isOpenRouter = provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase);
                 bool isOpenCodeGo = provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase);
+                bool isOpenCodeZen = provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase);
 
-                if (!isLmStudio && !isOpenRouter && !isOpenCodeGo)
+                if (!isLmStudio && !isOpenRouter && !isOpenCodeGo && !isOpenCodeZen)
                 {
                     llmModelStatusText.Text = getString("SettingsLlmLoadModelsNotSupported", "해당 공급자는 모델 불러오기를 지원하지 않습니다.");
                     return;
@@ -345,6 +380,8 @@ namespace TxtAIEditor.Core.Services
                         ? (!string.IsNullOrEmpty(settings.LlmModelLmStudio) ? settings.LlmModelLmStudio : settings.LlmModel)
                         : isOpenCodeGo
                         ? (!string.IsNullOrEmpty(settings.LlmModelOpenCodeGo) ? settings.LlmModelOpenCodeGo : settings.LlmModel)
+                        : isOpenCodeZen
+                        ? (!string.IsNullOrEmpty(settings.LlmModelOpenCodeZen) ? settings.LlmModelOpenCodeZen : settings.LlmModel)
                         : (!string.IsNullOrEmpty(settings.LlmModelOpenRouter) ? settings.LlmModelOpenRouter : settings.LlmModel);
 
                     SelectModelChoice(models.Contains(targetModel) ? targetModel : models.FirstOrDefault() ?? targetModel);
@@ -358,6 +395,8 @@ namespace TxtAIEditor.Core.Services
                         ? (!string.IsNullOrEmpty(settings.LlmModelLmStudio) ? settings.LlmModelLmStudio : settings.LlmModel)
                         : isOpenCodeGo
                         ? (!string.IsNullOrEmpty(settings.LlmModelOpenCodeGo) ? settings.LlmModelOpenCodeGo : settings.LlmModel)
+                        : isOpenCodeZen
+                        ? (!string.IsNullOrEmpty(settings.LlmModelOpenCodeZen) ? settings.LlmModelOpenCodeZen : settings.LlmModel)
                         : (!string.IsNullOrEmpty(settings.LlmModelOpenRouter) ? settings.LlmModelOpenRouter : settings.LlmModel);
                     SelectModelChoice(targetModel);
                     llmModelStatusText.Text = string.Format(getString("SettingsLlmLoadModelsFailedFormat", "{0} 모델 목록을 불러오지 못했습니다: {1}"), provider, ex.Message);
@@ -390,6 +429,13 @@ namespace TxtAIEditor.Core.Services
                     refreshLmStudioModelsButton.Content = getString("SettingsLlmLoadOpenCodeGoModels", "OpenCode Go 모델 불러오기");
                     refreshLmStudioModelsButton.Visibility = Visibility.Visible;
                     llmModelStatusText.Text = getString("SettingsLlmOpenCodeGoInfo", "OpenCode Go는 https://opencode.ai/zen/go/v1/models 에서 모델 목록을 불러옵니다.");
+                    llmModelStatusText.Visibility = Visibility.Visible;
+                }
+                else if (provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
+                {
+                    refreshLmStudioModelsButton.Content = getString("SettingsLlmLoadOpenCodeZenModels", "OpenCode Zen 모델 불러오기");
+                    refreshLmStudioModelsButton.Visibility = Visibility.Visible;
+                    llmModelStatusText.Text = getString("SettingsLlmOpenCodeZenInfo", "OpenCode Zen는 https://opencode.ai/zen/v1/models 에서 모델 목록을 불러옵니다.");
                     llmModelStatusText.Visibility = Visibility.Visible;
                 }
                 else
@@ -428,11 +474,15 @@ namespace TxtAIEditor.Core.Services
                 {
                     targetModel = !string.IsNullOrEmpty(settings.LlmModelOpenCodeGo) ? settings.LlmModelOpenCodeGo : "deepseek-v4-flash";
                 }
+                else if (provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
+                {
+                    targetModel = !string.IsNullOrEmpty(settings.LlmModelOpenCodeZen) ? settings.LlmModelOpenCodeZen : "gpt-5.5";
+                }
 
                 PopulateModelChoices(provider, targetModel);
                 UpdateModelRefreshButtonVisibility();
 
-                if (provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) || provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase) || provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
+                if (provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) || provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase) || provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase) || provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
                 {
                     _ = RefreshLmStudioModelsAsync();
                 }
@@ -1113,6 +1163,10 @@ SOFTWARE.",
             else if (settings.LlmProvider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
             {
                 settings.LlmModelOpenCodeGo = settings.LlmModel;
+            }
+            else if (settings.LlmProvider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmModelOpenCodeZen = settings.LlmModel;
             }
 
             settings.DefaultMarkdownEnabled = defaultMarkdownCheck.IsChecked == true;

@@ -258,6 +258,9 @@ namespace TxtAIEditor.Core.Services
                 "opencode go" => new GoProvider(),
                 "opencodego" => new GoProvider(),
                 "go" => new GoProvider(),
+                "opencode zen" => new GoProvider(),
+                "opencodezen" => new GoProvider(),
+                "zen" => new GoProvider(),
                 _ => new OpenAIProvider()
             };
 

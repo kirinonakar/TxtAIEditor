@@ -389,6 +389,12 @@
   <data name="SettingsLlmOpenCodeGoInfo" xml:space="preserve">
     <value>OpenCode Go loads the list of models from https://opencode.ai/zen/go/v1/models.</value>
   </data>
+  <data name="SettingsLlmLoadOpenCodeZenModels" xml:space="preserve">
+    <value>Load OpenCode Zen Models</value>
+  </data>
+  <data name="SettingsLlmOpenCodeZenInfo" xml:space="preserve">
+    <value>OpenCode Zen loads the list of models from https://opencode.ai/zen/v1/models.</value>
+  </data>
   <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
     <value>API Keys are stored in the Windows Credential Manager, not in settings files.</value>
   </data>

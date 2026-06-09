@@ -49,6 +49,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmModelOpenRouter { get; set; } = "moonshotai/kimi-k2.6:free";
         public string LlmModelLmStudio { get; set; } = "";
         public string LlmModelOpenCodeGo { get; set; } = "";
+        public string LlmModelOpenCodeZen { get; set; } = "";
         public bool LlmConfirmBeforeSending { get; set; } = false;
         public bool LlmAgentVerbose { get; set; } = false;
         public bool LlmAgentAutoApproveGitEdits { get; set; } = false;
