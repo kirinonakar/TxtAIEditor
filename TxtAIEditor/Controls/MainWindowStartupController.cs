@@ -193,6 +193,7 @@ namespace TxtAIEditor.Controls
             }
             else if (startupPaths.Folders.Count == 0)
             {
+                _openNewTab();
                 NavigateStartupFolderWithoutBlocking(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
             }
         }
