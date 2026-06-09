@@ -278,6 +278,7 @@ namespace TxtAIEditor.Core.Services
                     AddModelChoice("qwen3.7-max");
                     AddModelChoice("qwen3.7-plus");
                     AddModelChoice("qwen3.6-plus");
+                    AddModelChoice("qwen3.5-plus");
 
                     string target = !string.IsNullOrEmpty(settings.LlmModelOpenCodeGo) ? settings.LlmModelOpenCodeGo : selectedModel;
                     if (string.IsNullOrEmpty(target) || !llmModelCombo.Items.Contains(target))
@@ -306,10 +307,12 @@ namespace TxtAIEditor.Core.Services
                     AddModelChoice("glm-5.1");
                     AddModelChoice("kimi-k2.6");
                     AddModelChoice("minimax-m2.7");
+                    AddModelChoice("minimax-m2.5");
                     AddModelChoice("grok-build-0.1");
                     AddModelChoice("qwen3.7-max");
                     AddModelChoice("qwen3.7-plus");
                     AddModelChoice("qwen3.6-plus");
+                    AddModelChoice("qwen3.5-plus");
 
                     string target = !string.IsNullOrEmpty(settings.LlmModelOpenCodeZen) ? settings.LlmModelOpenCodeZen : selectedModel;
                     if (string.IsNullOrEmpty(target) || !llmModelCombo.Items.Contains(target))
