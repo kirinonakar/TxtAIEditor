@@ -281,7 +281,7 @@ namespace TxtAIEditor.Core.Services
                     AddModelChoice("qwen3.5-plus");
 
                     string target = !string.IsNullOrEmpty(settings.LlmModelOpenCodeGo) ? settings.LlmModelOpenCodeGo : selectedModel;
-                    if (string.IsNullOrEmpty(target) || !llmModelCombo.Items.Contains(target))
+                    if (string.IsNullOrEmpty(target))
                     {
                         target = "deepseek-v4-flash";
                     }
@@ -315,7 +315,7 @@ namespace TxtAIEditor.Core.Services
                     AddModelChoice("qwen3.5-plus");
 
                     string target = !string.IsNullOrEmpty(settings.LlmModelOpenCodeZen) ? settings.LlmModelOpenCodeZen : selectedModel;
-                    if (string.IsNullOrEmpty(target) || !llmModelCombo.Items.Contains(target))
+                    if (string.IsNullOrEmpty(target))
                     {
                         target = "gpt-5.5";
                     }
