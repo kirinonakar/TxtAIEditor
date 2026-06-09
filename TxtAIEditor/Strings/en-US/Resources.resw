@@ -383,6 +383,21 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouter loads the list of models from https://openrouter.ai/api/v1/models.</value>
   </data>
+  <data name="SettingsLlmThinkingLevel" xml:space="preserve">
+    <value>Thinking Level</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelLow" xml:space="preserve">
+    <value>Low</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelMedium" xml:space="preserve">
+    <value>Medium</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelHigh" xml:space="preserve">
+    <value>High</value>
+  </data>
   <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
     <value>Load OpenCode Go Models</value>
   </data>

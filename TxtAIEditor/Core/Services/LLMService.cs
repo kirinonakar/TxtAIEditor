@@ -255,12 +255,12 @@ namespace TxtAIEditor.Core.Services
                 "openrouter" => new OpenRouterProvider(),
                 "lm studio" => new LMStudioProvider(),
                 "lmstudio" => new LMStudioProvider(),
-                "opencode go" => new GoProvider(),
-                "opencodego" => new GoProvider(),
-                "go" => new GoProvider(),
-                "opencode zen" => new GoProvider(),
-                "opencodezen" => new GoProvider(),
-                "zen" => new GoProvider(),
+                "opencode go" => new GoProvider(settings.LlmThinkingLevel),
+                "opencodego" => new GoProvider(settings.LlmThinkingLevel),
+                "go" => new GoProvider(settings.LlmThinkingLevel),
+                "opencode zen" => new GoProvider(settings.LlmThinkingLevel),
+                "opencodezen" => new GoProvider(settings.LlmThinkingLevel),
+                "zen" => new GoProvider(settings.LlmThinkingLevel),
                 _ => new OpenAIProvider()
             };
 

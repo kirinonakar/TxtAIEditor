@@ -383,6 +383,21 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouterは https://openrouter.ai/api/v1/models からモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmThinkingLevel" xml:space="preserve">
+    <value>Thinking Level</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelNone" xml:space="preserve">
+    <value>なし</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelLow" xml:space="preserve">
+    <value>低い (Low)</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelMedium" xml:space="preserve">
+    <value>中 (Medium)</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelHigh" xml:space="preserve">
+    <value>高い (High)</value>
+  </data>
   <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
     <value>OpenCode Goモデルを取得</value>
   </data>

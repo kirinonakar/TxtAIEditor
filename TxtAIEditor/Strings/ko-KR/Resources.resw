@@ -383,6 +383,21 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouter는 https://openrouter.ai/api/v1/models 에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmThinkingLevel" xml:space="preserve">
+    <value>Thinking Level</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelNone" xml:space="preserve">
+    <value>사용 안함</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelLow" xml:space="preserve">
+    <value>낮음 (Low)</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelMedium" xml:space="preserve">
+    <value>중간 (Medium)</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelHigh" xml:space="preserve">
+    <value>높음 (High)</value>
+  </data>
   <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
     <value>OpenCode Go 모델 불러오기</value>
   </data>

@@ -50,6 +50,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmModelLmStudio { get; set; } = "";
         public string LlmModelOpenCodeGo { get; set; } = "";
         public string LlmModelOpenCodeZen { get; set; } = "";
+        public string LlmThinkingLevel { get; set; } = "";
         public bool LlmConfirmBeforeSending { get; set; } = false;
         public bool LlmAgentVerbose { get; set; } = false;
         public bool LlmAgentAutoApproveGitEdits { get; set; } = false;

@@ -174,6 +174,19 @@ namespace TxtAIEditor.Core.Services
                 _ => 0
             };
 
+            var llmThinkingLevelCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, Visibility = Visibility.Collapsed };
+            llmThinkingLevelCombo.Items.Add(getString("SettingsLlmThinkingLevelNone", "사용 안함"));
+            llmThinkingLevelCombo.Items.Add(getString("SettingsLlmThinkingLevelLow", "낮음 (Low)"));
+            llmThinkingLevelCombo.Items.Add(getString("SettingsLlmThinkingLevelMedium", "중간 (Medium)"));
+            llmThinkingLevelCombo.Items.Add(getString("SettingsLlmThinkingLevelHigh", "높음 (High)"));
+            llmThinkingLevelCombo.SelectedIndex = settings.LlmThinkingLevel.ToLowerInvariant() switch
+            {
+                "low" => 1,
+                "medium" => 2,
+                "high" => 3,
+                _ => 0
+            };
+
             var refreshLmStudioModelsButton = new Button { Content = getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기"), HorizontalAlignment = HorizontalAlignment.Stretch };
             var llmModelStatusText = new TextBlock
             {
@@ -413,6 +426,10 @@ namespace TxtAIEditor.Core.Services
             void UpdateModelRefreshButtonVisibility()
             {
                 string provider = GetSelectedProviderName();
+                bool isGoOrZen = provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase) ||
+                                 provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase);
+                llmThinkingLevelCombo.Visibility = isGoOrZen ? Visibility.Visible : Visibility.Collapsed;
+
                 if (provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase))
                 {
                     refreshLmStudioModelsButton.Content = getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기");
@@ -588,6 +605,9 @@ namespace TxtAIEditor.Core.Services
             llmSection.Children.Add(llmModelCombo);
             llmSection.Children.Add(refreshLmStudioModelsButton);
             llmSection.Children.Add(llmModelStatusText);
+
+            AddLabel(llmSection, getString("SettingsLlmThinkingLevel", "Thinking Level"));
+            llmSection.Children.Add(llmThinkingLevelCombo);
 
             AddLabel(llmSection, getString("SettingsExaEndpoint", "Exa 검색 API / MCP Endpoint"));
             llmSection.Children.Add(exaEndpointBox);
@@ -1123,6 +1143,13 @@ SOFTWARE.",
             settings.LlmConfirmBeforeSending = confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = agentVerboseCheck.IsChecked == true;
             settings.LlmAgentAutoApproveGitEdits = agentAutoApproveGitEditsCheck.IsChecked == true;
+            settings.LlmThinkingLevel = llmThinkingLevelCombo.SelectedIndex switch
+            {
+                1 => "low",
+                2 => "medium",
+                3 => "high",
+                _ => ""
+            };
 
             settings.LlmSourceLanguage = sourceLangCombo.SelectedIndex switch
             {

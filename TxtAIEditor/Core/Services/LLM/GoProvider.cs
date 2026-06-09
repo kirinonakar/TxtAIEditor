@@ -13,6 +13,22 @@ namespace TxtAIEditor.Core.Services.LLM
     public class GoProvider : ILLMProvider
     {
         private static readonly HttpClient _httpClient = new HttpClient();
+        private readonly string _thinkingLevel;
+
+        public GoProvider(string thinkingLevel = "")
+        {
+            _thinkingLevel = thinkingLevel ?? "";
+        }
+
+        private static int GetThinkingBudget(string level) => level.ToLowerInvariant() switch
+        {
+            "low" => 1024,
+            "medium" => 4096,
+            "high" => 16384,
+            _ => 0
+        };
+
+        private bool HasThinking => !string.IsNullOrEmpty(_thinkingLevel) && _thinkingLevel != "none";
 
         private static readonly HashSet<string> _anthropicModels = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -38,18 +54,23 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            var payload = new
+            var payloadDict = new Dictionary<string, object>
             {
-                model = model,
-                messages = new[]
+                ["model"] = model,
+                ["messages"] = new[]
                 {
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                temperature = 0.5
+                ["temperature"] = 0.5
             };
 
-            string jsonPayload = JsonSerializer.Serialize(payload);
+            if (HasThinking)
+            {
+                payloadDict["reasoning_effort"] = _thinkingLevel.ToLowerInvariant();
+            }
+
+            string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -96,19 +117,24 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            var payload = new
+            var payloadDict = new Dictionary<string, object>
             {
-                model = model,
-                messages = new[]
+                ["model"] = model,
+                ["messages"] = new[]
                 {
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                temperature = 0.5,
-                stream = true
+                ["temperature"] = 0.5,
+                ["stream"] = true
             };
 
-            string jsonPayload = JsonSerializer.Serialize(payload);
+            if (HasThinking)
+            {
+                payloadDict["reasoning_effort"] = _thinkingLevel.ToLowerInvariant();
+            }
+
+            string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -166,7 +192,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        private static async Task<string> GenerateAnthropicCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments)
+        private async Task<string> GenerateAnthropicCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments)
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
@@ -188,6 +214,19 @@ namespace TxtAIEditor.Core.Services.LLM
             if (!string.IsNullOrEmpty(systemPrompt))
             {
                 payloadDict["system"] = systemPrompt;
+            }
+
+            if (HasThinking)
+            {
+                int budget = GetThinkingBudget(_thinkingLevel);
+                if (budget > 0)
+                {
+                    payloadDict["thinking"] = new Dictionary<string, object>
+                    {
+                        ["type"] = "enabled",
+                        ["budget_tokens"] = budget
+                    };
+                }
             }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
@@ -223,7 +262,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        private static async Task GenerateAnthropicCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments)
+        private async Task GenerateAnthropicCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments)
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
@@ -241,6 +280,19 @@ namespace TxtAIEditor.Core.Services.LLM
             if (!string.IsNullOrEmpty(systemPrompt))
             {
                 payloadDict["system"] = systemPrompt;
+            }
+
+            if (HasThinking)
+            {
+                int budget = GetThinkingBudget(_thinkingLevel);
+                if (budget > 0)
+                {
+                    payloadDict["thinking"] = new Dictionary<string, object>
+                    {
+                        ["type"] = "enabled",
+                        ["budget_tokens"] = budget
+                    };
+                }
             }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
