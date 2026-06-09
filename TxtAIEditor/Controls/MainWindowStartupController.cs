@@ -194,7 +194,12 @@ namespace TxtAIEditor.Controls
             else if (startupPaths.Folders.Count == 0)
             {
                 _openNewTab();
-                NavigateStartupFolderWithoutBlocking(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+                string homeFolder = _settingsService.CurrentSettings.HomeFolderPath;
+                if (string.IsNullOrWhiteSpace(homeFolder) || !Directory.Exists(homeFolder))
+                {
+                    homeFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                }
+                NavigateStartupFolderWithoutBlocking(homeFolder);
             }
         }
 

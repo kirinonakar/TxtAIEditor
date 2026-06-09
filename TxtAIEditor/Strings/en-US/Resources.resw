@@ -1969,4 +1969,10 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentInsertNewTabOutputTooltip" xml:space="preserve">
     <value>Insert Agent response in a new tab (Selected part only, if selected)</value>
   </data>
+  <data name="SettingsHomeFolder" xml:space="preserve">
+    <value>Home Folder</value>
+  </data>
+  <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
+    <value>C:\Users\...\Documents</value>
+  </data>
 </root>

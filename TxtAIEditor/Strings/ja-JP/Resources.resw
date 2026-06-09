@@ -1970,4 +1970,10 @@
   <data name="AgentInsertNewTabOutputTooltip" xml:space="preserve">
     <value>Agentの応答を新規タブに入力 (選択された場合は選択部分のみ)</value>
   </data>
+  <data name="SettingsHomeFolder" xml:space="preserve">
+    <value>ホームフォルダ</value>
+  </data>
+  <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
+    <value>C:\Users\...\Documents</value>
+  </data>
 </root>

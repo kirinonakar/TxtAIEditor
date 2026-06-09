@@ -70,6 +70,9 @@ namespace TxtAIEditor.Core.Models
         public bool ToolbarShowLabels { get; set; } = true;
         public List<string> ToolbarHiddenButtons { get; set; } = new List<string>();
 
+        // Startup
+        public string HomeFolderPath { get; set; } = string.Empty;
+
         // Language
         public string Language { get; set; } = "Default";
     }

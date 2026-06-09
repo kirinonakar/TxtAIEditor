@@ -16,6 +16,7 @@ namespace TxtAIEditor.Core.Interfaces
         Task<SettingsDialogResult> ShowAsync(
             EditorSettings settings,
             XamlRoot xamlRoot,
-            Func<string, string, string> getString);
+            Func<string, string, string> getString,
+            Action<object>? initializePickerWindow = null);
     }
 }

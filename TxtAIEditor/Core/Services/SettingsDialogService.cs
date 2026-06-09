@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.Storage.Pickers;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 
@@ -29,7 +30,8 @@ namespace TxtAIEditor.Core.Services
         public async Task<SettingsDialogResult> ShowAsync(
             EditorSettings settings,
             XamlRoot xamlRoot,
-            Func<string, string, string> getString)
+            Func<string, string, string> getString,
+            Action<object>? initializePickerWindow = null)
         {
             var languageCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             languageCombo.Items.Add(getString("LanguageDefault", "Default (OS Language)"));
@@ -89,6 +91,8 @@ namespace TxtAIEditor.Core.Services
             var defaultMarkdownCheck = new CheckBox { Content = getString("SettingsLivePreview", "실시간 미리보기 기본 활성화"), IsChecked = settings.DefaultMarkdownEnabled };
             var defaultMarkdownToolbarCheck = new CheckBox { Content = getString("SettingsMarkdownToolbar", "기본 마크다운 툴바 활성화"), IsChecked = settings.DefaultMarkdownToolbarEnabled };
             var tabSizeBox = new TextBox { PlaceholderText = "예: 4", Text = settings.TabSize.ToString(), HorizontalAlignment = HorizontalAlignment.Stretch };
+            var homeFolderBox = new TextBox { PlaceholderText = getString("SettingsHomeFolderPlaceholder", "C:\\Users\\..."), Text = settings.HomeFolderPath, Width = 420, IsSpellCheckEnabled = false };
+            var homeFolderBrowseButton = new Button { Content = "...", Width = 32, Height = 32, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             var terminalProfileCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             foreach (var profile in TerminalShellProfile.GetProfiles())
             {
@@ -435,6 +439,25 @@ namespace TxtAIEditor.Core.Services
             editorSection.Children.Add(defaultMarkdownToolbarCheck);
             AddLabel(editorSection, getString("SettingsTabSize", "Tab size"));
             editorSection.Children.Add(tabSizeBox);
+
+            AddLabel(editorSection, getString("SettingsHomeFolder", "홈 폴더"));
+            var homeFolderPanel = new StackPanel { Orientation = Orientation.Horizontal };
+            homeFolderPanel.Children.Add(homeFolderBox);
+            homeFolderPanel.Children.Add(homeFolderBrowseButton);
+            editorSection.Children.Add(homeFolderPanel);
+
+            homeFolderBrowseButton.Click += async (_, _) =>
+            {
+                if (initializePickerWindow == null) return;
+                var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.ComputerFolder };
+                initializePickerWindow(picker);
+                picker.FileTypeFilter.Add("*");
+                var folder = await picker.PickSingleFolderAsync();
+                if (folder != null)
+                {
+                    homeFolderBox.Text = folder.Path;
+                }
+            };
 
             var terminalSection = CreateSection();
             AddLabel(terminalSection, getString("SettingsTerminalProfile", "터미널 셸"));
@@ -995,6 +1018,7 @@ SOFTWARE.",
             {
                 settings.TabSize = Math.Clamp(tabSize, 1, 16);
             }
+            settings.HomeFolderPath = homeFolderBox.Text.Trim();
             settings.TerminalProfile = (terminalProfileCombo.SelectedItem as TerminalProfileChoice)?.Id ?? "PowerShell";
 
             settings.LlmProvider = GetSelectedProviderName();

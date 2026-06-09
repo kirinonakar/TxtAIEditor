@@ -743,7 +743,8 @@ namespace TxtAIEditor
                 ApplyPreviewVisibility,
                 UpdateAutoSaveStatus,
                 _lifecycleController.CleanupBeforeRestart,
-                EditorWorkspace.RefreshSplitters);
+                EditorWorkspace.RefreshSplitters,
+                InitializePickerWindow);
             _startupController = new MainWindowStartupController(
                 this,
                 _settingsService,
