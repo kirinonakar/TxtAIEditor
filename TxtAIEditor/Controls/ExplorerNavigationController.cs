@@ -266,18 +266,9 @@ namespace TxtAIEditor.Controls
                         string keyNormalized = kvp.Key.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                         if (keyNormalized.Equals(folderPathNormalized, StringComparison.OrdinalIgnoreCase))
                         {
-                            string status = kvp.Value.Trim();
-                            if (status == "!!")
+                            if (kvp.Value.Trim() == "!!")
                             {
                                 hasIgnored = true;
-                            }
-                            else if (status == "??")
-                            {
-                                hasAdded = true;
-                            }
-                            else
-                            {
-                                hasModified = true;
                             }
                         }
                         else if (kvp.Key.StartsWith(folderPathWithSlash, StringComparison.OrdinalIgnoreCase))
@@ -287,7 +278,7 @@ namespace TxtAIEditor.Controls
                             {
                                 hasAdded = true;
                             }
-                            else
+                            else if (status != "!!")
                             {
                                 hasModified = true;
                             }
