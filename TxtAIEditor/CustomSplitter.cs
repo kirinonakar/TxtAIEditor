@@ -18,6 +18,13 @@ namespace TxtAIEditor
                 typeof(CustomSplitter),
                 new PropertyMetadata(double.NaN, OnVisualThicknessChanged));
 
+        public static readonly DependencyProperty OpaqueBackgroundProperty =
+            DependencyProperty.Register(
+                nameof(OpaqueBackground),
+                typeof(bool),
+                typeof(CustomSplitter),
+                new PropertyMetadata(false, OnOpaqueBackgroundChanged));
+
         private readonly Border _visualLine = new();
 
         private bool _isHorizontalSplitter;
@@ -44,11 +51,25 @@ namespace TxtAIEditor
             set => SetValue(VisualThicknessProperty, value);
         }
 
+        public bool OpaqueBackground
+        {
+            get => (bool)GetValue(OpaqueBackgroundProperty);
+            set => SetValue(OpaqueBackgroundProperty, value);
+        }
+
         private static void OnVisualThicknessChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is CustomSplitter splitter)
             {
                 splitter.UpdateVisualLineLayout();
+            }
+        }
+
+        private static void OnOpaqueBackgroundChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is CustomSplitter splitter)
+            {
+                splitter.RefreshTheme();
             }
         }
 
@@ -64,7 +85,6 @@ namespace TxtAIEditor
 
         private void CustomSplitter_Loaded(object sender, RoutedEventArgs e)
         {
-            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
             UpdateVisualLineLayout();
             ApplyBackground(SplitterBackgroundBrushKey);
         }
@@ -169,16 +189,22 @@ namespace TxtAIEditor
                 themeDict.TryGetValue(resourceKey, out var brushObj) &&
                 brushObj is Brush themeBrush)
             {
+                if (OpaqueBackground)
+                    Background = themeBrush;
                 _visualLine.Background = themeBrush;
                 return;
             }
 
             if (Application.Current.Resources.TryGetValue(resourceKey, out object resource) && resource is Brush brush)
             {
+                if (OpaqueBackground)
+                    Background = brush;
                 _visualLine.Background = brush;
             }
             else if (this.Resources.TryGetValue(resourceKey, out object localResource) && localResource is Brush localBrush)
             {
+                if (OpaqueBackground)
+                    Background = localBrush;
                 _visualLine.Background = localBrush;
             }
         }
