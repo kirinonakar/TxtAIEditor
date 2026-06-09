@@ -404,6 +404,7 @@ namespace TxtAIEditor.Controls
             _agentPane.HistoryDeleted += async (_, historyId) => await DeleteHistorySessionAsync(historyId);
             _agentPane.HistoryToolbarDeleteClicked += async (_, _) => await ClearAllHistoryAsync();
             _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
+            _agentPane.InsertNewTabOutputRequested += async (_, _) => await InsertNewTabOutputAsync();
             _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
             _agentPane.RemoveAttachmentRequested += (_, attachment) => _attachmentController.RemoveAttachment(attachment.Id);
             _agentPane.AgentPresetAddRequested += (_, _) => OnAddAgentPresetClick();
@@ -3094,11 +3095,30 @@ namespace TxtAIEditor.Controls
                     _getString("AgentNoOutputToInsert", "입력할 Agent 응답이 없습니다."));
                 return;
             }
-
             await RunOnUIThreadAsync(() => { });
             await _insertIntoActiveEditorAsync(output);
         }
 
+        private async Task InsertNewTabOutputAsync()
+        {
+            string fullOutput = _agentPane.Output.Text;
+            string selectedOutput = _agentPane.Output.SelectedText;
+            string output = IsSelectionFromOutput(selectedOutput, fullOutput)
+                ? selectedOutput
+                : fullOutput;
+
+            if (string.IsNullOrWhiteSpace(output) ||
+                _displayText.IsOutputPlaceholder(output))
+            {
+                _showError(
+                    _getString("AgentInsertTitle", "Agent 응답 입력"),
+                    _getString("AgentNoOutputToInsert", "입력할 Agent 응답이 없습니다."));
+                return;
+            }
+
+            await RunOnUIThreadAsync(() => { });
+            _openNewTabWithContent(null, output);
+        }
         private static bool IsSelectionFromOutput(string selectedText, string fullOutput)
         {
             if (string.IsNullOrEmpty(selectedText) || string.IsNullOrEmpty(fullOutput))

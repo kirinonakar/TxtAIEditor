@@ -97,6 +97,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? StopRequested;
         public event RoutedEventHandler? NewSessionRequested;
         public event RoutedEventHandler? InsertOutputRequested;
+        public event RoutedEventHandler? InsertNewTabOutputRequested;
         public event RoutedEventHandler? AddAttachmentRequested;
         public event EventHandler<AgentAttachmentItem>? RemoveAttachmentRequested;
         public event RoutedEventHandler? AgentPresetAddRequested;
@@ -646,6 +647,11 @@ namespace TxtAIEditor.Controls
         private void OnInsertOutputClick(object sender, RoutedEventArgs e)
         {
             InsertOutputRequested?.Invoke(sender, e);
+        }
+
+        private void OnInsertNewTabOutputClick(object sender, RoutedEventArgs e)
+        {
+            InsertNewTabOutputRequested?.Invoke(sender, e);
         }
 
         private void OnOutputPointerPressed(object sender, PointerRoutedEventArgs e)

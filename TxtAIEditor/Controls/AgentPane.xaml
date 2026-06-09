@@ -126,14 +126,22 @@
                            KeyDown="OnOutputTextKeyDown"/>
         </ScrollViewer>
 
-        <Button x:Name="AgentInsertOutputButton"
-                Grid.Row="2"
-                Content="입력"
-                HorizontalAlignment="Stretch"
-                Height="32"
-                Click="OnInsertOutputClick"
-                ToolTipService.ToolTip="Agent 응답을 현재 커서에 입력"
-                Style="{StaticResource AccentButtonStyle}"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button x:Name="AgentInsertOutputButton"
+                    Content="입력"
+                    HorizontalAlignment="Stretch"
+                    Height="32"
+                    Click="OnInsertOutputClick"
+                    ToolTipService.ToolTip="Agent 응답을 현재 커서에 입력"
+                    Style="{StaticResource AccentButtonStyle}"/>
+            <Button x:Name="AgentInsertNewTabOutputButton"
+                    Content="새 탭에 입력"
+                    HorizontalAlignment="Stretch"
+                    Height="32"
+                    Click="OnInsertNewTabOutputClick"
+                    ToolTipService.ToolTip="Agent 응답을 새 탭에 입력"
+                    Style="{StaticResource AgentButtonStyle}"/>
+        </StackPanel>
 
         <Border Grid.Row="3" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="6" CornerRadius="4">
             <Grid RowSpacing="4" ColumnSpacing="8">
