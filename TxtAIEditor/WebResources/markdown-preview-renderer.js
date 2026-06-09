@@ -637,8 +637,30 @@ function collectMarkdownListBlock(startLine, maxLine, getLine, options = {}) {
             continue;
         }
 
-        if (!String(line || '').trim() ||
-            leadingWhitespaceLength(line, Number(options.tabSize || 4)) > first.indent) {
+        if (!String(line || '').trim()) {
+            const tabSize = Number(options.tabSize || 4);
+            let hasContinuation = false;
+            for (let peek = lineNumber + 1; peek <= maxLine; peek++) {
+                const peekLine = getLine(peek);
+                if (peekLine === undefined) break;
+                const peekTrimmed = String(peekLine || '').trim();
+                if (!peekTrimmed) continue;
+                const peekItem = listItemInfo(peekLine, options);
+                if (peekItem && peekItem.indent >= first.indent) {
+                    hasContinuation = true;
+                } else if (leadingWhitespaceLength(peekLine, tabSize) > first.indent) {
+                    hasContinuation = true;
+                }
+                break;
+            }
+            if (hasContinuation) {
+                lines.push(line);
+                endLine = lineNumber;
+                continue;
+            }
+            break;
+        }
+        if (leadingWhitespaceLength(line, Number(options.tabSize || 4)) > first.indent) {
             lines.push(line);
             endLine = lineNumber;
             continue;
@@ -809,6 +831,17 @@ function renderMarkdownLine(line, options = {}) {
     return `<p>${inlineMarkdown(raw, options)}</p>`;
 }
 
+function isParagraphLine(raw, options = {}) {
+    const trimmed = raw.trim();
+    if (!trimmed) return false;
+    if (/^---+$|^\*\*\*+$|^___+$/.test(trimmed)) return false;
+    if (/^(#{1,6})\s+/.test(raw)) return false;
+    if (/^\s*>\s?/.test(raw)) return false;
+    if (listItemInfo(raw, options)) return false;
+    if (/^<([A-Za-z][A-Za-z0-9:-]*)(?:\s[^<>]*?)?>[\s\S]*<\/\1\s*>$/.test(trimmed)) return false;
+    return true;
+}
+
 function renderLine(line, mode = 'markdown', options = {}) {
     if (mode === 'html') return sanitizeHtml(line, options);
     if (mode === 'latex') return renderLatexLine(line);
@@ -823,6 +856,21 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
     if (mode !== 'markdown') {
         return { html: renderLine(line, mode, options), endLine: lineNumber };
     }
+    const trimmed = String(line ?? '').trim();
+
+    if (!trimmed) {
+        let endLine = lineNumber;
+        for (let i = lineNumber + 1; i <= maxLine; i++) {
+            const nextRaw = String(getLine(i) ?? '');
+            if (!nextRaw.trim()) {
+                endLine = i;
+            } else {
+                break;
+            }
+        }
+        return { html: '', endLine };
+    }
+
     if (fencedCodeInfo(line)) {
         const block = collectFencedCodeBlock(lineNumber, maxLine, getLine, options);
         if (block?.pending) {
@@ -856,6 +904,22 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
             return { html: renderMarkdownTableBlock(block, options), endLine: block.endLine };
         }
     }
+
+    if (isParagraphLine(line, options)) {
+        let endLine = lineNumber;
+        const paragraphLines = [line];
+        for (let i = lineNumber + 1; i <= maxLine; i++) {
+            const nextLine = getLine(i);
+            if (nextLine === undefined) break;
+            if (!String(nextLine ?? '').trim()) break;
+            if (!isParagraphLine(nextLine, options)) break;
+            paragraphLines.push(nextLine);
+            endLine = i;
+        }
+        const innerHtml = paragraphLines.map(l => inlineMarkdown(l, options)).join('<br>');
+        return { html: `<p>${innerHtml}</p>`, endLine };
+    }
+
     return { html: renderMarkdownLine(line, options), endLine: lineNumber };
 }
 
