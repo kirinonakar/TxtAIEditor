@@ -287,10 +287,6 @@ namespace TxtAIEditor.Controls
                             {
                                 hasAdded = true;
                             }
-                            else if (status == "!!")
-                            {
-                                hasIgnored = true;
-                            }
                             else
                             {
                                 hasModified = true;
