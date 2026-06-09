@@ -383,6 +383,12 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouter loads the list of models from https://openrouter.ai/api/v1/models.</value>
   </data>
+  <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
+    <value>Load OpenCode Go Models</value>
+  </data>
+  <data name="SettingsLlmOpenCodeGoInfo" xml:space="preserve">
+    <value>OpenCode Go loads the list of models from https://opencode.ai/zen/go/v1/models.</value>
+  </data>
   <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
     <value>API Keys are stored in the Windows Credential Manager, not in settings files.</value>
   </data>

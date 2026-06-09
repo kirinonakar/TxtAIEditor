@@ -255,6 +255,9 @@ namespace TxtAIEditor.Core.Services
                 "openrouter" => new OpenRouterProvider(),
                 "lm studio" => new LMStudioProvider(),
                 "lmstudio" => new LMStudioProvider(),
+                "opencode go" => new GoProvider(),
+                "opencodego" => new GoProvider(),
+                "go" => new GoProvider(),
                 _ => new OpenAIProvider()
             };
 

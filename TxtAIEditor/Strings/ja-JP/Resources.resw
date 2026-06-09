@@ -383,6 +383,12 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouterは https://openrouter.ai/api/v1/models からモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
+    <value>OpenCode Goモデルを取得</value>
+  </data>
+  <data name="SettingsLlmOpenCodeGoInfo" xml:space="preserve">
+    <value>OpenCode Goは https://opencode.ai/zen/go/v1/models からモデルリストを取得します。</value>
+  </data>
   <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
     <value>APIキーは設定ファイルではなく、Windowsの資格情報マネージャーに保存されます。</value>
   </data>

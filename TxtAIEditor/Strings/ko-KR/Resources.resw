@@ -383,6 +383,12 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouter는 https://openrouter.ai/api/v1/models 에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
+    <value>OpenCode Go 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmOpenCodeGoInfo" xml:space="preserve">
+    <value>OpenCode Go는 https://opencode.ai/zen/go/v1/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
   <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
     <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
