@@ -97,8 +97,11 @@
                                     <TextBox x:Name="LlmOutputText" Text="대기 중... 에디터에서 영역을 선택한 후 하단의 AI 분석 도구를 사용해 보세요." TextWrapping="Wrap" FontSize="13" IsReadOnly="True" BorderThickness="0" Background="Transparent" Foreground="{ThemeResource LlmOutputForeground}" Padding="0" AcceptsReturn="True"/>
                                 </ScrollViewer>
                                 
-                                <!-- Row 1: Insert Output Button -->
-                                <Button x:Name="LlmInsertOutputButton" Grid.Row="1" Content="입력" HorizontalAlignment="Stretch" Height="32" Click="OnLlmInsertOutputClick" ToolTipService.ToolTip="AI 응답을 현재 커서에 입력 (선택한 경우 선택부위만)" Style="{StaticResource AccentButtonStyle}"/>
+                                <!-- Row 1: Insert Output Buttons -->
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                    <Button x:Name="LlmInsertOutputButton" Content="입력" Height="32" Click="OnLlmInsertOutputClick" ToolTipService.ToolTip="AI 응답을 현재 커서에 입력 (선택한 경우 선택부위만)" Style="{StaticResource AccentButtonStyle}"/>
+                                    <Button x:Name="LlmInsertNewTabOutputButton" Content="새 탭에 입력" Height="32" Click="OnLlmInsertNewTabOutputClick" ToolTipService.ToolTip="AI 응답을 새 탭에 입력 (선택한 경우 선택부위만)" Style="{StaticResource RightSidebarButtonStyle}"/>
+                                </StackPanel>
     
                                 <!-- Row 2: Selected Context Info + Instruction tabs + File context -->
                                 <Border Grid.Row="2" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="8" CornerRadius="4">

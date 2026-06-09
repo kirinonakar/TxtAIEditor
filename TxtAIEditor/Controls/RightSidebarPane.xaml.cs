@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private string _currentTargetLanguage = "Korean";
         public event RoutedEventHandler? LlmCustomClick;
         public event RoutedEventHandler? LlmInsertOutputClick;
+        public event RoutedEventHandler? LlmInsertNewTabOutputClick;
         public event RoutedEventHandler? LlmAddInstructionClick;
 
         public TabView RightTabs => RightTabView;
@@ -57,6 +58,7 @@ namespace TxtAIEditor.Controls
         public Button LlmImproveBtn => LlmImproveButton;
         public Button LlmCustomRunBtn => LlmCustomRunButton;
         public Button LlmInsertOutputBtn => LlmInsertOutputButton;
+        public Button LlmInsertNewTabOutputBtn => LlmInsertNewTabOutputButton;
         public Button LlmAddInstructionBtn => LlmAddInstructionButton;
         public ScrollViewer InstructionTabScroller => InstructionTabScrollViewer;
 
@@ -111,6 +113,8 @@ namespace TxtAIEditor.Controls
             LlmCustomRunButton.Content = getString("LlmCustomRunButtonText", "전송");
             LlmInsertOutputButton.Content = getString("LlmInsertOutputButtonText", "입력");
             ToolTipService.SetToolTip(LlmInsertOutputButton, getString("LlmInsertOutputTooltip", "AI 응답을 현재 커서에 입력 (선택한 경우 선택부위만)"));
+            LlmInsertNewTabOutputButton.Content = getString("LlmInsertNewTabOutputButtonText", "새 탭에 입력");
+            ToolTipService.SetToolTip(LlmInsertNewTabOutputButton, getString("LlmInsertNewTabOutputTooltip", "AI 응답을 새 탭에 입력 (선택한 경우 선택부위만)"));
             ToolTipService.SetToolTip(LlmAddInstructionButton, getString("LlmAddInstructionTooltip", "새 커스텀 지시문 추가"));
 
             LlmPresetButton.Content = getString("LlmPresetButtonText", "프리셋");
@@ -192,6 +196,11 @@ namespace TxtAIEditor.Controls
         private void OnLlmInsertOutputClick(object sender, RoutedEventArgs e)
         {
             LlmInsertOutputClick?.Invoke(sender, e);
+        }
+
+        private void OnLlmInsertNewTabOutputClick(object sender, RoutedEventArgs e)
+        {
+            LlmInsertNewTabOutputClick?.Invoke(sender, e);
         }
 
         private void OnLlmAddInstructionClick(object sender, RoutedEventArgs e)

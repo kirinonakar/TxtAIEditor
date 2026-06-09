@@ -539,6 +539,25 @@ namespace TxtAIEditor
                 GetActiveTab,
                 GetTabTextForLlmContext,
                 InsertTextIntoActiveEditorAsync,
+                (title, content) =>
+                {
+                    string uniqueTitle = string.IsNullOrWhiteSpace(title) ? GetLocalizedString("UntitledNewTab", "제목 없음") : title;
+                    var tab = OpenNewTab(null, content);
+                    tab.Title = uniqueTitle;
+                    if (!string.IsNullOrWhiteSpace(title))
+                    {
+                        tab.Language = _languageDetectionService.GetMonacoLanguageName(title);
+                    }
+                    else
+                    {
+                        tab.Language = "plaintext";
+                    }
+
+                    tab.OriginalContent = string.Empty;
+                    _tabDirtyStateController.MarkTabDirty(tab);
+                    UpdateWindowTitle();
+                    return tab;
+                },
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString,
                 InitializePickerWindow,

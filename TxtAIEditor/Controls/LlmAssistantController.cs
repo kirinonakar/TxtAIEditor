@@ -22,6 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<OpenedTab, int, string> _getTabText;
         private readonly Func<string, Task<bool>> _insertIntoActiveEditorAsync;
+        private readonly Func<string?, string, TxtAIEditor.Core.Models.OpenedTab> _openNewTabWithContent;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly Action<object> _initializePickerWindow;
@@ -67,6 +68,7 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> activeTabProvider,
             Func<OpenedTab, int, string> getTabText,
             Func<string, Task<bool>> insertIntoActiveEditorAsync,
+            Func<string?, string, OpenedTab> openNewTabWithContent,
             Action<string, string> showError,
             Func<string, string, string> getString,
             Action<object> initializePickerWindow,
@@ -81,6 +83,7 @@ namespace TxtAIEditor.Controls
             _activeTabProvider = activeTabProvider;
             _getTabText = getTabText;
             _insertIntoActiveEditorAsync = insertIntoActiveEditorAsync;
+            _openNewTabWithContent = openNewTabWithContent;
             _showError = showError;
             _getString = getString;
             _initializePickerWindow = initializePickerWindow;
@@ -136,6 +139,7 @@ namespace TxtAIEditor.Controls
             _rightSidebar.LlmImproveClick += OnLlmImproveClick;
             _rightSidebar.LlmCustomClick += OnLlmCustomClick;
             _rightSidebar.LlmInsertOutputClick += OnLlmInsertOutputClick;
+            _rightSidebar.LlmInsertNewTabOutputClick += OnLlmInsertNewTabOutputClick;
             _rightSidebar.LlmTargetLanguageSelected += OnLlmTargetLanguageSelected;
             _rightSidebar.LlmAddInstructionClick += OnLlmAddInstructionClick;
         }
@@ -342,6 +346,23 @@ namespace TxtAIEditor.Controls
             }
 
             await _insertIntoActiveEditorAsync(output);
+        }
+
+        private async void OnLlmInsertNewTabOutputClick(object sender, RoutedEventArgs e)
+        {
+            string output = _rightSidebar.LlmOutput.SelectedText;
+            if (string.IsNullOrEmpty(output))
+            {
+                output = _rightSidebar.LlmOutput.Text;
+            }
+
+            if (string.IsNullOrWhiteSpace(output) || output.StartsWith("대기 중", StringComparison.Ordinal) || output.StartsWith("Waiting...", StringComparison.Ordinal) || output.StartsWith("待機中...", StringComparison.Ordinal))
+            {
+                _showError(_getString("LlmInsertTitle", "AI 응답 입력"), _getString("LlmNoOutputToInsert", "입력할 AI 응답이 없습니다."));
+                return;
+            }
+
+            _openNewTabWithContent(null, output);
         }
 
         private void OnLlmAddInstructionClick(object sender, RoutedEventArgs e)

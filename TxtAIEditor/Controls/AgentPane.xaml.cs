@@ -198,6 +198,8 @@ namespace TxtAIEditor.Controls
                 AgentActivityText.Text = _displayText.ActivityIdle;
             }
             ToolTipService.SetToolTip(AgentInsertOutputButton, getString("AgentInsertOutputTooltip", "Agent 응답을 현재 커서에 입력"));
+            AgentInsertNewTabOutputButton.Content = getString("AgentInsertNewTabOutputButtonText", "새 탭에 입력");
+            ToolTipService.SetToolTip(AgentInsertNewTabOutputButton, getString("AgentInsertNewTabOutputTooltip", "Agent 응답을 새 탭에 입력 (선택한 경우 선택부위만)"));
 
             AgentDiffApproveButton.Content = getString("AgentDiffApplyButton", "승인");
             AgentDiffCancelButton.Content = getString("AgentDiffCancelButton", "취소");

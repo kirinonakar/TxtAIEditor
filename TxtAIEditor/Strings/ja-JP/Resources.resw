@@ -1958,4 +1958,16 @@
   <data name="AgentHistoryLoadedActivity" xml:space="preserve">
     <value>セッション履歴がロードされました</value>
   </data>
+  <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
+    <value>新規タブに入力</value>
+  </data>
+  <data name="LlmInsertNewTabOutputTooltip" xml:space="preserve">
+    <value>AIの応答を新規タブに入力 (選択された場合は選択部分のみ)</value>
+  </data>
+  <data name="AgentInsertNewTabOutputButtonText" xml:space="preserve">
+    <value>新規タブに入力</value>
+  </data>
+  <data name="AgentInsertNewTabOutputTooltip" xml:space="preserve">
+    <value>Agentの応答を新規タブに入力 (選択された場合は選択部分のみ)</value>
+  </data>
 </root>

@@ -1957,4 +1957,16 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentHistoryLoadedActivity" xml:space="preserve">
     <value>Session history loaded</value>
   </data>
+  <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
+    <value>New Tab</value>
+  </data>
+  <data name="LlmInsertNewTabOutputTooltip" xml:space="preserve">
+    <value>Insert AI response in a new tab (Selected part only, if selected)</value>
+  </data>
+  <data name="AgentInsertNewTabOutputButtonText" xml:space="preserve">
+    <value>New Tab</value>
+  </data>
+  <data name="AgentInsertNewTabOutputTooltip" xml:space="preserve">
+    <value>Insert Agent response in a new tab (Selected part only, if selected)</value>
+  </data>
 </root>

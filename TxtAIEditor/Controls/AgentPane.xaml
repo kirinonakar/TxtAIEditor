@@ -135,11 +135,9 @@
                     ToolTipService.ToolTip="Agent 응답을 현재 커서에 입력"
                     Style="{StaticResource AccentButtonStyle}"/>
             <Button x:Name="AgentInsertNewTabOutputButton"
-                    Content="새 탭에 입력"
                     HorizontalAlignment="Stretch"
                     Height="32"
                     Click="OnInsertNewTabOutputClick"
-                    ToolTipService.ToolTip="Agent 응답을 새 탭에 입력"
                     Style="{StaticResource AgentButtonStyle}"/>
         </StackPanel>
 
