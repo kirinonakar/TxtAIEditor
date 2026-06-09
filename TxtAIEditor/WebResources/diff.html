@@ -113,11 +113,21 @@
             flex: 1;
             overflow: auto;
             position: relative;
-            /* Hide native scrollbar on right side — we draw our own scrollmap there */
-            scrollbar-width: none; /* Firefox */
         }
+        /* WebView2: hide vertical scrollbar, show styled horizontal */
         .view-wrapper::-webkit-scrollbar {
-            display: none; /* Chrome/WebView2 */
+            width: 0;
+            height: 8px;
+        }
+        .view-wrapper::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .view-wrapper::-webkit-scrollbar-thumb {
+            background: rgba(121, 121, 121, 0.4);
+            border-radius: 4px;
+        }
+        .view-wrapper::-webkit-scrollbar-thumb:hover {
+            background: rgba(121, 121, 121, 0.6);
         }
 
         .scroll-spacer {
