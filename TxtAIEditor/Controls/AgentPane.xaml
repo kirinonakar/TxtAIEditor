@@ -415,17 +415,18 @@
                                              Invoked="OnPromptRunKeyboardAcceleratorInvoked"/>
                     </TextBox.KeyboardAccelerators>
                 </TextBox>
-                <Button x:Name="AgentClearPromptButton"
-                        Content="&#x2715;"
-                        Width="20" Height="20"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        Margin="0,6,6,0"
-                        FontSize="10"
-                        Padding="2"
-                        Visibility="Collapsed"
-                        Click="OnClearPromptClick"
-                        Style="{StaticResource AgentButtonStyle}"/>
+                  <Button x:Name="AgentClearPromptButton"
+                          Width="20" Height="20"
+                          HorizontalAlignment="Right"
+                          VerticalAlignment="Top"
+                          Margin="0,6,6,0"
+                          FontSize="10"
+                          Padding="2"
+                          Visibility="Collapsed"
+                          Click="OnClearPromptClick"
+                          Style="{StaticResource AgentButtonStyle}">
+                      <FontIcon Glyph="&#xE10A;" FontSize="10"/>
+                  </Button>
             </Grid>
             <Grid Grid.Row="1" Grid.Column="1"
                   Width="64"
@@ -436,13 +437,13 @@
                 </Grid.RowDefinitions>
                 <Button x:Name="AgentPresetButton"
                         Grid.Row="0"
-                        Content="&#x2795;"
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         MinHeight="0"
                         Padding="0"
                         FontSize="14"
                         Style="{StaticResource AgentButtonStyle}">
+                    <FontIcon Glyph="&#xE104;" FontSize="16"/>
                     <Button.Flyout>
                         <Flyout x:Name="AgentPresetFlyout" Opened="OnAgentPresetFlyoutOpened">
                             <Grid Width="220" RowSpacing="8">
