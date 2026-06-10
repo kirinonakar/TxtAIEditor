@@ -7,18 +7,26 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
     public class LMStudioProvider : ILLMProvider
     {
+        private readonly ILocalizationService _localizationService;
+
         private static readonly HttpClient _httpClient = new HttpClient();
+
+        public LMStudioProvider(ILocalizationService localizationService)
+        {
+            _localizationService = localizationService;
+        }
 
         public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
-                throw new ArgumentException("LM Studio 모델을 먼저 선택해 주십시오.");
+                throw new ArgumentException(_localizationService.GetString("LmStudioErrorNoModelSelected", "LM Studio 모델을 먼저 선택해 주십시오."));
 
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:1234/v1" : endpoint.Trim();
             string requestUrl = baseEndpoint.TrimEnd('/') + "/chat/completions";
@@ -49,7 +57,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new HttpRequestException($"LM Studio API 호출 실패 ({response.StatusCode}): {responseBody}");
+                        throw new HttpRequestException(string.Format(_localizationService.GetString("LmStudioErrorApiCallFailed", "LM Studio API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
                     }
 
                     using (var doc = JsonDocument.Parse(responseBody))
@@ -66,7 +74,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         }
                     }
 
-                    return "LM Studio로부터 빈 응답을 수신했습니다.";
+                    return _localizationService.GetString("LmStudioErrorEmptyResponse", "LM Studio로부터 빈 응답을 수신했습니다.");
                 }
             }
         }
@@ -75,7 +83,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
-                throw new ArgumentException("LM Studio 모델을 먼저 선택해 주십시오.");
+                throw new ArgumentException(_localizationService.GetString("LmStudioErrorNoModelSelected", "LM Studio 모델을 먼저 선택해 주십시오."));
 
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:1234/v1" : endpoint.Trim();
             string requestUrl = baseEndpoint.TrimEnd('/') + "/chat/completions";
@@ -107,7 +115,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException($"LM Studio API 스트리밍 호출 실패 ({response.StatusCode}): {errorBody}");
+                        throw new HttpRequestException(string.Format(_localizationService.GetString("LmStudioErrorStreamCallFailed", "LM Studio API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))

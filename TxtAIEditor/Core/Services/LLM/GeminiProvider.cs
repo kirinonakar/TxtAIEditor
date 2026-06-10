@@ -7,11 +7,14 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
     public class GeminiProvider : ILLMProvider
     {
+        private readonly ILocalizationService _localizationService;
+
         private static readonly HttpClient _httpClient = new HttpClient();
 
         private readonly bool _verbose;
@@ -28,8 +31,9 @@ namespace TxtAIEditor.Core.Services.LLM
             new Regex(@"<\|channel\>thought(.*?)(?:<channel\|>|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase)
         };
 
-        public GeminiProvider(bool verbose = false)
+        public GeminiProvider(ILocalizationService localizationService, bool verbose = false)
         {
+            _localizationService = localizationService;
             _verbose = verbose;
         }
 
@@ -68,7 +72,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 {
                     string thoughtContent = match.Groups[1].Value;
                     int tokenCount = EstimateTokenCount(thoughtContent);
-                    return $"[Thinking: {tokenCount} tokens]\n\n";
+                    return string.Format(_localizationService.GetString("GeminiThinkingFormat", "[Thinking: {0} tokens]\n\n"), tokenCount);
                 });
             }
             return result;
@@ -165,7 +169,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         _thoughtBuffer += _accumulatedText.Substring(_lastProcessedIndex, earliestEndPos - _lastProcessedIndex);
                         
                         int tokenCount = EstimateTokenCount(_thoughtBuffer);
-                        await onChunk($"[Thinking: {tokenCount} tokens]\n\n");
+                        await onChunk(string.Format(_localizationService.GetString("GeminiThinkingFormat", "[Thinking: {0} tokens]\n\n"), tokenCount));
 
                         _inThought = false;
                         _thoughtBuffer = string.Empty;
@@ -221,7 +225,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!string.IsNullOrEmpty(_nativeThoughtBuffer))
                     {
                         int tokenCount = EstimateTokenCount(_nativeThoughtBuffer);
-                        await onChunk($"[Thinking: {tokenCount} tokens]\n\n");
+                        await onChunk(string.Format(_localizationService.GetString("GeminiThinkingFormat", "[Thinking: {0} tokens]\n\n"), tokenCount));
                         _nativeThoughtBuffer = string.Empty;
                     }
 
@@ -237,7 +241,7 @@ namespace TxtAIEditor.Core.Services.LLM
             if (!string.IsNullOrEmpty(_nativeThoughtBuffer))
             {
                 int tokenCount = EstimateTokenCount(_nativeThoughtBuffer);
-                await onChunk($"[Thinking: {tokenCount} tokens]\n\n");
+                await onChunk(string.Format(_localizationService.GetString("GeminiThinkingFormat", "[Thinking: {0} tokens]\n\n"), tokenCount));
                 _nativeThoughtBuffer = string.Empty;
             }
 
@@ -248,7 +252,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     _thoughtBuffer += _accumulatedText.Substring(_lastProcessedIndex);
                 }
                 int tokenCount = EstimateTokenCount(_thoughtBuffer);
-                await onChunk($"[Thinking: {tokenCount} tokens]\n\n");
+                await onChunk(string.Format(_localizationService.GetString("GeminiThinkingFormat", "[Thinking: {0} tokens]\n\n"), tokenCount));
             }
             else
             {
@@ -283,7 +287,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
-                throw new ArgumentException("API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.");
+                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string baseUrl = string.IsNullOrWhiteSpace(endpoint) ? "https://generativelanguage.googleapis.com" : endpoint.TrimEnd('/');
             string requestUrl = BuildGeminiUrl(baseUrl, model, false);
@@ -322,7 +326,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new HttpRequestException($"Google Gemini API 호출 실패 ({response.StatusCode}): {responseBody}");
+                        throw new HttpRequestException(string.Format(_localizationService.GetString("GeminiErrorApiCallFailed", "Google Gemini API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
                     }
 
                     using (var doc = JsonDocument.Parse(responseBody))
@@ -360,7 +364,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                             if (nativeThoughtSb.Length > 0)
                                             {
                                                 int tokenCount = EstimateTokenCount(nativeThoughtSb.ToString());
-                                                sb.Append($"[Thinking: {tokenCount} tokens]\n\n");
+                                                sb.Append(string.Format(_localizationService.GetString("GeminiThinkingFormat", "[Thinking: {0} tokens]\n\n"), tokenCount));
                                                 nativeThoughtSb.Clear();
                                             }
                                             sb.Append(partText);
@@ -369,7 +373,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                     if (nativeThoughtSb.Length > 0)
                                     {
                                         int tokenCount = EstimateTokenCount(nativeThoughtSb.ToString());
-                                        sb.Append($"[Thinking: {tokenCount} tokens]\n\n");
+                                        sb.Append(string.Format(_localizationService.GetString("GeminiThinkingFormat", "[Thinking: {0} tokens]\n\n"), tokenCount));
                                     }
                                     return ProcessGemma4Thoughts(sb.ToString());
                                 }
@@ -385,7 +389,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         }
                     }
                     
-                    return "Gemini AI로부터 빈 응답을 수신했습니다.";
+                    return _localizationService.GetString("GeminiErrorEmptyResponse", "Gemini AI로부터 빈 응답을 수신했습니다.");
                 }
             }
         }
@@ -394,7 +398,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
-                throw new ArgumentException("API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.");
+                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string baseUrl = string.IsNullOrWhiteSpace(endpoint) ? "https://generativelanguage.googleapis.com" : endpoint.TrimEnd('/');
             string requestUrl = BuildGeminiUrl(baseUrl, model, true);
@@ -433,7 +437,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException($"Google Gemini API 스트리밍 호출 실패 ({response.StatusCode}): {errorBody}");
+                        throw new HttpRequestException(string.Format(_localizationService.GetString("GeminiErrorStreamCallFailed", "Google Gemini API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))

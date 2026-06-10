@@ -182,7 +182,8 @@ namespace TxtAIEditor
             _fileService = new FileService();
             _settingsService = new SettingsService();
             _credentialService = new CredentialService();
-            _llmService = new LLMService(_settingsService, _credentialService);
+            _localizationService = new ResourceLocalizationService(_settingsService);
+            _llmService = new LLMService(_settingsService, _credentialService, _localizationService);
             _gitService = new GitService();
             _snippetService = new SnippetService();
             _languageDetectionService = new LanguageDetectionService();
@@ -191,7 +192,6 @@ namespace TxtAIEditor
             _stickyNoteService = new StickyNoteService();
             _settingsDialogService = new SettingsDialogService(_llmService);
             _uiPersonalizationService = new UiPersonalizationService();
-            _localizationService = new ResourceLocalizationService(_settingsService);
             _pdfTextExtractionService = new PdfTextExtractionService();
             _editorTabViewItemFactory = new EditorTabViewItemFactory(_localizationService);
             _editorTabDocumentFactory = new EditorTabDocumentFactory(_languageDetectionService, GetLocalizedString);

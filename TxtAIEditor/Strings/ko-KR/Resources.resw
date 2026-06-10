@@ -2002,7 +2002,64 @@
   <data name="SettingsHomeFolder" xml:space="preserve">
     <value>홈 폴더</value>
   </data>
-  <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
-    <value>C:\Users\...\Documents</value>
-  </data>
-</root>
+   <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
+     <value>C:\Users\...\Documents</value>
+   </data>
+   <data name="LlmErrorInvalidApiKey" xml:space="preserve">
+     <value>API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.</value>
+   </data>
+   <data name="LlmErrorEmptyResponse" xml:space="preserve">
+     <value>AI로부터 빈 응답을 수신했습니다.</value>
+   </data>
+   <data name="OpenAIErrorApiCallFailed" xml:space="preserve">
+     <value>OpenAI API 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="OpenAIErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenAI API 스트리밍 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="OpenRouterErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenRouter API 스트리밍 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="GeminiErrorApiCallFailed" xml:space="preserve">
+     <value>Google Gemini API 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="GeminiErrorEmptyResponse" xml:space="preserve">
+     <value>Gemini AI로부터 빈 응답을 수신했습니다.</value>
+   </data>
+   <data name="GeminiErrorStreamCallFailed" xml:space="preserve">
+     <value>Google Gemini API 스트리밍 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="GeminiThinkingFormat" xml:space="preserve">
+     <value>[Thinking: {0} tokens]&#10;&#10;</value>
+   </data>
+   <data name="LmStudioErrorNoModelSelected" xml:space="preserve">
+     <value>LM Studio 모델을 먼저 선택해 주십시오.</value>
+   </data>
+   <data name="LmStudioErrorApiCallFailed" xml:space="preserve">
+     <value>LM Studio API 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="LmStudioErrorEmptyResponse" xml:space="preserve">
+     <value>LM Studio로부터 빈 응답을 수신했습니다.</value>
+   </data>
+   <data name="LmStudioErrorStreamCallFailed" xml:space="preserve">
+     <value>LM Studio API 스트리밍 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorApiCallFailed" xml:space="preserve">
+     <value>OpenCode Go API 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenCode Go API 스트리밍 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorAnthropicApiCallFailed" xml:space="preserve">
+     <value>Anthropic API 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorAnthropicStreamCallFailed" xml:space="preserve">
+     <value>Anthropic API 스트리밍 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="LlmErrorNoApiKey" xml:space="preserve">
+     <value>에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 API Key를 먼저 저장해 주십시오.</value>
+   </data>
+   <data name="LlmErrorCommunicationPrefix" xml:space="preserve">
+     <value>AI 통신 오류가 발생했습니다: </value>
+   </data>
+ </root>

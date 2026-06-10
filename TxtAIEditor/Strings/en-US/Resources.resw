@@ -2002,7 +2002,64 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="SettingsHomeFolder" xml:space="preserve">
     <value>Home Folder</value>
   </data>
-  <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
-    <value>C:\Users\...\Documents</value>
-  </data>
-</root>
+   <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
+     <value>C:\Users\...\Documents</value>
+   </data>
+   <data name="LlmErrorInvalidApiKey" xml:space="preserve">
+     <value>API Key is invalid. Please check your settings first.</value>
+   </data>
+   <data name="LlmErrorEmptyResponse" xml:space="preserve">
+     <value>Received an empty response from AI.</value>
+   </data>
+   <data name="OpenAIErrorApiCallFailed" xml:space="preserve">
+     <value>OpenAI API call failed ({0}): {1}</value>
+   </data>
+   <data name="OpenAIErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenAI API streaming call failed ({0}): {1}</value>
+   </data>
+   <data name="OpenRouterErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenRouter API streaming call failed ({0}): {1}</value>
+   </data>
+   <data name="GeminiErrorApiCallFailed" xml:space="preserve">
+     <value>Google Gemini API call failed ({0}): {1}</value>
+   </data>
+   <data name="GeminiErrorEmptyResponse" xml:space="preserve">
+     <value>Received an empty response from Gemini AI.</value>
+   </data>
+   <data name="GeminiErrorStreamCallFailed" xml:space="preserve">
+     <value>Google Gemini API streaming call failed ({0}): {1}</value>
+   </data>
+   <data name="GeminiThinkingFormat" xml:space="preserve">
+     <value>[Thinking: {0} tokens]&#10;&#10;</value>
+   </data>
+   <data name="LmStudioErrorNoModelSelected" xml:space="preserve">
+     <value>Please select an LM Studio model first.</value>
+   </data>
+   <data name="LmStudioErrorApiCallFailed" xml:space="preserve">
+     <value>LM Studio API call failed ({0}): {1}</value>
+   </data>
+   <data name="LmStudioErrorEmptyResponse" xml:space="preserve">
+     <value>Received an empty response from LM Studio.</value>
+   </data>
+   <data name="LmStudioErrorStreamCallFailed" xml:space="preserve">
+     <value>LM Studio API streaming call failed ({0}): {1}</value>
+   </data>
+   <data name="GoErrorApiCallFailed" xml:space="preserve">
+     <value>OpenCode Go API call failed ({0}): {1}</value>
+   </data>
+   <data name="GoErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenCode Go API streaming call failed ({0}): {1}</value>
+   </data>
+   <data name="GoErrorAnthropicApiCallFailed" xml:space="preserve">
+     <value>Anthropic API call failed ({0}): {1}</value>
+   </data>
+   <data name="GoErrorAnthropicStreamCallFailed" xml:space="preserve">
+     <value>Anthropic API streaming call failed ({0}): {1}</value>
+   </data>
+   <data name="LlmErrorNoApiKey" xml:space="preserve">
+     <value>Error: The corresponding LLM API Key is not registered in the Credential Manager. Please open Settings and save your API Key first.</value>
+   </data>
+   <data name="LlmErrorCommunicationPrefix" xml:space="preserve">
+     <value>An AI communication error occurred: </value>
+   </data>
+ </root>

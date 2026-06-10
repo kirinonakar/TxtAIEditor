@@ -2003,7 +2003,64 @@
   <data name="SettingsHomeFolder" xml:space="preserve">
     <value>ホームフォルダ</value>
   </data>
-  <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
-    <value>C:\Users\...\Documents</value>
-  </data>
-</root>
+   <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
+     <value>C:\Users\...\Documents</value>
+   </data>
+   <data name="LlmErrorInvalidApiKey" xml:space="preserve">
+     <value>API Key が無効です。設定を先に確認してください。</value>
+   </data>
+   <data name="LlmErrorEmptyResponse" xml:space="preserve">
+     <value>AI から空の応答を受信しました。</value>
+   </data>
+   <data name="OpenAIErrorApiCallFailed" xml:space="preserve">
+     <value>OpenAI API 呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="OpenAIErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenAI API ストリーミング呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="OpenRouterErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenRouter API ストリーミング呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="GeminiErrorApiCallFailed" xml:space="preserve">
+     <value>Google Gemini API 呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="GeminiErrorEmptyResponse" xml:space="preserve">
+     <value>Gemini AI から空の応答を受信しました。</value>
+   </data>
+   <data name="GeminiErrorStreamCallFailed" xml:space="preserve">
+     <value>Google Gemini API ストリーミング呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="GeminiThinkingFormat" xml:space="preserve">
+     <value>[思考中: {0} トークン]&#10;&#10;</value>
+   </data>
+   <data name="LmStudioErrorNoModelSelected" xml:space="preserve">
+     <value>LM Studio モデルを先に選択してください。</value>
+   </data>
+   <data name="LmStudioErrorApiCallFailed" xml:space="preserve">
+     <value>LM Studio API 呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="LmStudioErrorEmptyResponse" xml:space="preserve">
+     <value>LM Studio から空の応答を受信しました。</value>
+   </data>
+   <data name="LmStudioErrorStreamCallFailed" xml:space="preserve">
+     <value>LM Studio API ストリーミング呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorApiCallFailed" xml:space="preserve">
+     <value>OpenCode Go API 呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenCode Go API ストリーミング呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorAnthropicApiCallFailed" xml:space="preserve">
+     <value>Anthropic API 呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorAnthropicStreamCallFailed" xml:space="preserve">
+     <value>Anthropic API ストリーミング呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="LlmErrorNoApiKey" xml:space="preserve">
+     <value>エラー: 該当する LLM API Key が資格情報マネージャーに登録されていません。設定を開いて先に API Key を保存してください。</value>
+   </data>
+   <data name="LlmErrorCommunicationPrefix" xml:space="preserve">
+     <value>AI通信エラーが発生しました: </value>
+   </data>
+ </root>

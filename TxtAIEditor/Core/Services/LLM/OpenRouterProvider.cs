@@ -7,12 +7,20 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
     public class OpenRouterProvider : ILLMProvider
     {
+        private readonly ILocalizationService _localizationService;
+
         private static readonly HttpClient _httpClient = new HttpClient();
+
+        public OpenRouterProvider(ILocalizationService localizationService)
+        {
+            _localizationService = localizationService;
+        }
 
         public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
@@ -29,7 +37,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
-                throw new ArgumentException("API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.");
+                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
@@ -59,7 +67,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException($"OpenRouter API 스트리밍 호출 실패 ({response.StatusCode}): {errorBody}");
+                        throw new HttpRequestException(string.Format(_localizationService.GetString("OpenRouterErrorStreamCallFailed", "OpenRouter API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))

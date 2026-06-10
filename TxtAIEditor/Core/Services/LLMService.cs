@@ -16,11 +16,13 @@ namespace TxtAIEditor.Core.Services
     {
         private readonly ISettingsService _settingsService;
         private readonly ICredentialService _credentialService;
+        private readonly ILocalizationService _localizationService;
 
-        public LLMService(ISettingsService settingsService, ICredentialService credentialService)
+        public LLMService(ISettingsService settingsService, ICredentialService credentialService, ILocalizationService localizationService)
         {
             _settingsService = settingsService;
             _credentialService = credentialService;
+            _localizationService = localizationService;
         }
 
         private string GetActiveLanguage()
@@ -241,27 +243,22 @@ namespace TxtAIEditor.Core.Services
             string langCode = GetActiveLanguage();
             if (requiresApiKey && string.IsNullOrEmpty(apiKey))
             {
-                return langCode switch
-                {
-                    "ja-JP" => "エラー: 該当する LLM API Key が資格情報マネージャーに登録されていません。設定を開いて先に API Key を保存してください。",
-                    "en-US" => "Error: The corresponding LLM API Key is not registered in the Credential Manager. Please open Settings and save your API Key first.",
-                    _ => "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 API Key를 먼저 저장해 주십시오."
-                };
+                return _localizationService.GetString("LlmErrorNoApiKey", "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 API Key를 먼저 저장해 주십시오.");
             }
 
             ILLMProvider provider = providerName.ToLower() switch
             {
-                "gemini" => new GeminiProvider(settings.LlmAgentVerbose),
-                "openrouter" => new OpenRouterProvider(),
-                "lm studio" => new LMStudioProvider(),
-                "lmstudio" => new LMStudioProvider(),
-                "opencode go" => new GoProvider(settings.LlmThinkingLevel),
-                "opencodego" => new GoProvider(settings.LlmThinkingLevel),
-                "go" => new GoProvider(settings.LlmThinkingLevel),
-                "opencode zen" => new GoProvider(settings.LlmThinkingLevel),
-                "opencodezen" => new GoProvider(settings.LlmThinkingLevel),
-                "zen" => new GoProvider(settings.LlmThinkingLevel),
-                _ => new OpenAIProvider()
+                "gemini" => new GeminiProvider(_localizationService, settings.LlmAgentVerbose),
+                "openrouter" => new OpenRouterProvider(_localizationService),
+                "lm studio" => new LMStudioProvider(_localizationService),
+                "lmstudio" => new LMStudioProvider(_localizationService),
+                "opencode go" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
+                "opencodego" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
+                "go" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
+                "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
+                "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
+                "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
+                _ => new OpenAIProvider(_localizationService)
             };
 
             try
@@ -304,12 +301,7 @@ namespace TxtAIEditor.Core.Services
             }
             catch (Exception ex)
             {
-                string errorPrefix = langCode switch
-                {
-                    "ja-JP" => "AI通信エラーが発生しました: ",
-                    "en-US" => "An AI communication error occurred: ",
-                    _ => "AI 통신 오류가 발생했습니다: "
-                };
+                string errorPrefix = _localizationService.GetString("LlmErrorCommunicationPrefix", "AI 통신 오류가 발생했습니다: ");
                 return $"{errorPrefix}{ex.Message}";
             }
         }
