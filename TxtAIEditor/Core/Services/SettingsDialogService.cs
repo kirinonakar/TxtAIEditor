@@ -626,6 +626,18 @@ namespace TxtAIEditor.Core.Services
             llmSection.Children.Add(agentVerboseCheck);
             llmSection.Children.Add(agentAutoApproveGitEditsCheck);
 
+            AddLabel(llmSection, getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)"));
+            var maxToolCallsBox = new NumberBox
+            {
+                Minimum = 0,
+                Maximum = 500,
+                Value = Math.Clamp(settings.LlmMaxToolCalls, 0, 500),
+                SmallChange = 1,
+                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Hidden,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            llmSection.Children.Add(maxToolCallsBox);
+
             AddLabel(llmSection, getString("SettingsLlmSourceLanguage", "번역 원본 언어 (Source Language)"));
             llmSection.Children.Add(sourceLangCombo);
             AddLabel(llmSection, getString("SettingsLlmTargetLanguage", "번역 대상 언어 (Target Language)"));
@@ -1143,6 +1155,7 @@ SOFTWARE.",
             settings.LlmConfirmBeforeSending = confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = agentVerboseCheck.IsChecked == true;
             settings.LlmAgentAutoApproveGitEdits = agentAutoApproveGitEditsCheck.IsChecked == true;
+            settings.LlmMaxToolCalls = (int)Math.Clamp(maxToolCallsBox.Value, 0, 500);
             settings.LlmThinkingLevel = llmThinkingLevelCombo.SelectedIndex switch
             {
                 1 => "low",

@@ -419,6 +419,9 @@
   <data name="SettingsLlmSourceLanguage" xml:space="preserve">
     <value>翻訳元言語 (Source Language)</value>
   </data>
+  <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
+    <value>ツール呼び出し最大回数 (0 = デフォルト)</value>
+  </data>
   <data name="SettingsLlmTargetLanguage" xml:space="preserve">
     <value>翻訳先言語 (Target Language)</value>
   </data>

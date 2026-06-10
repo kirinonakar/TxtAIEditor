@@ -56,6 +56,7 @@ namespace TxtAIEditor.Core.Models
         public bool LlmAgentAutoApproveGitEdits { get; set; } = false;
         public string LlmSourceLanguage { get; set; } = "Auto";
         public string LlmTargetLanguage { get; set; } = "Korean";
+        public int LlmMaxToolCalls { get; set; } = 50;
 
         // Exa Config
         public string ExaEndpoint { get; set; } = "https://mcp.exa.ai/mcp";

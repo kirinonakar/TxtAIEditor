@@ -489,7 +489,7 @@ namespace TxtAIEditor.Controls
 
                 bool completed = false;
                 bool reachedToolStepLimit = false;
-                const int maxToolSteps = 15;
+                int maxToolSteps = _settingsService.CurrentSettings.LlmMaxToolCalls > 0 ? _settingsService.CurrentSettings.LlmMaxToolCalls : 50;
                 var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
                 var failedToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
 
