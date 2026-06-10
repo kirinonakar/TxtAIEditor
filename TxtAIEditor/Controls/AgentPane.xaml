@@ -513,11 +513,17 @@
                         Click="OnRunClick"
                         Style="{StaticResource AccentButtonStyle}"/>
             </Grid>
-            <TextBlock x:Name="AgentModelNameText"
-                       Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
-                       FontSize="11"
-                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                       Margin="2,1,0,-12"/>
+            <HyperlinkButton x:Name="AgentModelNameButton"
+                             Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                             Padding="0"
+                             MinHeight="0"
+                             MinWidth="0"
+                             Margin="2,1,0,-12"
+                             Click="OnModelNameClick">
+                <TextBlock x:Name="AgentModelNameText"
+                           FontSize="11"
+                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+            </HyperlinkButton>
         </Grid>
 
         <Border x:Name="AgentActivityPanel"

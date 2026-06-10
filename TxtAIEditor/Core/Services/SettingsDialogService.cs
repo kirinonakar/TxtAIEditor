@@ -31,7 +31,8 @@ namespace TxtAIEditor.Core.Services
             EditorSettings settings,
             XamlRoot xamlRoot,
             Func<string, string, string> getString,
-            Action<object>? initializePickerWindow = null)
+            Action<object>? initializePickerWindow = null,
+            string? initialTab = null)
         {
             var languageCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             languageCombo.Items.Add(getString("LanguageDefault", "Default (OS Language)"));
@@ -1092,6 +1093,11 @@ SOFTWARE.",
             settingsPivot.Items.Add(new PivotItem { Header = new TextBlock { Text = getString("SettingsLLM", "LLM"), FontSize = 13 }, Content = new ScrollViewer { Content = llmSection } });
             settingsPivot.Items.Add(new PivotItem { Header = new TextBlock { Text = getString("SettingsShortcuts", "단축키"), FontSize = 13 }, Content = new ScrollViewer { Content = shortcutsSection } });
             settingsPivot.Items.Add(new PivotItem { Header = new TextBlock { Text = getString("SettingsAbout", "정보"), FontSize = 13 }, Content = new ScrollViewer { Content = aboutSection } });
+
+            if (initialTab != null && initialTab.Equals("LLM", StringComparison.OrdinalIgnoreCase))
+            {
+                settingsPivot.SelectedIndex = 4;
+            }
 
             ApplyCompactStyleToLogicalTree(settingsPivot);
 

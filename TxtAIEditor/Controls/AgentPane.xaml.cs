@@ -115,6 +115,7 @@ namespace TxtAIEditor.Controls
         public event EventHandler<string>? HistorySelected;
         public event EventHandler<string>? HistoryDeleted;
         public event RoutedEventHandler? HistoryToolbarDeleteClicked;
+        public event RoutedEventHandler? ModelNameClick;
 
         private List<AgentHistoryItemViewModel> _historyItems = new List<AgentHistoryItemViewModel>();
         private string? _selectedHistoryId;
@@ -821,6 +822,11 @@ namespace TxtAIEditor.Controls
         private void OnDiffApproveClick(object sender, RoutedEventArgs e)
         {
             DiffApproved?.Invoke(sender, e);
+        }
+
+        private void OnModelNameClick(object sender, RoutedEventArgs e)
+        {
+            ModelNameClick?.Invoke(sender, e);
         }
 
         private void OnDiffCancelClick(object sender, RoutedEventArgs e)

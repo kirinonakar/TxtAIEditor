@@ -146,13 +146,13 @@ namespace TxtAIEditor.Controls
             _livePreviewController.RenderActiveTab();
         }
 
-        public async Task ShowSettingsAsync()
+        public async Task ShowSettingsAsync(string? initialTab = null)
         {
             bool terminalWasSuspended = SuspendTerminalIfVisible();
             var settings = _settingsService.CurrentSettings;
             string oldLanguage = settings.Language;
 
-            var result = await _settingsDialogService.ShowAsync(settings, _xamlRootProvider(), _getLocalizedString, _initializePickerWindow);
+            var result = await _settingsDialogService.ShowAsync(settings, _xamlRootProvider(), _getLocalizedString, _initializePickerWindow, initialTab);
             ResumeTerminalIfNeeded(terminalWasSuspended);
             if (!result.Saved)
             {

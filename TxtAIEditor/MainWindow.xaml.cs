@@ -807,6 +807,9 @@ namespace TxtAIEditor
             this.Closed += _lifecycleController.HandleWindowClosed;
             this.AppWindow.Closing += OnAppWindowClosing;
             _lifecycleController.StartShortcuts();
+
+            PreviewGrid.ModelNameClick += OnModelNameClick;
+            PreviewGrid.AgentPane.ModelNameClick += OnModelNameClick;
         }
 
         private void WireLeftSidebarEvents()
@@ -1941,6 +1944,11 @@ namespace TxtAIEditor
         private async void OnSettingsClick(object sender, RoutedEventArgs e)
         {
             await _settingsController.ShowSettingsAsync();
+        }
+
+        private async void OnModelNameClick(object sender, RoutedEventArgs e)
+        {
+            await _settingsController.ShowSettingsAsync("LLM");
         }
 
         private async Task SyncSnippetsToOpenEditorsAsync()

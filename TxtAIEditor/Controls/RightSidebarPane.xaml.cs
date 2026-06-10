@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? LlmInsertOutputClick;
         public event RoutedEventHandler? LlmInsertNewTabOutputClick;
         public event RoutedEventHandler? LlmAddInstructionClick;
+        public event RoutedEventHandler? ModelNameClick;
 
         public TabView RightTabs => RightTabView;
         public ComboBox PreviewMode => PreviewModeCombo;
@@ -206,6 +207,11 @@ namespace TxtAIEditor.Controls
         private void OnLlmAddInstructionClick(object sender, RoutedEventArgs e)
         {
             LlmAddInstructionClick?.Invoke(sender, e);
+        }
+
+        private void OnModelNameClick(object sender, RoutedEventArgs e)
+        {
+            ModelNameClick?.Invoke(sender, e);
         }
 
         private void OnLlmTargetLangClick(object sender, RoutedEventArgs e)

@@ -17,6 +17,7 @@ namespace TxtAIEditor.Core.Interfaces
             EditorSettings settings,
             XamlRoot xamlRoot,
             Func<string, string, string> getString,
-            Action<object>? initializePickerWindow = null);
+            Action<object>? initializePickerWindow = null,
+            string? initialTab = null);
     }
 }

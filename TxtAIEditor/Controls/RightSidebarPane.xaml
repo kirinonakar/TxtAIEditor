@@ -237,10 +237,16 @@
                                         <Button x:Name="LlmCustomRunButton" Grid.Column="1" Content="전송" Click="OnLlmCustomClick" Style="{StaticResource AccentButtonStyle}"/>
                                     </Grid>
 
-                                    <TextBlock x:Name="LlmModelNameText"
-                                               FontSize="11"
-                                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                                               Margin="2,1,0,0"/>
+                                    <HyperlinkButton x:Name="LlmModelNameButton"
+                                                     Padding="0"
+                                                     MinHeight="0"
+                                                     MinWidth="0"
+                                                     Margin="2,1,0,0"
+                                                     Click="OnModelNameClick">
+                                        <TextBlock x:Name="LlmModelNameText"
+                                                   FontSize="11"
+                                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                                    </HyperlinkButton>
                                 </StackPanel>
                             </Grid>
                         </TabViewItem>
