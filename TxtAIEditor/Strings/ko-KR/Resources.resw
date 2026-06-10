@@ -318,7 +318,7 @@
     <value>Git 폴더가 아니어도 Autosave 허용</value>
   </data>
   <data name="SettingsLivePreview" xml:space="preserve">
-    <value>실시간 미리보기 기본 활성화</value>
+    <value>프리뷰 기본 활성화</value>
   </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>기본 마크다운 툴바 활성화</value>
@@ -639,7 +639,7 @@
     <value>취소</value>
   </data>
   <data name="LivePreviewTabHeader" xml:space="preserve">
-    <value>실시간 프리뷰</value>
+    <value>프리뷰</value>
   </data>
   <data name="AiAssistantTabHeader" xml:space="preserve">
     <value>AI Assistant</value>

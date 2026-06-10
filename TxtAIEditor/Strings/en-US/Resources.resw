@@ -318,7 +318,7 @@
     <value>Allow Autosave outside Git folders</value>
   </data>
   <data name="SettingsLivePreview" xml:space="preserve">
-    <value>Enable Live Preview by Default</value>
+    <value>Enable Preview by Default</value>
   </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>Enable Markdown Toolbar by Default</value>
@@ -639,7 +639,7 @@
     <value>Cancel</value>
   </data>
   <data name="LivePreviewTabHeader" xml:space="preserve">
-    <value>Live Preview</value>
+    <value>Preview</value>
   </data>
   <data name="AiAssistantTabHeader" xml:space="preserve">
     <value>AI Assistant</value>

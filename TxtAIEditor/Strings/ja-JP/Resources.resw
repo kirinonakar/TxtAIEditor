@@ -318,7 +318,7 @@
     <value>Gitフォルダー以外でも自動保存を許可する</value>
   </data>
   <data name="SettingsLivePreview" xml:space="preserve">
-    <value>デフォルトでライブプレビューを有効にする</value>
+    <value>デフォルトでプレビューを有効にする</value>
   </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>デフォルトでMarkdownツールバーを表示する</value>
@@ -640,7 +640,7 @@
     <value>キャンセル</value>
   </data>
   <data name="LivePreviewTabHeader" xml:space="preserve">
-    <value>リアルタイムプレビュー</value>
+    <value>プレビュー</value>
   </data>
   <data name="AiAssistantTabHeader" xml:space="preserve">
     <value>AI アシスタント</value>
