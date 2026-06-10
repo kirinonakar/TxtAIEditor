@@ -1667,6 +1667,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityCreateTabFormat" xml:space="preserve">
     <value>Inserting into new tab: {0}</value>
   </data>
+  <data name="AgentActivitySaveTabFormat" xml:space="preserve">
+    <value>Saving tab: {0}</value>
+  </data>
+  <data name="AgentActivityEditTabFormat" xml:space="preserve">
+    <value>Editing tab: {0}</value>
+  </data>
   <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
     <value>Running tool: {0}</value>
   </data>
@@ -1869,6 +1875,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
     <value>Read web page content: {0}</value>
+  </data>
+  <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
+    <value>Saved tab: {0}</value>
+  </data>
+  <data name="AgentVerboseEditTabOnly" xml:space="preserve">
+    <value>Edited tab: {0}</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
     <value>Modified Files (Double-click to compare)</value>

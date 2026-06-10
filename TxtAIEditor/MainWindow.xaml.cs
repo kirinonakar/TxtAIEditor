@@ -627,7 +627,32 @@ namespace TxtAIEditor
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
                 revertTabOrFileAsync: RevertTabOrFileAsync,
                 closeTabById: CloseTabById,
-                navigateToFolderAsync: NavigateExplorerToFolderAsync);
+                navigateToFolderAsync: NavigateExplorerToFolderAsync,
+                saveTabAsync: async (tab, targetPath) =>
+                {
+                    if (!string.IsNullOrEmpty(targetPath))
+                    {
+                        tab.FilePath = targetPath;
+                        tab.Title = Path.GetFileName(targetPath);
+                        tab.Language = _languageDetectionService.GetMonacoLanguageName(targetPath);
+                    }
+                    return await SaveTabAsync(tab);
+                },
+                editTabAsync: async (tab, newContent) =>
+                {
+                    tab.Content = newContent;
+                    if (_editorSessions.TryGetValue(tab.Id, out var session))
+                    {
+                        session.UpdateContentFromSync(newContent);
+                    }
+                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                    {
+                        await bridgeGroup.Bridge.SetTextAsync(newContent, shouldFocus: false);
+                    }
+                    _tabDirtyStateController.MarkTabDirty(tab);
+                    UpdateWindowTitle();
+                    return true;
+                });
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,

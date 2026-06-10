@@ -1668,6 +1668,12 @@
   <data name="AgentActivityCreateTabFormat" xml:space="preserve">
     <value>新しいタブに入力中: {0}</value>
   </data>
+  <data name="AgentActivitySaveTabFormat" xml:space="preserve">
+    <value>タブを保存中: {0}</value>
+  </data>
+  <data name="AgentActivityEditTabFormat" xml:space="preserve">
+    <value>タブを編集中: {0}</value>
+  </data>
   <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
     <value>ツール実行中: {0}</value>
   </data>
@@ -1870,6 +1876,12 @@
   </data>
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
     <value>ウェブページを読み込みました: {0}</value>
+  </data>
+  <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
+    <value>タブを保存しました: {0}</value>
+  </data>
+  <data name="AgentVerboseEditTabOnly" xml:space="preserve">
+    <value>タブの内容を編集しました: {0}</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
     <value>変更済み (ダブルクリックで比較)</value>

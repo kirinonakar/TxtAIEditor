@@ -41,6 +41,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, bool, Task>? _revertTabOrFileAsync;
         private readonly Action<string>? _closeTabById;
         private readonly Func<string, Task>? _navigateToFolderAsync;
+        private readonly Func<OpenedTab, string?, Task<bool>>? _saveTabAsync;
+        private readonly Func<OpenedTab, string, Task<bool>>? _editTabAsync;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentPresetController _presetController;
@@ -109,7 +111,9 @@ namespace TxtAIEditor.Controls
             Action? afterDialog = null,
             Func<string, string, bool, Task>? revertTabOrFileAsync = null,
             Action<string>? closeTabById = null,
-            Func<string, Task>? navigateToFolderAsync = null)
+            Func<string, Task>? navigateToFolderAsync = null,
+            Func<OpenedTab, string?, Task<bool>>? saveTabAsync = null,
+            Func<OpenedTab, string, Task<bool>>? editTabAsync = null)
         {
             _llmService = llmService;
             _settingsService = settingsService;
@@ -132,6 +136,8 @@ namespace TxtAIEditor.Controls
             _revertTabOrFileAsync = revertTabOrFileAsync;
             _closeTabById = closeTabById;
             _navigateToFolderAsync = navigateToFolderAsync;
+            _saveTabAsync = saveTabAsync;
+            _editTabAsync = editTabAsync;
             _displayText = new AgentDisplayLocalizer(_getString);
             _attachmentController = new AgentAttachmentController(
                 _agentPane,
@@ -791,6 +797,20 @@ namespace TxtAIEditor.Controls
                             string path = GetStringArgument(arguments, "path");
                             displayResult = string.Format(_getString("AgentVerboseOpenFileOnly", "파일을 열었습니다: {0}"), path);
                         }
+                        else if (normalizedName == "save_tab")
+                        {
+                            string path = GetFirstStringArgument(arguments, "path", "filePath", "file_path");
+                            if (string.IsNullOrEmpty(path))
+                            {
+                                path = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
+                            }
+                            displayResult = string.Format(_getString("AgentVerboseSaveTabOnly", "탭을 저장했습니다: {0}"), path);
+                        }
+                        else if (normalizedName == "edit_tab")
+                        {
+                            string path = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
+                            displayResult = string.Format(_getString("AgentVerboseEditTabOnly", "탭 내용을 수정했습니다: {0}"), path);
+                        }
                     }
 
                     await RunOnUIThreadAsync(() =>
@@ -1308,6 +1328,8 @@ namespace TxtAIEditor.Controls
                         "insert_text" => await InsertTextToolAsync(
                             GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
                         "create_tab" => await CreateTabToolAsync(arguments),
+                        "edit_tab" => await EditTabToolAsync(arguments),
+                        "save_tab" => await SaveTabToolAsync(arguments),
                         "open_file" => await OpenFileToolAsync(arguments),
                         "web_search_exa" => await _llmService.SearchExaAsync(
                             GetStringArgument(arguments, "query"),
@@ -1410,6 +1432,12 @@ namespace TxtAIEditor.Controls
                 "create_tab" => string.Format(
                     _getString("AgentActivityCreateTabFormat", "새 탭에 입력 중: {0}"),
                     TruncateForActivity(GetFirstStringArgument(arguments, "title", "name", "fileName", "file_name"))),
+                "save_tab" => string.Format(
+                    _getString("AgentActivitySaveTabFormat", "탭 저장 중: {0}"),
+                    TruncateForActivity(GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id", "path", "filePath", "file_path"))),
+                "edit_tab" => string.Format(
+                    _getString("AgentActivityEditTabFormat", "탭 수정 중: {0}"),
+                    TruncateForActivity(GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id"))),
                 "open_file" => string.Format(
                     _getString("AgentActivityOpenFileFormat", "파일 여는 중: {0}"),
                     GetStringArgument(arguments, "path")),
@@ -1535,6 +1563,8 @@ namespace TxtAIEditor.Controls
                 or "apply_patch"
                 or "insert_text"
                 or "create_tab"
+                or "edit_tab"
+                or "save_tab"
                 or "append_to_file"
                 or "merge_files"
                 or "split_file";
@@ -1967,6 +1997,13 @@ namespace TxtAIEditor.Controls
                 "insert_text_new_tab" => "create_tab",
                 "insert_into_new_tab" => "create_tab",
                 "paste_text_new_tab" => "create_tab",
+                "edit_tab" => "edit_tab",
+                "modify_tab" => "edit_tab",
+                "update_tab" => "edit_tab",
+                "overwrite_tab" => "edit_tab",
+                "save" => "save_tab",
+                "save_file" => "save_tab",
+                "save_tab" => "save_tab",
                 "read" => "read_file",
                 "search" => "search_text",
                 "powershell" => "run_powershell",
@@ -2305,6 +2342,194 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 return $"create_tab failed with exception: {ex}";
+            }
+        }
+
+        private async Task<string> SaveTabToolAsync(JsonElement arguments)
+        {
+            try
+            {
+                if (_saveTabAsync == null)
+                {
+                    return "save_tab failed: save operation is not supported by the host.";
+                }
+
+                OpenedTab? tab = null;
+                string titleOrId = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
+                if (!string.IsNullOrEmpty(titleOrId))
+                {
+                    var openTabs = _openTabsProvider();
+                    tab = openTabs.FirstOrDefault(t => string.Equals(t.Id, titleOrId, StringComparison.OrdinalIgnoreCase))
+                          ?? openTabs.FirstOrDefault(t => string.Equals(t.Title, titleOrId, StringComparison.OrdinalIgnoreCase))
+                          ?? openTabs.FirstOrDefault(t => !string.IsNullOrEmpty(t.FilePath) && string.Equals(Path.GetFileName(t.FilePath), titleOrId, StringComparison.OrdinalIgnoreCase));
+                    if (tab == null)
+                    {
+                        return $"save_tab failed: tab not found for '{titleOrId}'.";
+                    }
+                }
+                else
+                {
+                    tab = _activeTabProvider();
+                    if (tab == null)
+                    {
+                        return "save_tab failed: no active tab to save.";
+                    }
+                }
+
+                if (tab.IsReadOnlyViewer)
+                {
+                    return "save_tab failed: this is a read-only viewer tab and cannot be saved.";
+                }
+
+                string path = GetFirstStringArgument(arguments, "path", "filePath", "file_path");
+                string? originalFilePath = tab.FilePath;
+                string? originalTitle = tab.Title;
+                string? originalLanguage = tab.Language;
+
+                string? resolvedPath = null;
+                if (!string.IsNullOrEmpty(path))
+                {
+                    string root = _fileTools.WorkspaceRoot;
+                    resolvedPath = Path.IsPathRooted(path)
+                        ? Path.GetFullPath(path)
+                        : Path.GetFullPath(Path.Combine(root, path));
+
+                    if (!resolvedPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return $"save_tab failed: path '{path}' escapes workspace root.";
+                    }
+                }
+                else if (string.IsNullOrEmpty(tab.FilePath))
+                {
+                    return "save_tab failed: the tab is unsaved (has no file path) and no destination path was specified. Provide a 'path' argument.";
+                }
+
+                bool success = await RunOnUIThreadAsync(async () => await _saveTabAsync(tab, resolvedPath));
+                if (success)
+                {
+                    string finalPath = tab.FilePath ?? string.Empty;
+                    string relativePath = finalPath;
+                    try
+                    {
+                        if (finalPath.StartsWith(_fileTools.WorkspaceRoot, StringComparison.OrdinalIgnoreCase))
+                        {
+                            relativePath = finalPath.Substring(_fileTools.WorkspaceRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        }
+                    }
+                    catch {}
+
+                    var preview = new AgentFileEditPreview
+                    {
+                        ActionName = "save_tab",
+                        RelativePath = relativePath,
+                        FullPath = finalPath,
+                        OldContent = string.Empty,
+                        NewContent = tab.Content,
+                        IsNewFile = string.IsNullOrEmpty(originalFilePath)
+                    };
+                    await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
+
+                    return $"successfully saved tab to: {relativePath}";
+                }
+                else
+                {
+                    return "save_tab failed: save operation failed or was cancelled.";
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"save_tab failed with exception: {ex.Message}";
+            }
+        }
+
+        private async Task<string> EditTabToolAsync(JsonElement arguments)
+        {
+            try
+            {
+                if (_editTabAsync == null)
+                {
+                    return "edit_tab failed: edit operation is not supported by the host.";
+                }
+
+                OpenedTab? tab = null;
+                string titleOrId = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
+                if (!string.IsNullOrEmpty(titleOrId))
+                {
+                    var openTabs = _openTabsProvider();
+                    tab = openTabs.FirstOrDefault(t => string.Equals(t.Id, titleOrId, StringComparison.OrdinalIgnoreCase))
+                          ?? openTabs.FirstOrDefault(t => string.Equals(t.Title, titleOrId, StringComparison.OrdinalIgnoreCase))
+                          ?? openTabs.FirstOrDefault(t => !string.IsNullOrEmpty(t.FilePath) && string.Equals(Path.GetFileName(t.FilePath), titleOrId, StringComparison.OrdinalIgnoreCase));
+                    if (tab == null)
+                    {
+                        return $"edit_tab failed: tab not found for '{titleOrId}'.";
+                    }
+                }
+                else
+                {
+                    tab = _activeTabProvider();
+                    if (tab == null)
+                    {
+                        return "edit_tab failed: no active tab to edit.";
+                    }
+                }
+
+                if (tab.IsReadOnlyViewer)
+                {
+                    return "edit_tab failed: this is a read-only viewer tab and cannot be edited.";
+                }
+
+                string content = GetFirstStringArgument(arguments, "content", "newText", "new_text", "text");
+                if (content == null)
+                {
+                    return "edit_tab failed: content argument is missing.";
+                }
+
+                string oldContent = tab.Content;
+                if (string.Equals(oldContent, content, StringComparison.Ordinal))
+                {
+                    return "edit_tab completed: content is already identical.";
+                }
+
+                bool success = await RunOnUIThreadAsync(async () => await _editTabAsync(tab, content));
+                if (success)
+                {
+                    string finalPath = tab.FilePath ?? string.Empty;
+                    string relativePath = finalPath;
+                    try
+                    {
+                        if (finalPath.StartsWith(_fileTools.WorkspaceRoot, StringComparison.OrdinalIgnoreCase))
+                        {
+                            relativePath = finalPath.Substring(_fileTools.WorkspaceRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        }
+                    }
+                    catch {}
+
+                    if (string.IsNullOrEmpty(relativePath))
+                    {
+                        relativePath = tab.Title ?? "Untitled";
+                    }
+
+                    var preview = new AgentFileEditPreview
+                    {
+                        ActionName = "edit_tab",
+                        RelativePath = relativePath,
+                        FullPath = finalPath,
+                        OldContent = oldContent,
+                        NewContent = content,
+                        IsNewFile = false
+                    };
+                    await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
+
+                    return $"successfully edited tab: {relativePath}";
+                }
+                else
+                {
+                    return "edit_tab failed: edit operation failed or was cancelled.";
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"edit_tab failed with exception: {ex.Message}";
             }
         }
 

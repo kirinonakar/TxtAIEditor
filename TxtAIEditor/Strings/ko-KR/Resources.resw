@@ -1667,6 +1667,12 @@
   <data name="AgentActivityCreateTabFormat" xml:space="preserve">
     <value>새 탭에 입력 중: {0}</value>
   </data>
+  <data name="AgentActivitySaveTabFormat" xml:space="preserve">
+    <value>탭 저장 중: {0}</value>
+  </data>
+  <data name="AgentActivityEditTabFormat" xml:space="preserve">
+    <value>탭 수정 중: {0}</value>
+  </data>
   <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
     <value>도구 실행 중: {0}</value>
   </data>
@@ -1869,6 +1875,12 @@
   </data>
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
     <value>웹페이지를 읽었습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
+    <value>탭을 저장했습니다: {0}</value>
+  </data>
+  <data name="AgentVerboseEditTabOnly" xml:space="preserve">
+    <value>탭 내용을 수정했습니다: {0}</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
     <value>변경됨 (더블클릭 시 비교)</value>
