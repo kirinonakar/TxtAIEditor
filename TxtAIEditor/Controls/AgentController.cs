@@ -81,6 +81,7 @@ namespace TxtAIEditor.Controls
         private OpenedTab? _currentRunActiveTabSnapshot;
         private SelectionSnapshot? _currentRunSelectionSnapshot;
         private bool _currentRunRestrictEditsToSelection;
+        private double _currentRunTranscriptTokens;
 
         private sealed class SelectionSnapshot
         {
@@ -452,6 +453,7 @@ namespace TxtAIEditor.Controls
             _currentRunActiveTabSnapshot = null;
             _currentRunSelectionSnapshot = null;
             _currentRunRestrictEditsToSelection = false;
+            _currentRunTranscriptTokens = 0;
             var cancellationSource = new CancellationTokenSource();
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
@@ -725,8 +727,14 @@ namespace TxtAIEditor.Controls
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    string refreshedContext = BuildWorkspaceContext(instruction);
-                    transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResultForTranscript}\n\n[Current workspace state]\n{refreshedContext}";
+                    await RunOnUIThreadAsync(() =>
+                    {
+                        string refreshedContext = BuildWorkspaceContext(instruction);
+                        string addedPart = $"\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResultForTranscript}\n\n[Current workspace state]\n{refreshedContext}";
+                        transcript += addedPart;
+                        _currentRunTranscriptTokens += EstimateTokenCount(addedPart);
+                        UpdateContextStatsImmediate(force: true);
+                    });
                     
                     string displayResult = toolResult;
                     if (!skippedDuplicateTool &&
@@ -3204,9 +3212,9 @@ namespace TxtAIEditor.Controls
             _statsDebounceTimer.Start();
         }
 
-        private void UpdateContextStatsImmediate()
+        private void UpdateContextStatsImmediate(bool force = false)
         {
-            if (_isRunning)
+            if (_isRunning && !force)
             {
                 return;
             }
@@ -3716,7 +3724,7 @@ namespace TxtAIEditor.Controls
                 tokens += EstimateTokenCount(workspaceContext + Environment.NewLine + Environment.NewLine);
             }
 
-            return tokens + _attachmentController.EstimatedImageTokens;
+            return tokens + _currentRunTranscriptTokens + _attachmentController.EstimatedImageTokens;
         }
 
         private static double EstimateTokenCount(string text)
