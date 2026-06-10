@@ -354,7 +354,9 @@ function collectDisplayMathBlock(startLine, maxLine, getLine) {
     const parts = [];
     for (let line = startLine + 1; line <= maxLine; line++) {
         const text = getLine(line);
-        if (text === undefined) return null;
+        if (text === undefined) {
+            return { pending: true, endLine: line, extendRangeEnd: line };
+        }
         if (isDisplayMathClose(text, opener)) {
             return { text: parts.join('\n'), endLine: line };
         }
@@ -382,7 +384,9 @@ function collectHtmlBlock(startLine, maxLine, getLine) {
     const parts = [];
     for (let line = startLine; line <= maxLine; line++) {
         const text = getLine(line);
-        if (text === undefined) return null;
+        if (text === undefined) {
+            return { pending: true, endLine: line, extendRangeEnd: line };
+        }
         parts.push(text);
         if (closePattern.test(text)) return { html: parts.join('\n'), endLine: line };
     }
@@ -438,8 +442,11 @@ function collectMarkdownTableBlock(startLine, maxLine, getLine) {
     let endLine = startLine + 1;
     for (let line = startLine + 2; line <= maxLine; line++) {
         const text = getLine(line);
+        if (text === undefined) {
+            return { pending: true, endLine: line, extendRangeEnd: line };
+        }
         const row = splitTableRow(text);
-        if (text === undefined || !row || isTableSeparator(text)) break;
+        if (!row || isTableSeparator(text)) break;
         rows.push(row);
         endLine = line;
     }
@@ -487,7 +494,7 @@ function findFencedCodeBlockContaining(lineNumber, maxLine, getLine) {
 
     if (openFence && startLine > 0) {
         const block = collectFencedCodeBlock(startLine, maxLine, getLine);
-        if (block && targetLine <= block.endLine) {
+        if (block && !block.pending && targetLine <= block.endLine) {
             return {
                 kind: 'code',
                 startLine,
@@ -511,7 +518,7 @@ function findMarkdownTableBlockContaining(lineNumber, maxLine, getLine) {
         if (!isMarkdownTableStart(startLine, getLine)) continue;
 
         const block = collectMarkdownTableBlock(startLine, maxLine, getLine);
-        if (block && targetLine >= startLine && targetLine <= block.endLine) {
+        if (block && !block.pending && targetLine >= startLine && targetLine <= block.endLine) {
             return {
                 kind: 'table',
                 startLine,
@@ -627,7 +634,9 @@ function collectMarkdownListBlock(startLine, maxLine, getLine, options = {}) {
     let endLine = startLine;
     for (let lineNumber = startLine; lineNumber <= maxLine; lineNumber++) {
         const line = getLine(lineNumber);
-        if (line === undefined) break;
+        if (line === undefined) {
+            return { pending: true, endLine: lineNumber, extendRangeEnd: lineNumber };
+        }
 
         const item = listItemInfo(line, options);
         if (item) {
@@ -642,7 +651,9 @@ function collectMarkdownListBlock(startLine, maxLine, getLine, options = {}) {
             let hasContinuation = false;
             for (let peek = lineNumber + 1; peek <= maxLine; peek++) {
                 const peekLine = getLine(peek);
-                if (peekLine === undefined) break;
+                if (peekLine === undefined) {
+                    return { pending: true, endLine: peek, extendRangeEnd: peek };
+                }
                 const peekTrimmed = String(peekLine || '').trim();
                 if (!peekTrimmed) continue;
                 const peekItem = listItemInfo(peekLine, options);
@@ -683,7 +694,7 @@ function findMarkdownListBlockContaining(lineNumber, maxLine, getLine, options =
         if (!isMarkdownListStart(startLine, getLine, options)) continue;
 
         const block = collectMarkdownListBlock(startLine, maxLine, getLine, options);
-        if (block && targetLine >= block.startLine && targetLine <= block.endLine) {
+        if (block && !block.pending && targetLine >= block.startLine && targetLine <= block.endLine) {
             return {
                 kind: 'list',
                 startLine: block.startLine,
@@ -882,24 +893,36 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
     }
     if (htmlBlockTagName(line)) {
         const block = collectHtmlBlock(lineNumber, maxLine, getLine);
+        if (block?.pending) {
+            return block;
+        }
         if (block) {
             return { html: sanitizeHtml(block.html, options), endLine: block.endLine };
         }
     }
     if (isDisplayMathFence(line)) {
         const block = collectDisplayMathBlock(lineNumber, maxLine, getLine);
+        if (block?.pending) {
+            return block;
+        }
         if (block) {
             return { html: renderLatexLine(block.text), endLine: block.endLine };
         }
     }
     if (options.renderListsAsBlocks !== false && isMarkdownListStart(lineNumber, getLine, options)) {
         const block = collectMarkdownListBlock(lineNumber, maxLine, getLine, options);
+        if (block?.pending) {
+            return block;
+        }
         if (block) {
             return { html: renderMarkdownListBlock(block, options), endLine: block.endLine };
         }
     }
     if (isMarkdownTableStart(lineNumber, getLine)) {
         const block = collectMarkdownTableBlock(lineNumber, maxLine, getLine);
+        if (block?.pending) {
+            return block;
+        }
         if (block) {
             return { html: renderMarkdownTableBlock(block, options), endLine: block.endLine };
         }
@@ -912,6 +935,11 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
             const nextLine = getLine(i);
             if (nextLine === undefined) break;
             if (!String(nextLine ?? '').trim()) break;
+            if (fencedCodeInfo(nextLine)) break;
+            if (htmlBlockTagName(nextLine)) break;
+            if (isDisplayMathFence(nextLine)) break;
+            if (options.renderListsAsBlocks !== false && isMarkdownListStart(i, getLine, options)) break;
+            if (isMarkdownTableStart(i, getLine)) break;
             if (!isParagraphLine(nextLine, options)) break;
             paragraphLines.push(nextLine);
             endLine = i;
