@@ -34,6 +34,7 @@ namespace TxtAIEditor.Controls
         private string _fileContextDisplay = string.Empty;
         private System.Threading.CancellationTokenSource? _assistantCts = null;
         private bool _isAssistantRunning = false;
+        private string _lastCompletedHeader = string.Empty;
 
         private class CustomInstruction
         {
@@ -256,7 +257,16 @@ namespace TxtAIEditor.Controls
 
             string fileContext = GetActiveFileContext();
             string selectedText = _lastSelectionText;
-            string actionName = _getString("LlmActionCustom", "커스텀 지시사항 실행");
+            
+            string actionName = _getString("LlmActionCustomPrompt", "Custom Prompt");
+            if (_activeInstructionIndex >= 0 && _activeInstructionIndex < _instructions.Count)
+            {
+                var inst = _instructions[_activeInstructionIndex];
+                if (!string.IsNullOrEmpty(inst.PresetContent))
+                {
+                    actionName = inst.Name;
+                }
+            }
 
             await PreflightCheckAndRunAsync(actionName, $"{fileContext}\n\n{selectedText}",
                 (onChunk, ct) => _llmService.CustomPromptAsync(prompt, fileContext, selectedText, onChunk, ct),
@@ -337,9 +347,10 @@ namespace TxtAIEditor.Controls
             if (string.IsNullOrEmpty(output))
             {
                 output = _rightSidebar.LlmOutput.Text;
+                output = StripLastCompletedHeader(output);
             }
 
-            if (string.IsNullOrWhiteSpace(output) || output.StartsWith("대기 중", StringComparison.Ordinal) || output.StartsWith("Waiting...", StringComparison.Ordinal) || output.StartsWith("待機中...", StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(output) || output.StartsWith("대기 중", StringComparison.Ordinal) || output.StartsWith("Waiting...", StringComparison.Ordinal) || output.StartsWith("待機중...", StringComparison.Ordinal))
             {
                 _showError(_getString("LlmInsertTitle", "AI 응답 입력"), _getString("LlmNoOutputToInsert", "입력할 AI 응답이 없습니다."));
                 return;
@@ -354,15 +365,62 @@ namespace TxtAIEditor.Controls
             if (string.IsNullOrEmpty(output))
             {
                 output = _rightSidebar.LlmOutput.Text;
+                output = StripLastCompletedHeader(output);
             }
 
-            if (string.IsNullOrWhiteSpace(output) || output.StartsWith("대기 중", StringComparison.Ordinal) || output.StartsWith("Waiting...", StringComparison.Ordinal) || output.StartsWith("待機中...", StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(output) || output.StartsWith("대기 중", StringComparison.Ordinal) || output.StartsWith("Waiting...", StringComparison.Ordinal) || output.StartsWith("待機중...", StringComparison.Ordinal))
             {
                 _showError(_getString("LlmInsertTitle", "AI 응답 입력"), _getString("LlmNoOutputToInsert", "입력할 AI 응답이 없습니다."));
                 return;
             }
 
             _openNewTabWithContent(null, output);
+        }
+
+        private string StripLastCompletedHeader(string text)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(_lastCompletedHeader))
+            {
+                return text;
+            }
+
+            string normalizedText = text.Replace("\r\n", "\n").Replace("\r", "\n");
+            string normalizedHeader = _lastCompletedHeader.Replace("\r\n", "\n").Replace("\r", "\n");
+
+            if (normalizedText.StartsWith(normalizedHeader))
+            {
+                int headerLen = 0;
+                int normIdx = 0;
+                while (normIdx < normalizedHeader.Length && headerLen < text.Length)
+                {
+                    char cNorm = normalizedHeader[normIdx];
+                    char cOrig = text[headerLen];
+                    if (cNorm == '\n')
+                    {
+                        if (cOrig == '\r')
+                        {
+                            headerLen++;
+                            if (headerLen < text.Length && text[headerLen] == '\n')
+                            {
+                                headerLen++;
+                            }
+                        }
+                        else if (cOrig == '\n')
+                        {
+                            headerLen++;
+                        }
+                        normIdx++;
+                    }
+                    else
+                    {
+                        headerLen++;
+                        normIdx++;
+                    }
+                }
+                return text.Substring(headerLen);
+            }
+
+            return text;
         }
 
         private void OnLlmAddInstructionClick(object sender, RoutedEventArgs e)
@@ -897,7 +955,11 @@ namespace TxtAIEditor.Controls
             _isAssistantRunning = true;
             _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomCancelButtonText", "중단");
 
-            _rightSidebar.LlmOutput.Text = "";
+            string progressHeader = string.Format(_getString("LlmActionProgressFormat", "[{0} 진행 중...]"), actionName) + "\n\n";
+            string completedHeader = string.Format(_getString("LlmActionHeaderFormat", "[{0}]"), actionName) + "\n\n";
+            _lastCompletedHeader = completedHeader;
+
+            _rightSidebar.LlmOutput.Text = progressHeader;
             _rightSidebar.RightTabs.SelectedIndex = 1;
 
             try
@@ -912,6 +974,43 @@ namespace TxtAIEditor.Controls
                     });
                     await Task.CompletedTask;
                 }, _assistantCts.Token);
+
+                _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    string currentText = _rightSidebar.LlmOutput.Text;
+                    string normText = currentText.Replace("\r\n", "\n").Replace("\r", "\n");
+                    string normProgress = progressHeader.Replace("\r\n", "\n").Replace("\r", "\n");
+                    if (normText.StartsWith(normProgress))
+                    {
+                        int headerLen = 0;
+                        int normIdx = 0;
+                        while (normIdx < normProgress.Length && headerLen < currentText.Length)
+                        {
+                            char cNorm = normProgress[normIdx];
+                            char cOrig = currentText[headerLen];
+                            if (cNorm == '\n')
+                            {
+                                if (cOrig == '\r')
+                                {
+                                    headerLen++;
+                                    if (headerLen < currentText.Length && currentText[headerLen] == '\n')
+                                        headerLen++;
+                                }
+                                else if (cOrig == '\n')
+                                {
+                                    headerLen++;
+                                }
+                                normIdx++;
+                            }
+                            else
+                            {
+                                headerLen++;
+                                normIdx++;
+                            }
+                        }
+                        _rightSidebar.LlmOutput.Text = completedHeader + currentText.Substring(headerLen);
+                    }
+                });
             }
             catch (OperationCanceledException)
             {

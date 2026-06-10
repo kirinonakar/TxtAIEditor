@@ -767,6 +767,15 @@
   <data name="LlmActionCustom" xml:space="preserve">
     <value>Custom Send</value>
   </data>
+  <data name="LlmActionCustomPrompt" xml:space="preserve">
+    <value>Custom Prompt</value>
+  </data>
+  <data name="LlmActionProgressFormat" xml:space="preserve">
+    <value>[{0} in progress...]</value>
+  </data>
+  <data name="LlmActionHeaderFormat" xml:space="preserve">
+    <value>[{0}]</value>
+  </data>
   <data name="LlmSummarizeComplete" xml:space="preserve">
     <value>{0} complete. Saved to {1}.</value>
   </data>

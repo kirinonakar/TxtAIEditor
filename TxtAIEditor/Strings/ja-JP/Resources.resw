@@ -768,6 +768,15 @@
   <data name="LlmActionCustom" xml:space="preserve">
     <value>カスタム送信</value>
   </data>
+  <data name="LlmActionCustomPrompt" xml:space="preserve">
+    <value>Custom Prompt</value>
+  </data>
+  <data name="LlmActionProgressFormat" xml:space="preserve">
+    <value>[{0} 進行中...]</value>
+  </data>
+  <data name="LlmActionHeaderFormat" xml:space="preserve">
+    <value>[{0}]</value>
+  </data>
   <data name="LlmSummarizeComplete" xml:space="preserve">
     <value>{0} 完了。{1} に保存しました。</value>
   </data>
