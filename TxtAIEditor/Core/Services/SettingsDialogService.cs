@@ -888,6 +888,7 @@ namespace TxtAIEditor.Core.Services
                 ("F4", getString("ShortcutDescLivePreview", "에디터 내 실시간 미리보기를 켜거나 끕니다.")),
                 ("F9", getString("ShortcutDescTopMost", "항상위 토글")),
                 ("F10", getString("ShortcutDescTheme", "테마 토글")),
+                ("F11", getString("ShortcutDescMaximize", "창을 최대화하거나 원래 크기로 토글합니다.")),
                 ("F12", getString("ShortcutDescStickyNote", "스티커 노트"))
             };
 

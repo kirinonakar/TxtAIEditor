@@ -142,6 +142,7 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 | `F4` | Toggle Live Preview |
 | `F9` | Toggle Always on Top |
 | `F10` | Toggle Theme (Dark / Light) |
+| `F11` | Toggle Maximize Window |
 | `F12` | Toggle Sticky Note Mode |
 
 ### 🖱️ Column Selection (Multi-Cursor Selection)

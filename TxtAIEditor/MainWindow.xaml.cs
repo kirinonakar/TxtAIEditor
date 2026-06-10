@@ -509,7 +509,8 @@ namespace TxtAIEditor
                 _stickyNoteModeController.ToggleMode,
                 _terminalShortcutService,
                 ToggleLivePreview,
-                TogglePreviewWidth);
+                TogglePreviewWidth,
+                ToggleMaximize);
             _terminalPanelController = new TerminalPanelController(
                 this,
                 EditorWorkspace,
@@ -1126,6 +1127,9 @@ namespace TxtAIEditor
                             break;
                         case "f10":
                             OnToggleThemeClick(this, new RoutedEventArgs());
+                            break;
+                        case "f11":
+                            ToggleMaximize();
                             break;
                         case "f12":
                             _stickyNoteModeController.ToggleMode();
@@ -1896,6 +1900,22 @@ namespace TxtAIEditor
             _shellPanelLayoutService.TogglePreviewWidth();
         }
 
+        private void ToggleMaximize()
+        {
+            var presenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+            if (presenter != null)
+            {
+                if (presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+                {
+                    presenter.Restore();
+                }
+                else
+                {
+                    presenter.Maximize();
+                }
+            }
+        }
+
         private async void OnToggleThemeClick(object sender, RoutedEventArgs e)
         {
             await _settingsController.ToggleThemeAsync();
@@ -2362,6 +2382,10 @@ namespace TxtAIEditor
             else if (string.Equals(name, "f10", StringComparison.Ordinal))
             {
                 OnToggleThemeClick(this, new RoutedEventArgs());
+            }
+            else if (string.Equals(name, "f11", StringComparison.Ordinal))
+            {
+                ToggleMaximize();
             }
             else if (string.Equals(name, "f12", StringComparison.Ordinal))
             {

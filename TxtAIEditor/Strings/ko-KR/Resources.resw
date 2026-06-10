@@ -926,6 +926,9 @@
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>우측 패널 확장</value>
   </data>
+  <data name="ShortcutDescMaximize" xml:space="preserve">
+    <value>창 최대화 토글</value>
+  </data>
   <data name="EditorFindPlaceholder" xml:space="preserve">
     <value>찾기</value>
   </data>

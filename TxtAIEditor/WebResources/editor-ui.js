@@ -1646,6 +1646,11 @@ document.addEventListener('keydown', event => {
         post({ type: 'shortcut', name: 'f10' });
         return;
     }
+    if (event.key === 'F11') {
+        event.preventDefault();
+        post({ type: 'shortcut', name: 'f11' });
+        return;
+    }
     if (event.key === 'F12') {
         event.preventDefault();
         post({ type: 'shortcut', name: 'f12' });

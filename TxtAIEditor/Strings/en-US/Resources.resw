@@ -926,6 +926,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>Expand Right Panel</value>
   </data>
+  <data name="ShortcutDescMaximize" xml:space="preserve">
+    <value>Toggle Maximize Window</value>
+  </data>
   <data name="EditorFindPlaceholder" xml:space="preserve">
     <value>Find</value>
   </data>

@@ -927,6 +927,9 @@
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>右パネルの拡大</value>
   </data>
+  <data name="ShortcutDescMaximize" xml:space="preserve">
+    <value>ウィンドウ最大化の切り替え</value>
+  </data>
   <data name="EditorFindPlaceholder" xml:space="preserve">
     <value>検索</value>
   </data>

@@ -24,6 +24,7 @@ namespace TxtAIEditor.Controls
         private readonly TerminalShortcutService _terminalShortcutService;
         private readonly Action _toggleLivePreview;
         private readonly Action _togglePreviewWidth;
+        private readonly Action _toggleMaximize;
 
         public RootKeyboardShortcutController(
             Action openNewTab,
@@ -42,7 +43,8 @@ namespace TxtAIEditor.Controls
             Action toggleStickyNote,
             TerminalShortcutService terminalShortcutService,
             Action toggleLivePreview,
-            Action togglePreviewWidth)
+            Action togglePreviewWidth,
+            Action toggleMaximize)
         {
             _openNewTab = openNewTab;
             _toggleLeftPanelAsync = toggleLeftPanelAsync;
@@ -61,6 +63,7 @@ namespace TxtAIEditor.Controls
             _terminalShortcutService = terminalShortcutService;
             _toggleLivePreview = toggleLivePreview;
             _togglePreviewWidth = togglePreviewWidth;
+            _toggleMaximize = toggleMaximize;
         }
 
         public void HandleKeyDown(KeyRoutedEventArgs e)
@@ -160,6 +163,9 @@ namespace TxtAIEditor.Controls
                     return true;
                 case Windows.System.VirtualKey.F10:
                     _toggleTheme();
+                    return true;
+                case Windows.System.VirtualKey.F11:
+                    _toggleMaximize();
                     return true;
                 case Windows.System.VirtualKey.F12:
                     _toggleStickyNote();
