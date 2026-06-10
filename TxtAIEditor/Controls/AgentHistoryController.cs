@@ -21,7 +21,7 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentHistoryController
     {
-        private const int MaxHistoryItems = 10;
+        private const int MaxHistoryItems = 20;
 
         private readonly AgentPane _agentPane;
         private readonly string _historyFilePath;

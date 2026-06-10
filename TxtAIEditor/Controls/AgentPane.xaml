@@ -449,7 +449,7 @@
                         Padding="0"
                         FontSize="14"
                         Style="{StaticResource AgentButtonStyle}">
-                    <FontIcon Glyph="&#xE104;" FontSize="16"/>
+                    <FontIcon Glyph="&#xE109;" FontSize="16"/>
                     <Button.Flyout>
                         <Flyout x:Name="AgentPresetFlyout" Opened="OnAgentPresetFlyoutOpened">
                             <Grid Width="220" RowSpacing="8">
