@@ -121,9 +121,18 @@ namespace TxtAIEditor.Controls
                     _statusBarController.SyncEncodingCombo(tab);
                     _statusBarController.SyncLineEndingText(tab);
 
-                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                    if (tab.IsPendingReload)
                     {
-                        await bridgeGroup.Bridge.RequestSelectionAsync();
+                        tab.IsPendingReload = false;
+                        if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                        {
+                            await bridgeGroup.Bridge.SetTextAsync(tab.Content, shouldFocus: false);
+                        }
+                    }
+
+                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup2) && bridgeGroup2.Bridge != null)
+                    {
+                        await bridgeGroup2.Bridge.RequestSelectionAsync();
                     }
                     _tocController.RefreshToc(tab);
                 }

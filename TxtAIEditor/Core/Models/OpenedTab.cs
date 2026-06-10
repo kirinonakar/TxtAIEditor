@@ -134,6 +134,20 @@ namespace TxtAIEditor.Core.Models
             }
         }
 
+        private bool _isPendingReload = false;
+        public bool IsPendingReload
+        {
+            get => _isPendingReload;
+            set
+            {
+                if (_isPendingReload != value)
+                {
+                    _isPendingReload = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public string DisplayTitle => IsDirty ? $"{Title} *" : Title;
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

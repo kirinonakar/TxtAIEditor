@@ -2598,6 +2598,24 @@ namespace TxtAIEditor
             }
         }
 
+        private bool IsTabCurrentlyVisible(OpenedTab tab)
+        {
+            if (tab == null) return false;
+
+            if (EditorTabView != null && EditorTabView.SelectedItem is TabViewItem primaryItem && string.Equals(primaryItem.Tag as string, tab.Id, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (EditorTabView2 != null && EditorTabView2.Visibility == Microsoft.UI.Xaml.Visibility.Visible &&
+                EditorTabView2.SelectedItem is TabViewItem secondaryItem && string.Equals(secondaryItem.Tag as string, tab.Id, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         private async Task OnSearchReplaceFileModifiedAsync(string filePath)
         {
             if (string.IsNullOrEmpty(filePath)) return;
@@ -2619,9 +2637,18 @@ namespace TxtAIEditor
                     tab.Content = readResult.Model.GetText();
                     tab.IsDirty = false;
 
-                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                    bool isVisible = IsTabCurrentlyVisible(tab);
+                    if (isVisible)
                     {
-                        await bridgeGroup.Bridge.SetTextAsync(tab.Content, shouldFocus: false);
+                        tab.IsPendingReload = false;
+                        if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                        {
+                            await bridgeGroup.Bridge.SetTextAsync(tab.Content, shouldFocus: false);
+                        }
+                    }
+                    else
+                    {
+                        tab.IsPendingReload = true;
                     }
 
                     var tabItem = EditorTabView.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id)

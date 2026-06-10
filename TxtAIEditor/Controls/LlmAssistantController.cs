@@ -962,22 +962,50 @@ namespace TxtAIEditor.Controls
             _rightSidebar.LlmOutput.Text = progressHeader;
             _rightSidebar.RightTabs.SelectedIndex = 1;
 
+            var sb = new System.Text.StringBuilder(progressHeader);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            long lastUpdateMs = 0;
+            object lockObj = new object();
+
             try
             {
                 await streamingCall(async chunk =>
                 {
-                    _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                    string? textToUpdate = null;
+                    lock (lockObj)
                     {
-                        _rightSidebar.LlmOutput.Text += chunk;
-                        _rightSidebar.LlmOutput.SelectionStart = _rightSidebar.LlmOutput.Text.Length;
-                        _rightSidebar.LlmOutput.SelectionLength = 0;
-                    });
+                        sb.Append(chunk);
+                        long currentMs = stopwatch.ElapsedMilliseconds;
+                        if (currentMs - lastUpdateMs >= 100)
+                        {
+                            textToUpdate = sb.ToString();
+                            lastUpdateMs = currentMs;
+                        }
+                    }
+
+                    if (textToUpdate != null)
+                    {
+                        _rightSidebar.DispatcherQueue.TryEnqueue(() =>
+                        {
+                            _rightSidebar.LlmOutput.Text = textToUpdate;
+                            _rightSidebar.LlmOutput.SelectionStart = textToUpdate.Length;
+                            _rightSidebar.LlmOutput.SelectionLength = 0;
+                        });
+                    }
                     await Task.CompletedTask;
                 }, _assistantCts.Token);
 
+                string finalStreamedText;
+                lock (lockObj)
+                {
+                    finalStreamedText = sb.ToString();
+                }
+
                 _rightSidebar.DispatcherQueue.TryEnqueue(() =>
                 {
-                    string currentText = _rightSidebar.LlmOutput.Text;
+                    string currentText = finalStreamedText;
+                    _rightSidebar.LlmOutput.Text = currentText;
+
                     string normText = currentText.Replace("\r\n", "\n").Replace("\r", "\n");
                     string normProgress = progressHeader.Replace("\r\n", "\n").Replace("\r", "\n");
                     if (normText.StartsWith(normProgress))
@@ -1010,6 +1038,8 @@ namespace TxtAIEditor.Controls
                         }
                         _rightSidebar.LlmOutput.Text = completedHeader + currentText.Substring(headerLen);
                     }
+                    _rightSidebar.LlmOutput.SelectionStart = _rightSidebar.LlmOutput.Text.Length;
+                    _rightSidebar.LlmOutput.SelectionLength = 0;
                 });
             }
             catch (OperationCanceledException)
