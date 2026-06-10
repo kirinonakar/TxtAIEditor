@@ -187,7 +187,7 @@ namespace TxtAIEditor.Core.Services
         {
             string langCode = GetActiveLanguage();
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode);
-            string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty);
+            string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
             return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments);
         }
 

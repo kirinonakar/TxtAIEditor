@@ -15,20 +15,6 @@ namespace TxtAIEditor.Core.Services.LLM
 
             var builder = new StringBuilder();
             builder.AppendLine("You are the TxtAIEditor Agent, a coding-and-writing agent embedded inside a desktop editor.");
-            
-            var now = System.DateTime.Now;
-            string dateTimeStr = now.ToString("yyyy-MM-dd HH:mm:ss");
-            string dayOfWeek = now.ToString("dddd", System.Globalization.CultureInfo.InvariantCulture);
-            try
-            {
-                dayOfWeek = now.ToString("dddd", System.Globalization.CultureInfo.GetCultureInfo(languageCode));
-            }
-            catch {}
-            string timeZoneId = System.TimeZoneInfo.Local.Id;
-            builder.AppendLine($"Current local date and time: {dateTimeStr} ({dayOfWeek})");
-            builder.AppendLine($"User's local time zone: {timeZoneId}");
-            builder.AppendLine("Interpret relative date references (e.g., 'today', 'tomorrow', 'yesterday', 'this week', 'now') based on this current date and time zone.");
-            builder.AppendLine();
 
             builder.AppendLine("You must use the currently configured LLM provider/model and the context supplied by the host application.");
             builder.AppendLine("Act as an autonomous editor agent: understand the goal, inspect provided context, decide the smallest useful action, and produce an actionable result.");
@@ -148,7 +134,8 @@ namespace TxtAIEditor.Core.Services.LLM
             string instruction,
             string workspaceContext,
             string selectedText,
-            string openTabsContext)
+            string openTabsContext,
+            string languageCode = "en-US")
         {
             var builder = new StringBuilder();
             builder.AppendLine("[User task]");
@@ -175,6 +162,22 @@ namespace TxtAIEditor.Core.Services.LLM
                 builder.AppendLine("This is the editor selection source captured when the Agent run started. It contains only the file/path and line range; read the referenced file/range before editing or answering about the selected part.");
                 builder.AppendLine(selectedText);
             }
+
+            var now = System.DateTime.Now;
+            string dateTimeStr = now.ToString("yyyy-MM-dd HH:mm:ss");
+            string dayOfWeek = now.ToString("dddd", System.Globalization.CultureInfo.InvariantCulture);
+            try
+            {
+                dayOfWeek = now.ToString("dddd", System.Globalization.CultureInfo.GetCultureInfo(languageCode));
+            }
+            catch {}
+            string timeZoneId = System.TimeZoneInfo.Local.Id;
+
+            builder.AppendLine();
+            builder.AppendLine("[Dynamic Context]");
+            builder.AppendLine($"Current local date and time: {dateTimeStr} ({dayOfWeek})");
+            builder.AppendLine($"User's local time zone: {timeZoneId}");
+            builder.AppendLine("Interpret relative date references (e.g., 'today', 'tomorrow', 'yesterday', 'this week', 'now') based on this current date and time zone.");
 
             return builder.ToString();
         }
