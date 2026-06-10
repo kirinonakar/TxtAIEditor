@@ -80,6 +80,7 @@ namespace TxtAIEditor.Controls
         private string? _lmStudioLastFetchedModel;
         private string? _lmStudioLastFetchedEndpoint;
         private bool _lmStudioFetchInProgress;
+        private DateTime _lmStudioLastFetchedTime = DateTime.MinValue;
         private OpenedTab? _lastKnownActiveTab;
         private bool _lastKnownActiveTabFromTabSelection;
         private OpenedTab? _currentRunActiveTabSnapshot;
@@ -3205,7 +3206,7 @@ namespace TxtAIEditor.Controls
                 .Replace('\r', '\n');
         }
 
-        private void UpdateContextStats()
+        public void UpdateContextStats()
         {
             if (_isRunning)
             {
@@ -3276,11 +3277,20 @@ namespace TxtAIEditor.Controls
             UpdateModelDisplay();
         }
 
-        public void UpdateModelDisplay()
+        public void UpdateModelDisplay(bool forceClearCache = false)
         {
             var settings = _settingsService.CurrentSettings;
             if (settings != null)
             {
+                if (forceClearCache)
+                {
+                    // Reset LM Studio context length cache so that it will be forced to refetch when settings/models change
+                    _lmStudioContextLimitCache = null;
+                    _lmStudioLastFetchedModel = null;
+                    _lmStudioLastFetchedEndpoint = null;
+                    _lmStudioLastFetchedTime = DateTime.MinValue;
+                }
+
                 string provider = settings.LlmProvider ?? string.Empty;
                 string model = settings.LlmModel ?? string.Empty;
                 string format = _getString("AgentModelFormat", "모델: {0} ({1})");
@@ -3777,14 +3787,20 @@ namespace TxtAIEditor.Controls
 
             if (provider.Contains("lm studio") || provider.Contains("lmstudio"))
             {
-                if (_lmStudioContextLimitCache.HasValue && 
-                    settings.LlmModel == _lmStudioLastFetchedModel && 
-                    settings.LlmEndpoint == _lmStudioLastFetchedEndpoint)
+                bool needFetch = !_lmStudioContextLimitCache.HasValue ||
+                                 settings.LlmModel != _lmStudioLastFetchedModel ||
+                                 settings.LlmEndpoint != _lmStudioLastFetchedEndpoint ||
+                                 (DateTime.Now - _lmStudioLastFetchedTime) > TimeSpan.FromSeconds(10);
+
+                if (needFetch && !_lmStudioFetchInProgress)
+                {
+                    _ = Task.Run(() => FetchLmStudioContextLimitAsync(settings.LlmEndpoint ?? string.Empty, settings.LlmModel ?? string.Empty));
+                }
+
+                if (_lmStudioContextLimitCache.HasValue)
                 {
                     return _lmStudioContextLimitCache.Value;
                 }
-
-                _ = Task.Run(() => FetchLmStudioContextLimitAsync(settings.LlmEndpoint ?? string.Empty, settings.LlmModel ?? string.Empty));
             }
 
             if (model.Contains("gemini"))
@@ -4065,6 +4081,7 @@ namespace TxtAIEditor.Controls
                                             _lmStudioContextLimitCache = loadedCtxLen;
                                             _lmStudioLastFetchedModel = modelName;
                                             _lmStudioLastFetchedEndpoint = endpoint;
+                                            _lmStudioLastFetchedTime = DateTime.Now;
 
                                             await RunOnUIThreadAsync(() => UpdateContextStatsImmediate(true));
                                             return;
@@ -4076,6 +4093,7 @@ namespace TxtAIEditor.Controls
                                         _lmStudioContextLimitCache = maxCtxLen;
                                         _lmStudioLastFetchedModel = modelName;
                                         _lmStudioLastFetchedEndpoint = endpoint;
+                                        _lmStudioLastFetchedTime = DateTime.Now;
 
                                         await RunOnUIThreadAsync(() => UpdateContextStatsImmediate(true));
                                         return;

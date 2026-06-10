@@ -161,7 +161,8 @@ namespace TxtAIEditor.Controls
 
             await _settingsService.SaveSettingsAsync(settings);
             _llmAssistantController.UpdateModelDisplay();
-            _agentController.UpdateModelDisplay();
+            _agentController.UpdateModelDisplay(true);
+            _agentController.UpdateContextStats();
             ApplyResourceLanguage();
             _applyPreviewVisibility(settings.DefaultMarkdownEnabled);
             _topToolbar.MarkdownToolbarIsChecked = settings.DefaultMarkdownToolbarEnabled;
