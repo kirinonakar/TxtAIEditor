@@ -402,7 +402,8 @@
             blockContextLines: 120,
             scrollSyncEnabled: true,
             theme: 'Dark',
-            tabSize: 4
+            tabSize: 4,
+            renderedRange: null
         };
 
         initializeMermaid('Dark');
@@ -696,6 +697,7 @@
             }
             state.cacheVersion++;
             state.lastRangeKey = '';
+            state.renderedRange = null;
             setHtmlMode(false);
             document.body.classList.remove('csv-mode');
             document.body.classList.toggle('wrap-enabled', state.wordWrap);
@@ -788,11 +790,29 @@
             const contextStart = state.mode === 'markdown'
                 ? Math.max(1, visible.start - state.blockContextLines)
                 : visible.start;
-            requestMissingLines(contextStart, visible.end);
+
+            if (!state.renderedRange || 
+                state.renderedRange.mode !== state.mode ||
+                state.renderedRange.lineCount !== state.lineCount ||
+                visible.start < state.renderedRange.visibleStart - 10 ||
+                visible.start > state.renderedRange.visibleStart + 10 ||
+                visible.end > state.renderedRange.end ||
+                contextStart < state.renderedRange.start) {
+                
+                state.renderedRange = {
+                    start: contextStart,
+                    end: visible.end,
+                    visibleStart: visible.start,
+                    mode: state.mode,
+                    lineCount: state.lineCount
+                };
+            }
+
             const range = {
-                start: contextStart,
-                end: visible.end
+                start: state.renderedRange.start,
+                end: state.renderedRange.end
             };
+
             requestMissingLines(range.start, range.end);
             const key = `${visible.start}:${visible.end}:${range.start}:${range.end}:${state.lineCount}:${state.mode}:${scroll.clientWidth}:${totalVirtualHeight()}:${state.cacheVersion}`;
             if (key === state.lastRangeKey) return;
@@ -1007,6 +1027,7 @@
             }
             lines.forEach((line, index) => state.cache.set(index + 1, line));
             state.cacheVersion++;
+            state.renderedRange = null;
             setHtmlMode(false);
             document.body.classList.remove('csv-mode');
             document.body.classList.toggle('wrap-enabled', state.wordWrap);
