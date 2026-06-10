@@ -13,7 +13,6 @@ using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.Core.Services.LLM;
-using Windows.Storage.Pickers;
 
 namespace TxtAIEditor.Controls
 {
@@ -44,24 +43,10 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task>? _navigateToFolderAsync;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
+        private readonly AgentPresetController _presetController;
+        private readonly AgentHistoryController _historyController;
         private readonly List<AgentFileEditPreview> _sessionEdits = new();
-        private readonly string _agentPresetsFilePath;
-        private readonly string _agentHistoryFilePath;
-        private readonly List<AgentPresetItem> _agentPresets = new();
-        private readonly HashSet<string> _selectedAgentPresetNames = new(StringComparer.OrdinalIgnoreCase);
         private string _currentSessionId = Guid.NewGuid().ToString();
-        private readonly List<AgentHistoryItem> _agentHistory = new();
-
-        private sealed class AgentHistoryItem
-        {
-            public string Id { get; set; } = string.Empty;
-            public DateTime Timestamp { get; set; }
-            public string Title { get; set; } = string.Empty;
-            public string SessionHistoryText { get; set; } = string.Empty;
-            public double SessionHistoryTokenCount { get; set; }
-            public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
-            public string WorkspaceRoot { get; set; } = string.Empty;
-        }
 
         private string _lastSelectionText = string.Empty;
         private string? _lastSelectionTabId;
@@ -100,12 +85,6 @@ namespace TxtAIEditor.Controls
                 !string.IsNullOrEmpty(SourcePath) &&
                 StartLine > 0 &&
                 EndLine > 0;
-        }
-
-        private sealed class AgentPresetItem
-        {
-            public string Name { get; set; } = string.Empty;
-            public string Content { get; set; } = string.Empty;
         }
 
         public AgentController(
@@ -166,6 +145,15 @@ namespace TxtAIEditor.Controls
                 pdfTextExtractionService,
                 _beforeDialog,
                 _afterDialog);
+            _presetController = new AgentPresetController(
+                _agentPane,
+                _initializePickerWindow,
+                _showError,
+                _getString,
+                () => UpdateContextStatsImmediate(),
+                _beforeDialog,
+                _afterDialog);
+            _historyController = new AgentHistoryController(_agentPane);
             _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
             _fileTools.ConfirmPowerShellAsync = ConfirmPowerShellAsync;
             if (_fileModifiedAsync != null)
@@ -173,10 +161,6 @@ namespace TxtAIEditor.Controls
                 _fileTools.FileModifiedAsync = _fileModifiedAsync;
             }
 
-            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
-            _agentPresetsFilePath = Path.Combine(settingsDir, "agent-presets.json");
-            _agentHistoryFilePath = Path.Combine(settingsDir, "agent-history.json");
             _statsDebounceTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(250)
@@ -189,8 +173,8 @@ namespace TxtAIEditor.Controls
 
             WireEvents();
             UpdateContextStatsImmediate();
-            _ = LoadAgentPresetsAsync();
-            _ = LoadAgentHistoryAsync();
+            _ = _presetController.LoadAsync();
+            _ = _historyController.LoadAsync(_currentSessionId);
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
@@ -416,13 +400,13 @@ namespace TxtAIEditor.Controls
             _agentPane.InsertNewTabOutputRequested += async (_, _) => await InsertNewTabOutputAsync();
             _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
             _agentPane.RemoveAttachmentRequested += (_, attachment) => _attachmentController.RemoveAttachment(attachment.Id);
-            _agentPane.AgentPresetAddRequested += (_, _) => OnAddAgentPresetClick();
-            _agentPane.AgentPresetToggled += (_, presetName) => ToggleAgentPreset(presetName);
-            _agentPane.AgentPresetEdited += (_, presetName) => OnAgentPresetEdited(presetName);
-            _agentPane.AgentPresetDeleted += (_, presetName) => OnAgentPresetDeleted(presetName);
-            _agentPane.AgentPresetRemoved += (_, presetName) => RemoveSelectedAgentPreset(presetName);
-            _agentPane.AgentPresetExportRequested += (_, _) => OnExportAgentPresetsClick();
-            _agentPane.AgentPresetImportRequested += (_, _) => OnImportAgentPresetsClick();
+            _agentPane.AgentPresetAddRequested += async (_, _) => await _presetController.AddPresetAsync();
+            _agentPane.AgentPresetToggled += (_, presetName) => _presetController.TogglePreset(presetName);
+            _agentPane.AgentPresetEdited += async (_, presetName) => await _presetController.EditPresetAsync(presetName);
+            _agentPane.AgentPresetDeleted += async (_, presetName) => await _presetController.DeletePresetAsync(presetName);
+            _agentPane.AgentPresetRemoved += (_, presetName) => _presetController.RemoveSelectedPreset(presetName);
+            _agentPane.AgentPresetExportRequested += async (_, _) => await _presetController.ExportPresetsAsync();
+            _agentPane.AgentPresetImportRequested += async (_, _) => await _presetController.ImportPresetsAsync();
             
             _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
             _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
@@ -684,7 +668,7 @@ namespace TxtAIEditor.Controls
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (!TryParseToolCall(response, out string toolName, out JsonElement arguments))
+                    if (!AgentToolCallParser.TryParse(response, out string toolName, out JsonElement arguments))
                     {
                         if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
@@ -926,7 +910,7 @@ namespace TxtAIEditor.Controls
                 UpdateModifiedFilesList();
                 _attachmentController.Clear();
                 UpdateContextStatsImmediate();
-                UpdateHistoryUI();
+                _historyController.UpdateUI(_currentSessionId);
             });
         }
 
@@ -1015,52 +999,12 @@ namespace TxtAIEditor.Controls
 
         private string BuildInstructionDisplay(string userInstruction)
         {
-            var selectedPresets = GetSelectedAgentPresets();
-            if (selectedPresets.Count == 0)
-            {
-                return userInstruction;
-            }
-
-            string presetLabel = string.Join(", ", selectedPresets.Select(p => p.Name));
-            if (string.IsNullOrWhiteSpace(userInstruction))
-            {
-                return $"[{presetLabel}]";
-            }
-
-            return $"[{presetLabel}] {userInstruction}";
+            return _presetController.BuildInstructionDisplay(userInstruction);
         }
 
         private string BuildAgentInstruction(string userInstruction)
         {
-            var selectedPresets = GetSelectedAgentPresets();
-            if (selectedPresets.Count == 0)
-            {
-                return userInstruction;
-            }
-
-            var builder = new StringBuilder();
-            builder.AppendLine("[Agent persona/instruction presets]");
-            foreach (var preset in selectedPresets)
-            {
-                builder.AppendLine($"## {preset.Name}");
-                builder.AppendLine(preset.Content);
-                builder.AppendLine();
-            }
-
-            if (!string.IsNullOrWhiteSpace(userInstruction))
-            {
-                builder.AppendLine("[User request]");
-                builder.Append(userInstruction);
-            }
-
-            return builder.ToString().Trim();
-        }
-
-        private List<AgentPresetItem> GetSelectedAgentPresets()
-        {
-            return _agentPresets
-                .Where(p => _selectedAgentPresetNames.Contains(p.Name))
-                .ToList();
+            return _presetController.BuildAgentInstruction(userInstruction);
         }
 
         private string BuildWorkspaceContext(string instruction)
@@ -1513,543 +1457,6 @@ namespace TxtAIEditor.Controls
             value = value.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\n', ' ').Replace('\r', ' ');
             const int maxConfirmationChars = 40;
             return value.Length > maxConfirmationChars ? value.Substring(0, maxConfirmationChars) + "..." : value;
-        }
-
-        private static string FixJsonCarriageReturnEscapes(string json)
-        {
-            if (string.IsNullOrEmpty(json))
-            {
-                return json;
-            }
-
-            var sb = new StringBuilder(json.Length);
-            int len = json.Length;
-            for (int i = 0; i < len; i++)
-            {
-                if (json[i] == '\\')
-                {
-                    if (i + 1 >= len)
-                    {
-                        sb.Append('\\');
-                        break;
-                    }
-
-                    if (json[i + 1] == 'r')
-                    {
-                        bool isFollowedByNewline = false;
-                        if (i + 3 < len && json[i + 2] == '\\' && json[i + 3] == 'n')
-                        {
-                            isFollowedByNewline = true;
-                        }
-                        else if (i + 2 < len && (json[i + 2] == '\n' || json[i + 2] == '\r'))
-                        {
-                            isFollowedByNewline = true;
-                        }
-
-                        if (!isFollowedByNewline)
-                        {
-                            sb.Append("\\\\r");
-                        }
-                        else
-                        {
-                            sb.Append('\\').Append('r');
-                        }
-                        i++; // Skip 'r'
-                        continue;
-                    }
-                    else
-                    {
-                        sb.Append('\\').Append(json[i + 1]);
-                        i++; // Skip the escaped character
-                        continue;
-                    }
-                }
-                sb.Append(json[i]);
-            }
-            return sb.ToString();
-        }
-
-        private static bool TryParseToolCall(string response, out string toolName, out JsonElement arguments)
-        {
-            toolName = string.Empty;
-            arguments = default;
-
-            if (!TryExtractToolCallPayload(response, out string payload))
-            {
-                return false;
-            }
-
-            string fixedPayload = FixJsonCarriageReturnEscapes(payload);
-            string trimmedPayload = fixedPayload.Trim();
-
-            // Check if the payload starts with a tool name, followed by JSON arguments.
-            // e.g. create_file\n{"arguments":{"path":"test/fire.html","content":"..."}}
-            int openBraceIndex = trimmedPayload.IndexOf('{');
-            if (openBraceIndex > 0)
-            {
-                string possibleName = trimmedPayload.Substring(0, openBraceIndex).Trim();
-                if (Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$"))
-                {
-                    toolName = possibleName;
-                    string jsonPart = trimmedPayload.Substring(openBraceIndex);
-                    try
-                    {
-                        using var document = JsonDocument.Parse(jsonPart);
-                        var root = document.RootElement.Clone();
-                        arguments = root.TryGetProperty("arguments", out var argsProp)
-                            ? argsProp.Clone()
-                            : root.Clone();
-                        return !string.IsNullOrWhiteSpace(toolName);
-                    }
-                    catch
-                    {
-                        // Fall through to lenient/other parsing methods on failure
-                    }
-                }
-            }
-
-            if (TryExtractToolCallJson(response, out string json))
-            {
-                string fixedJson = FixJsonCarriageReturnEscapes(json);
-                try
-                {
-                    using var document = JsonDocument.Parse(fixedJson);
-                    var root = document.RootElement.Clone();
-                    if (root.TryGetProperty("name", out var nameProp))
-                    {
-                        toolName = nameProp.GetString() ?? string.Empty;
-                        arguments = root.TryGetProperty("arguments", out var argsProp)
-                            ? argsProp.Clone()
-                            : JsonDocument.Parse("{}").RootElement.Clone();
-
-                        return !string.IsNullOrWhiteSpace(toolName);
-                    }
-                }
-                catch
-                {
-                    // Fall through to lenient
-                }
-            }
-
-            return TryParseToolCallLenient(trimmedPayload, out toolName, out arguments);
-        }
-
-        private static bool TryParseToolCallLenient(string json, out string toolName, out JsonElement arguments)
-        {
-            toolName = string.Empty;
-            arguments = default;
-
-            string? name = ExtractLenientStringProperty(json, "name");
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return false;
-            }
-
-            string argumentsText = ExtractLenientObjectProperty(json, "arguments") ?? "{}";
-            var argumentValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var property in ExtractLenientStringProperties(argumentsText))
-            {
-                argumentValues[property.Key] = property.Value;
-            }
-
-            var numberMatches = Regex.Matches(
-                argumentsText,
-                "\"(?<key>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"\\s*:\\s*(?<value>-?\\d+)",
-                RegexOptions.Singleline);
-
-            foreach (Match match in numberMatches)
-            {
-                string key = DecodeLenientJsonString(match.Groups["key"].Value);
-                if (!argumentValues.ContainsKey(key))
-                {
-                    argumentValues[key] = match.Groups["value"].Value;
-                }
-            }
-
-            string repairedJson = JsonSerializer.Serialize(argumentValues);
-            using var argumentsDocument = JsonDocument.Parse(repairedJson);
-            toolName = DecodeLenientJsonString(name);
-            arguments = argumentsDocument.RootElement.Clone();
-            return !string.IsNullOrWhiteSpace(toolName);
-        }
-
-        private static IEnumerable<KeyValuePair<string, string>> ExtractLenientStringProperties(string objectText)
-        {
-            if (string.IsNullOrEmpty(objectText))
-            {
-                yield break;
-            }
-
-            int i = 0;
-            while (i < objectText.Length)
-            {
-                int keyQuoteIndex = objectText.IndexOf('"', i);
-                if (keyQuoteIndex < 0)
-                {
-                    yield break;
-                }
-
-                if (!TryReadQuotedToken(objectText, keyQuoteIndex, out string rawKey, out int keyEndIndex))
-                {
-                    yield break;
-                }
-
-                int colonIndex = SkipWhitespace(objectText, keyEndIndex + 1);
-                if (colonIndex >= objectText.Length || objectText[colonIndex] != ':')
-                {
-                    i = keyEndIndex + 1;
-                    continue;
-                }
-
-                int valueStartIndex = SkipWhitespace(objectText, colonIndex + 1);
-                if (valueStartIndex >= objectText.Length || objectText[valueStartIndex] != '"')
-                {
-                    i = valueStartIndex + 1;
-                    continue;
-                }
-
-                int valueContentStart = valueStartIndex + 1;
-                int valueEndIndex = FindLenientStringValueEnd(objectText, valueContentStart);
-                string rawValue = objectText.Substring(
-                    valueContentStart,
-                    Math.Max(0, valueEndIndex - valueContentStart));
-
-                yield return new KeyValuePair<string, string>(
-                    DecodeLenientJsonString(rawKey),
-                    DecodeLenientJsonString(rawValue));
-
-                i = Math.Min(objectText.Length, valueEndIndex + 1);
-            }
-        }
-
-        private static bool TryReadQuotedToken(string text, int quoteIndex, out string rawValue, out int endQuoteIndex)
-        {
-            rawValue = string.Empty;
-            endQuoteIndex = -1;
-            if (quoteIndex < 0 || quoteIndex >= text.Length || text[quoteIndex] != '"')
-            {
-                return false;
-            }
-
-            bool escaped = false;
-            for (int i = quoteIndex + 1; i < text.Length; i++)
-            {
-                char ch = text[i];
-                if (escaped)
-                {
-                    escaped = false;
-                    continue;
-                }
-
-                if (ch == '\\')
-                {
-                    escaped = true;
-                    continue;
-                }
-
-                if (ch == '"')
-                {
-                    rawValue = text.Substring(quoteIndex + 1, i - quoteIndex - 1);
-                    endQuoteIndex = i;
-                    return true;
-                }
-            }
-
-            rawValue = text.Substring(quoteIndex + 1);
-            endQuoteIndex = text.Length;
-            return true;
-        }
-
-        private static int FindLenientStringValueEnd(string text, int valueStartIndex)
-        {
-            bool escaped = false;
-            for (int i = valueStartIndex; i < text.Length; i++)
-            {
-                char ch = text[i];
-                if (escaped)
-                {
-                    escaped = false;
-                    continue;
-                }
-
-                if (ch == '\\')
-                {
-                    escaped = true;
-                    continue;
-                }
-
-                if (ch != '"')
-                {
-                    continue;
-                }
-
-                int nextIndex = SkipWhitespace(text, i + 1);
-                if (nextIndex >= text.Length ||
-                    text[nextIndex] == '}' ||
-                    text[nextIndex] == ']')
-                {
-                    return i;
-                }
-
-                if (text[nextIndex] == ',')
-                {
-                    int afterCommaIndex = SkipWhitespace(text, nextIndex + 1);
-                    if (LooksLikePropertyKeyAt(text, afterCommaIndex))
-                    {
-                        return i;
-                    }
-                }
-            }
-
-            return text.Length;
-        }
-
-        private static bool LooksLikePropertyKeyAt(string text, int quoteIndex)
-        {
-            if (!TryReadQuotedToken(text, quoteIndex, out _, out int keyEndIndex))
-            {
-                return false;
-            }
-
-            int colonIndex = SkipWhitespace(text, keyEndIndex + 1);
-            return colonIndex < text.Length && text[colonIndex] == ':';
-        }
-
-        private static int SkipWhitespace(string text, int startIndex)
-        {
-            int i = Math.Max(0, startIndex);
-            while (i < text.Length && char.IsWhiteSpace(text[i]))
-            {
-                i++;
-            }
-
-            return i;
-        }
-
-        private static string? ExtractLenientStringProperty(string text, string propertyName)
-        {
-            var match = Regex.Match(
-                text,
-                $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*\"(?<value>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"",
-                RegexOptions.Singleline | RegexOptions.IgnoreCase);
-
-            return match.Success ? match.Groups["value"].Value : null;
-        }
-
-        private static string? ExtractLenientObjectProperty(string text, string propertyName)
-        {
-            var match = Regex.Match(
-                text,
-                $"\"{Regex.Escape(propertyName)}\"\\s*:",
-                RegexOptions.Singleline | RegexOptions.IgnoreCase);
-            if (!match.Success)
-            {
-                return null;
-            }
-
-            int objectStart = text.IndexOf('{', match.Index + match.Length);
-            if (objectStart < 0)
-            {
-                return null;
-            }
-
-            if (TryExtractBalancedJsonObject(text, objectStart, out string objectText))
-            {
-                return objectText;
-            }
-
-            string fallback = text.Substring(objectStart);
-            int closingTagIndex = fallback.IndexOf("</tool_call>", StringComparison.OrdinalIgnoreCase);
-            if (closingTagIndex >= 0)
-            {
-                fallback = fallback.Substring(0, closingTagIndex);
-            }
-
-            return fallback;
-        }
-
-        private static string DecodeLenientJsonString(string value)
-        {
-            var builder = new StringBuilder(value.Length);
-            for (int i = 0; i < value.Length; i++)
-            {
-                char ch = value[i];
-                if (ch != '\\' || i + 1 >= value.Length)
-                {
-                    builder.Append(ch);
-                    continue;
-                }
-
-                char next = value[++i];
-                switch (next)
-                {
-                    case '"':
-                    case '\\':
-                    case '/':
-                        builder.Append(next);
-                        break;
-                    case 'n':
-                        builder.Append('\n');
-                        break;
-                    case 'r':
-                        builder.Append('\r');
-                        break;
-                    case 'u' when i + 4 < value.Length:
-                        string hex = value.Substring(i + 1, 4);
-                        if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out int codePoint))
-                        {
-                            builder.Append((char)codePoint);
-                            i += 4;
-                        }
-                        else
-                        {
-                            builder.Append('\\').Append(next);
-                        }
-                        break;
-                    default:
-                        builder.Append('\\').Append(next);
-                        break;
-                }
-            }
-
-            return builder.ToString();
-        }
-
-        private static bool IsToolCallLike(string response)
-        {
-            string trimmed = (response ?? string.Empty).TrimStart();
-            return trimmed.StartsWith("<tool_call>", StringComparison.OrdinalIgnoreCase) ||
-                   trimmed.StartsWith("{\"name\"", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool MightBeToolCallPrefix(string response)
-        {
-            string trimmed = (response ?? string.Empty).TrimStart();
-            if (string.IsNullOrEmpty(trimmed))
-            {
-                return true;
-            }
-
-            return "<tool_call>".StartsWith(trimmed, StringComparison.OrdinalIgnoreCase) ||
-                   "{\"name\"".StartsWith(trimmed, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool TryExtractToolCallJson(string response, out string json)
-        {
-            json = string.Empty;
-            if (string.IsNullOrWhiteSpace(response))
-            {
-                return false;
-            }
-
-            string text = response.Trim();
-            int toolCallIndex = text.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
-            if (toolCallIndex >= 0)
-            {
-                text = text.Substring(toolCallIndex + "<tool_call>".Length).TrimStart();
-            }
-
-            int jsonStart = text.IndexOf('{');
-            if (jsonStart < 0)
-            {
-                return false;
-            }
-
-            return TryExtractBalancedJsonObject(text, jsonStart, out json);
-        }
-
-        private static bool TryExtractToolCallPayload(string response, out string payload)
-        {
-            payload = string.Empty;
-            if (string.IsNullOrWhiteSpace(response))
-            {
-                return false;
-            }
-
-            string text = response.Trim();
-            int toolCallIndex = text.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
-            if (toolCallIndex >= 0)
-            {
-                int payloadStart = toolCallIndex + "<tool_call>".Length;
-                int payloadEnd = text.IndexOf("</tool_call>", payloadStart, StringComparison.OrdinalIgnoreCase);
-                payload = payloadEnd >= 0
-                    ? text.Substring(payloadStart, payloadEnd - payloadStart).Trim()
-                    : text.Substring(payloadStart).Trim();
-            }
-            else
-            {
-                int jsonStart = text.IndexOf('{');
-                if (jsonStart < 0)
-                {
-                    return false;
-                }
-
-                payload = text.Substring(jsonStart).Trim();
-            }
-
-            if (payload.StartsWith("{", StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            int openBraceIndex = payload.IndexOf('{');
-            if (openBraceIndex <= 0)
-            {
-                return false;
-            }
-
-            string possibleName = payload.Substring(0, openBraceIndex).Trim();
-            return Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$");
-        }
-
-        private static bool TryExtractBalancedJsonObject(string text, int jsonStart, out string json)
-        {
-            json = string.Empty;
-            int depth = 0;
-            bool inString = false;
-            bool escaped = false;
-            for (int i = jsonStart; i < text.Length; i++)
-            {
-                char ch = text[i];
-                if (escaped)
-                {
-                    escaped = false;
-                    continue;
-                }
-
-                if (ch == '\\' && inString)
-                {
-                    escaped = true;
-                    continue;
-                }
-
-                if (ch == '"')
-                {
-                    inString = !inString;
-                    continue;
-                }
-
-                if (inString)
-                {
-                    continue;
-                }
-
-                if (ch == '{')
-                {
-                    depth++;
-                }
-                else if (ch == '}')
-                {
-                    depth--;
-                    if (depth == 0)
-                    {
-                        json = text.Substring(jsonStart, i - jsonStart + 1);
-                        return true;
-                    }
-                }
-            }
-
-            return false;
         }
 
         private static string GetStringArgument(JsonElement arguments, string name)
@@ -2711,7 +2118,7 @@ namespace TxtAIEditor.Controls
                     }
                 }
             }
-            
+
             // Check other potential keys
             if (pathsList.Count == 0 && arguments.TryGetProperty("sources", out var sourcesProp) && sourcesProp.ValueKind == JsonValueKind.Array)
             {
@@ -2766,10 +2173,10 @@ namespace TxtAIEditor.Controls
                     string targetPath = GetFirstStringArgument(item, "path", "targetPath", "target_path", "file");
                     int startLine = GetIntArgument(item, "startLine", 0);
                     if (startLine == 0) startLine = GetIntArgument(item, "start_line", 0);
-                    
+
                     int endLine = GetIntArgument(item, "endLine", 0);
                     if (endLine == 0) endLine = GetIntArgument(item, "end_line", 0);
-                    
+
                     int lineCount = GetIntArgument(item, "lineCount", 0);
                     if (lineCount == 0) lineCount = GetIntArgument(item, "line_count", 0);
                     if (lineCount == 0) lineCount = GetIntArgument(item, "count", 0);
@@ -3299,414 +2706,6 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task LoadAgentPresetsAsync()
-        {
-            try
-            {
-                if (File.Exists(_agentPresetsFilePath))
-                {
-                    string json = await File.ReadAllTextAsync(_agentPresetsFilePath);
-                    var loaded = JsonSerializer.Deserialize<List<AgentPresetItem>>(json);
-                    if (loaded != null)
-                    {
-                        _agentPresets.Clear();
-                        _agentPresets.AddRange(loaded.Where(p => !string.IsNullOrWhiteSpace(p.Name)));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to load agent presets: {ex.Message}");
-            }
-
-            UpdateAgentPresetsUI();
-        }
-
-        private async Task SaveAgentPresetsAsync()
-        {
-            try
-            {
-                string? dir = Path.GetDirectoryName(_agentPresetsFilePath);
-                if (dir != null && !Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-
-                string json = JsonSerializer.Serialize(_agentPresets, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_agentPresetsFilePath, json);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to save agent presets: {ex.Message}");
-            }
-
-            UpdateAgentPresetsUI();
-        }
-
-        private void UpdateAgentPresetsUI()
-        {
-            var presetNames = _agentPresets.Select(p => p.Name).ToList();
-            var selectedNames = _selectedAgentPresetNames.ToList();
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                _agentPane.UpdateAgentPresetsMenu(presetNames, selectedNames, _getString);
-                UpdateContextStatsImmediate();
-            });
-        }
-
-        private async void OnAddAgentPresetClick()
-        {
-            var nameBox = CreateAgentPresetNameBox();
-            var contentBox = CreateAgentPresetContentBox();
-            var stack = CreateAgentPresetDialogContent(nameBox, contentBox);
-
-            _beforeDialog?.Invoke();
-            var dialog = new ContentDialog
-            {
-                Title = _getString("AgentPresetAddText", "프리셋 추가"),
-                Content = stack,
-                PrimaryButtonText = _getString("AgentPresetSaveAddButton", "추가"),
-                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
-                DefaultButton = ContentDialogButton.None,
-                XamlRoot = _agentPane.XamlRoot,
-                RequestedTheme = _agentPane.ActualTheme
-            };
-
-            var result = await dialog.ShowAsync();
-            _afterDialog?.Invoke();
-            if (result != ContentDialogResult.Primary)
-            {
-                return;
-            }
-
-            string presetName = nameBox.Text?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(presetName))
-            {
-                _showError(_getString("AgentPresetNameEmptyTitle", "프리셋 추가 오류"), _getString("AgentPresetNameEmptyMessage", "프리셋 이름을 입력해주세요."));
-                return;
-            }
-
-            var existing = _agentPresets.FirstOrDefault(p => p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
-            if (existing != null && !await ConfirmAgentPresetOverwriteAsync())
-            {
-                return;
-            }
-
-            if (existing != null)
-            {
-                _agentPresets.Remove(existing);
-            }
-
-            _agentPresets.Add(new AgentPresetItem
-            {
-                Name = presetName,
-                Content = NormalizePresetContent(contentBox.Text)
-            });
-            await SaveAgentPresetsAsync();
-        }
-
-        private async void OnExportAgentPresetsClick()
-        {
-            var picker = new FileSavePicker
-            {
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-                SuggestedFileName = "agent-presets.json"
-            };
-            _initializePickerWindow(picker);
-            picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
-
-            var file = await picker.PickSaveFileAsync();
-            if (file == null)
-            {
-                return;
-            }
-
-            try
-            {
-                string json = JsonSerializer.Serialize(_agentPresets, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(file.Path, json);
-            }
-            catch (Exception ex)
-            {
-                _showError(
-                    _getString("PresetExportErrorTitle", "프리셋 내보내기 오류"),
-                    string.Format(_getString("PresetExportErrorMessage", "프리셋을 내보내는 중 오류가 발생했습니다: {0}"), ex.Message));
-            }
-        }
-
-        private async void OnImportAgentPresetsClick()
-        {
-            var picker = new FileOpenPicker
-            {
-                ViewMode = PickerViewMode.List,
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
-            };
-            _initializePickerWindow(picker);
-            picker.FileTypeFilter.Add(".json");
-
-            var file = await picker.PickSingleFileAsync();
-            if (file == null)
-            {
-                return;
-            }
-
-            try
-            {
-                string json = await File.ReadAllTextAsync(file.Path);
-                var imported = JsonSerializer.Deserialize<List<AgentPresetItem>>(json);
-                if (imported == null)
-                {
-                    throw new InvalidDataException(_getString("PresetImportInvalidFile", "가져올 수 있는 프리셋 JSON이 아닙니다."));
-                }
-
-                foreach (var item in imported.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
-                {
-                    string name = item.Name.Trim();
-                    string content = NormalizePresetContent(item.Content);
-                    var existing = _agentPresets.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-                    if (existing != null)
-                    {
-                        bool wasSelected = _selectedAgentPresetNames.Remove(existing.Name);
-                        existing.Name = name;
-                        existing.Content = content;
-                        if (wasSelected)
-                        {
-                            _selectedAgentPresetNames.Add(existing.Name);
-                        }
-                    }
-                    else
-                    {
-                        _agentPresets.Add(new AgentPresetItem
-                        {
-                            Name = name,
-                            Content = content
-                        });
-                    }
-                }
-
-                await SaveAgentPresetsAsync();
-            }
-            catch (Exception ex)
-            {
-                _showError(
-                    _getString("PresetImportErrorTitle", "프리셋 가져오기 오류"),
-                    string.Format(_getString("PresetImportErrorMessage", "프리셋을 가져오는 중 오류가 발생했습니다: {0}"), ex.Message));
-            }
-        }
-
-        private async void OnAgentPresetEdited(string presetName)
-        {
-            var preset = _agentPresets.FirstOrDefault(p => p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
-            if (preset == null)
-            {
-                return;
-            }
-
-            var nameBox = CreateAgentPresetNameBox(preset.Name);
-            var contentBox = CreateAgentPresetContentBox(preset.Content);
-            var stack = CreateAgentPresetDialogContent(nameBox, contentBox);
-
-            _beforeDialog?.Invoke();
-            var dialog = new ContentDialog
-            {
-                Title = _getString("AgentPresetEditTitle", "프리셋 수정"),
-                Content = stack,
-                PrimaryButtonText = _getString("AgentPresetEditSaveButton", "저장"),
-                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
-                DefaultButton = ContentDialogButton.None,
-                XamlRoot = _agentPane.XamlRoot,
-                RequestedTheme = _agentPane.ActualTheme
-            };
-
-            var result = await dialog.ShowAsync();
-            _afterDialog?.Invoke();
-            if (result != ContentDialogResult.Primary)
-            {
-                return;
-            }
-
-            string newName = nameBox.Text?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(newName))
-            {
-                _showError(_getString("AgentPresetNameEmptyTitle", "프리셋 수정 오류"), _getString("AgentPresetNameEmptyMessage", "프리셋 이름을 입력해주세요."));
-                return;
-            }
-
-            if (!newName.Equals(presetName, StringComparison.OrdinalIgnoreCase))
-            {
-                var existing = _agentPresets.FirstOrDefault(p => p.Name.Equals(newName, StringComparison.OrdinalIgnoreCase));
-                if (existing != null)
-                {
-                    if (!await ConfirmAgentPresetOverwriteAsync())
-                    {
-                        return;
-                    }
-                    _agentPresets.Remove(existing);
-                    _selectedAgentPresetNames.Remove(existing.Name);
-                }
-            }
-
-            bool wasSelected = _selectedAgentPresetNames.Remove(preset.Name);
-            preset.Name = newName;
-            preset.Content = NormalizePresetContent(contentBox.Text);
-            if (wasSelected)
-            {
-                _selectedAgentPresetNames.Add(preset.Name);
-            }
-
-            await SaveAgentPresetsAsync();
-        }
-
-        private async void OnAgentPresetDeleted(string presetName)
-        {
-            var preset = _agentPresets.FirstOrDefault(p => p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
-            if (preset == null)
-            {
-                return;
-            }
-
-            _agentPresets.Remove(preset);
-            _selectedAgentPresetNames.Remove(preset.Name);
-            await SaveAgentPresetsAsync();
-        }
-
-        private void ToggleAgentPreset(string presetName)
-        {
-            if (!_agentPresets.Any(p => p.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase)))
-            {
-                return;
-            }
-
-            if (!_selectedAgentPresetNames.Add(presetName))
-            {
-                _selectedAgentPresetNames.Remove(presetName);
-            }
-
-            UpdateAgentPresetsUI();
-        }
-
-        private void RemoveSelectedAgentPreset(string presetName)
-        {
-            _selectedAgentPresetNames.Remove(presetName);
-            UpdateAgentPresetsUI();
-        }
-
-        private TextBox CreateAgentPresetNameBox(string text = "")
-        {
-            return new TextBox
-            {
-                PlaceholderText = _getString("AgentPresetSavePlaceholder", "프리셋 이름 입력..."),
-                Text = text,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Height = 32,
-                IsSpellCheckEnabled = false,
-                IsTextPredictionEnabled = false,
-                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI, Malgun Gothic"),
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
-        }
-
-        private TextBox CreateAgentPresetContentBox(string text = "")
-        {
-            var contentBox = new TextBox
-            {
-                PlaceholderText = _getString("AgentPresetContentPlaceholder", "페르소나/지침 내용..."),
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.Wrap,
-                Height = 280,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Segoe UI, Malgun Gothic")
-            };
-            contentBox.Text = NormalizeTextBoxLineEndings(text);
-            ScrollViewer.SetVerticalScrollMode(contentBox, ScrollMode.Enabled);
-            ScrollViewer.SetVerticalScrollBarVisibility(contentBox, ScrollBarVisibility.Auto);
-            contentBox.Paste += async (_, e) =>
-            {
-                e.Handled = true;
-                await PasteClipboardTextAsync(contentBox);
-            };
-            return contentBox;
-        }
-
-        private StackPanel CreateAgentPresetDialogContent(TextBox nameBox, TextBox contentBox)
-        {
-            var stack = new StackPanel { Spacing = 10, Width = 400 };
-            stack.Children.Add(new TextBlock { Text = _getString("AgentPresetSaveLabel", "프리셋 이름") });
-            stack.Children.Add(nameBox);
-            stack.Children.Add(new TextBlock { Text = _getString("AgentPresetContentLabel", "페르소나/지침") });
-            stack.Children.Add(contentBox);
-            return stack;
-        }
-
-        private async Task<bool> ConfirmAgentPresetOverwriteAsync()
-        {
-            _beforeDialog?.Invoke();
-            var confirmDialog = new ContentDialog
-            {
-                Title = _getString("AgentPresetDuplicateTitle", "프리셋 중복"),
-                Content = _getString("AgentPresetDuplicateMessage", "이미 동일한 이름의 프리셋이 존재합니다. 덮어쓰시겠습니까?"),
-                PrimaryButtonText = _getString("Yes", "예"),
-                CloseButtonText = _getString("No", "아니오"),
-                XamlRoot = _agentPane.XamlRoot,
-                RequestedTheme = _agentPane.ActualTheme
-            };
-            var confirmResult = await confirmDialog.ShowAsync();
-            _afterDialog?.Invoke();
-            return confirmResult == ContentDialogResult.Primary;
-        }
-
-        private static string NormalizePresetContent(string value)
-        {
-            return (value ?? string.Empty)
-                .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Replace("\r", "\n", StringComparison.Ordinal);
-        }
-
-        private static async Task PasteClipboardTextAsync(TextBox textBox)
-        {
-            try
-            {
-                var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
-                if (!content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Text))
-                {
-                    return;
-                }
-
-                string clipboardText = await content.GetTextAsync();
-                InsertTextAtSelection(textBox, NormalizeTextBoxLineEndings(clipboardText));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to paste agent preset content: {ex.Message}");
-            }
-        }
-
-        private static void InsertTextAtSelection(TextBox textBox, string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            string current = textBox.Text ?? string.Empty;
-            int selectionStart = Math.Max(0, Math.Min(textBox.SelectionStart, current.Length));
-            int selectionLength = Math.Max(0, Math.Min(textBox.SelectionLength, current.Length - selectionStart));
-
-            textBox.Text = current.Substring(0, selectionStart) +
-                text +
-                current.Substring(selectionStart + selectionLength);
-            textBox.SelectionStart = selectionStart + text.Length;
-            textBox.SelectionLength = 0;
-        }
-
-        private static string NormalizeTextBoxLineEndings(string value)
-        {
-            return (value ?? string.Empty)
-                .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Replace("\r", "\n", StringComparison.Ordinal)
-                .Replace("\n", "\r\n", StringComparison.Ordinal);
-        }
-
         private void AppendSessionHistory(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
@@ -4218,68 +3217,6 @@ namespace TxtAIEditor.Controls
             return string.Join("\n", diffResult);
         }
 
-        private async Task LoadAgentHistoryAsync()
-        {
-            try
-            {
-                if (File.Exists(_agentHistoryFilePath))
-                {
-                    string json = await File.ReadAllTextAsync(_agentHistoryFilePath);
-                    var loaded = JsonSerializer.Deserialize<List<AgentHistoryItem>>(json);
-                    if (loaded != null)
-                    {
-                        _agentHistory.Clear();
-                        _agentHistory.AddRange(loaded.Where(h => !string.IsNullOrWhiteSpace(h.Id)));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to load agent history: {ex.Message}");
-            }
-
-            UpdateHistoryUI();
-        }
-
-        private async Task SaveAgentHistoryAsync()
-        {
-            try
-            {
-                string? dir = Path.GetDirectoryName(_agentHistoryFilePath);
-                if (dir != null && !Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-
-                string json = JsonSerializer.Serialize(_agentHistory, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_agentHistoryFilePath, json);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to save agent history: {ex.Message}");
-            }
-
-            UpdateHistoryUI();
-        }
-
-        private void UpdateHistoryUI()
-        {
-            var viewModels = _agentHistory
-                .OrderByDescending(h => h.Timestamp)
-                .Select(h => new AgentHistoryItemViewModel
-                {
-                    Id = h.Id,
-                    Title = h.Title,
-                    TimeText = h.Timestamp.ToString("MM-dd HH:mm")
-                })
-                .ToList();
-
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                _agentPane.UpdateHistoryItems(viewModels, _currentSessionId);
-            });
-        }
-
         private async Task SaveCurrentSessionToHistoryAsync(string userInstruction)
         {
             if (_sessionHistory.Length == 0)
@@ -4287,49 +3224,25 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            string currentWorkspaceRoot = _fileTools.WorkspaceRoot;
-            var existing = _agentHistory.FirstOrDefault(h => h.Id == _currentSessionId);
-            if (existing != null)
+            var item = new AgentHistoryItem
             {
-                existing.Timestamp = DateTime.Now;
-                existing.SessionHistoryText = _sessionHistory.ToString();
-                existing.SessionHistoryTokenCount = _sessionHistoryTokenCount;
-                existing.SessionEdits = _sessionEdits.ToList();
-                existing.WorkspaceRoot = currentWorkspaceRoot;
+                Id = _currentSessionId,
+                Timestamp = DateTime.Now,
+                Title = GetSessionTitle(userInstruction),
+                SessionHistoryText = _sessionHistory.ToString(),
+                SessionHistoryTokenCount = _sessionHistoryTokenCount,
+                SessionEdits = _sessionEdits.ToList(),
+                WorkspaceRoot = _fileTools.WorkspaceRoot
+            };
 
-                // Move to top of the list
-                _agentHistory.Remove(existing);
-                _agentHistory.Insert(0, existing);
-            }
-            else
-            {
-                var item = new AgentHistoryItem
-                {
-                    Id = _currentSessionId,
-                    Timestamp = DateTime.Now,
-                    Title = GetSessionTitle(userInstruction),
-                    SessionHistoryText = _sessionHistory.ToString(),
-                    SessionHistoryTokenCount = _sessionHistoryTokenCount,
-                    SessionEdits = _sessionEdits.ToList(),
-                    WorkspaceRoot = currentWorkspaceRoot
-                };
-                _agentHistory.Insert(0, item);
-            }
-
-            // Limit history to 10 items
-            while (_agentHistory.Count > 10)
-            {
-                _agentHistory.RemoveAt(_agentHistory.Count - 1);
-            }
-
-            await SaveAgentHistoryAsync();
+            await _historyController.SaveSessionAsync(item, _currentSessionId);
         }
 
         private void LoadHistorySession(string historyId)
         {
             if (_isRunning) return;
 
-            var item = _agentHistory.FirstOrDefault(h => h.Id == historyId);
+            var item = _historyController.GetSession(historyId);
             if (item == null) return;
 
             _currentSessionId = item.Id;
@@ -4354,13 +3267,13 @@ namespace TxtAIEditor.Controls
 
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
-                string formatted = FormatHistoryForDisplay(item.SessionHistoryText, _settingsService.CurrentSettings.LlmAgentVerbose);
+                string formatted = AgentHistoryFormatter.Format(item.SessionHistoryText, _settingsService.CurrentSettings.LlmAgentVerbose);
                 _agentPane.ResetOutput(formatted);
                 _agentPane.ClearActivity(_getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨"));
                 UpdateModifiedFilesList();
                 _attachmentController.Clear();
                 UpdateContextStatsImmediate();
-                UpdateHistoryUI();
+                _historyController.UpdateUI(_currentSessionId);
             });
         }
 
@@ -4368,12 +3281,7 @@ namespace TxtAIEditor.Controls
         {
             if (string.IsNullOrEmpty(historyId)) return;
 
-            var item = _agentHistory.FirstOrDefault(h => h.Id == historyId);
-            if (item != null)
-            {
-                _agentHistory.Remove(item);
-                await SaveAgentHistoryAsync();
-            }
+            await _historyController.DeleteAsync(historyId, _currentSessionId);
 
             if (string.Equals(_currentSessionId, historyId, StringComparison.Ordinal))
             {
@@ -4381,99 +3289,14 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                UpdateHistoryUI();
+                _historyController.UpdateUI(_currentSessionId);
             }
         }
 
         private async Task ClearAllHistoryAsync()
         {
-            _agentHistory.Clear();
-            await SaveAgentHistoryAsync();
+            await _historyController.ClearAsync(_currentSessionId);
             ClearSession();
-        }
-
-        private string FormatHistoryForDisplay(string historyText, bool verbose)
-        {
-            if (string.IsNullOrEmpty(historyText))
-            {
-                return string.Empty;
-            }
-
-            if (verbose)
-            {
-                return historyText;
-            }
-
-            var lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            var result = new StringBuilder();
-            bool inToolCall = false;
-            bool inToolResult = false;
-            bool inUserPromptPresets = false;
-            bool afterUserRequest = false;
-
-            foreach (var line in lines)
-            {
-                if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
-                {
-                    inToolCall = false;
-                    inToolResult = false;
-                    inUserPromptPresets = line.Contains("[Agent persona/instruction presets]");
-                    afterUserRequest = false;
-                    result.AppendLine(line);
-                }
-                else if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase))
-                {
-                    inToolCall = true;
-                    inToolResult = false;
-                    inUserPromptPresets = false;
-                    afterUserRequest = false;
-                    continue;
-                }
-                else if (line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase))
-                {
-                    inToolCall = false;
-                    inToolResult = true;
-                    inUserPromptPresets = false;
-                    afterUserRequest = false;
-                    
-                    string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
-                    result.AppendLine($"[도구 실행 완료: {toolName}]");
-                    continue;
-                }
-                else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))
-                {
-                    inToolCall = false;
-                    inToolResult = false;
-                    inUserPromptPresets = false;
-                    afterUserRequest = false;
-                    result.AppendLine(line);
-                }
-                else if (inUserPromptPresets)
-                {
-                    if (line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
-                    {
-                        afterUserRequest = true;
-                        result.AppendLine(line);
-                    }
-                    else if (afterUserRequest)
-                    {
-                        result.AppendLine(line);
-                    }
-                    else if (line.StartsWith("## ", StringComparison.Ordinal))
-                    {
-                        result.AppendLine(line);
-                    }
-                }
-                else
-                {
-                    if (!inToolCall && !inToolResult)
-                    {
-                        result.AppendLine(line);
-                    }
-                }
-            }
-
-            return result.ToString().TrimEnd();
         }
 
         private void RefreshOutputDisplay()
@@ -4486,7 +3309,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            string formatted = FormatHistoryForDisplay(text, _settingsService.CurrentSettings.LlmAgentVerbose);
+            string formatted = AgentHistoryFormatter.Format(text, _settingsService.CurrentSettings.LlmAgentVerbose);
             _agentPane.ResetOutput(formatted);
         }
 
@@ -4495,10 +3318,10 @@ namespace TxtAIEditor.Controls
             string firstLine;
             if (string.IsNullOrWhiteSpace(instruction))
             {
-                var selected = GetSelectedAgentPresets();
-                if (selected.Count > 0)
+                string selectedPresetLabel = _presetController.GetSelectedPresetLabel();
+                if (!string.IsNullOrEmpty(selectedPresetLabel))
                 {
-                    firstLine = string.Join(", ", selected.Select(p => p.Name));
+                    firstLine = selectedPresetLabel;
                 }
                 else
                 {
