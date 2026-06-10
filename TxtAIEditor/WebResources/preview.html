@@ -403,7 +403,9 @@
             scrollSyncEnabled: true,
             theme: 'Dark',
             tabSize: 4,
-            renderedRange: null
+            renderedRange: null,
+            lastUpdateFromEditor: 0,
+            staleLines: new Set()
         };
 
         initializeMermaid('Dark');
@@ -417,6 +419,7 @@
         let isSyncingScroll = false;
         let suppressPreviewScrollEvents = false;
         let scrollSuppressionToken = 0;
+        let lastSetScrollTop = -1;
 
         function suppressPreviewScrollUntilNextFrame() {
             const token = ++scrollSuppressionToken;
@@ -434,6 +437,7 @@
             const target = Math.max(0, Number(value || 0));
             if (Math.abs(scroll.scrollTop - target) <= 0.5) return;
             suppressPreviewScrollUntilNextFrame();
+            lastSetScrollTop = target;
             scroll.scrollTop = target;
         }
 
@@ -677,6 +681,7 @@
         }
 
         function initVirtualPreview(message) {
+            state.lastUpdateFromEditor = Date.now();
             const preserveScrollTop = scroll.scrollTop;
             const nextMode = message.mode || 'markdown';
             const nextWordWrap = true; // Always enable wrapping in the preview panel
@@ -688,7 +693,9 @@
             state.tabSize = Number(message.tabSize || 4);
             state.lineCount = Math.max(1, Number(message.lineCount || 1));
             state.scrollSyncEnabled = message.scrollSyncEnabled !== false;
-            state.cache.clear();
+            for (const line of state.cache.keys()) {
+                state.staleLines.add(line);
+            }
             state.pending.clear();
             if (canReuseMeasuredHeights) {
                 trimRowHeights();
@@ -738,7 +745,8 @@
             let missingStart = 0;
             let missingCount = 0;
             for (let line = start; line <= end; line++) {
-                if (!state.cache.has(line)) {
+                const isMissing = !state.cache.has(line) || state.staleLines.has(line);
+                if (isMissing) {
                     if (missingStart === 0) {
                         missingStart = line;
                         missingCount = 1;
@@ -965,12 +973,20 @@
 
                 setupVirtualHeight();
 
-                // Restore scroll position relative to anchor line
-                const newAnchorTop = rowTop(anchorLine);
-                const corrected = newAnchorTop + anchorOffset;
-                if (Math.abs(scroll.scrollTop - corrected) > 1) {
-                    suppressPreviewScrollUntilNextFrame();
-                    scroll.scrollTop = Math.max(0, corrected);
+                // Skip scroll position correction during active editor typing to avoid jump/jitter.
+                // The editor will shortly send a syncScroll message to set the correct scroll position.
+                const isRecentEditorUpdate = (Date.now() - state.lastUpdateFromEditor) < 500;
+
+                if (!isRecentEditorUpdate) {
+                    // Restore scroll position relative to anchor line
+                    const newAnchorTop = rowTop(anchorLine);
+                    const corrected = newAnchorTop + anchorOffset;
+                    if (Math.abs(scroll.scrollTop - corrected) > 1) {
+                        suppressPreviewScrollUntilNextFrame();
+                        const targetScrollTop = Math.max(0, corrected);
+                        lastSetScrollTop = targetScrollTop;
+                        scroll.scrollTop = targetScrollTop;
+                    }
                 }
 
                 state.lastRangeKey = '';
@@ -983,6 +999,7 @@
             const safeLines = Array.isArray(lines) ? lines : [];
             for (let i = 0; i < safeLines.length; i++) {
                 state.cache.set(start + i, safeLines[i] ?? '');
+                state.staleLines.delete(start + i);
             }
             state.cacheVersion++;
             for (const key of [...state.pending]) {
@@ -997,11 +1014,13 @@
         }
 
         function receiveLines(message) {
+            state.lastUpdateFromEditor = Date.now();
             receiveLineBlock(message.startLine || 1, message.lines || []);
             queueRender(true);
         }
 
         function renderFullFallback(message) {
+            state.lastUpdateFromEditor = Date.now();
             const preserveScrollTop = scroll.scrollTop;
             const nextMode = message.mode || 'markdown';
             const nextWordWrap = true; // Always enable wrapping in the preview panel
@@ -1019,13 +1038,19 @@
             applyTheme(message);
             const lines = String(message.text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
             state.lineCount = Math.max(1, lines.length);
-            state.cache.clear();
+            for (const line of state.cache.keys()) {
+                state.staleLines.add(line);
+            }
             if (canReuseMeasuredHeights) {
                 trimRowHeights();
             } else {
                 state.rowHeights.clear();
             }
-            lines.forEach((line, index) => state.cache.set(index + 1, line));
+            lines.forEach((line, index) => {
+                const ln = index + 1;
+                state.cache.set(ln, line);
+                state.staleLines.delete(ln);
+            });
             state.cacheVersion++;
             state.renderedRange = null;
             setHtmlMode(false);
@@ -1042,6 +1067,12 @@
 
         scroll.addEventListener('scroll', () => {
             queueRender();
+
+            if (lastSetScrollTop !== -1 && Math.abs(scroll.scrollTop - lastSetScrollTop) <= 1) {
+                return;
+            }
+            lastSetScrollTop = -1;
+
             if (state.scrollSyncEnabled && !isSyncingScroll && !suppressPreviewScrollEvents) {
                 const firstVisible = lineAt(scroll.scrollTop);
                 const offset = scroll.scrollTop - rowTop(firstVisible);
