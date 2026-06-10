@@ -619,6 +619,7 @@ namespace TxtAIEditor
                 path => _gitService.FindRepositoryRoot(path) != null,
                 OpenAgentDiffViewAsync,
                 OnAgentFileModifiedAsync,
+                openFileInEditorAsync: LoadFileIntoTabAsync,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
                 revertTabOrFileAsync: RevertTabOrFileAsync,

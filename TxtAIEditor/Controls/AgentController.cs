@@ -35,6 +35,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<object> _initializePickerWindow;
         private readonly Func<string, bool> _isGitRepoProvider;
         private readonly Func<string, Task>? _fileModifiedAsync;
+        private readonly Func<string, Task>? _openFileInEditorAsync;
         private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
@@ -118,6 +119,7 @@ namespace TxtAIEditor.Controls
             Func<string, bool> isGitRepoProvider,
             Func<AgentFileEditPreview, Task> openDiffViewAsync,
             Func<string, Task>? fileModifiedAsync = null,
+            Func<string, Task>? openFileInEditorAsync = null,
             Action? beforeDialog = null,
             Action? afterDialog = null,
             Func<string, string, bool, Task>? revertTabOrFileAsync = null,
@@ -139,6 +141,7 @@ namespace TxtAIEditor.Controls
             _isGitRepoProvider = isGitRepoProvider;
             _openDiffViewAsync = openDiffViewAsync;
             _fileModifiedAsync = fileModifiedAsync;
+            _openFileInEditorAsync = openFileInEditorAsync;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
             _revertTabOrFileAsync = revertTabOrFileAsync;
@@ -721,7 +724,9 @@ namespace TxtAIEditor.Controls
                     }
 
                     cancellationToken.ThrowIfCancellationRequested();
-                    transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResultForTranscript}";
+
+                    string refreshedContext = BuildWorkspaceContext(instruction);
+                    transcript = $"{transcript}\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResultForTranscript}\n\n[Current workspace state]\n{refreshedContext}";
                     
                     string displayResult = toolResult;
                     if (!skippedDuplicateTool &&
@@ -783,6 +788,11 @@ namespace TxtAIEditor.Controls
                         {
                             string[] urls = GetUrlsArgument(arguments);
                             displayResult = string.Format(_getString("AgentVerboseWebFetchOnly", "웹페이지를 읽었습니다: {0}"), string.Join(", ", urls));
+                        }
+                        else if (normalizedName == "open_file")
+                        {
+                            string path = GetStringArgument(arguments, "path");
+                            displayResult = string.Format(_getString("AgentVerboseOpenFileOnly", "파일을 열었습니다: {0}"), path);
                         }
                     }
 
@@ -1341,6 +1351,7 @@ namespace TxtAIEditor.Controls
                         "insert_text" => await InsertTextToolAsync(
                             GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
                         "create_tab" => await CreateTabToolAsync(arguments),
+                        "open_file" => await OpenFileToolAsync(arguments),
                         "web_search_exa" => await _llmService.SearchExaAsync(
                             GetStringArgument(arguments, "query"),
                             GetIntArgument(arguments, "numResults", 5),
@@ -1442,6 +1453,9 @@ namespace TxtAIEditor.Controls
                 "create_tab" => string.Format(
                     _getString("AgentActivityCreateTabFormat", "새 탭에 입력 중: {0}"),
                     TruncateForActivity(GetFirstStringArgument(arguments, "title", "name", "fileName", "file_name"))),
+                "open_file" => string.Format(
+                    _getString("AgentActivityOpenFileFormat", "파일 여는 중: {0}"),
+                    GetStringArgument(arguments, "path")),
                 "web_search_exa" => string.Format(
                     _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
                     GetStringArgument(arguments, "query")),
@@ -2548,6 +2562,9 @@ namespace TxtAIEditor.Controls
                 "web_fetch" => "web_fetch",
                 "patch" => "apply_patch",
                 "apply_diff" => "apply_patch",
+                "open" => "open_file",
+                "open_in_editor" => "open_file",
+                "open_tab" => "open_file",
                 _ => normalized
             };
         }
@@ -2590,6 +2607,38 @@ namespace TxtAIEditor.Controls
             }
 
             return await _fileTools.CreateFileAsync(path, GetStringArgument(arguments, "content"));
+        }
+
+        private async Task<string> OpenFileToolAsync(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "open_file failed: path is empty. Provide the file path you want to open.";
+            }
+
+            string fullPath = path;
+            if (!Path.IsPathRooted(path))
+            {
+                string root = _fileTools.WorkspaceRoot;
+                if (!string.IsNullOrEmpty(root))
+                {
+                    fullPath = Path.GetFullPath(Path.Combine(root, path));
+                }
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                return $"open_file failed: file not found: {path}";
+            }
+
+            if (_openFileInEditorAsync != null)
+            {
+                await _openFileInEditorAsync(fullPath);
+                return $"opened: {path}";
+            }
+
+            return "open_file failed: opening files in editor is not available.";
         }
 
         private async Task<string> OverwriteFileToolAsync(JsonElement arguments)
