@@ -47,7 +47,7 @@ namespace TxtAIEditor.Controls
 
             ToolTipService.SetToolTip(LeftPanelToggle, getString("StatusLeftPanelTooltip", "좌측 패널"));
             ToolTipService.SetToolTip(RightPanelToggle, getString("StatusRightPanelTooltip", "우측 패널"));
-            ToolTipService.SetToolTip(ExpandPreviewButton, getString("ExpandPreviewTooltip", "프리뷰 늘리기"));
+            ToolTipService.SetToolTip(ExpandPreviewButton, getString("ExpandPreviewTooltip", "프리뷰 늘리기") + " (Ctrl+3)");
             ToolTipService.SetToolTip(LineNumberButton, getString("StatusGoToLineTooltip", "클릭하여 줄 이동"));
             ToolTipService.SetToolTip(LineEndingButton, getString("StatusLineEndingTooltip", "클릭하여 줄 끝 방식 변경"));
             ToolTipService.SetToolTip(StatusEncodingCombo, getString("StatusEncodingTooltip", "파일 인코딩 선택"));

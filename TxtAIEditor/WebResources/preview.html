@@ -1112,6 +1112,11 @@
         }
 
         function handleKeyDown(event) {
+            if (event.key === 'F4') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f4' });
+                return;
+            }
             if (event.key === 'F9') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'f9' });
@@ -1129,6 +1134,11 @@
             }
             const ctrl = event.ctrlKey || event.metaKey;
             const key = event.key ? event.key.toLowerCase() : '';
+            if (ctrl && key === '3') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'expandRightPanel' });
+                return;
+            }
             if (ctrl && key === 'f') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'find' });

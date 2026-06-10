@@ -877,6 +877,7 @@ namespace TxtAIEditor.Core.Services
                 ("Ctrl + P", getString("ShortcutDescPrint", "현재 문서를 인쇄합니다.")),
                 ("Ctrl + 1", getString("ShortcutDescLeftPanel", "좌측 패널(탐색기, 검색, 북마크 등)을 토글합니다.")),
                 ("Ctrl + 2", getString("ShortcutDescRightPanel", "우측 패널(실시간 미리보기, AI Assistant 등)을 토글합니다.")),
+                ("Ctrl + 3", getString("ShortcutDescExpandRightPanel", "우측 패널의 가로 폭을 확장 또는 축소합니다.")),
                 ("Ctrl + `", getString("ShortcutDescTerminal", "내장 터미널을 토글합니다.")),
                 ("Ctrl + Z", getString("ShortcutDescUndo", "이전 작업을 실행 취소합니다.")),
                 ("Ctrl + Y", getString("ShortcutDescRedo", "실행 취소한 작업을 다시 실행합니다.")),
@@ -884,6 +885,7 @@ namespace TxtAIEditor.Core.Services
                 ("Ctrl + V", getString("ShortcutDescPaste", "클립보드 내용을 붙여넣습니다.")),
                 ("Ctrl + X", getString("ShortcutDescCut", "선택 영역을 잘라냅니다.")),
                 ("Ctrl + Enter", getString("ShortcutDescAiPrompt", "AI 질문 입력창에서 프롬프트를 전송합니다.")),
+                ("F4", getString("ShortcutDescLivePreview", "에디터 내 실시간 미리보기를 켜거나 끕니다.")),
                 ("F9", getString("ShortcutDescTopMost", "항상위 토글")),
                 ("F10", getString("ShortcutDescTheme", "테마 토글")),
                 ("F12", getString("ShortcutDescStickyNote", "스티커 노트"))

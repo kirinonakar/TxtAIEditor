@@ -130,6 +130,7 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 | `Ctrl + P` | Print |
 | `Ctrl + 1` | Toggle Left Panel |
 | `Ctrl + 2` | Toggle Right Panel |
+| `Ctrl + 3` | Expand Right Panel |
 | `` Ctrl + ` `` | Toggle Terminal |
 | `Ctrl + Z` | Undo |
 | `Ctrl + Y` | Redo |
@@ -138,6 +139,7 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 | `Ctrl + X` | Cut |
 | `Ctrl + Mouse Wheel` | Zoom In / Out |
 | `Ctrl + Enter` | Send AI Prompt |
+| `F4` | Toggle Live Preview |
 | `F9` | Toggle Always on Top |
 | `F10` | Toggle Theme (Dark / Light) |
 | `F12` | Toggle Sticky Note Mode |

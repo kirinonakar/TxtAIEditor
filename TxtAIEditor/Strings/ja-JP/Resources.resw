@@ -921,6 +921,12 @@
   <data name="ShortcutDescStickyNote" xml:space="preserve">
     <value>付箋</value>
   </data>
+  <data name="ShortcutDescLivePreview" xml:space="preserve">
+    <value>ライブプレビュー切り替え</value>
+  </data>
+  <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
+    <value>右パネルの拡大</value>
+  </data>
   <data name="EditorFindPlaceholder" xml:space="preserve">
     <value>検索</value>
   </data>

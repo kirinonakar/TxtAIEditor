@@ -323,7 +323,10 @@
         }
 
         window.addEventListener('keydown', event => {
-            if (event.key === 'F9') {
+            if (event.key === 'F4') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f4' });
+            } else if (event.key === 'F9') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'f9' });
             } else if (event.key === 'F10') {
@@ -332,6 +335,13 @@
             } else if (event.key === 'F12') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'f12' });
+            } else {
+                const ctrl = event.ctrlKey || event.metaKey;
+                const key = event.key ? event.key.toLowerCase() : '';
+                if (ctrl && key === '3') {
+                    event.preventDefault();
+                    post({ type: 'shortcut', name: 'expandRightPanel' });
+                }
             }
         });
 

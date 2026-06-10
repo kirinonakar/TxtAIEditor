@@ -507,7 +507,9 @@ namespace TxtAIEditor
                 _stickyNoteModeController.ToggleTopMostFromShortcut,
                 () => OnToggleThemeClick(this, new RoutedEventArgs()),
                 _stickyNoteModeController.ToggleMode,
-                _terminalShortcutService);
+                _terminalShortcutService,
+                ToggleLivePreview,
+                TogglePreviewWidth);
             _terminalPanelController = new TerminalPanelController(
                 this,
                 EditorWorkspace,
@@ -1116,6 +1118,9 @@ namespace TxtAIEditor
                     var currentSession = getSession();
                     switch (shortcutName)
                     {
+                        case "f4":
+                            ToggleLivePreview();
+                            break;
                         case "f9":
                             _stickyNoteModeController.ToggleTopMostFromShortcut();
                             break;
@@ -1130,6 +1135,9 @@ namespace TxtAIEditor
                             break;
                         case "toggleRightPanel":
                             _ = ToggleRightPanelAsync();
+                            break;
+                        case "expandRightPanel":
+                            TogglePreviewWidth();
                             break;
                         case "newTab":
                             OpenNewTab();
@@ -1877,6 +1885,17 @@ namespace TxtAIEditor
             await _shellPaneController.ToggleRightPanelAsync();
         }
 
+        private void ToggleLivePreview()
+        {
+            TopToolbar.LivePreviewIsChecked = !TopToolbar.LivePreviewIsChecked;
+            OnToggleLivePreviewClick(this, new RoutedEventArgs());
+        }
+
+        private void TogglePreviewWidth()
+        {
+            _shellPanelLayoutService.TogglePreviewWidth();
+        }
+
         private async void OnToggleThemeClick(object sender, RoutedEventArgs e)
         {
             await _settingsController.ToggleThemeAsync();
@@ -2332,6 +2351,10 @@ namespace TxtAIEditor
             {
                 OnFindClick(null!, null!);
             }
+            else if (string.Equals(name, "f4", StringComparison.Ordinal))
+            {
+                ToggleLivePreview();
+            }
             else if (string.Equals(name, "f9", StringComparison.Ordinal))
             {
                 _stickyNoteModeController.ToggleTopMostFromShortcut();
@@ -2347,6 +2370,10 @@ namespace TxtAIEditor
             else if (string.Equals(name, "print", StringComparison.Ordinal))
             {
                 OnPrintClick(this, new RoutedEventArgs());
+            }
+            else if (string.Equals(name, "expandRightPanel", StringComparison.Ordinal))
+            {
+                TogglePreviewWidth();
             }
         }
 

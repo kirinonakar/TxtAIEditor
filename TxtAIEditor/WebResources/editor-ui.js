@@ -1631,6 +1631,11 @@ document.addEventListener('keydown', event => {
         return;
     }
 
+    if (event.key === 'F4') {
+        event.preventDefault();
+        post({ type: 'shortcut', name: 'f4' });
+        return;
+    }
     if (event.key === 'F9') {
         event.preventDefault();
         post({ type: 'shortcut', name: 'f9' });
@@ -1659,6 +1664,11 @@ document.addEventListener('keydown', event => {
         if (key === '2') {
             event.preventDefault();
             post({ type: 'shortcut', name: 'toggleRightPanel' });
+            return;
+        }
+        if (key === '3') {
+            event.preventDefault();
+            post({ type: 'shortcut', name: 'expandRightPanel' });
             return;
         }
         if (key === 'n') {

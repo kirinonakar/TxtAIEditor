@@ -101,7 +101,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(MarkdownToolbarToggle, getString("Markdown", "마크다운 툴바 토글"));
 
             LivePreviewToggle.Label = getString("LivePreview", "라이브");
-            ToolTipService.SetToolTip(LivePreviewToggle, getString("LivePreviewTooltip", "라이브 프리뷰"));
+            ToolTipService.SetToolTip(LivePreviewToggle, getString("LivePreviewTooltip", "라이브 프리뷰") + " (F4)");
 
             CsvTableToggle.Label = getString("CsvTable", "CSV 테이블");
             ToolTipService.SetToolTip(CsvTableToggle, getString("CsvTable", "CSV 테이블"));

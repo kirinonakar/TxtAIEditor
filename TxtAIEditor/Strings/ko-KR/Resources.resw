@@ -920,6 +920,12 @@
   <data name="ShortcutDescStickyNote" xml:space="preserve">
     <value>스티커 노트</value>
   </data>
+  <data name="ShortcutDescLivePreview" xml:space="preserve">
+    <value>라이브 프리뷰 토글</value>
+  </data>
+  <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
+    <value>우측 패널 확장</value>
+  </data>
   <data name="EditorFindPlaceholder" xml:space="preserve">
     <value>찾기</value>
   </data>

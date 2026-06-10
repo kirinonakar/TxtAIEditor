@@ -920,6 +920,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ShortcutDescStickyNote" xml:space="preserve">
     <value>Sticky Note</value>
   </data>
+  <data name="ShortcutDescLivePreview" xml:space="preserve">
+    <value>Toggle Live Preview</value>
+  </data>
+  <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
+    <value>Expand Right Panel</value>
+  </data>
   <data name="EditorFindPlaceholder" xml:space="preserve">
     <value>Find</value>
   </data>
