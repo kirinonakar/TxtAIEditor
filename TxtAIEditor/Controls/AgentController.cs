@@ -76,6 +76,10 @@ namespace TxtAIEditor.Controls
         private readonly DispatcherTimer _statsDebounceTimer;
         private TaskCompletionSource<bool>? _diffApprovalTcs;
         private string? _currentRunLastFilePath;
+        private int? _lmStudioContextLimitCache;
+        private string? _lmStudioLastFetchedModel;
+        private string? _lmStudioLastFetchedEndpoint;
+        private bool _lmStudioFetchInProgress;
         private OpenedTab? _lastKnownActiveTab;
         private bool _lastKnownActiveTabFromTabSelection;
         private OpenedTab? _currentRunActiveTabSnapshot;
@@ -3250,10 +3254,24 @@ namespace TxtAIEditor.Controls
                 selectionPart);
 
             double estimatedTokens = EstimateContextTokens();
-            double kTokens = estimatedTokens / 1000.0;
-            _agentPane.TokenCount.Text = string.Format(
-                _getString("AgentTokenCountFormat", "{0:F1}k tokens"),
-                kTokens);
+            int maxTokens = GetModelContextLimit();
+
+            if (maxTokens > 0)
+            {
+                string currentStr = FormatTokens(estimatedTokens);
+                string maxStr = FormatTokens(maxTokens);
+                _agentPane.TokenCount.Text = string.Format(
+                    _getString("AgentTokenCountWithLimitFormat", "{0} / {1} tokens"),
+                    currentStr,
+                    maxStr);
+            }
+            else
+            {
+                double kTokens = estimatedTokens / 1000.0;
+                _agentPane.TokenCount.Text = string.Format(
+                    _getString("AgentTokenCountFormat", "{0:F1}k tokens"),
+                    kTokens);
+            }
 
             UpdateModelDisplay();
         }
@@ -3744,6 +3762,351 @@ namespace TxtAIEditor.Controls
                 }
             }
             return tokens;
+        }
+
+        private int GetModelContextLimit()
+        {
+            var settings = _settingsService.CurrentSettings;
+            if (settings == null)
+            {
+                return 0;
+            }
+
+            string model = (settings.LlmModel ?? string.Empty).ToLowerInvariant();
+            string provider = (settings.LlmProvider ?? string.Empty).ToLowerInvariant();
+
+            if (provider.Contains("lm studio") || provider.Contains("lmstudio"))
+            {
+                if (_lmStudioContextLimitCache.HasValue && 
+                    settings.LlmModel == _lmStudioLastFetchedModel && 
+                    settings.LlmEndpoint == _lmStudioLastFetchedEndpoint)
+                {
+                    return _lmStudioContextLimitCache.Value;
+                }
+
+                _ = Task.Run(() => FetchLmStudioContextLimitAsync(settings.LlmEndpoint ?? string.Empty, settings.LlmModel ?? string.Empty));
+            }
+
+            if (model.Contains("gemini"))
+            {
+                if (model.Contains("pro"))
+                {
+                    return 2000000;
+                }
+                if (model.Contains("flash"))
+                {
+                    return 1000000;
+                }
+                return 1000000;
+            }
+
+            if (model.Contains("claude"))
+            {
+                return 200000;
+            }
+
+            if (model.Contains("kimi"))
+            {
+                return 200000;
+            }
+
+            if (model.Contains("o1") || model.Contains("o3"))
+            {
+                return 200000;
+            }
+
+            if (model.Contains("gpt-5"))
+            {
+                return 128000;
+            }
+
+            if (model.Contains("gpt-4"))
+            {
+                return 128000;
+            }
+
+            if (model.Contains("gpt-3.5"))
+            {
+                return 16385;
+            }
+
+            if (model.Contains("gemma"))
+            {
+                return 8192;
+            }
+
+            if (model.Contains("llama-3") || model.Contains("llama3"))
+            {
+                return 128000;
+            }
+
+            if (model.Contains("deepseek"))
+            {
+                return 128000;
+            }
+
+            if (model.Contains("qwen"))
+            {
+                return 128000;
+            }
+
+            if (model.Contains("glm"))
+            {
+                return 128000;
+            }
+
+            if (model.Contains("minimax"))
+            {
+                return 128000;
+            }
+
+            if (model.Contains("mimo"))
+            {
+                return 128000;
+            }
+
+            if (model.Contains("grok"))
+            {
+                return 128000;
+            }
+
+            if (provider.Contains("gemini"))
+            {
+                return 1000000;
+            }
+            if (provider.Contains("openai") || provider.Contains("openrouter") || provider.Contains("zen") || provider.Contains("go"))
+            {
+                return 128000;
+            }
+
+            return 0;
+        }
+
+        private static bool TryGetJsonInt(JsonElement parent, string propName, out int value)
+        {
+            value = 0;
+            if (parent.TryGetProperty(propName, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.Number)
+                {
+                    return prop.TryGetInt32(out value);
+                }
+                if (prop.ValueKind == JsonValueKind.String)
+                {
+                    return int.TryParse(prop.GetString(), out value);
+                }
+            }
+            return false;
+        }
+
+        private async Task FetchLmStudioContextLimitAsync(string endpoint, string modelName)
+        {
+            if (_lmStudioFetchInProgress) return;
+            _lmStudioFetchInProgress = true;
+
+            try
+            {
+                string baseUrl = "http://localhost:1234";
+                if (!string.IsNullOrWhiteSpace(endpoint))
+                {
+                    try
+                    {
+                        var uri = new Uri(endpoint);
+                        baseUrl = $"{uri.Scheme}://{uri.Authority}";
+                    }
+                    catch { }
+                }
+
+                string requestUrl = baseUrl.TrimEnd('/') + "/api/v1/models";
+
+                using (var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(15) })
+                using (var response = await client.GetAsync(requestUrl))
+                {
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string body = await response.Content.ReadAsStringAsync();
+                        using (var doc = JsonDocument.Parse(body))
+                        {
+                            JsonElement arrayEl = default;
+                            bool hasArray = false;
+
+                            if (doc.RootElement.TryGetProperty("models", out var modelsProp) && modelsProp.ValueKind == JsonValueKind.Array)
+                            {
+                                arrayEl = modelsProp;
+                                hasArray = true;
+                            }
+                            else if (doc.RootElement.TryGetProperty("data", out var dataProp) && dataProp.ValueKind == JsonValueKind.Array)
+                            {
+                                arrayEl = dataProp;
+                                hasArray = true;
+                            }
+                            else if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                            {
+                                arrayEl = doc.RootElement;
+                                hasArray = true;
+                            }
+
+                            if (hasArray)
+                            {
+                                JsonElement? matchedItem = null;
+
+                                // Pass 1: exact match with loaded instances
+                                foreach (var item in arrayEl.EnumerateArray())
+                                {
+                                    string? id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                                    string? key = item.TryGetProperty("key", out var keyProp) ? keyProp.GetString() : null;
+
+                                    bool isLoaded = item.TryGetProperty("loaded_instances", out var loadedInstances) && 
+                                                    loadedInstances.ValueKind == JsonValueKind.Array && 
+                                                    loadedInstances.GetArrayLength() > 0;
+
+                                    if (isLoaded)
+                                    {
+                                        if ((id != null && id.Equals(modelName, StringComparison.OrdinalIgnoreCase)) ||
+                                            (key != null && key.Equals(modelName, StringComparison.OrdinalIgnoreCase)))
+                                        {
+                                            matchedItem = item;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // Pass 2: partial match with loaded instances
+                                if (matchedItem == null)
+                                {
+                                    foreach (var item in arrayEl.EnumerateArray())
+                                    {
+                                        string? id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                                        string? key = item.TryGetProperty("key", out var keyProp) ? keyProp.GetString() : null;
+
+                                        bool isLoaded = item.TryGetProperty("loaded_instances", out var loadedInstances) && 
+                                                        loadedInstances.ValueKind == JsonValueKind.Array && 
+                                                        loadedInstances.GetArrayLength() > 0;
+
+                                        if (isLoaded)
+                                        {
+                                            if ((id != null && (modelName.Contains(id, StringComparison.OrdinalIgnoreCase) || id.Contains(modelName, StringComparison.OrdinalIgnoreCase))) ||
+                                                (key != null && (modelName.Contains(key, StringComparison.OrdinalIgnoreCase) || key.Contains(modelName, StringComparison.OrdinalIgnoreCase))))
+                                            {
+                                                matchedItem = item;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Pass 3: exact match (loaded or not)
+                                if (matchedItem == null)
+                                {
+                                    foreach (var item in arrayEl.EnumerateArray())
+                                    {
+                                        string? id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                                        string? key = item.TryGetProperty("key", out var keyProp) ? keyProp.GetString() : null;
+
+                                        if ((id != null && id.Equals(modelName, StringComparison.OrdinalIgnoreCase)) ||
+                                            (key != null && key.Equals(modelName, StringComparison.OrdinalIgnoreCase)))
+                                        {
+                                            matchedItem = item;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // Pass 4: partial match (loaded or not)
+                                if (matchedItem == null)
+                                {
+                                    foreach (var item in arrayEl.EnumerateArray())
+                                    {
+                                        string? id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                                        string? key = item.TryGetProperty("key", out var keyProp) ? keyProp.GetString() : null;
+
+                                        if ((id != null && (modelName.Contains(id, StringComparison.OrdinalIgnoreCase) || id.Contains(modelName, StringComparison.OrdinalIgnoreCase))) ||
+                                            (key != null && (modelName.Contains(key, StringComparison.OrdinalIgnoreCase) || key.Contains(modelName, StringComparison.OrdinalIgnoreCase))))
+                                        {
+                                            matchedItem = item;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // Pass 5: find any model with active loaded instances
+                                if (matchedItem == null)
+                                {
+                                    foreach (var item in arrayEl.EnumerateArray())
+                                    {
+                                        if (item.TryGetProperty("loaded_instances", out var loadedInstances) && 
+                                            loadedInstances.ValueKind == JsonValueKind.Array && 
+                                            loadedInstances.GetArrayLength() > 0)
+                                        {
+                                            matchedItem = item;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // Pass 6: first element as final fallback
+                                if (matchedItem == null && arrayEl.GetArrayLength() > 0)
+                                {
+                                    matchedItem = arrayEl[0];
+                                }
+
+                                if (matchedItem.HasValue)
+                                {
+                                    var item = matchedItem.Value;
+
+                                    if (item.TryGetProperty("loaded_instances", out var loadedInstances) && 
+                                        loadedInstances.ValueKind == JsonValueKind.Array && 
+                                        loadedInstances.GetArrayLength() > 0)
+                                    {
+                                        var firstInstance = loadedInstances[0];
+                                        if (firstInstance.TryGetProperty("config", out var config) && 
+                                            TryGetJsonInt(config, "context_length", out int loadedCtxLen))
+                                        {
+                                            _lmStudioContextLimitCache = loadedCtxLen;
+                                            _lmStudioLastFetchedModel = modelName;
+                                            _lmStudioLastFetchedEndpoint = endpoint;
+
+                                            await RunOnUIThreadAsync(() => UpdateContextStatsImmediate(true));
+                                            return;
+                                        }
+                                    }
+
+                                    if (TryGetJsonInt(item, "max_context_length", out int maxCtxLen))
+                                    {
+                                        _lmStudioContextLimitCache = maxCtxLen;
+                                        _lmStudioLastFetchedModel = modelName;
+                                        _lmStudioLastFetchedEndpoint = endpoint;
+
+                                        await RunOnUIThreadAsync(() => UpdateContextStatsImmediate(true));
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to fetch LM Studio context length: {ex.Message}");
+            }
+            finally
+            {
+                _lmStudioFetchInProgress = false;
+            }
+        }
+
+        private static string FormatTokens(double value)
+        {
+            if (value >= 1000000.0)
+            {
+                return (value / 1000000.0).ToString("0.#") + "M";
+            }
+            if (value >= 1000.0)
+            {
+                return (value / 1000.0).ToString("0.#") + "k";
+            }
+            return value.ToString("F0");
         }
 
         private string BuildSessionDiffLog()

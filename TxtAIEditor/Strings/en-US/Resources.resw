@@ -1754,6 +1754,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k tokens</value>
   </data>
+  <data name="AgentTokenCountWithLimitFormat" xml:space="preserve">
+    <value>{0} / {1} tokens</value>
+  </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} tokens</value>
   </data>

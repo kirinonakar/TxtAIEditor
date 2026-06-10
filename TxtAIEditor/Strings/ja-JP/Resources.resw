@@ -1755,6 +1755,9 @@
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k トークン</value>
   </data>
+  <data name="AgentTokenCountWithLimitFormat" xml:space="preserve">
+    <value>{0} / {1} トークン</value>
+  </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} トークン</value>
   </data>
