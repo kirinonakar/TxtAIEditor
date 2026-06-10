@@ -245,6 +245,32 @@ namespace TxtAIEditor.Controls
             });
         }
 
+        private bool IsPathIgnored(string path, System.Collections.Generic.Dictionary<string, string> statuses)
+        {
+            if (statuses.TryGetValue(path, out var status) && status.Trim() == "!!")
+            {
+                return true;
+            }
+
+            foreach (var kvp in statuses)
+            {
+                if (kvp.Value.Trim() == "!!")
+                {
+                    string ignoredDir = kvp.Key;
+                    string ignoredDirWithSlash = ignoredDir.EndsWith(Path.DirectorySeparatorChar)
+                        ? ignoredDir
+                        : ignoredDir + Path.DirectorySeparatorChar;
+
+                    if (path.StartsWith(ignoredDirWithSlash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private void UpdateItemsGitStatus(System.Collections.Generic.Dictionary<string, string> statuses, bool isDark)
         {
             foreach (var item in _viewModel.ExplorerItems)
@@ -254,24 +280,14 @@ namespace TxtAIEditor.Controls
                 {
                     bool hasModified = false;
                     bool hasAdded = false;
-                    bool hasIgnored = false;
 
                     string folderPathWithSlash = item.Path.EndsWith(Path.DirectorySeparatorChar)
                         ? item.Path
                         : item.Path + Path.DirectorySeparatorChar;
-                    string folderPathNormalized = item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
                     foreach (var kvp in statuses)
                     {
-                        string keyNormalized = kvp.Key.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                        if (keyNormalized.Equals(folderPathNormalized, StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (kvp.Value.Trim() == "!!")
-                            {
-                                hasIgnored = true;
-                            }
-                        }
-                        else if (kvp.Key.StartsWith(folderPathWithSlash, StringComparison.OrdinalIgnoreCase))
+                        if (kvp.Key.StartsWith(folderPathWithSlash, StringComparison.OrdinalIgnoreCase))
                         {
                             string status = kvp.Value.Trim();
                             if (status == "??")
@@ -293,7 +309,7 @@ namespace TxtAIEditor.Controls
                     {
                         item.GitStatus = ExplorerItem.GitStatusType.Added;
                     }
-                    else if (hasIgnored)
+                    else if (IsPathIgnored(item.Path, statuses))
                     {
                         item.GitStatus = ExplorerItem.GitStatusType.Ignored;
                     }
@@ -319,6 +335,10 @@ namespace TxtAIEditor.Controls
                         {
                             item.GitStatus = ExplorerItem.GitStatusType.Modified;
                         }
+                    }
+                    else if (IsPathIgnored(item.Path, statuses))
+                    {
+                        item.GitStatus = ExplorerItem.GitStatusType.Ignored;
                     }
                     else
                     {
