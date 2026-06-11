@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -33,9 +35,7 @@ namespace TxtAIEditor.Controls
                     {
                         using var document = JsonDocument.Parse(jsonPart);
                         var root = document.RootElement.Clone();
-                        arguments = root.TryGetProperty("arguments", out var argsProp)
-                            ? argsProp.Clone()
-                            : root.Clone();
+                        arguments = BuildArgumentsElement(root, stripNameProperty: false);
                         return !string.IsNullOrWhiteSpace(toolName);
                     }
                     catch
@@ -55,15 +55,7 @@ namespace TxtAIEditor.Controls
                     if (root.TryGetProperty("name", out var nameProp))
                     {
                         toolName = nameProp.GetString() ?? string.Empty;
-                        if (root.TryGetProperty("arguments", out var argsProp))
-                        {
-                            arguments = argsProp.Clone();
-                        }
-                        else
-                        {
-                            using var emptyDocument = JsonDocument.Parse("{}");
-                            arguments = emptyDocument.RootElement.Clone();
-                        }
+                        arguments = BuildArgumentsElement(root, stripNameProperty: true);
 
                         return !string.IsNullOrWhiteSpace(toolName);
                     }
@@ -75,6 +67,69 @@ namespace TxtAIEditor.Controls
             }
 
             return TryParseLenient(trimmedPayload, out toolName, out arguments);
+        }
+
+        private static JsonElement BuildArgumentsElement(JsonElement root, bool stripNameProperty)
+        {
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return root.Clone();
+            }
+
+            if (!stripNameProperty)
+            {
+                if (root.TryGetProperty("arguments", out var onlyArguments) &&
+                    root.EnumerateObject().Count() == 1 &&
+                    onlyArguments.ValueKind == JsonValueKind.Object)
+                {
+                    return onlyArguments.Clone();
+                }
+
+                return root.Clone();
+            }
+
+            using var stream = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(stream))
+            {
+                writer.WriteStartObject();
+                var writtenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                if (root.TryGetProperty("arguments", out var argumentsProperty))
+                {
+                    if (argumentsProperty.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var property in argumentsProperty.EnumerateObject())
+                        {
+                            property.WriteTo(writer);
+                            writtenNames.Add(property.Name);
+                        }
+                    }
+                    else
+                    {
+                        writer.WritePropertyName("arguments");
+                        argumentsProperty.WriteTo(writer);
+                        writtenNames.Add("arguments");
+                    }
+                }
+
+                foreach (var property in root.EnumerateObject())
+                {
+                    if (property.NameEquals("name") ||
+                        property.NameEquals("arguments") ||
+                        writtenNames.Contains(property.Name))
+                    {
+                        continue;
+                    }
+
+                    property.WriteTo(writer);
+                    writtenNames.Add(property.Name);
+                }
+
+                writer.WriteEndObject();
+            }
+
+            using var document = JsonDocument.Parse(stream.ToArray());
+            return document.RootElement.Clone();
         }
 
         private static string FixJsonCarriageReturnEscapes(string json)
