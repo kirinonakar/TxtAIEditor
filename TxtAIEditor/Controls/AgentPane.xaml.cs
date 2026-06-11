@@ -156,6 +156,12 @@ namespace TxtAIEditor.Controls
             bool appendingAtEnd = _outputLength == currentLength;
             if (appendingAtEnd)
             {
+                text = CollapseExcessBlankLinesForAppend(_rawOutputText, text);
+                if (string.IsNullOrEmpty(text))
+                {
+                    return;
+                }
+
                 _rawOutputText += text;
                 _outputLength += text.Length;
                 AppendRenderedText(text);
@@ -583,6 +589,79 @@ namespace TxtAIEditor.Controls
         {
             return text.EndsWith("\r\n\r\n", StringComparison.Ordinal) ||
                    text.EndsWith("\n\n", StringComparison.Ordinal);
+        }
+
+        private static string CollapseExcessBlankLinesForAppend(string existingText, string text)
+        {
+            string normalized = NormalizeOutputLineBreaks(text);
+            normalized = CollapseLineBreakRuns(normalized);
+
+            int trailingBreaks = CountTrailingLineBreaks(NormalizeOutputLineBreaks(existingText));
+            int leadingBreaks = CountLeadingLineBreaks(normalized);
+            int allowedLeadingBreaks = Math.Max(0, 2 - trailingBreaks);
+            if (leadingBreaks > allowedLeadingBreaks)
+            {
+                normalized = normalized.Substring(leadingBreaks - allowedLeadingBreaks);
+            }
+
+            return normalized.Replace("\n", OutputLineBreak, StringComparison.Ordinal);
+        }
+
+        private static string NormalizeOutputLineBreaks(string text)
+        {
+            return (text ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        }
+
+        private static string CollapseLineBreakRuns(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder(text.Length);
+            int lineBreakRun = 0;
+            foreach (char ch in text)
+            {
+                if (ch == '\n')
+                {
+                    if (lineBreakRun < 2)
+                    {
+                        builder.Append(ch);
+                    }
+
+                    lineBreakRun++;
+                }
+                else
+                {
+                    builder.Append(ch);
+                    lineBreakRun = 0;
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static int CountLeadingLineBreaks(string text)
+        {
+            int count = 0;
+            while (count < text.Length && text[count] == '\n')
+            {
+                count++;
+            }
+
+            return count;
+        }
+
+        private static int CountTrailingLineBreaks(string text)
+        {
+            int count = 0;
+            for (int i = text.Length - 1; i >= 0 && text[i] == '\n'; i--)
+            {
+                count++;
+            }
+
+            return count;
         }
 
         private bool IsControlDown()
