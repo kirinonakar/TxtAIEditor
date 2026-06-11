@@ -18,7 +18,8 @@ namespace TxtAIEditor.Controls
 {
     public sealed class AgentController
     {
-        private const int MaxSessionHistoryPromptChars = 80_000;
+        private const int FallbackSessionHistoryPromptChars = 80_000;
+        private const double PromptContextSafetyRatio = 0.95;
 
         private readonly ILLMService _llmService;
         private readonly ISettingsService _settingsService;
@@ -49,6 +50,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentSelectionContextController _selectionContextController;
         private readonly AgentFileToolController _fileToolController;
         private readonly AgentContextStatsController _contextStatsController;
+        private readonly AgentModelContextLimitProvider _modelContextLimits = new();
         private string _currentSessionId = Guid.NewGuid().ToString();
 
         private bool _isRunning;
@@ -162,11 +164,11 @@ namespace TxtAIEditor.Controls
                 BuildActiveSelectionContext,
                 BuildAgentInstruction,
                 BuildWorkspaceContext,
-                () => _sessionHistory.Length > 0,
-                () => AgentTokenEstimator.Estimate(BuildSessionHistoryForPrompt()),
+                BuildSessionHistoryForPrompt,
                 () => _currentRunTranscriptTokens,
                 RefreshOutputDisplay,
-                _getString);
+                _getString,
+                _modelContextLimits);
             _outputInsertController = new AgentOutputInsertController(
                 _agentPane,
                 insertIntoActiveEditorAsync,
@@ -338,8 +340,12 @@ namespace TxtAIEditor.Controls
                     !UserRequestAllowsEditsOutsideSelection(instruction));
                 string workspaceContext = BuildWorkspaceContext(instruction);
                 string lastWorkspaceContext = workspaceContext;
+                string runSelectionContext = BuildActiveSelectionContext();
                 var initialTranscriptBuilder = new StringBuilder();
-                string sessionHistoryForPrompt = BuildSessionHistoryForPrompt();
+                string sessionHistoryForPrompt = BuildSessionHistoryForPrompt(
+                    instruction,
+                    workspaceContext,
+                    runSelectionContext);
                 if (!string.IsNullOrWhiteSpace(sessionHistoryForPrompt))
                 {
                     initialTranscriptBuilder.AppendLine("[Session History]");
@@ -351,7 +357,6 @@ namespace TxtAIEditor.Controls
                 string initialTranscript = initialTranscriptBuilder.ToString();
 
                 string transcript = initialTranscript;
-                string runSelectionContext = BuildActiveSelectionContext();
                 string response = string.Empty;
 
                 bool completed = false;
@@ -938,7 +943,10 @@ namespace TxtAIEditor.Controls
             return _presetController.BuildAgentInstruction(userInstruction);
         }
 
-        private string BuildSessionHistoryForPrompt()
+        private string BuildSessionHistoryForPrompt(
+            string instruction,
+            string workspaceContext,
+            string selectedText)
         {
             if (_sessionHistory.Length == 0)
             {
@@ -946,12 +954,56 @@ namespace TxtAIEditor.Controls
             }
 
             string history = _sessionHistory.ToString();
-            if (history.Length <= MaxSessionHistoryPromptChars)
+            int contextLimit = GetModelContextLimitForPromptBudget();
+            if (contextLimit <= 0)
+            {
+                if (IsLmStudioProvider())
+                {
+                    return string.Empty;
+                }
+
+                return BuildSessionHistoryTail(history, FallbackSessionHistoryPromptChars);
+            }
+
+            double maxPromptTokens = Math.Floor(contextLimit * PromptContextSafetyRatio);
+            double basePromptTokens = EstimateAgentPromptTokens(
+                instruction,
+                workspaceContext,
+                selectedText);
+            double sessionHistoryWrapperTokens = AgentTokenEstimator.Estimate(
+                "[Session History]" + Environment.NewLine +
+                Environment.NewLine +
+                "=================================" + Environment.NewLine + Environment.NewLine);
+            double availableHistoryTokens = maxPromptTokens - basePromptTokens - sessionHistoryWrapperTokens;
+
+            if (availableHistoryTokens <= 0)
+            {
+                return string.Empty;
+            }
+
+            int hardCharCap = Math.Min(history.Length, FallbackSessionHistoryPromptChars);
+            string cappedHistory = BuildSessionHistoryTail(history, hardCharCap);
+            if (AgentTokenEstimator.Estimate(cappedHistory) <= availableHistoryTokens)
+            {
+                return cappedHistory;
+            }
+
+            return TrimSessionHistoryToTokenBudget(history, hardCharCap, availableHistoryTokens);
+        }
+
+        private string BuildSessionHistoryTail(string history, int maxChars)
+        {
+            if (string.IsNullOrEmpty(history) || maxChars <= 0)
+            {
+                return string.Empty;
+            }
+
+            if (history.Length <= maxChars)
             {
                 return history;
             }
 
-            string tail = history.Substring(history.Length - MaxSessionHistoryPromptChars);
+            string tail = history.Substring(history.Length - maxChars);
             int firstLineBreak = tail.IndexOf('\n');
             if (firstLineBreak >= 0 && firstLineBreak + 1 < tail.Length)
             {
@@ -961,6 +1013,68 @@ namespace TxtAIEditor.Controls
             return "[... earlier session history omitted to keep the prompt compact ...]" +
                 Environment.NewLine +
                 tail;
+        }
+
+        private string TrimSessionHistoryToTokenBudget(
+            string history,
+            int maxChars,
+            double tokenBudget)
+        {
+            string best = string.Empty;
+            int low = 1;
+            int high = Math.Min(history.Length, maxChars);
+
+            while (low <= high)
+            {
+                int mid = low + ((high - low) / 2);
+                string candidate = BuildSessionHistoryTail(history, mid);
+                double candidateTokens = AgentTokenEstimator.Estimate(candidate);
+
+                if (candidateTokens <= tokenBudget)
+                {
+                    best = candidate;
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            return best;
+        }
+
+        private double EstimateAgentPromptTokens(
+            string instruction,
+            string workspaceContext,
+            string selectedText)
+        {
+            string languageCode = _displayText.LanguageCode;
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(languageCode);
+            string userContent = AgentPromptBuilder.BuildUserContent(
+                instruction,
+                workspaceContext,
+                selectedText,
+                string.Empty,
+                languageCode);
+
+            return AgentTokenEstimator.Estimate(systemPrompt) +
+                AgentTokenEstimator.Estimate(userContent) +
+                _attachmentController.EstimatedImageTokens;
+        }
+
+        private int GetModelContextLimitForPromptBudget()
+        {
+            return _modelContextLimits.GetContextLimit(
+                _settingsService.CurrentSettings,
+                () => _agentPane.DispatcherQueue.TryEnqueue(() => UpdateContextStatsImmediate(force: true)));
+        }
+
+        private bool IsLmStudioProvider()
+        {
+            string provider = _settingsService.CurrentSettings?.LlmProvider ?? string.Empty;
+            return provider.Contains("lm studio", StringComparison.OrdinalIgnoreCase) ||
+                provider.Contains("lmstudio", StringComparison.OrdinalIgnoreCase);
         }
 
         private string BuildWorkspaceContext(string instruction)

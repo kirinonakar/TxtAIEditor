@@ -50,6 +50,8 @@ namespace TxtAIEditor.Controls
                 {
                     return _lmStudioContextLimitCache.Value;
                 }
+
+                return 0;
             }
 
             if (model.Contains("gemini"))

@@ -18,12 +18,11 @@ namespace TxtAIEditor.Controls
         private readonly Func<string> _activeSelectionContextProvider;
         private readonly Func<string, string> _buildAgentInstruction;
         private readonly Func<string, string> _buildWorkspaceContext;
-        private readonly Func<bool> _hasSessionHistoryProvider;
-        private readonly Func<double> _sessionHistoryTokenCountProvider;
+        private readonly Func<string, string, string, string> _buildSessionHistoryForPrompt;
         private readonly Func<double> _currentRunTranscriptTokensProvider;
         private readonly Action _refreshOutputDisplay;
         private readonly Func<string, string, string> _getString;
-        private readonly AgentModelContextLimitProvider _modelContextLimits = new();
+        private readonly AgentModelContextLimitProvider _modelContextLimits;
 
         public AgentContextStatsController(
             ISettingsService settingsService,
@@ -36,11 +35,11 @@ namespace TxtAIEditor.Controls
             Func<string> activeSelectionContextProvider,
             Func<string, string> buildAgentInstruction,
             Func<string, string> buildWorkspaceContext,
-            Func<bool> hasSessionHistoryProvider,
-            Func<double> sessionHistoryTokenCountProvider,
+            Func<string, string, string, string> buildSessionHistoryForPrompt,
             Func<double> currentRunTranscriptTokensProvider,
             Action refreshOutputDisplay,
-            Func<string, string, string> getString)
+            Func<string, string, string> getString,
+            AgentModelContextLimitProvider modelContextLimits)
         {
             _settingsService = settingsService;
             _agentPane = agentPane;
@@ -52,11 +51,11 @@ namespace TxtAIEditor.Controls
             _activeSelectionContextProvider = activeSelectionContextProvider;
             _buildAgentInstruction = buildAgentInstruction;
             _buildWorkspaceContext = buildWorkspaceContext;
-            _hasSessionHistoryProvider = hasSessionHistoryProvider;
-            _sessionHistoryTokenCountProvider = sessionHistoryTokenCountProvider;
+            _buildSessionHistoryForPrompt = buildSessionHistoryForPrompt;
             _currentRunTranscriptTokensProvider = currentRunTranscriptTokensProvider;
             _refreshOutputDisplay = refreshOutputDisplay;
             _getString = getString;
+            _modelContextLimits = modelContextLimits;
         }
 
         public void Update(bool force = false)
@@ -157,10 +156,11 @@ namespace TxtAIEditor.Controls
 
             tokens += AgentTokenEstimator.Estimate(Environment.NewLine + "[Workspace context]" + Environment.NewLine);
 
-            if (_hasSessionHistoryProvider())
+            string sessionHistoryForPrompt = _buildSessionHistoryForPrompt(instruction, workspaceContext, selectedText);
+            if (!string.IsNullOrWhiteSpace(sessionHistoryForPrompt))
             {
                 tokens += AgentTokenEstimator.Estimate("[Session History]" + Environment.NewLine);
-                tokens += _sessionHistoryTokenCountProvider() + AgentTokenEstimator.Estimate(Environment.NewLine);
+                tokens += AgentTokenEstimator.Estimate(sessionHistoryForPrompt) + AgentTokenEstimator.Estimate(Environment.NewLine);
                 tokens += AgentTokenEstimator.Estimate("=================================" + Environment.NewLine + Environment.NewLine);
                 tokens += AgentTokenEstimator.Estimate(workspaceContext + Environment.NewLine + Environment.NewLine);
             }
