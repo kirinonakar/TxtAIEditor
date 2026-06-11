@@ -364,7 +364,8 @@ namespace TxtAIEditor.Controls
                 int emptyResponseRetryCount = 0;
                 const int maxEmptyResponseRetries = 1;
                 int maxToolSteps = _settingsService.CurrentSettings.LlmMaxToolCalls > 0 ? _settingsService.CurrentSettings.LlmMaxToolCalls : 50;
-                var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
+                string? lastSuccessfulToolInvocationKey = null;
+                string? lastSuccessfulToolResult = null;
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
@@ -639,12 +640,13 @@ namespace TxtAIEditor.Controls
                     string toolResult;
                     string toolResultForTranscript;
 
-                    if (successfulToolResults.TryGetValue(toolInvocationKey, out string? cachedToolResult) &&
+                    if (string.Equals(lastSuccessfulToolInvocationKey, toolInvocationKey, StringComparison.Ordinal) &&
+                        lastSuccessfulToolResult != null &&
                         ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                     {
                         skippedDuplicateTool = true;
-                        toolResult = cachedToolResult ?? string.Empty;
-                        toolResultForTranscript = "[Tool execution skipped: identical successful call already ran in this agent run. Use the earlier result already present in the transcript.]";
+                        toolResult = lastSuccessfulToolResult;
+                        toolResultForTranscript = "[Tool execution skipped: identical successful call was the previous agent tool call. Reused the immediately previous result.]";
                     }
                     else
                     {
@@ -652,16 +654,17 @@ namespace TxtAIEditor.Controls
                         toolResultForTranscript = toolResult;
                         if (IsSuccessfulToolResult(toolResult))
                         {
-                            if (IsMutatingTool(normalizedToolName))
-                            {
-                                successfulToolResults.Clear();
-                            }
-
-                            successfulToolResults[toolInvocationKey] = toolResult;
+                            lastSuccessfulToolInvocationKey = toolInvocationKey;
+                            lastSuccessfulToolResult = toolResult;
                             if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                             {
                                 toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
                             }
+                        }
+                        else
+                        {
+                            lastSuccessfulToolInvocationKey = null;
+                            lastSuccessfulToolResult = null;
                         }
                     }
 
