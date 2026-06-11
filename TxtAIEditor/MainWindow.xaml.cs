@@ -71,7 +71,10 @@ namespace TxtAIEditor
         private readonly EditorSplitLayoutController _editorSplitLayoutController;
         private readonly EditorBridgeShortcutController _editorBridgeShortcutController;
         private readonly EditorBridgeDocumentController _editorBridgeDocumentController;
+        private readonly EditorBridgeInteractionController _editorBridgeInteractionController;
         private readonly EditorLinkNavigationController _editorLinkNavigationController;
+        private readonly EditorWebViewInitializationController _editorWebViewInitializationController;
+        private readonly EditorLineNavigationController _editorLineNavigationController;
         private readonly SplitImeSyncController _splitImeSyncController;
         private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly TabSaveController _tabSaveController;
@@ -280,6 +283,12 @@ namespace TxtAIEditor
                 HandleWebViewShortcut,
                 SyncPreviewScrollToEditors,
                 _dialogController.ShowErrorMessage);
+            _editorWebViewInitializationController = new EditorWebViewInitializationController(
+                _settingsService,
+                _livePreviewController);
+            _editorLineNavigationController = new EditorLineNavigationController(
+                _viewModel,
+                _tabBridges);
             _pdfViewerController = new PdfViewerController(
                 _settingsService,
                 GetActiveTab,
@@ -334,7 +343,8 @@ namespace TxtAIEditor
                 _tabDirtyStateController,
                 GetActiveTab,
                 LoadFileIntoTabAsync,
-                UpdateLivePreview);
+                UpdateLivePreview,
+                _editorLineNavigationController);
             _searchReplaceController = new SearchReplaceController(
                 _fileSearchService,
                 _viewModel,
@@ -723,15 +733,9 @@ namespace TxtAIEditor
                 async targetLine =>
                 {
                     var activeTab = GetActiveTab();
-                    if (activeTab != null && _tabBridges.TryGetValue(activeTab.Id, out var bridgeGroup))
+                    if (activeTab != null)
                     {
-                        if (bridgeGroup.Bridge != null)
-                            await bridgeGroup.Bridge.RevealLineAsync(targetLine, 0, 0, "");
-                        else if (bridgeGroup.WebView?.CoreWebView2 != null)
-                        {
-                            var msg = new { action = "revealLine", lineNumber = targetLine, indexOfMatch = 0, matchLength = 0, query = "" };
-                            bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(System.Text.Json.JsonSerializer.Serialize(msg));
-                        }
+                        await _editorLineNavigationController.RevealTabLineAsync(activeTab.Id, targetLine);
                     }
                 });
             _editorBridgeDocumentController = new EditorBridgeDocumentController(
@@ -777,6 +781,19 @@ namespace TxtAIEditor
                 UpdateLanguageUI,
                 _tocController,
                 UpdateWindowTitle);
+            _editorBridgeInteractionController = new EditorBridgeInteractionController(
+                EditorWorkspace,
+                EditorTabView,
+                EditorTabView2,
+                _tabBridges,
+                DispatcherQueue,
+                GetActiveTab,
+                _statusBarController,
+                _tabSelectionController,
+                _livePreviewController,
+                UpdateRightPanelSelectionContext,
+                () => _scrollSyncEnabled,
+                enabled => _scrollSyncEnabled = enabled);
             _editorSplitLayoutController = new EditorSplitLayoutController(
                 TopToolbar,
                 EditorWorkspace,
@@ -1359,96 +1376,26 @@ namespace TxtAIEditor
 
             bridge.CursorChanged += (line, col) =>
             {
-                var ownerTabView = GetTabViewForTab(tab);
-                if (ownerTabView != null && EditorWorkspace.ActiveTabView != ownerTabView)
-                {
-                    EditorWorkspace.ActiveTabView = ownerTabView;
-                    if (ownerTabView.SelectedItem is TabViewItem activeTabItem)
-                    {
-                        _tabSelectionController.QueueChanged(ownerTabView, activeTabItem);
-                    }
-                }
-
-                if (GetActiveTab() == tab)
-                {
-                    _statusBarController.SetCursorPosition(line, col);
-                    _ = bridge.RequestSelectionAsync();
-                }
+                _editorBridgeInteractionController.HandleCursorChanged(bridge, tab, line, col);
             };
 
             bridge.SelectionReceived += (selectedText, selStartLine, selEndLine) =>
             {
-                var ownerTabView = GetTabViewForTab(tab);
-                if (ownerTabView != null && EditorWorkspace.ActiveTabView != ownerTabView)
-                {
-                    EditorWorkspace.ActiveTabView = ownerTabView;
-                    if (ownerTabView.SelectedItem is TabViewItem activeTabItem)
-                    {
-                        _tabSelectionController.QueueChanged(ownerTabView, activeTabItem);
-                    }
-                }
-
-                if (GetActiveTab() == tab)
-                {
-                    UpdateRightPanelSelectionContext(selectedText, tab, selStartLine, selEndLine);
-                }
+                _editorBridgeInteractionController.HandleSelectionReceived(
+                    tab,
+                    selectedText,
+                    selStartLine,
+                    selEndLine);
             };
 
             bridge.ScrollChanged += (firstLine, offset) =>
             {
-                if (!_scrollSyncEnabled)
-                {
-                    return;
-                }
-
-                this.DispatcherQueue.TryEnqueue(() =>
-                {
-                    if (GetActiveTab() == tab)
-                    {
-                        _livePreviewController.PostScrollSync(firstLine, offset);
-
-                        // If split mode is active, sync the other pane's selected tab too
-                        if (EditorWorkspace.CurrentSplitMode != TxtAIEditor.Controls.EditorSplitMode.None)
-                        {
-                            TabView? otherTabView = null;
-                            if (IsTabInTabView(EditorTabView, tab.Id))
-                            {
-                                otherTabView = EditorTabView2;
-                            }
-                            else if (IsTabInTabView(EditorTabView2, tab.Id))
-                            {
-                                otherTabView = EditorTabView;
-                            }
-
-                            if (otherTabView != null && otherTabView.SelectedItem is TabViewItem otherItem && otherItem.Tag is string otherTabId)
-                            {
-                                if (_tabBridges.TryGetValue(otherTabId, out var otherBridgeGroup) && otherBridgeGroup.Bridge != null)
-                                {
-                                    _ = otherBridgeGroup.Bridge.SyncScrollFromPreviewAsync(firstLine, offset);
-                                }
-                            }
-                        }
-                    }
-                });
+                _editorBridgeInteractionController.HandleScrollChanged(tab, firstLine, offset);
             };
 
             bridge.ScrollSyncChanged += (enabled) =>
             {
-                this.DispatcherQueue.TryEnqueue(async () =>
-                {
-                    _scrollSyncEnabled = enabled;
-
-                    // Synchronize all open editor tabs to this state
-                    foreach (var grp in _tabBridges.Values)
-                    {
-                        if (grp.Bridge != null)
-                        {
-                            await grp.Bridge.UpdateScrollSyncStateAsync(enabled);
-                        }
-                    }
-
-                    _livePreviewController.PostScrollSyncState(enabled);
-                });
+                _editorBridgeInteractionController.HandleScrollSyncChanged(enabled);
             };
 
             bridge.CtrlClicked += (text, isUrl, isPath) =>
@@ -1467,45 +1414,7 @@ namespace TxtAIEditor
 
         private async void InitializeEditorWebView(WebView2 wv, MonacoBridge bridge)
         {
-            try
-            {
-                WebViewAppearanceService.ApplyEditorHostBackground(
-                    wv,
-                    WebViewAppearanceService.ResolveEditorBackgroundColor(_settingsService.CurrentSettings));
-                await bridge.InitializeAsync();
-
-                var coreWebView = wv.CoreWebView2;
-                if (coreWebView == null)
-                {
-                    throw new InvalidOperationException("CoreWebView2 failed to initialize.");
-                }
-
-                WebViewAppearanceService.ApplyPreferredColorScheme(coreWebView, _settingsService.CurrentSettings.Theme);
-                
-                coreWebView.SetVirtualHostNameToFolderMapping(
-                    PreviewWebResourceService.ResourceHostName,
-                    PreviewWebResourceService.WebResourcesPath,
-                    CoreWebView2HostResourceAccessKind.Allow
-                );
-                _livePreviewController.RegisterDocumentResourceAccess(coreWebView);
-
-                var settings = _settingsService.CurrentSettings;
-                var url = $"http://{PreviewWebResourceService.ResourceHostName}/editor.html?v={PreviewWebResourceService.GetEditorResourceVersion()}" +
-                    $"&theme={Uri.EscapeDataString(settings.Theme)}" +
-                    $"&fontSize={settings.FontSize}" +
-                    $"&fontFamily={Uri.EscapeDataString(settings.FontFamily)}" +
-                    $"&wordWrap={(settings.WordWrap ? "pre-wrap" : "pre")}";
-                if (!string.IsNullOrEmpty(settings.CustomBackgroundColor))
-                    url += $"&customBg={Uri.EscapeDataString(settings.CustomBackgroundColor)}";
-                if (!string.IsNullOrEmpty(settings.CustomForegroundColor))
-                    url += $"&customFg={Uri.EscapeDataString(settings.CustomForegroundColor)}";
-
-                bridge.LoadEditor(url);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed initialization of editor: {ex.Message}");
-            }
+            await _editorWebViewInitializationController.InitializeAsync(wv, bridge);
         }
 
         #endregion
@@ -1533,22 +1442,7 @@ namespace TxtAIEditor
             if (lineNumber >= 1)
             {
                 await Task.Delay(250);
-                string? targetTabId = null;
-                foreach (var tab in _viewModel.Tabs)
-                {
-                    if (string.Equals(tab.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetTabId = tab.Id;
-                        break;
-                    }
-                }
-
-                if (targetTabId != null && _tabBridges.TryGetValue(targetTabId, out var bridgeGroup) && bridgeGroup.WebView?.CoreWebView2 != null)
-                {
-                    var revealMsg = new { action = "revealLine", lineNumber = lineNumber, indexOfMatch = 0, matchLength = 0, query = "" };
-                    string json = System.Text.Json.JsonSerializer.Serialize(revealMsg);
-                    try { bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(json); } catch { }
-                }
+                await _editorLineNavigationController.RevealFileLineAsync(filePath, lineNumber);
             }
         }
 
@@ -2434,16 +2328,7 @@ namespace TxtAIEditor
 
         private async Task PerformLineNavigationAsync(string tabId, int targetLine)
         {
-            if (_tabBridges.TryGetValue(tabId, out var bridgeGroup))
-            {
-                if (bridgeGroup.Bridge != null)
-                    await bridgeGroup.Bridge.RevealLineAsync(targetLine, 0, 0, "");
-                else if (bridgeGroup.WebView?.CoreWebView2 != null)
-                {
-                    var msg = new { action = "revealLine", lineNumber = targetLine, indexOfMatch = 0, matchLength = 0, query = "" };
-                    bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(System.Text.Json.JsonSerializer.Serialize(msg));
-                }
-            }
+            await _editorLineNavigationController.RevealTabLineAsync(tabId, targetLine);
         }
 
         #endregion

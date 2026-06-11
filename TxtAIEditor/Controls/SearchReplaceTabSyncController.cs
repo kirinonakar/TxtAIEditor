@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -22,6 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<string, Task> _loadFileAsync;
         private readonly Action<OpenedTab> _updateLivePreview;
+        private readonly EditorLineNavigationController _lineNavigationController;
 
         public SearchReplaceTabSyncController(
             MainWindowViewModel viewModel,
@@ -32,7 +32,8 @@ namespace TxtAIEditor.Controls
             TabDirtyStateController tabDirtyStateController,
             Func<OpenedTab?> activeTabProvider,
             Func<string, Task> loadFileAsync,
-            Action<OpenedTab> updateLivePreview)
+            Action<OpenedTab> updateLivePreview,
+            EditorLineNavigationController lineNavigationController)
         {
             _viewModel = viewModel;
             _primaryTabView = primaryTabView;
@@ -43,6 +44,7 @@ namespace TxtAIEditor.Controls
             _activeTabProvider = activeTabProvider;
             _loadFileAsync = loadFileAsync;
             _updateLivePreview = updateLivePreview;
+            _lineNavigationController = lineNavigationController;
         }
 
         public async Task HandleFileModifiedAsync(string filePath)
@@ -109,32 +111,12 @@ namespace TxtAIEditor.Controls
         {
             await _loadFileAsync(item.Path);
             await Task.Delay(250);
-
-            string? targetTabId = _viewModel.Tabs
-                .FirstOrDefault(tab => string.Equals(tab.FilePath, item.Path, StringComparison.OrdinalIgnoreCase))
-                ?.Id;
-
-            if (targetTabId != null &&
-                _tabBridges.TryGetValue(targetTabId, out var bridgeGroup) &&
-                bridgeGroup.WebView?.CoreWebView2 != null)
-            {
-                var revealMsg = new
-                {
-                    action = "revealLine",
-                    lineNumber = item.LineNumber,
-                    indexOfMatch = item.IndexOfMatch,
-                    matchLength = item.MatchLength,
-                    query
-                };
-                string json = JsonSerializer.Serialize(revealMsg);
-                try
-                {
-                    bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(json);
-                }
-                catch
-                {
-                }
-            }
+            await _lineNavigationController.RevealFileLineAsync(
+                item.Path,
+                item.LineNumber,
+                item.IndexOfMatch,
+                item.MatchLength,
+                query);
         }
 
         private bool IsTabCurrentlyVisible(OpenedTab tab)
