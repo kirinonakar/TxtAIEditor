@@ -970,6 +970,16 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            bool isHeading = TryParseMarkdownHeading(line, out int headingLevel, out string displayLine);
+            double headingFontSize = GetMarkdownHeadingFontSize(headingLevel);
+            line = displayLine;
+
+            if (string.IsNullOrEmpty(line))
+            {
+                inlines.Add(CreateTextRun(string.Empty, isHeading, headingFontSize));
+                return;
+            }
+
             int i = 0;
             bool isBold = false;
             bool isCode = false;
@@ -1003,7 +1013,10 @@ namespace TxtAIEditor.Controls
                     {
                         Text = text,
                         FontFamily = new FontFamily("Consolas"),
-                        FontSize = 12,
+                        FontSize = isHeading ? headingFontSize : 12,
+                        FontWeight = isHeading
+                            ? Microsoft.UI.Text.FontWeights.Bold
+                            : Microsoft.UI.Text.FontWeights.Normal,
                         VerticalAlignment = VerticalAlignment.Center
                     };
 
@@ -1015,11 +1028,7 @@ namespace TxtAIEditor.Controls
                 }
                 else
                 {
-                    var run = new Run { Text = text };
-                    if (isBold)
-                    {
-                        run.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
-                    }
+                    var run = CreateTextRun(text, isHeading || isBold, headingFontSize);
                     inlines.Add(run);
                 }
             }
@@ -1085,6 +1094,57 @@ namespace TxtAIEditor.Controls
             }
 
             FlushCurrentSegment();
+        }
+
+        private static Run CreateTextRun(string text, bool isBold, double fontSize)
+        {
+            var run = new Run { Text = text };
+            if (isBold)
+            {
+                run.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
+            }
+
+            if (fontSize > 0)
+            {
+                run.FontSize = fontSize;
+            }
+
+            return run;
+        }
+
+        private static bool TryParseMarkdownHeading(string line, out int level, out string displayLine)
+        {
+            level = 0;
+            displayLine = line;
+
+            int hashCount = 0;
+            while (hashCount < line.Length && hashCount < 6 && line[hashCount] == '#')
+            {
+                hashCount++;
+            }
+
+            if (hashCount == 0 ||
+                hashCount >= line.Length ||
+                (line[hashCount] != ' ' && line[hashCount] != '\t'))
+            {
+                return false;
+            }
+
+            level = hashCount;
+            displayLine = line.Substring(hashCount).TrimStart(' ', '\t');
+            return true;
+        }
+
+        private static double GetMarkdownHeadingFontSize(int level)
+        {
+            return level switch
+            {
+                1 => 17,
+                2 => 16,
+                3 => 15,
+                >= 4 and <= 6 => 14,
+                _ => 0
+            };
         }
 
         private Brush GetBrushResource(string key, Windows.UI.Color fallbackColor)
