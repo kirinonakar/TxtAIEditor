@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -13,21 +12,16 @@ using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.Core.Services.LLM;
+using static TxtAIEditor.Controls.AgentToolHelpers;
 
 namespace TxtAIEditor.Controls
 {
     public sealed class AgentController
     {
-        private const int MaxActiveFileContextChars = 120_000;
-
         private readonly ILLMService _llmService;
         private readonly ISettingsService _settingsService;
         private readonly AgentPane _agentPane;
         private readonly Func<OpenedTab?> _activeTabProvider;
-        private readonly Func<IReadOnlyList<OpenedTab>> _openTabsProvider;
-        private readonly Func<OpenedTab, int, string> _getTabText;
-        private readonly Func<string, Task<bool>> _insertIntoActiveEditorAsync;
-        private readonly Func<string?, string, OpenedTab> _openNewTabWithContent;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
@@ -41,53 +35,26 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, bool, Task>? _revertTabOrFileAsync;
         private readonly Action<string>? _closeTabById;
         private readonly Func<string, Task>? _navigateToFolderAsync;
-        private readonly Func<OpenedTab, string?, Task<bool>>? _saveTabAsync;
-        private readonly Func<OpenedTab, string, Task<bool>>? _editTabAsync;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentPresetController _presetController;
         private readonly AgentHistoryController _historyController;
-        private readonly List<AgentFileEditPreview> _sessionEdits = new();
+        private readonly AgentSessionEditController _sessionEditController;
+        private readonly AgentWorkspaceContextBuilder _workspaceContextBuilder;
+        private readonly AgentOutputInsertController _outputInsertController;
+        private readonly AgentConfirmationController _confirmationController;
+        private readonly AgentTabToolController _tabToolController;
+        private readonly AgentSelectionContextController _selectionContextController;
+        private readonly AgentFileToolController _fileToolController;
+        private readonly AgentContextStatsController _contextStatsController;
         private string _currentSessionId = Guid.NewGuid().ToString();
 
-        private string _lastSelectionText = string.Empty;
-        private string? _lastSelectionTabId;
-        private string? _lastSelectionSourceTitle;
-        private string? _lastSelectionSourcePath;
-        private int _lastSelectionStartLine;
-        private int _lastSelectionEndLine;
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
         private readonly StringBuilder _sessionHistory = new();
         private double _sessionHistoryTokenCount;
         private readonly DispatcherTimer _statsDebounceTimer;
-        private TaskCompletionSource<bool>? _diffApprovalTcs;
-        private string? _currentRunLastFilePath;
-        private int? _lmStudioContextLimitCache;
-        private string? _lmStudioLastFetchedModel;
-        private string? _lmStudioLastFetchedEndpoint;
-        private bool _lmStudioFetchInProgress;
-        private DateTime _lmStudioLastFetchedTime = DateTime.MinValue;
-        private OpenedTab? _lastKnownActiveTab;
-        private bool _lastKnownActiveTabFromTabSelection;
-        private OpenedTab? _currentRunActiveTabSnapshot;
-        private SelectionSnapshot? _currentRunSelectionSnapshot;
-        private bool _currentRunRestrictEditsToSelection;
         private double _currentRunTranscriptTokens;
-
-        private sealed class SelectionSnapshot
-        {
-            public string Text { get; init; } = string.Empty;
-            public string? SourcePath { get; init; }
-            public int StartLine { get; init; }
-            public int EndLine { get; init; }
-
-            public bool HasLineRange =>
-                !string.IsNullOrEmpty(Text) &&
-                !string.IsNullOrEmpty(SourcePath) &&
-                StartLine > 0 &&
-                EndLine > 0;
-        }
 
         public AgentController(
             ILLMService llmService,
@@ -119,10 +86,6 @@ namespace TxtAIEditor.Controls
             _settingsService = settingsService;
             _agentPane = agentPane;
             _activeTabProvider = activeTabProvider;
-            _openTabsProvider = openTabsProvider;
-            _getTabText = getTabText;
-            _insertIntoActiveEditorAsync = insertIntoActiveEditorAsync;
-            _openNewTabWithContent = openNewTabWithContent;
             _showError = showError;
             _getString = getString;
             _fileTools = fileTools;
@@ -136,8 +99,6 @@ namespace TxtAIEditor.Controls
             _revertTabOrFileAsync = revertTabOrFileAsync;
             _closeTabById = closeTabById;
             _navigateToFolderAsync = navigateToFolderAsync;
-            _saveTabAsync = saveTabAsync;
-            _editTabAsync = editTabAsync;
             _displayText = new AgentDisplayLocalizer(_getString);
             _attachmentController = new AgentAttachmentController(
                 _agentPane,
@@ -147,10 +108,20 @@ namespace TxtAIEditor.Controls
                 _displayText,
                 () => _isRunning,
                 UpdateContextStats,
-                EstimateTokenCount,
+                AgentTokenEstimator.Estimate,
                 pdfTextExtractionService,
                 _beforeDialog,
                 _afterDialog);
+            _selectionContextController = new AgentSelectionContextController(
+                _activeTabProvider,
+                () => _fileTools.WorkspaceRoot);
+            _fileToolController = new AgentFileToolController(
+                _fileTools,
+                _selectionContextController,
+                GetActiveTabForContext,
+                () => _isRunning,
+                _getString,
+                _openFileInEditorAsync);
             _presetController = new AgentPresetController(
                 _agentPane,
                 _initializePickerWindow,
@@ -160,8 +131,73 @@ namespace TxtAIEditor.Controls
                 _beforeDialog,
                 _afterDialog);
             _historyController = new AgentHistoryController(_agentPane);
-            _fileTools.ConfirmFileEditAsync = ConfirmFileEditAsync;
-            _fileTools.ConfirmPowerShellAsync = ConfirmPowerShellAsync;
+            _sessionEditController = new AgentSessionEditController(
+                _agentPane,
+                async action => await RunOnUIThreadAsync<bool>(async () =>
+                {
+                    await action();
+                    return true;
+                }),
+                _fileModifiedAsync,
+                _revertTabOrFileAsync,
+                _closeTabById,
+                AppendActivity,
+                _showError,
+                _getString);
+            _workspaceContextBuilder = new AgentWorkspaceContextBuilder(
+                () => _fileTools.WorkspaceRoot,
+                openTabsProvider,
+                getTabText,
+                _attachmentController);
+            _contextStatsController = new AgentContextStatsController(
+                _settingsService,
+                _agentPane,
+                _displayText,
+                _attachmentController,
+                () => _isRunning,
+                GetActiveTabForContext,
+                GetActiveSelectionText,
+                BuildActiveSelectionContext,
+                BuildAgentInstruction,
+                BuildWorkspaceContext,
+                () => _sessionHistory.Length > 0,
+                () => _sessionHistoryTokenCount,
+                () => _currentRunTranscriptTokens,
+                RefreshOutputDisplay,
+                _getString);
+            _outputInsertController = new AgentOutputInsertController(
+                _agentPane,
+                insertIntoActiveEditorAsync,
+                openNewTabWithContent,
+                _showError,
+                _getString,
+                _displayText.IsOutputPlaceholder,
+                () => RunOnUIThreadAsync(() => { }));
+            _tabToolController = new AgentTabToolController(
+                GetActiveTabForContext,
+                _activeTabProvider,
+                openTabsProvider,
+                getTabText,
+                insertIntoActiveEditorAsync,
+                openNewTabWithContent,
+                saveTabAsync,
+                editTabAsync,
+                _fileTools,
+                _sessionEditController,
+                action => RunOnUIThreadAsync(action),
+                action => RunOnUIThreadAsync(action),
+                action => RunOnUIThreadAsync(action));
+            _confirmationController = new AgentConfirmationController(
+                _settingsService,
+                _agentPane,
+                _fileTools,
+                _isGitRepoProvider,
+                _sessionEditController,
+                async action => await RunOnUIThreadAsync(action),
+                AppendActivity,
+                _getString);
+            _fileTools.ConfirmFileEditAsync = _confirmationController.ConfirmFileEditAsync;
+            _fileTools.ConfirmPowerShellAsync = _confirmationController.ConfirmPowerShellAsync;
             if (_fileModifiedAsync != null)
             {
                 _fileTools.FileModifiedAsync = _fileModifiedAsync;
@@ -183,215 +219,49 @@ namespace TxtAIEditor.Controls
             _ = _historyController.LoadAsync(_currentSessionId);
         }
 
-        public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
+        public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEditController.SessionEdits;
 
         public void SetActiveTab(OpenedTab? activeTab)
         {
-            _lastKnownActiveTab = activeTab;
-            _lastKnownActiveTabFromTabSelection = true;
-            ClearSelectionIfItBelongsToAnotherTab(activeTab);
+            _selectionContextController.SetActiveTab(activeTab);
             UpdateContextStats();
         }
 
         public void SetSelectionText(string selectedText, OpenedTab? sourceTab = null, int startLine = 0, int endLine = 0)
         {
-            _lastSelectionText = selectedText ?? string.Empty;
-            if (string.IsNullOrEmpty(_lastSelectionText))
-            {
-                _lastSelectionTabId = null;
-                _lastSelectionSourceTitle = null;
-                _lastSelectionSourcePath = null;
-                _lastSelectionStartLine = 0;
-                _lastSelectionEndLine = 0;
-            }
-            else
-            {
-                _lastSelectionTabId = sourceTab?.Id;
-                _lastSelectionSourceTitle = sourceTab?.Title;
-                _lastSelectionSourcePath = sourceTab?.FilePath;
-                _lastSelectionStartLine = startLine;
-                _lastSelectionEndLine = endLine;
-            }
+            _selectionContextController.SetSelectionText(selectedText, sourceTab, startLine, endLine);
             UpdateContextStats();
         }
 
         public void ClearSelection()
         {
-            _lastSelectionText = string.Empty;
-            _lastSelectionTabId = null;
-            _lastSelectionSourceTitle = null;
-            _lastSelectionSourcePath = null;
-            _lastSelectionStartLine = 0;
-            _lastSelectionEndLine = 0;
+            _selectionContextController.ClearSelection();
             UpdateContextStats();
-        }
-
-        private void ClearSelectionIfItBelongsToAnotherTab(OpenedTab? activeTab)
-        {
-            if (string.IsNullOrEmpty(_lastSelectionText) || string.IsNullOrEmpty(_lastSelectionTabId))
-            {
-                return;
-            }
-
-            if (activeTab != null &&
-                string.Equals(_lastSelectionTabId, activeTab.Id, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            _lastSelectionText = string.Empty;
-            _lastSelectionTabId = null;
-            _lastSelectionSourceTitle = null;
-            _lastSelectionSourcePath = null;
-            _lastSelectionStartLine = 0;
-            _lastSelectionEndLine = 0;
         }
 
         private OpenedTab? GetActiveTabForContext()
         {
-            if (_isRunning && _currentRunActiveTabSnapshot != null)
-            {
-                return _currentRunActiveTabSnapshot;
-            }
-
-            var liveActiveTab = _activeTabProvider();
-            if (!_lastKnownActiveTabFromTabSelection)
-            {
-                _lastKnownActiveTab = liveActiveTab;
-                return liveActiveTab;
-            }
-
-            if (_lastKnownActiveTab == null)
-            {
-                return null;
-            }
-
-            if (liveActiveTab == null)
-            {
-                return _lastKnownActiveTab;
-            }
-
-            if (string.Equals(liveActiveTab.Id, _lastKnownActiveTab.Id, StringComparison.Ordinal))
-            {
-                _lastKnownActiveTab = liveActiveTab;
-                return liveActiveTab;
-            }
-
-            // Prefer the explicit tab-selection snapshot when the editor focus provider still
-            // points at the previously focused editor after the user switched tabs.
-            return _lastKnownActiveTab;
+            return _selectionContextController.GetActiveTabForContext(_isRunning);
         }
 
         private Task<OpenedTab?> CaptureActiveTabForRunAsync()
         {
-            return RunOnUIThreadAsync(() =>
-            {
-                var activeTab = GetActiveTabForContext();
-                _lastKnownActiveTab = activeTab;
-                return activeTab;
-            });
+            return RunOnUIThreadAsync(() => _selectionContextController.CaptureActiveTabForRun(_isRunning));
         }
 
         private string GetActiveSelectionText()
         {
-            var activeTab = GetActiveTabForContext();
-            if (string.IsNullOrEmpty(_lastSelectionText))
-            {
-                return string.Empty;
-            }
-
-            if (activeTab == null)
-            {
-                return string.Empty;
-            }
-
-            if (_lastSelectionTabId == null)
-            {
-                return _lastSelectionText;
-            }
-
-            return string.Equals(_lastSelectionTabId, activeTab.Id, StringComparison.Ordinal)
-                ? _lastSelectionText
-                : string.Empty;
+            return _selectionContextController.GetActiveSelectionText(_isRunning);
         }
 
         private string BuildActiveSelectionContext()
         {
-            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            if (string.IsNullOrEmpty(selection.Text))
-            {
-                return string.Empty;
-            }
-
-            string source = FormatSelectionSourceForPrompt(selection.SourcePath, _lastSelectionSourceTitle);
-            if (string.IsNullOrWhiteSpace(source))
-            {
-                return string.Empty;
-            }
-
-            if (selection.StartLine > 0 && selection.EndLine > 0)
-            {
-                string linePart = selection.StartLine == selection.EndLine
-                    ? $"line {selection.StartLine}"
-                    : $"line {selection.StartLine}-{selection.EndLine}";
-                return $"{source} - {linePart}";
-            }
-
-            return source;
+            return _selectionContextController.BuildActiveSelectionContext(_isRunning);
         }
 
-        private string FormatSelectionSourceForPrompt(string? sourcePath, string? sourceTitle)
+        private AgentSelectionSnapshot CaptureActiveSelectionSnapshot()
         {
-            if (!string.IsNullOrWhiteSpace(sourcePath))
-            {
-                try
-                {
-                    string root = _fileTools.WorkspaceRoot;
-                    if (!string.IsNullOrWhiteSpace(root))
-                    {
-                        string fullRoot = Path.GetFullPath(root);
-                        string fullSource = Path.GetFullPath(sourcePath);
-                        if (fullSource.StartsWith(fullRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return Path.GetRelativePath(fullRoot, fullSource).Replace('\\', '/');
-                        }
-                    }
-                }
-                catch {}
-
-                return sourcePath.Replace('\\', '/');
-            }
-
-            return sourceTitle ?? string.Empty;
-        }
-
-        private SelectionSnapshot CaptureActiveSelectionSnapshot()
-        {
-            if (_isRunning &&
-                _currentRunSelectionSnapshot != null &&
-                !string.IsNullOrEmpty(_currentRunSelectionSnapshot.Text))
-            {
-                return _currentRunSelectionSnapshot;
-            }
-
-            return CaptureLiveSelectionSnapshot();
-        }
-
-        private SelectionSnapshot CaptureLiveSelectionSnapshot()
-        {
-            string selectedText = GetActiveSelectionText();
-            if (string.IsNullOrEmpty(selectedText))
-            {
-                return new SelectionSnapshot();
-            }
-
-            return new SelectionSnapshot
-            {
-                Text = selectedText,
-                SourcePath = _lastSelectionSourcePath,
-                StartLine = _lastSelectionStartLine,
-                EndLine = _lastSelectionEndLine
-            };
+            return _selectionContextController.CaptureActiveSelectionSnapshot(_isRunning);
         }
 
         private void WireEvents()
@@ -402,8 +272,8 @@ namespace TxtAIEditor.Controls
             _agentPane.HistorySelected += (_, historyId) => LoadHistorySession(historyId);
             _agentPane.HistoryDeleted += async (_, historyId) => await DeleteHistorySessionAsync(historyId);
             _agentPane.HistoryToolbarDeleteClicked += async (_, _) => await ClearAllHistoryAsync();
-            _agentPane.InsertOutputRequested += async (_, _) => await InsertOutputAsync();
-            _agentPane.InsertNewTabOutputRequested += async (_, _) => await InsertNewTabOutputAsync();
+            _agentPane.InsertOutputRequested += async (_, _) => await _outputInsertController.InsertOutputAsync();
+            _agentPane.InsertNewTabOutputRequested += async (_, _) => await _outputInsertController.InsertNewTabOutputAsync();
             _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
             _agentPane.RemoveAttachmentRequested += (_, attachment) => _attachmentController.RemoveAttachment(attachment.Id);
             _agentPane.AgentPresetAddRequested += async (_, _) => await _presetController.AddPresetAsync();
@@ -418,9 +288,9 @@ namespace TxtAIEditor.Controls
             _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
             _agentPane.IncludeActiveFileCheckBox.Unchecked += (_, _) => UpdateContextStats();
 
-            _agentPane.DiffApproved += (_, _) => _diffApprovalTcs?.TrySetResult(true);
-            _agentPane.DiffCancelled += (_, _) => _diffApprovalTcs?.TrySetResult(false);
-            _agentPane.FileRevertRequested += async (_, preview) => await RevertFileChangeAsync(preview);
+            _agentPane.DiffApproved += (_, _) => _confirmationController.ApprovePending();
+            _agentPane.DiffCancelled += (_, _) => _confirmationController.CancelPending();
+            _agentPane.FileRevertRequested += async (_, preview) => await _sessionEditController.RevertAsync(preview);
             _agentPane.FileDiffRequested += async (_, preview) => await _openDiffViewAsync(preview);
         }
  
@@ -444,10 +314,8 @@ namespace TxtAIEditor.Controls
             }
   
             _isRunning = true;
-            _currentRunLastFilePath = null;
-            _currentRunActiveTabSnapshot = null;
-            _currentRunSelectionSnapshot = null;
-            _currentRunRestrictEditsToSelection = false;
+            _fileToolController.StartRun();
+            _selectionContextController.ClearRunSnapshots();
             _currentRunTranscriptTokens = 0;
             var cancellationSource = new CancellationTokenSource();
             _runCancellation = cancellationSource;
@@ -461,11 +329,11 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                _currentRunActiveTabSnapshot = await CaptureActiveTabForRunAsync();
-                _currentRunSelectionSnapshot = CaptureLiveSelectionSnapshot();
-                _currentRunRestrictEditsToSelection =
-                    _currentRunSelectionSnapshot.HasLineRange &&
-                    !UserRequestAllowsEditsOutsideSelection(instruction);
+                await CaptureActiveTabForRunAsync();
+                AgentSelectionSnapshot currentRunSelectionSnapshot = _selectionContextController.CaptureSelectionForRun(_isRunning);
+                _fileToolController.SetRestrictEditsToSelection(
+                    currentRunSelectionSnapshot.HasLineRange &&
+                    !UserRequestAllowsEditsOutsideSelection(instruction));
                 string workspaceContext = BuildWorkspaceContext(instruction);
                 var initialTranscriptBuilder = new StringBuilder();
                 if (_sessionHistory.Length > 0)
@@ -502,7 +370,7 @@ namespace TxtAIEditor.Controls
                     bool hasToolCall = false;
 
                     string currentTranscript = transcript;
-                    string sessionDiffLog = BuildSessionDiffLog();
+                    string sessionDiffLog = _sessionEditController.BuildDiffLog();
                     if (string.IsNullOrEmpty(sessionDiffLog))
                     {
                         sessionDiffLog = "(No changes have been made in this session yet.)";
@@ -531,7 +399,7 @@ namespace TxtAIEditor.Controls
                                         toolCallPlaceholderShown = true;
                                         if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                         {
-                                            int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
+                                            int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
                                             string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                             _agentPane.DispatcherQueue.TryEnqueue(() =>
                                             {
@@ -551,7 +419,7 @@ namespace TxtAIEditor.Controls
                             {
                                 if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                 {
-                                    int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText));
+                                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
                                     string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
                                     {
@@ -572,7 +440,7 @@ namespace TxtAIEditor.Controls
                                 {
                                     int idx = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
                                     string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
-                                    int tokenCount = (int)Math.Round(EstimateTokenCount(toolCallText));
+                                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(toolCallText));
                                     string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                     _agentPane.DispatcherQueue.TryEnqueue(() =>
                                     {
@@ -605,7 +473,7 @@ namespace TxtAIEditor.Controls
                                     if (!toolCallPlaceholderShown)
                                     {
                                         toolCallPlaceholderShown = true;
-                                        int tokenCount = (int)Math.Round(EstimateTokenCount(streamedText.Substring(toolCallIndex)));
+                                        int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText.Substring(toolCallIndex)));
                                         string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                         _agentPane.DispatcherQueue.TryEnqueue(() =>
                                         {
@@ -727,7 +595,7 @@ namespace TxtAIEditor.Controls
                         string refreshedContext = BuildWorkspaceContext(instruction);
                         string addedPart = $"\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResultForTranscript}\n\n[Current workspace state]\n{refreshedContext}";
                         transcript += addedPart;
-                        _currentRunTranscriptTokens += EstimateTokenCount(addedPart);
+                        _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(addedPart);
                         UpdateContextStatsImmediate(force: true);
                     });
                     
@@ -902,9 +770,8 @@ namespace TxtAIEditor.Controls
             finally
             {
                 _isRunning = false;
-                _currentRunActiveTabSnapshot = null;
-                _currentRunSelectionSnapshot = null;
-                _currentRunRestrictEditsToSelection = false;
+                _selectionContextController.ClearRunSnapshots();
+                _fileToolController.FinishRun();
                 if (ReferenceEquals(_runCancellation, cancellationSource))
                 {
                     _runCancellation = null;
@@ -921,13 +788,12 @@ namespace TxtAIEditor.Controls
             _currentSessionId = Guid.NewGuid().ToString();
             _sessionHistory.Clear();
             _sessionHistoryTokenCount = 0;
-            _sessionEdits.Clear();
+            _sessionEditController.Clear();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 _agentPane.Prompt.Text = string.Empty;
                 _agentPane.ResetOutput(_displayText.OutputPlaceholder);
                 _agentPane.ClearActivity(_displayText.ActivityIdle);
-                UpdateModifiedFilesList();
                 _attachmentController.Clear();
                 UpdateContextStatsImmediate();
                 _historyController.UpdateUI(_currentSessionId);
@@ -1007,7 +873,7 @@ namespace TxtAIEditor.Controls
             }
 
             _runCancellation?.Cancel();
-            _diffApprovalTcs?.TrySetResult(false);
+            _confirmationController.CancelPending();
         }
 
         private string BuildRunHeader(string instruction)
@@ -1029,223 +895,11 @@ namespace TxtAIEditor.Controls
 
         private string BuildWorkspaceContext(string instruction)
         {
-            var context = new List<string>();
-            context.Add("[Workspace root]");
-            context.Add(_fileTools.WorkspaceRoot);
-            context.Add("");
-
-            AddReferencedPathContext(context, instruction);
-
-            var activeTab = GetActiveTabForContext();
-            var openTabs = _openTabsProvider();
-            if (openTabs.Count > 0)
-            {
-                context.Add("[Open tabs]");
-                foreach (var tab in openTabs.Take(30))
-                {
-                    string tabName = string.IsNullOrWhiteSpace(tab.FilePath) ? tab.Title : tab.FilePath;
-                    string activeMarker = activeTab != null &&
-                        string.Equals(tab.Id, activeTab.Id, StringComparison.Ordinal)
-                            ? " (active)"
-                            : string.Empty;
-                    context.Add($"- {tabName}{activeMarker}");
-                }
-            }
-
-            if (activeTab != null && _agentPane.IncludeActiveFile && !IsPdfTab(activeTab))
-            {
-                string title = string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath;
-                bool hasSelectionRangeContext = CaptureActiveSelectionSnapshot().HasLineRange;
-
-                context.Add("");
-                context.Add("[Active tab]");
-                context.Add($"Title: {activeTab.Title}");
-                context.Add($"Path: {title}");
-                context.Add($"Language: {activeTab.Language ?? "plaintext"}");
-                context.Add($"Dirty: {activeTab.IsDirty}");
-
-                if (hasSelectionRangeContext)
-                {
-                    context.Add("");
-                    context.Add("[Active tab content omitted: selected_range_context provides the target line range; use read_file to inspect it.]");
-                }
-                else
-                {
-                    string content = _getTabText(activeTab, MaxActiveFileContextChars);
-                    bool truncated = content.Length >= MaxActiveFileContextChars;
-
-                    context.Add("");
-                    context.Add("[Active tab content]");
-                    context.Add(content);
-                    if (truncated)
-                    {
-                        context.Add("");
-                        context.Add("[Context truncated: active tab exceeded the maximum included length]");
-                    }
-                }
-            }
-
-            if (_attachmentController.Count > 0)
-            {
-                context.Add("");
-                context.Add("[Agent attachments]");
-                foreach (var attachment in _attachmentController.Attachments)
-                {
-                    context.Add($"- {attachment.DisplayName} ({attachment.Detail}, approx {attachment.EstimatedTokens:N0} tokens)");
-                    if (attachment.IsImage)
-                    {
-                        var image = attachment.ImageContent;
-                        context.Add($"  Image input included separately for vision-capable models: {image?.MimeType}, {image?.Width}x{image?.Height}");
-                    }
-                    else if (!string.IsNullOrEmpty(attachment.TextContent))
-                    {
-                        context.Add("");
-                        context.Add($"[Attachment file: {attachment.DisplayName}]");
-                        context.Add($"Path: {attachment.Path}");
-                        context.Add(attachment.TextContent);
-                        context.Add("");
-                    }
-                }
-            }
-
-            return string.Join(Environment.NewLine, context);
-        }
-
-        private static bool IsPdfTab(OpenedTab tab)
-        {
-            return tab.IsPdfViewer ||
-                   string.Equals(tab.Language, "pdf", StringComparison.OrdinalIgnoreCase) ||
-                   (!string.IsNullOrWhiteSpace(tab.FilePath) &&
-                    string.Equals(Path.GetExtension(tab.FilePath), ".pdf", StringComparison.OrdinalIgnoreCase));
-        }
-
-        private void AddReferencedPathContext(List<string> context, string instruction)
-        {
-            var mentionedPaths = ExtractMentionedPaths(instruction).Take(20).ToList();
-            if (mentionedPaths.Count == 0)
-            {
-                return;
-            }
-
-            context.Add("[User-referenced file names]");
-            context.Add("Use these exact file names and paths. Do not translate, romanize, or rename them.");
-            foreach (string mentionedPath in mentionedPaths)
-            {
-                context.Add($"- Mentioned exactly: {mentionedPath}");
-                var matches = FindWorkspacePathMatches(mentionedPath, 5).ToList();
-                if (matches.Count == 0)
-                {
-                    context.Add("  Workspace match: not found yet; if the user asked to create/save this file, create it with exactly this name.");
-                }
-                else
-                {
-                    foreach (string match in matches)
-                    {
-                        context.Add($"  Workspace match: {match}");
-                    }
-                }
-            }
-            context.Add("");
-        }
-
-        private IEnumerable<string> ExtractMentionedPaths(string instruction)
-        {
-            if (string.IsNullOrWhiteSpace(instruction))
-            {
-                yield break;
-            }
-
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            const string extensions = "csv|md|txt|json|xml|html|htm|css|js|ts|tsx|jsx|cs|xaml|py|rs|java|kt|cpp|c|h|hpp|sql|xlsx|xls|docx|pptx|pdf|png|jpg|jpeg|webp|gif|bmp";
-            string pattern = $@"(?<path>[^\s""'<>|:*?\r\n]+?\.(?:{extensions}))(?=$|[\s""'<>|,.;:!?()\[\]{{}}]|[가-힣])";
-            foreach (Match match in Regex.Matches(instruction, pattern, RegexOptions.IgnoreCase))
-            {
-                string path = match.Groups["path"].Value
-                    .Trim()
-                    .Trim('.', ',', ';', ':', '!', '?', ')', ']', '}');
-
-                if (string.IsNullOrWhiteSpace(path) ||
-                    path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                    path.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (seen.Add(path))
-                {
-                    yield return path;
-                }
-            }
-        }
-
-        private IEnumerable<string> FindWorkspacePathMatches(string mentionedPath, int maxResults)
-        {
-            string root = _fileTools.WorkspaceRoot;
-            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
-            {
-                yield break;
-            }
-
-            string normalizedMention = mentionedPath.Replace('\\', '/');
-            string mentionedFileName = Path.GetFileName(mentionedPath);
-            int count = 0;
-
-            foreach (string filePath in EnumerateWorkspaceFilesForContext(root))
-            {
-                string relative = Path.GetRelativePath(root, filePath).Replace('\\', '/');
-                bool isMatch = string.Equals(relative, normalizedMention, StringComparison.OrdinalIgnoreCase) ||
-                               string.Equals(Path.GetFileName(filePath), mentionedFileName, StringComparison.OrdinalIgnoreCase);
-                if (!isMatch)
-                {
-                    continue;
-                }
-
-                yield return relative;
-                count++;
-                if (count >= maxResults)
-                {
-                    yield break;
-                }
-            }
-        }
-
-        private static IEnumerable<string> EnumerateWorkspaceFilesForContext(string root)
-        {
-            var excludedDirectoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ".git", ".vs", "bin", "obj", "node_modules", ".next", "dist", "build"
-            };
-
-            var pending = new Stack<string>();
-            pending.Push(root);
-            while (pending.Count > 0)
-            {
-                string dir = pending.Pop();
-                IEnumerable<string> files;
-                IEnumerable<string> subdirs;
-                try
-                {
-                    files = Directory.EnumerateFiles(dir);
-                    subdirs = Directory.EnumerateDirectories(dir);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                foreach (string file in files)
-                {
-                    yield return file;
-                }
-
-                foreach (string subdir in subdirs)
-                {
-                    if (!excludedDirectoryNames.Contains(Path.GetFileName(subdir)))
-                    {
-                        pending.Push(subdir);
-                    }
-                }
-            }
+            return _workspaceContextBuilder.Build(
+                instruction,
+                GetActiveTabForContext(),
+                _agentPane.IncludeActiveFile,
+                CaptureActiveSelectionSnapshot().HasLineRange);
         }
 
         private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForCurrentRun()
@@ -1259,7 +913,7 @@ namespace TxtAIEditor.Controls
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string normalizedToolName = NormalizeToolName(toolName);
-                string? selectionScopeError = ValidateSelectionEditScope(normalizedToolName, arguments);
+                string? selectionScopeError = _fileToolController.ValidateSelectionEditScope(normalizedToolName, arguments);
                 if (!string.IsNullOrEmpty(selectionScopeError))
                 {
                     AppendActivity(string.Format(
@@ -1273,19 +927,7 @@ namespace TxtAIEditor.Controls
                 string result;
                 if (normalizedToolName == "replace_in_file")
                 {
-                    string path = GetEditPathArgument(arguments);
-                    if (string.IsNullOrWhiteSpace(path))
-                    {
-                        return "replace_in_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
-                    }
-
-                    string oldText = GetFirstStringArgument(arguments, "oldText", "old_text", "find", "search", "target", "before");
-                    string newText = GetFirstStringArgument(arguments, "newText", "new_text", "replace", "replacement", "after");
-                    string content = GetFirstStringArgument(arguments, "content", "text");
-
-                    result = string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(content)
-                        ? await _fileTools.OverwriteFileAsync(path, content)
-                        : await _fileTools.ReplaceInFileAsync(path, oldText, newText);
+                    result = await _fileToolController.ReplaceInFileAsync(arguments);
                 }
                 else
                 {
@@ -1318,19 +960,19 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "path"),
                             GetIntArgument(arguments, "startLine", 1),
                             GetIntArgument(arguments, "lineCount", 160)),
-                        "create_file" => await CreateFileToolAsync(arguments),
-                        "overwrite_file" => await OverwriteFileToolAsync(arguments),
-                        "append_to_file" => await AppendToFileToolAsync(arguments),
-                        "merge_files" => await MergeFilesToolAsync(arguments),
-                        "split_file" => await SplitFileToolAsync(arguments),
-                        "replace_range" => await ReplaceRangeToolAsync(arguments),
-                        "apply_patch" => await ApplyPatchToolAsync(arguments),
-                        "insert_text" => await InsertTextToolAsync(
+                        "create_file" => await _fileToolController.CreateFileAsync(arguments),
+                        "overwrite_file" => await _fileToolController.OverwriteFileAsync(arguments),
+                        "append_to_file" => await _fileToolController.AppendToFileAsync(arguments),
+                        "merge_files" => await _fileToolController.MergeFilesAsync(arguments),
+                        "split_file" => await _fileToolController.SplitFileAsync(arguments),
+                        "replace_range" => await _fileToolController.ReplaceRangeAsync(arguments),
+                        "apply_patch" => await _fileToolController.ApplyPatchAsync(arguments),
+                        "insert_text" => await _tabToolController.InsertTextAsync(
                             GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
-                        "create_tab" => await CreateTabToolAsync(arguments),
-                        "edit_tab" => await EditTabToolAsync(arguments),
-                        "save_tab" => await SaveTabToolAsync(arguments),
-                        "open_file" => await OpenFileToolAsync(arguments),
+                        "create_tab" => await _tabToolController.CreateTabAsync(arguments),
+                        "edit_tab" => await _tabToolController.EditTabAsync(arguments),
+                        "save_tab" => await _tabToolController.SaveTabAsync(arguments),
+                        "open_file" => await _fileToolController.OpenFileAsync(arguments),
                         "web_search_exa" => await _llmService.SearchExaAsync(
                             GetStringArgument(arguments, "query"),
                             GetIntArgument(arguments, "numResults", 5),
@@ -1345,7 +987,7 @@ namespace TxtAIEditor.Controls
                     };
                 }
                 cancellationToken.ThrowIfCancellationRequested();
-                TrackSuccessfulFileToolPath(normalizedToolName, arguments, result);
+                _fileToolController.TrackSuccessfulFileToolPath(normalizedToolName, arguments, result);
                 AppendActivity(string.Format(
                     _getString("AgentActivityToolDoneFormat", "도구 완료: {0}"),
                     normalizedToolName));
@@ -1456,1386 +1098,24 @@ namespace TxtAIEditor.Controls
             };
         }
 
-        private static bool IsUnchangedEditCompletionResult(string toolResult)
-        {
-            return !string.IsNullOrWhiteSpace(toolResult) &&
-                toolResult.Contains(" unchanged:", StringComparison.OrdinalIgnoreCase) &&
-                !toolResult.Contains("failed", StringComparison.OrdinalIgnoreCase) &&
-                !toolResult.Contains("cancelled", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string TruncateForActivity(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return "(empty)";
-            }
-
-            value = value.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\n', ' ').Replace('\r', ' ');
-            return value.Length > 120 ? value.Substring(0, 120) + "..." : value;
-        }
-
-        private static string TruncateForConfirmation(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return "(empty)";
-            }
-
-            value = value.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\n', ' ').Replace('\r', ' ');
-            const int maxConfirmationChars = 40;
-            return value.Length > maxConfirmationChars ? value.Substring(0, maxConfirmationChars) + "..." : value;
-        }
-
-        private static string GetStringArgument(JsonElement arguments, string name)
-        {
-            return arguments.TryGetProperty(name, out var value) ? value.GetString() ?? string.Empty : string.Empty;
-        }
-
-        private static string[] GetUrlsArgument(JsonElement arguments)
-        {
-            if (arguments.TryGetProperty("urls", out var urlsProp))
-            {
-                if (urlsProp.ValueKind == JsonValueKind.Array)
-                {
-                    var list = new System.Collections.Generic.List<string>();
-                    foreach (var item in urlsProp.EnumerateArray())
-                    {
-                        string val = item.GetString() ?? "";
-                        if (!string.IsNullOrEmpty(val))
-                        {
-                            list.Add(val);
-                        }
-                    }
-                    if (list.Count > 0)
-                    {
-                        return list.ToArray();
-                    }
-                }
-                else if (urlsProp.ValueKind == JsonValueKind.String)
-                {
-                    string singleUrl = urlsProp.GetString() ?? "";
-                    if (!string.IsNullOrEmpty(singleUrl))
-                    {
-                        return new[] { singleUrl };
-                    }
-                }
-            }
-
-            // Fallback to checking single "url" key
-            string fallbackUrl = GetFirstStringArgument(arguments, "url", "uri", "address");
-            if (!string.IsNullOrEmpty(fallbackUrl))
-            {
-                return new[] { fallbackUrl };
-            }
-
-            return System.Array.Empty<string>();
-        }
-
-        private static bool ShouldSkipDuplicateSuccessfulTool(string normalizedToolName)
-        {
-            return normalizedToolName is "read_file"
-                or "run_powershell"
-                or "run_rg"
-                or "run_rga"
-                or "run_pdftotext"
-                or "search_text"
-                or "create_file"
-                or "overwrite_file"
-                or "replace_in_file"
-                or "replace_range"
-                or "append_to_file"
-                or "merge_files"
-                or "split_file"
-                or "apply_patch"
-                or "insert_text"
-                or "web_search_exa"
-                or "web_fetch"
-                or "web_fetch_exa";
-        }
-
-        private static bool IsMutatingTool(string normalizedToolName)
-        {
-            return normalizedToolName is "create_file"
-                or "overwrite_file"
-                or "replace_in_file"
-                or "replace_range"
-                or "apply_patch"
-                or "insert_text"
-                or "create_tab"
-                or "edit_tab"
-                or "save_tab"
-                or "append_to_file"
-                or "merge_files"
-                or "split_file";
-        }
-
-        private static void ClearCachedToolResults(Dictionary<string, string> toolResults, string normalizedToolName)
-        {
-            string prefix = normalizedToolName + ":";
-            foreach (string key in toolResults.Keys.Where(key => key.StartsWith(prefix, StringComparison.Ordinal)).ToList())
-            {
-                toolResults.Remove(key);
-            }
-        }
-
-        private string? ValidateSelectionEditScope(string normalizedToolName, JsonElement arguments)
-        {
-            if (!_currentRunRestrictEditsToSelection ||
-                !IsFileEditingTool(normalizedToolName))
-            {
-                return null;
-            }
-
-            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            if (!selection.HasLineRange)
-            {
-                return null;
-            }
-
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return null;
-            }
-
-            if (!PathsReferToSameFile(path, selection.SourcePath!))
-            {
-                return string.Format(
-                    _getString(
-                        "AgentSelectionEditDifferentFileBlockedFormat",
-                        "{0} failed: selected_range_context limits edits to {1}, but the requested edit targets {2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
-                    normalizedToolName,
-                    FormatSelectionScope(selection),
-                    path);
-            }
-
-            if (normalizedToolName != "replace_range")
-            {
-                return string.Format(
-                    _getString(
-                        "AgentSelectionEditToolBlockedFormat",
-                        "{0} failed: selected_range_context limits file edits to {1}. Use replace_range within the selected line range for selected-range edits. If the selected-range task is already complete, write the final answer."),
-                    normalizedToolName,
-                    FormatSelectionScope(selection));
-            }
-
-            int startLine = GetReplaceRangeStartLineArgument(arguments, path);
-            int endLine = GetReplaceRangeEndLineArgument(arguments, path);
-            if (startLine < selection.StartLine || endLine > selection.EndLine)
-            {
-                return string.Format(
-                    _getString(
-                        "AgentSelectionEditRangeBlockedFormat",
-                        "replace_range failed: selected_range_context limits edits to {0}, but the requested edit targets lines {1}-{2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
-                    FormatSelectionScope(selection),
-                    startLine,
-                    endLine);
-            }
-
-            return null;
-        }
-
-
-
-        private static bool IsFileEditingTool(string normalizedToolName)
-        {
-            return normalizedToolName is "overwrite_file"
-                or "replace_in_file"
-                or "replace_range"
-                or "apply_patch"
-                or "append_to_file"
-                or "merge_files"
-                or "split_file";
-        }
-
-        private bool PathsReferToSameFile(string path, string selectionPath)
-        {
-            try
-            {
-                string resolvedPath = Path.IsPathRooted(path)
-                    ? path
-                    : Path.Combine(_fileTools.WorkspaceRoot, path);
-                string resolvedSelectionPath = Path.IsPathRooted(selectionPath)
-                    ? selectionPath
-                    : Path.Combine(_fileTools.WorkspaceRoot, selectionPath);
-
-                return string.Equals(
-                    Path.GetFullPath(resolvedPath),
-                    Path.GetFullPath(resolvedSelectionPath),
-                    StringComparison.OrdinalIgnoreCase);
-            }
-            catch
-            {
-                return string.Equals(path, selectionPath, StringComparison.OrdinalIgnoreCase);
-            }
-        }
-
-        private string FormatSelectionScope(SelectionSnapshot selection)
-        {
-            string source = FormatSelectionSourceForPrompt(selection.SourcePath, _lastSelectionSourceTitle);
-            if (string.IsNullOrWhiteSpace(source))
-            {
-                source = selection.SourcePath ?? "the selected file";
-            }
-
-            return $"{source} lines {selection.StartLine}-{selection.EndLine}";
-        }
-
-        private static bool UserRequestAllowsEditsOutsideSelection(string instruction)
-        {
-            if (string.IsNullOrWhiteSpace(instruction))
-            {
-                return false;
-            }
-
-            return Regex.IsMatch(
-                instruction,
-                @"\b(whole|entire|full)\s+(file|document|workspace|project|repository)\b|\b(all|every)\s+(file|document)\b|전체\s*(파일|문서|워크스페이스|작업공간|프로젝트|저장소)|(?:파일|문서|프로젝트|저장소)\s*전체|すべての(?:ファイル|文書)|(?:ファイル|文書|ワークスペース|プロジェクト|リポジトリ)全体",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        }
-
-        private static bool IsSuccessfulToolResult(string result)
-        {
-            if (string.IsNullOrWhiteSpace(result))
-            {
-                return false;
-            }
-
-            if (result.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase) ||
-                result.Contains(" failed:", StringComparison.OrdinalIgnoreCase) ||
-                result.Contains(" cancelled", StringComparison.OrdinalIgnoreCase) ||
-                result.Contains(" timed out", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            var exitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
-            return !exitCodeMatch.Success ||
-                (int.TryParse(exitCodeMatch.Groups[1].Value, out int exitCode) && exitCode == 0);
-        }
-
-        private static string AppendToolStatusMessage(string result, string message)
-        {
-            string trimmedResult = (result ?? string.Empty).TrimEnd();
-            if (string.IsNullOrWhiteSpace(message) ||
-                trimmedResult.EndsWith(message, StringComparison.Ordinal))
-            {
-                return trimmedResult;
-            }
-
-            return $"{trimmedResult}\n{message}";
-        }
-
-        private static string BuildToolInvocationKey(string normalizedToolName, JsonElement arguments)
-        {
-            if (normalizedToolName == "run_powershell")
-            {
-                return normalizedToolName + ":" + NormalizePowerShellForDuplicateCheck(GetStringArgument(arguments, "command"));
-            }
-
-            var builder = new StringBuilder(normalizedToolName);
-            builder.Append(':');
-            AppendCanonicalJson(builder, arguments);
-            return builder.ToString();
-        }
-
-        private static string NormalizePowerShellForDuplicateCheck(string command)
-        {
-            string normalized = Regex.Replace(command ?? string.Empty, @"\s+", " ").Trim();
-            normalized = Regex.Replace(normalized, @"\s+2>\s*&\s*1\s*$", string.Empty, RegexOptions.IgnoreCase).Trim();
-            return normalized.ToLowerInvariant();
-        }
-
-        private static void AppendCanonicalJson(StringBuilder builder, JsonElement element)
-        {
-            switch (element.ValueKind)
-            {
-                case JsonValueKind.Object:
-                    builder.Append('{');
-                    bool firstProperty = true;
-                    foreach (var property in element.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
-                    {
-                        if (!firstProperty)
-                        {
-                            builder.Append(',');
-                        }
-
-                        firstProperty = false;
-                        builder.Append(JsonSerializer.Serialize(property.Name));
-                        builder.Append(':');
-                        AppendCanonicalJson(builder, property.Value);
-                    }
-                    builder.Append('}');
-                    break;
-
-                case JsonValueKind.Array:
-                    builder.Append('[');
-                    bool firstItem = true;
-                    foreach (var item in element.EnumerateArray())
-                    {
-                        if (!firstItem)
-                        {
-                            builder.Append(',');
-                        }
-
-                        firstItem = false;
-                        AppendCanonicalJson(builder, item);
-                    }
-                    builder.Append(']');
-                    break;
-
-                case JsonValueKind.String:
-                    builder.Append(JsonSerializer.Serialize(element.GetString() ?? string.Empty));
-                    break;
-
-                default:
-                    builder.Append(element.GetRawText());
-                    break;
-            }
-        }
-
         private string GetPathArgument(JsonElement arguments)
         {
-            string path = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path");
-            if (!string.IsNullOrWhiteSpace(path))
-            {
-                return path;
-            }
-
-            return string.Empty;
+            return _fileToolController.GetPathArgument(arguments);
         }
 
         private string GetEditPathArgument(JsonElement arguments)
         {
-            string path = GetPathArgument(arguments);
-            if (!string.IsNullOrWhiteSpace(path))
-            {
-                return path;
-            }
-
-            return InferEditPathFromContext();
-        }
-
-        private string InferEditPathFromContext()
-        {
-            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            if (!string.IsNullOrWhiteSpace(selection.SourcePath) &&
-                !string.IsNullOrEmpty(selection.Text))
-            {
-                return selection.SourcePath;
-            }
-
-            if (!string.IsNullOrWhiteSpace(_currentRunLastFilePath))
-            {
-                return _currentRunLastFilePath;
-            }
-
-            string activePath = GetActiveTabForContext()?.FilePath ?? string.Empty;
-            return string.IsNullOrWhiteSpace(activePath) ? string.Empty : activePath;
-        }
-
-        private void TrackSuccessfulFileToolPath(string normalizedToolName, JsonElement arguments, string result)
-        {
-            if (result.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
-                result.Contains("cancelled", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            if (normalizedToolName is not ("read_file" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
-            {
-                return;
-            }
-
-            string path;
-            if (normalizedToolName == "merge_files")
-            {
-                path = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
-            }
-            else
-            {
-                path = normalizedToolName == "read_file"
-                    ? GetPathArgument(arguments)
-                    : GetEditPathArgument(arguments);
-            }
-
-            if (!string.IsNullOrWhiteSpace(path))
-            {
-                _currentRunLastFilePath = path;
-            }
-        }
-
-        private bool ShouldUseActiveSelectionRangeForPath(string path)
-        {
-            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            if (string.IsNullOrWhiteSpace(path) ||
-                string.IsNullOrWhiteSpace(selection.SourcePath) ||
-                string.IsNullOrEmpty(selection.Text) ||
-                selection.StartLine <= 0 ||
-                selection.EndLine <= 0)
-            {
-                return false;
-            }
-
-            try
-            {
-                string resolvedPath = Path.IsPathRooted(path)
-                    ? path
-                    : Path.Combine(_fileTools.WorkspaceRoot, path);
-                string resolvedSelectionPath = Path.IsPathRooted(selection.SourcePath)
-                    ? selection.SourcePath
-                    : Path.Combine(_fileTools.WorkspaceRoot, selection.SourcePath);
-
-                return string.Equals(
-                    Path.GetFullPath(resolvedPath),
-                    Path.GetFullPath(resolvedSelectionPath),
-                    StringComparison.OrdinalIgnoreCase);
-            }
-            catch
-            {
-                return string.Equals(path, selection.SourcePath, StringComparison.OrdinalIgnoreCase);
-            }
+            return _fileToolController.GetEditPathArgument(arguments);
         }
 
         private int GetReplaceRangeStartLineArgument(JsonElement arguments, string path)
         {
-            if (TryGetIntArgument(arguments, "startLine", out int explicitStartLine) && explicitStartLine > 0)
-            {
-                return explicitStartLine;
-            }
-
-            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            return ShouldUseActiveSelectionRangeForPath(path)
-                ? selection.StartLine
-                : 1;
+            return _fileToolController.GetReplaceRangeStartLineArgument(arguments, path);
         }
 
         private int GetReplaceRangeEndLineArgument(JsonElement arguments, string path)
         {
-            if (TryGetIntArgument(arguments, "endLine", out int explicitEndLine) && explicitEndLine > 0)
-            {
-                return explicitEndLine;
-            }
-
-            if (TryGetIntArgument(arguments, "startLine", out int explicitStartLine) && explicitStartLine > 0)
-            {
-                return explicitStartLine;
-            }
-
-            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            return ShouldUseActiveSelectionRangeForPath(path)
-                ? selection.EndLine
-                : 1;
-        }
-
-        private string GetReplaceRangeExpectedSnippetArgument(JsonElement arguments, string path)
-        {
-            string explicitExpected = GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected");
-            if (!string.IsNullOrEmpty(explicitExpected))
-            {
-                return explicitExpected;
-            }
-
-            if (TryGetIntArgument(arguments, "startLine", out _) ||
-                TryGetIntArgument(arguments, "endLine", out _))
-            {
-                return string.Empty;
-            }
-
-            SelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            return ShouldUseActiveSelectionRangeForPath(path)
-                ? selection.Text
-                : string.Empty;
-        }
-
-        private static string GetFirstStringArgument(JsonElement arguments, params string[] names)
-        {
-            foreach (string name in names)
-            {
-                string value = GetStringArgument(arguments, name);
-                if (!string.IsNullOrEmpty(value))
-                {
-                    return value;
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private static string NormalizeToolName(string toolName)
-        {
-            string normalized = (toolName ?? string.Empty)
-                .Trim()
-                .Replace("-", "_", StringComparison.Ordinal)
-                .Replace(" ", "_", StringComparison.Ordinal)
-                .ToLowerInvariant();
-
-            return normalized switch
-            {
-                "replace_text" => "replace_in_file",
-                "replace" => "replace_in_file",
-                "edit_file" => "replace_in_file",
-                "write_file" => "overwrite_file",
-                "append" => "append_to_file",
-                "append_file" => "append_to_file",
-                "append_to_file" => "append_to_file",
-                "merge" => "merge_files",
-                "merge_file" => "merge_files",
-                "merge_files" => "merge_files",
-                "split" => "split_file",
-                "split_file" => "split_file",
-                "split_files" => "split_file",
-                "write_text" => "overwrite_file",
-                "insert" => "insert_text",
-                "insert_into_editor" => "insert_text",
-                "insert_text_into_editor" => "insert_text",
-                "paste_text" => "insert_text",
-                "new_tab" => "create_tab",
-                "open_new_tab" => "create_tab",
-                "create_new_tab" => "create_tab",
-                "insert_text_new_tab" => "create_tab",
-                "insert_into_new_tab" => "create_tab",
-                "paste_text_new_tab" => "create_tab",
-                "edit_tab" => "edit_tab",
-                "modify_tab" => "edit_tab",
-                "update_tab" => "edit_tab",
-                "overwrite_tab" => "edit_tab",
-                "save" => "save_tab",
-                "save_file" => "save_tab",
-                "save_tab" => "save_tab",
-                "read" => "read_file",
-                "search" => "search_text",
-                "powershell" => "run_powershell",
-                "rg" => "run_rg",
-                "rga" => "run_rga",
-                "pdftotext" => "run_pdftotext",
-                "search_exa" => "web_search_exa",
-                "exa_search" => "web_search_exa",
-                "exa" => "web_search_exa",
-                "fetch_exa" => "web_fetch_exa",
-                "exa_fetch" => "web_fetch_exa",
-                "fetch" => "web_fetch",
-                "web_fetch" => "web_fetch",
-                "patch" => "apply_patch",
-                "apply_diff" => "apply_patch",
-                "open" => "open_file",
-                "open_in_editor" => "open_file",
-                "open_tab" => "open_file",
-                _ => normalized
-            };
-        }
-
-        private static int GetIntArgument(JsonElement arguments, string name, int fallback)
-        {
-            return TryGetIntArgument(arguments, name, out int value) ? value : fallback;
-        }
-
-        private static bool TryGetIntArgument(JsonElement arguments, string name, out int value)
-        {
-            value = 0;
-            if (!arguments.TryGetProperty(name, out var propertyValue))
-            {
-                return false;
-            }
-
-            if (propertyValue.ValueKind == JsonValueKind.Number && propertyValue.TryGetInt32(out int number))
-            {
-                value = number;
-                return true;
-            }
-
-            if (propertyValue.ValueKind == JsonValueKind.String &&
-                int.TryParse(propertyValue.GetString(), out int parsed))
-            {
-                value = parsed;
-                return true;
-            }
-
-            return false;
-        }
-
-        private async Task<string> CreateFileToolAsync(JsonElement arguments)
-        {
-            string path = GetPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "create_file failed: path is empty. Provide the exact output file path requested by the user.";
-            }
-
-            return await _fileTools.CreateFileAsync(path, GetStringArgument(arguments, "content"));
-        }
-
-        private async Task<string> OpenFileToolAsync(JsonElement arguments)
-        {
-            string path = GetPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "open_file failed: path is empty. Provide the file path you want to open.";
-            }
-
-            string fullPath = path;
-            if (!Path.IsPathRooted(path))
-            {
-                string root = _fileTools.WorkspaceRoot;
-                if (!string.IsNullOrEmpty(root))
-                {
-                    fullPath = Path.GetFullPath(Path.Combine(root, path));
-                }
-            }
-
-            if (!File.Exists(fullPath))
-            {
-                return $"open_file failed: file not found: {path}";
-            }
-
-            if (_openFileInEditorAsync != null)
-            {
-                await _openFileInEditorAsync(fullPath);
-                return $"opened: {path}";
-            }
-
-            return "open_file failed: opening files in editor is not available.";
-        }
-
-        private async Task<string> OverwriteFileToolAsync(JsonElement arguments)
-        {
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "overwrite_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
-            }
-
-            return await _fileTools.OverwriteFileAsync(
-                path,
-                GetFirstStringArgument(arguments, "content", "newText", "new_text", "text"));
-        }
-
-        private async Task<string> AppendToFileToolAsync(JsonElement arguments)
-        {
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "append_to_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
-            }
-
-            return await _fileTools.AppendToFileAsync(
-                path,
-                GetFirstStringArgument(arguments, "content", "newText", "new_text", "text"));
-        }
-
-        private async Task<string> MergeFilesToolAsync(JsonElement arguments)
-        {
-            string targetPath = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
-            if (string.IsNullOrWhiteSpace(targetPath))
-            {
-                return "merge_files failed: targetPath is empty.";
-            }
-
-            var pathsList = new List<string>();
-            if (arguments.TryGetProperty("paths", out var pathsProp))
-            {
-                if (pathsProp.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var item in pathsProp.EnumerateArray())
-                    {
-                        string p = item.GetString() ?? string.Empty;
-                        if (!string.IsNullOrWhiteSpace(p))
-                        {
-                            pathsList.Add(p);
-                        }
-                    }
-                }
-                else if (pathsProp.ValueKind == JsonValueKind.String)
-                {
-                    string singlePath = pathsProp.GetString() ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(singlePath))
-                    {
-                        pathsList.Add(singlePath);
-                    }
-                }
-            }
-
-            // Check other potential keys
-            if (pathsList.Count == 0 && arguments.TryGetProperty("sources", out var sourcesProp) && sourcesProp.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in sourcesProp.EnumerateArray())
-                {
-                    string p = item.GetString() ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(p))
-                    {
-                        pathsList.Add(p);
-                    }
-                }
-            }
-
-            if (pathsList.Count == 0 && arguments.TryGetProperty("files", out var filesProp) && filesProp.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in filesProp.EnumerateArray())
-                {
-                    string p = item.GetString() ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(p))
-                    {
-                        pathsList.Add(p);
-                    }
-                }
-            }
-
-            return await _fileTools.MergeFilesAsync(pathsList.ToArray(), targetPath);
-        }
-
-        private async Task<string> SplitFileToolAsync(JsonElement arguments)
-        {
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "split_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
-            }
-
-            int linesPerFile = GetIntArgument(arguments, "linesPerFile", 0);
-            if (linesPerFile == 0)
-            {
-                linesPerFile = GetIntArgument(arguments, "lines_per_file", 0);
-            }
-            if (linesPerFile == 0)
-            {
-                linesPerFile = GetIntArgument(arguments, "lines", 0);
-            }
-
-            var rangesList = new List<AgentFileToolService.SplitRange>();
-            if (arguments.TryGetProperty("ranges", out var rangesProp) && rangesProp.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in rangesProp.EnumerateArray())
-                {
-                    string targetPath = GetFirstStringArgument(item, "path", "targetPath", "target_path", "file");
-                    int startLine = GetIntArgument(item, "startLine", 0);
-                    if (startLine == 0) startLine = GetIntArgument(item, "start_line", 0);
-
-                    int endLine = GetIntArgument(item, "endLine", 0);
-                    if (endLine == 0) endLine = GetIntArgument(item, "end_line", 0);
-
-                    int lineCount = GetIntArgument(item, "lineCount", 0);
-                    if (lineCount == 0) lineCount = GetIntArgument(item, "line_count", 0);
-                    if (lineCount == 0) lineCount = GetIntArgument(item, "count", 0);
-
-                    rangesList.Add(new AgentFileToolService.SplitRange
-                    {
-                        Path = targetPath,
-                        StartLine = startLine,
-                        EndLine = endLine,
-                        LineCount = lineCount
-                    });
-                }
-            }
-
-            return await _fileTools.SplitFileAsync(path, rangesList, linesPerFile);
-        }
-
-        private async Task<string> ReplaceRangeToolAsync(JsonElement arguments)
-        {
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "replace_range failed: path is empty and no selected, recently read, or active file path could be inferred.";
-            }
-
-            return await _fileTools.ReplaceRangeAsync(
-                path,
-                GetReplaceRangeStartLineArgument(arguments, path),
-                GetReplaceRangeEndLineArgument(arguments, path),
-                GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
-                GetReplaceRangeExpectedSnippetArgument(arguments, path));
-        }
-
-        private async Task<string> ApplyPatchToolAsync(JsonElement arguments)
-        {
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "apply_patch failed: path is empty and no selected, recently read, or active file path could be inferred.";
-            }
-
-            return await _fileTools.ApplyPatchAsync(
-                path,
-                GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content"));
-        }
-
-        private async Task<string> InsertTextToolAsync(string content)
-        {
-            if (string.IsNullOrEmpty(content))
-            {
-                return "insert_text failed: content is empty.";
-            }
-
-            var activeTab = GetActiveTabForContext();
-            if (activeTab == null)
-            {
-                return "insert_text failed: no active tab.";
-            }
-
-            string oldContent = _getTabText(activeTab, int.MaxValue);
-
-            bool inserted = await RunOnUIThreadAsync(async () => await _insertIntoActiveEditorAsync(content));
-            if (!inserted)
-            {
-                return "insert_text failed: active editor did not accept the text.";
-            }
-
-            // Wait 200ms for WebView2/Monaco content sync
-            await Task.Delay(200);
-
-            string newContent = _getTabText(activeTab, int.MaxValue);
-
-            string relPath = string.IsNullOrEmpty(activeTab.FilePath)
-                ? activeTab.Title
-                : Path.GetRelativePath(_fileTools.WorkspaceRoot, activeTab.FilePath).Replace('\\', '/');
-            string fullPath = string.IsNullOrEmpty(activeTab.FilePath)
-                ? activeTab.Id
-                : activeTab.FilePath;
-
-            var preview = new AgentFileEditPreview
-            {
-                ActionName = "insert_text",
-                RelativePath = relPath,
-                FullPath = fullPath,
-                OldContent = oldContent,
-                NewContent = newContent,
-                IsNewFile = false
-            };
-
-            await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
-
-            return $"inserted into active editor: {content.Length:N0} chars";
-        }
-
-        private async Task<string> CreateTabToolAsync(JsonElement arguments)
-        {
-            try
-            {
-                string content = GetFirstStringArgument(arguments, "content", "text", "newText", "new_text");
-                if (string.IsNullOrEmpty(content))
-                {
-                    return "create_tab failed: content is empty.";
-                }
-
-                string title = GetFirstStringArgument(arguments, "title", "name", "fileName", "file_name");
-                OpenedTab tab = await RunOnUIThreadAsync(() => _openNewTabWithContent(
-                    string.IsNullOrWhiteSpace(title) ? null : title,
-                    content));
-
-                string displayTitle = string.IsNullOrWhiteSpace(tab.Title) ? "Untitled" : tab.Title;
-
-                var preview = new AgentFileEditPreview
-                {
-                    ActionName = "create_tab",
-                    RelativePath = displayTitle,
-                    FullPath = tab.Id,
-                    OldContent = string.Empty,
-                    NewContent = content,
-                    IsNewFile = true
-                };
-
-                await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
-
-                return $"created new tab: {displayTitle} ({content.Length:N0} chars)";
-            }
-            catch (Exception ex)
-            {
-                return $"create_tab failed with exception: {ex}";
-            }
-        }
-
-        private async Task<string> SaveTabToolAsync(JsonElement arguments)
-        {
-            try
-            {
-                if (_saveTabAsync == null)
-                {
-                    return "save_tab failed: save operation is not supported by the host.";
-                }
-
-                OpenedTab? tab = null;
-                string titleOrId = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
-                if (!string.IsNullOrEmpty(titleOrId))
-                {
-                    var openTabs = _openTabsProvider();
-                    tab = openTabs.FirstOrDefault(t => string.Equals(t.Id, titleOrId, StringComparison.OrdinalIgnoreCase))
-                          ?? openTabs.FirstOrDefault(t => string.Equals(t.Title, titleOrId, StringComparison.OrdinalIgnoreCase))
-                          ?? openTabs.FirstOrDefault(t => !string.IsNullOrEmpty(t.FilePath) && string.Equals(Path.GetFileName(t.FilePath), titleOrId, StringComparison.OrdinalIgnoreCase));
-                    if (tab == null)
-                    {
-                        return $"save_tab failed: tab not found for '{titleOrId}'.";
-                    }
-                }
-                else
-                {
-                    tab = _activeTabProvider();
-                    if (tab == null)
-                    {
-                        return "save_tab failed: no active tab to save.";
-                    }
-                }
-
-                if (tab.IsReadOnlyViewer)
-                {
-                    return "save_tab failed: this is a read-only viewer tab and cannot be saved.";
-                }
-
-                string path = GetFirstStringArgument(arguments, "path", "filePath", "file_path");
-                string? originalFilePath = tab.FilePath;
-                string? originalTitle = tab.Title;
-                string? originalLanguage = tab.Language;
-
-                string? resolvedPath = null;
-                if (!string.IsNullOrEmpty(path))
-                {
-                    string root = _fileTools.WorkspaceRoot;
-                    resolvedPath = Path.IsPathRooted(path)
-                        ? Path.GetFullPath(path)
-                        : Path.GetFullPath(Path.Combine(root, path));
-
-                    if (!resolvedPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return $"save_tab failed: path '{path}' escapes workspace root.";
-                    }
-                }
-                else if (string.IsNullOrEmpty(tab.FilePath))
-                {
-                    return "save_tab failed: the tab is unsaved (has no file path) and no destination path was specified. Provide a 'path' argument.";
-                }
-
-                bool success = await RunOnUIThreadAsync(async () => await _saveTabAsync(tab, resolvedPath));
-                if (success)
-                {
-                    string finalPath = tab.FilePath ?? string.Empty;
-                    string relativePath = finalPath;
-                    try
-                    {
-                        if (finalPath.StartsWith(_fileTools.WorkspaceRoot, StringComparison.OrdinalIgnoreCase))
-                        {
-                            relativePath = finalPath.Substring(_fileTools.WorkspaceRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                        }
-                    }
-                    catch {}
-
-                    var preview = new AgentFileEditPreview
-                    {
-                        ActionName = "save_tab",
-                        RelativePath = relativePath,
-                        FullPath = finalPath,
-                        OldContent = string.Empty,
-                        NewContent = tab.Content,
-                        IsNewFile = string.IsNullOrEmpty(originalFilePath)
-                    };
-                    await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
-
-                    return $"successfully saved tab to: {relativePath}";
-                }
-                else
-                {
-                    return "save_tab failed: save operation failed or was cancelled.";
-                }
-            }
-            catch (Exception ex)
-            {
-                return $"save_tab failed with exception: {ex.Message}";
-            }
-        }
-
-        private async Task<string> EditTabToolAsync(JsonElement arguments)
-        {
-            try
-            {
-                if (_editTabAsync == null)
-                {
-                    return "edit_tab failed: edit operation is not supported by the host.";
-                }
-
-                OpenedTab? tab = null;
-                string titleOrId = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
-                if (!string.IsNullOrEmpty(titleOrId))
-                {
-                    var openTabs = _openTabsProvider();
-                    tab = openTabs.FirstOrDefault(t => string.Equals(t.Id, titleOrId, StringComparison.OrdinalIgnoreCase))
-                          ?? openTabs.FirstOrDefault(t => string.Equals(t.Title, titleOrId, StringComparison.OrdinalIgnoreCase))
-                          ?? openTabs.FirstOrDefault(t => !string.IsNullOrEmpty(t.FilePath) && string.Equals(Path.GetFileName(t.FilePath), titleOrId, StringComparison.OrdinalIgnoreCase));
-                    if (tab == null)
-                    {
-                        return $"edit_tab failed: tab not found for '{titleOrId}'.";
-                    }
-                }
-                else
-                {
-                    tab = _activeTabProvider();
-                    if (tab == null)
-                    {
-                        return "edit_tab failed: no active tab to edit.";
-                    }
-                }
-
-                if (tab.IsReadOnlyViewer)
-                {
-                    return "edit_tab failed: this is a read-only viewer tab and cannot be edited.";
-                }
-
-                string content = GetFirstStringArgument(arguments, "content", "newText", "new_text", "text");
-                if (content == null)
-                {
-                    return "edit_tab failed: content argument is missing.";
-                }
-
-                string oldContent = tab.Content;
-                if (string.Equals(oldContent, content, StringComparison.Ordinal))
-                {
-                    return "edit_tab completed: content is already identical.";
-                }
-
-                bool success = await RunOnUIThreadAsync(async () => await _editTabAsync(tab, content));
-                if (success)
-                {
-                    string finalPath = tab.FilePath ?? string.Empty;
-                    string relativePath = finalPath;
-                    try
-                    {
-                        if (finalPath.StartsWith(_fileTools.WorkspaceRoot, StringComparison.OrdinalIgnoreCase))
-                        {
-                            relativePath = finalPath.Substring(_fileTools.WorkspaceRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                        }
-                    }
-                    catch {}
-
-                    if (string.IsNullOrEmpty(relativePath))
-                    {
-                        relativePath = tab.Title ?? "Untitled";
-                    }
-
-                    var preview = new AgentFileEditPreview
-                    {
-                        ActionName = "edit_tab",
-                        RelativePath = relativePath,
-                        FullPath = finalPath,
-                        OldContent = oldContent,
-                        NewContent = content,
-                        IsNewFile = false
-                    };
-                    await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
-
-                    return $"successfully edited tab: {relativePath}";
-                }
-                else
-                {
-                    return "edit_tab failed: edit operation failed or was cancelled.";
-                }
-            }
-            catch (Exception ex)
-            {
-                return $"edit_tab failed with exception: {ex.Message}";
-            }
-        }
-
-        private async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)
-        {
-            var settings = _settingsService.CurrentSettings;
-            string root = _fileTools.WorkspaceRoot;
-            if (settings.LlmAgentAutoApproveGitEdits && _isGitRepoProvider(root))
-            {
-                AppendActivity(string.Format(
-                    _getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"),
-                    preview.RelativePath));
-                await RunOnUIThreadAsync(() => TrackSessionEdit(preview));
-                return true;
-            }
-
-            AppendActivity(string.Format(
-                _getString("AgentActivityDiffReviewFormat", "파일 변경 승인 대기 중: {0}"),
-                preview.RelativePath));
-
-            return await RunOnUIThreadAsync(async () =>
-            {
-                string titleKey = preview.ActionName switch
-                {
-                    "create_file" => "AgentCreateDialogTitle",
-                    _ => "AgentEditDialogTitle"
-                };
-
-                string defaultTitle = preview.ActionName switch
-                {
-                    "create_file" => "Agent 파일 생성 확인: {0}",
-                    _ => "Agent 파일 수정 확인: {0}"
-                };
-
-                string summaryText = preview.IsNewFile
-                    ? string.Format(_getString("AgentCreateSummaryFormat", "파일을 생성하시겠습니까? 경로: {0}"), preview.RelativePath)
-                    : string.Format(_getString("AgentEditSummaryFormat", "파일을 수정하시겠습니까? 경로: {0}"), preview.RelativePath);
-
-                string headerText = string.Format(
-                    _getString(titleKey, defaultTitle),
-                    Path.GetFileName(preview.RelativePath));
-
-                _agentPane.ShowDiffConfirm(headerText, summaryText);
-
-                _diffApprovalTcs = new TaskCompletionSource<bool>();
-
-                bool approved = await _diffApprovalTcs.Task;
-
-                _agentPane.HideDiffConfirm();
-
-                AppendActivity(approved
-                    ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
-                    : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
-
-                if (approved)
-                {
-                    TrackSessionEdit(preview);
-                }
-
-                return approved;
-            });
-        }
-
-        private void TrackSessionEdit(AgentFileEditPreview preview)
-        {
-            // Keep every accepted edit as a chronological undo stack.
-            // Do not merge by file here: if A -> B -> C is collapsed into a single
-            // entry and the original IsNewFile flag is kept, restore can jump to the
-            // wrong state, especially for files created and then edited in the same
-            // agent session.
-            _sessionEdits.Add(CloneSessionEdit(preview));
-            UpdateModifiedFilesList();
-        }
-
-        private async Task RevertFileChangeAsync(AgentFileEditPreview preview)
-        {
-            try
-            {
-                int editIndex = FindLatestSessionEditIndex(preview.FullPath);
-                if (editIndex < 0)
-                {
-                    return;
-                }
-
-                AgentFileEditPreview editToRevert = _sessionEdits[editIndex];
-                bool isFileBackedPath = IsFileBackedSessionPath(editToRevert.FullPath);
-
-                // Important: make the durable source match the restored state before
-                // notifying the editor/file refresh pipeline. Otherwise the editor can
-                // briefly show OldContent and then be refreshed from the still-modified
-                // file on disk, which makes the revert appear to undo itself.
-                if (editToRevert.IsNewFile)
-                {
-                    if (isFileBackedPath && File.Exists(editToRevert.FullPath))
-                    {
-                        File.Delete(editToRevert.FullPath);
-                    }
-                }
-                else if (isFileBackedPath)
-                {
-                    await File.WriteAllTextAsync(editToRevert.FullPath, editToRevert.OldContent);
-                }
-
-                if (_fileModifiedAsync != null && isFileBackedPath)
-                {
-                    await _fileModifiedAsync(editToRevert.FullPath);
-                }
-
-                if (_revertTabOrFileAsync != null)
-                {
-                    await RunOnUIThreadAsync<bool>(async () =>
-                    {
-                        await _revertTabOrFileAsync(editToRevert.FullPath, editToRevert.OldContent, editToRevert.IsNewFile);
-                        return true;
-                    });
-                }
-                else if (editToRevert.IsNewFile && !isFileBackedPath && _closeTabById != null)
-                {
-                    await RunOnUIThreadAsync(() => _closeTabById(editToRevert.FullPath));
-                }
-
-                _sessionEdits.RemoveAt(editIndex);
-                UpdateModifiedFilesList();
-
-                AppendActivity(string.Format(_getString("AgentActivityFileReverted", "파일 변경 취소 완료: {0}"), editToRevert.RelativePath));
-            }
-            catch (Exception ex)
-            {
-                _showError(
-                    _getString("AgentRevertErrorTitle", "변경 취소 오류"),
-                    string.Format(_getString("AgentRevertErrorFormat", "파일을 되돌리는 중 오류가 발생했습니다: {0}"), ex.Message));
-            }
-        }
-
-        private AgentFileEditPreview CloneSessionEdit(AgentFileEditPreview preview)
-        {
-            return new AgentFileEditPreview
-            {
-                ActionName = preview.ActionName,
-                RelativePath = preview.RelativePath,
-                FullPath = preview.FullPath,
-                OldContent = preview.OldContent,
-                NewContent = preview.NewContent,
-                IsNewFile = preview.IsNewFile
-            };
-        }
-
-        private int FindLatestSessionEditIndex(string fullPath)
-        {
-            string targetKey = GetSessionEditKey(fullPath, string.Empty);
-            for (int i = _sessionEdits.Count - 1; i >= 0; i--)
-            {
-                AgentFileEditPreview edit = _sessionEdits[i];
-                if (string.Equals(GetSessionEditKey(edit.FullPath, edit.RelativePath), targetKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        private List<AgentFileEditPreview> GetLatestSessionEditsForDisplay()
-        {
-            var latestByPath = new Dictionary<string, AgentFileEditPreview>(StringComparer.OrdinalIgnoreCase);
-            foreach (AgentFileEditPreview edit in _sessionEdits)
-            {
-                latestByPath[GetSessionEditKey(edit.FullPath, edit.RelativePath)] = edit;
-            }
-
-            return latestByPath.Values.ToList();
-        }
-
-        private static string GetSessionEditKey(string fullPath, string relativePath)
-        {
-            return !string.IsNullOrWhiteSpace(fullPath)
-                ? fullPath
-                : relativePath ?? string.Empty;
-        }
-
-        private static bool IsFileBackedSessionPath(string? fullPath)
-        {
-            if (string.IsNullOrWhiteSpace(fullPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                if (File.Exists(fullPath))
-                {
-                    return true;
-                }
-
-                return Path.IsPathRooted(fullPath);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-
-        private void UpdateModifiedFilesList()
-        {
-            _agentPane.UpdateModifiedFiles(GetLatestSessionEditsForDisplay());
-        }
-
-        private async Task<bool> ConfirmPowerShellAsync(string command)
-        {
-            AppendActivity(_getString("AgentActivityPowerShellConfirmationPending", "PowerShell 실행 승인 대기 중"));
-
-            return await RunOnUIThreadAsync(async () =>
-            {
-                string headerText = _getString("AgentPowerShellConfirmHeader", "PowerShell 실행 확인");
-                string displayCommand = TruncateForConfirmation(command);
-                string summaryText = string.Format(_getString("AgentPowerShellConfirmSummaryFormat", "아래 명령을 실행하시겠습니까?\n\n{0}"), displayCommand);
-
-                _agentPane.ShowDiffConfirm(headerText, summaryText);
-
-                _diffApprovalTcs = new TaskCompletionSource<bool>();
-
-                bool approved = await _diffApprovalTcs.Task;
-
-                _agentPane.HideDiffConfirm();
-
-                AppendActivity(approved
-                    ? _getString("AgentActivityPowerShellApproved", "PowerShell 실행 승인됨")
-                    : _getString("AgentActivityPowerShellCancelled", "PowerShell 실행 취소됨"));
-
-                return approved;
-            });
-        }
-
-        private string BuildDiffSummary(AgentFileEditPreview preview)
-        {
-            if (preview.IsNewFile)
-            {
-                return string.Format(_getString("AgentCreateSummaryFormat", "파일을 생성하시겠습니까? 경로: {0}"), preview.RelativePath);
-            }
-            return string.Format(_getString("AgentEditSummaryFormat", "파일을 수정하시겠습니까? 경로: {0}"), preview.RelativePath);
-        }
-
-        private async Task InsertOutputAsync()
-        {
-            string fullOutput = _agentPane.Output.Text;
-            string selectedOutput = _agentPane.Output.SelectedText;
-            string output = IsSelectionFromOutput(selectedOutput, fullOutput)
-                ? selectedOutput
-                : fullOutput;
-
-            if (string.IsNullOrWhiteSpace(output) ||
-                _displayText.IsOutputPlaceholder(output))
-            {
-                _showError(
-                    _getString("AgentInsertTitle", "Agent 응답 입력"),
-                    _getString("AgentNoOutputToInsert", "입력할 Agent 응답이 없습니다."));
-                return;
-            }
-            await RunOnUIThreadAsync(() => { });
-            await _insertIntoActiveEditorAsync(output);
-        }
-
-        private async Task InsertNewTabOutputAsync()
-        {
-            string fullOutput = _agentPane.Output.Text;
-            string selectedOutput = _agentPane.Output.SelectedText;
-            string output = IsSelectionFromOutput(selectedOutput, fullOutput)
-                ? selectedOutput
-                : fullOutput;
-
-            if (string.IsNullOrWhiteSpace(output) ||
-                _displayText.IsOutputPlaceholder(output))
-            {
-                _showError(
-                    _getString("AgentInsertTitle", "Agent 응답 입력"),
-                    _getString("AgentNoOutputToInsert", "입력할 Agent 응답이 없습니다."));
-                return;
-            }
-
-            await RunOnUIThreadAsync(() => { });
-            _openNewTabWithContent(null, output);
-        }
-        private static bool IsSelectionFromOutput(string selectedText, string fullOutput)
-        {
-            if (string.IsNullOrEmpty(selectedText) || string.IsNullOrEmpty(fullOutput))
-            {
-                return false;
-            }
-
-            if (fullOutput.Contains(selectedText, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            string normalizedSelected = NormalizeLineEndings(selectedText);
-            string normalizedOutput = NormalizeLineEndings(fullOutput);
-            return normalizedSelected.Length > 0 &&
-                normalizedOutput.Contains(normalizedSelected, StringComparison.Ordinal);
-        }
-
-        private static string NormalizeLineEndings(string value)
-        {
-            return (value ?? string.Empty)
-                .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Replace('\r', '\n');
+            return _fileToolController.GetReplaceRangeEndLineArgument(arguments, path);
         }
 
         public void UpdateContextStats()
@@ -2851,595 +1131,25 @@ namespace TxtAIEditor.Controls
 
         private void UpdateContextStatsImmediate(bool force = false)
         {
-            if (_isRunning && !force)
-            {
-                return;
-            }
-
-            var activeTab = GetActiveTabForContext();
-            string tabPart;
-            if (activeTab == null)
-            {
-                tabPart = _getString("AgentNoActiveTab", "활성 탭 없음");
-            }
-            else
-            {
-                tabPart = Path.GetFileName(string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath);
-                if (_agentPane.IncludeActiveFile && IsPdfTab(activeTab))
-                {
-                    tabPart = string.Format(_getString("AgentPdfActiveTabExcluded", "{0} (PDF 제외)"), tabPart);
-                }
-            }
-
-            string activeSelectionText = GetActiveSelectionText();
-            string selectionPart = string.IsNullOrEmpty(activeSelectionText)
-                ? _getString("AgentNoSelection", "선택 없음")
-                : string.Format(_getString("AgentSelectionStats", "선택 {0:N0}자"), activeSelectionText.Length);
-
-            if (_attachmentController.Count > 0)
-            {
-                selectionPart = $"{selectionPart} · {_displayText.FormatAttachmentCount(_attachmentController.Count)}";
-            }
-
-            _agentPane.ContextStats.Text = string.Format(
-                _getString("AgentContextStatsFormat", "맥락: {0} · {1}"),
-                tabPart,
-                selectionPart);
-
-            double estimatedTokens = EstimateContextTokens();
-            int maxTokens = GetModelContextLimit();
-
-            if (maxTokens > 0)
-            {
-                string currentStr = FormatTokens(estimatedTokens);
-                string maxStr = FormatTokens(maxTokens);
-                _agentPane.TokenCount.Text = string.Format(
-                    _getString("AgentTokenCountWithLimitFormat", "{0} / {1} tokens"),
-                    currentStr,
-                    maxStr);
-            }
-            else
-            {
-                double kTokens = estimatedTokens / 1000.0;
-                _agentPane.TokenCount.Text = string.Format(
-                    _getString("AgentTokenCountFormat", "{0:F1}k tokens"),
-                    kTokens);
-            }
-
-            UpdateModelDisplay();
+            _contextStatsController.Update(force);
         }
 
         public void UpdateModelDisplay(bool forceClearCache = false)
         {
-            var settings = _settingsService.CurrentSettings;
-            if (settings != null)
-            {
-                if (forceClearCache)
-                {
-                    // Reset LM Studio context length cache so that it will be forced to refetch when settings/models change
-                    _lmStudioContextLimitCache = null;
-                    _lmStudioLastFetchedModel = null;
-                    _lmStudioLastFetchedEndpoint = null;
-                    _lmStudioLastFetchedTime = DateTime.MinValue;
-                }
-
-                string provider = settings.LlmProvider ?? string.Empty;
-                string model = settings.LlmModel ?? string.Empty;
-                string format = _getString("AgentModelFormat", "모델: {0} ({1})");
-                _agentPane.UpdateModelName(string.Format(format, model, provider));
-                RefreshOutputDisplay();
-            }
+            _contextStatsController.UpdateModelDisplay(forceClearCache);
         }
 
         private void AppendSessionHistory(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
             _sessionHistory.Append(text);
-            _sessionHistoryTokenCount += EstimateTokenCount(text);
+            _sessionHistoryTokenCount += AgentTokenEstimator.Estimate(text);
         }
 
         private void AppendSessionHistoryLine(string line = "")
         {
             _sessionHistory.AppendLine(line);
-            _sessionHistoryTokenCount += EstimateTokenCount(line + Environment.NewLine);
-        }
-
-        private double EstimateContextTokens()
-        {
-            string langCode = _displayText.LanguageCode;
-            string systemPrompt = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildSystemPrompt(langCode);
-
-            string instruction = BuildAgentInstruction(_agentPane.Prompt.Text?.Trim() ?? string.Empty);
-            string workspaceContext = BuildWorkspaceContext(instruction);
-            string selectedText = BuildActiveSelectionContext();
-
-            // Calculate base user content tokens (excluding the initial transcript)
-            string baseUserContent = TxtAIEditor.Core.Services.LLM.AgentPromptBuilder.BuildUserContent(
-                instruction,
-                string.Empty,
-                selectedText,
-                string.Empty);
-            double tokens = EstimateTokenCount(systemPrompt) + EstimateTokenCount(baseUserContent);
-
-            // Add the active tab context header tokens that BuildUserContent inserts
-            tokens += EstimateTokenCount(Environment.NewLine + "[Active tab context]" + Environment.NewLine);
-
-            if (_sessionHistory.Length > 0)
-            {
-                tokens += EstimateTokenCount("[Session History]" + Environment.NewLine);
-                tokens += _sessionHistoryTokenCount + EstimateTokenCount(Environment.NewLine);
-                tokens += EstimateTokenCount("=================================" + Environment.NewLine + Environment.NewLine);
-                tokens += EstimateTokenCount(workspaceContext + Environment.NewLine + Environment.NewLine);
-            }
-            else
-            {
-                tokens += EstimateTokenCount(workspaceContext + Environment.NewLine + Environment.NewLine);
-            }
-
-            return tokens + _currentRunTranscriptTokens + _attachmentController.EstimatedImageTokens;
-        }
-
-        private static double EstimateTokenCount(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return 0;
-            double tokens = 0;
-            for (int i = 0; i < text.Length; i++)
-            {
-                char c = text[i];
-                if (c <= 127)
-                {
-                    tokens += 0.25;
-                }
-                else
-                {
-                    tokens += 0.7;
-                }
-            }
-            return tokens;
-        }
-
-        private int GetModelContextLimit()
-        {
-            var settings = _settingsService.CurrentSettings;
-            if (settings == null)
-            {
-                return 0;
-            }
-
-            string model = (settings.LlmModel ?? string.Empty).ToLowerInvariant();
-            string provider = (settings.LlmProvider ?? string.Empty).ToLowerInvariant();
-
-            if (provider.Contains("lm studio") || provider.Contains("lmstudio"))
-            {
-                bool needFetch = !_lmStudioContextLimitCache.HasValue ||
-                                 settings.LlmModel != _lmStudioLastFetchedModel ||
-                                 settings.LlmEndpoint != _lmStudioLastFetchedEndpoint ||
-                                 (DateTime.Now - _lmStudioLastFetchedTime) > TimeSpan.FromSeconds(10);
-
-                if (needFetch && !_lmStudioFetchInProgress)
-                {
-                    _ = Task.Run(() => FetchLmStudioContextLimitAsync(settings.LlmEndpoint ?? string.Empty, settings.LlmModel ?? string.Empty));
-                }
-
-                if (_lmStudioContextLimitCache.HasValue)
-                {
-                    return _lmStudioContextLimitCache.Value;
-                }
-            }
-
-            if (model.Contains("gemini"))
-            {
-                if (model.Contains("pro"))
-                {
-                    return 2000000;
-                }
-                if (model.Contains("flash"))
-                {
-                    return 1000000;
-                }
-                return 1000000;
-            }
-
-            if (model.Contains("claude"))
-            {
-                return 200000;
-            }
-
-            if (model.Contains("kimi"))
-            {
-                return 200000;
-            }
-
-            if (model.Contains("o1") || model.Contains("o3"))
-            {
-                return 200000;
-            }
-
-            if (model.Contains("gpt-5"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("gpt-4"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("gpt-3.5"))
-            {
-                return 16385;
-            }
-
-            if (model.Contains("gemma"))
-            {
-                return 8192;
-            }
-
-            if (model.Contains("llama-3") || model.Contains("llama3"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("deepseek"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("qwen"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("glm"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("minimax"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("mimo"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("grok"))
-            {
-                return 128000;
-            }
-
-            if (provider.Contains("gemini"))
-            {
-                return 1000000;
-            }
-            if (provider.Contains("openai") || provider.Contains("openrouter") || provider.Contains("zen") || provider.Contains("go"))
-            {
-                return 128000;
-            }
-
-            return 0;
-        }
-
-        private static bool TryGetJsonInt(JsonElement parent, string propName, out int value)
-        {
-            value = 0;
-            if (parent.TryGetProperty(propName, out var prop))
-            {
-                if (prop.ValueKind == JsonValueKind.Number)
-                {
-                    return prop.TryGetInt32(out value);
-                }
-                if (prop.ValueKind == JsonValueKind.String)
-                {
-                    return int.TryParse(prop.GetString(), out value);
-                }
-            }
-            return false;
-        }
-
-        private async Task FetchLmStudioContextLimitAsync(string endpoint, string modelName)
-        {
-            if (_lmStudioFetchInProgress) return;
-            _lmStudioFetchInProgress = true;
-
-            try
-            {
-                string baseUrl = "http://localhost:1234";
-                if (!string.IsNullOrWhiteSpace(endpoint))
-                {
-                    try
-                    {
-                        var uri = new Uri(endpoint);
-                        baseUrl = $"{uri.Scheme}://{uri.Authority}";
-                    }
-                    catch { }
-                }
-
-                string requestUrl = baseUrl.TrimEnd('/') + "/api/v1/models";
-
-                using (var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(15) })
-                using (var response = await client.GetAsync(requestUrl))
-                {
-                    if (response.IsSuccessStatusCode)
-                    {
-                        string body = await response.Content.ReadAsStringAsync();
-                        using (var doc = JsonDocument.Parse(body))
-                        {
-                            JsonElement arrayEl = default;
-                            bool hasArray = false;
-
-                            if (doc.RootElement.TryGetProperty("models", out var modelsProp) && modelsProp.ValueKind == JsonValueKind.Array)
-                            {
-                                arrayEl = modelsProp;
-                                hasArray = true;
-                            }
-                            else if (doc.RootElement.TryGetProperty("data", out var dataProp) && dataProp.ValueKind == JsonValueKind.Array)
-                            {
-                                arrayEl = dataProp;
-                                hasArray = true;
-                            }
-                            else if (doc.RootElement.ValueKind == JsonValueKind.Array)
-                            {
-                                arrayEl = doc.RootElement;
-                                hasArray = true;
-                            }
-
-                            if (hasArray)
-                            {
-                                JsonElement? matchedItem = null;
-
-                                // Pass 1: exact match with loaded instances
-                                foreach (var item in arrayEl.EnumerateArray())
-                                {
-                                    string? id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
-                                    string? key = item.TryGetProperty("key", out var keyProp) ? keyProp.GetString() : null;
-
-                                    bool isLoaded = item.TryGetProperty("loaded_instances", out var loadedInstances) && 
-                                                    loadedInstances.ValueKind == JsonValueKind.Array && 
-                                                    loadedInstances.GetArrayLength() > 0;
-
-                                    if (isLoaded)
-                                    {
-                                        if ((id != null && id.Equals(modelName, StringComparison.OrdinalIgnoreCase)) ||
-                                            (key != null && key.Equals(modelName, StringComparison.OrdinalIgnoreCase)))
-                                        {
-                                            matchedItem = item;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                // Pass 2: partial match with loaded instances
-                                if (matchedItem == null)
-                                {
-                                    foreach (var item in arrayEl.EnumerateArray())
-                                    {
-                                        string? id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
-                                        string? key = item.TryGetProperty("key", out var keyProp) ? keyProp.GetString() : null;
-
-                                        bool isLoaded = item.TryGetProperty("loaded_instances", out var loadedInstances) && 
-                                                        loadedInstances.ValueKind == JsonValueKind.Array && 
-                                                        loadedInstances.GetArrayLength() > 0;
-
-                                        if (isLoaded)
-                                        {
-                                            if ((id != null && (modelName.Contains(id, StringComparison.OrdinalIgnoreCase) || id.Contains(modelName, StringComparison.OrdinalIgnoreCase))) ||
-                                                (key != null && (modelName.Contains(key, StringComparison.OrdinalIgnoreCase) || key.Contains(modelName, StringComparison.OrdinalIgnoreCase))))
-                                            {
-                                                matchedItem = item;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Pass 3: exact match (loaded or not)
-                                if (matchedItem == null)
-                                {
-                                    foreach (var item in arrayEl.EnumerateArray())
-                                    {
-                                        string? id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
-                                        string? key = item.TryGetProperty("key", out var keyProp) ? keyProp.GetString() : null;
-
-                                        if ((id != null && id.Equals(modelName, StringComparison.OrdinalIgnoreCase)) ||
-                                            (key != null && key.Equals(modelName, StringComparison.OrdinalIgnoreCase)))
-                                        {
-                                            matchedItem = item;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                // Pass 4: partial match (loaded or not)
-                                if (matchedItem == null)
-                                {
-                                    foreach (var item in arrayEl.EnumerateArray())
-                                    {
-                                        string? id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
-                                        string? key = item.TryGetProperty("key", out var keyProp) ? keyProp.GetString() : null;
-
-                                        if ((id != null && (modelName.Contains(id, StringComparison.OrdinalIgnoreCase) || id.Contains(modelName, StringComparison.OrdinalIgnoreCase))) ||
-                                            (key != null && (modelName.Contains(key, StringComparison.OrdinalIgnoreCase) || key.Contains(modelName, StringComparison.OrdinalIgnoreCase))))
-                                        {
-                                            matchedItem = item;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                // Pass 5: find any model with active loaded instances
-                                if (matchedItem == null)
-                                {
-                                    foreach (var item in arrayEl.EnumerateArray())
-                                    {
-                                        if (item.TryGetProperty("loaded_instances", out var loadedInstances) && 
-                                            loadedInstances.ValueKind == JsonValueKind.Array && 
-                                            loadedInstances.GetArrayLength() > 0)
-                                        {
-                                            matchedItem = item;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                // Pass 6: first element as final fallback
-                                if (matchedItem == null && arrayEl.GetArrayLength() > 0)
-                                {
-                                    matchedItem = arrayEl[0];
-                                }
-
-                                if (matchedItem.HasValue)
-                                {
-                                    var item = matchedItem.Value;
-
-                                    if (item.TryGetProperty("loaded_instances", out var loadedInstances) && 
-                                        loadedInstances.ValueKind == JsonValueKind.Array && 
-                                        loadedInstances.GetArrayLength() > 0)
-                                    {
-                                        var firstInstance = loadedInstances[0];
-                                        if (firstInstance.TryGetProperty("config", out var config) && 
-                                            TryGetJsonInt(config, "context_length", out int loadedCtxLen))
-                                        {
-                                            _lmStudioContextLimitCache = loadedCtxLen;
-                                            _lmStudioLastFetchedModel = modelName;
-                                            _lmStudioLastFetchedEndpoint = endpoint;
-                                            _lmStudioLastFetchedTime = DateTime.Now;
-
-                                            await RunOnUIThreadAsync(() => UpdateContextStatsImmediate(true));
-                                            return;
-                                        }
-                                    }
-
-                                    if (TryGetJsonInt(item, "max_context_length", out int maxCtxLen))
-                                    {
-                                        _lmStudioContextLimitCache = maxCtxLen;
-                                        _lmStudioLastFetchedModel = modelName;
-                                        _lmStudioLastFetchedEndpoint = endpoint;
-                                        _lmStudioLastFetchedTime = DateTime.Now;
-
-                                        await RunOnUIThreadAsync(() => UpdateContextStatsImmediate(true));
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to fetch LM Studio context length: {ex.Message}");
-            }
-            finally
-            {
-                _lmStudioFetchInProgress = false;
-            }
-        }
-
-        private static string FormatTokens(double value)
-        {
-            if (value >= 1000000.0)
-            {
-                return (value / 1000000.0).ToString("0.#") + "M";
-            }
-            if (value >= 1000.0)
-            {
-                return (value / 1000.0).ToString("0.#") + "k";
-            }
-            return value.ToString("F0");
-        }
-
-        private string BuildSessionDiffLog()
-        {
-            if (_sessionEdits.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            var builder = new StringBuilder();
-            foreach (var edit in _sessionEdits)
-            {
-                builder.AppendLine($"--- File: {edit.RelativePath} (Action: {edit.ActionName}) ---");
-                if (edit.IsNewFile)
-                {
-                    builder.AppendLine("[New File Content]");
-                    builder.AppendLine(edit.NewContent);
-                }
-                else
-                {
-                    string diff = GenerateDiff(edit.OldContent, edit.NewContent);
-                    builder.AppendLine(diff);
-                }
-                builder.AppendLine();
-            }
-
-            return builder.ToString().TrimEnd();
-        }
-
-        private static string GenerateDiff(string oldText, string newText)
-        {
-            if (string.IsNullOrEmpty(oldText))
-            {
-                return "+ " + newText.Replace("\r", "").Replace("\n", "\n+ ");
-            }
-            if (string.IsNullOrEmpty(newText))
-            {
-                return "- " + oldText.Replace("\r", "").Replace("\n", "\n- ");
-            }
-
-            var oldLines = oldText.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
-            var newLines = newText.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
-            int n = oldLines.Length;
-            int m = newLines.Length;
-
-            if ((long)n * m > 500_000)
-            {
-                return "[Diff too large to display line-by-line]";
-            }
-
-            int[,] lcs = new int[n + 1, m + 1];
-
-            for (int i = 1; i <= n; i++)
-            {
-                for (int j = 1; j <= m; j++)
-                {
-                    if (oldLines[i - 1] == newLines[j - 1])
-                    {
-                        lcs[i, j] = lcs[i - 1, j - 1] + 1;
-                    }
-                    else
-                    {
-                        lcs[i, j] = Math.Max(lcs[i - 1, j], lcs[i, j - 1]);
-                    }
-                }
-            }
-
-            var diffResult = new List<string>();
-            int x = n, y = m;
-            while (x > 0 || y > 0)
-            {
-                if (x > 0 && y > 0 && oldLines[x - 1] == newLines[y - 1])
-                {
-                    diffResult.Add("  " + oldLines[x - 1]);
-                    x--;
-                    y--;
-                }
-                else if (y > 0 && (x == 0 || lcs[x, y - 1] >= lcs[x - 1, y]))
-                {
-                    diffResult.Add("+ " + newLines[y - 1]);
-                    y--;
-                }
-                else if (x > 0 && (y == 0 || lcs[x, y - 1] < lcs[x - 1, y]))
-                {
-                    diffResult.Add("- " + oldLines[x - 1]);
-                    x--;
-                }
-            }
-
-            diffResult.Reverse();
-            return string.Join("\n", diffResult);
+            _sessionHistoryTokenCount += AgentTokenEstimator.Estimate(line + Environment.NewLine);
         }
 
         private async Task SaveCurrentSessionToHistoryAsync(string userInstruction)
@@ -3456,7 +1166,7 @@ namespace TxtAIEditor.Controls
                 Title = GetSessionTitle(userInstruction),
                 SessionHistoryText = _sessionHistory.ToString(),
                 SessionHistoryTokenCount = _sessionHistoryTokenCount,
-                SessionEdits = _sessionEdits.ToList(),
+                SessionEdits = _sessionEditController.SessionEdits.ToList(),
                 WorkspaceRoot = _fileTools.WorkspaceRoot
             };
 
@@ -3475,11 +1185,7 @@ namespace TxtAIEditor.Controls
             _sessionHistory.Append(item.SessionHistoryText);
             _sessionHistoryTokenCount = item.SessionHistoryTokenCount;
 
-            _sessionEdits.Clear();
-            if (item.SessionEdits != null)
-            {
-                _sessionEdits.AddRange(item.SessionEdits);
-            }
+            _sessionEditController.Replace(item.SessionEdits);
 
             // Restore workspace folder if it was saved and still exists
             string savedWorkspaceRoot = item.WorkspaceRoot ?? string.Empty;
@@ -3495,7 +1201,6 @@ namespace TxtAIEditor.Controls
                 string formatted = AgentHistoryFormatter.Format(item.SessionHistoryText, _settingsService.CurrentSettings.LlmAgentVerbose);
                 _agentPane.ResetOutput(formatted);
                 _agentPane.ClearActivity(_getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨"));
-                UpdateModifiedFilesList();
                 _attachmentController.Clear();
                 UpdateContextStatsImmediate();
                 _historyController.UpdateUI(_currentSessionId);

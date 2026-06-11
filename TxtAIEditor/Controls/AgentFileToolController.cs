@@ -1,0 +1,497 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using System.Threading.Tasks;
+using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
+using static TxtAIEditor.Controls.AgentToolHelpers;
+
+namespace TxtAIEditor.Controls
+{
+    internal sealed class AgentFileToolController
+    {
+        private readonly AgentFileToolService _fileTools;
+        private readonly AgentSelectionContextController _selectionContextController;
+        private readonly Func<OpenedTab?> _activeTabProvider;
+        private readonly Func<bool> _isRunningProvider;
+        private readonly Func<string, string, string> _getString;
+        private readonly Func<string, Task>? _openFileInEditorAsync;
+
+        private string? _currentRunLastFilePath;
+        private bool _currentRunRestrictEditsToSelection;
+
+        public AgentFileToolController(
+            AgentFileToolService fileTools,
+            AgentSelectionContextController selectionContextController,
+            Func<OpenedTab?> activeTabProvider,
+            Func<bool> isRunningProvider,
+            Func<string, string, string> getString,
+            Func<string, Task>? openFileInEditorAsync)
+        {
+            _fileTools = fileTools;
+            _selectionContextController = selectionContextController;
+            _activeTabProvider = activeTabProvider;
+            _isRunningProvider = isRunningProvider;
+            _getString = getString;
+            _openFileInEditorAsync = openFileInEditorAsync;
+        }
+
+        public void StartRun()
+        {
+            _currentRunLastFilePath = null;
+            _currentRunRestrictEditsToSelection = false;
+        }
+
+        public void SetRestrictEditsToSelection(bool restrictEditsToSelection)
+        {
+            _currentRunRestrictEditsToSelection = restrictEditsToSelection;
+        }
+
+        public void FinishRun()
+        {
+            _currentRunRestrictEditsToSelection = false;
+        }
+
+        public string? ValidateSelectionEditScope(string normalizedToolName, JsonElement arguments)
+        {
+            if (!_currentRunRestrictEditsToSelection ||
+                !IsFileEditingTool(normalizedToolName))
+            {
+                return null;
+            }
+
+            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            if (!selection.HasLineRange)
+            {
+                return null;
+            }
+
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            if (!PathsReferToSameFile(path, selection.SourcePath!))
+            {
+                return string.Format(
+                    _getString(
+                        "AgentSelectionEditDifferentFileBlockedFormat",
+                        "{0} failed: selected_range_context limits edits to {1}, but the requested edit targets {2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
+                    normalizedToolName,
+                    FormatSelectionScope(selection),
+                    path);
+            }
+
+            if (normalizedToolName != "replace_range")
+            {
+                return string.Format(
+                    _getString(
+                        "AgentSelectionEditToolBlockedFormat",
+                        "{0} failed: selected_range_context limits file edits to {1}. Use replace_range within the selected line range for selected-range edits. If the selected-range task is already complete, write the final answer."),
+                    normalizedToolName,
+                    FormatSelectionScope(selection));
+            }
+
+            int startLine = GetReplaceRangeStartLineArgument(arguments, path);
+            int endLine = GetReplaceRangeEndLineArgument(arguments, path);
+            if (startLine < selection.StartLine || endLine > selection.EndLine)
+            {
+                return string.Format(
+                    _getString(
+                        "AgentSelectionEditRangeBlockedFormat",
+                        "replace_range failed: selected_range_context limits edits to {0}, but the requested edit targets lines {1}-{2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
+                    FormatSelectionScope(selection),
+                    startLine,
+                    endLine);
+            }
+
+            return null;
+        }
+
+        public void TrackSuccessfulFileToolPath(string normalizedToolName, JsonElement arguments, string result)
+        {
+            if (result.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+                result.Contains("cancelled", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (normalizedToolName is not ("read_file" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
+            {
+                return;
+            }
+
+            string path;
+            if (normalizedToolName == "merge_files")
+            {
+                path = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
+            }
+            else
+            {
+                path = normalizedToolName == "read_file"
+                    ? GetPathArgument(arguments)
+                    : GetEditPathArgument(arguments);
+            }
+
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                _currentRunLastFilePath = path;
+            }
+        }
+
+        public string GetPathArgument(JsonElement arguments)
+        {
+            string path = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path");
+            return string.IsNullOrWhiteSpace(path) ? string.Empty : path;
+        }
+
+        public string GetEditPathArgument(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            return string.IsNullOrWhiteSpace(path) ? InferEditPathFromContext() : path;
+        }
+
+        public int GetReplaceRangeStartLineArgument(JsonElement arguments, string path)
+        {
+            if (TryGetIntArgument(arguments, "startLine", out int explicitStartLine) && explicitStartLine > 0)
+            {
+                return explicitStartLine;
+            }
+
+            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            return ShouldUseActiveSelectionRangeForPath(path)
+                ? selection.StartLine
+                : 1;
+        }
+
+        public int GetReplaceRangeEndLineArgument(JsonElement arguments, string path)
+        {
+            if (TryGetIntArgument(arguments, "endLine", out int explicitEndLine) && explicitEndLine > 0)
+            {
+                return explicitEndLine;
+            }
+
+            if (TryGetIntArgument(arguments, "startLine", out int explicitStartLine) && explicitStartLine > 0)
+            {
+                return explicitStartLine;
+            }
+
+            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            return ShouldUseActiveSelectionRangeForPath(path)
+                ? selection.EndLine
+                : 1;
+        }
+
+        public async Task<string> ReplaceInFileAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "replace_in_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            string oldText = GetFirstStringArgument(arguments, "oldText", "old_text", "find", "search", "target", "before");
+            string newText = GetFirstStringArgument(arguments, "newText", "new_text", "replace", "replacement", "after");
+            string content = GetFirstStringArgument(arguments, "content", "text");
+
+            return string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(content)
+                ? await _fileTools.OverwriteFileAsync(path, content)
+                : await _fileTools.ReplaceInFileAsync(path, oldText, newText);
+        }
+
+        public async Task<string> CreateFileAsync(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "create_file failed: path is empty. Provide the exact output file path requested by the user.";
+            }
+
+            return await _fileTools.CreateFileAsync(path, GetStringArgument(arguments, "content"));
+        }
+
+        public async Task<string> OpenFileAsync(JsonElement arguments)
+        {
+            string path = GetPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "open_file failed: path is empty. Provide the file path you want to open.";
+            }
+
+            string fullPath = path;
+            if (!Path.IsPathRooted(path))
+            {
+                string root = _fileTools.WorkspaceRoot;
+                if (!string.IsNullOrEmpty(root))
+                {
+                    fullPath = Path.GetFullPath(Path.Combine(root, path));
+                }
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                return $"open_file failed: file not found: {path}";
+            }
+
+            if (_openFileInEditorAsync != null)
+            {
+                await _openFileInEditorAsync(fullPath);
+                return $"opened: {path}";
+            }
+
+            return "open_file failed: opening files in editor is not available.";
+        }
+
+        public async Task<string> OverwriteFileAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "overwrite_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            return await _fileTools.OverwriteFileAsync(
+                path,
+                GetFirstStringArgument(arguments, "content", "newText", "new_text", "text"));
+        }
+
+        public async Task<string> AppendToFileAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "append_to_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            return await _fileTools.AppendToFileAsync(
+                path,
+                GetFirstStringArgument(arguments, "content", "newText", "new_text", "text"));
+        }
+
+        public async Task<string> MergeFilesAsync(JsonElement arguments)
+        {
+            string targetPath = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
+            if (string.IsNullOrWhiteSpace(targetPath))
+            {
+                return "merge_files failed: targetPath is empty.";
+            }
+
+            var pathsList = new List<string>();
+            if (arguments.TryGetProperty("paths", out var pathsProp))
+            {
+                if (pathsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in pathsProp.EnumerateArray())
+                    {
+                        string p = item.GetString() ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(p))
+                        {
+                            pathsList.Add(p);
+                        }
+                    }
+                }
+                else if (pathsProp.ValueKind == JsonValueKind.String)
+                {
+                    string singlePath = pathsProp.GetString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(singlePath))
+                    {
+                        pathsList.Add(singlePath);
+                    }
+                }
+            }
+
+            if (pathsList.Count == 0 &&
+                arguments.TryGetProperty("sources", out var sourcesProp) &&
+                sourcesProp.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in sourcesProp.EnumerateArray())
+                {
+                    string p = item.GetString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(p))
+                    {
+                        pathsList.Add(p);
+                    }
+                }
+            }
+
+            if (pathsList.Count == 0 &&
+                arguments.TryGetProperty("files", out var filesProp) &&
+                filesProp.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in filesProp.EnumerateArray())
+                {
+                    string p = item.GetString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(p))
+                    {
+                        pathsList.Add(p);
+                    }
+                }
+            }
+
+            return await _fileTools.MergeFilesAsync(pathsList.ToArray(), targetPath);
+        }
+
+        public async Task<string> SplitFileAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "split_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            int linesPerFile = GetIntArgument(arguments, "linesPerFile", 0);
+            if (linesPerFile == 0)
+            {
+                linesPerFile = GetIntArgument(arguments, "lines_per_file", 0);
+            }
+            if (linesPerFile == 0)
+            {
+                linesPerFile = GetIntArgument(arguments, "lines", 0);
+            }
+
+            var rangesList = new List<AgentFileToolService.SplitRange>();
+            if (arguments.TryGetProperty("ranges", out var rangesProp) && rangesProp.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in rangesProp.EnumerateArray())
+                {
+                    string targetPath = GetFirstStringArgument(item, "path", "targetPath", "target_path", "file");
+                    int startLine = GetIntArgument(item, "startLine", 0);
+                    if (startLine == 0) startLine = GetIntArgument(item, "start_line", 0);
+
+                    int endLine = GetIntArgument(item, "endLine", 0);
+                    if (endLine == 0) endLine = GetIntArgument(item, "end_line", 0);
+
+                    int lineCount = GetIntArgument(item, "lineCount", 0);
+                    if (lineCount == 0) lineCount = GetIntArgument(item, "line_count", 0);
+                    if (lineCount == 0) lineCount = GetIntArgument(item, "count", 0);
+
+                    rangesList.Add(new AgentFileToolService.SplitRange
+                    {
+                        Path = targetPath,
+                        StartLine = startLine,
+                        EndLine = endLine,
+                        LineCount = lineCount
+                    });
+                }
+            }
+
+            return await _fileTools.SplitFileAsync(path, rangesList, linesPerFile);
+        }
+
+        public async Task<string> ReplaceRangeAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "replace_range failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            return await _fileTools.ReplaceRangeAsync(
+                path,
+                GetReplaceRangeStartLineArgument(arguments, path),
+                GetReplaceRangeEndLineArgument(arguments, path),
+                GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
+                GetReplaceRangeExpectedSnippetArgument(arguments, path));
+        }
+
+        public async Task<string> ApplyPatchAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "apply_patch failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            return await _fileTools.ApplyPatchAsync(
+                path,
+                GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content"));
+        }
+
+        private AgentSelectionSnapshot CaptureActiveSelectionSnapshot()
+        {
+            return _selectionContextController.CaptureActiveSelectionSnapshot(_isRunningProvider());
+        }
+
+        private string InferEditPathFromContext()
+        {
+            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            if (!string.IsNullOrWhiteSpace(selection.SourcePath) &&
+                !string.IsNullOrEmpty(selection.Text))
+            {
+                return selection.SourcePath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_currentRunLastFilePath))
+            {
+                return _currentRunLastFilePath;
+            }
+
+            string activePath = _activeTabProvider()?.FilePath ?? string.Empty;
+            return string.IsNullOrWhiteSpace(activePath) ? string.Empty : activePath;
+        }
+
+        private bool ShouldUseActiveSelectionRangeForPath(string path)
+        {
+            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            if (string.IsNullOrWhiteSpace(path) ||
+                string.IsNullOrWhiteSpace(selection.SourcePath) ||
+                string.IsNullOrEmpty(selection.Text) ||
+                selection.StartLine <= 0 ||
+                selection.EndLine <= 0)
+            {
+                return false;
+            }
+
+            return PathsReferToSameFile(path, selection.SourcePath);
+        }
+
+        private string GetReplaceRangeExpectedSnippetArgument(JsonElement arguments, string path)
+        {
+            string explicitExpected = GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected");
+            if (!string.IsNullOrEmpty(explicitExpected))
+            {
+                return explicitExpected;
+            }
+
+            if (TryGetIntArgument(arguments, "startLine", out _) ||
+                TryGetIntArgument(arguments, "endLine", out _))
+            {
+                return string.Empty;
+            }
+
+            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+            return ShouldUseActiveSelectionRangeForPath(path)
+                ? selection.Text
+                : string.Empty;
+        }
+
+        private bool PathsReferToSameFile(string path, string selectionPath)
+        {
+            try
+            {
+                string resolvedPath = Path.IsPathRooted(path)
+                    ? path
+                    : Path.Combine(_fileTools.WorkspaceRoot, path);
+                string resolvedSelectionPath = Path.IsPathRooted(selectionPath)
+                    ? selectionPath
+                    : Path.Combine(_fileTools.WorkspaceRoot, selectionPath);
+
+                return string.Equals(
+                    Path.GetFullPath(resolvedPath),
+                    Path.GetFullPath(resolvedSelectionPath),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(path, selectionPath, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private string FormatSelectionScope(AgentSelectionSnapshot selection)
+        {
+            return _selectionContextController.FormatSelectionScope(selection);
+        }
+    }
+}
