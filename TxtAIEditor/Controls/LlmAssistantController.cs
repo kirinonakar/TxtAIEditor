@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<object> _initializePickerWindow;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
+        private readonly Action? _onFileSaved;
 
         private string _lastSelectionText = string.Empty;
         private string _fileContextText = string.Empty;
@@ -74,7 +75,8 @@ namespace TxtAIEditor.Controls
             Func<string, string, string> getString,
             Action<object> initializePickerWindow,
             Action? beforeDialog = null,
-            Action? afterDialog = null)
+            Action? afterDialog = null,
+            Action? onFileSaved = null)
         {
             _llmService = llmService;
             _settingsService = settingsService;
@@ -90,6 +92,7 @@ namespace TxtAIEditor.Controls
             _initializePickerWindow = initializePickerWindow;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
+            _onFileSaved = onFileSaved;
 
             WireEvents();
 
@@ -682,6 +685,7 @@ namespace TxtAIEditor.Controls
                     Directory.CreateDirectory(dir);
 
                 await File.WriteAllTextAsync(outputPath, combined);
+                _onFileSaved?.Invoke();
 
                 string completeMsg = string.Format(
                     _getString("LlmSummarizeComplete", "{0} 완료. {1} 로 저장하였습니다."),
@@ -859,6 +863,7 @@ namespace TxtAIEditor.Controls
                             {
                                 _rightSidebar.LlmOutput.Text = cancelledWithSaveMsg;
                             });
+                            _onFileSaved?.Invoke();
                             return;
                         }
                         hasError = true;
@@ -876,6 +881,7 @@ namespace TxtAIEditor.Controls
                 // 모든 chunk 완료 — 모든 마커 제거 후 최종 파일 저장
                 string finalContent = await File.ReadAllTextAsync(outputPath);
                 await File.WriteAllTextAsync(outputPath, StripAllProgressMarkers(finalContent));
+                _onFileSaved?.Invoke();
 
                 string completeMsg = string.Format(
                     _getString("LlmTranslateComplete", "{0} 완료. {1} 로 저장하였습니다."),
@@ -897,6 +903,10 @@ namespace TxtAIEditor.Controls
                 {
                     _rightSidebar.LlmOutput.Text = cancelMsg;
                 });
+                if (File.Exists(outputPath))
+                {
+                    _onFileSaved?.Invoke();
+                }
             }
             finally
             {

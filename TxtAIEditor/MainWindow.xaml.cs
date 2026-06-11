@@ -620,7 +620,14 @@ namespace TxtAIEditor
                 GetLocalizedString,
                 InitializePickerWindow,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
-                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
+                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
+                onFileSaved: () =>
+                {
+                    this.DispatcherQueue.TryEnqueue(() =>
+                    {
+                        _explorerNavigationController.RefreshCurrentFolder();
+                    });
+                });
             _agentFileWorkflowController = new AgentFileWorkflowController(
                 _viewModel,
                 EditorTabView,
