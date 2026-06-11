@@ -34,6 +34,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- create_file {\"path\":\"relative/path.txt\",\"content\":\"...\"}: create a workspace file.");
             builder.AppendLine("- replace_in_file {\"path\":\"relative/path.cs\",\"oldText\":\"...\",\"newText\":\"...\"}: exact replacement; prefer replace_range/apply_patch when safer.");
             builder.AppendLine("- replace_range {\"path\":\"relative/path.cs\",\"startLine\":120,\"endLine\":145,\"newText\":\"...\",\"expectedSnippet\":\"optional\"}: replace line range.");
+            builder.AppendLine("  If expectedSnippet is provided, copy it from inside startLine-endLine exactly; include any header/comment line in startLine when the snippet includes it.");
             builder.AppendLine("- apply_patch {\"path\":\"relative/path.cs\",\"patch\":\"unified diff...\"}: patch complex edits.");
             builder.AppendLine("- overwrite_file {\"path\":\"relative/path.cs\",\"content\":\"...\"}: full rewrite only when explicitly requested.");
             builder.AppendLine("- append_to_file {\"path\":\"relative/path.txt\",\"content\":\"...\"}, merge_files {\"paths\":[\"a.txt\",\"b.txt\"],\"targetPath\":\"merged.txt\"}, split_file {\"path\":\"huge.txt\",\"linesPerFile\":100}.");

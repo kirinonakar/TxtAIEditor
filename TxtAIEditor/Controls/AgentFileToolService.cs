@@ -509,7 +509,14 @@ namespace TxtAIEditor.Controls
             return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
         }
 
-        public async Task<string> ReplaceRangeAsync(string path, int startLine, int endLine, string newText, string? expectedSnippet)
+        public async Task<string> ReplaceRangeAsync(
+            string path,
+            int startLine,
+            int endLine,
+            string newText,
+            string? expectedSnippet,
+            int? allowedStartLine = null,
+            int? allowedEndLine = null)
         {
             string fullPath = ResolveInsideWorkspace(path);
             if (!File.Exists(fullPath))
@@ -531,6 +538,7 @@ namespace TxtAIEditor.Controls
                 return $"replace_range failed: endLine {endLine} is out of bounds (startLine-{lines.Length}).";
             }
 
+            string? rangeAdjustmentNote = null;
             var targetLines = new List<string>();
             for (int i = startLine - 1; i <= endLine - 1; i++)
             {
@@ -540,14 +548,31 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrEmpty(expectedSnippet))
             {
-                string normalizedExpected = NormalizeNewlines(expectedSnippet);
+                string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
                 if (!targetText.Contains(normalizedExpected, StringComparison.Ordinal))
                 {
                     string cleanTarget = Regex.Replace(targetText, @"\s+", " ").Trim();
-                    string cleanExpected = Regex.Replace(normalizedExpected, @"\s+", " ").Trim();
+                    string cleanExpected = NormalizeWhitespaceForSnippetComparison(normalizedExpected);
                     if (!cleanTarget.Contains(cleanExpected, StringComparison.Ordinal))
                     {
-                        return $"replace_range failed: expectedSnippet was not found in the target line range ({startLine}-{endLine}).";
+                        int originalStartLine = startLine;
+                        int originalEndLine = endLine;
+                        if (!TryResolveNearbyExpectedSnippetRange(
+                            lines,
+                            startLine,
+                            endLine,
+                            normalizedExpected,
+                            allowedStartLine,
+                            allowedEndLine,
+                            out int adjustedStartLine,
+                            out int adjustedEndLine))
+                        {
+                            return $"replace_range failed: expectedSnippet was not found in the target line range ({startLine}-{endLine}).";
+                        }
+
+                        startLine = adjustedStartLine;
+                        endLine = adjustedEndLine;
+                        rangeAdjustmentNote = $" auto-adjusted lines {originalStartLine}-{originalEndLine} to {startLine}-{endLine} to match expectedSnippet.";
                     }
                 }
             }
@@ -586,7 +611,78 @@ namespace TxtAIEditor.Controls
 
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
             await NotifyFileModifiedAsync(fullPath);
-            return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}";
+            return $"modified: {RelativePath(ResolveWorkspaceRoot(), fullPath)}{rangeAdjustmentNote}";
+        }
+
+        private static bool TryResolveNearbyExpectedSnippetRange(
+            string[] lines,
+            int startLine,
+            int endLine,
+            string normalizedExpected,
+            int? allowedStartLine,
+            int? allowedEndLine,
+            out int adjustedStartLine,
+            out int adjustedEndLine)
+        {
+            adjustedStartLine = startLine;
+            adjustedEndLine = endLine;
+
+            if (string.IsNullOrWhiteSpace(normalizedExpected))
+            {
+                return false;
+            }
+
+            int requestedLineCount = endLine - startLine + 1;
+            int expectedLineCount = CountNormalizedLines(normalizedExpected);
+            if (expectedLineCount < Math.Max(2, requestedLineCount - 2))
+            {
+                return false;
+            }
+
+            int margin = Math.Min(10, Math.Max(3, Math.Abs(expectedLineCount - requestedLineCount) + 2));
+            int windowStartLine = Math.Max(allowedStartLine ?? 1, startLine - margin);
+            int windowEndLine = Math.Min(allowedEndLine ?? lines.Length, endLine + margin);
+            if (windowEndLine - windowStartLine + 1 < expectedLineCount)
+            {
+                return false;
+            }
+
+            return TryFindExpectedSnippetLineRange(lines, windowStartLine, windowEndLine, normalizedExpected, false, out adjustedStartLine, out adjustedEndLine) ||
+                   TryFindExpectedSnippetLineRange(lines, windowStartLine, windowEndLine, normalizedExpected, true, out adjustedStartLine, out adjustedEndLine);
+        }
+
+        private static bool TryFindExpectedSnippetLineRange(
+            string[] lines,
+            int windowStartLine,
+            int windowEndLine,
+            string normalizedExpected,
+            bool allowWhitespaceOnlyDifference,
+            out int matchStartLine,
+            out int matchEndLine)
+        {
+            matchStartLine = 0;
+            matchEndLine = 0;
+
+            int expectedLineCount = CountNormalizedLines(normalizedExpected);
+            string expectedComparable = allowWhitespaceOnlyDifference
+                ? NormalizeWhitespaceForSnippetComparison(normalizedExpected)
+                : normalizedExpected;
+
+            for (int candidateStartLine = windowStartLine; candidateStartLine + expectedLineCount - 1 <= windowEndLine; candidateStartLine++)
+            {
+                string candidateText = string.Join("\n", lines.Skip(candidateStartLine - 1).Take(expectedLineCount));
+                string candidateComparable = allowWhitespaceOnlyDifference
+                    ? NormalizeWhitespaceForSnippetComparison(candidateText)
+                    : candidateText;
+                if (string.Equals(candidateComparable, expectedComparable, StringComparison.Ordinal))
+                {
+                    matchStartLine = candidateStartLine;
+                    matchEndLine = candidateStartLine + expectedLineCount - 1;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private class PatchHunk
@@ -1683,6 +1779,21 @@ namespace TxtAIEditor.Controls
         private static string NormalizeNewlines(string? content)
         {
             return (content ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+        }
+
+        private static string TrimBoundaryNewlines(string content)
+        {
+            return content.Trim('\n');
+        }
+
+        private static int CountNormalizedLines(string content)
+        {
+            return string.IsNullOrEmpty(content) ? 0 : content.Split('\n').Length;
+        }
+
+        private static string NormalizeWhitespaceForSnippetComparison(string content)
+        {
+            return Regex.Replace(content, @"\s+", " ").Trim();
         }
 
         private static string DetectLineEnding(string text)

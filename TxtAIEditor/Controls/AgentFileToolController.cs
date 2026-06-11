@@ -388,12 +388,28 @@ namespace TxtAIEditor.Controls
                 return "replace_range failed: path is empty and no selected, recently read, or active file path could be inferred.";
             }
 
+            int? allowedStartLine = null;
+            int? allowedEndLine = null;
+            if (_currentRunRestrictEditsToSelection)
+            {
+                AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+                if (selection.HasLineRange &&
+                    !string.IsNullOrWhiteSpace(selection.SourcePath) &&
+                    PathsReferToSameFile(path, selection.SourcePath))
+                {
+                    allowedStartLine = selection.StartLine;
+                    allowedEndLine = selection.EndLine;
+                }
+            }
+
             return await _fileTools.ReplaceRangeAsync(
                 path,
                 GetReplaceRangeStartLineArgument(arguments, path),
                 GetReplaceRangeEndLineArgument(arguments, path),
                 GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
-                GetReplaceRangeExpectedSnippetArgument(arguments, path));
+                GetReplaceRangeExpectedSnippetArgument(arguments, path),
+                allowedStartLine,
+                allowedEndLine);
         }
 
         public async Task<string> ApplyPatchAsync(JsonElement arguments)
