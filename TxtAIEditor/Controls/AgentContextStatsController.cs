@@ -155,7 +155,7 @@ namespace TxtAIEditor.Controls
                 string.Empty);
             double tokens = AgentTokenEstimator.Estimate(systemPrompt) + AgentTokenEstimator.Estimate(baseUserContent);
 
-            tokens += AgentTokenEstimator.Estimate(Environment.NewLine + "[Active tab context]" + Environment.NewLine);
+            tokens += AgentTokenEstimator.Estimate(Environment.NewLine + "[Workspace context]" + Environment.NewLine);
 
             if (_hasSessionHistoryProvider())
             {

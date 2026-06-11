@@ -18,6 +18,8 @@ namespace TxtAIEditor.Controls
 {
     public sealed class AgentController
     {
+        private const int MaxSessionHistoryPromptChars = 80_000;
+
         private readonly ILLMService _llmService;
         private readonly ISettingsService _settingsService;
         private readonly AgentPane _agentPane;
@@ -161,7 +163,7 @@ namespace TxtAIEditor.Controls
                 BuildAgentInstruction,
                 BuildWorkspaceContext,
                 () => _sessionHistory.Length > 0,
-                () => _sessionHistoryTokenCount,
+                () => AgentTokenEstimator.Estimate(BuildSessionHistoryForPrompt()),
                 () => _currentRunTranscriptTokens,
                 RefreshOutputDisplay,
                 _getString);
@@ -335,11 +337,13 @@ namespace TxtAIEditor.Controls
                     currentRunSelectionSnapshot.HasLineRange &&
                     !UserRequestAllowsEditsOutsideSelection(instruction));
                 string workspaceContext = BuildWorkspaceContext(instruction);
+                string lastWorkspaceContext = workspaceContext;
                 var initialTranscriptBuilder = new StringBuilder();
-                if (_sessionHistory.Length > 0)
+                string sessionHistoryForPrompt = BuildSessionHistoryForPrompt();
+                if (!string.IsNullOrWhiteSpace(sessionHistoryForPrompt))
                 {
                     initialTranscriptBuilder.AppendLine("[Session History]");
-                    initialTranscriptBuilder.AppendLine(_sessionHistory.ToString());
+                    initialTranscriptBuilder.AppendLine(sessionHistoryForPrompt);
                     initialTranscriptBuilder.AppendLine("=================================");
                     initialTranscriptBuilder.AppendLine();
                 }
@@ -354,7 +358,6 @@ namespace TxtAIEditor.Controls
                 bool reachedToolStepLimit = false;
                 int maxToolSteps = _settingsService.CurrentSettings.LlmMaxToolCalls > 0 ? _settingsService.CurrentSettings.LlmMaxToolCalls : 50;
                 var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
-                var failedToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
@@ -578,13 +581,29 @@ namespace TxtAIEditor.Controls
                     string toolResult;
                     string toolResultForTranscript;
 
-                    toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
-                    toolResultForTranscript = toolResult;
-                    if (IsSuccessfulToolResult(toolResult))
+                    if (successfulToolResults.TryGetValue(toolInvocationKey, out string? cachedToolResult) &&
+                        ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                     {
-                        if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
+                        skippedDuplicateTool = true;
+                        toolResult = cachedToolResult ?? string.Empty;
+                        toolResultForTranscript = "[Tool execution skipped: identical successful call already ran in this agent run. Use the earlier result already present in the transcript.]";
+                    }
+                    else
+                    {
+                        toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
+                        toolResultForTranscript = toolResult;
+                        if (IsSuccessfulToolResult(toolResult))
                         {
-                            toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
+                            if (IsMutatingTool(normalizedToolName))
+                            {
+                                successfulToolResults.Clear();
+                            }
+
+                            successfulToolResults[toolInvocationKey] = toolResult;
+                            if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
+                            {
+                                toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
+                            }
                         }
                     }
 
@@ -593,16 +612,41 @@ namespace TxtAIEditor.Controls
                     await RunOnUIThreadAsync(() =>
                     {
                         string refreshedContext = BuildWorkspaceContext(instruction);
-                        string addedPart = $"\n\n[Agent tool call]\n{response}\n\n[Tool result: {toolName}]\n{toolResultForTranscript}\n\n[Current workspace state]\n{refreshedContext}";
+                        var addedPartBuilder = new StringBuilder();
+                        addedPartBuilder.AppendLine();
+                        addedPartBuilder.AppendLine();
+                        addedPartBuilder.AppendLine("[Agent tool call]");
+                        addedPartBuilder.AppendLine(response);
+                        addedPartBuilder.AppendLine();
+                        addedPartBuilder.AppendLine($"[Tool result: {toolName}]");
+                        addedPartBuilder.AppendLine(toolResultForTranscript);
+                        addedPartBuilder.AppendLine();
+                        addedPartBuilder.AppendLine("[Current workspace state]");
+                        if (string.Equals(refreshedContext, lastWorkspaceContext, StringComparison.Ordinal))
+                        {
+                            addedPartBuilder.AppendLine("Unchanged since the previous workspace context.");
+                        }
+                        else
+                        {
+                            addedPartBuilder.AppendLine(refreshedContext);
+                            lastWorkspaceContext = refreshedContext;
+                        }
+
+                        string addedPart = addedPartBuilder.ToString();
                         transcript += addedPart;
                         _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(addedPart);
                         UpdateContextStatsImmediate(force: true);
                     });
                     
                     string displayResult = toolResult;
-                    if (!skippedDuplicateTool &&
-                        !_settingsService.CurrentSettings.LlmAgentVerbose &&
-                        !toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
+                    if (skippedDuplicateTool)
+                    {
+                        displayResult = _getString(
+                            "AgentDuplicateToolReused",
+                            "동일한 도구 호출이 이미 성공해 재실행하지 않았습니다.");
+                    }
+                    else if (!_settingsService.CurrentSettings.LlmAgentVerbose &&
+                             !toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
                     {
                         string normalizedName = normalizedToolName;
                         if (normalizedName == "read_file")
@@ -891,6 +935,31 @@ namespace TxtAIEditor.Controls
         private string BuildAgentInstruction(string userInstruction)
         {
             return _presetController.BuildAgentInstruction(userInstruction);
+        }
+
+        private string BuildSessionHistoryForPrompt()
+        {
+            if (_sessionHistory.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            string history = _sessionHistory.ToString();
+            if (history.Length <= MaxSessionHistoryPromptChars)
+            {
+                return history;
+            }
+
+            string tail = history.Substring(history.Length - MaxSessionHistoryPromptChars);
+            int firstLineBreak = tail.IndexOf('\n');
+            if (firstLineBreak >= 0 && firstLineBreak + 1 < tail.Length)
+            {
+                tail = tail.Substring(firstLineBreak + 1);
+            }
+
+            return "[... earlier session history omitted to keep the prompt compact ...]" +
+                Environment.NewLine +
+                tail;
         }
 
         private string BuildWorkspaceContext(string instruction)
