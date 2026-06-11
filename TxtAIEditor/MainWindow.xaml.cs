@@ -69,6 +69,9 @@ namespace TxtAIEditor
         private readonly PdfViewerController _pdfViewerController;
         private readonly TabSelectionController _tabSelectionController;
         private readonly EditorSplitLayoutController _editorSplitLayoutController;
+        private readonly EditorBridgeShortcutController _editorBridgeShortcutController;
+        private readonly EditorBridgeDocumentController _editorBridgeDocumentController;
+        private readonly EditorLinkNavigationController _editorLinkNavigationController;
         private readonly SplitImeSyncController _splitImeSyncController;
         private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly TabSaveController _tabSaveController;
@@ -281,6 +284,9 @@ namespace TxtAIEditor
                 _settingsService,
                 GetActiveTab,
                 UpdateRightPanelSelectionContext);
+            _editorLinkNavigationController = new EditorLinkNavigationController(
+                GetActiveTab,
+                NavigateExplorerToFolderAsync);
             _tabReloadController = new TabReloadController(
                 _secureNoteEncryptionService,
                 _settingsService,
@@ -300,6 +306,25 @@ namespace TxtAIEditor
                 _tabBridges,
                 _editorSessions,
                 UpdateWindowTitle);
+            _editorBridgeShortcutController = new EditorBridgeShortcutController(
+                ToggleLivePreview,
+                _stickyNoteModeController.ToggleTopMostFromShortcut,
+                () => OnToggleThemeClick(this, new RoutedEventArgs()),
+                ToggleMaximize,
+                _stickyNoteModeController.ToggleMode,
+                ToggleLeftPanelAsync,
+                ToggleRightPanelAsync,
+                TogglePreviewWidth,
+                () => OpenNewTab(),
+                () => OnSaveFileClick(this, new RoutedEventArgs()),
+                () => OnOpenFileClick(this, new RoutedEventArgs()),
+                _terminalShortcutService.RequestToggle,
+                () => OnCloseActiveTabShortcutInvoked(null!, null!),
+                () => OnPrintClick(this, new RoutedEventArgs()),
+                FocusSearchPanel,
+                _tabDirtyStateController,
+                SchedulePreview,
+                tab => SyncEditsToOtherTabsAsync(tab));
             _searchReplaceTabSyncController = new SearchReplaceTabSyncController(
                 _viewModel,
                 EditorTabView,
@@ -709,6 +734,17 @@ namespace TxtAIEditor
                         }
                     }
                 });
+            _editorBridgeDocumentController = new EditorBridgeDocumentController(
+                _tabDirtyStateController,
+                _statusBarController,
+                _tocController,
+                SchedulePreview,
+                UpdateLanguageUI,
+                QueuePendingSplitImeLineSyncIfNeeded,
+                SchedulePendingSplitImeCompletionSyncIfNeeded,
+                tab => ScheduleDeferredPendingSplitImeSyncIfNeeded(tab),
+                SyncLineChangeToOtherTabsAsync,
+                tab => SyncEditsToOtherTabsAsync(tab));
             _shellPaneController = new ShellPaneController(
                 LeftSidebarTabView,
                 StatusBarPane,
@@ -1179,87 +1215,7 @@ namespace TxtAIEditor
             {
                 this.DispatcherQueue.TryEnqueue(() =>
                 {
-                    var currentSession = getSession();
-                    switch (shortcutName)
-                    {
-                        case "f4":
-                            ToggleLivePreview();
-                            break;
-                        case "f9":
-                            _stickyNoteModeController.ToggleTopMostFromShortcut();
-                            break;
-                        case "f10":
-                            OnToggleThemeClick(this, new RoutedEventArgs());
-                            break;
-                        case "f11":
-                            ToggleMaximize();
-                            break;
-                        case "f12":
-                            _stickyNoteModeController.ToggleMode();
-                            break;
-                        case "toggleLeftPanel":
-                            _ = ToggleLeftPanelAsync();
-                            break;
-                        case "toggleRightPanel":
-                            _ = ToggleRightPanelAsync();
-                            break;
-                        case "expandRightPanel":
-                            TogglePreviewWidth();
-                            break;
-                        case "newTab":
-                            OpenNewTab();
-                            break;
-                        case "save":
-                            OnSaveFileClick(this, new RoutedEventArgs());
-                            break;
-                        case "open":
-                            OnOpenFileClick(this, new RoutedEventArgs());
-                            break;
-                        case "terminal":
-                            _terminalShortcutService.RequestToggle();
-                            break;
-                        case "closeTab":
-                            OnCloseActiveTabShortcutInvoked(null!, null!);
-                            break;
-                        case "print":
-                            OnPrintClick(this, new RoutedEventArgs());
-                            break;
-                        case "searchAll":
-                            EnsureLeftPanelVisible();
-                            ShowLeftSidebarPage(3);
-                            this.DispatcherQueue.TryEnqueue(() =>
-                            {
-                                SearchQueryInput.Focus(FocusState.Programmatic);
-                                SearchQueryInput.Focus(FocusState.Keyboard);
-                            });
-                            break;
-                        case "undo":
-                            {
-                                var text = currentSession.Undo();
-                                if (text != null)
-                                {
-                                    _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                                    _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                                    SchedulePreview(tab);
-                                    _ = bridge.SetTextAsync(text);
-                                    _ = SyncEditsToOtherTabsAsync(tab);
-                                }
-                            }
-                            break;
-                        case "redo":
-                            {
-                                var text = currentSession.Redo();
-                                if (text != null)
-                                {
-                                    _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                                    _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                                    SchedulePreview(tab);
-                                    _ = bridge.SetTextAsync(text);
-                                    _ = SyncEditsToOtherTabsAsync(tab);
-                                }
-                            }
-                            break;
-                    }
+                    _editorBridgeShortcutController.Handle(shortcutName, bridge, tab, tabItem, getSession());
                 });
             };
 
@@ -1308,125 +1264,97 @@ namespace TxtAIEditor
 
             bridge.LineChanged += async (lineNumber, text, isComposing) =>
             {
-                var currentSession = getSession();
-                currentSession.ReplaceLine(lineNumber, text);
-
-                if (!isComposing)
-                {
-                    _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                    _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                }
-
-                SchedulePreview(tab);
-
-                // Split 상태의 같은 파일 IME 조합 중에는 반대편 pane에 live patch를 보내지 않는다.
-                // 특히 컬럼 입력은 첫 줄과 나머지 줄 이벤트 간격이 일정하지 않아 짧은 타이머로는
-                // 컬럼 여부를 안전하게 판정할 수 없다. 따라서 조합 중에는 현재 pane의 session만 갱신하고,
-                // composition 완료(isComposing=false) 후 보류된 줄을 한 번에 동기화한다.
-                // split이 아니거나 같은 파일 반대편 탭이 없는 경우, 그리고 IME 조합 중이 아닌 일반 입력은 기존 경로를 유지한다.
-                if (isComposing && QueuePendingSplitImeLineSyncIfNeeded(tab, lineNumber, text))
-                {
-                    return;
-                }
-
-                if (!isComposing && SchedulePendingSplitImeCompletionSyncIfNeeded(tab, lineNumber, text))
-                {
-                    return;
-                }
-
-                await SyncLineChangeToOtherTabsAsync(tab, lineNumber, text, isComposing);
+                await _editorBridgeDocumentController.HandleLineChangedAsync(
+                    tab,
+                    tabItem,
+                    getSession(),
+                    lineNumber,
+                    text,
+                    isComposing);
             };
 
             bridge.LineInsertRequested += async (lineNumber, text) =>
             {
-                var currentSession = getSession();
-                int lineCount = currentSession.InsertLine(lineNumber, text);
-                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                await bridge.UpdateLineCountAsync(lineCount);
-                SchedulePreview(tab);
-                await SyncEditsToOtherTabsAsync(tab);
-                _statusBarController.UpdateTotalLines(tab);
+                await _editorBridgeDocumentController.HandleLineInsertRequestedAsync(
+                    bridge,
+                    tab,
+                    tabItem,
+                    getSession(),
+                    lineNumber,
+                    text);
             };
 
             bridge.LineSplitRequested += async (lineNumber, before, after) =>
             {
-                var currentSession = getSession();
-                int lineCount = currentSession.SplitLine(lineNumber, before, after);
-                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                await bridge.UpdateLineCountAsync(lineCount);
-                SchedulePreview(tab);
-                await SyncEditsToOtherTabsAsync(tab);
-                _statusBarController.UpdateTotalLines(tab);
+                await _editorBridgeDocumentController.HandleLineSplitRequestedAsync(
+                    bridge,
+                    tab,
+                    tabItem,
+                    getSession(),
+                    lineNumber,
+                    before,
+                    after);
             };
 
             bridge.MergeLineWithPreviousRequested += async (lineNumber) =>
             {
-                var currentSession = getSession();
-                int lineCount = currentSession.MergeLineWithPrevious(lineNumber);
-                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                await bridge.UpdateLineCountAsync(lineCount);
-                SchedulePreview(tab);
-                await SyncEditsToOtherTabsAsync(tab);
-                _statusBarController.UpdateTotalLines(tab);
+                await _editorBridgeDocumentController.HandleMergeLineWithPreviousRequestedAsync(
+                    bridge,
+                    tab,
+                    tabItem,
+                    getSession(),
+                    lineNumber);
             };
 
             bridge.DeleteLineRequested += async (lineNumber) =>
             {
-                var currentSession = getSession();
-                int lineCount = currentSession.DeleteLine(lineNumber);
-                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                await bridge.UpdateLineCountAsync(lineCount);
-                SchedulePreview(tab);
-                await SyncEditsToOtherTabsAsync(tab);
-                _statusBarController.UpdateTotalLines(tab);
+                await _editorBridgeDocumentController.HandleDeleteLineRequestedAsync(
+                    bridge,
+                    tab,
+                    tabItem,
+                    getSession(),
+                    lineNumber);
             };
 
             bridge.FindRequested += async (query, startLine, startColumn, reverse, matchCase, isRegex) =>
             {
-                var currentSession = getSession();
-                var result = currentSession.Find(query, startLine, startColumn, reverse, matchCase, isRegex);
-                await bridge.SendFindResultAsync(result, query);
+                await _editorBridgeDocumentController.HandleFindRequestedAsync(
+                    bridge,
+                    getSession(),
+                    query,
+                    startLine,
+                    startColumn,
+                    reverse,
+                    matchCase,
+                    isRegex);
             };
 
             bridge.FindAllRequested += async (query, matchCase, isRegex) =>
             {
-                var currentSession = getSession();
-                var results = currentSession.FindAll(query, matchCase, isRegex);
-                await bridge.SendFindAllResultsAsync(results, query);
+                await _editorBridgeDocumentController.HandleFindAllRequestedAsync(
+                    bridge,
+                    getSession(),
+                    query,
+                    matchCase,
+                    isRegex);
             };
 
             bridge.ReplaceAllRequested += async (query, replace, matchCase, isRegex) =>
             {
-                var currentSession = getSession();
-                currentSession.ReplaceAll(query, replace, matchCase, isRegex);
-                string updatedText = currentSession.GetText();
-                await bridge.SetTextAsync(updatedText, shouldFocus: false);
-                await SyncEditsToOtherTabsAsync(tab);
-                await bridge.SendFindAllResultsAsync(currentSession.FindAll(query, matchCase, isRegex), query);
-
-                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                SchedulePreview(tab);
-                _statusBarController.UpdateTotalLines(tab);
+                await _editorBridgeDocumentController.HandleReplaceAllRequestedAsync(
+                    bridge,
+                    tab,
+                    tabItem,
+                    getSession(),
+                    query,
+                    replace,
+                    matchCase,
+                    isRegex);
             };
 
-            bridge.ContentChanged += async (isComposing) =>
+            bridge.ContentChanged += (isComposing) =>
             {
-                if (!isComposing)
-                {
-                    _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                    _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-                    UpdateLanguageUI(tab);
-                    _tocController?.RefreshToc(tab);
-                    _statusBarController.UpdateTotalLines(tab);
-                    ScheduleDeferredPendingSplitImeSyncIfNeeded(tab);
-                }
-
-                SchedulePreview(tab);
+                _editorBridgeDocumentController.HandleContentChanged(tab, tabItem, isComposing);
             };
 
             bridge.CursorChanged += (line, col) =>
@@ -1527,54 +1455,7 @@ namespace TxtAIEditor
             {
                 this.DispatcherQueue.TryEnqueue(async () =>
                 {
-                    if (isUrl)
-                    {
-                        try
-                        {
-                            if (Uri.TryCreate(text, UriKind.Absolute, out var uri))
-                            {
-                                _ = await Windows.System.Launcher.LaunchUriAsync(uri);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Failed to open URL in browser: {ex.Message}");
-                        }
-                    }
-                    else if (isPath)
-                    {
-                        try
-                        {
-                            string resolvedPath = text;
-                            var activeTab = GetActiveTab();
-                            if (!System.IO.Path.IsPathRooted(resolvedPath) && activeTab != null && !string.IsNullOrEmpty(activeTab.FilePath))
-                            {
-                                string? currentDir = System.IO.Path.GetDirectoryName(activeTab.FilePath);
-                                if (!string.IsNullOrEmpty(currentDir))
-                                {
-                                    resolvedPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(currentDir, resolvedPath));
-                                }
-                            }
-
-                            if (System.IO.File.Exists(resolvedPath) || System.IO.Directory.Exists(resolvedPath))
-                            {
-                                string targetFolder = resolvedPath;
-                                if (System.IO.File.Exists(resolvedPath))
-                                {
-                                    targetFolder = System.IO.Path.GetDirectoryName(resolvedPath) ?? resolvedPath;
-                                }
-
-                                if (System.IO.Directory.Exists(targetFolder))
-                                {
-                                    await NavigateExplorerToFolderAsync(targetFolder);
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Failed to resolve and open path: {ex.Message}");
-                        }
-                    }
+                    await _editorLinkNavigationController.HandleCtrlClickAsync(text, isUrl, isPath);
                 });
             };
         }
