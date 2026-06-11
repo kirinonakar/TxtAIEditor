@@ -361,6 +361,8 @@ namespace TxtAIEditor.Controls
 
                 bool completed = false;
                 bool reachedToolStepLimit = false;
+                int emptyResponseRetryCount = 0;
+                const int maxEmptyResponseRetries = 1;
                 int maxToolSteps = _settingsService.CurrentSettings.LlmMaxToolCalls > 0 ? _settingsService.CurrentSettings.LlmMaxToolCalls : 50;
                 var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -526,6 +528,57 @@ namespace TxtAIEditor.Controls
 
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
+
+                    if (string.IsNullOrWhiteSpace(response))
+                    {
+                        await RunOnUIThreadAsync(() =>
+                        {
+                            _agentPane.StopThinkingActivity();
+                        });
+
+                        if (emptyResponseRetryCount < maxEmptyResponseRetries)
+                        {
+                            emptyResponseRetryCount++;
+                            string retryNote =
+                                "\n\n[Agent empty response]\n" +
+                                "The model returned no visible content. Continue by writing exactly one tool_call or a final answer.";
+
+                            await RunOnUIThreadAsync(() =>
+                            {
+                                transcript += retryNote;
+                                _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+                                UpdateContextStatsImmediate(force: true);
+                                AppendActivity(_getString(
+                                    "AgentActivityEmptyResponseRetry",
+                                    "빈 응답을 수신해 다시 시도합니다."));
+                            });
+
+                            continue;
+                        }
+
+                        string emptyResponseMessage = _getString(
+                            "LlmErrorEmptyResponse",
+                            "AI로부터 빈 응답을 수신했습니다.");
+
+                        await RunOnUIThreadAsync(() =>
+                        {
+                            AppendActivity(emptyResponseMessage);
+                            _agentPane.AppendOutputLine(emptyResponseMessage);
+                        });
+
+                        AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                        string emptyRunTranscript = transcript.Substring(initialTranscript.Length);
+                        if (!string.IsNullOrWhiteSpace(emptyRunTranscript))
+                        {
+                            AppendSessionHistoryLine(emptyRunTranscript.Trim());
+                        }
+                        AppendSessionHistoryLine($"[Agent Response]: {emptyResponseMessage}");
+                        AppendSessionHistoryLine();
+                        _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+
+                        completed = true;
+                        break;
+                    }
 
                     await RunOnUIThreadAsync(() =>
                     {
