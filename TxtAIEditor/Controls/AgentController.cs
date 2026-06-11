@@ -832,6 +832,7 @@ namespace TxtAIEditor.Controls
             _currentSessionId = Guid.NewGuid().ToString();
             _sessionHistory.Clear();
             _sessionHistoryTokenCount = 0;
+            _currentRunTranscriptTokens = 0;
             _sessionEditController.Clear();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
@@ -1253,6 +1254,7 @@ namespace TxtAIEditor.Controls
             _sessionHistory.Clear();
             _sessionHistory.Append(item.SessionHistoryText);
             _sessionHistoryTokenCount = item.SessionHistoryTokenCount;
+            _currentRunTranscriptTokens = 0;
 
             _sessionEditController.Replace(item.SessionEdits);
 
