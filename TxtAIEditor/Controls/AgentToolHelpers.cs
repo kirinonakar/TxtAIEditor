@@ -42,11 +42,46 @@ namespace TxtAIEditor.Controls
 
         public static string GetStringArgument(JsonElement arguments, string name)
         {
-            return arguments.TryGetProperty(name, out var value) ? value.GetString() ?? string.Empty : string.Empty;
+            if (arguments.ValueKind == JsonValueKind.String)
+            {
+                return IsSingleStringArgumentName(name)
+                    ? arguments.GetString() ?? string.Empty
+                    : string.Empty;
+            }
+
+            if (arguments.ValueKind != JsonValueKind.Object)
+            {
+                return string.Empty;
+            }
+
+            if (!arguments.TryGetProperty(name, out var value))
+            {
+                return string.Empty;
+            }
+
+            return value.ValueKind switch
+            {
+                JsonValueKind.String => value.GetString() ?? string.Empty,
+                JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => value.GetRawText(),
+                _ => string.Empty
+            };
         }
 
         public static string[] GetUrlsArgument(JsonElement arguments)
         {
+            if (arguments.ValueKind == JsonValueKind.String)
+            {
+                string singleUrl = arguments.GetString() ?? string.Empty;
+                return string.IsNullOrWhiteSpace(singleUrl)
+                    ? Array.Empty<string>()
+                    : new[] { singleUrl };
+            }
+
+            if (arguments.ValueKind != JsonValueKind.Object)
+            {
+                return Array.Empty<string>();
+            }
+
             if (arguments.TryGetProperty("urls", out var urlsProp))
             {
                 if (urlsProp.ValueKind == JsonValueKind.Array)
@@ -285,6 +320,11 @@ namespace TxtAIEditor.Controls
         public static bool TryGetIntArgument(JsonElement arguments, string name, out int value)
         {
             value = 0;
+            if (arguments.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
             if (!arguments.TryGetProperty(name, out var prop))
             {
                 return false;
@@ -301,6 +341,18 @@ namespace TxtAIEditor.Controls
             }
 
             return false;
+        }
+
+        private static bool IsSingleStringArgumentName(string name)
+        {
+            return name is "arguments"
+                or "command"
+                or "query"
+                or "url"
+                or "uri"
+                or "address"
+                or "content"
+                or "text";
         }
 
         private static string NormalizePowerShellForDuplicateCheck(string command)
