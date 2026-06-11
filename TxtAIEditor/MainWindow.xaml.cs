@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -44,6 +43,7 @@ namespace TxtAIEditor
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
         private readonly CompareSelectionDialogService _compareSelectionDialogService;
         private readonly SearchReplaceController _searchReplaceController;
+        private readonly SearchReplaceTabSyncController _searchReplaceTabSyncController;
         private readonly GitPanelController _gitPanelController;
         private readonly GitStatusRefreshController _gitStatusRefreshController;
         private readonly FavoritesRecentController _favoritesRecentController;
@@ -57,6 +57,7 @@ namespace TxtAIEditor
         private readonly SnippetsController _snippetsController;
         private readonly LlmAssistantController _llmAssistantController;
         private readonly AgentController _agentController;
+        private readonly AgentFileWorkflowController _agentFileWorkflowController;
         private readonly TocController _tocController;
         private readonly ShellPaneController _shellPaneController;
         private readonly MarkdownToolbarController _markdownToolbarController;
@@ -65,6 +66,7 @@ namespace TxtAIEditor
         private readonly TabReloadController _tabReloadController;
         private readonly CompareTabController _compareTabController;
         private readonly LivePreviewController _livePreviewController;
+        private readonly PdfViewerController _pdfViewerController;
         private readonly TabSelectionController _tabSelectionController;
         private readonly EditorSplitLayoutController _editorSplitLayoutController;
         private readonly SplitImeSyncController _splitImeSyncController;
@@ -82,6 +84,7 @@ namespace TxtAIEditor
         private readonly UnsavedChangesDialogService _unsavedChangesDialogService;
         private readonly WindowDialogController _dialogController;
         private readonly WindowCloseController _windowCloseController;
+        private readonly WindowTitleController _windowTitleController;
         private readonly MainWindowSettingsController _settingsController;
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private bool _startupInitializationComplete;
@@ -145,8 +148,6 @@ namespace TxtAIEditor
         // Dynamic tabs collection
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges = 
             new Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)>();
-        private readonly Dictionary<string, WebView2> _pdfViewerWebViews =
-            new Dictionary<string, WebView2>();
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions =
             new Dictionary<string, EditorDocumentSession>();
 
@@ -157,7 +158,6 @@ namespace TxtAIEditor
         private ToggleButton LeftPanelToggle => StatusBarPane.LeftPanelToggleButton;
         private ToggleButton RightPanelToggle => StatusBarPane.RightPanelToggleButton;
         private TextBlock StatusGitBranch => StatusBarPane.GitBranchText;
-        private TextBlock StatusLanguage => StatusBarPane.LanguageText;
         private ListView FileListView => LeftSidebarTabView.FileList;
         private ListView SearchResultsList => LeftSidebarTabView.SearchResults;
         private TextBox SearchQueryInput => LeftSidebarTabView.SearchQuery;
@@ -216,6 +216,10 @@ namespace TxtAIEditor
                 () => EditorWorkspace.IsTerminalVisible,
                 () => TerminalPane.SuspendNativeWindows(),
                 () => TerminalPane.ResumeNativeWindows());
+            _windowTitleController = new WindowTitleController(
+                this,
+                AppTitleTextBlock,
+                GetActiveTab);
             _tabEncryptionController = new TabEncryptionController(
                 GetLocalizedString,
                 _dialogController.WaitForDialogXamlRootAsync,
@@ -239,6 +243,8 @@ namespace TxtAIEditor
                 GetActiveTab,
                 tab => GetActiveTab() == tab,
                 tabId => _editorSessions.TryGetValue(tabId, out var session) ? session : null,
+                _languageDetectionService,
+                _tabBridges,
                 GetLocalizedString,
                 () => this.Content.XamlRoot,
                 GetCurrentElementTheme,
@@ -271,6 +277,10 @@ namespace TxtAIEditor
                 HandleWebViewShortcut,
                 SyncPreviewScrollToEditors,
                 _dialogController.ShowErrorMessage);
+            _pdfViewerController = new PdfViewerController(
+                _settingsService,
+                GetActiveTab,
+                UpdateRightPanelSelectionContext);
             _tabReloadController = new TabReloadController(
                 _secureNoteEncryptionService,
                 _settingsService,
@@ -290,6 +300,34 @@ namespace TxtAIEditor
                 _tabBridges,
                 _editorSessions,
                 UpdateWindowTitle);
+            _searchReplaceTabSyncController = new SearchReplaceTabSyncController(
+                _viewModel,
+                EditorTabView,
+                EditorTabView2,
+                _tabBridges,
+                _editorSessions,
+                _tabDirtyStateController,
+                GetActiveTab,
+                LoadFileIntoTabAsync,
+                UpdateLivePreview);
+            _searchReplaceController = new SearchReplaceController(
+                _fileSearchService,
+                _viewModel,
+                SearchQueryInput,
+                ReplaceQueryInput,
+                SearchMatchCaseToggle,
+                SearchWholeWordToggle,
+                SearchRegexToggle,
+                SearchResultsList,
+                GetSearchRoot,
+                GetLargeFileThresholdBytes,
+                () => this.Content.XamlRoot,
+                _dialogController.ShowErrorMessage,
+                _searchReplaceTabSyncController.LoadAndHighlightAsync,
+                RefreshGitStatusUIAsync,
+                beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
+                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
+            _searchReplaceController.FileModified += _searchReplaceTabSyncController.HandleFileModifiedAsync;
             _splitImeSyncController = new SplitImeSyncController(
                 _tabBridges,
                 _editorSessions,
@@ -304,24 +342,6 @@ namespace TxtAIEditor
             {
                 Interval = TimeSpan.FromSeconds(30)
             };
-            _searchReplaceController = new SearchReplaceController(
-                _fileSearchService,
-                _viewModel,
-                SearchQueryInput,
-                ReplaceQueryInput,
-                SearchMatchCaseToggle,
-                SearchWholeWordToggle,
-                SearchRegexToggle,
-                SearchResultsList,
-                GetSearchRoot,
-                GetLargeFileThresholdBytes,
-                () => this.Content.XamlRoot,
-                _dialogController.ShowErrorMessage,
-                LoadFileIntoTabAndHighlightAsync,
-                RefreshGitStatusUIAsync,
-                beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
-                afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
-            _searchReplaceController.FileModified += OnSearchReplaceFileModifiedAsync;
             _gitPanelController = new GitPanelController(
                 _gitService,
                 _fileService,
@@ -566,6 +586,22 @@ namespace TxtAIEditor
                 InitializePickerWindow,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
+            _agentFileWorkflowController = new AgentFileWorkflowController(
+                _viewModel,
+                EditorTabView,
+                EditorTabView2,
+                _tabBridges,
+                _editorSessions,
+                _tabCloseController,
+                _searchReplaceTabSyncController,
+                _compareTabController,
+                GetAgentSessionEdits,
+                () => FileListView.SelectedItem as ExplorerItem,
+                () => _currentFolderPath,
+                () => _currentRepoPath,
+                LoadDirectoryRoot,
+                QueueGitStatusRefresh,
+                GetLocalizedString);
             _agentController = new AgentController(
                 _llmService,
                 _settingsService,
@@ -616,17 +652,17 @@ namespace TxtAIEditor
                 },
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString,
-                new AgentFileToolService(GetAgentWorkspaceRoot),
+                new AgentFileToolService(_agentFileWorkflowController.GetWorkspaceRoot),
                 _pdfTextExtractionService,
                 InitializePickerWindow,
                 path => _gitService.FindRepositoryRoot(path) != null,
-                OpenAgentDiffViewAsync,
-                OnAgentFileModifiedAsync,
+                _agentFileWorkflowController.OpenDiffViewAsync,
+                _agentFileWorkflowController.HandleFileModifiedAsync,
                 openFileInEditorAsync: LoadFileIntoTabAsync,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
-                revertTabOrFileAsync: RevertTabOrFileAsync,
-                closeTabById: CloseTabById,
+                revertTabOrFileAsync: _agentFileWorkflowController.RevertTabOrFileAsync,
+                closeTabById: _agentFileWorkflowController.CloseTabById,
                 navigateToFolderAsync: NavigateExplorerToFolderAsync,
                 saveTabAsync: async (tab, targetPath) =>
                 {
@@ -757,7 +793,7 @@ namespace TxtAIEditor
                 LeftSplitter,
                 RightSplitter,
                 _tabBridges,
-                _pdfViewerWebViews,
+                _pdfViewerController,
                 _statusBarController,
                 _livePreviewController,
                 _llmAssistantController,
@@ -1044,8 +1080,7 @@ namespace TxtAIEditor
                 (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args),
                 _currentFolderPath);
 
-            _pdfViewerWebViews[tab.Id] = tabParts.WebView;
-            tabParts.WebView.CoreWebView2Initialized += (_, _) => ConfigurePdfViewer(tab, tabParts.WebView);
+            _pdfViewerController.Register(tab, tabParts.WebView);
 
             EditorWorkspace.DisableTabItemTransitions();
             targetTabView.TabItems.Add(tabParts.TabItem);
@@ -1675,10 +1710,8 @@ namespace TxtAIEditor
 
         private async void OnFindClick(object sender, RoutedEventArgs e)
         {
-            if (TryGetActivePdfWebView(out var pdfWebView))
+            if (await _pdfViewerController.FocusFindInActiveViewerAsync())
             {
-                pdfWebView.Focus(FocusState.Programmatic);
-                await TryTriggerPdfFindAsync(pdfWebView);
                 return;
             }
 
@@ -1702,85 +1735,7 @@ namespace TxtAIEditor
 
         private bool IsActiveTabPdfViewer()
         {
-            return GetActiveTab()?.IsPdfViewer == true;
-        }
-
-        private bool TryGetActivePdfWebView(out WebView2 pdfWebView)
-        {
-            pdfWebView = null!;
-            var activeTab = GetActiveTab();
-            if (activeTab?.IsPdfViewer != true)
-            {
-                return false;
-            }
-
-            if (_pdfViewerWebViews.TryGetValue(activeTab.Id, out var viewer) && viewer != null)
-            {
-                pdfWebView = viewer;
-                return true;
-            }
-
-            return false;
-        }
-
-        private void ConfigurePdfViewer(OpenedTab tab, WebView2 pdfWebView)
-        {
-            if (pdfWebView.CoreWebView2 == null)
-            {
-                return;
-            }
-
-            pdfWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
-            pdfWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
-            pdfWebView.CoreWebView2.Settings.IsStatusBarEnabled = true;
-            pdfWebView.CoreWebView2.WebMessageReceived += (_, args) => OnPdfWebMessageReceived(tab, args);
-            
-            WebViewAppearanceService.ApplyPreferredColorScheme(pdfWebView.CoreWebView2, _settingsService.CurrentSettings.Theme);
-
-            _ = InstallPdfSelectionBridgeAsync(pdfWebView);
-        }
-
-        private static async Task InstallPdfSelectionBridgeAsync(WebView2 pdfWebView)
-        {
-            if (pdfWebView.CoreWebView2 == null)
-            {
-                return;
-            }
-
-            try
-            {
-                await pdfWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PdfSelectionBridgeScript);
-                await pdfWebView.CoreWebView2.ExecuteScriptAsync(PdfSelectionBridgeScript);
-            }
-            catch
-            {
-            }
-        }
-
-        private void OnPdfWebMessageReceived(OpenedTab tab, CoreWebView2WebMessageReceivedEventArgs args)
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(args.WebMessageAsJson);
-                var root = document.RootElement;
-                if (!root.TryGetProperty("type", out var typeProp) ||
-                    !string.Equals(typeProp.GetString(), "pdfSelection", StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                string selectedText = root.TryGetProperty("text", out var textProp)
-                    ? textProp.GetString() ?? string.Empty
-                    : string.Empty;
-
-                if (GetActiveTab() == tab)
-                {
-                    UpdateRightPanelSelectionContext(selectedText, tab, 0, 0);
-                }
-            }
-            catch
-            {
-            }
+            return _pdfViewerController.IsActiveViewer();
         }
 
         private void UpdateRightPanelSelectionContext(string selectedText, OpenedTab tab, int startLine, int endLine)
@@ -1797,81 +1752,6 @@ namespace TxtAIEditor
                 SelectionStatsText.Text = string.Format(fmt, selectedText.Length.ToString("N0"), StatusBarController.EstimateTokenCount(selectedText).ToString("N0"));
             }
             _statusBarController.UpdateSelectionStats(selectedText);
-        }
-
-        private const string PdfSelectionBridgeScript = @"
-(() => {
-    if (window.__txtAiEditorPdfSelectionBridge) return;
-    window.__txtAiEditorPdfSelectionBridge = true;
-    let lastText = '';
-    let timer = 0;
-
-    function selectedTextFromRoot(root) {
-        try {
-            const selection = root && root.getSelection ? root.getSelection() : null;
-            const text = selection ? String(selection.toString() || '') : '';
-            if (text) return text;
-        } catch {}
-
-        try {
-            const active = root && root.activeElement;
-            if (active && active.shadowRoot) {
-                return selectedTextFromRoot(active.shadowRoot);
-            }
-        } catch {}
-
-        return '';
-    }
-
-    function readSelection() {
-        let text = selectedTextFromRoot(window);
-        if (!text) {
-            try {
-                const viewer = document.querySelector('pdf-viewer');
-                if (viewer && viewer.shadowRoot) text = selectedTextFromRoot(viewer.shadowRoot);
-            } catch {}
-        }
-
-        if (text !== lastText) {
-            lastText = text;
-            try {
-                chrome.webview.postMessage({ type: 'pdfSelection', text });
-            } catch {}
-        }
-    }
-
-    function scheduleRead() {
-        clearTimeout(timer);
-        timer = setTimeout(readSelection, 80);
-    }
-
-    document.addEventListener('selectionchange', scheduleRead, true);
-    document.addEventListener('mouseup', scheduleRead, true);
-    document.addEventListener('pointerup', scheduleRead, true);
-    document.addEventListener('keyup', scheduleRead, true);
-    window.addEventListener('focus', scheduleRead, true);
-    scheduleRead();
-})();
-";
-
-        private static async Task TryTriggerPdfFindAsync(WebView2 pdfWebView)
-        {
-            if (pdfWebView.CoreWebView2 == null)
-            {
-                return;
-            }
-
-            const string keyDown = "{\"type\":\"keyDown\",\"modifiers\":2,\"windowsVirtualKeyCode\":70,\"nativeVirtualKeyCode\":70,\"code\":\"KeyF\",\"key\":\"f\"}";
-            const string keyUp = "{\"type\":\"keyUp\",\"modifiers\":2,\"windowsVirtualKeyCode\":70,\"nativeVirtualKeyCode\":70,\"code\":\"KeyF\",\"key\":\"f\"}";
-
-            try
-            {
-                await pdfWebView.CoreWebView2.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", keyDown);
-                await pdfWebView.CoreWebView2.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", keyUp);
-            }
-            catch
-            {
-            }
         }
 
         private async void OnToggleCsvTableClick(object sender, RoutedEventArgs e)
@@ -2039,140 +1919,10 @@ namespace TxtAIEditor
             _terminalPanelController.Toggle();
         }
 
-        private async Task OnAgentFileModifiedAsync(string filePath)
+        private IReadOnlyList<AgentFileEditPreview> GetAgentSessionEdits()
         {
-            await OnSearchReplaceFileModifiedAsync(filePath);
-
-            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
-            {
-                LoadDirectoryRoot(_currentFolderPath);
-            }
-
-            QueueGitStatusRefresh();
-
-            // Auto-update open compare tabs for this file
-            var edit = _agentController.SessionEdits.FirstOrDefault(e => string.Equals(e.FullPath, filePath, StringComparison.OrdinalIgnoreCase));
-            if (edit != null)
-            {
-                string title = $"{GetLocalizedString("AgentDiffTitle", "Agent 변경 비교")}: {Path.GetFileName(edit.RelativePath)}";
-                await _compareTabController.UpdateCompareTabIfOpenAsync(
-                    title,
-                    edit.FullPath,
-                    edit.FullPath,
-                    edit.OldContent,
-                    edit.NewContent,
-                    labelA: GetLocalizedString("DiffOriginalLabel", "원본"),
-                    labelB: GetLocalizedString("DiffModifiedLabel", "수정본"));
-            }
+            return _agentController.SessionEdits;
         }
-
-        private async Task OpenAgentDiffViewAsync(AgentFileEditPreview preview)
-        {
-            await _compareTabController.OpenCompareTabAsync(
-                preview.FullPath,
-                preview.FullPath,
-                preview.OldContent,
-                preview.NewContent,
-                customTitle: $"{GetLocalizedString("AgentDiffTitle", "Agent 변경 비교")}: {Path.GetFileName(preview.RelativePath)}",
-                labelA: GetLocalizedString("DiffOriginalLabel", "원본"),
-                labelB: GetLocalizedString("DiffModifiedLabel", "수정본"));
-        }
-
-        private void CloseTabById(string tabId)
-        {
-            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-            if (tab != null)
-            {
-                var tabItem = EditorTabView.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id)
-                           ?? EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
-                if (tabItem != null)
-                {
-                    _tabCloseController.CloseAndCleanup(tab, tabItem);
-                }
-            }
-        }
-
-        private async Task RevertTabOrFileAsync(string pathOrId, string oldContent, bool isNewFile)
-        {
-            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == pathOrId || string.Equals(t.FilePath, pathOrId, StringComparison.OrdinalIgnoreCase));
-            if (tab != null)
-            {
-                if (isNewFile)
-                {
-                    var tabItem = EditorTabView.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id)
-                               ?? EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
-                    if (tabItem != null)
-                    {
-                        _tabCloseController.CloseAndCleanup(tab, tabItem);
-                    }
-                    if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
-                    {
-                        try { File.Delete(tab.FilePath); } catch { }
-                    }
-                }
-                else
-                {
-                    tab.Content = oldContent;
-                    if (_editorSessions.TryGetValue(tab.Id, out var session))
-                    {
-                        session.UpdateContentFromSync(oldContent);
-                    }
-                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-                    {
-                        await bridgeGroup.Bridge.SetTextAsync(oldContent, shouldFocus: false);
-                    }
-                }
-            }
-            else
-            {
-                if (isNewFile)
-                {
-                    if (File.Exists(pathOrId))
-                    {
-                        try { File.Delete(pathOrId); } catch { }
-                    }
-                }
-                else
-                {
-                    if (Path.IsPathRooted(pathOrId))
-                    {
-                        await File.WriteAllTextAsync(pathOrId, oldContent);
-                    }
-                }
-            }
-        }
-
-
-        private string GetAgentWorkspaceRoot()
-        {
-            if (FileListView.SelectedItem is ExplorerItem selectedItem)
-            {
-                if (selectedItem.IsFolder && Directory.Exists(selectedItem.Path))
-                {
-                    return selectedItem.Path;
-                }
-
-                string? selectedFileDirectory = Path.GetDirectoryName(selectedItem.Path);
-                if (!string.IsNullOrWhiteSpace(selectedFileDirectory) && Directory.Exists(selectedFileDirectory))
-                {
-                    return selectedFileDirectory;
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(_currentFolderPath) && Directory.Exists(_currentFolderPath))
-            {
-                return _currentFolderPath;
-            }
-
-            if (!string.IsNullOrWhiteSpace(_currentRepoPath) && Directory.Exists(_currentRepoPath))
-            {
-                return _currentRepoPath;
-            }
-
-            return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        }
-
-
 
         #endregion
 
@@ -2219,11 +1969,7 @@ namespace TxtAIEditor
 
         private void CloseReadOnlyViewer(string tabId)
         {
-            if (_pdfViewerWebViews.TryGetValue(tabId, out var pdfWebView))
-            {
-                pdfWebView.Close();
-                _pdfViewerWebViews.Remove(tabId);
-            }
+            _pdfViewerController.Close(tabId);
         }
 
         #endregion
@@ -2578,21 +2324,7 @@ namespace TxtAIEditor
 
         private void UpdateWindowTitle()
         {
-            var activeTab = GetActiveTab();
-            string pathOrTitle = activeTab != null 
-                ? (!string.IsNullOrEmpty(activeTab.FilePath) ? activeTab.FilePath : activeTab.Title)
-                : "";
-
-            string newTitle = string.IsNullOrEmpty(pathOrTitle) 
-                ? "TxtAIEditor" 
-                : $"TxtAIEditor - {pathOrTitle}";
-
-            this.Title = newTitle;
-
-            if (AppTitleTextBlock != null)
-            {
-                AppTitleTextBlock.Text = newTitle;
-            }
+            _windowTitleController.Update();
         }
 
         #endregion
@@ -2682,78 +2414,6 @@ namespace TxtAIEditor
             }
         }
 
-        private bool IsTabCurrentlyVisible(OpenedTab tab)
-        {
-            if (tab == null) return false;
-
-            if (EditorTabView != null && EditorTabView.SelectedItem is TabViewItem primaryItem && string.Equals(primaryItem.Tag as string, tab.Id, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            if (EditorTabView2 != null && EditorTabView2.Visibility == Microsoft.UI.Xaml.Visibility.Visible &&
-                EditorTabView2.SelectedItem is TabViewItem secondaryItem && string.Equals(secondaryItem.Tag as string, tab.Id, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        private async Task OnSearchReplaceFileModifiedAsync(string filePath)
-        {
-            if (string.IsNullOrEmpty(filePath)) return;
-
-            var matchedTabs = _viewModel.Tabs.Where(t => string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (matchedTabs.Count == 0) return;
-
-            try
-            {
-                var readResult = await LineArrayTextModel.LoadFromFileAsync(filePath, "Auto");
-                
-                foreach (var tab in matchedTabs)
-                {
-                    if (_editorSessions.TryGetValue(tab.Id, out var session))
-                    {
-                        session.UpdateContentFromSync(readResult.Model.GetText());
-                    }
-
-                    tab.Content = readResult.Model.GetText();
-                    tab.IsDirty = false;
-
-                    bool isVisible = IsTabCurrentlyVisible(tab);
-                    if (isVisible)
-                    {
-                        tab.IsPendingReload = false;
-                        if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-                        {
-                            await bridgeGroup.Bridge.SetTextAsync(tab.Content, shouldFocus: false);
-                        }
-                    }
-                    else
-                    {
-                        tab.IsPendingReload = true;
-                    }
-
-                    var tabItem = EditorTabView.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id)
-                               ?? EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
-                    if (tabItem != null)
-                    {
-                        _tabDirtyStateController.CleanDirtyStateOnOtherTabs(tab);
-                    }
-
-                    if (tab == GetActiveTab())
-                    {
-                        UpdateLivePreview(tab);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to hot-reload replaced file '{filePath}': {ex.Message}");
-            }
-        }
-
         private async void OnSearchResultDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
         {
             await _searchReplaceController.OpenSearchResultAsync(e.OriginalSource);
@@ -2803,81 +2463,7 @@ namespace TxtAIEditor
 
         private void UpdateLanguageUI(OpenedTab tab)
         {
-            if (tab == null) return;
-            if (tab.IsImageViewer)
-            {
-                if (StatusLanguage != null)
-                {
-                    StatusLanguage.Text = "IMAGE";
-                }
-                return;
-            }
-
-            if (tab.IsPdfViewer)
-            {
-                if (StatusLanguage != null)
-                {
-                    StatusLanguage.Text = "PDF";
-                }
-                return;
-            }
-
-            if (tab.IsDocxViewer)
-            {
-                if (StatusLanguage != null)
-                {
-                    StatusLanguage.Text = "DOCX";
-                }
-                return;
-            }
-
-            string detected = tab.Language;
-            if (detected == "plaintext" || string.IsNullOrEmpty(detected))
-            {
-                string content = tab.Content;
-                if (_editorSessions.TryGetValue(tab.Id, out var session))
-                {
-                    content = session.GetText(2000);
-                }
-                detected = _languageDetectionService.DetectLanguageFromContent(content, "plaintext");
-            }
-
-            if (StatusLanguage != null)
-            {
-                StatusLanguage.Text = detected.ToUpper();
-            }
-
-            if (tab.Language != detected)
-            {
-                tab.Language = detected;
-                if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-                {
-                    _ = bridgeGroup.Bridge.SetLanguageAsync(detected);
-                }
-            }
-        }
-
-        private async Task LoadFileIntoTabAndHighlightAsync(SearchResultItem item, string query)
-        {
-            await LoadFileIntoTabAsync(item.Path);
-            await Task.Delay(250);
-
-            string? targetTabId = null;
-            foreach (var tab in _viewModel.Tabs)
-            {
-                if (string.Equals(tab.FilePath, item.Path, StringComparison.OrdinalIgnoreCase))
-                {
-                    targetTabId = tab.Id;
-                    break;
-                }
-            }
-
-            if (targetTabId != null && _tabBridges.TryGetValue(targetTabId, out var bridgeGroup) && bridgeGroup.WebView?.CoreWebView2 != null)
-            {
-                var revealMsg = new { action = "revealLine", lineNumber = item.LineNumber, indexOfMatch = item.IndexOfMatch, matchLength = item.MatchLength, query };
-                string json = System.Text.Json.JsonSerializer.Serialize(revealMsg);
-                try { bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(json); } catch { }
-            }
+            _statusBarController.UpdateLanguage(tab);
         }
 
         private async void OnSearchQueryInputKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
@@ -2923,9 +2509,8 @@ namespace TxtAIEditor
 
         private async Task OnTabReloadAsync(OpenedTab tab, TabViewItem tabItem)
         {
-            if (tab.IsPdfViewer && _pdfViewerWebViews.TryGetValue(tab.Id, out var pdfWebView))
+            if (_pdfViewerController.Reload(tab))
             {
-                pdfWebView.Reload();
                 _statusBarController.UpdateFileStats(tab);
                 _statusBarController.UpdateTotalLines(tab);
                 UpdateLanguageUI(tab);

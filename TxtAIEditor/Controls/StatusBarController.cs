@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Editor;
 
@@ -16,6 +17,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<OpenedTab, bool> _isActiveTab;
         private readonly Func<string, EditorDocumentSession?> _sessionProvider;
+        private readonly ILanguageDetectionService _languageDetectionService;
+        private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly Func<string, string, string> _getString;
         private readonly Func<XamlRoot> _xamlRootProvider;
         private readonly Func<ElementTheme> _themeProvider;
@@ -33,6 +36,8 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> activeTabProvider,
             Func<OpenedTab, bool> isActiveTab,
             Func<string, EditorDocumentSession?> sessionProvider,
+            ILanguageDetectionService languageDetectionService,
+            IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             Func<string, string, string> getString,
             Func<XamlRoot> xamlRootProvider,
             Func<ElementTheme> themeProvider,
@@ -47,6 +52,8 @@ namespace TxtAIEditor.Controls
             _activeTabProvider = activeTabProvider;
             _isActiveTab = isActiveTab;
             _sessionProvider = sessionProvider;
+            _languageDetectionService = languageDetectionService;
+            _tabBridges = tabBridges;
             _getString = getString;
             _xamlRootProvider = xamlRootProvider;
             _themeProvider = themeProvider;
@@ -169,6 +176,54 @@ namespace TxtAIEditor.Controls
 
             string lineEnding = _sessionProvider(tab.Id)?.Model.LineEnding == "\r\n" ? "CRLF" : "LF";
             _statusBar.LineEndingText.Text = lineEnding;
+        }
+
+        public void UpdateLanguage(OpenedTab tab)
+        {
+            if (tab == null)
+            {
+                return;
+            }
+
+            if (tab.IsImageViewer)
+            {
+                _statusBar.LanguageText.Text = "IMAGE";
+                return;
+            }
+
+            if (tab.IsPdfViewer)
+            {
+                _statusBar.LanguageText.Text = "PDF";
+                return;
+            }
+
+            if (tab.IsDocxViewer)
+            {
+                _statusBar.LanguageText.Text = "DOCX";
+                return;
+            }
+
+            string detected = tab.Language;
+            if (detected == "plaintext" || string.IsNullOrEmpty(detected))
+            {
+                string content = tab.Content;
+                if (_sessionProvider(tab.Id) is { } session)
+                {
+                    content = session.GetText(2000);
+                }
+                detected = _languageDetectionService.DetectLanguageFromContent(content, "plaintext");
+            }
+
+            _statusBar.LanguageText.Text = detected.ToUpper();
+
+            if (tab.Language != detected)
+            {
+                tab.Language = detected;
+                if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                {
+                    _ = bridgeGroup.Bridge.SetLanguageAsync(detected);
+                }
+            }
         }
 
         private async void OnEncodingSelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -36,7 +36,7 @@ namespace TxtAIEditor.Controls
         private readonly CustomSplitter _leftSplitter;
         private readonly CustomSplitter _rightSplitter;
         private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
-        private readonly IDictionary<string, WebView2> _pdfViewerWebViews;
+        private readonly PdfViewerController _pdfViewerController;
         private readonly StatusBarController _statusBarController;
         private readonly LivePreviewController _livePreviewController;
         private readonly LlmAssistantController _llmAssistantController;
@@ -75,7 +75,7 @@ namespace TxtAIEditor.Controls
             CustomSplitter leftSplitter,
             CustomSplitter rightSplitter,
             IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
-            IDictionary<string, WebView2> pdfViewerWebViews,
+            PdfViewerController pdfViewerController,
             StatusBarController statusBarController,
             LivePreviewController livePreviewController,
             LlmAssistantController llmAssistantController,
@@ -113,7 +113,7 @@ namespace TxtAIEditor.Controls
             _leftSplitter = leftSplitter;
             _rightSplitter = rightSplitter;
             _tabBridges = tabBridges;
-            _pdfViewerWebViews = pdfViewerWebViews;
+            _pdfViewerController = pdfViewerController;
             _statusBarController = statusBarController;
             _livePreviewController = livePreviewController;
             _llmAssistantController = llmAssistantController;
@@ -275,10 +275,7 @@ namespace TxtAIEditor.Controls
             {
                 WebViewAppearanceService.ApplyPreferredColorScheme(grp.WebView?.CoreWebView2, theme);
             }
-            foreach (var pdfWebView in _pdfViewerWebViews.Values)
-            {
-                WebViewAppearanceService.ApplyPreferredColorScheme(pdfWebView?.CoreWebView2, theme);
-            }
+            _pdfViewerController.ApplyPreferredColorScheme(theme);
         }
 
         private void ApplyMarkdownToolbarBackground(Windows.UI.Color color)
