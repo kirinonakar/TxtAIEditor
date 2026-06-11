@@ -41,6 +41,14 @@ function lineTextFromElement(element) {
     return (element.textContent || '').replace(/\u00a0/g, ' ');
 }
 
+function beginEditTransaction() {
+    post({ type: 'editTransactionStarted' });
+}
+
+function endEditTransaction() {
+    post({ type: 'editTransactionEnded' });
+}
+
 function makeEditablePlainText(element, caretColumn = null, restoreCaret = true) {
     if (!element || element.getAttribute('contenteditable') !== 'true') return null;
     const text = lineTextFromElement(element);
@@ -777,18 +785,23 @@ function insertTextAtCaret(text) {
         if (!cleanDirtyMarker(lineNumber)) {
             markDirty(lineNumber, 'mod');
         }
-        post({ type: 'lineChanged', lineNumber, text: firstLine });
-        for (let i = 1; i < parts.length; i++) {
-            const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
-            const nextLineNumber = lineNumber + i;
-            state.cache.set(nextLineNumber, nextText);
-            state.dirtyLines.set(nextLineNumber, 'add');
-            post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
-        }
+        beginEditTransaction();
+        try {
+            post({ type: 'lineChanged', lineNumber, text: firstLine });
+            for (let i = 1; i < parts.length; i++) {
+                const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
+                const nextLineNumber = lineNumber + i;
+                state.cache.set(nextLineNumber, nextText);
+                state.dirtyLines.set(nextLineNumber, 'add');
+                post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
+            }
 
+            post({ type: 'contentChanged' });
+        } finally {
+            endEditTransaction();
+        }
         state.lineCount += insertedCount;
         setupVirtualHeight();
-        post({ type: 'contentChanged' });
         queueRender(true);
         setTimeout(() => focusLine(lastLineNumber, parts[parts.length - 1]?.length || 0), 0);
         return;
@@ -1411,23 +1424,28 @@ function replaceColumnSelectionWith(selection, text, skipRender = false) {
     const useLineByLinePaste = lines.length === lineCount;
     const insertedLengthForCaret = useLineByLinePaste ? lines[0].length : replacementText.length;
 
-    for (let line = startLine; line <= endLine; line++) {
-        const originalText = state.cache.get(line) || '';
-        const replaceText = useLineByLinePaste ? lines[line - startLine] : replacementText;
+    beginEditTransaction();
+    try {
+        for (let line = startLine; line <= endLine; line++) {
+            const originalText = state.cache.get(line) || '';
+            const replaceText = useLineByLinePaste ? lines[line - startLine] : replacementText;
 
-        const sCol = Math.max(0, Math.min(startCol, originalText.length));
-        const eCol = Math.max(0, Math.min(endCol, originalText.length));
+            const sCol = Math.max(0, Math.min(startCol, originalText.length));
+            const eCol = Math.max(0, Math.min(endCol, originalText.length));
 
-        const nextText = originalText.slice(0, sCol) + replaceText + originalText.slice(eCol);
-        state.cache.set(line, nextText);
-    if (!cleanDirtyMarker(line)) {
-        markDirty(line, 'mod');
+            const nextText = originalText.slice(0, sCol) + replaceText + originalText.slice(eCol);
+            state.cache.set(line, nextText);
+            if (!cleanDirtyMarker(line)) {
+                markDirty(line, 'mod');
+            }
+            post({ type: 'lineChanged', lineNumber: line, text: nextText });
+        }
+
+        post({ type: 'contentChanged' });
+    } finally {
+        endEditTransaction();
     }
-        post({ type: 'lineChanged', lineNumber: line, text: nextText });
-    }
-
     state.cacheVersion++;
-    post({ type: 'contentChanged' });
 
     const nextCol = startCol + insertedLengthForCaret;
     state.selection = {
@@ -1687,14 +1705,19 @@ function replaceSelectionWith(selection, text, editSelection = null) {
 
     state.lineCount = Math.max(1, state.lineCount + netLines);
     setupVirtualHeight();
-    post({ type: 'lineChanged', lineNumber: start.line, text: newLines[0] });
-    for (let i = end.line; i > start.line; i--) {
-        post({ type: 'deleteLine', lineNumber: i });
+    beginEditTransaction();
+    try {
+        post({ type: 'lineChanged', lineNumber: start.line, text: newLines[0] });
+        for (let i = end.line; i > start.line; i--) {
+            post({ type: 'deleteLine', lineNumber: i });
+        }
+        for (let i = 1; i < newLines.length; i++) {
+            post({ type: 'insertLine', lineNumber: start.line + i, text: newLines[i] });
+        }
+        post({ type: 'contentChanged' });
+    } finally {
+        endEditTransaction();
     }
-    for (let i = 1; i < newLines.length; i++) {
-        post({ type: 'insertLine', lineNumber: start.line + i, text: newLines[i] });
-    }
-    post({ type: 'contentChanged' });
     if (editSelection) {
         const positionFromOffset = offset => {
             const safeOffset = Math.max(0, Math.min(offset, replacementText.length));
@@ -1841,11 +1864,17 @@ function toggleComment() {
         return true;
     })();
 
-    for (let line = startLine; line <= endLine; line++) {
-        toggleCommentForLine(line, syntax, shouldUncomment);
+    beginEditTransaction();
+    try {
+        for (let line = startLine; line <= endLine; line++) {
+            toggleCommentForLine(line, syntax, shouldUncomment);
+        }
+
+        post({ type: 'contentChanged' });
+    } finally {
+        endEditTransaction();
     }
 
-    post({ type: 'contentChanged' });
     queueRender(true);
     setTimeout(() => focusLine(startLine, 0), 0);
 }
@@ -1857,36 +1886,41 @@ function changeLineIndent(direction) {
     const indentText = ' '.repeat(Math.max(1, state.tabSize || 4));
     let changed = false;
 
-    for (let line = startLine; line <= endLine; line++) {
-        const original = state.cache.get(line);
-        if (original === undefined) continue;
+    beginEditTransaction();
+    try {
+        for (let line = startLine; line <= endLine; line++) {
+            const original = state.cache.get(line);
+            if (original === undefined) continue;
 
-        let next = original;
-        if (direction > 0) {
-            next = indentText + original;
-        } else if (original.startsWith('\t')) {
-            next = original.slice(1);
-        } else {
-            const leadingSpaces = original.match(/^ +/)?.[0].length || 0;
-            const removeCount = Math.min(indentText.length, leadingSpaces);
-            if (removeCount > 0) {
-                next = original.slice(removeCount);
+            let next = original;
+            if (direction > 0) {
+                next = indentText + original;
+            } else if (original.startsWith('\t')) {
+                next = original.slice(1);
+            } else {
+                const leadingSpaces = original.match(/^ +/)?.[0].length || 0;
+                const removeCount = Math.min(indentText.length, leadingSpaces);
+                if (removeCount > 0) {
+                    next = original.slice(removeCount);
+                }
+            }
+
+            if (next !== original) {
+                state.cache.set(line, next);
+                if (!cleanDirtyMarker(line)) {
+                    markDirty(line, 'mod');
+                }
+                post({ type: 'lineChanged', lineNumber: line, text: next });
+                changed = true;
             }
         }
 
-        if (next !== original) {
-            state.cache.set(line, next);
-            if (!cleanDirtyMarker(line)) {
-                markDirty(line, 'mod');
-            }
-            post({ type: 'lineChanged', lineNumber: line, text: next });
-            changed = true;
-        }
+        if (!changed) return;
+
+        post({ type: 'contentChanged' });
+    } finally {
+        endEditTransaction();
     }
-
-    if (!changed) return;
-
-    post({ type: 'contentChanged' });
     queueRender(true);
     setTimeout(() => focusLine(startLine, 0), 0);
 }

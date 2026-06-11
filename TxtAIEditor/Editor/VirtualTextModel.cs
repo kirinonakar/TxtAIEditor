@@ -620,6 +620,8 @@ namespace TxtAIEditor.Editor
 
         private DateTime _lastUndoPushTime = DateTime.MinValue;
         private int _lastUndoLineNumber = -1;
+        private int _undoGroupDepth;
+        private bool _undoGroupHasSnapshot;
 
         public EditorDocumentSession(OpenedTab tab, ITextModel model)
         {
@@ -636,6 +638,34 @@ namespace TxtAIEditor.Editor
         {
             Model = LineArrayTextModel.FromText(text);
             RefreshTabContentPreview();
+        }
+
+        public void BeginUndoGroup()
+        {
+            if (_undoGroupDepth == 0)
+            {
+                _undoGroupHasSnapshot = false;
+            }
+
+            _undoGroupDepth++;
+        }
+
+        public void EndUndoGroup()
+        {
+            if (_undoGroupDepth <= 0)
+            {
+                _undoGroupDepth = 0;
+                _undoGroupHasSnapshot = false;
+                return;
+            }
+
+            _undoGroupDepth--;
+            if (_undoGroupDepth == 0)
+            {
+                _undoGroupHasSnapshot = false;
+                _lastUndoPushTime = DateTime.MinValue;
+                _lastUndoLineNumber = -1;
+            }
         }
 
         public IReadOnlyList<string> GetLines(int startLine, int count) => Model.GetLines(startLine, count);
@@ -692,6 +722,8 @@ namespace TxtAIEditor.Editor
 
             _lastUndoPushTime = DateTime.MinValue;
             _lastUndoLineNumber = -1;
+            _undoGroupDepth = 0;
+            _undoGroupHasSnapshot = false;
 
             return text;
         }
@@ -707,6 +739,8 @@ namespace TxtAIEditor.Editor
 
             _lastUndoPushTime = DateTime.MinValue;
             _lastUndoLineNumber = -1;
+            _undoGroupDepth = 0;
+            _undoGroupHasSnapshot = false;
 
             return text;
         }
@@ -789,7 +823,16 @@ namespace TxtAIEditor.Editor
 
         private void PushUndo(bool isStructural = false, int lineNumber = -1)
         {
-            _redoStack.Clear();
+            if (_undoGroupDepth > 0)
+            {
+                if (!_undoGroupHasSnapshot)
+                {
+                    PushUndoSnapshot(lineNumber);
+                    _undoGroupHasSnapshot = true;
+                }
+
+                return;
+            }
 
             var now = DateTime.UtcNow;
             if (!isStructural && 
@@ -800,10 +843,16 @@ namespace TxtAIEditor.Editor
                 return;
             }
 
-            _undoStack.Add(Model.GetText());
+            PushUndoSnapshot(lineNumber);
             _lastUndoPushTime = now;
             _lastUndoLineNumber = lineNumber;
+        }
 
+        private void PushUndoSnapshot(int lineNumber)
+        {
+            _redoStack.Clear();
+            _undoStack.Add(Model.GetText());
+            _lastUndoLineNumber = lineNumber;
             if (_undoStack.Count > MaxUndoDepth)
             {
                 _undoStack.RemoveAt(0);

@@ -33,6 +33,8 @@ namespace TxtAIEditor.Editor
         public event Action<int, string, string>? LineSplitRequested;
         public event Action<int>? MergeLineWithPreviousRequested;
         public event Action<int>? DeleteLineRequested;
+        public event Action? EditTransactionStarted;
+        public event Action? EditTransactionEnded;
         public event Action<string, int, int, bool, bool, bool>? FindRequested;
         public event Action<string, bool, bool>? FindAllRequested;
         public event Action<string, string, bool, bool>? ReplaceAllRequested;
@@ -664,6 +666,14 @@ namespace TxtAIEditor.Editor
                             {
                                 DeleteLineRequested?.Invoke(deleteLineProp.GetInt32());
                             }
+                            break;
+
+                        case "editTransactionStarted":
+                            EditTransactionStarted?.Invoke();
+                            break;
+
+                        case "editTransactionEnded":
+                            EditTransactionEnded?.Invoke();
                             break;
 
                         case "find":

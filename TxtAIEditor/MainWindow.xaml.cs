@@ -1333,6 +1333,16 @@ namespace TxtAIEditor
                     lineNumber);
             };
 
+            bridge.EditTransactionStarted += () =>
+            {
+                getSession().BeginUndoGroup();
+            };
+
+            bridge.EditTransactionEnded += () =>
+            {
+                getSession().EndUndoGroup();
+            };
+
             bridge.FindRequested += async (query, startLine, startColumn, reverse, matchCase, isRegex) =>
             {
                 await _editorBridgeDocumentController.HandleFindRequestedAsync(
