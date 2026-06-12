@@ -28,8 +28,8 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- list_files {\"glob\":\"**/*.cs\",\"maxResults\":80}: list workspace files.");
             builder.AppendLine("- search_text {\"query\":\"needle\",\"glob\":\"**/*\",\"maxResults\":80}: simple workspace search across file paths and text-file contents.");
             builder.AppendLine("- run_rg {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}: ripgrep from workspace root.");
-            builder.AppendLine("- run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}: ripgrep-all for PDF/docx/etc.");
-            builder.AppendLine("- extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}: extract PDF/DOCX/PPTX into .txt, and XLSX into CSV-formatted .csv by default. Multi-sheet XLSX files are saved as separate files with _sheet1, _sheet2, etc. It records only the source and saved output path; use read_file on the generated file with targeted ranges when needed.");
+            builder.AppendLine("- run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}: ripgrep-all for PDF/DOCX/HWPX/etc.");
+            builder.AppendLine("- extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}: extract PDF/DOCX/PPTX/HWPX into .txt, and XLSX into CSV-formatted .csv by default. Multi-sheet XLSX files are saved as separate files with _sheet1, _sheet2, etc. It records only the source and saved output path; use read_file on the generated file with targeted ranges when needed.");
             builder.AppendLine("- read_file {\"path\":\"relative/path.cs\",\"startLine\":1,\"lineCount\":160}: read up to 5000 lines.");
             builder.AppendLine("- read_image {\"path\":\"relative/screenshot.png\"}: inspect an image file using the model's vision capability. Use for screenshots, diagrams, photos, UI captures, and image-only documents. The host attaches the image to the next model call; after the tool result, analyze the attached image directly.");
             builder.AppendLine("- create_file {\"path\":\"relative/path.txt\",\"content\":\"...\"}: create a workspace file.");
@@ -44,7 +44,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- run_powershell {\"command\":\"Get-ChildItem -Recurse -Filter *.cs\",\"timeoutMs\":10000}: real PowerShell from workspace root, read-only by default.");
             builder.AppendLine();
             builder.AppendLine("Tool choice and safety:");
-            builder.AppendLine("- Prefer internal tools. Use search_text for simple search, run_rg for regex/large search, extract_document for PDF/DOCX/PPTX/XLSX conversion, then read_file on the generated .txt/.csv in targeted ranges. Use run_rga only when specialized document search is needed. Report possible OCR need for scanned PDFs.");
+            builder.AppendLine("- Prefer internal tools. Use search_text for simple search, run_rg for regex/large search, extract_document for PDF/DOCX/PPTX/XLSX/HWPX conversion, then read_file on the generated .txt/.csv in targeted ranges. Use run_rga only when specialized document search is needed. Report possible OCR need for scanned PDFs.");
             builder.AppendLine("- Use run_powershell only for inspection such as Get-ChildItem, Get-Content, Select-String, git status/diff/log, dotnet build/test. Never use it to create/delete/overwrite/move/rename/download/install/run downloaded scripts/change permissions/change git history/system settings unless the user explicitly asks.");
             builder.AppendLine("- Do not treat list_files/search_text globs as PowerShell commands.");
             builder.AppendLine();

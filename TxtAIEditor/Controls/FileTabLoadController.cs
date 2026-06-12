@@ -95,9 +95,9 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                if (IsDocxFile(filePath))
+                if (IsReadOnlyDocumentFile(filePath))
                 {
-                    await OpenDocxFileAsync(filePath, repoRoot);
+                    await OpenReadOnlyDocumentFileAsync(filePath, repoRoot);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return;
                 }
@@ -211,15 +211,17 @@ namespace TxtAIEditor.Controls
             return Path.GetExtension(filePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsDocxFile(string filePath)
+        private static bool IsReadOnlyDocumentFile(string filePath)
         {
-            return Path.GetExtension(filePath).Equals(".docx", StringComparison.OrdinalIgnoreCase);
+            string extension = Path.GetExtension(filePath);
+            return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
         }
 
-        private async Task OpenDocxFileAsync(string filePath, string? repoRoot)
+        private async Task OpenReadOnlyDocumentFileAsync(string filePath, string? repoRoot)
         {
-            var docxService = new DocxTextExtractionService();
-            string extractedText = await docxService.ExtractTextAsync(filePath);
+            var documentService = new DocumentTextExtractionService();
+            string extractedText = await documentService.ExtractTextAsync(filePath, 50_000_000);
             _openNewTab(new FileTabOpenRequest
             {
                 FilePath = filePath,

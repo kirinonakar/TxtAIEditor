@@ -83,12 +83,12 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ### 🤖 AI Agent
 *   **Autonomous Problem Solving:** Solve complex, multi-step editing tasks automatically by allowing the AI agent to run workspace tools (file search, read/write, terminal command execution, and web search/retrieval).
     *   **Web Search & Fetch:** Supports real-time web search and webpage content extraction powered by the Exa API or Exa MCP server, allowing the agent to find live documentation, code samples, and up-to-date information. (Configurable via Exa API Key and Endpoint in the settings).   
-    *   **Document Extraction:** The agent can convert PDF, DOCX, PPTX, and XLSX files into readable workspace files via `extract_document`. PDF/DOCX/PPTX are saved as `.txt`, XLSX is exported as CSV, and multi-sheet XLSX files are split into `_sheet1.csv`, `_sheet2.csv`, etc. The agent records only the source and generated file paths, then reads targeted ranges from the converted files to avoid overflowing model context.
+    *   **Document Extraction:** The agent can convert PDF, DOCX, PPTX, XLSX, and HWPX files into readable workspace files via `extract_document`. PDF/DOCX/PPTX/HWPX are saved as `.txt`, XLSX is exported as CSV, and multi-sheet XLSX files are split into `_sheet1.csv`, `_sheet2.csv`, etc. The agent records only the source and generated file paths, then reads targeted ranges from the converted files to avoid overflowing model context.
 *   **Persona & System Instructions:** You can specify custom personas and system instructions for the AI agent.
  *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install:
      *   [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`)
      *   [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) for plain text and source code search.
-     *   [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`) for searching document formats (PDF, docx, etc.).
+     *   [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`) for searching document formats (PDF, DOCX, HWPX, etc.).
      *   [pdftotext](https://poppler.freedesktop.org/) (Xpdf/Poppler tools) for fast PDF conversion inside `extract_document`.
 
 ### 💻 Terminal

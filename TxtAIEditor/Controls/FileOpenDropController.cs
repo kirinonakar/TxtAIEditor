@@ -64,7 +64,9 @@ namespace TxtAIEditor.Controls
             ".gif",
             ".bmp",
             ".webp",
-            ".pdf"
+            ".pdf",
+            ".docx",
+            ".hwpx"
         };
 
         public FileOpenDropController(

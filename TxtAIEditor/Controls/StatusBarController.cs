@@ -199,7 +199,12 @@ namespace TxtAIEditor.Controls
 
             if (tab.IsDocxViewer)
             {
-                _statusBar.LanguageText.Text = "DOCX";
+                string extension = string.IsNullOrWhiteSpace(tab.FilePath)
+                    ? string.Empty
+                    : Path.GetExtension(tab.FilePath);
+                _statusBar.LanguageText.Text = extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase)
+                    ? "HWPX"
+                    : "DOCX";
                 return;
             }
 

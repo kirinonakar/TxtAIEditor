@@ -39,7 +39,7 @@ namespace TxtAIEditor.Controls
 
             bool effectiveReadOnly = isReadOnly ||
                 filePath?.EndsWith(".diff", StringComparison.OrdinalIgnoreCase) == true ||
-                filePath?.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) == true;
+                IsExtractedDocumentViewerFile(filePath);
 
             if (filePath != null)
             {
@@ -47,7 +47,7 @@ namespace TxtAIEditor.Controls
                 tab.Title = Path.GetFileName(filePath);
                 tab.Content = content;
                 tab.Language = _languageDetectionService.GetMonacoLanguageName(filePath);
-                if (filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+                if (IsExtractedDocumentViewerFile(filePath))
                 {
                     tab.IsDocxViewer = true;
                 }
@@ -65,6 +65,12 @@ namespace TxtAIEditor.Controls
             tab.OriginalEncodingName = encodingName;
 
             return new EditorTabDocumentParts(tab, session, effectiveReadOnly);
+        }
+
+        private static bool IsExtractedDocumentViewerFile(string? filePath)
+        {
+            return filePath?.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) == true ||
+                   filePath?.EndsWith(".hwpx", StringComparison.OrdinalIgnoreCase) == true;
         }
     }
 

@@ -125,8 +125,8 @@ namespace TxtAIEditor.Controls
             {
                 if (tab.IsDocxViewer)
                 {
-                    var docxService = new DocxTextExtractionService();
-                    string extractedText = await docxService.ExtractTextAsync(tab.FilePath);
+                    var documentService = new DocumentTextExtractionService();
+                    string extractedText = await documentService.ExtractTextAsync(tab.FilePath, 50_000_000);
                     var docxModel = LineArrayTextModel.FromText(extractedText);
                     ApplyTabReloadState(tab, docxModel, "UTF-8", false, extractedText);
 

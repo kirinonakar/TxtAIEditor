@@ -152,6 +152,7 @@ namespace TxtAIEditor
                 ".webp" => "\uEB9F",
                 ".pdf" => "\uE12A",
                 ".docx" => "\uE161",
+                ".hwpx" => "\uE161",
                 _ => "\uE160"       // Generic file icon
             };
         }

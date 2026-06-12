@@ -150,6 +150,7 @@ namespace TxtAIEditor.Controls
                 extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
@@ -316,7 +317,7 @@ namespace TxtAIEditor.Controls
         {
             if (string.IsNullOrWhiteSpace(path))
             {
-                return _getString("AgentExtractDocumentEmptyPath", "extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, or XLSX file path.");
+                return _getString("AgentExtractDocumentEmptyPath", "extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, XLSX, or HWPX file path.");
             }
 
             string fullPath;
@@ -337,7 +338,7 @@ namespace TxtAIEditor.Controls
             if (!DocumentTextExtractionService.IsSupportedExtension(fullPath))
             {
                 return string.Format(
-                    _getString("AgentExtractDocumentUnsupportedTypeFormat", "extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx."),
+                    _getString("AgentExtractDocumentUnsupportedTypeFormat", "extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx, .hwpx."),
                     Path.GetExtension(fullPath));
             }
 

@@ -32,6 +32,7 @@ namespace TxtAIEditor.Core.Services
                 changed |= RegisterFileType(".yaml", "TxtAIEditor.yaml", "YAML Document", executablePath);
                 changed |= RegisterFileType(".yml", "TxtAIEditor.yml", "YAML Document", executablePath);
                 changed |= RegisterFileType(".pdf", "TxtAIEditor.pdf", "PDF Document", executablePath);
+                changed |= RegisterFileType(".hwpx", "TxtAIEditor.hwpx", "HWPX Document", executablePath);
 
                 if (IsRunningPackaged())
                 {

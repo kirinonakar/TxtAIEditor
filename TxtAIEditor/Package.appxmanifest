@@ -103,6 +103,14 @@
             </uap:SupportedFileTypes>
           </uap:FileTypeAssociation>
         </uap:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="txtaieditor.hwpx">
+            <uap:DisplayName>TxtAIEditor HWPX</uap:DisplayName>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.hwpx</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
         <desktop4:Extension Category="windows.fileExplorerContextMenus">
           <desktop4:FileExplorerContextMenus>
             <desktop4:ItemType Type="*">

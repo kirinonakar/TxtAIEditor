@@ -35,6 +35,7 @@ namespace TxtAIEditor.Core.Services
                 ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
                 ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
                 ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
+                ".hwpx" => await ExtractHwpxTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
                 _ => string.Empty
             };
 
@@ -48,7 +49,8 @@ namespace TxtAIEditor.Core.Services
             return extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
-                extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
+                extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress)
@@ -290,6 +292,59 @@ namespace TxtAIEditor.Core.Services
             return builder.ToString();
         }
 
+        private static async Task<string> ExtractHwpxTextAsync(string filePath, int maxChars, IProgress<int>? progress)
+        {
+            using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
+            var sectionEntries = archive.Entries
+                .Where(entry => Regex.IsMatch(entry.FullName, @"^Contents/section\d+\.xml$", RegexOptions.IgnoreCase))
+                .OrderBy(entry => GetTrailingNumber(entry.FullName))
+                .ToList();
+
+            if (sectionEntries.Count == 0)
+            {
+                sectionEntries = archive.Entries
+                    .Where(entry =>
+                        entry.FullName.StartsWith("Contents/", StringComparison.OrdinalIgnoreCase) &&
+                        entry.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) &&
+                        !entry.FullName.EndsWith("/header.xml", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(entry => entry.FullName, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            var builder = new StringBuilder();
+            for (int sectionIndex = 0; sectionIndex < sectionEntries.Count; sectionIndex++)
+            {
+                ZipArchiveEntry sectionEntry = sectionEntries[sectionIndex];
+                progress?.Report(5 + (int)((sectionIndex / (double)Math.Max(1, sectionEntries.Count)) * 90));
+
+                XDocument section = await LoadXmlEntryAsync(sectionEntry).ConfigureAwait(false);
+                foreach (XElement paragraph in section.Descendants().Where(e => e.Name.LocalName == "p"))
+                {
+                    int before = builder.Length;
+                    AppendHwpxParagraphText(builder, paragraph, maxChars);
+                    if (builder.Length > before)
+                    {
+                        AppendLimited(builder, "\n", maxChars);
+                    }
+
+                    if (builder.Length >= maxChars)
+                    {
+                        break;
+                    }
+                }
+
+                if (builder.Length >= maxChars)
+                {
+                    break;
+                }
+
+                AppendLimited(builder, "\n", maxChars);
+            }
+
+            progress?.Report(95);
+            return builder.ToString();
+        }
+
         public static async Task<IReadOnlyList<ExtractedSpreadsheetSheet>> ExtractXlsxSheetsAsync(string filePath, int maxChars, IProgress<int>? progress = null)
         {
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
@@ -433,6 +488,46 @@ namespace TxtAIEditor.Core.Services
                     case "br":
                     case "cr":
                         builder.Append('\n');
+                        break;
+                }
+            }
+        }
+
+        private static void AppendHwpxParagraphText(StringBuilder builder, XElement paragraph, int maxChars)
+        {
+            foreach (XNode node in paragraph.DescendantNodes())
+            {
+                if (builder.Length >= maxChars)
+                {
+                    break;
+                }
+
+                if (node is XText textNode && textNode.Parent?.Name.LocalName == "t")
+                {
+                    AppendLimited(builder, textNode.Value, maxChars);
+                    continue;
+                }
+
+                if (node is not XElement element)
+                {
+                    continue;
+                }
+
+                switch (element.Name.LocalName)
+                {
+                    case "tab":
+                        AppendLimited(builder, "\t", maxChars);
+                        break;
+                    case "lineBreak":
+                    case "br":
+                    case "cr":
+                        AppendLimited(builder, "\n", maxChars);
+                        break;
+                    case "nbSpace":
+                        AppendLimited(builder, " ", maxChars);
+                        break;
+                    case "fwSpace":
+                        AppendLimited(builder, "\u3000", maxChars);
                         break;
                 }
             }
