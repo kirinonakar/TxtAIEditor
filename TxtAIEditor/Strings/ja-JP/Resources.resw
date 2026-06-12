@@ -2048,11 +2048,26 @@
    <data name="OpenExternalViewerTooltip" xml:space="preserve">
      <value>外部ビューアーで開く</value>
    </data>
+   <data name="ExternalViewerOpenTitle" xml:space="preserve">
+     <value>外部ビューアーを開く</value>
+   </data>
+   <data name="ExternalViewerOpenFailedTitle" xml:space="preserve">
+     <value>外部ビューアーを開けませんでした</value>
+   </data>
+   <data name="ExternalViewerNoActiveTab" xml:space="preserve">
+     <value>外部ビューアーで開くアクティブなタブがありません。</value>
+   </data>
+   <data name="ExternalViewerPathMissing" xml:space="preserve">
+     <value>設定 &gt; エディターで外部ビューアーのパスまたは実行エイリアスを先に指定してください。</value>
+   </data>
+   <data name="ExternalViewerStartFailedFormat" xml:space="preserve">
+     <value>外部ビューアーを起動できません: {0}{1}Shell 起動失敗: {2}{1}直接起動失敗: {3}</value>
+   </data>
    <data name="SettingsExternalViewerPath" xml:space="preserve">
-     <value>外部ビューアーのパス</value>
+     <value>外部ビューアーのパスまたは実行エイリアス</value>
    </data>
    <data name="SettingsExternalViewerPathPlaceholder" xml:space="preserve">
-     <value>C:\Program Files\Viewer\viewer.exe</value>
+     <value>uviewer または C:\Program Files\Viewer\viewer.exe</value>
    </data>
    <data name="SettingsExternalViewerArguments" xml:space="preserve">
      <value>外部ビューアーのパラメーター</value>

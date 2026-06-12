@@ -42,8 +42,17 @@ namespace TxtAIEditor.Core.Services
                 System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
             }
 
+            ApplyDefaults(loadedSettings);
             CurrentSettings = loadedSettings;
             IsLoaded = true;
+        }
+
+        private static void ApplyDefaults(EditorSettings settings)
+        {
+            if (string.IsNullOrWhiteSpace(settings.ExternalViewerPath))
+            {
+                settings.ExternalViewerPath = EditorSettings.DefaultExternalViewerPath;
+            }
         }
 
         public async Task SaveSettingsAsync(EditorSettings settings)

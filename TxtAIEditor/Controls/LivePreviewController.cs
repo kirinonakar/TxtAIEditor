@@ -31,6 +31,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string> _shortcutHandler;
         private readonly Action<int, double> _previewScrollRequested;
         private readonly Action<string, string> _showErrorMessage;
+        private readonly Func<string, string, string> _getString;
         private readonly DispatcherTimer _previewDebounceTimer;
         private readonly Dictionary<string, string> _mappedEditorDocumentDirectories = new Dictionary<string, string>();
         private readonly Dictionary<CoreWebView2, string> _mappedDocumentDirectoriesByWebView = new Dictionary<CoreWebView2, string>();
@@ -52,7 +53,8 @@ namespace TxtAIEditor.Controls
             Func<CoreWebView2WebMessageReceivedEventArgs, string> normalizeWebMessageJson,
             Action<string> shortcutHandler,
             Action<int, double> previewScrollRequested,
-            Action<string, string> showErrorMessage)
+            Action<string, string> showErrorMessage,
+            Func<string, string, string> getString)
         {
             _previewPane = previewPane;
             _settingsService = settingsService;
@@ -66,6 +68,7 @@ namespace TxtAIEditor.Controls
             _shortcutHandler = shortcutHandler;
             _previewScrollRequested = previewScrollRequested;
             _showErrorMessage = showErrorMessage;
+            _getString = getString;
 
             _previewPane.PreviewModeSelectionChanged += OnPreviewModeSelectionChanged;
             _previewPane.OpenPreviewInBrowserClick += OnOpenPreviewInBrowserClick;
@@ -528,7 +531,9 @@ namespace TxtAIEditor.Controls
             var tab = _activeTabProvider();
             if (tab == null)
             {
-                _showErrorMessage("외부 뷰어 열기", "외부 뷰어로 열 활성 탭이 없습니다.");
+                _showErrorMessage(
+                    _getString("ExternalViewerOpenTitle", "외부 뷰어 열기"),
+                    _getString("ExternalViewerNoActiveTab", "외부 뷰어로 열 활성 탭이 없습니다."));
                 return;
             }
 
@@ -536,13 +541,9 @@ namespace TxtAIEditor.Controls
             string viewerPath = settings.ExternalViewerPath?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(viewerPath))
             {
-                _showErrorMessage("외부 뷰어 열기", "설정 > 편집에서 외부 뷰어 경로를 먼저 지정해 주세요.");
-                return;
-            }
-
-            if (!File.Exists(viewerPath))
-            {
-                _showErrorMessage("외부 뷰어 열기 실패", $"외부 뷰어를 찾을 수 없습니다: {viewerPath}");
+                _showErrorMessage(
+                    _getString("ExternalViewerOpenTitle", "외부 뷰어 열기"),
+                    _getString("ExternalViewerPathMissing", "설정 > 편집에서 외부 뷰어 경로 또는 실행 별칭을 먼저 지정해 주세요."));
                 return;
             }
 
@@ -550,19 +551,50 @@ namespace TxtAIEditor.Controls
             {
                 string targetPath = await GetExternalViewerTargetPathAsync(tab);
                 string arguments = BuildExternalViewerArguments(settings.ExternalViewerArguments, targetPath);
+                string workingDirectory = Path.GetDirectoryName(targetPath) ?? string.Empty;
 
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = viewerPath,
-                    Arguments = arguments,
-                    UseShellExecute = true,
-                    WorkingDirectory = Path.GetDirectoryName(targetPath) ?? string.Empty
-                });
+                StartExternalViewer(viewerPath, arguments, workingDirectory);
             }
             catch (Exception ex)
             {
-                _showErrorMessage("외부 뷰어 열기 실패", ex.Message);
+                _showErrorMessage(_getString("ExternalViewerOpenFailedTitle", "외부 뷰어 열기 실패"), ex.Message);
             }
+        }
+
+        private void StartExternalViewer(string viewerPath, string arguments, string workingDirectory)
+        {
+            try
+            {
+                Process.Start(CreateExternalViewerStartInfo(viewerPath, arguments, workingDirectory, useShellExecute: true));
+            }
+            catch (Exception shellException)
+            {
+                try
+                {
+                    Process.Start(CreateExternalViewerStartInfo(viewerPath, arguments, workingDirectory, useShellExecute: false));
+                }
+                catch (Exception directException)
+                {
+                    throw new InvalidOperationException(
+                        string.Format(
+                            _getString("ExternalViewerStartFailedFormat", "외부 뷰어를 실행할 수 없습니다: {0}{1}Shell 실행 실패: {2}{1}직접 실행 실패: {3}"),
+                            viewerPath,
+                            Environment.NewLine,
+                            shellException.Message,
+                            directException.Message));
+                }
+            }
+        }
+
+        private static ProcessStartInfo CreateExternalViewerStartInfo(string viewerPath, string arguments, string workingDirectory, bool useShellExecute)
+        {
+            return new ProcessStartInfo
+            {
+                FileName = viewerPath,
+                Arguments = arguments,
+                UseShellExecute = useShellExecute,
+                WorkingDirectory = workingDirectory
+            };
         }
 
         private async Task<string> GetExternalViewerTargetPathAsync(OpenedTab tab)

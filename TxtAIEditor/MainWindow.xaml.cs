@@ -283,7 +283,8 @@ namespace TxtAIEditor
                 NormalizeWebMessageJson,
                 HandleWebViewShortcut,
                 SyncPreviewScrollToEditors,
-                _dialogController.ShowErrorMessage);
+                _dialogController.ShowErrorMessage,
+                GetLocalizedString);
             _editorWebViewInitializationController = new EditorWebViewInitializationController(
                 _settingsService,
                 _livePreviewController);

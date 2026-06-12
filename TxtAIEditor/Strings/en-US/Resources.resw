@@ -2047,11 +2047,26 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
    <data name="OpenExternalViewerTooltip" xml:space="preserve">
      <value>Open in External Viewer</value>
    </data>
+   <data name="ExternalViewerOpenTitle" xml:space="preserve">
+     <value>Open External Viewer</value>
+   </data>
+   <data name="ExternalViewerOpenFailedTitle" xml:space="preserve">
+     <value>Failed to Open External Viewer</value>
+   </data>
+   <data name="ExternalViewerNoActiveTab" xml:space="preserve">
+     <value>There is no active tab to open in the external viewer.</value>
+   </data>
+   <data name="ExternalViewerPathMissing" xml:space="preserve">
+     <value>Set the external viewer path or command alias in Settings &gt; Editor first.</value>
+   </data>
+   <data name="ExternalViewerStartFailedFormat" xml:space="preserve">
+     <value>Could not start the external viewer: {0}{1}Shell launch failed: {2}{1}Direct launch failed: {3}</value>
+   </data>
    <data name="SettingsExternalViewerPath" xml:space="preserve">
-     <value>External Viewer Path</value>
+     <value>External Viewer Path or Command Alias</value>
    </data>
    <data name="SettingsExternalViewerPathPlaceholder" xml:space="preserve">
-     <value>C:\Program Files\Viewer\viewer.exe</value>
+     <value>uviewer or C:\Program Files\Viewer\viewer.exe</value>
    </data>
    <data name="SettingsExternalViewerArguments" xml:space="preserve">
      <value>External Viewer Arguments</value>

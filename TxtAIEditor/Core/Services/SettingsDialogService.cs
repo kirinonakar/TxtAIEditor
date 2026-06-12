@@ -94,7 +94,7 @@ namespace TxtAIEditor.Core.Services
             var tabSizeBox = new TextBox { PlaceholderText = "예: 4", Text = settings.TabSize.ToString(), HorizontalAlignment = HorizontalAlignment.Stretch };
             var homeFolderBox = new TextBox { PlaceholderText = getString("SettingsHomeFolderPlaceholder", "C:\\Users\\..."), Text = settings.HomeFolderPath, Width = 420, IsSpellCheckEnabled = false };
             var homeFolderBrowseButton = new Button { Content = "...", Width = 32, Height = 32, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-            var externalViewerPathBox = new TextBox { PlaceholderText = getString("SettingsExternalViewerPathPlaceholder", "C:\\Program Files\\Viewer\\viewer.exe"), Text = settings.ExternalViewerPath, Width = 420, IsSpellCheckEnabled = false };
+            var externalViewerPathBox = new TextBox { PlaceholderText = getString("SettingsExternalViewerPathPlaceholder", "uviewer 또는 C:\\Program Files\\Viewer\\viewer.exe"), Text = settings.ExternalViewerPath, Width = 420, IsSpellCheckEnabled = false };
             var externalViewerBrowseButton = new Button { Content = "...", Width = 32, Height = 32, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             var externalViewerArgumentsBox = new TextBox
             {

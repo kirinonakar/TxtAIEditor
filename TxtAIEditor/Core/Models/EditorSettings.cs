@@ -5,6 +5,8 @@ namespace TxtAIEditor.Core.Models
 {
     public class EditorSettings
     {
+        public const string DefaultExternalViewerPath = "uviewer";
+
         public string Theme { get; set; } = "Dark";
         public string FontFamily { get; set; } = "Consolas, 'Courier New', monospace";
         public double FontSize { get; set; } = 14.0;
@@ -27,7 +29,7 @@ namespace TxtAIEditor.Core.Models
         public bool AutoSave { get; set; } = false;
         public bool AutoSaveAllowNonGitFolders { get; set; } = false;
         public string PreviewMode { get; set; } = "Markdown";
-        public string ExternalViewerPath { get; set; } = string.Empty;
+        public string ExternalViewerPath { get; set; } = DefaultExternalViewerPath;
         public string ExternalViewerArguments { get; set; } = string.Empty;
         public bool LeftSidebarVisible { get; set; } = true;
         public bool RightSidebarVisible { get; set; } = true;
