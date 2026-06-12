@@ -94,6 +94,15 @@ namespace TxtAIEditor.Core.Services
             var tabSizeBox = new TextBox { PlaceholderText = "예: 4", Text = settings.TabSize.ToString(), HorizontalAlignment = HorizontalAlignment.Stretch };
             var homeFolderBox = new TextBox { PlaceholderText = getString("SettingsHomeFolderPlaceholder", "C:\\Users\\..."), Text = settings.HomeFolderPath, Width = 420, IsSpellCheckEnabled = false };
             var homeFolderBrowseButton = new Button { Content = "...", Width = 32, Height = 32, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            var externalViewerPathBox = new TextBox { PlaceholderText = getString("SettingsExternalViewerPathPlaceholder", "C:\\Program Files\\Viewer\\viewer.exe"), Text = settings.ExternalViewerPath, Width = 420, IsSpellCheckEnabled = false };
+            var externalViewerBrowseButton = new Button { Content = "...", Width = 32, Height = 32, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            var externalViewerArgumentsBox = new TextBox
+            {
+                PlaceholderText = getString("SettingsExternalViewerArgumentsPlaceholder", "예: --open {file}"),
+                Text = settings.ExternalViewerArguments,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                IsSpellCheckEnabled = false
+            };
             var terminalProfileCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             foreach (var profile in TerminalShellProfile.GetProfiles())
             {
@@ -569,6 +578,35 @@ namespace TxtAIEditor.Core.Services
                 if (folder != null)
                 {
                     homeFolderBox.Text = folder.Path;
+                }
+            };
+
+            AddLabel(editorSection, getString("SettingsExternalViewerPath", "외부 뷰어 경로"));
+            var externalViewerPanel = new StackPanel { Orientation = Orientation.Horizontal };
+            externalViewerPanel.Children.Add(externalViewerPathBox);
+            externalViewerPanel.Children.Add(externalViewerBrowseButton);
+            editorSection.Children.Add(externalViewerPanel);
+            AddLabel(editorSection, getString("SettingsExternalViewerArguments", "외부 뷰어 파라미터"));
+            editorSection.Children.Add(externalViewerArgumentsBox);
+            editorSection.Children.Add(new TextBlock
+            {
+                Text = getString("SettingsExternalViewerArgumentsInfo", "{file} 위치에 현재 파일 경로를 넣습니다. {file}이 없으면 마지막 인자로 파일 경로를 자동 추가합니다."),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11
+            });
+
+            externalViewerBrowseButton.Click += async (_, _) =>
+            {
+                if (initializePickerWindow == null) return;
+                var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.ComputerFolder };
+                initializePickerWindow(picker);
+                picker.FileTypeFilter.Add(".exe");
+                picker.FileTypeFilter.Add(".bat");
+                picker.FileTypeFilter.Add(".cmd");
+                var file = await picker.PickSingleFileAsync();
+                if (file != null)
+                {
+                    externalViewerPathBox.Text = file.Path;
                 }
             };
 
@@ -1155,6 +1193,8 @@ SOFTWARE.",
                 settings.TabSize = Math.Clamp(tabSize, 1, 16);
             }
             settings.HomeFolderPath = homeFolderBox.Text.Trim();
+            settings.ExternalViewerPath = externalViewerPathBox.Text.Trim();
+            settings.ExternalViewerArguments = externalViewerArgumentsBox.Text.Trim();
             settings.TerminalProfile = (terminalProfileCombo.SelectedItem as TerminalProfileChoice)?.Id ?? "PowerShell";
 
             settings.LlmProvider = GetSelectedProviderName();

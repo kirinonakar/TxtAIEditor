@@ -2038,6 +2038,27 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
    <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
      <value>C:\Users\...\Documents</value>
    </data>
+   <data name="ExplorerHomeFolderTooltip" xml:space="preserve">
+     <value>Go to Home Folder</value>
+   </data>
+   <data name="OpenExternalViewerTooltip" xml:space="preserve">
+     <value>Open in External Viewer</value>
+   </data>
+   <data name="SettingsExternalViewerPath" xml:space="preserve">
+     <value>External Viewer Path</value>
+   </data>
+   <data name="SettingsExternalViewerPathPlaceholder" xml:space="preserve">
+     <value>C:\Program Files\Viewer\viewer.exe</value>
+   </data>
+   <data name="SettingsExternalViewerArguments" xml:space="preserve">
+     <value>External Viewer Arguments</value>
+   </data>
+   <data name="SettingsExternalViewerArgumentsPlaceholder" xml:space="preserve">
+     <value>e.g., --open {file}</value>
+   </data>
+   <data name="SettingsExternalViewerArgumentsInfo" xml:space="preserve">
+     <value>Use {file} where the current file path should be inserted. If {file} is omitted, the file path is added as the last argument.</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key is invalid. Please check your settings first.</value>
    </data>

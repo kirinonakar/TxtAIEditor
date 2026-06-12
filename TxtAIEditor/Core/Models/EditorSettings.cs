@@ -27,6 +27,8 @@ namespace TxtAIEditor.Core.Models
         public bool AutoSave { get; set; } = false;
         public bool AutoSaveAllowNonGitFolders { get; set; } = false;
         public string PreviewMode { get; set; } = "Markdown";
+        public string ExternalViewerPath { get; set; } = string.Empty;
+        public string ExternalViewerArguments { get; set; } = string.Empty;
         public bool LeftSidebarVisible { get; set; } = true;
         public bool RightSidebarVisible { get; set; } = true;
         public bool DefaultMarkdownEnabled { get; set; } = true;

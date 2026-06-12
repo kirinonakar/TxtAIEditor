@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<int> _showLeftSidebarPage;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly ILocalizationService _localizationService;
+        private readonly Func<string> _homeFolderPathProvider;
 
         public enum ExplorerSortMode
         {
@@ -47,7 +48,8 @@ namespace TxtAIEditor.Controls
             Action ensureLeftPanelVisible,
             Action<int> showLeftSidebarPage,
             Func<string, Task> loadFileIntoTabAsync,
-            ILocalizationService localizationService)
+            ILocalizationService localizationService,
+            Func<string> homeFolderPathProvider)
         {
             _leftSidebar = leftSidebar;
             _viewModel = viewModel;
@@ -61,6 +63,7 @@ namespace TxtAIEditor.Controls
             _showLeftSidebarPage = showLeftSidebarPage;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _localizationService = localizationService;
+            _homeFolderPathProvider = homeFolderPathProvider;
 
             WireEvents();
             UpdateSortButtonVisuals();
@@ -121,6 +124,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.RefreshClick += OnExplorerRefreshClick;
             _leftSidebar.SortClick += OnExplorerSortClick;
             _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
+            _leftSidebar.ExplorerHomeClick += OnExplorerHomeClick;
             _leftSidebar.FileListViewDoubleTapped += OnFileListViewDoubleTapped;
         }
 
@@ -163,6 +167,20 @@ namespace TxtAIEditor.Controls
             };
             startInfo.ArgumentList.Add(CurrentFolderPath);
             Process.Start(startInfo);
+        }
+
+        private async void OnExplorerHomeClick(object sender, RoutedEventArgs e)
+        {
+            string homeFolderPath = _homeFolderPathProvider()?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(homeFolderPath) || !Directory.Exists(homeFolderPath))
+            {
+                homeFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            }
+
+            if (!string.IsNullOrWhiteSpace(homeFolderPath) && Directory.Exists(homeFolderPath))
+            {
+                await NavigateToFolderAsync(homeFolderPath);
+            }
         }
 
         private void OnExplorerUpClick(object sender, RoutedEventArgs e)

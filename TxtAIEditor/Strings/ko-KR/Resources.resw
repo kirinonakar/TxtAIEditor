@@ -2038,6 +2038,27 @@
    <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
      <value>C:\Users\...\Documents</value>
    </data>
+   <data name="ExplorerHomeFolderTooltip" xml:space="preserve">
+     <value>홈 폴더로 이동</value>
+   </data>
+   <data name="OpenExternalViewerTooltip" xml:space="preserve">
+     <value>외부 뷰어로 열기</value>
+   </data>
+   <data name="SettingsExternalViewerPath" xml:space="preserve">
+     <value>외부 뷰어 경로</value>
+   </data>
+   <data name="SettingsExternalViewerPathPlaceholder" xml:space="preserve">
+     <value>C:\Program Files\Viewer\viewer.exe</value>
+   </data>
+   <data name="SettingsExternalViewerArguments" xml:space="preserve">
+     <value>외부 뷰어 파라미터</value>
+   </data>
+   <data name="SettingsExternalViewerArgumentsPlaceholder" xml:space="preserve">
+     <value>예: --open {file}</value>
+   </data>
+   <data name="SettingsExternalViewerArgumentsInfo" xml:space="preserve">
+     <value>{file} 위치에 현재 파일 경로를 넣습니다. {file}이 없으면 마지막 인자로 파일 경로를 자동 추가합니다.</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.</value>
    </data>

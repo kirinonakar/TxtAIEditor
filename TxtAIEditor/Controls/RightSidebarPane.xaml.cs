@@ -15,6 +15,7 @@ namespace TxtAIEditor.Controls
 
         public event SelectionChangedEventHandler? PreviewModeSelectionChanged;
         public event RoutedEventHandler? OpenPreviewInBrowserClick;
+        public event RoutedEventHandler? OpenExternalViewerClick;
         public event RoutedEventHandler? LlmAddFileContextClick;
         public event RoutedEventHandler? LlmRemoveFileContextClick;
         public event RoutedEventHandler? LlmExplainClick;
@@ -48,6 +49,7 @@ namespace TxtAIEditor.Controls
         public ComboBoxItem ComboCsv => ComboItemCsv;
         public Button OpenBrowserBtn => OpenBrowserButton;
         public TextBlock OpenBrowserBtnText => OpenBrowserButtonText;
+        public Button OpenExternalViewerBtn => OpenExternalViewerButton;
         public TabViewItem AiAssistantTabItem => AiAssistantTab;
         public TabViewItem AgentTabItem => AgentTab;
         public Button LlmAddFileCtxButton => LlmAddFileContextButton;
@@ -78,6 +80,7 @@ namespace TxtAIEditor.Controls
             ComboItemCsv.Content = getString("ComboItemCsv", "CSV Table");
             OpenBrowserButtonText.Text = getString("OpenInBrowserButtonText", "브라우저");
             ToolTipService.SetToolTip(OpenBrowserButton, getString("OpenInBrowserTooltip", "HTML 미리보기를 브라우저로 열기"));
+            ToolTipService.SetToolTip(OpenExternalViewerButton, getString("OpenExternalViewerTooltip", "외부 뷰어로 열기"));
 
             AiAssistantTab.Header = getString("AiAssistantTabHeader", "AI Assistant");
             AgentTab.Header = getString("AgentTabHeader", "Agent");
@@ -144,6 +147,11 @@ namespace TxtAIEditor.Controls
         private void OnOpenPreviewInBrowserClick(object sender, RoutedEventArgs e)
         {
             OpenPreviewInBrowserClick?.Invoke(sender, e);
+        }
+
+        private void OnOpenExternalViewerClick(object sender, RoutedEventArgs e)
+        {
+            OpenExternalViewerClick?.Invoke(sender, e);
         }
 
         private void OnLlmAddFileContextClick(object sender, RoutedEventArgs e)

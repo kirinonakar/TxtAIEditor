@@ -75,6 +75,9 @@
                                                 <TextBlock x:Name="OpenBrowserButtonText" Text="브라우저" FontSize="11" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
+                                        <Button x:Name="OpenExternalViewerButton" Click="OnOpenExternalViewerClick" Height="24" Width="28" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="외부 뷰어로 열기">
+                                            <FontIcon Glyph="&#xE8A7;" FontSize="13"/>
+                                        </Button>
                                     </StackPanel>
                                 </Border>
     

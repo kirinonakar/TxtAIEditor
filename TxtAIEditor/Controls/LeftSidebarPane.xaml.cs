@@ -59,6 +59,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? RefreshClick;
         public event RoutedEventHandler? SortClick;
         public event RoutedEventHandler? OpenInWindowsExplorerClick;
+        public event RoutedEventHandler? ExplorerHomeClick;
         public event DoubleTappedEventHandler? FileListViewDoubleTapped;
         public event RightTappedEventHandler? FileListViewItemRightTapped;
         public event RoutedEventHandler? AddFileToFavoritesClick;
@@ -139,6 +140,7 @@ namespace TxtAIEditor.Controls
         public Button ExplorerRefreshBtn => ExplorerRefreshButton;
         public Button ExplorerSortBtn => ExplorerSortButton;
         public Button ExplorerOpenInWindowsBtn => ExplorerOpenInWindowsButton;
+        public Button ExplorerHomeBtn => ExplorerHomeButton;
 
         public ListView FileList => FileListView;
         public ListView FavoritesList => FavoritesListView;
@@ -197,6 +199,9 @@ namespace TxtAIEditor.Controls
             var openInWindowsExplorerText = getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기");
             ToolTipService.SetToolTip(ExplorerOpenInWindowsButton, openInWindowsExplorerText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerOpenInWindowsButton, openInWindowsExplorerText);
+            var homeFolderText = getString("ExplorerHomeFolderTooltip", "홈 폴더로 이동");
+            ToolTipService.SetToolTip(ExplorerHomeButton, homeFolderText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerHomeButton, homeFolderText);
 
             FavoritesFileTab.Content = getString("FavoritesFileTab", "파일");
             FavoritesFolderTab.Content = getString("FavoritesFolderTab", "폴더");
@@ -277,6 +282,7 @@ namespace TxtAIEditor.Controls
         private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e) => OpenInWindowsExplorerClick?.Invoke(sender, e);
+        private void OnExplorerHomeClick(object sender, RoutedEventArgs e) => ExplorerHomeClick?.Invoke(sender, e);
         private void OnFileListViewDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => FileListViewDoubleTapped?.Invoke(sender, e);
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e) => FileListViewItemRightTapped?.Invoke(sender, e);
         private void OnAddFileToFavoritesClick(object sender, RoutedEventArgs e) => AddFileToFavoritesClick?.Invoke(sender, e);

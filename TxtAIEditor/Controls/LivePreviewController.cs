@@ -69,6 +69,7 @@ namespace TxtAIEditor.Controls
 
             _previewPane.PreviewModeSelectionChanged += OnPreviewModeSelectionChanged;
             _previewPane.OpenPreviewInBrowserClick += OnOpenPreviewInBrowserClick;
+            _previewPane.OpenExternalViewerClick += OnOpenExternalViewerClick;
 
             _previewDebounceTimer = new DispatcherTimer
             {
@@ -479,6 +480,11 @@ namespace TxtAIEditor.Controls
             await OpenInBrowserAsync();
         }
 
+        private async void OnOpenExternalViewerClick(object sender, RoutedEventArgs e)
+        {
+            await OpenExternalViewerAsync();
+        }
+
         private async Task OpenInBrowserAsync()
         {
             var tab = _activeTabProvider();
@@ -515,6 +521,116 @@ namespace TxtAIEditor.Controls
             {
                 _showErrorMessage("브라우저 열기 실패", ex.Message);
             }
+        }
+
+        private async Task OpenExternalViewerAsync()
+        {
+            var tab = _activeTabProvider();
+            if (tab == null)
+            {
+                _showErrorMessage("외부 뷰어 열기", "외부 뷰어로 열 활성 탭이 없습니다.");
+                return;
+            }
+
+            var settings = _settingsService.CurrentSettings;
+            string viewerPath = settings.ExternalViewerPath?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(viewerPath))
+            {
+                _showErrorMessage("외부 뷰어 열기", "설정 > 편집에서 외부 뷰어 경로를 먼저 지정해 주세요.");
+                return;
+            }
+
+            if (!File.Exists(viewerPath))
+            {
+                _showErrorMessage("외부 뷰어 열기 실패", $"외부 뷰어를 찾을 수 없습니다: {viewerPath}");
+                return;
+            }
+
+            try
+            {
+                string targetPath = await GetExternalViewerTargetPathAsync(tab);
+                string arguments = BuildExternalViewerArguments(settings.ExternalViewerArguments, targetPath);
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = viewerPath,
+                    Arguments = arguments,
+                    UseShellExecute = true,
+                    WorkingDirectory = Path.GetDirectoryName(targetPath) ?? string.Empty
+                });
+            }
+            catch (Exception ex)
+            {
+                _showErrorMessage("외부 뷰어 열기 실패", ex.Message);
+            }
+        }
+
+        private async Task<string> GetExternalViewerTargetPathAsync(OpenedTab tab)
+        {
+            if (!string.IsNullOrWhiteSpace(tab.FilePath) && File.Exists(tab.FilePath))
+            {
+                return tab.FilePath;
+            }
+
+            string previewDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "ExternalViewer");
+            Directory.CreateDirectory(previewDir);
+
+            string extension = ResolveTemporaryExtension(tab);
+            string targetPath = Path.Combine(previewDir, $"preview-{tab.Id}{extension}");
+            string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
+            await File.WriteAllTextAsync(targetPath, previewText, Encoding.UTF8);
+            return targetPath;
+        }
+
+        private static string ResolveTemporaryExtension(OpenedTab tab)
+        {
+            if (!string.IsNullOrWhiteSpace(tab.FilePath))
+            {
+                string fileExtension = Path.GetExtension(tab.FilePath);
+                if (!string.IsNullOrWhiteSpace(fileExtension))
+                {
+                    return fileExtension;
+                }
+            }
+
+            return tab.Language?.ToLowerInvariant() switch
+            {
+                "html" => ".html",
+                "csv" => ".csv",
+                "latex" => ".tex",
+                _ => ".md"
+            };
+        }
+
+        private static string BuildExternalViewerArguments(string? argumentTemplate, string targetPath)
+        {
+            string quotedPath = QuoteArgument(targetPath);
+            string template = argumentTemplate?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                return quotedPath;
+            }
+
+            if (template.Contains("{file}", StringComparison.OrdinalIgnoreCase))
+            {
+                return RegexReplaceFilePlaceholder(template, quotedPath);
+            }
+
+            return $"{template} {quotedPath}";
+        }
+
+        private static string RegexReplaceFilePlaceholder(string template, string quotedPath)
+        {
+            return System.Text.RegularExpressions.Regex.Replace(
+                template,
+                "\\{file\\}",
+                quotedPath.Replace("$", "$$"),
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        private static string QuoteArgument(string value)
+        {
+            return "\"" + value.Replace("\"", "\\\"") + "\"";
         }
 
         private void OnPreviewWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)

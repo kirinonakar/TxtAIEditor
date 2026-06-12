@@ -440,7 +440,8 @@ namespace TxtAIEditor
                 EnsureLeftPanelVisible,
                 ShowLeftSidebarPage,
                 LoadFileIntoTabAsync,
-                _localizationService);
+                _localizationService,
+                () => _settingsService.CurrentSettings.HomeFolderPath);
             _favoritesRecentController = new FavoritesRecentController(
                 _settingsService,
                 _recentFilesService,

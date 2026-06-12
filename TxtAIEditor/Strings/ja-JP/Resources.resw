@@ -2039,6 +2039,27 @@
    <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
      <value>C:\Users\...\Documents</value>
    </data>
+   <data name="ExplorerHomeFolderTooltip" xml:space="preserve">
+     <value>ホームフォルダへ移動</value>
+   </data>
+   <data name="OpenExternalViewerTooltip" xml:space="preserve">
+     <value>外部ビューアーで開く</value>
+   </data>
+   <data name="SettingsExternalViewerPath" xml:space="preserve">
+     <value>外部ビューアーのパス</value>
+   </data>
+   <data name="SettingsExternalViewerPathPlaceholder" xml:space="preserve">
+     <value>C:\Program Files\Viewer\viewer.exe</value>
+   </data>
+   <data name="SettingsExternalViewerArguments" xml:space="preserve">
+     <value>外部ビューアーのパラメーター</value>
+   </data>
+   <data name="SettingsExternalViewerArgumentsPlaceholder" xml:space="preserve">
+     <value>例: --open {file}</value>
+   </data>
+   <data name="SettingsExternalViewerArgumentsInfo" xml:space="preserve">
+     <value>{file} の位置に現在のファイルパスを挿入します。{file} がない場合、ファイルパスを最後の引数として自動追加します。</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key が無効です。設定を先に確認してください。</value>
    </data>
