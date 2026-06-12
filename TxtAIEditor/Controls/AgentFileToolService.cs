@@ -29,6 +29,7 @@ namespace TxtAIEditor.Controls
         };
 
         private readonly Func<string> _workspaceRootProvider;
+        private readonly DocumentTextExtractionService _documentTextExtractionService = new();
 
         public AgentFileToolService(Func<string> workspaceRootProvider)
         {
@@ -161,6 +162,118 @@ namespace TxtAIEditor.Controls
             return builder.ToString();
         }
 
+        public async Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, or XLSX file path.";
+            }
+
+            string fullPath;
+            try
+            {
+                fullPath = ResolveInsideWorkspace(path, allowOutside: true);
+            }
+            catch (Exception ex)
+            {
+                return $"extract_document failed: {ex.Message}";
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                return BuildMissingFileMessage("extract_document", path);
+            }
+
+            if (!DocumentTextExtractionService.IsSupportedExtension(fullPath))
+            {
+                return $"extract_document failed: unsupported file type '{Path.GetExtension(fullPath)}'. Supported types: .pdf, .docx, .pptx, .xlsx.";
+            }
+
+            int limit = Math.Clamp(maxChars <= 0 ? 5000000 : maxChars, 1, 50000000);
+            string text = await _documentTextExtractionService.ExtractTextAsync(fullPath, limit);
+            string relativePath = RelativePath(ResolveWorkspaceRoot(), fullPath);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return $"extract_document: no text extracted from {relativePath}. If this is a scanned PDF or image-only document, OCR may be required.";
+            }
+
+            string targetFullPath;
+            try
+            {
+                targetFullPath = string.IsNullOrWhiteSpace(outputPath)
+                    ? GetDefaultExtractedTextPath(fullPath)
+                    : ResolveInsideWorkspace(outputPath);
+            }
+            catch (Exception ex)
+            {
+                return $"extract_document failed: {ex.Message}";
+            }
+
+            if (!Path.GetExtension(targetFullPath).Equals(".txt", StringComparison.OrdinalIgnoreCase))
+            {
+                targetFullPath += ".txt";
+            }
+
+            string newContent = NormalizeNewlines(text);
+            string oldContent = File.Exists(targetFullPath)
+                ? NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath))
+                : string.Empty;
+
+            if (File.Exists(targetFullPath) &&
+                string.Equals(newContent, oldContent, StringComparison.Ordinal))
+            {
+                return $"extract_document unchanged: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)} already contains the extracted text. Use read_file on that .txt path to inspect needed ranges.";
+            }
+
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "extract_document",
+                RelativePath = RelativePath(ResolveWorkspaceRoot(), targetFullPath),
+                FullPath = targetFullPath,
+                OldContent = oldContent,
+                NewContent = newContent,
+                IsNewFile = !File.Exists(targetFullPath)
+            };
+
+            if (!await ConfirmEditAsync(preview))
+            {
+                return $"extract_document cancelled: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)}";
+            }
+
+            string? targetDirectory = Path.GetDirectoryName(targetFullPath);
+            if (!string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            await File.WriteAllTextAsync(targetFullPath, newContent, Encoding.UTF8);
+            await NotifyFileModifiedAsync(targetFullPath);
+
+            string targetRelativePath = RelativePath(ResolveWorkspaceRoot(), targetFullPath);
+            int lineCount = CountNormalizedLines(newContent);
+            var builder = new StringBuilder();
+            builder.AppendLine($"extract_document saved: {targetRelativePath}");
+            builder.AppendLine($"source: {relativePath}");
+            builder.AppendLine($"format: {Path.GetExtension(fullPath).TrimStart('.').ToUpperInvariant()}");
+            builder.AppendLine($"characters: {newContent.Length}{(newContent.Length >= limit ? $" (truncated to maxChars={limit})" : string.Empty)}");
+            builder.AppendLine($"lines: {lineCount}");
+            builder.AppendLine($"Next step: use read_file with path \"{targetRelativePath}\" and targeted startLine/lineCount ranges to inspect the converted text without loading the whole document into context.");
+            return builder.ToString();
+        }
+
+        private string GetDefaultExtractedTextPath(string sourceFullPath)
+        {
+            string root = ResolveWorkspaceRoot();
+            string fileName = Path.GetFileNameWithoutExtension(sourceFullPath) + ".txt";
+            if (IsInsideRoot(root, sourceFullPath))
+            {
+                string directory = Path.GetDirectoryName(sourceFullPath) ?? root;
+                return Path.Combine(directory, fileName);
+            }
+
+            return Path.Combine(root, fileName);
+        }
+
         private string BuildMissingFileMessage(string toolName, string path)
         {
             var builder = new StringBuilder();
@@ -257,27 +370,6 @@ namespace TxtAIEditor.Controls
             if (result.Contains("failed to start"))
             {
                 return $"{result}\nNote: Make sure 'ripgrep-all' (rga) is installed and available in the system PATH.";
-            }
-
-            return result;
-        }
-
-        public async Task<string> RunPdftotextAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(arguments))
-            {
-                return "run_pdftotext failed: arguments are empty.";
-            }
-
-            string resolvedPdftotext = ResolveExecutablePath("pdftotext");
-            string workspaceRoot = ResolveWorkspaceRoot();
-
-            string result = await RunProcessAsync(resolvedPdftotext, arguments, workspaceRoot, timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
-
-            if (result.Contains("failed to start"))
-            {
-                return $"{result}\nNote: Make sure 'pdftotext' is installed and available in the system PATH.";
             }
 
             return result;

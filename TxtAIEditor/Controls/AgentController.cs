@@ -715,6 +715,11 @@ namespace TxtAIEditor.Controls
                             string path = GetStringArgument(arguments, "path");
                             displayResult = string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
                         }
+                        else if (normalizedName == "extract_document")
+                        {
+                            string path = GetStringArgument(arguments, "path");
+                            displayResult = string.Format(_getString("AgentVerboseExtractDocumentOnly", "문서 텍스트 추출을 완료했습니다: {0}"), path);
+                        }
                         else if (normalizedName == "append_to_file")
                         {
                             string path = GetEditPathArgument(arguments);
@@ -749,11 +754,6 @@ namespace TxtAIEditor.Controls
                         {
                             string args = GetStringArgument(arguments, "arguments");
                             displayResult = string.Format(_getString("AgentVerboseRunRgaOnly", "Ripgrep All 검색을 완료했습니다: {0}"), args);
-                        }
-                        else if (normalizedName == "run_pdftotext")
-                        {
-                            string args = GetStringArgument(arguments, "arguments");
-                            displayResult = string.Format(_getString("AgentVerboseRunPdftotextOnly", "PdfToText 변환을 완료했습니다: {0}"), args);
                         }
                         else if (normalizedName == "web_search_exa")
                         {
@@ -1188,10 +1188,6 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "arguments"),
                             GetIntArgument(arguments, "timeoutMs", 10000),
                             cancellationToken),
-                        "run_pdftotext" => await _fileTools.RunPdftotextAsync(
-                            GetStringArgument(arguments, "arguments"),
-                            GetIntArgument(arguments, "timeoutMs", 10000),
-                            cancellationToken),
                         "run_powershell" => await _fileTools.RunPowerShellAsync(
                             GetStringArgument(arguments, "command"),
                             GetIntArgument(arguments, "timeoutMs", 10000),
@@ -1200,6 +1196,10 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "path"),
                             GetIntArgument(arguments, "startLine", 1),
                             GetIntArgument(arguments, "lineCount", 160)),
+                        "extract_document" => await _fileTools.ExtractDocumentAsync(
+                            GetExtractDocumentInputPathArgument(arguments),
+                            GetExtractDocumentOutputPathArgument(arguments),
+                            GetIntArgument(arguments, "maxChars", 5000000)),
                         "create_file" => await _fileToolController.CreateFileAsync(arguments),
                         "overwrite_file" => await _fileToolController.OverwriteFileAsync(arguments),
                         "append_to_file" => await _fileToolController.AppendToFileAsync(arguments),
@@ -1273,9 +1273,6 @@ namespace TxtAIEditor.Controls
                 "run_rga" => string.Format(
                     _getString("AgentActivityRunRgaFormat", "rga 실행 중: {0}"),
                     TruncateForActivity(GetStringArgument(arguments, "arguments"))),
-                "run_pdftotext" => string.Format(
-                    _getString("AgentActivityRunPdftotextFormat", "pdftotext 실행 중: {0}"),
-                    TruncateForActivity(GetStringArgument(arguments, "arguments"))),
                 "run_powershell" => string.Format(
                     _getString("AgentActivityRunPowerShellFormat", "PowerShell 실행 중: {0}"),
                     TruncateForActivity(GetStringArgument(arguments, "command"))),
@@ -1284,6 +1281,9 @@ namespace TxtAIEditor.Controls
                     GetStringArgument(arguments, "path"),
                     GetIntArgument(arguments, "startLine", 1),
                     GetIntArgument(arguments, "lineCount", 160)),
+                "extract_document" => string.Format(
+                    _getString("AgentActivityExtractDocumentFormat", "문서 텍스트 추출 중: {0}"),
+                    GetExtractDocumentInputPathArgument(arguments)),
                 "create_file" => string.Format(
                     _getString("AgentActivityCreateFileFormat", "파일 만드는 중: {0}"),
                     GetStringArgument(arguments, "path")),
@@ -1336,6 +1336,121 @@ namespace TxtAIEditor.Controls
                     _getString("AgentActivityUnknownToolFormat", "도구 실행 중: {0}"),
                     toolName)
             };
+        }
+
+        private string GetExtractDocumentInputPathArgument(JsonElement arguments)
+        {
+            string explicitPath = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path", "source", "input");
+            if (!string.IsNullOrWhiteSpace(explicitPath))
+            {
+                return explicitPath;
+            }
+
+            string legacyArguments = GetStringArgument(arguments, "arguments");
+            if (string.IsNullOrWhiteSpace(legacyArguments))
+            {
+                return string.Empty;
+            }
+
+            foreach (string token in SplitCommandLineArguments(legacyArguments))
+            {
+                if (IsSupportedDocumentPathToken(token))
+                {
+                    return token;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private string GetExtractDocumentOutputPathArgument(JsonElement arguments)
+        {
+            string explicitOutput = GetFirstStringArgument(arguments, "outputPath", "output_path", "targetPath", "target_path", "target", "output");
+            if (!string.IsNullOrWhiteSpace(explicitOutput))
+            {
+                return explicitOutput;
+            }
+
+            string legacyArguments = GetStringArgument(arguments, "arguments");
+            if (string.IsNullOrWhiteSpace(legacyArguments))
+            {
+                return string.Empty;
+            }
+
+            var tokens = SplitCommandLineArguments(legacyArguments);
+            int sourceIndex = tokens.FindIndex(IsSupportedDocumentPathToken);
+            if (sourceIndex < 0)
+            {
+                return string.Empty;
+            }
+
+            for (int i = sourceIndex + 1; i < tokens.Count; i++)
+            {
+                string token = tokens[i];
+                if (string.IsNullOrWhiteSpace(token) ||
+                    token.StartsWith("-", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return token;
+            }
+
+            return string.Empty;
+        }
+
+        private static List<string> SplitCommandLineArguments(string arguments)
+        {
+            var tokens = new List<string>();
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                return tokens;
+            }
+
+            var builder = new StringBuilder();
+            char quote = '\0';
+
+            foreach (char ch in arguments)
+            {
+                if ((ch == '"' || ch == '\'') && (quote == '\0' || quote == ch))
+                {
+                    quote = quote == '\0' ? ch : '\0';
+                    continue;
+                }
+
+                if (char.IsWhiteSpace(ch) && quote == '\0')
+                {
+                    if (builder.Length > 0)
+                    {
+                        tokens.Add(builder.ToString());
+                        builder.Clear();
+                    }
+                    continue;
+                }
+
+                builder.Append(ch);
+            }
+
+            if (builder.Length > 0)
+            {
+                tokens.Add(builder.ToString());
+            }
+
+            return tokens;
+        }
+
+        private static bool IsSupportedDocumentPathToken(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token) || token.StartsWith("-", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string extension = Path.GetExtension(token);
+            return extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
         }
 
         private string GetPathArgument(JsonElement arguments)

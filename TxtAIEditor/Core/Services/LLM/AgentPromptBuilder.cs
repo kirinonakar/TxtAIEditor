@@ -29,7 +29,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- search_text {\"query\":\"needle\",\"glob\":\"**/*.cs\",\"maxResults\":80}: simple workspace text search.");
             builder.AppendLine("- run_rg {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}: ripgrep from workspace root.");
             builder.AppendLine("- run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}: ripgrep-all for PDF/docx/etc.");
-            builder.AppendLine("- run_pdftotext {\"arguments\":\"-layout doc.pdf doc.txt\",\"timeoutMs\":10000}: extract PDF text with layout.");
+            builder.AppendLine("- extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}: extract PDF, DOCX, PPTX, or XLSX text into a .txt file. It returns the saved path, not the full text; use read_file on the .txt path with targeted ranges when needed.");
             builder.AppendLine("- read_file {\"path\":\"relative/path.cs\",\"startLine\":1,\"lineCount\":160}: read up to 5000 lines.");
             builder.AppendLine("- create_file {\"path\":\"relative/path.txt\",\"content\":\"...\"}: create a workspace file.");
             builder.AppendLine("- replace_in_file {\"path\":\"relative/path.cs\",\"oldText\":\"...\",\"newText\":\"...\"}: exact replacement; prefer replace_range/apply_patch when safer.");
@@ -43,7 +43,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- run_powershell {\"command\":\"Get-ChildItem -Recurse -Filter *.cs\",\"timeoutMs\":10000}: real PowerShell from workspace root, read-only by default.");
             builder.AppendLine();
             builder.AppendLine("Tool choice and safety:");
-            builder.AppendLine("- Prefer internal tools. Use search_text for simple search, run_rg for regex/large search, run_rga for document formats, and run_pdftotext -layout before summarizing PDFs from rga hits. Report possible OCR need for scanned PDFs.");
+            builder.AppendLine("- Prefer internal tools. Use search_text for simple search, run_rg for regex/large search, extract_document for PDF/DOCX/PPTX/XLSX text conversion, then read_file on the generated .txt in targeted ranges. Use run_rga only when specialized document search is needed. Report possible OCR need for scanned PDFs.");
             builder.AppendLine("- Use run_powershell only for inspection such as Get-ChildItem, Get-Content, Select-String, git status/diff/log, dotnet build/test. Never use it to create/delete/overwrite/move/rename/download/install/run downloaded scripts/change permissions/change git history/system settings unless the user explicitly asks.");
             builder.AppendLine("- Do not treat list_files/search_text globs as PowerShell commands.");
             builder.AppendLine();

@@ -118,7 +118,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (normalizedToolName is not ("read_file" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
+            if (normalizedToolName is not ("read_file" or "extract_document" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
             {
                 return;
             }
@@ -127,6 +127,10 @@ namespace TxtAIEditor.Controls
             if (normalizedToolName == "merge_files")
             {
                 path = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
+            }
+            else if (normalizedToolName == "extract_document")
+            {
+                path = GetExtractDocumentOutputPath(arguments, result);
             }
             else
             {
@@ -139,6 +143,38 @@ namespace TxtAIEditor.Controls
             {
                 _currentRunLastFilePath = path;
             }
+        }
+
+        private string GetExtractDocumentOutputPath(JsonElement arguments, string result)
+        {
+            string explicitOutput = GetFirstStringArgument(arguments, "outputPath", "output_path", "targetPath", "target_path", "target", "output");
+            if (!string.IsNullOrWhiteSpace(explicitOutput))
+            {
+                return explicitOutput.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
+                    ? explicitOutput
+                    : explicitOutput + ".txt";
+            }
+
+            const string savedPrefix = "extract_document saved:";
+            const string unchangedPrefix = "extract_document unchanged:";
+            using var reader = new StringReader(result ?? string.Empty);
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                if (line.StartsWith(savedPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return line.Substring(savedPrefix.Length).Trim();
+                }
+
+                if (line.StartsWith(unchangedPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    string remainder = line.Substring(unchangedPrefix.Length).Trim();
+                    int spaceIndex = remainder.IndexOf(' ');
+                    return spaceIndex > 0 ? remainder.Substring(0, spaceIndex) : remainder;
+                }
+            }
+
+            return GetPathArgument(arguments);
         }
 
         public string GetPathArgument(JsonElement arguments)

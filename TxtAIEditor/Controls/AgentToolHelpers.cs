@@ -125,9 +125,9 @@ namespace TxtAIEditor.Controls
                 or "run_powershell"
                 or "run_rg"
                 or "run_rga"
-                or "run_pdftotext"
                 or "search_text"
                 or "create_file"
+                or "extract_document"
                 or "overwrite_file"
                 or "replace_in_file"
                 or "replace_range"
@@ -144,6 +144,7 @@ namespace TxtAIEditor.Controls
         public static bool IsMutatingTool(string normalizedToolName)
         {
             return normalizedToolName is "create_file"
+                or "extract_document"
                 or "overwrite_file"
                 or "replace_in_file"
                 or "replace_range"
@@ -295,7 +296,15 @@ namespace TxtAIEditor.Controls
                 "powershell" => "run_powershell",
                 "rg" => "run_rg",
                 "rga" => "run_rga",
-                "pdftotext" => "run_pdftotext",
+                "pdftotext" => "extract_document",
+                "run_pdftotext" => "extract_document",
+                "extract" => "extract_document",
+                "extract_text" => "extract_document",
+                "extract_document_text" => "extract_document",
+                "document_text" => "extract_document",
+                "read_document" => "extract_document",
+                "convert_document_to_text" => "extract_document",
+                "extract_document" => "extract_document",
                 "search_exa" => "web_search_exa",
                 "exa_search" => "web_search_exa",
                 "exa" => "web_search_exa",
@@ -351,6 +360,7 @@ namespace TxtAIEditor.Controls
                 or "url"
                 or "uri"
                 or "address"
+                or "path"
                 or "content"
                 or "text";
         }
