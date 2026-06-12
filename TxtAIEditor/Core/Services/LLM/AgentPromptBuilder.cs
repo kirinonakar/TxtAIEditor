@@ -28,7 +28,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- list_files {\"glob\":\"**/*.cs\",\"maxResults\":80}: list workspace files.");
             builder.AppendLine("- search_text {\"query\":\"needle\",\"glob\":\"**/*\",\"maxResults\":80}: simple workspace search across file paths and text-file contents.");
             builder.AppendLine("- run_rg {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}: ripgrep from workspace root.");
-            builder.AppendLine("- run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}: ripgrep-all for PDF/DOCX/HWPX/etc.");
+            builder.AppendLine("- run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}: ripgrep-all for supported document formats such as PDF/DOCX. For HWPX, use extract_document first.");
             builder.AppendLine("- extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}: extract PDF/DOCX/PPTX/HWPX into .txt, and XLSX into CSV-formatted .csv by default. Multi-sheet XLSX files are saved as separate files with _sheet1, _sheet2, etc. It records only the source and saved output path; use read_file on the generated file with targeted ranges when needed.");
             builder.AppendLine("- read_file {\"path\":\"relative/path.cs\",\"startLine\":1,\"lineCount\":160}: read up to 5000 lines.");
             builder.AppendLine("- read_image {\"path\":\"relative/screenshot.png\"}: inspect an image file using the model's vision capability. Use for screenshots, diagrams, photos, UI captures, and image-only documents. The host attaches the image to the next model call; after the tool result, analyze the attached image directly.");

@@ -88,7 +88,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
  *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install:
      *   [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`)
      *   [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) for plain text and source code search.
-     *   [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`) for searching document formats (PDF, DOCX, HWPX, etc.).
+     *   [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`) for searching supported document formats (PDF, DOCX, etc.). Use `extract_document` for HWPX.
      *   [pdftotext](https://poppler.freedesktop.org/) (Xpdf/Poppler tools) for fast PDF conversion inside `extract_document`.
 
 ### 💻 Terminal
