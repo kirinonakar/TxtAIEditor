@@ -140,6 +140,12 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private async void QueueDelayedEmbeddedTerminalResize()
+        {
+            await Task.Delay(80);
+            ResizeEmbeddedTerminal();
+        }
+
         public void UpdateAllTerminalThemes()
         {
             PostTerminalMessage(new
@@ -602,6 +608,7 @@ namespace TxtAIEditor.Controls
         private void OnTerminalWebViewSizeChanged(object sender, SizeChangedEventArgs e)
         {
             QueueEmbeddedTerminalResize();
+            QueueDelayedEmbeddedTerminalResize();
         }
 
         private void OnNewTerminalClick(SplitButton sender, SplitButtonClickEventArgs args)

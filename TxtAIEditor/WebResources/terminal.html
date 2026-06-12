@@ -157,7 +157,8 @@
       lineHeight: 1.08,
       scrollback: 5000,
       theme: darkTheme,
-      windowsMode: true
+      windowsMode: false,
+      windowsPty: { backend: 'conpty' }
     });
 
     term.loadAddon(fitAddon);
@@ -242,8 +243,15 @@
       cancelAnimationFrame(pendingFit);
       pendingFit = requestAnimationFrame(() => {
         fitAddon.fit();
+        refreshTerminalRows();
         vscodeBridge?.postMessage({ type: 'resize', sessionId: activeSessionId, cols: term.cols, rows: term.rows });
       });
+    }
+
+    function refreshTerminalRows() {
+      if (typeof term.refresh === 'function') {
+        term.refresh(0, Math.max(0, term.rows - 1));
+      }
     }
 
     function applyTheme(themeName) {
@@ -294,6 +302,11 @@
     });
 
     window.addEventListener('resize', fitAndNotify);
+    if (typeof ResizeObserver !== 'undefined') {
+      const resizeObserver = new ResizeObserver(() => fitAndNotify());
+      resizeObserver.observe(document.body);
+      resizeObserver.observe(terminalElement);
+    }
     window.addEventListener('focus', () => term.focus());
     setTimeout(() => {
       fitAndNotify();
