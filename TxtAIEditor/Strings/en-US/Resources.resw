@@ -2116,4 +2116,43 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
    <data name="LlmErrorCommunicationPrefix" xml:space="preserve">
      <value>An AI communication error occurred: </value>
    </data>
+   <data name="AgentActivityExtractDocumentProgressFormat" xml:space="preserve">
+     <value>Extracting document text: {0}%</value>
+   </data>
+   <data name="AgentActivityExtractDocumentFormat" xml:space="preserve">
+     <value>Extracting document text: {0}</value>
+   </data>
+   <data name="AgentVerboseExtractDocumentOnly" xml:space="preserve">
+     <value>Document text extraction completed: {0}</value>
+   </data>
+   <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
+     <value>extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, or XLSX file path.</value>
+   </data>
+   <data name="AgentExtractDocumentFailedFormat" xml:space="preserve">
+     <value>extract_document failed: {0}</value>
+   </data>
+   <data name="AgentExtractDocumentUnsupportedTypeFormat" xml:space="preserve">
+     <value>extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx.</value>
+   </data>
+   <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
+     <value>extract_document failed: could not extract text from {0}: {1}</value>
+   </data>
+   <data name="AgentExtractDocumentNoTextFormat" xml:space="preserve">
+     <value>extract_document: no text extracted from {0}. If this is a scanned PDF or image-only document, OCR may be required.</value>
+   </data>
+   <data name="AgentExtractDocumentUnchangedPrefix" xml:space="preserve">
+     <value>extract_document unchanged:</value>
+   </data>
+   <data name="AgentExtractDocumentUnchangedDetail" xml:space="preserve">
+     <value>The output file already contains the extracted text.</value>
+   </data>
+   <data name="AgentExtractDocumentSavedPrefix" xml:space="preserve">
+     <value>extract_document saved:</value>
+   </data>
+   <data name="AgentExtractDocumentSourcePrefix" xml:space="preserve">
+     <value>source:</value>
+   </data>
+   <data name="AgentExtractDocumentOutputExistsNoteFormat" xml:space="preserve">
+     <value>note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}</value>
+   </data>
  </root>

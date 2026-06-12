@@ -202,6 +202,7 @@ namespace TxtAIEditor.Controls
                 _getString);
             _fileTools.ConfirmFileEditAsync = _confirmationController.ConfirmFileEditAsync;
             _fileTools.ConfirmPowerShellAsync = _confirmationController.ConfirmPowerShellAsync;
+            _fileTools.ActivityReporter = AppendActivity;
             if (_fileModifiedAsync != null)
             {
                 _fileTools.FileModifiedAsync = _fileModifiedAsync;

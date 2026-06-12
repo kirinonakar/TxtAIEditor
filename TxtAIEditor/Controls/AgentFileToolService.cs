@@ -30,15 +30,20 @@ namespace TxtAIEditor.Controls
 
         private readonly Func<string> _workspaceRootProvider;
         private readonly DocumentTextExtractionService _documentTextExtractionService = new();
+        private readonly Func<string, string, string> _getString;
 
-        public AgentFileToolService(Func<string> workspaceRootProvider)
+        public AgentFileToolService(
+            Func<string> workspaceRootProvider,
+            Func<string, string, string>? getString = null)
         {
             _workspaceRootProvider = workspaceRootProvider;
+            _getString = getString ?? ((_, fallback) => fallback);
         }
 
         public Func<AgentFileEditPreview, Task<bool>>? ConfirmFileEditAsync { get; set; }
         public Func<string, Task<bool>>? ConfirmPowerShellAsync { get; set; }
         public Func<string, Task>? FileModifiedAsync { get; set; }
+        public Action<string>? ActivityReporter { get; set; }
 
         public string WorkspaceRoot => ResolveWorkspaceRoot();
 
@@ -220,7 +225,7 @@ namespace TxtAIEditor.Controls
         {
             if (string.IsNullOrWhiteSpace(path))
             {
-                return "extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, or XLSX file path.";
+                return _getString("AgentExtractDocumentEmptyPath", "extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, or XLSX file path.");
             }
 
             string fullPath;
@@ -230,7 +235,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                return $"extract_document failed: {ex.Message}";
+                return string.Format(_getString("AgentExtractDocumentFailedFormat", "extract_document failed: {0}"), ex.Message);
             }
 
             if (!File.Exists(fullPath))
@@ -240,24 +245,46 @@ namespace TxtAIEditor.Controls
 
             if (!DocumentTextExtractionService.IsSupportedExtension(fullPath))
             {
-                return $"extract_document failed: unsupported file type '{Path.GetExtension(fullPath)}'. Supported types: .pdf, .docx, .pptx, .xlsx.";
+                return string.Format(
+                    _getString("AgentExtractDocumentUnsupportedTypeFormat", "extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx."),
+                    Path.GetExtension(fullPath));
             }
 
             int limit = Math.Clamp(maxChars <= 0 ? 5000000 : maxChars, 1, 50000000);
+            int lastProgress = -5;
+            var progress = new Progress<int>(percent =>
+            {
+                int clamped = Math.Clamp(percent, 0, 100);
+                if (clamped < lastProgress + 5 && clamped != 100)
+                {
+                    return;
+                }
+
+                lastProgress = clamped;
+                ActivityReporter?.Invoke(string.Format(
+                    _getString("AgentActivityExtractDocumentProgressFormat", "문서 텍스트 추출 중: {0}%"),
+                    clamped));
+            });
+
             string text;
             try
             {
-                text = await _documentTextExtractionService.ExtractTextAsync(fullPath, limit);
+                text = await _documentTextExtractionService.ExtractTextAsync(fullPath, limit, progress);
             }
             catch (Exception ex)
             {
-                return $"extract_document failed: could not extract text from {path}: {ex.Message}";
+                return string.Format(
+                    _getString("AgentExtractDocumentReadFailedFormat", "extract_document failed: could not extract text from {0}: {1}"),
+                    path,
+                    ex.Message);
             }
 
             string relativePath = RelativePath(ResolveWorkspaceRoot(), fullPath);
             if (string.IsNullOrWhiteSpace(text))
             {
-                return $"extract_document: no text extracted from {relativePath}. If this is a scanned PDF or image-only document, OCR may be required.";
+                return string.Format(
+                    _getString("AgentExtractDocumentNoTextFormat", "extract_document: no text extracted from {0}. If this is a scanned PDF or image-only document, OCR may be required."),
+                    relativePath);
             }
 
             string targetFullPath;
@@ -269,7 +296,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                return $"extract_document failed: {ex.Message}";
+                return string.Format(_getString("AgentExtractDocumentFailedFormat", "extract_document failed: {0}"), ex.Message);
             }
 
             if (!Path.GetExtension(targetFullPath).Equals(".txt", StringComparison.OrdinalIgnoreCase))
@@ -285,7 +312,10 @@ namespace TxtAIEditor.Controls
                 string oldContent = NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath));
                 if (string.Equals(newContent, oldContent, StringComparison.Ordinal))
                 {
-                    return $"extract_document unchanged: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)} already contains the extracted text. Use read_file on that .txt path to inspect needed ranges.";
+                    var unchangedBuilder = new StringBuilder();
+                    unchangedBuilder.AppendLine($"{_getString("AgentExtractDocumentUnchangedPrefix", "extract_document unchanged:")} {RelativePath(ResolveWorkspaceRoot(), targetFullPath)}");
+                    unchangedBuilder.AppendLine(_getString("AgentExtractDocumentUnchangedDetail", "The output file already contains the extracted text."));
+                    return unchangedBuilder.ToString();
                 }
 
                 targetFullPath = GetAvailableSiblingPath(targetFullPath);
@@ -302,11 +332,13 @@ namespace TxtAIEditor.Controls
 
             string targetRelativePath = RelativePath(ResolveWorkspaceRoot(), targetFullPath);
             var builder = new StringBuilder();
-            builder.AppendLine($"extract_document saved: {targetRelativePath}");
-            builder.AppendLine($"source: {relativePath}");
+            builder.AppendLine($"{_getString("AgentExtractDocumentSavedPrefix", "extract_document saved:")} {targetRelativePath}");
+            builder.AppendLine($"{_getString("AgentExtractDocumentSourcePrefix", "source:")} {relativePath}");
             if (targetAlreadyExists)
             {
-                builder.AppendLine($"note: requested output existed, so the converted text was saved to a new file instead of overwriting: {targetRelativePath}");
+                builder.AppendLine(string.Format(
+                    _getString("AgentExtractDocumentOutputExistsNoteFormat", "note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}"),
+                    targetRelativePath));
             }
             return builder.ToString();
         }

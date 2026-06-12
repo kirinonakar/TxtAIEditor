@@ -695,7 +695,7 @@ namespace TxtAIEditor
                 },
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString,
-                new AgentFileToolService(_agentFileWorkflowController.GetWorkspaceRoot),
+                new AgentFileToolService(_agentFileWorkflowController.GetWorkspaceRoot, GetLocalizedString),
                 _pdfTextExtractionService,
                 InitializePickerWindow,
                 path => _gitService.FindRepositoryRoot(path) != null,

@@ -155,8 +155,8 @@ namespace TxtAIEditor.Controls
                     : explicitOutput + ".txt";
             }
 
-            const string savedPrefix = "extract_document saved:";
-            const string unchangedPrefix = "extract_document unchanged:";
+            string savedPrefix = _getString("AgentExtractDocumentSavedPrefix", "extract_document saved:");
+            string unchangedPrefix = _getString("AgentExtractDocumentUnchangedPrefix", "extract_document unchanged:");
             using var reader = new StringReader(result ?? string.Empty);
             string? line;
             while ((line = reader.ReadLine()) != null)

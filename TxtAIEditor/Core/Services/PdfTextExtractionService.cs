@@ -10,20 +10,25 @@ namespace TxtAIEditor.Core.Services
 {
     public sealed class PdfTextExtractionService
     {
-        private const int MaxDecodedStreamBytes = 16 * 1024 * 1024;
+        private const int MaxDecodedStreamBytes = 1024 * 1024;
+        private const int MaxRawStreamBytesToDecode = 2 * 1024 * 1024;
+        private const int MaxStreamsToInspect = 300;
+        private const int MaxLooseFallbackChars = 256 * 1024;
 
-        public async Task<string> ExtractTextAsync(string filePath, int maxChars)
+        public async Task<string> ExtractTextAsync(string filePath, int maxChars, IProgress<int>? progress = null)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || maxChars <= 0)
             {
                 return string.Empty;
             }
 
+            progress?.Report(1);
             byte[] bytes = await File.ReadAllBytesAsync(filePath).ConfigureAwait(false);
+            progress?.Report(5);
             string raw = Encoding.Latin1.GetString(bytes);
             var parts = new List<string>();
 
-            foreach (var streamText in EnumerateDecodedStreams(raw))
+            foreach (var streamText in EnumerateDecodedStreams(raw, progress))
             {
                 string extracted = ExtractTextFromContentStream(streamText);
                 if (!string.IsNullOrWhiteSpace(extracted))
@@ -38,6 +43,7 @@ namespace TxtAIEditor.Core.Services
 
             if (parts.Count == 0)
             {
+                progress?.Report(90);
                 string fallback = ExtractLooseLiteralText(raw);
                 if (!string.IsNullOrWhiteSpace(fallback))
                 {
@@ -45,15 +51,24 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
+            progress?.Report(95);
             string text = NormalizeExtractedText(string.Join("\n", parts));
+            progress?.Report(100);
             return text.Length > maxChars ? text.Substring(0, maxChars) : text;
         }
 
-        private static IEnumerable<string> EnumerateDecodedStreams(string raw)
+        private static IEnumerable<string> EnumerateDecodedStreams(string raw, IProgress<int>? progress)
         {
             int searchStart = 0;
+            int inspectedStreams = 0;
+            int lastReportedPercent = 5;
             while (searchStart < raw.Length)
             {
+                if (inspectedStreams >= MaxStreamsToInspect)
+                {
+                    yield break;
+                }
+
                 int streamIndex = raw.IndexOf("stream", searchStart, StringComparison.Ordinal);
                 if (streamIndex < 0)
                 {
@@ -78,13 +93,26 @@ namespace TxtAIEditor.Core.Services
 
                 string dictionary = GetStreamDictionary(raw, streamIndex);
                 string streamData = raw.Substring(dataStart, Math.Max(0, endIndex - dataStart));
+                inspectedStreams++;
+                if (ShouldSkipStream(dictionary, streamData.Length))
+                {
+                    searchStart = endIndex + "endstream".Length;
+                    continue;
+                }
+
                 string? decoded = DecodeStream(streamData, dictionary);
-                if (!string.IsNullOrEmpty(decoded))
+                if (!string.IsNullOrEmpty(decoded) && LooksLikeTextContentStream(decoded))
                 {
                     yield return decoded;
                 }
 
                 searchStart = endIndex + "endstream".Length;
+                int percent = 5 + (int)Math.Min(84, (searchStart / (double)Math.Max(1, raw.Length)) * 84);
+                if (percent >= lastReportedPercent + 5)
+                {
+                    lastReportedPercent = percent;
+                    progress?.Report(percent);
+                }
             }
         }
 
@@ -98,6 +126,57 @@ namespace TxtAIEditor.Core.Services
             }
 
             return raw.Substring(dictStart, streamIndex - dictStart);
+        }
+
+        private static bool ShouldSkipStream(string dictionary, int rawStreamLength)
+        {
+            if (string.IsNullOrWhiteSpace(dictionary))
+            {
+                return rawStreamLength > MaxRawStreamBytesToDecode;
+            }
+
+            string compact = Regex.Replace(dictionary, @"\s+", " ");
+            string[] binaryMarkers =
+            {
+                "/Subtype /Image",
+                "/Subtype/Image",
+                "/ImageMask",
+                "/DCTDecode",
+                "/JPXDecode",
+                "/CCITTFaxDecode",
+                "/JBIG2Decode",
+                "/BitsPerComponent",
+                "/ColorSpace",
+                "/Width",
+                "/Height",
+                "/FontFile",
+                "/FontFile2",
+                "/FontFile3"
+            };
+
+            foreach (string marker in binaryMarkers)
+            {
+                if (compact.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return rawStreamLength > MaxRawStreamBytesToDecode;
+        }
+
+        private static bool LooksLikeTextContentStream(string content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return false;
+            }
+
+            return content.Contains("BT", StringComparison.Ordinal) &&
+                (content.Contains("Tj", StringComparison.Ordinal) ||
+                 content.Contains("TJ", StringComparison.Ordinal) ||
+                 content.Contains("'", StringComparison.Ordinal) ||
+                 content.Contains("\"", StringComparison.Ordinal));
         }
 
         private static string? DecodeStream(string streamData, string dictionary)
@@ -297,6 +376,11 @@ namespace TxtAIEditor.Core.Services
 
         private static string ExtractLooseLiteralText(string raw)
         {
+            if (raw.Length > MaxLooseFallbackChars)
+            {
+                raw = raw.Substring(0, MaxLooseFallbackChars);
+            }
+
             var builder = new StringBuilder();
             foreach (Match match in Regex.Matches(raw, @"\((?:\\.|[^\\)]){3,}\)"))
             {

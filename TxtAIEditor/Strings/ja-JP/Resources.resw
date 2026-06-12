@@ -2117,4 +2117,43 @@
    <data name="LlmErrorCommunicationPrefix" xml:space="preserve">
      <value>AI通信エラーが発生しました: </value>
    </data>
+   <data name="AgentActivityExtractDocumentProgressFormat" xml:space="preserve">
+     <value>文書テキストを抽出中: {0}%</value>
+   </data>
+   <data name="AgentActivityExtractDocumentFormat" xml:space="preserve">
+     <value>文書テキストを抽出中: {0}</value>
+   </data>
+   <data name="AgentVerboseExtractDocumentOnly" xml:space="preserve">
+     <value>文書テキストの抽出が完了しました: {0}</value>
+   </data>
+   <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
+     <value>extract_document 失敗: パスが空です。PDF、DOCX、PPTX、または XLSX ファイルのパスを指定してください。</value>
+   </data>
+   <data name="AgentExtractDocumentFailedFormat" xml:space="preserve">
+     <value>extract_document 失敗: {0}</value>
+   </data>
+   <data name="AgentExtractDocumentUnsupportedTypeFormat" xml:space="preserve">
+     <value>extract_document 失敗: サポートされていないファイル形式です: '{0}'。対応形式: .pdf, .docx, .pptx, .xlsx。</value>
+   </data>
+   <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
+     <value>extract_document 失敗: {0} からテキストを抽出できません: {1}</value>
+   </data>
+   <data name="AgentExtractDocumentNoTextFormat" xml:space="preserve">
+     <value>extract_document: {0} からテキストを抽出できませんでした。スキャン PDF または画像のみの文書の場合、OCR が必要な可能性があります。</value>
+   </data>
+   <data name="AgentExtractDocumentUnchangedPrefix" xml:space="preserve">
+     <value>extract_document 変更なし:</value>
+   </data>
+   <data name="AgentExtractDocumentUnchangedDetail" xml:space="preserve">
+     <value>出力ファイルには既に抽出済みのテキストが含まれています。</value>
+   </data>
+   <data name="AgentExtractDocumentSavedPrefix" xml:space="preserve">
+     <value>extract_document 保存済み:</value>
+   </data>
+   <data name="AgentExtractDocumentSourcePrefix" xml:space="preserve">
+     <value>元ファイル:</value>
+   </data>
+   <data name="AgentExtractDocumentOutputExistsNoteFormat" xml:space="preserve">
+     <value>注: 指定された出力ファイルが既に存在するため、上書きせず新しいファイルとして保存しました: {0}</value>
+   </data>
  </root>
