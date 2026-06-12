@@ -242,7 +242,15 @@
     function fitAndNotify() {
       cancelAnimationFrame(pendingFit);
       pendingFit = requestAnimationFrame(() => {
-        fitAddon.fit();
+        const proposed = typeof fitAddon.proposeDimensions === 'function'
+          ? fitAddon.proposeDimensions()
+          : null;
+        if (proposed) {
+          term.resize(Math.max(2, proposed.cols - 1), Math.max(2, proposed.rows - 1));
+        } else {
+          fitAddon.fit();
+          term.resize(Math.max(2, term.cols - 1), Math.max(2, term.rows - 1));
+        }
         refreshTerminalRows();
         vscodeBridge?.postMessage({ type: 'resize', sessionId: activeSessionId, cols: term.cols, rows: term.rows });
       });
