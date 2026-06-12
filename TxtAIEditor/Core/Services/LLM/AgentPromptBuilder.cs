@@ -29,7 +29,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- search_text {\"query\":\"needle\",\"glob\":\"**/*.cs\",\"maxResults\":80}: simple workspace text search.");
             builder.AppendLine("- run_rg {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}: ripgrep from workspace root.");
             builder.AppendLine("- run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}: ripgrep-all for PDF/docx/etc.");
-            builder.AppendLine("- extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}: extract PDF, DOCX, PPTX, or XLSX text into a .txt file. It returns the saved path, not the full text; use read_file on the .txt path with targeted ranges when needed.");
+            builder.AppendLine("- extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}: extract PDF, DOCX, PPTX, or XLSX text into a .txt file. It records only the source and saved .txt path; use read_file on the .txt path with targeted ranges when needed.");
             builder.AppendLine("- read_file {\"path\":\"relative/path.cs\",\"startLine\":1,\"lineCount\":160}: read up to 5000 lines.");
             builder.AppendLine("- create_file {\"path\":\"relative/path.txt\",\"content\":\"...\"}: create a workspace file.");
             builder.AppendLine("- replace_in_file {\"path\":\"relative/path.cs\",\"oldText\":\"...\",\"newText\":\"...\"}: exact replacement; prefer replace_range/apply_patch when safer.");

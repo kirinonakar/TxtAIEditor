@@ -190,7 +190,16 @@ namespace TxtAIEditor.Controls
             }
 
             int limit = Math.Clamp(maxChars <= 0 ? 5000000 : maxChars, 1, 50000000);
-            string text = await _documentTextExtractionService.ExtractTextAsync(fullPath, limit);
+            string text;
+            try
+            {
+                text = await _documentTextExtractionService.ExtractTextAsync(fullPath, limit);
+            }
+            catch (Exception ex)
+            {
+                return $"extract_document failed: could not extract text from {path}: {ex.Message}";
+            }
+
             string relativePath = RelativePath(ResolveWorkspaceRoot(), fullPath);
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -215,29 +224,17 @@ namespace TxtAIEditor.Controls
             }
 
             string newContent = NormalizeNewlines(text);
-            string oldContent = File.Exists(targetFullPath)
-                ? NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath))
-                : string.Empty;
-
-            if (File.Exists(targetFullPath) &&
-                string.Equals(newContent, oldContent, StringComparison.Ordinal))
+            string requestedTargetFullPath = targetFullPath;
+            bool targetAlreadyExists = File.Exists(targetFullPath);
+            if (targetAlreadyExists)
             {
-                return $"extract_document unchanged: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)} already contains the extracted text. Use read_file on that .txt path to inspect needed ranges.";
-            }
+                string oldContent = NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath));
+                if (string.Equals(newContent, oldContent, StringComparison.Ordinal))
+                {
+                    return $"extract_document unchanged: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)} already contains the extracted text. Use read_file on that .txt path to inspect needed ranges.";
+                }
 
-            var preview = new AgentFileEditPreview
-            {
-                ActionName = "extract_document",
-                RelativePath = RelativePath(ResolveWorkspaceRoot(), targetFullPath),
-                FullPath = targetFullPath,
-                OldContent = oldContent,
-                NewContent = newContent,
-                IsNewFile = !File.Exists(targetFullPath)
-            };
-
-            if (!await ConfirmEditAsync(preview))
-            {
-                return $"extract_document cancelled: {RelativePath(ResolveWorkspaceRoot(), targetFullPath)}";
+                targetFullPath = GetAvailableSiblingPath(targetFullPath);
             }
 
             string? targetDirectory = Path.GetDirectoryName(targetFullPath);
@@ -250,14 +247,13 @@ namespace TxtAIEditor.Controls
             await NotifyFileModifiedAsync(targetFullPath);
 
             string targetRelativePath = RelativePath(ResolveWorkspaceRoot(), targetFullPath);
-            int lineCount = CountNormalizedLines(newContent);
             var builder = new StringBuilder();
             builder.AppendLine($"extract_document saved: {targetRelativePath}");
             builder.AppendLine($"source: {relativePath}");
-            builder.AppendLine($"format: {Path.GetExtension(fullPath).TrimStart('.').ToUpperInvariant()}");
-            builder.AppendLine($"characters: {newContent.Length}{(newContent.Length >= limit ? $" (truncated to maxChars={limit})" : string.Empty)}");
-            builder.AppendLine($"lines: {lineCount}");
-            builder.AppendLine($"Next step: use read_file with path \"{targetRelativePath}\" and targeted startLine/lineCount ranges to inspect the converted text without loading the whole document into context.");
+            if (targetAlreadyExists)
+            {
+                builder.AppendLine($"note: requested output existed, so the converted text was saved to a new file instead of overwriting: {targetRelativePath}");
+            }
             return builder.ToString();
         }
 
@@ -272,6 +268,28 @@ namespace TxtAIEditor.Controls
             }
 
             return Path.Combine(root, fileName);
+        }
+
+        private string GetAvailableSiblingPath(string fullPath)
+        {
+            if (!File.Exists(fullPath))
+            {
+                return fullPath;
+            }
+
+            string directory = Path.GetDirectoryName(fullPath) ?? ResolveWorkspaceRoot();
+            string filenameWithoutExtension = Path.GetFileNameWithoutExtension(fullPath);
+            string extension = Path.GetExtension(fullPath);
+
+            int counter = 1;
+            string candidate;
+            do
+            {
+                candidate = Path.Combine(directory, $"{filenameWithoutExtension} ({counter}){extension}");
+                counter++;
+            } while (File.Exists(candidate));
+
+            return candidate;
         }
 
         private string BuildMissingFileMessage(string toolName, string path)
