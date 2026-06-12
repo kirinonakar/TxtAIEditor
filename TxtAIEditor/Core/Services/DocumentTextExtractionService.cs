@@ -11,6 +11,13 @@ using System.Xml.Linq;
 
 namespace TxtAIEditor.Core.Services
 {
+    public sealed class ExtractedSpreadsheetSheet
+    {
+        public int Index { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public string CsvContent { get; init; } = string.Empty;
+    }
+
     public sealed class DocumentTextExtractionService
     {
         public async Task<string> ExtractTextAsync(string filePath, int maxChars, IProgress<int>? progress = null)
@@ -257,6 +264,34 @@ namespace TxtAIEditor.Core.Services
 
         private static async Task<string> ExtractXlsxTextAsync(string filePath, int maxChars, IProgress<int>? progress)
         {
+            IReadOnlyList<ExtractedSpreadsheetSheet> sheets = await ExtractXlsxSheetsAsync(filePath, maxChars, progress).ConfigureAwait(false);
+            if (sheets.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            if (sheets.Count == 1)
+            {
+                return sheets[0].CsvContent;
+            }
+
+            var builder = new StringBuilder();
+            foreach (ExtractedSpreadsheetSheet sheet in sheets)
+            {
+                AppendLimitedLine(builder, $"# Sheet: {EscapeCsvComment(sheet.Name)}", maxChars);
+                AppendLimited(builder, sheet.CsvContent, maxChars);
+                AppendLimited(builder, "\n", maxChars);
+                if (builder.Length >= maxChars)
+                {
+                    break;
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        public static async Task<IReadOnlyList<ExtractedSpreadsheetSheet>> ExtractXlsxSheetsAsync(string filePath, int maxChars, IProgress<int>? progress = null)
+        {
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
             IReadOnlyList<string> sharedStrings = await LoadSharedStringsAsync(archive).ConfigureAwait(false);
             IReadOnlyDictionary<string, string> sheetNamesByPath = await LoadSheetNamesByPathAsync(archive).ConfigureAwait(false);
@@ -266,7 +301,7 @@ namespace TxtAIEditor.Core.Services
                 .OrderBy(entry => GetTrailingNumber(entry.FullName))
                 .ToList();
 
-            var builder = new StringBuilder();
+            var sheets = new List<ExtractedSpreadsheetSheet>();
             int fallbackSheetNumber = 1;
             for (int sheetIndex = 0; sheetIndex < sheetEntries.Count; sheetIndex++)
             {
@@ -275,20 +310,29 @@ namespace TxtAIEditor.Core.Services
                 string sheetName = sheetNamesByPath.TryGetValue(sheetEntry.FullName, out string? mappedName)
                     ? mappedName
                     : $"Sheet {fallbackSheetNumber}";
-                AppendLimitedLine(builder, $"[{sheetName}]", maxChars);
 
+                var builder = new StringBuilder();
                 XDocument sheet = await LoadXmlEntryAsync(sheetEntry).ConfigureAwait(false);
                 foreach (XElement row in sheet.Descendants().Where(e => e.Name.LocalName == "row"))
                 {
                     var values = new List<string>();
                     foreach (XElement cell in row.Elements().Where(e => e.Name.LocalName == "c"))
                     {
+                        int columnIndex = GetCellColumnIndex(cell);
+                        if (columnIndex > 0)
+                        {
+                            while (values.Count < columnIndex - 1)
+                            {
+                                values.Add(string.Empty);
+                            }
+                        }
+
                         values.Add(GetCellText(cell, sharedStrings));
                     }
 
                     if (values.Any(value => !string.IsNullOrWhiteSpace(value)))
                     {
-                        AppendLimitedLine(builder, string.Join("\t", values), maxChars);
+                        AppendLimitedLine(builder, string.Join(",", values.Select(EscapeCsvField)), maxChars);
                     }
 
                     if (builder.Length >= maxChars)
@@ -297,17 +341,68 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
 
-                AppendLimited(builder, "\n", maxChars);
-                if (builder.Length >= maxChars)
+                sheets.Add(new ExtractedSpreadsheetSheet
                 {
-                    break;
-                }
+                    Index = sheetIndex + 1,
+                    Name = sheetName,
+                    CsvContent = builder.ToString().TrimEnd('\r', '\n')
+                });
 
                 fallbackSheetNumber++;
             }
 
             progress?.Report(95);
-            return builder.ToString();
+            return sheets;
+        }
+
+        private static string EscapeCsvField(string value)
+        {
+            value ??= string.Empty;
+            bool mustQuote = value.Contains(',', StringComparison.Ordinal) ||
+                value.Contains('"', StringComparison.Ordinal) ||
+                value.Contains('\n') ||
+                value.Contains('\r') ||
+                value.StartsWith(' ') ||
+                value.EndsWith(' ');
+
+            return mustQuote
+                ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
+                : value;
+        }
+
+        private static string EscapeCsvComment(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\r", " ", StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal);
+        }
+
+        private static int GetCellColumnIndex(XElement cell)
+        {
+            string reference = cell.Attribute("r")?.Value ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                return 0;
+            }
+
+            int column = 0;
+            foreach (char ch in reference)
+            {
+                if (ch < 'A' || ch > 'Z')
+                {
+                    if (ch >= 'a' && ch <= 'z')
+                    {
+                        column = (column * 26) + (ch - 'a' + 1);
+                        continue;
+                    }
+
+                    break;
+                }
+
+                column = (column * 26) + (ch - 'A' + 1);
+            }
+
+            return column;
         }
 
         private static async Task<ZipArchive> OpenArchiveAsync(string filePath)
