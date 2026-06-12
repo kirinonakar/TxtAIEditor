@@ -8,6 +8,7 @@ using Microsoft.Web.WebView2.Core;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
+using TxtAIEditor.Editor;
 
 namespace TxtAIEditor.Controls
 {
@@ -33,12 +34,7 @@ namespace TxtAIEditor.Controls
         public void Register(OpenedTab tab, WebView2 pdfWebView)
         {
             _viewerWebViews[tab.Id] = pdfWebView;
-            pdfWebView.CoreWebView2Initialized += (_, _) => Configure(tab, pdfWebView);
-
-            if (pdfWebView.CoreWebView2 != null)
-            {
-                Configure(tab, pdfWebView);
-            }
+            _ = InitializeAsync(tab, pdfWebView);
         }
 
         public bool IsActiveViewer()
@@ -102,6 +98,31 @@ namespace TxtAIEditor.Controls
             }
 
             return false;
+        }
+
+        private async Task InitializeAsync(OpenedTab tab, WebView2 pdfWebView)
+        {
+            try
+            {
+                var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                await pdfWebView.EnsureCoreWebView2Async(env);
+
+                if (!_viewerWebViews.TryGetValue(tab.Id, out var registeredWebView) ||
+                    !ReferenceEquals(registeredWebView, pdfWebView))
+                {
+                    return;
+                }
+
+                Configure(tab, pdfWebView);
+
+                if (!string.IsNullOrEmpty(tab.FilePath))
+                {
+                    pdfWebView.Source = new Uri(tab.FilePath, UriKind.Absolute);
+                }
+            }
+            catch
+            {
+            }
         }
 
         private void Configure(OpenedTab tab, WebView2 pdfWebView)

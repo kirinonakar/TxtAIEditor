@@ -64,6 +64,7 @@ namespace TxtAIEditor.Editor
             {
                 string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 string cacheFolder = System.IO.Path.Combine(localAppData, "TxtAIEditor", "WebView2Cache");
+                System.IO.Directory.CreateDirectory(cacheFolder);
                 var env = await CoreWebView2Environment.CreateWithOptionsAsync(null, cacheFolder, null);
                 lock (_envLock)
                 {
@@ -73,7 +74,12 @@ namespace TxtAIEditor.Editor
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to create shared WebView2 environment: {ex.Message}");
-                var env = await CoreWebView2Environment.CreateWithOptionsAsync(null, null, null);
+                string fallbackCacheFolder = System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(),
+                    "TxtAIEditor",
+                    "WebView2Cache");
+                System.IO.Directory.CreateDirectory(fallbackCacheFolder);
+                var env = await CoreWebView2Environment.CreateWithOptionsAsync(null, fallbackCacheFolder, null);
                 lock (_envLock)
                 {
                     _sharedEnvironment ??= env;

@@ -129,7 +129,6 @@ namespace TxtAIEditor.Controls
         {
             var pdfWebView = new WebView2
             {
-                Source = new Uri(tab.FilePath!, UriKind.Absolute),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 DefaultBackgroundColor = editorBackgroundColor,
