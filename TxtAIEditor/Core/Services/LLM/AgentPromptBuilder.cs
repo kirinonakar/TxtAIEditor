@@ -26,7 +26,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine();
             builder.AppendLine("Tools (internal, not PowerShell):");
             builder.AppendLine("- list_files {\"glob\":\"**/*.cs\",\"maxResults\":80}: list workspace files.");
-            builder.AppendLine("- search_text {\"query\":\"needle\",\"glob\":\"**/*.cs\",\"maxResults\":80}: simple workspace text search.");
+            builder.AppendLine("- search_text {\"query\":\"needle\",\"glob\":\"**/*\",\"maxResults\":80}: simple workspace search across file paths and text-file contents.");
             builder.AppendLine("- run_rg {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}: ripgrep from workspace root.");
             builder.AppendLine("- run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}: ripgrep-all for PDF/docx/etc.");
             builder.AppendLine("- extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}: extract PDF, DOCX, PPTX, or XLSX text into a .txt file. It records only the source and saved .txt path; use read_file on the .txt path with targeted ranges when needed.");

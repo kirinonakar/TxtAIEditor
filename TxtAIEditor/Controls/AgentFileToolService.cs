@@ -68,8 +68,28 @@ namespace TxtAIEditor.Controls
             string root = ResolveWorkspaceRoot();
             int limit = Math.Clamp(maxResults <= 0 ? 80 : maxResults, 1, 300);
             var results = new List<string>();
+            var contentSearchFiles = new List<string>();
 
             foreach (string filePath in EnumerateWorkspaceFiles(root).Where(path => GlobMatches(RelativePath(root, path), glob)))
+            {
+                string relativePath = RelativePath(root, filePath);
+                if (relativePath.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    Path.GetFileName(filePath).Contains(query, StringComparison.OrdinalIgnoreCase))
+                {
+                    results.Add($"[path] {relativePath}");
+                    if (results.Count >= limit)
+                    {
+                        return string.Join(Environment.NewLine, results);
+                    }
+                }
+
+                if (ShouldSearchFileContents(filePath))
+                {
+                    contentSearchFiles.Add(filePath);
+                }
+            }
+
+            foreach (string filePath in contentSearchFiles)
             {
                 string[] lines;
                 try
@@ -103,6 +123,40 @@ namespace TxtAIEditor.Controls
             return results.Count == 0
                 ? "No matches found."
                 : string.Join(Environment.NewLine, results);
+        }
+
+        private static bool ShouldSearchFileContents(string filePath)
+        {
+            string extension = Path.GetExtension(filePath);
+            if (extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".ico", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".woff", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".woff2", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.Length > 10 * 1024 * 1024)
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return true;
         }
 
         public async Task<string> ReadFileAsync(string path, int startLine, int lineCount)
