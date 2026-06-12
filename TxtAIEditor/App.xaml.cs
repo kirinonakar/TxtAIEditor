@@ -69,7 +69,7 @@ namespace TxtAIEditor
             }
         }
 
-        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+        protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
             if (_isComActivation)
             {
@@ -129,8 +129,10 @@ namespace TxtAIEditor
 
             StartIpcWatcher();
 
-            _window = new MainWindow();
+            var mainWindow = new MainWindow();
+            _window = mainWindow;
             _window.Closed += (_, _) => CleanupAppResources();
+            await mainWindow.PrepareForInitialActivationAsync();
             _window.Activate();
 
             _ = Task.Run(FileAssociationService.RegisterUnpackagedFileAssociations);

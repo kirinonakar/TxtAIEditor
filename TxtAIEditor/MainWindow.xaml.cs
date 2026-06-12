@@ -969,6 +969,23 @@ namespace TxtAIEditor
             PreviewGrid.AgentPane.ModelNameClick += OnModelNameClick;
         }
 
+        public async Task PrepareForInitialActivationAsync()
+        {
+            try
+            {
+                if (!_settingsService.IsLoaded)
+                {
+                    await _settingsService.LoadSettingsAsync();
+                }
+
+                WindowPlacementService.ApplySavedWindowPlacement(AppWindow, _settingsService.CurrentSettings);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to prepare initial window placement: {ex.Message}");
+            }
+        }
+
         private void WireLeftSidebarEvents()
         {
             LeftSidebarTabView.SearchQueryInputKeyDown += OnSearchQueryInputKeyDown;

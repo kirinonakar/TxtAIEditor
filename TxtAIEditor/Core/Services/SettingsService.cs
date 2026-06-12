@@ -11,6 +11,7 @@ namespace TxtAIEditor.Core.Services
     {
         private readonly string _settingsFilePath;
         public EditorSettings CurrentSettings { get; private set; } = new EditorSettings();
+        public bool IsLoaded { get; private set; }
 
         public SettingsService()
         {
@@ -22,6 +23,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task LoadSettingsAsync()
         {
+            EditorSettings loadedSettings = new EditorSettings();
+
             try
             {
                 if (File.Exists(_settingsFilePath))
@@ -30,8 +33,7 @@ namespace TxtAIEditor.Core.Services
                     var settings = JsonSerializer.Deserialize<EditorSettings>(json);
                     if (settings != null)
                     {
-                        CurrentSettings = settings;
-                        return;
+                        loadedSettings = settings;
                     }
                 }
             }
@@ -40,8 +42,8 @@ namespace TxtAIEditor.Core.Services
                 System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
             }
 
-            // Fallback default
-            CurrentSettings = new EditorSettings();
+            CurrentSettings = loadedSettings;
+            IsLoaded = true;
         }
 
         public async Task SaveSettingsAsync(EditorSettings settings)
@@ -49,6 +51,7 @@ namespace TxtAIEditor.Core.Services
             try
             {
                 CurrentSettings = settings;
+                IsLoaded = true;
                 string? dir = Path.GetDirectoryName(_settingsFilePath);
                 if (dir != null && !Directory.Exists(dir))
                 {

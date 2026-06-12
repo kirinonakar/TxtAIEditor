@@ -138,8 +138,12 @@ namespace TxtAIEditor.Controls
 
         private async Task LoadSettingsAsync()
         {
-            await _settingsService.LoadSettingsAsync();
-            WindowPlacementService.ApplySavedWindowPlacement(_window.AppWindow, _settingsService.CurrentSettings);
+            if (!_settingsService.IsLoaded)
+            {
+                await _settingsService.LoadSettingsAsync();
+                WindowPlacementService.ApplySavedWindowPlacement(_window.AppWindow, _settingsService.CurrentSettings);
+            }
+
             _editorWorkspace.LastTerminalHeight = Math.Clamp(_settingsService.CurrentSettings.TerminalPanelHeight, 120, 600);
             _terminalPane.ApplySettings(_settingsService.CurrentSettings);
         }
