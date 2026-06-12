@@ -75,6 +75,7 @@ namespace TxtAIEditor
         private readonly EditorLinkNavigationController _editorLinkNavigationController;
         private readonly EditorWebViewInitializationController _editorWebViewInitializationController;
         private readonly EditorLineNavigationController _editorLineNavigationController;
+        private readonly EditorTabOpenController _editorTabOpenController;
         private readonly SplitImeSyncController _splitImeSyncController;
         private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly TabSaveController _tabSaveController;
@@ -802,6 +803,40 @@ namespace TxtAIEditor
                 UpdateRightPanelSelectionContext,
                 () => _scrollSyncEnabled,
                 enabled => _scrollSyncEnabled = enabled);
+            _editorTabOpenController = new EditorTabOpenController(
+                _settingsService,
+                _snippetService,
+                _viewModel,
+                EditorWorkspace,
+                _editorTabDocumentFactory,
+                _editorTabViewItemFactory,
+                _favoritesRecentController,
+                _statusBarController,
+                _tabEncryptionController,
+                _pdfViewerController,
+                _editorWebViewInitializationController,
+                _editorBridgeShortcutController,
+                _editorBridgeDocumentController,
+                _editorBridgeInteractionController,
+                _editorLinkNavigationController,
+                _tabSelectionController,
+                _tabBridges,
+                _editorSessions,
+                DispatcherQueue,
+                GetCurrentActiveTabView,
+                GetActiveTab,
+                GetTabViewForTabItem,
+                () => _currentFolderPath,
+                () => _livePreviewEnabled,
+                () => _scrollSyncEnabled,
+                () => _csvTableModeEnabled,
+                GetPreviewBaseHref,
+                GetLocalizedString,
+                ApplyEditorSurfaceBackground,
+                UpdateLanguageUI,
+                UpdateWindowTitle,
+                ShowTabContextMenu,
+                InitialEditorLineWarmupCount);
             _editorSplitLayoutController = new EditorSplitLayoutController(
                 TopToolbar,
                 EditorWorkspace,
@@ -1028,7 +1063,7 @@ namespace TxtAIEditor
             bool isEncrypted = false,
             string? encryptionPassword = null)
         {
-            var documentParts = _editorTabDocumentFactory.Create(
+            return _editorTabOpenController.OpenNewTab(
                 filePath,
                 content,
                 isReadOnly,
@@ -1037,402 +1072,21 @@ namespace TxtAIEditor
                 textModel,
                 isEncrypted,
                 encryptionPassword);
-            var tab = documentParts.Tab;
-            tab.InlineLivePreviewEnabled = _livePreviewEnabled;
-            var session = documentParts.Session;
-            isReadOnly = documentParts.IsReadOnly;
-            _editorSessions[tab.Id] = session;
-
-            _viewModel.Tabs.Add(tab);
-            if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
-            {
-                _favoritesRecentController.AddRecentFile(tab.FilePath);
-            }
-
-            var settings = _settingsService.CurrentSettings;
-            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
-            _settingsController.ApplyEditorSurfaceBackground(settings);
-
-            var targetTabView = GetCurrentActiveTabView();
-            var tabParts = _editorTabViewItemFactory.Create(
-                tab,
-                editorBgColor,
-                settings.UiFontFamily,
-                GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
-                _tabEncryptionController.ShowMenu,
-                (tabItem, args) => ShowTabContextMenu(tab, tabItem, targetTabView, tabItem, args),
-                _currentFolderPath);
-            _tabBridges[tab.Id] = (tabParts.WebView, tabParts.Bridge);
-
-            WireEditorBridge(tabParts.Bridge, tabParts.WebView, tabParts.LoadCover, tab, tabParts.TabItem, session, isReadOnly);
-
-            // 탭 헤더와 선택 상태를 먼저 UI에 올린다.
-            // WebView2 초기화가 간헐적으로 UI 턴을 잡으면 파일 내용보다 탭 제목이 늦게 보이는 현상이 생길 수 있다.
-            EditorWorkspace.DisableTabItemTransitions();
-            targetTabView.TabItems.Add(tabParts.TabItem);
-            targetTabView.SelectedItem = tabParts.TabItem;
-            EditorWorkspace.SetEditorSurfaceBackground(editorBgColor);
-            EditorWorkspace.DisableTabItemTransitions();
-            this.DispatcherQueue.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-                () =>
-                {
-                    EditorWorkspace.SetEditorSurfaceBackground(WebViewAppearanceService.ResolveEditorBackgroundColor(_settingsService.CurrentSettings));
-                    EditorWorkspace.DisableTabItemTransitions();
-                });
-
-            _statusBarController.UpdateFileStats(tab);
-            _statusBarController.UpdateTotalLines(tab);
-            _statusBarController.UpdateSelectionStats(null);
-            _statusBarController.SyncEncodingCombo(tab);
-            _statusBarController.SyncLineEndingText(tab);
-            UpdateWindowTitle();
-
-            // Editor WebView2 초기화는 다음 UI 턴의 낮은 우선순위로 미룬다.
-            // 이렇게 하면 탭 제목 렌더링이 항상 WebView2 시작 비용보다 먼저 처리된다.
-            bool initQueued = this.DispatcherQueue.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-                () =>
-                {
-                    if (_tabBridges.ContainsKey(tab.Id))
-                    {
-                        InitializeEditorWebView(tabParts.WebView, tabParts.Bridge);
-                    }
-                });
-
-            if (!initQueued)
-            {
-                InitializeEditorWebView(tabParts.WebView, tabParts.Bridge);
-            }
-
-            return tab;
         }
 
         private OpenedTab OpenPdfTab(string filePath)
         {
-            var tab = new OpenedTab
-            {
-                FilePath = filePath,
-                Title = Path.GetFileName(filePath),
-                Content = string.Empty,
-                Language = "pdf",
-                EncodingName = string.Empty,
-                EncodingWasAutoDetected = false,
-                IsPdfViewer = true
-            };
-
-            _viewModel.Tabs.Add(tab);
-            if (File.Exists(tab.FilePath))
-            {
-                _favoritesRecentController.AddRecentFile(tab.FilePath);
-            }
-
-            var settings = _settingsService.CurrentSettings;
-            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
-            _settingsController.ApplyEditorSurfaceBackground(settings);
-
-            var targetTabView = GetCurrentActiveTabView();
-            var tabParts = _editorTabViewItemFactory.CreatePdfViewer(
-                tab,
-                editorBgColor,
-                settings.UiFontFamily,
-                GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
-                _tabEncryptionController.ShowMenu,
-                (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args),
-                _currentFolderPath);
-
-            _pdfViewerController.Register(tab, tabParts.WebView);
-
-            EditorWorkspace.DisableTabItemTransitions();
-            targetTabView.TabItems.Add(tabParts.TabItem);
-            targetTabView.SelectedItem = tabParts.TabItem;
-            EditorWorkspace.SetEditorSurfaceBackground(editorBgColor);
-
-            _statusBarController.UpdateFileStats(tab);
-            _statusBarController.UpdateTotalLines(tab);
-            _statusBarController.UpdateSelectionStats(null);
-            _statusBarController.SyncEncodingCombo(tab);
-            _statusBarController.SyncLineEndingText(tab);
-            UpdateLanguageUI(tab);
-            UpdateWindowTitle();
-
-            return tab;
+            return _editorTabOpenController.OpenPdfTab(filePath);
         }
 
         private OpenedTab OpenImageTab(string filePath)
         {
-            var tab = new OpenedTab
-            {
-                FilePath = filePath,
-                Title = Path.GetFileName(filePath),
-                Content = string.Empty,
-                Language = "image",
-                EncodingName = string.Empty,
-                EncodingWasAutoDetected = false,
-                IsImageViewer = true
-            };
-
-            _viewModel.Tabs.Add(tab);
-            if (File.Exists(tab.FilePath))
-            {
-                _favoritesRecentController.AddRecentFile(tab.FilePath);
-            }
-
-            var settings = _settingsService.CurrentSettings;
-            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
-            _settingsController.ApplyEditorSurfaceBackground(settings);
-
-            var targetTabView = GetCurrentActiveTabView();
-            var tabItem = _editorTabViewItemFactory.CreateImageViewer(
-                tab,
-                editorBgColor,
-                settings.UiFontFamily,
-                GetLocalizedString("EncryptedTabTooltip", "암호화됨"),
-                _tabEncryptionController.ShowMenu,
-                (item, args) => ShowTabContextMenu(tab, item, targetTabView, item, args),
-                _currentFolderPath);
-
-            EditorWorkspace.DisableTabItemTransitions();
-            targetTabView.TabItems.Add(tabItem);
-            targetTabView.SelectedItem = tabItem;
-            EditorWorkspace.SetEditorSurfaceBackground(editorBgColor);
-
-            _statusBarController.UpdateFileStats(tab);
-            _statusBarController.UpdateTotalLines(tab);
-            _statusBarController.UpdateSelectionStats(null);
-            _statusBarController.SyncEncodingCombo(tab);
-            _statusBarController.SyncLineEndingText(tab);
-            UpdateLanguageUI(tab);
-            UpdateWindowTitle();
-
-            return tab;
-        }
-
-        private void WireEditorBridge(
-            MonacoBridge bridge,
-            WebView2 editorWebView,
-            Border editorLoadCover,
-            OpenedTab tab,
-            TabViewItem tabItem,
-            EditorDocumentSession session,
-            bool isReadOnly)
-        {
-            Func<EditorDocumentSession> getSession = () => _editorSessions.TryGetValue(tab.Id, out var s) ? s : session;
-
-            editorWebView.GotFocus += (sender, args) =>
-            {
-                this.DispatcherQueue.TryEnqueue(() =>
-                {
-                    var ownerTabView = GetTabViewForTabItem(tabItem);
-                    if (ownerTabView != null)
-                    {
-                        if (EditorWorkspace.ActiveTabView != ownerTabView || !ReferenceEquals(ownerTabView.SelectedItem, tabItem))
-                        {
-                            EditorWorkspace.ActiveTabView = ownerTabView;
-                            ownerTabView.SelectedItem = tabItem;
-                            _tabSelectionController.QueueChanged(ownerTabView, tabItem);
-                        }
-                    }
-                });
-            };
-
-            bridge.ShortcutPressed += (shortcutName) =>
-            {
-                this.DispatcherQueue.TryEnqueue(() =>
-                {
-                    _editorBridgeShortcutController.Handle(shortcutName, bridge, tab, tabItem, getSession());
-                });
-            };
-
-            bridge.EditorReady += async () =>
-            {
-                var currentSession = getSession();
-                await bridge.InitializeModelAsync(
-                    currentSession.Model.LineCount,
-                    tab.Language,
-                    _settingsService.CurrentSettings,
-                    isReadOnly,
-                    currentSession.GetLines(1, InitialEditorLineWarmupCount));
-                await bridge.UpdateSnippetsAsync(_snippetService.GetSnippets());
-                await bridge.UpdateScrollSyncStateAsync(_scrollSyncEnabled);
-                await bridge.SetInlineLivePreviewAsync(_livePreviewEnabled, GetPreviewBaseHref(tab));
-                await bridge.SetCsvTableModeAsync(_csvTableModeEnabled);
-            };
-
-            bridge.EditorRendered += () =>
-            {
-                this.DispatcherQueue.TryEnqueue(() =>
-                {
-                    editorWebView.Opacity = 1;
-                    editorLoadCover.Visibility = Visibility.Collapsed;
-                    if (GetActiveTab() == tab)
-                    {
-                        editorWebView.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
-                        _ = bridge.FocusAsync();
-                    }
-                });
-            };
-
-            bridge.LinesRequested += async (requestId, startLine, count) =>
-            {
-                try
-                {
-                    var currentSession = getSession();
-                    var lines = currentSession.GetLines(startLine, count);
-                    await bridge.SendLinesAsync(requestId, startLine, lines);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to send editor lines: {ex.Message}");
-                }
-            };
-
-            bridge.LineChanged += async (lineNumber, text, isComposing) =>
-            {
-                await _editorBridgeDocumentController.HandleLineChangedAsync(
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber,
-                    text,
-                    isComposing);
-            };
-
-            bridge.LineInsertRequested += async (lineNumber, text) =>
-            {
-                await _editorBridgeDocumentController.HandleLineInsertRequestedAsync(
-                    bridge,
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber,
-                    text);
-            };
-
-            bridge.LineSplitRequested += async (lineNumber, before, after) =>
-            {
-                await _editorBridgeDocumentController.HandleLineSplitRequestedAsync(
-                    bridge,
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber,
-                    before,
-                    after);
-            };
-
-            bridge.MergeLineWithPreviousRequested += async (lineNumber) =>
-            {
-                await _editorBridgeDocumentController.HandleMergeLineWithPreviousRequestedAsync(
-                    bridge,
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber);
-            };
-
-            bridge.DeleteLineRequested += async (lineNumber) =>
-            {
-                await _editorBridgeDocumentController.HandleDeleteLineRequestedAsync(
-                    bridge,
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber);
-            };
-
-            bridge.EditTransactionStarted += () =>
-            {
-                getSession().BeginUndoGroup();
-            };
-
-            bridge.EditTransactionEnded += () =>
-            {
-                getSession().EndUndoGroup();
-            };
-
-            bridge.FindRequested += async (query, startLine, startColumn, reverse, matchCase, isRegex) =>
-            {
-                await _editorBridgeDocumentController.HandleFindRequestedAsync(
-                    bridge,
-                    getSession(),
-                    query,
-                    startLine,
-                    startColumn,
-                    reverse,
-                    matchCase,
-                    isRegex);
-            };
-
-            bridge.FindAllRequested += async (query, matchCase, isRegex) =>
-            {
-                await _editorBridgeDocumentController.HandleFindAllRequestedAsync(
-                    bridge,
-                    getSession(),
-                    query,
-                    matchCase,
-                    isRegex);
-            };
-
-            bridge.ReplaceAllRequested += async (query, replace, matchCase, isRegex) =>
-            {
-                await _editorBridgeDocumentController.HandleReplaceAllRequestedAsync(
-                    bridge,
-                    tab,
-                    tabItem,
-                    getSession(),
-                    query,
-                    replace,
-                    matchCase,
-                    isRegex);
-            };
-
-            bridge.ContentChanged += (isComposing) =>
-            {
-                _editorBridgeDocumentController.HandleContentChanged(tab, tabItem, isComposing);
-            };
-
-            bridge.CursorChanged += (line, col) =>
-            {
-                _editorBridgeInteractionController.HandleCursorChanged(bridge, tab, line, col);
-            };
-
-            bridge.SelectionReceived += (selectedText, selStartLine, selEndLine) =>
-            {
-                _editorBridgeInteractionController.HandleSelectionReceived(
-                    tab,
-                    selectedText,
-                    selStartLine,
-                    selEndLine);
-            };
-
-            bridge.ScrollChanged += (firstLine, offset) =>
-            {
-                _editorBridgeInteractionController.HandleScrollChanged(tab, firstLine, offset);
-            };
-
-            bridge.ScrollSyncChanged += (enabled) =>
-            {
-                _editorBridgeInteractionController.HandleScrollSyncChanged(enabled);
-            };
-
-            bridge.CtrlClicked += (text, isUrl, isPath) =>
-            {
-                this.DispatcherQueue.TryEnqueue(async () =>
-                {
-                    await _editorLinkNavigationController.HandleCtrlClickAsync(text, isUrl, isPath);
-                });
-            };
+            return _editorTabOpenController.OpenImageTab(filePath);
         }
 
         private void SchedulePreview(OpenedTab tab)
         {
             _livePreviewController.Schedule(tab);
-        }
-
-        private async void InitializeEditorWebView(WebView2 wv, MonacoBridge bridge)
-        {
-            await _editorWebViewInitializationController.InitializeAsync(wv, bridge);
         }
 
         #endregion
@@ -2131,6 +1785,11 @@ namespace TxtAIEditor
         private void ApplyToolbarSettings(EditorSettings settings)
         {
             _settingsController.ApplyToolbarSettings(settings);
+        }
+
+        private void ApplyEditorSurfaceBackground(EditorSettings settings)
+        {
+            _settingsController.ApplyEditorSurfaceBackground(settings);
         }
         #endregion
 
