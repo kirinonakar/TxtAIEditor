@@ -126,6 +126,7 @@ namespace TxtAIEditor.Controls
                 or "run_rg"
                 or "run_rga"
                 or "search_text"
+                or "read_image"
                 or "create_file"
                 or "extract_document"
                 or "overwrite_file"
@@ -292,6 +293,11 @@ namespace TxtAIEditor.Controls
                 "save_file" => "save_tab",
                 "save_tab" => "save_tab",
                 "read" => "read_file",
+                "read_image" => "read_image",
+                "view_image" => "read_image",
+                "image" => "read_image",
+                "inspect_image" => "read_image",
+                "analyze_image" => "read_image",
                 "search" => "search_text",
                 "powershell" => "run_powershell",
                 "rg" => "run_rg",

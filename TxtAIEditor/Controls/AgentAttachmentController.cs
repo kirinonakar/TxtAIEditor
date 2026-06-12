@@ -23,6 +23,7 @@ namespace TxtAIEditor.Controls
         public string? TextContent { get; set; }
         public LlmMessageAttachment? ImageContent { get; set; }
         public int EstimatedTokens { get; set; }
+        public bool IsPathOnlyDocument { get; set; }
         public bool IsImage => ImageContent != null;
     }
 
@@ -114,15 +115,8 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                int skippedPdfCount = 0;
                 foreach (var file in files)
                 {
-                    if (IsPdfFile(file))
-                    {
-                        skippedPdfCount++;
-                        continue;
-                    }
-
                     try
                     {
                         var attachment = await CreateAttachmentAsync(file);
@@ -141,13 +135,6 @@ namespace TxtAIEditor.Controls
                                 _getString("AgentAttachmentErrorFormat", "An error occurred while adding the attachment: {0}"),
                                 ex.Message));
                     }
-                }
-
-                if (skippedPdfCount > 0)
-                {
-                    _showError(
-                        _getString("AgentAttachmentErrorTitle", "Attachment Error"),
-                        _getString("AgentPdfAttachmentExcluded", "PDF files are not included as attachments."));
                 }
 
                 RefreshAttachments();
@@ -188,9 +175,17 @@ namespace TxtAIEditor.Controls
             string path = file.Path ?? displayName;
             string mimeType = GetMimeType(file);
 
-            if (IsPdfFile(file))
+            if (IsDocumentFile(file))
             {
-                return null;
+                int pathOnlyEstimatedTokens = (int)Math.Round(_estimateTokenCount(path));
+                return new AgentAttachmentState
+                {
+                    Path = path,
+                    DisplayName = displayName,
+                    Detail = _getString("AgentAttachmentDocumentPathOnlyDetail", "Document, path only"),
+                    EstimatedTokens = pathOnlyEstimatedTokens,
+                    IsPathOnlyDocument = true
+                };
             }
 
             if (IsImageFile(file, mimeType))
@@ -330,16 +325,6 @@ namespace TxtAIEditor.Controls
             return StripBinaryControlCharacters(fallback);
         }
 
-        private async Task<string> ReadAttachmentPdfTextAsync(StorageFile file)
-        {
-            if (string.IsNullOrWhiteSpace(file.Path) || !File.Exists(file.Path))
-            {
-                return string.Empty;
-            }
-
-            return await _pdfTextExtractionService.ExtractTextAsync(file.Path, MaxAttachmentTextChars);
-        }
-
         private static int EstimateImageTokens(int width, int height)
         {
             int tilesWide = Math.Max(1, (int)Math.Ceiling(width / 512.0));
@@ -381,9 +366,13 @@ namespace TxtAIEditor.Controls
                    extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsPdfFile(StorageFile file)
+        private static bool IsDocumentFile(StorageFile file)
         {
-            return Path.GetExtension(file.Name).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+            string extension = Path.GetExtension(file.Name);
+            return extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string GetMimeType(StorageFile file)

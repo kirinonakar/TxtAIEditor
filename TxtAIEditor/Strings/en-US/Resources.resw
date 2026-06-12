@@ -1933,6 +1933,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
     <value>File, included first {0:N0} chars</value>
   </data>
+  <data name="AgentAttachmentDocumentPathOnlyDetail" xml:space="preserve">
+    <value>Document, path only</value>
+  </data>
   <data name="AgentPresetButtonTooltip" xml:space="preserve">
     <value>Persona/instruction presets</value>
   </data>

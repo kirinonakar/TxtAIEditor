@@ -118,7 +118,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (normalizedToolName is not ("read_file" or "extract_document" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
+            if (normalizedToolName is not ("read_file" or "read_image" or "extract_document" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
             {
                 return;
             }
@@ -134,7 +134,7 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                path = normalizedToolName == "read_file"
+                path = normalizedToolName is "read_file" or "read_image"
                     ? GetPathArgument(arguments)
                     : GetEditPathArgument(arguments);
             }

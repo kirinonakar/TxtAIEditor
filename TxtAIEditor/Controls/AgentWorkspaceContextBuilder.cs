@@ -131,6 +131,10 @@ namespace TxtAIEditor.Controls
                     var image = attachment.ImageContent;
                     context.Add($"  Image input included separately for vision-capable models: {image?.MimeType}, {image?.Width}x{image?.Height}");
                 }
+                else if (attachment.IsPathOnlyDocument)
+                {
+                    context.Add($"  Path: {attachment.Path}");
+                }
                 else if (!string.IsNullOrEmpty(attachment.TextContent))
                 {
                     context.Add("");

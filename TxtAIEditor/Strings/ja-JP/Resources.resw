@@ -1934,6 +1934,9 @@
   <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
     <value>ファイル、先頭 {0:N0} 文字まで含めました</value>
   </data>
+  <data name="AgentAttachmentDocumentPathOnlyDetail" xml:space="preserve">
+    <value>文書、パスのみ含める</value>
+  </data>
   <data name="AgentPresetButtonTooltip" xml:space="preserve">
     <value>ペルソナ/指示プリセット</value>
   </data>

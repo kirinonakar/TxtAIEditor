@@ -59,6 +59,7 @@ namespace TxtAIEditor.Controls
         private double _sessionHistoryTokenCount;
         private readonly DispatcherTimer _statsDebounceTimer;
         private double _currentRunTranscriptTokens;
+        private readonly List<LlmMessageAttachment> _currentRunImageToolAttachments = new();
 
         public AgentController(
             ILLMService llmService,
@@ -320,6 +321,7 @@ namespace TxtAIEditor.Controls
   
             _isRunning = true;
             _fileToolController.StartRun();
+            _currentRunImageToolAttachments.Clear();
             _selectionContextController.ClearRunSnapshots();
             _currentRunTranscriptTokens = 0;
             var cancellationSource = new CancellationTokenSource();
@@ -877,6 +879,7 @@ namespace TxtAIEditor.Controls
             {
                 _isRunning = false;
                 _selectionContextController.ClearRunSnapshots();
+                _currentRunImageToolAttachments.Clear();
                 _fileToolController.FinishRun();
                 if (ReferenceEquals(_runCancellation, cancellationSource))
                 {
@@ -1145,7 +1148,10 @@ namespace TxtAIEditor.Controls
 
         private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForCurrentRun()
         {
-            return _attachmentController.GetImageAttachments();
+            var attachments = new List<LlmMessageAttachment>();
+            attachments.AddRange(_attachmentController.GetImageAttachments());
+            attachments.AddRange(_currentRunImageToolAttachments);
+            return attachments;
         }
 
         private async Task<string> ExecuteToolAsync(string toolName, JsonElement arguments, CancellationToken cancellationToken)
@@ -1197,6 +1203,7 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "path"),
                             GetIntArgument(arguments, "startLine", 1),
                             GetIntArgument(arguments, "lineCount", 160)),
+                        "read_image" => await ReadImageToolAsync(arguments),
                         "extract_document" => await _fileTools.ExtractDocumentAsync(
                             GetExtractDocumentInputPathArgument(arguments),
                             GetExtractDocumentOutputPathArgument(arguments),
@@ -1250,6 +1257,21 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private async Task<string> ReadImageToolAsync(JsonElement arguments)
+        {
+            AgentReadImageResult imageResult = await _fileTools.ReadImageAsync(
+                GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path"));
+
+            if (imageResult.Attachment != null)
+            {
+                _currentRunImageToolAttachments.RemoveAll(existing =>
+                    string.Equals(existing.DisplayName, imageResult.Attachment.DisplayName, StringComparison.OrdinalIgnoreCase));
+                _currentRunImageToolAttachments.Add(imageResult.Attachment);
+            }
+
+            return imageResult.TranscriptText;
+        }
+
         private void AppendActivity(string message)
         {
             _agentPane.DispatcherQueue.TryEnqueue(() =>
@@ -1282,6 +1304,9 @@ namespace TxtAIEditor.Controls
                     GetStringArgument(arguments, "path"),
                     GetIntArgument(arguments, "startLine", 1),
                     GetIntArgument(arguments, "lineCount", 160)),
+                "read_image" => string.Format(
+                    _getString("AgentActivityReadImageFormat", "이미지 읽는 중: {0}"),
+                    GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path")),
                 "extract_document" => string.Format(
                     _getString("AgentActivityExtractDocumentFormat", "문서 텍스트 추출 중: {0}"),
                     GetExtractDocumentInputPathArgument(arguments)),

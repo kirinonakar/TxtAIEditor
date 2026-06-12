@@ -1933,6 +1933,9 @@
   <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
     <value>파일, {0:N0}자까지 포함</value>
   </data>
+  <data name="AgentAttachmentDocumentPathOnlyDetail" xml:space="preserve">
+    <value>문서, 경로만 포함</value>
+  </data>
   <data name="AgentPresetButtonTooltip" xml:space="preserve">
     <value>페르소나/지침 프리셋</value>
   </data>
