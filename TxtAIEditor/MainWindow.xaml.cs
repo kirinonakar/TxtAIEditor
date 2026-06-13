@@ -548,7 +548,8 @@ namespace TxtAIEditor
                 DragOverlay,
                 InitializePickerWindow,
                 LoadFileIntoTabAsync,
-                NavigateExplorerToFolderAndRevealAsync,
+                (folderPath, revealInLeftPanel) => NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel),
+                () => _shellPanelLayoutService.IsLeftSidebarVisible,
                 _dialogController.ShowErrorMessage);
             _rootKeyboardShortcutController = new RootKeyboardShortcutController(
                 () => OpenNewTab(),
@@ -1364,6 +1365,13 @@ namespace TxtAIEditor
             string cleanedPath = path.Trim().Trim('"', '\'');
             if (File.Exists(cleanedPath))
             {
+                string? folderPath = Path.GetDirectoryName(cleanedPath);
+                if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+                {
+                    await NavigateExplorerToFolderAsync(
+                        folderPath,
+                        revealInLeftPanel: _shellPanelLayoutService.IsLeftSidebarVisible);
+                }
                 await LoadFileIntoTabAsync(cleanedPath);
             }
             else if (Directory.Exists(cleanedPath))

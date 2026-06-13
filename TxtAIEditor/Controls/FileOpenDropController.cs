@@ -12,7 +12,8 @@ namespace TxtAIEditor.Controls
         private readonly FrameworkElement _dragOverlay;
         private readonly Action<object> _initializePickerWindow;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
-        private readonly Func<string, Task> _navigateExplorerToFolderAsync;
+        private readonly Func<string, bool, Task> _navigateExplorerToFolderAsync;
+        private readonly Func<bool> _isLeftSidebarVisible;
         private readonly Action<string, string> _showError;
 
         private static readonly string[] TextFileExtensions =
@@ -73,13 +74,15 @@ namespace TxtAIEditor.Controls
             FrameworkElement dragOverlay,
             Action<object> initializePickerWindow,
             Func<string, Task> loadFileIntoTabAsync,
-            Func<string, Task> navigateExplorerToFolderAsync,
+            Func<string, bool, Task> navigateExplorerToFolderAsync,
+            Func<bool> isLeftSidebarVisible,
             Action<string, string> showError)
         {
             _dragOverlay = dragOverlay;
             _initializePickerWindow = initializePickerWindow;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
+            _isLeftSidebarVisible = isLeftSidebarVisible;
             _showError = showError;
         }
 
@@ -163,14 +166,14 @@ namespace TxtAIEditor.Controls
                         string? folderPath = Path.GetDirectoryName(item.Path);
                         if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
                         {
-                            await _navigateExplorerToFolderAsync(folderPath);
+                            await _navigateExplorerToFolderAsync(folderPath, _isLeftSidebarVisible());
                         }
 
                         await _loadFileIntoTabAsync(item.Path);
                     }
                     else if (Directory.Exists(item.Path))
                     {
-                        await _navigateExplorerToFolderAsync(item.Path);
+                        await _navigateExplorerToFolderAsync(item.Path, true);
                     }
                 }
             }
