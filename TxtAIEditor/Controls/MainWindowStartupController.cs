@@ -20,7 +20,6 @@ namespace TxtAIEditor.Controls
         private readonly ISettingsService _settingsService;
         private readonly MainWindowViewModel _viewModel;
         private readonly EditorWorkspacePane _editorWorkspace;
-        private readonly TerminalPane _terminalPane;
         private readonly TopCommandBarPane _topToolbar;
         private readonly ToggleButton _leftPanelToggle;
         private readonly ToggleButton _rightPanelToggle;
@@ -49,7 +48,6 @@ namespace TxtAIEditor.Controls
             ISettingsService settingsService,
             MainWindowViewModel viewModel,
             EditorWorkspacePane editorWorkspace,
-            TerminalPane terminalPane,
             TopCommandBarPane topToolbar,
             ToggleButton leftPanelToggle,
             ToggleButton rightPanelToggle,
@@ -76,7 +74,6 @@ namespace TxtAIEditor.Controls
             _settingsService = settingsService;
             _viewModel = viewModel;
             _editorWorkspace = editorWorkspace;
-            _terminalPane = terminalPane;
             _topToolbar = topToolbar;
             _leftPanelToggle = leftPanelToggle;
             _rightPanelToggle = rightPanelToggle;
@@ -107,10 +104,11 @@ namespace TxtAIEditor.Controls
                 var startupPaths = ParseStartupPaths(Environment.GetCommandLineArgs());
 
                 await LoadSettingsAsync();
-                await LoadUserContentIndexesAsync();
+                LoadRecentFilesForStartup();
                 ApplyInitialShellState();
 
                 await OpenStartupTargetsAsync(startupPaths);
+                QueueDeferredUserContentIndexes();
 
                 if (!string.IsNullOrEmpty(_getCurrentRepoPath()))
                 {
@@ -144,15 +142,33 @@ namespace TxtAIEditor.Controls
                 WindowPlacementService.ApplySavedWindowPlacement(_window.AppWindow, _settingsService.CurrentSettings);
             }
 
-            _editorWorkspace.LastTerminalHeight = Math.Clamp(_settingsService.CurrentSettings.TerminalPanelHeight, 120, 600);
-            _terminalPane.ApplySettings(_settingsService.CurrentSettings);
+            _editorWorkspace.ApplyTerminalSettings(_settingsService.CurrentSettings);
         }
 
-        private async Task LoadUserContentIndexesAsync()
+        private void LoadRecentFilesForStartup()
         {
-            await _snippetsController.LoadAsync();
-            _favoritesRecentController.RefreshFavorites();
             _favoritesRecentController.LoadRecentFiles();
+        }
+
+        private void QueueDeferredUserContentIndexes()
+        {
+            async void LoadDeferredIndexes()
+            {
+                try
+                {
+                    await _snippetsController.LoadAsync();
+                    _favoritesRecentController.RefreshFavorites();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Deferred startup content load failed: {ex.Message}");
+                }
+            }
+
+            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, LoadDeferredIndexes))
+            {
+                LoadDeferredIndexes();
+            }
         }
 
         private void ApplyInitialShellState()
@@ -230,7 +246,7 @@ namespace TxtAIEditor.Controls
 
         private void NavigateStartupFolderWithoutBlocking(string folderPath)
         {
-            async Task NavigateAsync()
+            async void NavigateAsync()
             {
                 try
                 {
@@ -242,7 +258,10 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            _ = NavigateAsync();
+            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, NavigateAsync))
+            {
+                NavigateAsync();
+            }
         }
 
         private void QueuePreviewInitialization()

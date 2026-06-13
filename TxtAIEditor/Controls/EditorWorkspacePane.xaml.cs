@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using TxtAIEditor.Core.Models;
 using Windows.Foundation;
 
 namespace TxtAIEditor.Controls
@@ -20,7 +21,9 @@ namespace TxtAIEditor.Controls
     {
         private const double TerminalSplitterVisibleThickness = 2;
 
-        private readonly TerminalPane _terminalPane = new TerminalPane();
+        private TerminalPane? _terminalPane;
+        private EditorSettings? _pendingTerminalSettings;
+        private Func<string, string, string>? _pendingTerminalLocalization;
         private bool _isDraggingEditorSplitter = false;
         private double _editorSplitterStartWidth = 0;
         private double _editorSplitterStartHeight = 0;
@@ -35,10 +38,6 @@ namespace TxtAIEditor.Controls
         public EditorWorkspacePane()
         {
             InitializeComponent();
-            TerminalPaneHost.Content = _terminalPane;
-            _terminalPane.HorizontalAlignment = HorizontalAlignment.Stretch;
-            _terminalPane.VerticalAlignment = VerticalAlignment.Stretch;
-            _terminalPane.Visibility = Visibility.Collapsed;
             SizeChanged += OnWorkspaceSizeChanged;
             ActiveTabView = EditorTabView;
             Loaded += (_, __) => DisableTabItemTransitions();
@@ -61,15 +60,24 @@ namespace TxtAIEditor.Controls
 
         public TabView EditorTabViewControl => EditorTabView;
         public TabView EditorTabView2Control => EditorTabView2;
-        public TerminalPane TerminalPaneControl => _terminalPane;
-        private TerminalPane TerminalPane => _terminalPane;
+        public TerminalPane TerminalPaneControl => EnsureTerminalPane();
+        private TerminalPane TerminalPane => EnsureTerminalPane();
 
-        public bool IsTerminalVisible => TerminalPaneHost.Visibility == Visibility.Visible;
+        public bool IsTerminalCreated => _terminalPane != null;
+
+        public bool IsTerminalVisible => _terminalPane != null && TerminalPaneHost.Visibility == Visibility.Visible;
 
         public double PersistedTerminalPanelHeight =>
             IsTerminalVisible && TerminalPanelRow.Height.Value > 0
                 ? TerminalPanelRow.Height.Value
                 : LastTerminalHeight;
+
+        public void ApplyTerminalSettings(EditorSettings settings)
+        {
+            _pendingTerminalSettings = settings;
+            LastTerminalHeight = Math.Clamp(settings.TerminalPanelHeight, 120, 600);
+            _terminalPane?.ApplySettings(settings);
+        }
 
         public void SetEditorSurfaceBackground(Windows.UI.Color color)
         {
@@ -227,6 +235,7 @@ namespace TxtAIEditor.Controls
 
         public void Localize(Func<string, string, string> getString)
         {
+            _pendingTerminalLocalization = getString;
             string leftTooltip = getString("MoveTabLeftTooltip", "왼쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)");
             string rightTooltip = getString("MoveTabRightTooltip", "오른쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)");
 
@@ -234,6 +243,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(MoveTabRightBtn, rightTooltip);
             ToolTipService.SetToolTip(MoveTab2LeftBtn, leftTooltip);
             ToolTipService.SetToolTip(MoveTab2RightBtn, rightTooltip);
+            _terminalPane?.Localize(getString);
         }
 
         public void SetSplitMode(EditorSplitMode mode, Action openNewTab)
@@ -359,7 +369,7 @@ namespace TxtAIEditor.Controls
 
         public bool HideTerminalPanelIfEmpty()
         {
-            if (TerminalPane.HasSessions)
+            if (_terminalPane?.HasSessions == true)
             {
                 return false;
             }
@@ -370,7 +380,35 @@ namespace TxtAIEditor.Controls
 
         public void StopAllTerminalSessions()
         {
-            TerminalPane.StopAllSessions();
+            _terminalPane?.StopAllSessions();
+        }
+
+        private TerminalPane EnsureTerminalPane()
+        {
+            if (_terminalPane != null)
+            {
+                return _terminalPane;
+            }
+
+            _terminalPane = new TerminalPane
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Visibility = Visibility.Collapsed
+            };
+            TerminalPaneHost.Content = _terminalPane;
+
+            if (_pendingTerminalSettings != null)
+            {
+                _terminalPane.ApplySettings(_pendingTerminalSettings);
+            }
+
+            if (_pendingTerminalLocalization != null)
+            {
+                _terminalPane.Localize(_pendingTerminalLocalization);
+            }
+
+            return _terminalPane;
         }
 
         private void EnsureSecondPaneHasTab(Action openNewTab)
@@ -386,13 +424,14 @@ namespace TxtAIEditor.Controls
 
         private void EnsureTerminalPanelVisible()
         {
-            _terminalPane.Visibility = Visibility.Visible;
+            var terminalPane = EnsureTerminalPane();
+            terminalPane.Visibility = Visibility.Visible;
             TerminalPaneHost.Visibility = Visibility.Visible;
             TerminalSplitter.Visibility = Visibility.Visible;
             TerminalSplitterRow.Height = new GridLength(TerminalSplitterVisibleThickness);
             LastTerminalHeight = Math.Clamp(LastTerminalHeight, 120, GetMaxTerminalPanelHeight());
             TerminalPanelRow.Height = new GridLength(LastTerminalHeight);
-            TerminalPane.QueueEmbeddedTerminalResize();
+            terminalPane.QueueEmbeddedTerminalResize();
         }
 
         private void HideTerminalPanel()
@@ -407,7 +446,11 @@ namespace TxtAIEditor.Controls
 
         private void CollapseTerminalPanel()
         {
-            _terminalPane.Visibility = Visibility.Collapsed;
+            if (_terminalPane != null)
+            {
+                _terminalPane.Visibility = Visibility.Collapsed;
+            }
+
             TerminalPaneHost.Visibility = Visibility.Collapsed;
             TerminalSplitter.Visibility = Visibility.Collapsed;
             TerminalSplitterRow.Height = new GridLength(0);
@@ -429,7 +472,7 @@ namespace TxtAIEditor.Controls
         {
             if (IsTerminalVisible)
             {
-                TerminalPane.QueueEmbeddedTerminalResize();
+                _terminalPane?.QueueEmbeddedTerminalResize();
             }
         }
 
@@ -512,7 +555,7 @@ namespace TxtAIEditor.Controls
                 double newHeight = Math.Clamp(_terminalSplitterStartHeight - deltaY, 120, GetMaxTerminalPanelHeight());
                 LastTerminalHeight = newHeight;
                 TerminalPanelRow.Height = new GridLength(newHeight);
-                TerminalPane.QueueEmbeddedTerminalResize();
+                _terminalPane?.QueueEmbeddedTerminalResize();
                 e.Handled = true;
             }
         }
@@ -523,7 +566,7 @@ namespace TxtAIEditor.Controls
             {
                 _isDraggingTerminalSplitter = false;
                 splitter.ReleasePointerCapture(e.Pointer);
-                TerminalPane.QueueEmbeddedTerminalResize();
+                _terminalPane?.QueueEmbeddedTerminalResize();
                 TerminalPanelHeightChanged?.Invoke(this, EventArgs.Empty);
                 e.Handled = true;
             }

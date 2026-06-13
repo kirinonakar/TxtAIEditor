@@ -57,6 +57,7 @@ namespace TxtAIEditor.Controls
         {
             await _snippetService.LoadSnippetsAsync();
             Refresh();
+            await NotifySnippetsChangedAsync();
         }
 
         public void Refresh()

@@ -76,35 +76,15 @@ namespace TxtAIEditor
                 return;
             }
 
-            // Kill any windowless background TxtAIEditor processes from previous runs
-            try
-            {
-                var currentProc = System.Diagnostics.Process.GetCurrentProcess();
-                var existingProcs = System.Diagnostics.Process.GetProcessesByName("TxtAIEditor");
-                foreach (var p in existingProcs)
-                {
-                    if (p.Id != currentProc.Id)
-                    {
-                        if (p.MainWindowHandle == IntPtr.Zero)
-                        {
-                            try
-                            {
-                                // If it has no window and has been running for more than 2 seconds, it's a zombie
-                                if ((DateTime.Now - p.StartTime).TotalSeconds > 2)
-                                {
-                                    p.Kill();
-                                    p.WaitForExit(1000);
-                                }
-                            }
-                            catch { }
-                        }
-                    }
-                }
-            }
-            catch { }
-
             bool createdNew;
             _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out createdNew);
+
+            if (!createdNew)
+            {
+                CleanupWindowlessBackgroundProcesses();
+                _singleInstanceMutex.Dispose();
+                _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out createdNew);
+            }
 
             if (!createdNew)
             {
@@ -136,6 +116,37 @@ namespace TxtAIEditor
             _window.Activate();
 
             _ = Task.Run(FileAssociationService.RegisterUnpackagedFileAssociations);
+        }
+
+        private static void CleanupWindowlessBackgroundProcesses()
+        {
+            try
+            {
+                var currentProc = System.Diagnostics.Process.GetCurrentProcess();
+                var existingProcs = System.Diagnostics.Process.GetProcessesByName("TxtAIEditor");
+                foreach (var p in existingProcs)
+                {
+                    if (p.Id == currentProc.Id || p.MainWindowHandle != IntPtr.Zero)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        if ((DateTime.Now - p.StartTime).TotalSeconds > 2)
+                        {
+                            p.Kill();
+                            p.WaitForExit(1000);
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch
+            {
+            }
         }
 
         private void StartExplorerCommandServer()

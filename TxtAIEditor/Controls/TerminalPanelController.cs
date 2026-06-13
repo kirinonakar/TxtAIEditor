@@ -11,42 +11,54 @@ namespace TxtAIEditor.Controls
     {
         private readonly EditorWorkspacePane _editorWorkspace;
         private readonly TopCommandBarPane _topToolbar;
-        private readonly TerminalPane _terminalPane;
         private readonly Func<TxtAIEditor.ExplorerItem?> _selectedExplorerItemProvider;
         private readonly Func<string> _currentFolderProvider;
         private readonly Func<string> _currentRepoProvider;
         private readonly Func<string, int, Task> _openFileAsync;
         private readonly Func<string, Task> _navigateFolderAsync;
+        private readonly Window _owner;
+        private TerminalPane? _terminalPane;
 
         public TerminalPanelController(
             Window owner,
             EditorWorkspacePane editorWorkspace,
             TopCommandBarPane topToolbar,
-            TerminalPane terminalPane,
             Func<TxtAIEditor.ExplorerItem?> selectedExplorerItemProvider,
             Func<string> currentFolderProvider,
             Func<string> currentRepoProvider,
             Func<string, int, Task> openFileAsync,
             Func<string, Task> navigateFolderAsync)
         {
+            _owner = owner;
             _editorWorkspace = editorWorkspace;
             _topToolbar = topToolbar;
-            _terminalPane = terminalPane;
             _selectedExplorerItemProvider = selectedExplorerItemProvider;
             _currentFolderProvider = currentFolderProvider;
             _currentRepoProvider = currentRepoProvider;
             _openFileAsync = openFileAsync;
             _navigateFolderAsync = navigateFolderAsync;
+        }
 
-            _terminalPane.AttachOwner(owner);
+        private TerminalPane EnsureTerminalPane()
+        {
+            if (_terminalPane != null)
+            {
+                return _terminalPane;
+            }
+
+            _terminalPane = _editorWorkspace.TerminalPaneControl;
+            _terminalPane.AttachOwner(_owner);
             _terminalPane.WorkingDirectoryProvider = GetWorkingDirectory;
             _terminalPane.SessionsEmptied += OnSessionsEmptied;
             _terminalPane.CloseRequested += OnCloseRequested;
             _terminalPane.PathOpenRequested += OnPathOpenRequested;
+
+            return _terminalPane;
         }
 
         public void Toggle()
         {
+            EnsureTerminalPane();
             _topToolbar.TerminalIsChecked = _editorWorkspace.ToggleTerminal(GetWorkingDirectory);
         }
 

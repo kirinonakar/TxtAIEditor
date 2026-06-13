@@ -28,7 +28,6 @@ namespace TxtAIEditor.Controls
         private readonly MarkdownToolbarControl _markdownToolbar;
         private readonly Grid _markdownToolbarHost;
         private readonly EditorWorkspacePane _editorWorkspace;
-        private readonly TerminalPane _terminalPane;
         private readonly LeftSidebarPane _leftSidebar;
         private readonly StatusBarPane _statusBarPane;
         private readonly RightSidebarPane _rightSidebar;
@@ -67,7 +66,6 @@ namespace TxtAIEditor.Controls
             MarkdownToolbarControl markdownToolbar,
             Grid markdownToolbarHost,
             EditorWorkspacePane editorWorkspace,
-            TerminalPane terminalPane,
             LeftSidebarPane leftSidebar,
             StatusBarPane statusBarPane,
             RightSidebarPane rightSidebar,
@@ -105,7 +103,6 @@ namespace TxtAIEditor.Controls
             _markdownToolbar = markdownToolbar;
             _markdownToolbarHost = markdownToolbarHost;
             _editorWorkspace = editorWorkspace;
-            _terminalPane = terminalPane;
             _leftSidebar = leftSidebar;
             _statusBarPane = statusBarPane;
             _rightSidebar = rightSidebar;
@@ -170,7 +167,7 @@ namespace TxtAIEditor.Controls
             _updateAutoSaveStatus();
             _topToolbar.WordWrapIsChecked = settings.WordWrap;
             ApplyUiPersonalization(settings);
-            _terminalPane.ApplySettings(settings);
+            _editorWorkspace.ApplyTerminalSettings(settings);
             LocalizeUi();
             ApplyToolbarSettings(settings);
 
@@ -230,7 +227,6 @@ namespace TxtAIEditor.Controls
                 _editorWorkspace.Localize(_getLocalizedString);
                 _leftSidebar.Localize(_getLocalizedString, string.IsNullOrEmpty(_getCurrentFolderPath()), _isGitNotDetectedText);
                 _statusBarPane.Localize(_getLocalizedString, _isGitNotDetectedText);
-                _terminalPane.Localize(_getLocalizedString);
                 _rightSidebar.Localize(_getLocalizedString);
                 _rightSidebar.UpdateTranslateLanguage(_settingsService.CurrentSettings?.LlmTargetLanguage ?? "Korean");
                 _markdownToolbar.LocalizeTooltips(_getLocalizedString);

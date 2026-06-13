@@ -305,7 +305,7 @@ namespace TxtAIEditor.Controls
         private void QueueEditorInitialization(OpenedTab tab, WebView2 webView, MonacoBridge bridge)
         {
             bool initQueued = _dispatcherQueue.TryEnqueue(
-                DispatcherQueuePriority.Low,
+                DispatcherQueuePriority.Normal,
                 () =>
                 {
                     if (_tabBridges.ContainsKey(tab.Id))
@@ -370,10 +370,6 @@ namespace TxtAIEditor.Controls
                     _settingsService.CurrentSettings,
                     isReadOnly,
                     currentSession.GetLines(1, _initialEditorLineWarmupCount));
-                await bridge.UpdateSnippetsAsync(_snippetService.GetSnippets());
-                await bridge.UpdateScrollSyncStateAsync(_isScrollSyncEnabled());
-                await bridge.SetInlineLivePreviewAsync(_isLivePreviewEnabled(), _getPreviewBaseHref(tab));
-                await bridge.SetCsvTableModeAsync(_isCsvTableModeEnabled());
             };
 
             bridge.EditorRendered += () =>
@@ -388,6 +384,8 @@ namespace TxtAIEditor.Controls
                         _ = bridge.FocusAsync();
                     }
                 });
+
+                _ = ApplyDeferredEditorStateAsync(bridge, tab);
             };
 
             bridge.LinesRequested += async (requestId, startLine, count) =>
@@ -540,6 +538,26 @@ namespace TxtAIEditor.Controls
                     await _editorLinkNavigationController.HandleCtrlClickAsync(text, isUrl, isPath);
                 });
             };
+        }
+
+        private async Task ApplyDeferredEditorStateAsync(MonacoBridge bridge, OpenedTab tab)
+        {
+            try
+            {
+                await bridge.UpdateScrollSyncStateAsync(_isScrollSyncEnabled());
+                await bridge.SetInlineLivePreviewAsync(_isLivePreviewEnabled(), _getPreviewBaseHref(tab));
+                await bridge.SetCsvTableModeAsync(_isCsvTableModeEnabled());
+
+                var snippets = _snippetService.GetSnippets();
+                if (snippets.Count > 0)
+                {
+                    await bridge.UpdateSnippetsAsync(snippets);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Deferred editor state sync failed: {ex.Message}");
+            }
         }
     }
 }
