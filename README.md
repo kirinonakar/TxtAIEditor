@@ -23,7 +23,7 @@
 
 **TxtAIEditor** is a high-performance, elegant, and modern desktop text editor shell built for Windows. It marries the robust, native desktop capabilities of **WinUI 3 (.NET 10.0)** with the rendering flexibility of a **WebView2-based custom core**. 
 
-Designed for developers, writers, and power users, TxtAIEditor provides a fluid, distraction-free environment. It features standard workspace tools like a **live Markdown/HTML/LaTeX previewer**, a **built-in terminal**, **comprehensive Git integration**, **multi-provider secure AI assistance**, and a **virtualized editor core** capable of opening and editing files from small snippets to 200MB+ logs seamlessly.
+Designed for developers, writers, and power users, TxtAIEditor provides a fluid, distraction-free environment. It features standard workspace tools like a **live Markdown/HTML/LaTeX previewer**, a **built-in terminal**, **comprehensive Git integration**, **multi-provider AI assistance and AI agent**, and a **virtualized editor core** capable of opening and editing files from small snippets to 200MB+ texts seamlessly.
 
 <p align="center">
   <img src="screenshot.png" alt="TxtAIEditor Screenshot" width="100%" />
@@ -34,7 +34,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ## ✨ Key Features
 
 ### 📝 Virtualized Editor Core
-*   **Massive File Support:** Instantly open and edit extremely large files (200MB+ logs or source code) with zero lag, keeping the editor highly responsive.
+*   **Massive File Support:** Instantly open and edit extremely large files (200MB+ texts) with zero lag, keeping the editor highly responsive.
 *   **Virtual Scrolling:** Renders only visible viewport lines plus an overscan buffer, keeping DOM elements minimal and rendering fast.
 *   **Syntax Highlighting:** Premium, high-performance syntax coloring for Markdown (headers, lists, blockquotes, bold/italic, code blocks, links), C#, JavaScript, Python, HTML, CSS, LaTeX, and many more.
 *   **Auto-Completion & Snippets:** Intelligent auto-completion suggesting variables, keywords, and customizable snippets (such as Markdown tables, LaTeX matrices, HTML5 shells, C# notifier properties) that insert seamlessly via Enter or Tab.
@@ -156,7 +156,7 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 
 *   **Custom Text Color Selector:**
     *   **Right-Click** on the `TextColor` button to summon the native **Color Picker** dialog, allowing you to select and configure custom text colors precisely.
-*   **AI Target Language Selector:**
+*   **AI Translation Target Language Selector:**
     *   **Right-Click** on the translate button to open a context menu enabling you to switch target translation languages (Korean, English, Japanese, Chinese, French, Spanish, German) instantly.
 *   **Add to Favorites:**
     *   **Right-Click** any file or folder in the Explorer panel and choose **"Add to Favorites"** to instantly pin it to your Favorites sidebar for quick access.
