@@ -40,6 +40,7 @@ namespace TxtAIEditor.Controls
         private OpenedTab? _activeTabForPreview;
         private string _mappedPreviewDocumentDirectory = string.Empty;
         private Task? _initializeTask;
+        private bool _initializeAndRenderQueued;
 
         public LivePreviewController(
             RightSidebarPane previewPane,
@@ -87,6 +88,10 @@ namespace TxtAIEditor.Controls
         private WebView2? PreviewWebViewIfCreated => _previewPane.PreviewWebViewControlIfCreated;
 
         private ComboBox PreviewModeCombo => _previewPane.PreviewMode;
+
+        private bool IsLivePreviewVisible =>
+            _previewPane.Visibility == Visibility.Visible &&
+            ReferenceEquals(_previewPane.RightTabs.SelectedItem, _previewPane.LivePreviewTabItem);
 
         public async Task InitializeAsync()
         {
@@ -163,19 +168,56 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private void QueueInitializeAndRenderActiveTab()
+        {
+            if (_initializeAndRenderQueued || !IsLivePreviewVisible)
+            {
+                return;
+            }
+
+            _initializeAndRenderQueued = true;
+
+            async void InitializeAndRender()
+            {
+                try
+                {
+                    await InitializeAsync();
+                    if (PreviewWebViewIfCreated?.CoreWebView2 != null && IsLivePreviewVisible)
+                    {
+                        RenderActiveTab();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to initialize and render preview: {ex.Message}");
+                }
+                finally
+                {
+                    _initializeAndRenderQueued = false;
+                }
+            }
+
+            var dispatcher = _previewPane.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, InitializeAndRender) != true)
+            {
+                InitializeAndRender();
+            }
+        }
+
         public void Render(OpenedTab tab)
         {
             try
             {
-                var previewWebView = PreviewWebViewIfCreated;
-                var coreWebView = previewWebView?.CoreWebView2;
-                if (coreWebView == null)
+                if (!IsLivePreviewVisible)
                 {
                     return;
                 }
 
-                if ((TabViewItem)_previewPane.RightTabs.SelectedItem != _previewPane.LivePreviewTabItem)
+                var previewWebView = PreviewWebViewIfCreated;
+                var coreWebView = previewWebView?.CoreWebView2;
+                if (coreWebView == null)
                 {
+                    QueueInitializeAndRenderActiveTab();
                     return;
                 }
 
@@ -472,23 +514,27 @@ namespace TxtAIEditor.Controls
 
         private void OnRightTabsSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if ((TabViewItem)_previewPane.RightTabs.SelectedItem == _previewPane.LivePreviewTabItem)
+            if (IsLivePreviewVisible)
             {
-                RenderActiveTab();
+                QueueInitializeAndRenderActiveTab();
             }
         }
 
         private void OnPreviewModeSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (PreviewWebViewIfCreated?.CoreWebView2 != null)
+            var tab = _activeTabProvider();
+            if (tab != null)
             {
-                var tab = _activeTabProvider();
-                if (tab != null)
-                {
-                    _tabPreviewModes[tab.Id] = PreviewModeCombo.SelectedIndex;
-                }
-                RenderActiveTab();
+                _tabPreviewModes[tab.Id] = PreviewModeCombo.SelectedIndex;
             }
+
+            if (PreviewWebViewIfCreated?.CoreWebView2 == null)
+            {
+                QueueInitializeAndRenderActiveTab();
+                return;
+            }
+
+            RenderActiveTab();
         }
 
         private async void OnOpenPreviewInBrowserClick(object sender, RoutedEventArgs e)
