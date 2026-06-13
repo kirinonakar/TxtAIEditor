@@ -383,16 +383,15 @@ namespace TxtAIEditor.Controls
                 RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light
             };
 
-            var fileListView = BuildCommitChangedFilesList(changedFiles, isDarkTheme);
             string currentHash = hash;
-            fileListView.ItemClick += async (_, args) =>
-            {
-                if (args.ClickedItem is ListViewItem clickedItem && clickedItem.Tag is ValueTuple<string, string> fileTuple)
+            var fileListView = BuildCommitChangedFilesList(
+                changedFiles,
+                isDarkTheme,
+                async file =>
                 {
                     dialog.Hide();
-                    await OpenCommitFileCompareAsync(repoPath, currentHash, fileTuple.Item1, fileTuple.Item2);
-                }
-            };
+                    await OpenCommitFileCompareAsync(repoPath, currentHash, file.Status, file.Path);
+                });
 
             var stack = new StackPanel { Spacing = 2 };
             stack.Children.Add(new ScrollViewer
@@ -423,23 +422,33 @@ namespace TxtAIEditor.Controls
             _afterDialog?.Invoke();
         }
 
-        private ListView BuildCommitChangedFilesList(System.Collections.Generic.IEnumerable<(string Status, string Path)> changedFiles, bool isDarkTheme)
+        private ListView BuildCommitChangedFilesList(
+            System.Collections.Generic.IEnumerable<(string Status, string Path)> changedFiles,
+            bool isDarkTheme,
+            Func<(string Status, string Path), Task> openFileAsync)
         {
             var fileListView = new ListView
             {
                 Height = 220,
                 SelectionMode = ListViewSelectionMode.Single,
-                IsItemClickEnabled = true,
                 Margin = new Thickness(0, 5, 0, 0)
             };
 
             foreach (var file in changedFiles)
             {
-                fileListView.Items.Add(new ListViewItem
+                var listViewItem = new ListViewItem
                 {
                     Content = CreateCommitFileRow(file.Status, file.Path, isDarkTheme),
                     Tag = file
-                });
+                };
+
+                listViewItem.Tapped += async (_, args) =>
+                {
+                    args.Handled = true;
+                    await openFileAsync(file);
+                };
+
+                fileListView.Items.Add(listViewItem);
             }
 
             return fileListView;

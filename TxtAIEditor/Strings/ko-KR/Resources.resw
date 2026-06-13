@@ -1883,7 +1883,7 @@
     <value>탭 내용을 수정했습니다: {0}</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
-    <value>변경됨 (더블클릭 시 비교)</value>
+    <value>변경됨 (클릭 시 비교)</value>
   </data>
   <data name="AgentModifiedFilesDescription" xml:space="preserve">
     <value>수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.</value>

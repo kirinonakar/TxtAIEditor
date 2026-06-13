@@ -1883,7 +1883,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Edited tab: {0}</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
-    <value>Modified Files (Double-click to compare)</value>
+    <value>Modified Files (Click to compare)</value>
   </data>
   <data name="AgentModifiedFilesDescription" xml:space="preserve">
     <value>List of modified files. Click the right icon to revert.</value>

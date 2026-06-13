@@ -212,7 +212,7 @@ namespace TxtAIEditor.Controls
             AgentDiffCancelButton.Content = getString("AgentDiffCancelButton", "취소");
             AgentDiffConfirmHeader.Text = getString("AgentDiffConfirmHeaderDefault", "파일 변경 확인");
             AgentDiffConfirmDescription.Text = getString("AgentDiffConfirmDescriptionDefault", "파일을 수정하시겠습니까?");
-            AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (더블클릭 시 비교)");
+            AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (클릭 시 비교)");
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
             ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
             RebuildAgentPresetMenu();
@@ -1424,10 +1424,11 @@ namespace TxtAIEditor.Controls
             AgentAttachmentsList.Visibility = attachments.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void OnModifiedFilesListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        private void OnModifiedFilesListItemClick(object sender, ItemClickEventArgs e)
         {
-            if (AgentModifiedFilesList.SelectedItem is AgentFileEditPreview preview)
+            if (e.ClickedItem is AgentFileEditPreview preview)
             {
+                AgentModifiedFilesList.SelectedItem = preview;
                 FileDiffRequested?.Invoke(this, preview);
             }
         }

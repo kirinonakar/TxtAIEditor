@@ -1884,7 +1884,7 @@
     <value>タブの内容を編集しました: {0}</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
-    <value>変更済み (ダブルクリックで比較)</value>
+    <value>変更済み (クリックで比較)</value>
   </data>
   <data name="AgentModifiedFilesDescription" xml:space="preserve">
     <value>変更されたファイルの一覧です。元に戻すには右のアイコンをクリックしてください。</value>

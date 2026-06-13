@@ -309,7 +309,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock x:Name="AgentModifiedFilesHeader"
-                                       Text="변경됨 (더블클릭 시 비교)"
+                                       Text="변경됨 (클릭 시 비교)"
                                        FontWeight="SemiBold"
                                        FontSize="12"/>
                             <TextBlock x:Name="AgentModifiedFilesDescription"
@@ -337,7 +337,8 @@
                               MaxHeight="150"
                               Margin="0,4,0,0"
                               SelectionMode="Single"
-                              DoubleTapped="OnModifiedFilesListDoubleTapped">
+                              IsItemClickEnabled="True"
+                              ItemClick="OnModifiedFilesListItemClick">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
