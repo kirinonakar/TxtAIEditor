@@ -30,7 +30,7 @@ namespace TxtAIEditor.Controls
         private readonly SnippetsController _snippetsController;
         private readonly FavoritesRecentController _favoritesRecentController;
         private readonly Func<string> _getCurrentRepoPath;
-        private readonly Func<string, Task> _navigateExplorerToFolderAsync;
+        private readonly Func<string, bool, Task> _navigateExplorerToFolderAsync;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Action _openNewTab;
         private readonly Action<bool> _applyLeftSidebarVisibility;
@@ -58,7 +58,7 @@ namespace TxtAIEditor.Controls
             SnippetsController snippetsController,
             FavoritesRecentController favoritesRecentController,
             Func<string> getCurrentRepoPath,
-            Func<string, Task> navigateExplorerToFolderAsync,
+            Func<string, bool, Task> navigateExplorerToFolderAsync,
             Func<string, Task> loadFileIntoTabAsync,
             Action openNewTab,
             Action<bool> applyLeftSidebarVisibility,
@@ -246,11 +246,13 @@ namespace TxtAIEditor.Controls
 
         private void NavigateStartupFolderWithoutBlocking(string folderPath)
         {
+            bool revealInLeftPanel = _settingsService.CurrentSettings.LeftSidebarVisible;
+
             async void NavigateAsync()
             {
                 try
                 {
-                    await _navigateExplorerToFolderAsync(folderPath);
+                    await _navigateExplorerToFolderAsync(folderPath, revealInLeftPanel);
                 }
                 catch (Exception ex)
                 {

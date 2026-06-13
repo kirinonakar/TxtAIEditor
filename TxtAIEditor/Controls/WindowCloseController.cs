@@ -54,7 +54,6 @@ namespace TxtAIEditor.Controls
         {
             if (_isClosingConfirmed)
             {
-                await _saveUiLayoutSettingsAsync();
                 return;
             }
 
@@ -64,15 +63,13 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            args.Cancel = true;
             var dirtyTabs = _viewModel.Tabs.Where(t => t.IsDirty).ToList();
-            if (dirtyTabs.Count > 0)
-            {
-                args.Cancel = true;
-            }
 
             await _saveUiLayoutSettingsAsync();
             if (dirtyTabs.Count == 0)
             {
+                ConfirmClose();
                 return;
             }
 
@@ -101,8 +98,7 @@ namespace TxtAIEditor.Controls
 
                 if (result == UnsavedChangesDialogResult.Discard)
                 {
-                    _isClosingConfirmed = true;
-                    _closeWindow();
+                    ConfirmClose();
                 }
                 else if (result == UnsavedChangesDialogResult.Save)
                 {
@@ -115,8 +111,7 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    _isClosingConfirmed = true;
-                    _closeWindow();
+                    ConfirmClose();
                 }
             }
             finally
@@ -126,6 +121,12 @@ namespace TxtAIEditor.Controls
                     _resumeTerminal();
                 }
             }
+        }
+
+        private void ConfirmClose()
+        {
+            _isClosingConfirmed = true;
+            _closeWindow();
         }
     }
 }

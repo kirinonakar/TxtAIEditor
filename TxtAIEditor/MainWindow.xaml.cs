@@ -297,7 +297,7 @@ namespace TxtAIEditor
                 UpdateRightPanelSelectionContext);
             _editorLinkNavigationController = new EditorLinkNavigationController(
                 GetActiveTab,
-                NavigateExplorerToFolderAsync);
+                NavigateExplorerToFolderAndRevealAsync);
             _tabReloadController = new TabReloadController(
                 _secureNoteEncryptionService,
                 _settingsService,
@@ -450,7 +450,7 @@ namespace TxtAIEditor
                 _viewModel,
                 LeftSidebarTabView,
                 callback => DispatcherQueue.TryEnqueue(() => callback()),
-                NavigateExplorerToFolderAsync,
+                NavigateExplorerToFolderAndRevealAsync,
                 LoadFileIntoTabAsync,
                 _dialogController.ShowErrorMessage);
             _tabSaveController = new TabSaveController(
@@ -536,7 +536,7 @@ namespace TxtAIEditor
                 _favoritesRecentController,
                 GetLocalizedString,
                 ShowLeftSidebarPage,
-                NavigateExplorerToFolderAsync,
+                NavigateExplorerToFolderAndRevealAsync,
                 OnTabReloadAsync,
                 _tabEncryptionController.EncryptAsync,
                 _tabEncryptionController.ChangePasswordAsync,
@@ -548,7 +548,7 @@ namespace TxtAIEditor
                 DragOverlay,
                 InitializePickerWindow,
                 LoadFileIntoTabAsync,
-                NavigateExplorerToFolderAsync,
+                NavigateExplorerToFolderAndRevealAsync,
                 _dialogController.ShowErrorMessage);
             _rootKeyboardShortcutController = new RootKeyboardShortcutController(
                 () => OpenNewTab(),
@@ -577,7 +577,7 @@ namespace TxtAIEditor
                 () => _currentFolderPath,
                 () => _currentRepoPath,
                 async (filePath, line) => await LoadFileIntoTabAsync(filePath, line),
-                NavigateExplorerToFolderAsync);
+                NavigateExplorerToFolderAndRevealAsync);
             _snippetsController = new SnippetsController(
                 _snippetService,
                 _viewModel,
@@ -707,7 +707,7 @@ namespace TxtAIEditor
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
                 revertTabOrFileAsync: _agentFileWorkflowController.RevertTabOrFileAsync,
                 closeTabById: _agentFileWorkflowController.CloseTabById,
-                navigateToFolderAsync: NavigateExplorerToFolderAsync,
+                navigateToFolderAsync: NavigateExplorerToFolderAndRevealAsync,
                 saveTabAsync: async (tab, targetPath) =>
                 {
                     if (!string.IsNullOrEmpty(targetPath))
@@ -1344,9 +1344,14 @@ namespace TxtAIEditor
             _explorerNavigationController.LoadDirectoryRoot(folderPath);
         }
 
-        private async Task NavigateExplorerToFolderAsync(string folderPath)
+        private async Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true)
         {
-            await _explorerNavigationController.NavigateToFolderAsync(folderPath);
+            await _explorerNavigationController.NavigateToFolderAsync(folderPath, revealInLeftPanel);
+        }
+
+        private Task NavigateExplorerToFolderAndRevealAsync(string folderPath)
+        {
+            return NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel: true);
         }
 
         internal async Task OpenShellPathAsync(string path)
@@ -1363,7 +1368,9 @@ namespace TxtAIEditor
             }
             else if (Directory.Exists(cleanedPath))
             {
-                await NavigateExplorerToFolderAsync(cleanedPath);
+                await NavigateExplorerToFolderAsync(
+                    cleanedPath,
+                    revealInLeftPanel: _shellPanelLayoutService.IsLeftSidebarVisible);
             }
         }
 

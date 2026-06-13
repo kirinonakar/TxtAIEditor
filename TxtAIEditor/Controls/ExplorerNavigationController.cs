@@ -93,7 +93,7 @@ namespace TxtAIEditor.Controls
             _ = UpdateGitStatusesAsync();
         }
 
-        public async Task NavigateToFolderAsync(string folderPath)
+        public async Task NavigateToFolderAsync(string folderPath, bool revealInLeftPanel = true)
         {
             if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
             {
@@ -103,8 +103,11 @@ namespace TxtAIEditor.Controls
             UpdateRepoPath(folderPath);
             LoadDirectoryRoot(folderPath);
 
-            _ensureLeftPanelVisible();
-            _showLeftSidebarPage(0);
+            if (revealInLeftPanel)
+            {
+                _ensureLeftPanelVisible();
+                _showLeftSidebarPage(0);
+            }
 
             await _refreshGitStatusAsync();
         }
