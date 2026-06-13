@@ -168,7 +168,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void QueueInitializeAndRenderActiveTab()
+        public void EnsureVisiblePreviewRendered()
         {
             if (_initializeAndRenderQueued || !IsLivePreviewVisible)
             {
@@ -217,7 +217,7 @@ namespace TxtAIEditor.Controls
                 var coreWebView = previewWebView?.CoreWebView2;
                 if (coreWebView == null)
                 {
-                    QueueInitializeAndRenderActiveTab();
+                    EnsureVisiblePreviewRendered();
                     return;
                 }
 
@@ -516,7 +516,7 @@ namespace TxtAIEditor.Controls
         {
             if (IsLivePreviewVisible)
             {
-                QueueInitializeAndRenderActiveTab();
+                EnsureVisiblePreviewRendered();
             }
         }
 
@@ -530,7 +530,7 @@ namespace TxtAIEditor.Controls
 
             if (PreviewWebViewIfCreated?.CoreWebView2 == null)
             {
-                QueueInitializeAndRenderActiveTab();
+                EnsureVisiblePreviewRendered();
                 return;
             }
 

@@ -1332,7 +1332,7 @@ namespace TxtAIEditor
 
         private void RefreshActivePreview()
         {
-            _livePreviewController.RenderActiveTab();
+            _livePreviewController.EnsureVisiblePreviewRendered();
         }
 
         #endregion
