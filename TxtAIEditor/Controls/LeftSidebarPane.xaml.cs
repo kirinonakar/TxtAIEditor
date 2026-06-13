@@ -94,7 +94,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? SearchAllFilesClick;
         public event RoutedEventHandler? ReplaceAllClick;
         public event RoutedEventHandler? ReplaceOneClick;
-        public event DoubleTappedEventHandler? SearchResultDoubleTapped;
+        public event ItemClickEventHandler? SearchResultItemClick;
         public event ItemClickEventHandler? RecentFileItemClick;
         public event RoutedEventHandler? RemoveRecentFileClick;
         public event ItemClickEventHandler? TocItemClick;
@@ -317,7 +317,7 @@ namespace TxtAIEditor.Controls
         private void OnSearchAllFilesClick(object sender, RoutedEventArgs e) => SearchAllFilesClick?.Invoke(sender, e);
         private void OnReplaceAllClick(object sender, RoutedEventArgs e) => ReplaceAllClick?.Invoke(sender, e);
         private void OnReplaceOneClick(object sender, RoutedEventArgs e) => ReplaceOneClick?.Invoke(sender, e);
-        private void OnSearchResultDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => SearchResultDoubleTapped?.Invoke(sender, e);
+        private void OnSearchResultItemClick(object sender, ItemClickEventArgs e) => SearchResultItemClick?.Invoke(sender, e);
         private void OnRecentFileItemClick(object sender, ItemClickEventArgs e) => RecentFileItemClick?.Invoke(sender, e);
         private void OnRemoveRecentFileClick(object sender, RoutedEventArgs e) => RemoveRecentFileClick?.Invoke(sender, e);
         private void OnTocItemClick(object sender, ItemClickEventArgs e) => TocItemClick?.Invoke(sender, e);

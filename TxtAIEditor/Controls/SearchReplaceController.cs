@@ -259,12 +259,11 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public async Task OpenSearchResultAsync(object originalSource)
+        public async Task OpenSearchResultAsync(SearchResultItem item)
         {
-            var item = VisualTreeDataContext.FindFromOriginalSource<SearchResultItem>(originalSource) ??
-                       _searchResultsList.SelectedItem as SearchResultItem;
             if (item != null)
             {
+                _searchResultsList.SelectedItem = item;
                 await _loadAndHighlightResultAsync(item, _lastSearchQuery);
             }
         }

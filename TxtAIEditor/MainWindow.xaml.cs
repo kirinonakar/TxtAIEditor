@@ -993,7 +993,7 @@ namespace TxtAIEditor
             LeftSidebarTabView.SearchAllFilesClick += OnSearchAllFilesClick;
             LeftSidebarTabView.ReplaceAllClick += OnReplaceAllClick;
             LeftSidebarTabView.ReplaceOneClick += OnReplaceOneClick;
-            LeftSidebarTabView.SearchResultDoubleTapped += OnSearchResultDoubleTapped;
+            LeftSidebarTabView.SearchResultItemClick += OnSearchResultItemClick;
         }
 
         private void WireTopToolbarEvents()
@@ -1884,9 +1884,12 @@ namespace TxtAIEditor
             }
         }
 
-        private async void OnSearchResultDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+        private async void OnSearchResultItemClick(object sender, ItemClickEventArgs e)
         {
-            await _searchReplaceController.OpenSearchResultAsync(e.OriginalSource);
+            if (e.ClickedItem is SearchResultItem item)
+            {
+                await _searchReplaceController.OpenSearchResultAsync(item);
+            }
         }
 
         private string GetSearchRoot()

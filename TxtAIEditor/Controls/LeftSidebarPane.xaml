@@ -313,7 +313,7 @@
                                     </Grid>
                                 </StackPanel>
     
-                                <ListView x:Name="SearchResultsList" Grid.Row="1" SelectionMode="Single" DoubleTapped="OnSearchResultDoubleTapped">
+                                <ListView x:Name="SearchResultsList" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnSearchResultItemClick">
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="models:SearchResultItem">
                                             <Grid Padding="0,5,0,5">
