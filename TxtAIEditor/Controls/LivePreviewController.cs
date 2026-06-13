@@ -91,7 +91,8 @@ namespace TxtAIEditor.Controls
 
         private bool IsLivePreviewVisible =>
             _previewPane.Visibility == Visibility.Visible &&
-            ReferenceEquals(_previewPane.RightTabs.SelectedItem, _previewPane.LivePreviewTabItem);
+            (ReferenceEquals(_previewPane.RightTabs.SelectedItem, _previewPane.LivePreviewTabItem) ||
+             _previewPane.RightTabs.SelectedItem == null);
 
         public async Task InitializeAsync()
         {
