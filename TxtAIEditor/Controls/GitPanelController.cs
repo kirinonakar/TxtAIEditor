@@ -385,9 +385,9 @@ namespace TxtAIEditor.Controls
 
             var fileListView = BuildCommitChangedFilesList(changedFiles, isDarkTheme);
             string currentHash = hash;
-            fileListView.DoubleTapped += async (_, _) =>
+            fileListView.ItemClick += async (_, args) =>
             {
-                if (fileListView.SelectedItem is ListViewItem clickedItem && clickedItem.Tag is ValueTuple<string, string> fileTuple)
+                if (args.ClickedItem is ListViewItem clickedItem && clickedItem.Tag is ValueTuple<string, string> fileTuple)
                 {
                     dialog.Hide();
                     await OpenCommitFileCompareAsync(repoPath, currentHash, fileTuple.Item1, fileTuple.Item2);
@@ -410,7 +410,7 @@ namespace TxtAIEditor.Controls
             });
             stack.Children.Add(new TextBlock
             {
-                Text = _getString("GitHistoryItemDialogHeader", "변경된 파일 목록 (더블클릭 시 비교 뷰어 열림):"),
+                Text = _getString("GitHistoryItemDialogHeader", "변경된 파일 목록 (클릭 시 비교 뷰어 열림):"),
                 FontSize = 11,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 Margin = new Thickness(0, 5, 0, 5)
@@ -429,6 +429,7 @@ namespace TxtAIEditor.Controls
             {
                 Height = 220,
                 SelectionMode = ListViewSelectionMode.Single,
+                IsItemClickEnabled = true,
                 Margin = new Thickness(0, 5, 0, 0)
             };
 
@@ -560,7 +561,7 @@ namespace TxtAIEditor.Controls
 
         private void WireEvents()
         {
-            _leftSidebar.GitFileDoubleTapped += OnGitFileDoubleTapped;
+            _leftSidebar.GitFileItemClick += OnGitFileItemClick;
             _leftSidebar.GitStageToggleClick += OnGitStageToggleClick;
             _leftSidebar.GitRestoreFileClick += OnGitRestoreFileClick;
             _leftSidebar.GitCommitClick += OnGitCommitClick;
@@ -568,7 +569,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitRestoreAllClick += OnGitRestoreAllClick;
             _leftSidebar.GitPushClick += OnGitPushClick;
             _leftSidebar.GitRefreshClick += OnGitRefreshClick;
-            _leftSidebar.GitHistoryItemDoubleTapped += OnGitHistoryItemDoubleTapped;
+            _leftSidebar.GitHistoryItemClick += OnGitHistoryItemClick;
         }
 
         private async void OnGitStageAllClick(object sender, RoutedEventArgs e)
@@ -581,8 +582,9 @@ namespace TxtAIEditor.Controls
             await ToggleStageAsync(sender, _repoPathProvider());
         }
 
-        private async void OnGitFileDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        private async void OnGitFileItemClick(object sender, ItemClickEventArgs e)
         {
+            _leftSidebar.GitChangedFiles.SelectedItem = e.ClickedItem;
             await OpenChangedFileDiffAsync(_repoPathProvider());
         }
 
@@ -611,8 +613,9 @@ namespace TxtAIEditor.Controls
             await RefreshAsync();
         }
 
-        private async void OnGitHistoryItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        private async void OnGitHistoryItemClick(object sender, ItemClickEventArgs e)
         {
+            _leftSidebar.GitHistory.SelectedItem = e.ClickedItem;
             await ShowHistoryItemAsync(_repoPathProvider());
         }
     }

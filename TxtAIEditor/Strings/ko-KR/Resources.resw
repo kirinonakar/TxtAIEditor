@@ -990,7 +990,7 @@
     <value>닫기</value>
   </data>
   <data name="GitHistoryItemDialogHeader" xml:space="preserve">
-    <value>변경된 파일 목록 (더블클릭 시 비교 뷰어 열림):</value>
+    <value>변경된 파일 목록 (클릭 시 비교 뷰어 열림):</value>
   </data>
   <data name="GitCommitSuccessTitle" xml:space="preserve">
     <value>Git 커밋</value>

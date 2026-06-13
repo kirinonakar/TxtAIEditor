@@ -36,7 +36,7 @@ namespace TxtAIEditor.Controls
             _revealLineAsync = revealLineAsync;
 
             _leftSidebar.TocList.ItemsSource = _viewModel.TocItems;
-            _leftSidebar.TocItemDoubleTapped += OnTocItemDoubleTapped;
+            _leftSidebar.TocItemClick += OnTocItemClick;
         }
 
         public void RefreshToc(OpenedTab? tab)
@@ -550,9 +550,9 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async void OnTocItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        private async void OnTocItemClick(object sender, ItemClickEventArgs e)
         {
-            var item = VisualTreeDataContext.FindFromOriginalSource<TocItem>(e.OriginalSource)
+            var item = e.ClickedItem as TocItem
                 ?? _leftSidebar.TocList.SelectedItem as TocItem;
             if (item == null) return;
 

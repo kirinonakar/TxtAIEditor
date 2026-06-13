@@ -990,7 +990,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Close</value>
   </data>
   <data name="GitHistoryItemDialogHeader" xml:space="preserve">
-    <value>Changed Files (Double-click to open diff):</value>
+    <value>Changed Files (Click to open diff):</value>
   </data>
   <data name="GitCommitSuccessTitle" xml:space="preserve">
     <value>Git Commit</value>

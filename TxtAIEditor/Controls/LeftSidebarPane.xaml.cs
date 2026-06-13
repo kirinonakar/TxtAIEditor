@@ -60,7 +60,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? SortClick;
         public event RoutedEventHandler? OpenInWindowsExplorerClick;
         public event RoutedEventHandler? ExplorerHomeClick;
-        public event DoubleTappedEventHandler? FileListViewDoubleTapped;
+        public event ItemClickEventHandler? FileListViewItemClick;
         public event RightTappedEventHandler? FileListViewItemRightTapped;
         public event RoutedEventHandler? AddFileToFavoritesClick;
         public event RoutedEventHandler? AddFolderToFavoritesClick;
@@ -70,7 +70,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? CopyFolderPathClick;
         public event RoutedEventHandler? RenameClick;
         public event RoutedEventHandler? DeleteClick;
-        public event DoubleTappedEventHandler? FavoriteItemDoubleTapped;
+        public event ItemClickEventHandler? FavoriteItemClick;
         public event RoutedEventHandler? RemoveFavoriteClick;
         public event RoutedEventHandler? FavoritePinClick;
         public event RoutedEventHandler? FavoritesTabClick;
@@ -81,7 +81,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExportSnippetsClick;
         public event RoutedEventHandler? ImportSnippetsClick;
         public event RoutedEventHandler? ResetSnippetsClick;
-        public event DoubleTappedEventHandler? GitFileDoubleTapped;
+        public event ItemClickEventHandler? GitFileItemClick;
         public event RoutedEventHandler? GitStageToggleClick;
         public event RoutedEventHandler? GitRestoreFileClick;
         public event RoutedEventHandler? GitCommitClick;
@@ -89,15 +89,15 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? GitRestoreAllClick;
         public event RoutedEventHandler? GitPushClick;
         public event RoutedEventHandler? GitRefreshClick;
-        public event DoubleTappedEventHandler? GitHistoryItemDoubleTapped;
+        public event ItemClickEventHandler? GitHistoryItemClick;
         public event KeyEventHandler? SearchQueryInputKeyDown;
         public event RoutedEventHandler? SearchAllFilesClick;
         public event RoutedEventHandler? ReplaceAllClick;
         public event RoutedEventHandler? ReplaceOneClick;
         public event DoubleTappedEventHandler? SearchResultDoubleTapped;
-        public event DoubleTappedEventHandler? RecentFileItemDoubleTapped;
+        public event ItemClickEventHandler? RecentFileItemClick;
         public event RoutedEventHandler? RemoveRecentFileClick;
-        public event DoubleTappedEventHandler? TocItemDoubleTapped;
+        public event ItemClickEventHandler? TocItemClick;
 
         public Grid ExplorerPage => ExplorerSidebarPage;
         public Grid FavoritesPage => FavoritesSidebarPage;
@@ -283,7 +283,7 @@ namespace TxtAIEditor.Controls
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e) => OpenInWindowsExplorerClick?.Invoke(sender, e);
         private void OnExplorerHomeClick(object sender, RoutedEventArgs e) => ExplorerHomeClick?.Invoke(sender, e);
-        private void OnFileListViewDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => FileListViewDoubleTapped?.Invoke(sender, e);
+        private void OnFileListViewItemClick(object sender, ItemClickEventArgs e) => FileListViewItemClick?.Invoke(sender, e);
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e) => FileListViewItemRightTapped?.Invoke(sender, e);
         private void OnAddFileToFavoritesClick(object sender, RoutedEventArgs e) => AddFileToFavoritesClick?.Invoke(sender, e);
         private void OnAddFolderToFavoritesClick(object sender, RoutedEventArgs e) => AddFolderToFavoritesClick?.Invoke(sender, e);
@@ -293,7 +293,7 @@ namespace TxtAIEditor.Controls
         private void OnCopyFolderPathClick(object sender, RoutedEventArgs e) => CopyFolderPathClick?.Invoke(sender, e);
         private void OnRenameClick(object sender, RoutedEventArgs e) => RenameClick?.Invoke(sender, e);
         private void OnDeleteClick(object sender, RoutedEventArgs e) => DeleteClick?.Invoke(sender, e);
-        private void OnFavoriteItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => FavoriteItemDoubleTapped?.Invoke(sender, e);
+        private void OnFavoriteItemClick(object sender, ItemClickEventArgs e) => FavoriteItemClick?.Invoke(sender, e);
         private void OnRemoveFavoriteClick(object sender, RoutedEventArgs e) => RemoveFavoriteClick?.Invoke(sender, e);
         private void OnFavoritePinClick(object sender, RoutedEventArgs e) => FavoritePinClick?.Invoke(sender, e);
         private void OnFavoritesTabClick(object sender, RoutedEventArgs e) => FavoritesTabClick?.Invoke(sender, e);
@@ -304,7 +304,7 @@ namespace TxtAIEditor.Controls
         private void OnExportSnippetsClick(object sender, RoutedEventArgs e) => ExportSnippetsClick?.Invoke(sender, e);
         private void OnImportSnippetsClick(object sender, RoutedEventArgs e) => ImportSnippetsClick?.Invoke(sender, e);
         private void OnResetSnippetsClick(object sender, RoutedEventArgs e) => ResetSnippetsClick?.Invoke(sender, e);
-        private void OnGitFileDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => GitFileDoubleTapped?.Invoke(sender, e);
+        private void OnGitFileItemClick(object sender, ItemClickEventArgs e) => GitFileItemClick?.Invoke(sender, e);
         private void OnGitStageToggleClick(object sender, RoutedEventArgs e) => GitStageToggleClick?.Invoke(sender, e);
         private void OnGitRestoreFileClick(object sender, RoutedEventArgs e) => GitRestoreFileClick?.Invoke(sender, e);
         private void OnGitCommitClick(object sender, RoutedEventArgs e) => GitCommitClick?.Invoke(sender, e);
@@ -312,15 +312,15 @@ namespace TxtAIEditor.Controls
         private void OnGitRestoreAllClick(object sender, RoutedEventArgs e) => GitRestoreAllClick?.Invoke(sender, e);
         private void OnGitPushClick(object sender, RoutedEventArgs e) => GitPushClick?.Invoke(sender, e);
         private void OnGitRefreshClick(object sender, RoutedEventArgs e) => GitRefreshClick?.Invoke(sender, e);
-        private void OnGitHistoryItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => GitHistoryItemDoubleTapped?.Invoke(sender, e);
+        private void OnGitHistoryItemClick(object sender, ItemClickEventArgs e) => GitHistoryItemClick?.Invoke(sender, e);
         private void OnSearchQueryInputKeyDown(object sender, KeyRoutedEventArgs e) => SearchQueryInputKeyDown?.Invoke(sender, e);
         private void OnSearchAllFilesClick(object sender, RoutedEventArgs e) => SearchAllFilesClick?.Invoke(sender, e);
         private void OnReplaceAllClick(object sender, RoutedEventArgs e) => ReplaceAllClick?.Invoke(sender, e);
         private void OnReplaceOneClick(object sender, RoutedEventArgs e) => ReplaceOneClick?.Invoke(sender, e);
         private void OnSearchResultDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => SearchResultDoubleTapped?.Invoke(sender, e);
-        private void OnRecentFileItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => RecentFileItemDoubleTapped?.Invoke(sender, e);
+        private void OnRecentFileItemClick(object sender, ItemClickEventArgs e) => RecentFileItemClick?.Invoke(sender, e);
         private void OnRemoveRecentFileClick(object sender, RoutedEventArgs e) => RemoveRecentFileClick?.Invoke(sender, e);
-        private void OnTocItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => TocItemDoubleTapped?.Invoke(sender, e);
+        private void OnTocItemClick(object sender, ItemClickEventArgs e) => TocItemClick?.Invoke(sender, e);
     }
 
     public class LocalizationBridge : System.ComponentModel.INotifyPropertyChanged

@@ -125,7 +125,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.SortClick += OnExplorerSortClick;
             _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
             _leftSidebar.ExplorerHomeClick += OnExplorerHomeClick;
-            _leftSidebar.FileListViewDoubleTapped += OnFileListViewDoubleTapped;
+            _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
         }
 
         private async void OnSelectFolderClick(object sender, RoutedEventArgs e)
@@ -200,9 +200,9 @@ namespace TxtAIEditor.Controls
             LoadDirectoryRoot(parent.FullName);
         }
 
-        private void OnFileListViewDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        private void OnFileListViewItemClick(object sender, Microsoft.UI.Xaml.Controls.ItemClickEventArgs e)
         {
-            var item = VisualTreeDataContext.FindFromOriginalSource<ExplorerItem>(e.OriginalSource)
+            var item = e.ClickedItem as ExplorerItem
                        ?? _leftSidebar.FileList.SelectedItem as ExplorerItem;
             if (item == null)
             {

@@ -171,7 +171,7 @@
                                         </Button>
                                     </Grid>
                                 </StackPanel>
-                                <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Single" DoubleTapped="OnFileListViewDoubleTapped">
+                                <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFileListViewItemClick">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Padding="0,3,0,3" RightTapped="OnFileListViewItemRightTapped">
@@ -225,7 +225,7 @@
                                     <ToggleButton x:Name="FavoritesFileTab" Grid.Column="0" Content="파일" FontSize="13" Height="30" Padding="10,0" Margin="15,0,0,0" IsChecked="True" Click="OnFavoritesTabClick"/>
                                     <ToggleButton x:Name="FavoritesFolderTab" Grid.Column="1" Content="폴더" FontSize="13" Height="30" Padding="10,0" Margin="6,0,0,0" Click="OnFavoritesTabClick"/>
                                 </Grid>
-                                <ListView x:Name="FavoritesListView" Grid.Row="2" SelectionMode="Single" DoubleTapped="OnFavoriteItemDoubleTapped">
+                                <ListView x:Name="FavoritesListView" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFavoriteItemClick">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding Path}">
@@ -259,7 +259,7 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             <TextBlock x:Name="RecentFilesHeaderText" Grid.Row="0" Text="최근 파일" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,10"/>
-                            <ListView x:Name="RecentFilesListView" Grid.Row="1" SelectionMode="Single" DoubleTapped="OnRecentFileItemDoubleTapped">
+                            <ListView x:Name="RecentFilesListView" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnRecentFileItemClick">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding Path}">
@@ -349,7 +349,7 @@
                                     <ComboBox x:Name="GitBranchesCombo" PlaceholderText="브랜치 목록" Height="24" FontSize="10" Padding="6,0,4,0" HorizontalAlignment="Stretch"/>
                                 </StackPanel>
     
-                                <ListView x:Name="GitChangedFilesList" Grid.Row="1" SelectionMode="Single" DoubleTapped="OnGitFileDoubleTapped">
+                                <ListView x:Name="GitChangedFilesList" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnGitFileItemClick">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Padding="0,4,0,4">
@@ -399,7 +399,7 @@
     
                                 <StackPanel Grid.Row="4" Spacing="4" Margin="10,8,10,0">
                                     <TextBlock x:Name="GitHistoryHeader" Text="과거 기록" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                                    <ListView x:Name="GitHistoryList" Height="120" SelectionMode="Single" DoubleTapped="OnGitHistoryItemDoubleTapped">
+                                    <ListView x:Name="GitHistoryList" Height="120" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnGitHistoryItemClick">
                                         <ListView.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Padding="0,2,0,2">
@@ -461,7 +461,7 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             <TextBlock x:Name="TocHeaderText" Grid.Row="0" Text="목차 (TOC)" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,10"/>
-                            <ListView x:Name="TocListView" Grid.Row="1" SelectionMode="Single" DoubleTapped="OnTocItemDoubleTapped">
+                            <ListView x:Name="TocListView" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnTocItemClick">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Padding="0,4,0,4">

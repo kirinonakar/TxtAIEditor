@@ -127,11 +127,11 @@ namespace TxtAIEditor.Controls
         {
             _leftSidebar.AddFileToFavoritesClick += OnAddFileToFavoritesClick;
             _leftSidebar.AddFolderToFavoritesClick += OnAddFolderToFavoritesClick;
-            _leftSidebar.FavoriteItemDoubleTapped += OnFavoriteItemDoubleTapped;
+            _leftSidebar.FavoriteItemClick += OnFavoriteItemClick;
             _leftSidebar.RemoveFavoriteClick += OnRemoveFavoriteClick;
             _leftSidebar.FavoritePinClick += OnFavoritePinClick;
             _leftSidebar.FavoritesTabClick += OnFavoritesTabClick;
-            _leftSidebar.RecentFileItemDoubleTapped += OnRecentFileItemDoubleTapped;
+            _leftSidebar.RecentFileItemClick += OnRecentFileItemClick;
             _leftSidebar.RemoveRecentFileClick += OnRemoveRecentFileClick;
         }
 
@@ -233,9 +233,9 @@ namespace TxtAIEditor.Controls
             return string.IsNullOrWhiteSpace(name) ? displayPath : name;
         }
 
-        private async void OnFavoriteItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        private async void OnFavoriteItemClick(object sender, ItemClickEventArgs e)
         {
-            var item = VisualTreeDataContext.FindFromOriginalSource<FavoriteItem>(e.OriginalSource)
+            var item = e.ClickedItem as FavoriteItem
                 ?? _leftSidebar.FavoritesList.SelectedItem as FavoriteItem;
             if (item == null)
             {
@@ -324,9 +324,9 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async void OnRecentFileItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        private async void OnRecentFileItemClick(object sender, ItemClickEventArgs e)
         {
-            var item = VisualTreeDataContext.FindFromOriginalSource<RecentFileItem>(e.OriginalSource)
+            var item = e.ClickedItem as RecentFileItem
                 ?? _leftSidebar.RecentFilesList.SelectedItem as RecentFileItem;
             if (item == null)
             {

@@ -991,7 +991,7 @@
     <value>閉じる</value>
   </data>
   <data name="GitHistoryItemDialogHeader" xml:space="preserve">
-    <value>変更されたファイルの一覧 (ダブルクリックで比較ビューを開く):</value>
+    <value>変更されたファイルの一覧 (クリックで比較ビューを開く):</value>
   </data>
   <data name="GitCommitSuccessTitle" xml:space="preserve">
     <value>Git コミット</value>
