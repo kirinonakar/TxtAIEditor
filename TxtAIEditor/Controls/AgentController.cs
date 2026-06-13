@@ -221,11 +221,27 @@ namespace TxtAIEditor.Controls
 
             WireEvents();
             UpdateContextStatsImmediate();
-            _ = _presetController.LoadAsync();
-            _ = _historyController.LoadAsync(_currentSessionId);
+            QueueDeferredStartupDataLoad();
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEditController.SessionEdits;
+
+        private void QueueDeferredStartupDataLoad()
+        {
+            var dispatcher = _agentPane.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => _ = LoadStartupDataAsync()) == true)
+            {
+                return;
+            }
+
+            _ = LoadStartupDataAsync();
+        }
+
+        private async Task LoadStartupDataAsync()
+        {
+            await _presetController.LoadAsync();
+            await _historyController.LoadAsync(_currentSessionId);
+        }
 
         public void SetActiveTab(OpenedTab? activeTab)
         {

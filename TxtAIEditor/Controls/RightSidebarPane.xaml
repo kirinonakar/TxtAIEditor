@@ -81,7 +81,12 @@
                                     </StackPanel>
                                 </Border>
     
-                                <WebView2 x:Name="PreviewWebView" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" UseSystemFocusVisuals="False"/>
+                                <ContentControl x:Name="PreviewWebViewHost"
+                                                Grid.Row="1"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Stretch"/>
                             </Grid>
                         </TabViewItem>
     

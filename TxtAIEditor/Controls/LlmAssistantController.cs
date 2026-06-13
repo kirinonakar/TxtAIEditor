@@ -103,7 +103,7 @@ namespace TxtAIEditor.Controls
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
             _presetsFilePath = Path.Combine(settingsDir, "presets.json");
-            _ = LoadPresetsAsync();
+            QueueDeferredPresetLoad();
         }
 
         public void SetSelectionText(string selectedText)
@@ -114,6 +114,17 @@ namespace TxtAIEditor.Controls
         public void ClearSelection()
         {
             _lastSelectionText = string.Empty;
+        }
+
+        private void QueueDeferredPresetLoad()
+        {
+            var dispatcher = _rightSidebar.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => _ = LoadPresetsAsync()) == true)
+            {
+                return;
+            }
+
+            _ = LoadPresetsAsync();
         }
 
         public void SetOutput(string message)

@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 
@@ -14,6 +16,8 @@ namespace TxtAIEditor.Core.Services
     {
         private const int MaxRecentFiles = 30;
         private readonly string _recentFilesFilePath;
+        private readonly object _saveLock = new();
+        private int _saveVersion;
 
         public RecentFilesService()
         {
@@ -65,6 +69,15 @@ namespace TxtAIEditor.Core.Services
 
         public void Save(IEnumerable<RecentFileItem> recentFiles)
         {
+            Interlocked.Increment(ref _saveVersion);
+            lock (_saveLock)
+            {
+                SaveSnapshot(CreateSnapshot(recentFiles));
+            }
+        }
+
+        private void SaveSnapshot(IReadOnlyList<RecentFileItem> recentFiles)
+        {
             try
             {
                 string? dir = Path.GetDirectoryName(_recentFilesFilePath);
@@ -74,7 +87,7 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 string json = JsonSerializer.Serialize(
-                    recentFiles.ToList(),
+                    recentFiles,
                     new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(_recentFilesFilePath, json);
             }
@@ -82,6 +95,35 @@ namespace TxtAIEditor.Core.Services
             {
                 Debug.WriteLine($"Failed to save recent files: {ex.Message}");
             }
+        }
+
+        private void SaveLater(IReadOnlyList<RecentFileItem> snapshot)
+        {
+            int version = Interlocked.Increment(ref _saveVersion);
+            _ = Task.Run(() =>
+            {
+                lock (_saveLock)
+                {
+                    if (version != Volatile.Read(ref _saveVersion))
+                    {
+                        return;
+                    }
+
+                    SaveSnapshot(snapshot);
+                }
+            });
+        }
+
+        private static List<RecentFileItem> CreateSnapshot(IEnumerable<RecentFileItem> recentFiles)
+        {
+            return recentFiles
+                .Select(item => new RecentFileItem
+                {
+                    Name = item.Name,
+                    Path = item.Path,
+                    LastOpenedText = item.LastOpenedText
+                })
+                .ToList();
         }
 
         public void Add(ObservableCollection<RecentFileItem> recentFiles, string filePath)
@@ -112,7 +154,7 @@ namespace TxtAIEditor.Core.Services
                     recentFiles.RemoveAt(recentFiles.Count - 1);
                 }
 
-                Save(recentFiles);
+                SaveLater(CreateSnapshot(recentFiles));
             }
             catch (Exception ex)
             {

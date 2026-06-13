@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         public event Action<string>? LlmTargetLanguageSelected;
         private Func<string, string, string>? _getString;
         private string _currentTargetLanguage = "Korean";
+        private WebView2? _previewWebView;
         public event RoutedEventHandler? LlmCustomClick;
         public event RoutedEventHandler? LlmInsertOutputClick;
         public event RoutedEventHandler? LlmInsertNewTabOutputClick;
@@ -33,7 +34,8 @@ namespace TxtAIEditor.Controls
 
         public TabView RightTabs => RightTabView;
         public ComboBox PreviewMode => PreviewModeCombo;
-        public WebView2 PreviewWebViewControl => PreviewWebView;
+        public WebView2 PreviewWebViewControl => EnsurePreviewWebView();
+        public WebView2? PreviewWebViewControlIfCreated => _previewWebView;
         public TextBox LlmOutput => LlmOutputText;
         public TextBlock SelectionStats => SelectionStatsText;
         public TextBox LlmFileContext => LlmFileContextInput;
@@ -64,6 +66,23 @@ namespace TxtAIEditor.Controls
         public Button LlmInsertNewTabOutputBtn => LlmInsertNewTabOutputButton;
         public Button LlmAddInstructionBtn => LlmAddInstructionButton;
         public ScrollViewer InstructionTabScroller => InstructionTabScrollViewer;
+
+        private WebView2 EnsurePreviewWebView()
+        {
+            if (_previewWebView != null)
+            {
+                return _previewWebView;
+            }
+
+            _previewWebView = new WebView2
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                UseSystemFocusVisuals = false
+            };
+            PreviewWebViewHost.Content = _previewWebView;
+            return _previewWebView;
+        }
 
         public void UpdateLlmModelName(string text)
         {

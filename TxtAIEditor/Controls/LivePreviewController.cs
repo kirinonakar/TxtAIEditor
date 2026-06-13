@@ -84,6 +84,8 @@ namespace TxtAIEditor.Controls
 
         private WebView2 PreviewWebView => _previewPane.PreviewWebViewControl;
 
+        private WebView2? PreviewWebViewIfCreated => _previewPane.PreviewWebViewControlIfCreated;
+
         private ComboBox PreviewModeCombo => _previewPane.PreviewMode;
 
         public async Task InitializeAsync()
@@ -102,11 +104,12 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                PreviewWebView.DefaultBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+                var previewWebView = PreviewWebView;
+                previewWebView.DefaultBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
                 var env = await MonacoBridge.GetSharedEnvironmentAsync();
-                await PreviewWebView.EnsureCoreWebView2Async(env);
+                await previewWebView.EnsureCoreWebView2Async(env);
 
-                var coreWebView = PreviewWebView.CoreWebView2;
+                var coreWebView = previewWebView.CoreWebView2;
                 if (coreWebView == null)
                 {
                     throw new InvalidOperationException("CoreWebView2 failed to initialize.");
@@ -123,10 +126,10 @@ namespace TxtAIEditor.Controls
                 coreWebView.Settings.IsScriptEnabled = true;
                 coreWebView.Settings.AreDefaultContextMenusEnabled = false;
                 coreWebView.Settings.AreDevToolsEnabled = false;
-                PreviewWebView.WebMessageReceived += OnPreviewWebMessageReceived;
-                PreviewWebView.NavigationCompleted += (_, _) => RenderActiveTab();
+                previewWebView.WebMessageReceived += OnPreviewWebMessageReceived;
+                previewWebView.NavigationCompleted += (_, _) => RenderActiveTab();
 
-                PreviewWebView.Source = new Uri(
+                previewWebView.Source = new Uri(
                     $"http://{PreviewWebResourceService.ResourceHostName}/preview.html?v={PreviewWebResourceService.GetWebResourceVersion("preview.html")}");
             }
             catch (Exception ex)
@@ -164,7 +167,9 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                if (PreviewWebView.CoreWebView2 == null)
+                var previewWebView = PreviewWebViewIfCreated;
+                var coreWebView = previewWebView?.CoreWebView2;
+                if (coreWebView == null)
                 {
                     return;
                 }
@@ -233,7 +238,7 @@ namespace TxtAIEditor.Controls
                         previewFontFamily = _settingsService.CurrentSettings.PreviewFontFamily,
                         previewFontSize = _settingsService.CurrentSettings.PreviewFontSize
                     };
-                    PreviewWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(csvMsg));
+                    coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(csvMsg));
                     return;
                 }
 
@@ -248,7 +253,7 @@ namespace TxtAIEditor.Controls
                         scrollSyncEnabled = _isScrollSyncEnabled()
                     };
 
-                    PreviewWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(htmlMsg));
+                    coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(htmlMsg));
                     return;
                 }
 
@@ -274,7 +279,7 @@ namespace TxtAIEditor.Controls
                     scrollSyncEnabled = _isScrollSyncEnabled()
                 };
 
-                PreviewWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(renderMsg));
+                coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(renderMsg));
             }
             catch (Exception ex)
             {
@@ -284,6 +289,12 @@ namespace TxtAIEditor.Controls
 
         private void PostEmptyVirtualPreview()
         {
+            var coreWebView = PreviewWebViewIfCreated?.CoreWebView2;
+            if (coreWebView == null)
+            {
+                return;
+            }
+
             var renderMsg = new
             {
                 action = "initVirtualPreview",
@@ -305,7 +316,7 @@ namespace TxtAIEditor.Controls
                 scrollSyncEnabled = _isScrollSyncEnabled()
             };
 
-            PreviewWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(renderMsg));
+            coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(renderMsg));
         }
 
         private static bool IsReadOnlyViewerTab(OpenedTab tab)
@@ -365,7 +376,7 @@ namespace TxtAIEditor.Controls
 
         public void ApplyPreferredColorScheme(string theme)
         {
-            WebViewAppearanceService.ApplyPreferredColorScheme(PreviewWebView.CoreWebView2, theme);
+            WebViewAppearanceService.ApplyPreferredColorScheme(PreviewWebViewIfCreated?.CoreWebView2, theme);
         }
 
         public void PostScrollSync(int firstLine, double offset)
@@ -382,7 +393,8 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                if (PreviewWebView.CoreWebView2 == null)
+                var coreWebView = PreviewWebViewIfCreated?.CoreWebView2;
+                if (coreWebView == null)
                 {
                     return;
                 }
@@ -393,7 +405,7 @@ namespace TxtAIEditor.Controls
                     firstLine = firstLine,
                     offset = offset
                 };
-                PreviewWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(syncMsg));
+                coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(syncMsg));
             }
             catch (Exception ex)
             {
@@ -410,7 +422,8 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                if (PreviewWebView.CoreWebView2 == null)
+                var coreWebView = PreviewWebViewIfCreated?.CoreWebView2;
+                if (coreWebView == null)
                 {
                     return;
                 }
@@ -420,7 +433,7 @@ namespace TxtAIEditor.Controls
                     action = "scrollSyncChanged",
                     enabled = enabled
                 };
-                PreviewWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(syncMsg));
+                coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(syncMsg));
             }
             catch (Exception ex)
             {
@@ -443,7 +456,7 @@ namespace TxtAIEditor.Controls
             try
             {
                 _previewDebounceTimer.Stop();
-                PreviewWebView.Close();
+                PreviewWebViewIfCreated?.Close();
             }
             catch { }
         }
@@ -467,7 +480,7 @@ namespace TxtAIEditor.Controls
 
         private void OnPreviewModeSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (PreviewWebView.CoreWebView2 != null)
+            if (PreviewWebViewIfCreated?.CoreWebView2 != null)
             {
                 var tab = _activeTabProvider();
                 if (tab != null)
@@ -723,7 +736,7 @@ namespace TxtAIEditor.Controls
                     startLine = startLine,
                     lines = lines
                 };
-                PreviewWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(reply));
+                sender.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(reply));
             }
             catch (Exception ex)
             {
@@ -735,7 +748,8 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                if (PreviewWebView.CoreWebView2 == null || string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+                var coreWebView = PreviewWebViewIfCreated?.CoreWebView2;
+                if (coreWebView == null || string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
                 {
                     return;
                 }
@@ -747,12 +761,12 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                PreviewWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                coreWebView.SetVirtualHostNameToFolderMapping(
                     PreviewWebResourceService.DocumentHostName,
                     normalizedDirectory,
                     CoreWebView2HostResourceAccessKind.Allow);
                 _mappedPreviewDocumentDirectory = normalizedDirectory;
-                _mappedDocumentDirectoriesByWebView[PreviewWebView.CoreWebView2] = normalizedDirectory;
+                _mappedDocumentDirectoriesByWebView[coreWebView] = normalizedDirectory;
             }
             catch (Exception ex)
             {
