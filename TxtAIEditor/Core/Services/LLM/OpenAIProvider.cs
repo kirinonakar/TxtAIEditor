@@ -26,7 +26,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
-                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
+                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key 또는 OAuth Access Token이 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
@@ -44,7 +44,7 @@ namespace TxtAIEditor.Core.Services.LLM
             string jsonPayload = JsonSerializer.Serialize(payload);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", NormalizeBearerCredential(apiKey));
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, cancellationToken))
@@ -78,7 +78,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
-                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
+                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key 또는 OAuth Access Token이 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
@@ -97,7 +97,7 @@ namespace TxtAIEditor.Core.Services.LLM
             string jsonPayload = JsonSerializer.Serialize(payload);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", NormalizeBearerCredential(apiKey));
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
@@ -178,6 +178,18 @@ namespace TxtAIEditor.Core.Services.LLM
             }
 
             return parts;
+        }
+
+        private static string NormalizeBearerCredential(string credential)
+        {
+            string value = (credential ?? string.Empty).Trim();
+            const string bearerPrefix = "Bearer ";
+            if (value.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return value.Substring(bearerPrefix.Length).Trim();
+            }
+
+            return value;
         }
     }
 }

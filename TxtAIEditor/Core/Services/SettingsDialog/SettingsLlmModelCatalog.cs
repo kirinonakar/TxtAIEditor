@@ -10,6 +10,7 @@ namespace TxtAIEditor.Core.Services
         {
             "Gemini",
             "OpenAI",
+            "OpenAI OAuth",
             "OpenRouter",
             "LM Studio",
             "OpenCode Go",
@@ -55,6 +56,7 @@ namespace TxtAIEditor.Core.Services
             {
                 "LM Studio" => "http://localhost:1234/v1",
                 "OpenAI" => "https://api.openai.com/v1",
+                "OpenAI OAuth" => "https://api.openai.com/v1",
                 "OpenRouter" => "https://openrouter.ai/api/v1",
                 "Gemini" => "https://generativelanguage.googleapis.com",
                 "OpenCode Go" => "https://opencode.ai/zen/go/v1",
@@ -77,7 +79,7 @@ namespace TxtAIEditor.Core.Services
                 };
             }
 
-            if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+            if (IsOpenAIProvider(provider))
             {
                 return new[] { "gpt-5.5" };
             }
@@ -156,7 +158,7 @@ namespace TxtAIEditor.Core.Services
                 return EnsureKnownModel(settings.LlmModelGemini, selectedModel, GetStaticModels(provider), "gemini-flash-lite-latest");
             }
 
-            if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+            if (IsOpenAIProvider(provider))
             {
                 return EnsureKnownModel(settings.LlmModelOpenAI, selectedModel, GetStaticModels(provider), "gpt-5.5");
             }
@@ -193,7 +195,7 @@ namespace TxtAIEditor.Core.Services
                 return !string.IsNullOrEmpty(settings.LlmModelGemini) ? settings.LlmModelGemini : "gemini-flash-lite-latest";
             }
 
-            if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+            if (IsOpenAIProvider(provider))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelOpenAI) ? settings.LlmModelOpenAI : "gpt-5.5";
             }
@@ -247,7 +249,7 @@ namespace TxtAIEditor.Core.Services
             {
                 settings.LlmModelGemini = settings.LlmModel;
             }
-            else if (settings.LlmProvider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+            else if (IsOpenAIProvider(settings.LlmProvider))
             {
                 settings.LlmModelOpenAI = settings.LlmModel;
             }
@@ -286,6 +288,12 @@ namespace TxtAIEditor.Core.Services
             }
 
             return fallback;
+        }
+
+        private static bool IsOpenAIProvider(string provider)
+        {
+            return provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

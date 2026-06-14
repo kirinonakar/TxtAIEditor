@@ -112,6 +112,33 @@ namespace TxtAIEditor.Controls
             return _edits.ReplaceInFileAsync(path, oldText, newText);
         }
 
+        public Task<string> SearchReplaceAsync(
+            string path,
+            string searchText,
+            string replacementText,
+            bool useRegex,
+            bool matchCase,
+            bool wholeWord,
+            int maxReplacements,
+            int startLine,
+            int endLine,
+            int? allowedStartLine = null,
+            int? allowedEndLine = null)
+        {
+            return _edits.SearchReplaceAsync(
+                path,
+                searchText,
+                replacementText,
+                useRegex,
+                matchCase,
+                wholeWord,
+                maxReplacements,
+                startLine,
+                endLine,
+                allowedStartLine,
+                allowedEndLine);
+        }
+
         public Task<string> ReplaceRangeAsync(
             string path,
             int startLine,

@@ -84,12 +84,45 @@ namespace TxtAIEditor.Controls
                     path);
             }
 
+            if (normalizedToolName == "search_replace")
+            {
+                int searchReplaceStartLine = GetSearchReplaceStartLineArgument(arguments);
+                int searchReplaceEndLine = GetSearchReplaceEndLineArgument(arguments);
+                if (searchReplaceStartLine <= 0 && searchReplaceEndLine <= 0)
+                {
+                    return null;
+                }
+
+                if (searchReplaceStartLine <= 0)
+                {
+                    searchReplaceStartLine = selection.StartLine;
+                }
+
+                if (searchReplaceEndLine <= 0)
+                {
+                    searchReplaceEndLine = selection.EndLine;
+                }
+
+                if (searchReplaceStartLine < selection.StartLine || searchReplaceEndLine > selection.EndLine)
+                {
+                    return string.Format(
+                        _getString(
+                            "AgentSelectionSearchReplaceRangeBlockedFormat",
+                            "search_replace failed: selected_range_context limits edits to {0}, but the requested edit targets lines {1}-{2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
+                        FormatSelectionScope(selection),
+                        searchReplaceStartLine,
+                        searchReplaceEndLine);
+                }
+
+                return null;
+            }
+
             if (normalizedToolName != "replace_range")
             {
                 return string.Format(
                     _getString(
                         "AgentSelectionEditToolBlockedFormat",
-                        "{0} failed: selected_range_context limits file edits to {1}. Use replace_range within the selected line range for selected-range edits. If the selected-range task is already complete, write the final answer."),
+                        "{0} failed: selected_range_context limits file edits to {1}. Use replace_range or search_replace within the selected line range for selected-range edits. If the selected-range task is already complete, write the final answer."),
                     normalizedToolName,
                     FormatSelectionScope(selection));
             }
@@ -118,7 +151,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (normalizedToolName is not ("read_file" or "read_image" or "extract_document" or "replace_in_file" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
+            if (normalizedToolName is not ("read_file" or "read_image" or "extract_document" or "replace_in_file" or "search_replace" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
             {
                 return;
             }
@@ -220,6 +253,36 @@ namespace TxtAIEditor.Controls
                 : 1;
         }
 
+        public int GetSearchReplaceStartLineArgument(JsonElement arguments)
+        {
+            if (TryGetIntArgument(arguments, "startLine", out int startLine) && startLine > 0)
+            {
+                return startLine;
+            }
+
+            if (TryGetIntArgument(arguments, "start_line", out startLine) && startLine > 0)
+            {
+                return startLine;
+            }
+
+            return 0;
+        }
+
+        public int GetSearchReplaceEndLineArgument(JsonElement arguments)
+        {
+            if (TryGetIntArgument(arguments, "endLine", out int endLine) && endLine > 0)
+            {
+                return endLine;
+            }
+
+            if (TryGetIntArgument(arguments, "end_line", out endLine) && endLine > 0)
+            {
+                return endLine;
+            }
+
+            return 0;
+        }
+
         public async Task<string> ReplaceInFileAsync(JsonElement arguments)
         {
             string path = GetEditPathArgument(arguments);
@@ -235,6 +298,77 @@ namespace TxtAIEditor.Controls
             return string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(content)
                 ? await _fileTools.OverwriteFileAsync(path, content)
                 : await _fileTools.ReplaceInFileAsync(path, oldText, newText);
+        }
+
+        public async Task<string> SearchReplaceAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "search_replace failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            string searchText = GetFirstStringArgument(arguments, "search", "find", "query", "pattern", "oldText", "old_text", "target", "before");
+            string replacementText = GetFirstStringArgument(arguments, "replacement", "replaceWith", "replace_with", "replace", "newText", "new_text", "after");
+            bool useRegex = GetBoolArgument(arguments, "useRegex",
+                GetBoolArgument(arguments, "isRegex",
+                    GetBoolArgument(arguments, "regex", false)));
+            bool matchCase = GetBoolArgument(arguments, "matchCase",
+                GetBoolArgument(arguments, "caseSensitive", true));
+            bool wholeWord = GetBoolArgument(arguments, "wholeWord",
+                GetBoolArgument(arguments, "whole_word", false));
+
+            int maxReplacements = GetIntArgument(arguments, "maxReplacements", 0);
+            if (maxReplacements == 0)
+            {
+                maxReplacements = GetIntArgument(arguments, "max_replacements", 0);
+            }
+            if (maxReplacements == 0)
+            {
+                maxReplacements = GetIntArgument(arguments, "maxCount", 0);
+            }
+            if (maxReplacements == 0)
+            {
+                maxReplacements = GetIntArgument(arguments, "count", 0);
+            }
+
+            int startLine = GetSearchReplaceStartLineArgument(arguments);
+            int endLine = GetSearchReplaceEndLineArgument(arguments);
+            int? allowedStartLine = null;
+            int? allowedEndLine = null;
+            if (_currentRunRestrictEditsToSelection)
+            {
+                AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
+                if (selection.HasLineRange &&
+                    !string.IsNullOrWhiteSpace(selection.SourcePath) &&
+                    PathsReferToSameFile(path, selection.SourcePath))
+                {
+                    allowedStartLine = selection.StartLine;
+                    allowedEndLine = selection.EndLine;
+                    if (startLine <= 0)
+                    {
+                        startLine = selection.StartLine;
+                    }
+
+                    if (endLine <= 0)
+                    {
+                        endLine = selection.EndLine;
+                    }
+                }
+            }
+
+            return await _fileTools.SearchReplaceAsync(
+                path,
+                searchText,
+                replacementText,
+                useRegex,
+                matchCase,
+                wholeWord,
+                maxReplacements,
+                startLine,
+                endLine,
+                allowedStartLine,
+                allowedEndLine);
         }
 
         public async Task<string> CreateFileAsync(JsonElement arguments)

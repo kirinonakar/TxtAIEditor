@@ -131,6 +131,7 @@ namespace TxtAIEditor.Controls
                 or "extract_document"
                 or "overwrite_file"
                 or "replace_in_file"
+                or "search_replace"
                 or "replace_range"
                 or "append_to_file"
                 or "merge_files"
@@ -148,6 +149,7 @@ namespace TxtAIEditor.Controls
                 or "extract_document"
                 or "overwrite_file"
                 or "replace_in_file"
+                or "search_replace"
                 or "replace_range"
                 or "apply_patch"
                 or "insert_text"
@@ -172,6 +174,7 @@ namespace TxtAIEditor.Controls
         {
             return normalizedToolName is "overwrite_file"
                 or "replace_in_file"
+                or "search_replace"
                 or "replace_range"
                 or "apply_patch"
                 or "append_to_file"
@@ -264,6 +267,11 @@ namespace TxtAIEditor.Controls
                 "replace_text" => "replace_in_file",
                 "replace" => "replace_in_file",
                 "edit_file" => "replace_in_file",
+                "search_replace" => "search_replace",
+                "search_and_replace" => "search_replace",
+                "find_replace" => "search_replace",
+                "find_and_replace" => "search_replace",
+                "regex_replace" => "search_replace",
                 "write_file" => "overwrite_file",
                 "append" => "append_to_file",
                 "append_file" => "append_to_file",
@@ -330,6 +338,50 @@ namespace TxtAIEditor.Controls
         public static int GetIntArgument(JsonElement arguments, string name, int fallback)
         {
             return TryGetIntArgument(arguments, name, out int value) ? value : fallback;
+        }
+
+        public static bool GetBoolArgument(JsonElement arguments, string name, bool fallback)
+        {
+            if (arguments.ValueKind != JsonValueKind.Object)
+            {
+                return fallback;
+            }
+
+            if (!arguments.TryGetProperty(name, out var prop))
+            {
+                return fallback;
+            }
+
+            if (prop.ValueKind == JsonValueKind.True)
+            {
+                return true;
+            }
+
+            if (prop.ValueKind == JsonValueKind.False)
+            {
+                return false;
+            }
+
+            if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out int number))
+            {
+                return number != 0;
+            }
+
+            if (prop.ValueKind == JsonValueKind.String)
+            {
+                string value = prop.GetString()?.Trim() ?? string.Empty;
+                if (bool.TryParse(value, out bool parsed))
+                {
+                    return parsed;
+                }
+
+                return value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("y", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("on", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return fallback;
         }
 
         public static bool TryGetIntArgument(JsonElement arguments, string name, out int value)

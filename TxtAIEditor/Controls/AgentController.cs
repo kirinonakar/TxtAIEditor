@@ -744,6 +744,11 @@ namespace TxtAIEditor.Controls
                             string path = GetEditPathArgument(arguments);
                             displayResult = string.Format(_getString("AgentVerboseAppendFileOnly", "파일에 내용을 덧붙였습니다: {0}"), path);
                         }
+                        else if (normalizedName == "search_replace")
+                        {
+                            string path = GetEditPathArgument(arguments);
+                            displayResult = string.Format(_getString("AgentVerboseSearchReplaceOnly", "검색/치환을 완료했습니다: {0}"), path);
+                        }
                         else if (normalizedName == "merge_files")
                         {
                             string target = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
@@ -817,7 +822,7 @@ namespace TxtAIEditor.Controls
 
 
                     string verifyToolName = NormalizeToolName(toolName);
-                    bool isFileEditTool = verifyToolName is "replace_in_file" or "replace_range"
+                    bool isFileEditTool = verifyToolName is "replace_in_file" or "search_replace" or "replace_range"
                         or "apply_patch" or "overwrite_file" or "append_to_file";
                     if (isFileEditTool && IsUnchangedEditCompletionResult(toolResult))
                     {
@@ -1192,6 +1197,10 @@ namespace TxtAIEditor.Controls
                 {
                     result = await _fileToolController.ReplaceInFileAsync(arguments);
                 }
+                else if (normalizedToolName == "search_replace")
+                {
+                    result = await _fileToolController.SearchReplaceAsync(arguments);
+                }
                 else
                 {
                     result = normalizedToolName switch
@@ -1331,6 +1340,9 @@ namespace TxtAIEditor.Controls
                     GetStringArgument(arguments, "path")),
                 "replace_in_file" => string.Format(
                     _getString("AgentActivityReplaceFileFormat", "파일 수정 중: {0}"),
+                    GetEditPathArgument(arguments)),
+                "search_replace" => string.Format(
+                    _getString("AgentActivitySearchReplaceFormat", "검색/치환 중: {0}"),
                     GetEditPathArgument(arguments)),
                 "replace_range" => string.Format(
                     _getString("AgentActivityReplaceRangeFormat", "파일 범위 수정 중: {0} ({1}줄부터 {2}줄)"),

@@ -203,6 +203,156 @@ namespace TxtAIEditor.Controls
             return $"modified: {_workspace.RelativePath(fullPath)}";
         }
 
+        public async Task<string> SearchReplaceAsync(
+            string path,
+            string searchText,
+            string replacementText,
+            bool useRegex,
+            bool matchCase,
+            bool wholeWord,
+            int maxReplacements,
+            int startLine,
+            int endLine,
+            int? allowedStartLine = null,
+            int? allowedEndLine = null)
+        {
+            string fullPath = _workspace.ResolveInsideWorkspace(path);
+            if (!File.Exists(fullPath))
+            {
+                return $"search_replace failed: file not found: {path}";
+            }
+
+            if (string.IsNullOrEmpty(searchText))
+            {
+                return "search_replace failed: search text is empty.";
+            }
+
+            string rawText = await File.ReadAllTextAsync(fullPath);
+            string lineEnding = DetectLineEnding(rawText);
+            string content = NormalizeNewlines(rawText);
+            string[] lines = content.Split('\n');
+
+            if (startLine <= 0 && endLine <= 0)
+            {
+                startLine = allowedStartLine ?? 1;
+                endLine = allowedEndLine ?? lines.Length;
+            }
+            else
+            {
+                if (startLine <= 0)
+                {
+                    startLine = 1;
+                }
+
+                if (endLine <= 0)
+                {
+                    endLine = lines.Length;
+                }
+            }
+
+            if (allowedStartLine.HasValue && startLine < allowedStartLine.Value)
+            {
+                return $"search_replace failed: startLine {startLine} is outside the allowed range ({allowedStartLine.Value}-{allowedEndLine ?? lines.Length}).";
+            }
+
+            if (allowedEndLine.HasValue && endLine > allowedEndLine.Value)
+            {
+                return $"search_replace failed: endLine {endLine} is outside the allowed range ({allowedStartLine ?? 1}-{allowedEndLine.Value}).";
+            }
+
+            if (startLine < 1 || startLine > lines.Length)
+            {
+                return $"search_replace failed: startLine {startLine} is out of bounds (1-{lines.Length}).";
+            }
+
+            if (endLine < startLine || endLine > lines.Length)
+            {
+                return $"search_replace failed: endLine {endLine} is out of bounds (startLine-{lines.Length}).";
+            }
+
+            int startOffset = GetLineStartOffset(lines, startLine);
+            int endOffset = GetLineEndOffset(lines, endLine);
+            string targetText = content.Substring(startOffset, endOffset - startOffset);
+
+            string pattern = useRegex ? searchText : Regex.Escape(searchText);
+            if (wholeWord)
+            {
+                pattern = $@"\b(?:{pattern})\b";
+            }
+
+            RegexOptions options = RegexOptions.CultureInvariant | RegexOptions.Multiline;
+            if (!matchCase)
+            {
+                options |= RegexOptions.IgnoreCase;
+            }
+
+            string normalizedReplacement = NormalizeNewlines(replacementText);
+            string replacedText;
+            int replacementCount;
+
+            try
+            {
+                var regex = new Regex(pattern, options, TimeSpan.FromSeconds(2));
+                int matchCount = regex.Matches(targetText).Count;
+                if (matchCount == 0)
+                {
+                    return $"search_replace failed: no matches found in {path} lines {startLine}-{endLine}.";
+                }
+
+                replacementCount = maxReplacements > 0
+                    ? Math.Min(maxReplacements, matchCount)
+                    : matchCount;
+
+                if (useRegex)
+                {
+                    replacedText = maxReplacements > 0
+                        ? regex.Replace(targetText, normalizedReplacement, maxReplacements)
+                        : regex.Replace(targetText, normalizedReplacement);
+                }
+                else
+                {
+                    replacedText = maxReplacements > 0
+                        ? regex.Replace(targetText, _ => normalizedReplacement, maxReplacements)
+                        : regex.Replace(targetText, _ => normalizedReplacement);
+                }
+            }
+            catch (ArgumentException ex)
+            {
+                return $"search_replace failed: invalid {(useRegex ? "regex" : "search")} pattern: {ex.Message}";
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return "search_replace failed: regex matching timed out.";
+            }
+
+            string updated = content.Substring(0, startOffset) + replacedText + content.Substring(endOffset);
+            if (string.Equals(updated, content, StringComparison.Ordinal))
+            {
+                return BuildUnchangedEditResult("search_replace", fullPath);
+            }
+
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "search_replace",
+                RelativePath = _workspace.RelativePath(fullPath),
+                FullPath = fullPath,
+                OldContent = content,
+                NewContent = updated
+            };
+
+            if (!await _confirmEditAsync(preview))
+            {
+                return $"search_replace cancelled: {path}";
+            }
+
+            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await _notifyFileModifiedAsync(fullPath);
+
+            string replacementLabel = replacementCount == 1 ? "replacement" : "replacements";
+            string regexLabel = useRegex ? " regex" : string.Empty;
+            return $"modified: {_workspace.RelativePath(fullPath)} ({replacementCount}{regexLabel} {replacementLabel}, lines {startLine}-{endLine})";
+        }
+
         public async Task<string> ReplaceRangeAsync(
             string path,
             int startLine,
@@ -746,6 +896,23 @@ namespace TxtAIEditor.Controls
         private string BuildUnchangedEditResult(string toolName, string fullPath)
         {
             return $"{toolName} unchanged: {_workspace.RelativePath(fullPath)} requested change is already applied; no additional edit was needed.";
+        }
+
+        private static int GetLineStartOffset(string[] lines, int oneBasedLine)
+        {
+            int offset = 0;
+            for (int i = 0; i < oneBasedLine - 1; i++)
+            {
+                offset += lines[i].Length + 1;
+            }
+
+            return offset;
+        }
+
+        private static int GetLineEndOffset(string[] lines, int oneBasedLine)
+        {
+            int offset = GetLineStartOffset(lines, oneBasedLine);
+            return offset + lines[oneBasedLine - 1].Length;
         }
 
         private static bool TryResolveNearbyExpectedSnippetRange(
