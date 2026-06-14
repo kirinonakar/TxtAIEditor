@@ -13,6 +13,8 @@ namespace TxtAIEditor.Core.Services
             "editor-core.js",
             "editor-highlighter.js",
             "editor-selection.js",
+            "editor-caret.js",
+            "editor-composition.js",
             "editor-commands.js",
             "editor-ui.js",
             "markdown-preview-renderer.js",
