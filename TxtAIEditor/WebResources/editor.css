@@ -9,6 +9,7 @@
     --font-family: Consolas, "Courier New", monospace;
     --font-size: 14px;
     --line-height: 22px;
+    --preview-row-height: 24px;
     --gutter-width: 56px;
     --wrap: pre;
     --csv-grid-template: var(--gutter-width) repeat(8, 128px);
@@ -521,7 +522,14 @@ body.csv-table-mode:not(.wrap-enabled) .line-row.csv-row {
 
 .inline-live-preview-enabled .line-row.live-preview-empty,
 .inline-live-preview-enabled .line-row.live-preview-empty .line-text {
-    min-height: var(--line-height);
+    min-height: var(--preview-row-height);
+    height: var(--preview-row-height);
+    line-height: var(--preview-row-height);
+}
+
+.inline-live-preview-enabled .line-row.live-preview-empty .line-text {
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 .inline-live-preview-enabled .line-row.live-preview-source-block {

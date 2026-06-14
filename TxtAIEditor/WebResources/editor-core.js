@@ -586,6 +586,8 @@ function queueRender(force = false) {
 function measureRenderedRows(renderOnChange = true) {
     if (!usesMeasuredLineHeights()) return;
 
+    const anchorLine = lineAt(scrollContainer.scrollTop);
+    const anchorOffset = scrollContainer.scrollTop - lineTop(anchorLine);
     let changed = false;
     for (const row of viewport.querySelectorAll('.line-row')) {
         const lineNumber = Number(row.dataset.line || 0);
@@ -602,6 +604,13 @@ function measureRenderedRows(renderOnChange = true) {
 
     if (changed) {
         setupVirtualHeight();
+        if (state.inlineLivePreviewEnabled) {
+            const maxScrollTop = Math.max(0, totalVirtualHeight() - scrollContainer.clientHeight);
+            const anchoredScrollTop = Math.min(maxScrollTop, Math.max(0, lineTop(anchorLine) + anchorOffset));
+            if (Math.abs(scrollContainer.scrollTop - anchoredScrollTop) > 1) {
+                scrollContainer.scrollTop = anchoredScrollTop;
+            }
+        }
         if (renderOnChange) {
             state.lastRangeKey = '';
             requestAnimationFrame(() => runtime.render());
