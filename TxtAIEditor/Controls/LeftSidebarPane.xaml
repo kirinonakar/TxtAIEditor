@@ -177,16 +177,16 @@
                                             <Grid Padding="0,3,0,3" RightTapped="OnFileListViewItemRightTapped">
                                                 <Grid.ContextFlyout>
                                                     <MenuFlyout>
-                                                        <MenuFlyoutItem Text="즐겨찾기에 추가" Click="OnAddFileToFavoritesClick" Tag="{Binding}"/>
-                                                        <MenuFlyoutItem Text="폴더를 즐겨찾기에 추가" Click="OnAddFolderToFavoritesClick" Tag="{Binding}"/>
-                                                        <MenuFlyoutItem x:Name="ExplorerInsertMarkdownImageMenuItem" Text="마크다운 삽입" Click="OnInsertMarkdownImageClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem Text="즐겨찾기에 추가" Icon="Favorite" Click="OnAddFileToFavoritesClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem Text="폴더를 즐겨찾기에 추가" Icon="OutlineStar" Click="OnAddFolderToFavoritesClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem x:Name="ExplorerInsertMarkdownImageMenuItem" Text="마크다운 삽입" Icon="Pictures" Click="OnInsertMarkdownImageClick" Tag="{Binding}"/>
                                                         <MenuFlyoutSeparator/>
-                                                        <MenuFlyoutItem x:Name="ExplorerCopyFileNameMenuItem" Text="파일이름 복사" Click="OnCopyFileNameClick" Tag="{Binding}"/>
-                                                        <MenuFlyoutItem x:Name="ExplorerCopyFilePathMenuItem" Text="경로 복사" Click="OnCopyFilePathClick" Tag="{Binding}"/>
-                                                        <MenuFlyoutItem x:Name="ExplorerCopyFolderPathMenuItem" Text="폴더 경로 복사" Click="OnCopyFolderPathClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem x:Name="ExplorerCopyFileNameMenuItem" Text="파일이름 복사" Icon="Copy" Click="OnCopyFileNameClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem x:Name="ExplorerCopyFilePathMenuItem" Text="경로 복사" Icon="Link" Click="OnCopyFilePathClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem x:Name="ExplorerCopyFolderPathMenuItem" Text="폴더 경로 복사" Icon="Link" Click="OnCopyFolderPathClick" Tag="{Binding}"/>
                                                         <MenuFlyoutSeparator/>
-                                                        <MenuFlyoutItem x:Name="ExplorerRenameMenuItem" Text="이름 바꾸기" Click="OnRenameClick" Tag="{Binding}"/>
-                                                        <MenuFlyoutItem x:Name="ExplorerDeleteMenuItem" Text="삭제" Click="OnDeleteClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem x:Name="ExplorerRenameMenuItem" Text="이름 바꾸기" Icon="Rename" Click="OnRenameClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem x:Name="ExplorerDeleteMenuItem" Text="삭제" Icon="Delete" Click="OnDeleteClick" Tag="{Binding}"/>
                                                     </MenuFlyout>
                                                 </Grid.ContextFlyout>
                                                 <Grid.ColumnDefinitions>

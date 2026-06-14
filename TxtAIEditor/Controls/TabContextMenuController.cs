@@ -51,30 +51,30 @@ namespace TxtAIEditor.Controls
         {
             var menu = new MenuFlyout();
 
-            var copyFileNameItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFileName", "파일이름 복사") };
+            var copyFileNameItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFileName", "파일이름 복사"), Icon = new SymbolIcon(Symbol.Copy) };
             copyFileNameItem.IsEnabled = !string.IsNullOrEmpty(tab.FilePath);
             copyFileNameItem.Click += (_, __) => CopyFileName(tab);
             menu.Items.Add(copyFileNameItem);
 
-            var copyFilePathItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFilePath", "경로 복사") };
+            var copyFilePathItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFilePath", "경로 복사"), Icon = new SymbolIcon(Symbol.Link) };
             copyFilePathItem.IsEnabled = !string.IsNullOrEmpty(tab.FilePath);
             copyFilePathItem.Click += (_, __) => CopyFilePath(tab);
             menu.Items.Add(copyFilePathItem);
 
             menu.Items.Add(new MenuFlyoutSeparator());
 
-            var addToFavoritesItem = new MenuFlyoutItem { Text = _getString("TabMenuAddToFavorites", "즐겨찾기 추가") };
+            var addToFavoritesItem = new MenuFlyoutItem { Text = _getString("TabMenuAddToFavorites", "즐겨찾기 추가"), Icon = new SymbolIcon(Symbol.Favorite) };
             addToFavoritesItem.IsEnabled = !string.IsNullOrEmpty(tab.FilePath);
             addToFavoritesItem.Click += async (_, __) => await AddBookmarkAsync(tab);
             menu.Items.Add(addToFavoritesItem);
 
-            var openFolderItem = new MenuFlyoutItem { Text = _getString("TabMenuOpenFolder", "해당 폴더로 이동") };
+            var openFolderItem = new MenuFlyoutItem { Text = _getString("TabMenuOpenFolder", "해당 폴더로 이동"), Icon = new SymbolIcon(Symbol.Folder) };
             openFolderItem.Click += async (_, __) => await OpenFolderAsync(tab);
             menu.Items.Add(openFolderItem);
 
             menu.Items.Add(new MenuFlyoutSeparator());
 
-            var reloadItem = new MenuFlyoutItem { Text = _getString("TabMenuReload", "새로고침") };
+            var reloadItem = new MenuFlyoutItem { Text = _getString("TabMenuReload", "새로고침"), Icon = new SymbolIcon(Symbol.Refresh) };
             reloadItem.IsEnabled = !string.IsNullOrEmpty(tab.FilePath);
             reloadItem.Click += async (_, __) => await _reloadTabAsync(tab, tabItem);
             menu.Items.Add(reloadItem);
@@ -85,17 +85,17 @@ namespace TxtAIEditor.Controls
 
                 if (tab.IsEncrypted)
                 {
-                    var changePasswordItem = new MenuFlyoutItem { Text = _getString("TabMenuChangeEncryptionPassword", "암호 변경") };
+                    var changePasswordItem = new MenuFlyoutItem { Text = _getString("TabMenuChangeEncryptionPassword", "암호 변경"), Icon = new SymbolIcon(Symbol.Permissions) };
                     changePasswordItem.Click += async (_, __) => await _changeEncryptionPasswordAsync(tab);
                     menu.Items.Add(changePasswordItem);
 
-                    var removeEncryptionItem = new MenuFlyoutItem { Text = _getString("TabMenuRemoveEncryption", "암호 해제") };
+                    var removeEncryptionItem = new MenuFlyoutItem { Text = _getString("TabMenuRemoveEncryption", "암호 해제"), Icon = new SymbolIcon(Symbol.Permissions) };
                     removeEncryptionItem.Click += async (_, __) => await _removeEncryptionAsync(tab);
                     menu.Items.Add(removeEncryptionItem);
                 }
                 else
                 {
-                    var encryptItem = new MenuFlyoutItem { Text = _getString("TabMenuEncrypt", "암호화") };
+                    var encryptItem = new MenuFlyoutItem { Text = _getString("TabMenuEncrypt", "암호화"), Icon = new SymbolIcon(Symbol.Permissions) };
                     encryptItem.Click += async (_, __) => await _encryptTabAsync(tab);
                     menu.Items.Add(encryptItem);
                 }
@@ -103,15 +103,15 @@ namespace TxtAIEditor.Controls
 
             menu.Items.Add(new MenuFlyoutSeparator());
 
-            var closeRightItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseRight", "오른쪽 탭 닫기") };
+            var closeRightItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseRight", "오른쪽 탭 닫기"), Icon = new SymbolIcon(Symbol.Forward) };
             closeRightItem.Click += (_, __) => _closeRightTabs(tab, tabItem, targetTabView);
             menu.Items.Add(closeRightItem);
 
-            var closeLeftItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseLeft", "왼쪽 탭 닫기") };
+            var closeLeftItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseLeft", "왼쪽 탭 닫기"), Icon = new SymbolIcon(Symbol.Back) };
             closeLeftItem.Click += (_, __) => _closeLeftTabs(tab, tabItem, targetTabView);
             menu.Items.Add(closeLeftItem);
 
-            var closeOthersItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseOthers", "다른 탭 닫기") };
+            var closeOthersItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseOthers", "다른 탭 닫기"), Icon = new SymbolIcon(Symbol.Cancel) };
             closeOthersItem.Click += (_, __) => _closeOtherTabs(tab, tabItem, targetTabView);
             menu.Items.Add(closeOthersItem);
 
