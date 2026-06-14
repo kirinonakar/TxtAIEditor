@@ -531,13 +531,46 @@ function findMarkdownTableBlockContaining(lineNumber, maxLine, getLine) {
     return null;
 }
 
+function paragraphBlockBoundsAt(lineNumber, maxLine, getLine, options = {}) {
+    const isEditableParagraphLine = line => {
+        if (!isParagraphLine(String(line ?? ''), options)) return false;
+        if (fencedCodeInfo(line)) return false;
+        if (htmlBlockTagName(line)) return false;
+        if (isDisplayMathFence(line)) return false;
+        return true;
+    };
+
+    const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), maxLine);
+    const targetText = getLine(targetLine);
+    if (targetText === undefined || !isEditableParagraphLine(targetText)) {
+        return null;
+    }
+
+    let startLine = targetLine;
+    for (let line = targetLine - 1; line >= 1; line--) {
+        const text = getLine(line);
+        if (text === undefined || !isEditableParagraphLine(text) || isMarkdownTableStart(line, getLine)) break;
+        startLine = line;
+    }
+
+    let endLine = targetLine;
+    for (let line = targetLine + 1; line <= maxLine; line++) {
+        const text = getLine(line);
+        if (text === undefined || !isEditableParagraphLine(text) || isMarkdownTableStart(line, getLine)) break;
+        endLine = line;
+    }
+
+    return endLine > startLine ? { kind: 'paragraph', startLine, endLine } : null;
+}
+
 function findEditablePreviewBlockContaining(lineNumber, maxLine, getLine, options = {}) {
     if (!lineNumber || lineNumber < 1) return null;
     return (options.renderListsAsBlocks !== false
         ? findMarkdownListBlockContaining(lineNumber, maxLine, getLine, options)
         : null) ||
         findFencedCodeBlockContaining(lineNumber, maxLine, getLine) ||
-        findMarkdownTableBlockContaining(lineNumber, maxLine, getLine);
+        findMarkdownTableBlockContaining(lineNumber, maxLine, getLine) ||
+        paragraphBlockBoundsAt(lineNumber, maxLine, getLine, options);
 }
 
 function renderMarkdownTableBlock(block, options = {}) {
