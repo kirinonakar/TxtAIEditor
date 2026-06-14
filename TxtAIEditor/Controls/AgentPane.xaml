@@ -80,7 +80,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <TextBlock Text="세션 히스토리 (최근 10개)" FontWeight="SemiBold" FontSize="12" Grid.Row="0"/>
+                            <TextBlock x:Name="AgentHistoryTitleText" Text="세션 히스토리 (최근 20개)" FontWeight="SemiBold" FontSize="12" Grid.Row="0"/>
                             <ScrollViewer Grid.Row="1" MaxHeight="300" VerticalScrollBarVisibility="Auto">
                                 <StackPanel x:Name="AgentHistoryListPanel" Spacing="4"/>
                             </ScrollViewer>

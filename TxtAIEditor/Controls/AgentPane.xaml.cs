@@ -197,6 +197,7 @@ namespace TxtAIEditor.Controls
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
             AgentNewSessionButton.Content = getString("AgentNewSessionButton", "새 세션");
             ToolTipService.SetToolTip(AgentHistoryButton, getString("AgentHistoryTooltip", "세션 히스토리"));
+            AgentHistoryTitleText.Text = getString("AgentHistoryTitle", "세션 히스토리 (최근 20개)");
             ToolTipService.SetToolTip(AgentDeleteHistoryButton, getString("AgentDeleteHistoryTooltip", "히스토리 삭제"));
             AgentInsertOutputButton.Content = getString("LlmInsertOutputButtonText", "입력");
             AgentActivityHeaderText.Text = getString("AgentActivityHeader", "진행 상황");
