@@ -18,6 +18,8 @@ namespace TxtAIEditor.Controls
     public sealed class LivePreviewController
     {
         private const int InitialPreviewLineWarmupCount = 120;
+        private const int PreviewLayoutRenderRetryLimit = 12;
+        private const int PreviewLayoutRenderRetryMilliseconds = 50;
 
         private readonly RightSidebarPane _previewPane;
         private readonly ISettingsService _settingsService;
@@ -33,6 +35,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showErrorMessage;
         private readonly Func<string, string, string> _getString;
         private readonly DispatcherTimer _previewDebounceTimer;
+        private readonly DispatcherTimer _renderAfterLayoutTimer;
         private readonly Dictionary<string, string> _mappedEditorDocumentDirectories = new Dictionary<string, string>();
         private readonly Dictionary<CoreWebView2, string> _mappedDocumentDirectoriesByWebView = new Dictionary<CoreWebView2, string>();
         private readonly Dictionary<string, int> _tabPreviewModes = new Dictionary<string, int>();
@@ -43,6 +46,8 @@ namespace TxtAIEditor.Controls
         private Task? _initializeTask;
         private bool _initializeAndRenderQueued;
         private bool _renderAfterLayoutQueued;
+        private bool _pendingForceSelectPreviewTab;
+        private int _renderAfterLayoutAttempts;
         private bool _updatingPreviewModeSelection;
 
         public LivePreviewController(
@@ -83,6 +88,11 @@ namespace TxtAIEditor.Controls
                 Interval = TimeSpan.FromMilliseconds(50)
             };
             _previewDebounceTimer.Tick += OnPreviewDebounceTimerTick;
+            _renderAfterLayoutTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(PreviewLayoutRenderRetryMilliseconds)
+            };
+            _renderAfterLayoutTimer.Tick += OnRenderAfterLayoutTimerTick;
             _previewPane.RightTabs.SelectionChanged += OnRightTabsSelectionChanged;
             _previewPane.SizeChanged += OnPreviewPaneSizeChanged;
             _previewPane.RegisterPropertyChangedCallback(UIElement.VisibilityProperty, OnPreviewPaneVisibilityChanged);
@@ -566,6 +576,7 @@ namespace TxtAIEditor.Controls
             try
             {
                 _previewDebounceTimer.Stop();
+                _renderAfterLayoutTimer.Stop();
                 PreviewWebViewIfCreated?.Close();
             }
             catch { }
@@ -614,37 +625,74 @@ namespace TxtAIEditor.Controls
 
         private void QueueEnsureVisiblePreviewRenderedAfterLayout(bool forceSelectPreviewTab)
         {
+            _pendingForceSelectPreviewTab = _pendingForceSelectPreviewTab || forceSelectPreviewTab;
+
             if (_renderAfterLayoutQueued)
             {
                 return;
             }
 
             _renderAfterLayoutQueued = true;
-            var dispatcher = _previewPane.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-                {
-                    _renderAfterLayoutQueued = false;
-                    if (!IsPreviewPaneSizedForWebView)
-                    {
-                        return;
-                    }
+            _renderAfterLayoutAttempts = 0;
+            QueueRenderAfterLayoutAttempt();
+        }
 
-                    if (forceSelectPreviewTab)
-                    {
-                        EnsureVisiblePreviewRendered();
-                    }
-                    else if (IsLivePreviewVisible && IsPreviewPaneSizedForWebView)
-                    {
-                        EnsureVisiblePreviewRendered();
-                    }
-                }) != true)
+        private void QueueRenderAfterLayoutAttempt()
+        {
+            var dispatcher = _previewPane.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, RunRenderAfterLayoutAttempt) != true)
             {
-                _renderAfterLayoutQueued = false;
-                if (forceSelectPreviewTab && IsPreviewPaneSizedForWebView)
-                {
-                    EnsureVisiblePreviewRendered();
-                }
+                RunRenderAfterLayoutAttempt();
             }
+        }
+
+        private void RunRenderAfterLayoutAttempt()
+        {
+            if (_previewPane.Visibility != Visibility.Visible || PreviewTargetTab == null)
+            {
+                ClearRenderAfterLayoutQueue();
+                return;
+            }
+
+            if (!IsPreviewPaneSizedForWebView)
+            {
+                _renderAfterLayoutAttempts++;
+                if (_renderAfterLayoutAttempts >= PreviewLayoutRenderRetryLimit)
+                {
+                    ClearRenderAfterLayoutQueue();
+                    return;
+                }
+
+                _renderAfterLayoutTimer.Stop();
+                _renderAfterLayoutTimer.Start();
+                return;
+            }
+
+            bool forceSelectPreviewTab = _pendingForceSelectPreviewTab;
+            ClearRenderAfterLayoutQueue();
+
+            if (forceSelectPreviewTab)
+            {
+                EnsureVisiblePreviewRendered();
+            }
+            else if (IsLivePreviewVisible)
+            {
+                EnsureVisiblePreviewRendered();
+            }
+        }
+
+        private void OnRenderAfterLayoutTimerTick(object? sender, object e)
+        {
+            _renderAfterLayoutTimer.Stop();
+            QueueRenderAfterLayoutAttempt();
+        }
+
+        private void ClearRenderAfterLayoutQueue()
+        {
+            _renderAfterLayoutTimer.Stop();
+            _renderAfterLayoutQueued = false;
+            _pendingForceSelectPreviewTab = false;
+            _renderAfterLayoutAttempts = 0;
         }
 
         private bool EnsureLivePreviewVisibleForRender(bool forceSelectPreviewTab)
