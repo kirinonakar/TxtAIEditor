@@ -251,8 +251,8 @@ namespace TxtAIEditor.Core.Services
             ILLMProvider provider = providerName.ToLower() switch
             {
                 "gemini" => new GeminiProvider(_localizationService, settings.LlmAgentVerbose),
-                "openai oauth" => new OpenAIProvider(_localizationService),
-                "openaioauth" => new OpenAIProvider(_localizationService),
+                "openai oauth" => new OpenAIProvider(_localizationService, isOAuth: true),
+                "openaioauth" => new OpenAIProvider(_localizationService, isOAuth: true),
                 "openrouter" => new OpenRouterProvider(_localizationService),
                 "lm studio" => new LMStudioProvider(_localizationService),
                 "lmstudio" => new LMStudioProvider(_localizationService),

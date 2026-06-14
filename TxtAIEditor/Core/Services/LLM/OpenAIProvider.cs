@@ -14,12 +14,14 @@ namespace TxtAIEditor.Core.Services.LLM
     public class OpenAIProvider : ILLMProvider
     {
         private readonly ILocalizationService _localizationService;
+        private readonly bool _isOAuth;
 
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public OpenAIProvider(ILocalizationService localizationService)
+        public OpenAIProvider(ILocalizationService localizationService, bool isOAuth = false)
         {
             _localizationService = localizationService;
+            _isOAuth = isOAuth;
         }
 
         public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
@@ -32,16 +34,32 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            var payload = new
+            object payload;
+            if (_isOAuth)
             {
-                model = model,
-                messages = new[]
+                payload = new
                 {
-                    new { role = "system", content = (object)systemPrompt },
-                    new { role = "user", content = BuildUserContent(userContent, attachments) }
-                },
-                temperature = 0.5
-            };
+                    model = model,
+                    messages = new[]
+                    {
+                        new { role = "system", content = (object)systemPrompt },
+                        new { role = "user", content = BuildUserContent(userContent, attachments) }
+                    }
+                };
+            }
+            else
+            {
+                payload = new
+                {
+                    model = model,
+                    messages = new[]
+                    {
+                        new { role = "system", content = (object)systemPrompt },
+                        new { role = "user", content = BuildUserContent(userContent, attachments) }
+                    },
+                    temperature = 0.5
+                };
+            }
 
             string jsonPayload = JsonSerializer.Serialize(payload);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
@@ -89,17 +107,34 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            var payload = new
+            object payload;
+            if (_isOAuth)
             {
-                model = model,
-                messages = new[]
+                payload = new
                 {
-                    new { role = "system", content = (object)systemPrompt },
-                    new { role = "user", content = BuildUserContent(userContent, attachments) }
-                },
-                temperature = 0.5,
-                stream = true
-            };
+                    model = model,
+                    messages = new[]
+                    {
+                        new { role = "system", content = (object)systemPrompt },
+                        new { role = "user", content = BuildUserContent(userContent, attachments) }
+                    },
+                    stream = true
+                };
+            }
+            else
+            {
+                payload = new
+                {
+                    model = model,
+                    messages = new[]
+                    {
+                        new { role = "system", content = (object)systemPrompt },
+                        new { role = "user", content = BuildUserContent(userContent, attachments) }
+                    },
+                    temperature = 0.5,
+                    stream = true
+                };
+            }
 
             string jsonPayload = JsonSerializer.Serialize(payload);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
