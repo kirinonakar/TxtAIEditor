@@ -25,7 +25,9 @@ namespace TxtAIEditor.Core.Services.LLM
         public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrEmpty(apiKey))
+            bool isLocalEndpoint = endpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                                   endpoint.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(apiKey) && !isLocalEndpoint)
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key 또는 OAuth Access Token이 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
@@ -44,7 +46,10 @@ namespace TxtAIEditor.Core.Services.LLM
             string jsonPayload = JsonSerializer.Serialize(payload);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", NormalizeBearerCredential(apiKey));
+                if (!string.IsNullOrEmpty(apiKey))
+                {
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", NormalizeBearerCredential(apiKey));
+                }
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, cancellationToken))
@@ -77,7 +82,9 @@ namespace TxtAIEditor.Core.Services.LLM
         public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrEmpty(apiKey))
+            bool isLocalEndpoint = endpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                                   endpoint.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(apiKey) && !isLocalEndpoint)
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key 또는 OAuth Access Token이 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
@@ -97,7 +104,10 @@ namespace TxtAIEditor.Core.Services.LLM
             string jsonPayload = JsonSerializer.Serialize(payload);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", NormalizeBearerCredential(apiKey));
+                if (!string.IsNullOrEmpty(apiKey))
+                {
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", NormalizeBearerCredential(apiKey));
+                }
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))

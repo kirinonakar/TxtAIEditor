@@ -43,6 +43,7 @@ namespace TxtAIEditor.Core.Services
         {
             return string.IsNullOrWhiteSpace(endpoint) ||
                 endpoint.Equals("https://api.openai.com/v1", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.Equals("http://127.0.0.1:10531/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://openrouter.ai/api/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("http://localhost:1234/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
@@ -56,7 +57,7 @@ namespace TxtAIEditor.Core.Services
             {
                 "LM Studio" => "http://localhost:1234/v1",
                 "OpenAI" => "https://api.openai.com/v1",
-                "OpenAI OAuth" => "https://api.openai.com/v1",
+                "OpenAI OAuth" => "http://127.0.0.1:10531/v1",
                 "OpenRouter" => "https://openrouter.ai/api/v1",
                 "Gemini" => "https://generativelanguage.googleapis.com",
                 "OpenCode Go" => "https://opencode.ai/zen/go/v1",

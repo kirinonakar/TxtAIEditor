@@ -238,7 +238,9 @@ namespace TxtAIEditor.Core.Services
             string providerName = settings.LlmProvider;
             string apiKey = await GetApiKeyAsync(providerName);
             bool requiresApiKey = !providerName.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) &&
-                                    !providerName.Equals("LMStudio", StringComparison.OrdinalIgnoreCase);
+                                    !providerName.Equals("LMStudio", StringComparison.OrdinalIgnoreCase) &&
+                                    !providerName.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) &&
+                                    !providerName.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
 
             string langCode = GetActiveLanguage();
             if (requiresApiKey && string.IsNullOrEmpty(apiKey))
