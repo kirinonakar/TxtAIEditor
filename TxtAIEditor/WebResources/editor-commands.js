@@ -1039,10 +1039,97 @@ function syncRenderedRowsAfterCompositionSelectionCollapse(startLine, endLine, n
     return targetRow?.querySelector?.('.line-text') || null;
 }
 
+function textPositionForOffsetInElement(element, offset) {
+    if (!element) return null;
+
+    let remaining = Math.max(0, Number(offset || 0));
+    let lastTextNode = null;
+
+    function walk(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            lastTextNode = node;
+            const length = node.textContent.length;
+            if (remaining <= length) {
+                return { node, offset: remaining };
+            }
+            remaining -= length;
+            return null;
+        }
+
+        for (const child of node.childNodes) {
+            const found = walk(child);
+            if (found) return found;
+        }
+        return null;
+    }
+
+    return walk(element) || (lastTextNode
+        ? { node: lastTextNode, offset: lastTextNode.textContent.length }
+        : null);
+}
+
+function setNativeSelectionRangeInElement(element, startOffset, endOffset) {
+    if (!element || element.getAttribute?.('contenteditable') !== 'true') return false;
+
+    const textLength = lineTextFromElement(element).length;
+    const start = Math.max(0, Math.min(Number(startOffset || 0), textLength));
+    const end = Math.max(start, Math.min(Number(endOffset || 0), textLength));
+    const startPosition = textPositionForOffsetInElement(element, start);
+    const endPosition = textPositionForOffsetInElement(element, end);
+    if (!startPosition || !endPosition) return false;
+
+    const range = document.createRange();
+    range.setStart(startPosition.node, startPosition.offset);
+    range.setEnd(endPosition.node, endPosition.offset);
+
+    element.focus({ preventScroll: true });
+    const domSelection = window.getSelection();
+    if (!domSelection) return false;
+    domSelection.removeAllRanges();
+    domSelection.addRange(range);
+    return true;
+}
+
+function prepareSingleLineSelectionForNativeComposition(selection) {
+    if (!selection || selection.isColumn || selection.start.line !== selection.end.line) {
+        return null;
+    }
+
+    const { start, end } = selection;
+    if (start.column === end.column) return null;
+
+    const targetElement = viewport.querySelector(`.line-text[data-line="${start.line}"]`);
+    if (!targetElement || targetElement.getAttribute('contenteditable') !== 'true') {
+        return null;
+    }
+
+    if (!setNativeSelectionRangeInElement(targetElement, start.column, end.column)) {
+        return null;
+    }
+
+    // 한 줄 선택 영역은 직접 지우지 말고 브라우저/IME의 네이티브 replace-composition에 맡긴다.
+    // compositionstart 도중 textContent를 바꾸고 캐럿을 다시 잡으면 WebView2/Chrome 한글 IME가
+    // 첫 음절을 `ㅍㅗ`처럼 호환 자모 두 글자로 확정하는 경우가 있다.
+    state.selection = null;
+    state.selectionAnchor = { line: start.line, column: start.column };
+    state.currentLine = start.line;
+    state.currentColumn = start.column + 1;
+    state.editingLine = start.line;
+    syncCustomSelectionClass();
+    clearCustomSelectionVisuals();
+    reportCursorAndSelection(targetElement);
+    return targetElement;
+}
+
 function replaceSelectionForCompositionStart(element, markPendingImeStart = false) {
     const selection = compositionSelectionRange();
     if (!selection || selection.isColumn) {
         return element;
+    }
+
+    const nativeCompositionElement = prepareSingleLineSelectionForNativeComposition(selection);
+    if (nativeCompositionElement) {
+        return nativeCompositionElement;
     }
 
     const { start, end } = selection;
