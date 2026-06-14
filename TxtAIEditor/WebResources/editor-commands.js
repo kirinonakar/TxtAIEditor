@@ -463,8 +463,65 @@ function offsetFromPointInElement(element, clientX, clientY, referenceRect = nul
     return bestOffset;
 }
 
+function commitDomLineBeforeCaretNavigation(element) {
+    if (!element || element.getAttribute?.('contenteditable') !== 'true') return false;
+
+    const lineNumber = Number(element.dataset.line || state.currentLine || 1);
+    const domText = lineTextFromElement(element);
+    if (state.cache.get(lineNumber) === domText) return false;
+
+    // 화살표키 이동은 queueRender/focusLine을 거치므로, 이동 전에 contenteditable DOM에만
+    // 남아 있는 최종 IME 문자열을 모델 캐시에 먼저 저장해야 한다. 그렇지 않으면 렌더링이
+    // 이전 캐시 값으로 돌아가면서 방금 입력한 한글이 사라질 수 있다.
+    commitLine(element);
+    return true;
+}
+
+function finishPendingImeBeforeCaretNavigation(element) {
+    if (!element || element.getAttribute?.('contenteditable') !== 'true') return false;
+
+    if (state.rangeComposition) {
+        const pending = state.rangeComposition;
+        const lineNumber = Number(pending.lineNumber || element.dataset.line || state.currentLine || 1);
+        const targetElement = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) || element;
+        const finalText = targetElement?.getAttribute?.('contenteditable') === 'true'
+            ? lineTextFromElement(targetElement)
+            : pending.beforeText;
+        const insertedText = changedTextBetween(pending.beforeText, finalText);
+
+        if (finishRangeComposition(targetElement, lineNumber, insertedText)) {
+            state.isComposing = false;
+            state.compositionLine = null;
+            clearPendingImeSelectionCollapse();
+            reportCursorAndSelection(targetElement);
+            return true;
+        }
+    }
+
+    if (state.columnComposition) {
+        const lineNumber = Number(element.dataset.line || state.compositionLine || state.currentLine || 1);
+        if (finishColumnComposition(element, lineNumber)) {
+            state.isComposing = false;
+            state.compositionLine = null;
+            clearPendingImeSelectionCollapse();
+            reportCursorAndSelection(element);
+            return true;
+        }
+    }
+
+    if (state.isComposing) {
+        commitLineForSave(element);
+        clearPendingImeSelectionCollapse();
+        return true;
+    }
+
+    commitDomLineBeforeCaretNavigation(element);
+    return false;
+}
+
 function moveCaretVertical(element, direction, extendSelection = false) {
     if (!element || element.getAttribute('contenteditable') !== 'true') return false;
+    if (finishPendingImeBeforeCaretNavigation(element)) return true;
 
     const lineNumber = Number(element.dataset.line || state.currentLine || 1);
     const text = lineTextFromElement(element);
@@ -1373,6 +1430,7 @@ function replaceSelectionForCompositionStart(element, markPendingImeStart = fals
 
 function moveCaretHorizontal(element, direction, extendSelection = false) {
     if (!element || element.getAttribute('contenteditable') !== 'true') return false;
+    if (finishPendingImeBeforeCaretNavigation(element)) return true;
 
     const lineNumber = Number(element.dataset.line || state.currentLine || 1);
     const text = lineTextFromElement(element);
