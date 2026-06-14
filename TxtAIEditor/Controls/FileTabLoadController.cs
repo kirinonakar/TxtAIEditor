@@ -64,7 +64,7 @@ namespace TxtAIEditor.Controls
             _showErrorMessage = showErrorMessage;
         }
 
-        public async Task LoadAsync(string filePath)
+        public async Task<OpenedTab?> LoadAsync(string filePath)
         {
             await _fileOpenSemaphore.WaitAsync();
             try
@@ -75,42 +75,47 @@ namespace TxtAIEditor.Controls
                     _currentRepoPathChanged(repoRoot);
                 }
 
-                if (FocusExistingTab(filePath))
+                var existingTab = FocusExistingTab(filePath);
+                if (existingTab != null)
                 {
                     QueueGitRefreshIfNeeded(repoRoot);
-                    return;
+                    return existingTab;
                 }
 
                 if (IsSupportedImageFile(filePath))
                 {
-                    _openImageTab(filePath);
+                    var tab = _openImageTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
-                    return;
+                    return tab;
                 }
 
                 if (IsPdfFile(filePath))
                 {
-                    _openPdfTab(filePath);
+                    var tab = _openPdfTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
-                    return;
+                    return tab;
                 }
 
                 if (IsReadOnlyDocumentFile(filePath))
                 {
-                    await OpenReadOnlyDocumentFileAsync(filePath, repoRoot);
+                    var tab = await OpenReadOnlyDocumentFileAsync(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
-                    return;
+                    return tab;
                 }
 
                 bool isEncrypted = await _secureNoteEncryptionService.IsSecureNoteFileAsync(filePath);
                 if (isEncrypted)
                 {
-                    await OpenEncryptedFileAsync(filePath, repoRoot);
-                    return;
+                    var tab = await OpenEncryptedFileAsync(filePath);
+                    if (tab != null)
+                    {
+                        QueueGitRefreshIfNeeded(repoRoot);
+                    }
+                    return tab;
                 }
 
                 var readResult = await LineArrayTextModel.LoadFromFileAsync(filePath, "Auto");
-                _openNewTab(new FileTabOpenRequest
+                var openedTab = _openNewTab(new FileTabOpenRequest
                 {
                     FilePath = filePath,
                     Content = "",
@@ -120,10 +125,12 @@ namespace TxtAIEditor.Controls
                 });
 
                 QueueGitRefreshIfNeeded(repoRoot);
+                return openedTab;
             }
             catch (Exception ex)
             {
                 _showErrorMessage("파일 로드 에러", ex.Message);
+                return null;
             }
             finally
             {
@@ -131,18 +138,18 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task OpenEncryptedFileAsync(string filePath, string? repoRoot)
+        private async Task<OpenedTab?> OpenEncryptedFileAsync(string filePath)
         {
             string? password = await _promptPasswordAsync(
                 _getString("EncryptionPasswordDialogTitle", "암호 입력"),
                 _getString("EncryptionOpenButton", "열기"));
             if (password == null)
             {
-                return;
+                return null;
             }
 
             string decryptedText = await _secureNoteEncryptionService.DecryptFileAsync(filePath, password);
-            _openNewTab(new FileTabOpenRequest
+            return _openNewTab(new FileTabOpenRequest
             {
                 FilePath = filePath,
                 Content = decryptedText,
@@ -152,17 +159,15 @@ namespace TxtAIEditor.Controls
                 IsEncrypted = true,
                 EncryptionPassword = password
             });
-
-            QueueGitRefreshIfNeeded(repoRoot);
         }
 
-        private bool FocusExistingTab(string filePath)
+        private OpenedTab? FocusExistingTab(string filePath)
         {
             var existingTab = _viewModel.Tabs.FirstOrDefault(t =>
                 string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
             if (existingTab == null)
             {
-                return false;
+                return null;
             }
 
             TabViewItem? tabItem = FindTabItem(_editorTabView, existingTab.Id);
@@ -185,7 +190,7 @@ namespace TxtAIEditor.Controls
                 _ = bridgeGroup.Bridge.FocusAsync();
             }
 
-            return true;
+            return existingTab;
         }
 
         private static TabViewItem? FindTabItem(TabView tabView, string tabId)
@@ -218,11 +223,11 @@ namespace TxtAIEditor.Controls
                    extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
         }
 
-        private async Task OpenReadOnlyDocumentFileAsync(string filePath, string? repoRoot)
+        private async Task<OpenedTab> OpenReadOnlyDocumentFileAsync(string filePath)
         {
             var documentService = new DocumentTextExtractionService();
             string extractedText = await documentService.ExtractTextAsync(filePath, 50_000_000);
-            _openNewTab(new FileTabOpenRequest
+            return _openNewTab(new FileTabOpenRequest
             {
                 FilePath = filePath,
                 Content = extractedText,

@@ -38,6 +38,7 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, int> _tabPreviewModes = new Dictionary<string, int>();
 
         private OpenedTab? _activeTabForPreview;
+        private OpenedTab? _scheduledTabForPreview;
         private string _mappedPreviewDocumentDirectory = string.Empty;
         private Task? _initializeTask;
         private bool _initializeAndRenderQueued;
@@ -94,6 +95,8 @@ namespace TxtAIEditor.Controls
             _previewPane.Visibility == Visibility.Visible &&
             (ReferenceEquals(_previewPane.RightTabs.SelectedItem, _previewPane.LivePreviewTabItem) ||
              _previewPane.RightTabs.SelectedItem == null);
+
+        private OpenedTab? PreviewTargetTab => _activeTabForPreview ?? _activeTabProvider();
 
         public async Task InitializeAsync()
         {
@@ -156,14 +159,21 @@ namespace TxtAIEditor.Controls
 
         public void Schedule(OpenedTab tab)
         {
+            var targetTab = PreviewTargetTab;
+            if (targetTab != null && !string.Equals(targetTab.Id, tab.Id, StringComparison.Ordinal))
+            {
+                return;
+            }
+
             _activeTabForPreview = tab;
+            _scheduledTabForPreview = tab;
             _previewDebounceTimer.Stop();
             _previewDebounceTimer.Start();
         }
 
         public void RenderActiveTab()
         {
-            var tab = _activeTabProvider() ?? _activeTabForPreview;
+            var tab = PreviewTargetTab;
             if (tab != null)
             {
                 Render(tab);
@@ -514,6 +524,16 @@ namespace TxtAIEditor.Controls
         {
             _mappedEditorDocumentDirectories.Remove(tabId);
             _tabPreviewModes.Remove(tabId);
+            if (string.Equals(_activeTabForPreview?.Id, tabId, StringComparison.Ordinal))
+            {
+                _activeTabForPreview = null;
+            }
+
+            if (string.Equals(_scheduledTabForPreview?.Id, tabId, StringComparison.Ordinal))
+            {
+                _scheduledTabForPreview = null;
+            }
+
             if (coreWebView != null)
             {
                 _mappedDocumentDirectoriesByWebView.Remove(coreWebView);
@@ -533,9 +553,11 @@ namespace TxtAIEditor.Controls
         private void OnPreviewDebounceTimerTick(object? sender, object e)
         {
             _previewDebounceTimer.Stop();
-            if (_activeTabForPreview != null)
+            var tab = _scheduledTabForPreview ?? PreviewTargetTab;
+            _scheduledTabForPreview = null;
+            if (tab != null)
             {
-                Render(_activeTabForPreview);
+                Render(tab);
             }
         }
 
@@ -554,7 +576,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var tab = _activeTabProvider();
+            var tab = PreviewTargetTab;
             if (tab != null)
             {
                 _tabPreviewModes[tab.Id] = PreviewModeCombo.SelectedIndex;
@@ -800,7 +822,7 @@ namespace TxtAIEditor.Controls
                 int requestId = root.TryGetProperty("requestId", out var requestIdProp) ? requestIdProp.GetInt32() : 0;
                 int startLine = root.TryGetProperty("startLine", out var startLineProp) ? startLineProp.GetInt32() : 1;
                 int count = root.TryGetProperty("count", out var countProp) ? countProp.GetInt32() : 80;
-                var activeTab = _activeTabProvider();
+                var activeTab = PreviewTargetTab;
                 IReadOnlyList<string> lines = Array.Empty<string>();
                 if (activeTab != null)
                 {

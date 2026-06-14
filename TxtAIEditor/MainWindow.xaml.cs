@@ -1126,12 +1126,36 @@ namespace TxtAIEditor
 
         internal async Task LoadFileIntoTabAsync(string filePath, int lineNumber)
         {
-            await _fileTabLoadController.LoadAsync(filePath);
+            var loadedTab = await _fileTabLoadController.LoadAsync(filePath);
+            if (loadedTab != null)
+            {
+                ActivateLoadedTab(loadedTab);
+            }
+
             if (lineNumber >= 1)
             {
                 await Task.Delay(250);
                 await _editorLineNavigationController.RevealFileLineAsync(filePath, lineNumber);
             }
+        }
+
+        private void ActivateLoadedTab(OpenedTab tab)
+        {
+            var tabView = GetTabViewForTab(tab);
+            var tabItem = tabView != null ? FindTabItem(tabView, tab.Id) : null;
+
+            if (tabView != null && tabItem != null)
+            {
+                EditorWorkspace.ActiveTabView = tabView;
+                if (!ReferenceEquals(tabView.SelectedItem, tabItem))
+                {
+                    tabView.SelectedItem = tabItem;
+                }
+
+                _tabSelectionController.QueueChanged(tabView, tabItem);
+            }
+
+            _livePreviewController.Render(tab);
         }
 
         private async void OnSaveFileClick(object sender, RoutedEventArgs e)
@@ -1671,14 +1695,20 @@ namespace TxtAIEditor
 
         private bool IsTabInTabView(TabView tabView, string tabId)
         {
+            return FindTabItem(tabView, tabId) != null;
+        }
+
+        private static TabViewItem? FindTabItem(TabView tabView, string tabId)
+        {
             foreach (var item in tabView.TabItems)
             {
                 if (item is TabViewItem tvi && string.Equals(tvi.Tag as string, tabId, StringComparison.Ordinal))
                 {
-                    return true;
+                    return tvi;
                 }
             }
-            return false;
+
+            return null;
         }
 
         private bool IsTabOpen(OpenedTab tab)
