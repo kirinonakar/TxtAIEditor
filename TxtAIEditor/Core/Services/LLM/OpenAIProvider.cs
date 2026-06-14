@@ -15,13 +15,15 @@ namespace TxtAIEditor.Core.Services.LLM
     {
         private readonly ILocalizationService _localizationService;
         private readonly bool _isOAuth;
+        private readonly string _thinkingLevel;
 
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public OpenAIProvider(ILocalizationService localizationService, bool isOAuth = false)
+        public OpenAIProvider(ILocalizationService localizationService, bool isOAuth = false, string thinkingLevel = "")
         {
             _localizationService = localizationService;
             _isOAuth = isOAuth;
+            _thinkingLevel = thinkingLevel ?? "";
         }
 
         public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)

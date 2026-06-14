@@ -29,6 +29,7 @@ namespace TxtAIEditor.Core.Services.LLM
             "low" => 1024,
             "medium" => 4096,
             "high" => 16384,
+            "xhigh" => 32768,
             _ => 0
         };
 

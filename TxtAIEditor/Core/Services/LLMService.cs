@@ -251,8 +251,8 @@ namespace TxtAIEditor.Core.Services
             ILLMProvider provider = providerName.ToLower() switch
             {
                 "gemini" => new GeminiProvider(_localizationService, settings.LlmAgentVerbose),
-                "openai oauth" => new OpenAIProvider(_localizationService, isOAuth: true),
-                "openaioauth" => new OpenAIProvider(_localizationService, isOAuth: true),
+                "openai oauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel),
+                "openaioauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel),
                 "openrouter" => new OpenRouterProvider(_localizationService),
                 "lm studio" => new LMStudioProvider(_localizationService),
                 "lmstudio" => new LMStudioProvider(_localizationService),
@@ -262,7 +262,7 @@ namespace TxtAIEditor.Core.Services
                 "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
                 "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
                 "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
-                _ => new OpenAIProvider(_localizationService)
+                _ => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel)
             };
 
             try

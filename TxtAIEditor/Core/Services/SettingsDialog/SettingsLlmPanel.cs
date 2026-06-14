@@ -98,6 +98,7 @@ namespace TxtAIEditor.Core.Services
                 1 => "low",
                 2 => "medium",
                 3 => "high",
+                4 => "xhigh",
                 _ => ""
             };
             settings.LlmSourceLanguage = _sourceLangCombo.SelectedIndex switch
@@ -409,11 +410,13 @@ namespace TxtAIEditor.Core.Services
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelLow", "낮음 (Low)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelMedium", "중간 (Medium)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelHigh", "높음 (High)"));
+            comboBox.Items.Add(getString("SettingsLlmThinkingLevelXHigh", "최고 (X-High)"));
             comboBox.SelectedIndex = settings.LlmThinkingLevel.ToLowerInvariant() switch
             {
                 "low" => 1,
                 "medium" => 2,
                 "high" => 3,
+                "xhigh" => 4,
                 _ => 0
             };
             return comboBox;

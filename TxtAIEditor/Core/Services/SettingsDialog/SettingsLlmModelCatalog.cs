@@ -36,7 +36,10 @@ namespace TxtAIEditor.Core.Services
         public static bool SupportsThinkingLevel(string provider)
         {
             return provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase) ||
-                provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase);
+                provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool IsKnownDefaultEndpoint(string endpoint)

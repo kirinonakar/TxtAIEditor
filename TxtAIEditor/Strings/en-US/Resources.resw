@@ -398,6 +398,9 @@
   <data name="SettingsLlmThinkingLevelHigh" xml:space="preserve">
     <value>High</value>
   </data>
+  <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
+    <value>X-High</value>
+  </data>
   <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
     <value>Load OpenCode Go Models</value>
   </data>
