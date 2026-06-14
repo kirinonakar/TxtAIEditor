@@ -49,6 +49,7 @@ namespace TxtAIEditor.Controls
         private bool _pendingForceSelectPreviewTab;
         private int _renderAfterLayoutAttempts;
         private bool _updatingPreviewModeSelection;
+        private bool _isPreviewReady;
 
         public LivePreviewController(
             RightSidebarPane previewPane,
@@ -126,6 +127,7 @@ namespace TxtAIEditor.Controls
         {
             try
             {
+                _isPreviewReady = false;
                 var previewWebView = PreviewWebView;
                 previewWebView.DefaultBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
                 var env = await MonacoBridge.GetSharedEnvironmentAsync();
@@ -279,6 +281,11 @@ namespace TxtAIEditor.Controls
                 if (coreWebView == null)
                 {
                     EnsureVisiblePreviewRendered();
+                    return;
+                }
+
+                if (!_isPreviewReady)
+                {
                     return;
                 }
 
@@ -932,6 +939,13 @@ namespace TxtAIEditor.Controls
                 }
 
                 string type = typeProp.GetString() ?? string.Empty;
+                if (string.Equals(type, "previewReady", StringComparison.Ordinal))
+                {
+                    _isPreviewReady = true;
+                    sender.DispatcherQueue.TryEnqueue(() => RenderActiveTab());
+                    return;
+                }
+
                 if (string.Equals(type, "shortcut", StringComparison.Ordinal))
                 {
                     if (root.TryGetProperty("name", out var nameProp))
