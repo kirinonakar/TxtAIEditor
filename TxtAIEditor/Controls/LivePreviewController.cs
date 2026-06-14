@@ -41,6 +41,7 @@ namespace TxtAIEditor.Controls
         private string _mappedPreviewDocumentDirectory = string.Empty;
         private Task? _initializeTask;
         private bool _initializeAndRenderQueued;
+        private bool _updatingPreviewModeSelection;
 
         public LivePreviewController(
             RightSidebarPane previewPane,
@@ -162,7 +163,7 @@ namespace TxtAIEditor.Controls
 
         public void RenderActiveTab()
         {
-            var tab = _activeTabProvider();
+            var tab = _activeTabProvider() ?? _activeTabForPreview;
             if (tab != null)
             {
                 Render(tab);
@@ -186,6 +187,7 @@ namespace TxtAIEditor.Controls
                     if (PreviewWebViewIfCreated?.CoreWebView2 != null && IsLivePreviewVisible)
                     {
                         RenderActiveTab();
+                        QueueRenderActiveTabAfterLayout();
                     }
                 }
                 catch (Exception ex)
@@ -205,8 +207,25 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private void QueueRenderActiveTabAfterLayout()
+        {
+            var dispatcher = _previewPane.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    if (IsLivePreviewVisible)
+                    {
+                        RenderActiveTab();
+                    }
+                }) != true)
+            {
+                RenderActiveTab();
+            }
+        }
+
         public void Render(OpenedTab tab)
         {
+            _activeTabForPreview = tab;
+
             try
             {
                 if (!IsLivePreviewVisible)
@@ -251,11 +270,18 @@ namespace TxtAIEditor.Controls
 
                 if (PreviewModeCombo.SelectedIndex != selectedMode)
                 {
-                    PreviewModeCombo.SelectedIndex = selectedMode;
-                    return;
+                    _updatingPreviewModeSelection = true;
+                    try
+                    {
+                        PreviewModeCombo.SelectedIndex = selectedMode;
+                    }
+                    finally
+                    {
+                        _updatingPreviewModeSelection = false;
+                    }
                 }
 
-                string mode = PreviewModeCombo.SelectedIndex switch
+                string mode = selectedMode switch
                 {
                     1 => "html",
                     2 => "latex",
@@ -523,6 +549,11 @@ namespace TxtAIEditor.Controls
 
         private void OnPreviewModeSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_updatingPreviewModeSelection)
+            {
+                return;
+            }
+
             var tab = _activeTabProvider();
             if (tab != null)
             {
