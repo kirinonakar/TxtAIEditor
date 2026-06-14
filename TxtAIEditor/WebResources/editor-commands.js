@@ -1322,7 +1322,7 @@ function finishRangeComposition(element, lineNumber, compositionText = '') {
     return true;
 }
 
-function replaceSelectionForCompositionStart(element, markPendingImeStart = false) {
+function replaceSelectionForCompositionStart(element, markPendingImeStart = true) {
     const selection = compositionSelectionRange();
     if (!selection || selection.isColumn) {
         return element;
@@ -1333,10 +1333,12 @@ function replaceSelectionForCompositionStart(element, markPendingImeStart = fals
         return nativeCompositionElement;
     }
 
-    const rangeCompositionElement = beginRangeCompositionForSelection(element, selection);
-    if (rangeCompositionElement) {
-        return rangeCompositionElement;
-    }
+    // 여러 줄 선택 영역도 한글 조합이 끝날 때까지 삭제를 미루지 않는다.
+    // 이전 방식은 IME 임시 조합 위치만 만들고 compositionend/화살표 이동 때
+    // 원래 선택 영역을 교체했기 때문에, 마우스로 다른 곳을 클릭하면 선택 영역이
+    // 그대로 남거나 다음 caret 이동 시점에야 뒤늦게 삭제되는 문제가 있었다.
+    // 여기서 먼저 모델과 현재 렌더된 행을 선택 시작 위치로 접고, 브라우저 IME는
+    // 접힌 caret에 조합 문자열을 네이티브로 입력하게 둔다.
 
     const { start, end } = selection;
     const prefix = (state.cache.get(start.line) ?? '').slice(0, start.column);
