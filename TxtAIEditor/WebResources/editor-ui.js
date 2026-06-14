@@ -53,6 +53,7 @@ import {
     commitLine,
     compositionSelectionRange,
     finishColumnComposition,
+    finishRangeComposition,
     flushPendingEditForSave,
     focusLine,
     getCaretOffset,
@@ -416,7 +417,9 @@ viewport.addEventListener('input', event => {
             syncCustomSelectionClass();
         }
         commitLine(element);
-        triggerAutocomplete(element);
+        if (!state.isComposing && !state.rangeComposition) {
+            triggerAutocomplete(element);
+        }
     }
 });
 
@@ -489,6 +492,10 @@ viewport.addEventListener('compositionend', event => {
     state.isComposing = false;
     clearPendingImeSelectionCollapse();
     state.compositionLine = null;
+
+    if (finishRangeComposition(element, lineNumber, event.data || '')) {
+        return;
+    }
 
     if (finishColumnComposition(element, lineNumber)) {
         return;

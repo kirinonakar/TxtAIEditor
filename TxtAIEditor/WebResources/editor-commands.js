@@ -552,7 +552,10 @@ function commitLine(element) {
     const isInlineLivePreviewActiveLine = state.inlineLivePreviewEnabled &&
         state.inlineLivePreviewSourceLine === lineNumber;
 
-    if (isComposing && state.columnComposition) {
+    if (isComposing && state.rangeComposition) {
+        // 다중 줄 선택 IME 조합 중에는 모델/DOM 재렌더를 건드리지 않는다.
+        // 최종 조합 문자열은 compositionend에서 원래 선택 영역에 한 번에 반영한다.
+    } else if (isComposing && state.columnComposition) {
         updateColumnCompositionPreview(element);
     } else {
         state.cache.set(lineNumber, text);
@@ -565,12 +568,12 @@ function commitLine(element) {
     state.currentColumn = getCaretOffset(element) + 1;
 
     if (isComposing) {
-        if (!state.columnComposition) {
+        if (!state.columnComposition && !state.rangeComposition) {
             post({ type: 'lineChanged', lineNumber, text, isComposing: true });
             post({ type: 'contentChanged', isComposing: true });
         }
         reportCursorAndSelection(element);
-        if (state.wordWrap) {
+        if (state.wordWrap && !state.rangeComposition) {
             measureRenderedRows(false);
         }
         return;
@@ -595,6 +598,16 @@ function commitLineForSave(element) {
     }
 
     const lineNumber = Number(element.dataset.line || state.compositionLine || state.currentLine || 1);
+
+    if (state.rangeComposition && finishRangeComposition(element, lineNumber)) {
+        state.isComposing = false;
+        state.compositionLine = null;
+        reportCursorAndSelection(element);
+        if (state.wordWrap) {
+            measureRenderedRows(false);
+        }
+        return true;
+    }
 
     if (state.columnComposition && finishColumnComposition(element, lineNumber)) {
         state.isComposing = false;
@@ -1121,6 +1134,137 @@ function prepareSingleLineSelectionForNativeComposition(selection) {
     return targetElement;
 }
 
+function rangeCompositionTarget(element, selection) {
+    if (!selection || selection.isColumn || selection.start.line === selection.end.line) {
+        return null;
+    }
+
+    const startElement = viewport.querySelector(`.line-text[data-line="${selection.start.line}"]`);
+    if (startElement && startElement.getAttribute('contenteditable') === 'true') {
+        const textLength = lineTextFromElement(startElement).length;
+        return {
+            element: startElement,
+            line: selection.start.line,
+            column: Math.max(0, Math.min(selection.start.column, textLength))
+        };
+    }
+
+    const incomingLine = Number(element?.dataset?.line || 0);
+    if (element && element.getAttribute?.('contenteditable') === 'true') {
+        const textLength = lineTextFromElement(element).length;
+        const fallbackColumn = incomingLine === selection.start.line
+            ? selection.start.column
+            : Math.max(0, Number(state.currentColumn || 1) - 1);
+        return {
+            element,
+            line: incomingLine || state.currentLine || selection.start.line,
+            column: Math.max(0, Math.min(fallbackColumn, textLength))
+        };
+    }
+
+    const active = activeEditableElement();
+    if (active && active.getAttribute?.('contenteditable') === 'true') {
+        const line = Number(active.dataset.line || state.currentLine || selection.start.line);
+        const textLength = lineTextFromElement(active).length;
+        const fallbackColumn = line === selection.start.line
+            ? selection.start.column
+            : Math.max(0, Number(state.currentColumn || 1) - 1);
+        return {
+            element: active,
+            line,
+            column: Math.max(0, Math.min(fallbackColumn, textLength))
+        };
+    }
+
+    return null;
+}
+
+function beginRangeCompositionForSelection(element, selection) {
+    const normalized = normalizeSelection(selection);
+    if (!normalized || normalized.isColumn || normalized.start.line === normalized.end.line) {
+        state.rangeComposition = null;
+        return null;
+    }
+
+    const target = rangeCompositionTarget(element, normalized);
+    if (!target || !target.element || target.element.getAttribute('contenteditable') !== 'true') {
+        state.rangeComposition = null;
+        return null;
+    }
+
+    // 여러 줄 선택 영역은 contenteditable 안의 네이티브 DOM selection으로 표현할 수 없다.
+    // 그래서 compositionstart 직전에 선택 영역을 직접 삭제하고 줄을 병합하면 한글 IME가 첫 음절을
+    // `ㅍㅗ`처럼 자소 단위로 확정할 수 있다. 선택 삭제는 compositionend까지 미루고,
+    // 여기서는 IME가 조합 문자열만 안전하게 만들 수 있는 임시 조합 위치만 준비한다.
+    makeEditablePlainText(target.element, target.column);
+    setCaret(target.element, target.column);
+
+    state.rangeComposition = {
+        selection: cloneEditorSelection(normalized),
+        lineNumber: target.line,
+        beforeText: lineTextFromElement(target.element),
+        caretColumn: target.column,
+        startedAt: performance.now()
+    };
+
+    state.selection = null;
+    state.selectionAnchor = { line: target.line, column: target.column };
+    state.currentLine = target.line;
+    state.currentColumn = target.column + 1;
+    state.editingLine = target.line;
+    syncCustomSelectionClass();
+    clearCustomSelectionVisuals();
+    reportCursorAndSelection(target.element);
+    return target.element;
+}
+
+function finishRangeComposition(element, lineNumber, compositionText = '') {
+    const pending = state.rangeComposition;
+    if (!pending || !pending.selection) {
+        state.rangeComposition = null;
+        return false;
+    }
+
+    const targetLine = Number(lineNumber || element?.dataset?.line || pending.lineNumber || state.currentLine || 1);
+    let targetElement = targetLine === pending.lineNumber && element?.getAttribute?.('contenteditable') === 'true'
+        ? element
+        : viewport.querySelector(`.line-text[data-line="${pending.lineNumber}"]`);
+
+    if (!targetElement || targetElement.getAttribute?.('contenteditable') !== 'true') {
+        targetElement = element && element.getAttribute?.('contenteditable') === 'true' ? element : null;
+    }
+
+    const finalText = targetElement ? lineTextFromElement(targetElement) : pending.beforeText;
+    let insertedText = String(compositionText || '');
+    if (!insertedText && finalText !== pending.beforeText) {
+        insertedText = changedTextBetween(pending.beforeText, finalText);
+    }
+
+    const originalSelection = cloneEditorSelection(pending.selection);
+    state.rangeComposition = null;
+
+    // 임시 조합 위치에 들어간 텍스트를 원래 줄 상태로 되돌린 뒤,
+    // 원래 다중 줄 선택 영역을 최종 조합 문자열로 한 번에 교체한다.
+    state.cache.set(pending.lineNumber, pending.beforeText);
+    if (targetElement && targetElement.getAttribute?.('contenteditable') === 'true') {
+        targetElement.textContent = pending.beforeText;
+        const restoreColumn = Math.max(0, Math.min(pending.caretColumn, pending.beforeText.length));
+        setCaret(targetElement, restoreColumn);
+    }
+
+    if (insertedText) {
+        replaceSelectionWith(originalSelection, insertedText);
+    } else {
+        state.selection = originalSelection;
+        state.selectionAnchor = originalSelection.start;
+        syncCustomSelectionClass();
+        queueRender(true);
+        setTimeout(() => focusLine(originalSelection.start.line, originalSelection.start.column), 0);
+    }
+
+    return true;
+}
+
 function replaceSelectionForCompositionStart(element, markPendingImeStart = false) {
     const selection = compositionSelectionRange();
     if (!selection || selection.isColumn) {
@@ -1130,6 +1274,11 @@ function replaceSelectionForCompositionStart(element, markPendingImeStart = fals
     const nativeCompositionElement = prepareSingleLineSelectionForNativeComposition(selection);
     if (nativeCompositionElement) {
         return nativeCompositionElement;
+    }
+
+    const rangeCompositionElement = beginRangeCompositionForSelection(element, selection);
+    if (rangeCompositionElement) {
+        return rangeCompositionElement;
     }
 
     const { start, end } = selection;
@@ -2016,6 +2165,7 @@ export {
     cutSelectionToClipboard,
     deleteSelectionOrForward,
     finishColumnComposition,
+    finishRangeComposition,
     flushPendingEditForSave,
     focusLine,
     getCaretOffset,
