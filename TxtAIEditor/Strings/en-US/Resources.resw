@@ -1906,6 +1906,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentVerboseEditTabOnly" xml:space="preserve">
     <value>Edited tab: {0}</value>
   </data>
+  <data name="AgentVerboseOpenFileOnly" xml:space="preserve">
+    <value>Opened file: {0}</value>
+  </data>
+  <data name="AgentVerboseOpenFileExistingOnly" xml:space="preserve">
+    <value>Activated already-open file: {0}</value>
+  </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
     <value>Modified Files (Click to compare)</value>
   </data>

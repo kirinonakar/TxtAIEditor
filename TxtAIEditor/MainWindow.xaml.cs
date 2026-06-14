@@ -703,7 +703,7 @@ namespace TxtAIEditor
                 path => _gitService.FindRepositoryRoot(path) != null,
                 _agentFileWorkflowController.OpenDiffViewAsync,
                 _agentFileWorkflowController.HandleFileModifiedAsync,
-                openFileInEditorAsync: LoadFileIntoTabAsync,
+                openFileInEditorAsync: LoadFileIntoTabForAgentAsync,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); },
                 revertTabOrFileAsync: _agentFileWorkflowController.RevertTabOrFileAsync,
@@ -1137,6 +1137,25 @@ namespace TxtAIEditor
                 await Task.Delay(250);
                 await _editorLineNavigationController.RevealFileLineAsync(filePath, lineNumber);
             }
+        }
+
+        internal async Task<AgentOpenFileResult> LoadFileIntoTabForAgentAsync(string filePath)
+        {
+            var loadResult = await _fileTabLoadController.LoadWithResultAsync(filePath);
+            if (!loadResult.Success || loadResult.Tab == null)
+            {
+                return AgentOpenFileResult.Failed(
+                    filePath,
+                    string.IsNullOrWhiteSpace(loadResult.ErrorMessage)
+                        ? "file could not be opened in the editor."
+                        : loadResult.ErrorMessage);
+            }
+
+            ActivateLoadedTab(loadResult.Tab);
+
+            return loadResult.ActivatedExistingTab
+                ? AgentOpenFileResult.ActivatedExisting(loadResult.FullPath)
+                : AgentOpenFileResult.Opened(loadResult.FullPath);
         }
 
         private void ActivateLoadedTab(OpenedTab tab)

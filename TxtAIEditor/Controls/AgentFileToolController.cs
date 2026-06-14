@@ -16,7 +16,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<bool> _isRunningProvider;
         private readonly Func<string, string, string> _getString;
-        private readonly Func<string, Task>? _openFileInEditorAsync;
+        private readonly Func<string, Task<AgentOpenFileResult>>? _openFileInEditorAsync;
 
         private string? _currentRunLastFilePath;
         private bool _currentRunRestrictEditsToSelection;
@@ -27,7 +27,7 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> activeTabProvider,
             Func<bool> isRunningProvider,
             Func<string, string, string> getString,
-            Func<string, Task>? openFileInEditorAsync)
+            Func<string, Task<AgentOpenFileResult>>? openFileInEditorAsync)
         {
             _fileTools = fileTools;
             _selectionContextController = selectionContextController;
@@ -379,7 +379,24 @@ namespace TxtAIEditor.Controls
                 return "create_file failed: path is empty. Provide the exact output file path requested by the user.";
             }
 
-            return await _fileTools.CreateFileAsync(path, GetStringArgument(arguments, "content"));
+            string result = await _fileTools.CreateFileAsync(path, GetStringArgument(arguments, "content"));
+            if (!GetBoolArgument(arguments, "openAfterCreate",
+                    GetBoolArgument(arguments, "open_after_create", false)) ||
+                !IsSuccessfulToolResult(result))
+            {
+                return result;
+            }
+
+            string createdPath = ExtractCreatedPath(result);
+            if (string.IsNullOrWhiteSpace(createdPath))
+            {
+                return AppendToolStatusMessage(
+                    result,
+                    "open_file skipped: created file path could not be determined from create_file result.");
+            }
+
+            string openResult = await OpenFileByPathAsync(createdPath);
+            return AppendToolStatusMessage(result, openResult);
         }
 
         public async Task<string> OpenFileAsync(JsonElement arguments)
@@ -390,6 +407,11 @@ namespace TxtAIEditor.Controls
                 return "open_file failed: path is empty. Provide the file path you want to open.";
             }
 
+            return await OpenFileByPathAsync(path);
+        }
+
+        private async Task<string> OpenFileByPathAsync(string path)
+        {
             string fullPath = path;
             if (!Path.IsPathRooted(path))
             {
@@ -407,11 +429,46 @@ namespace TxtAIEditor.Controls
 
             if (_openFileInEditorAsync != null)
             {
-                await _openFileInEditorAsync(fullPath);
-                return $"opened: {path}";
+                AgentOpenFileResult openResult = await _openFileInEditorAsync(fullPath);
+                if (!openResult.Success)
+                {
+                    string message = string.IsNullOrWhiteSpace(openResult.ErrorMessage)
+                        ? "unknown error"
+                        : openResult.ErrorMessage;
+                    return $"open_file failed: {path}: {message}";
+                }
+
+                return openResult.ActivatedExistingTab
+                    ? $"open_file activated_existing: {path}"
+                    : $"open_file opened: {path}";
             }
 
             return "open_file failed: opening files in editor is not available.";
+        }
+
+        private static string ExtractCreatedPath(string result)
+        {
+            const string createdPrefix = "created:";
+            using var reader = new StringReader(result ?? string.Empty);
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                if (!line.StartsWith(createdPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string path = line.Substring(createdPrefix.Length).Trim();
+                int noteIndex = path.IndexOf(" (Note:", StringComparison.OrdinalIgnoreCase);
+                if (noteIndex >= 0)
+                {
+                    path = path.Substring(0, noteIndex).Trim();
+                }
+
+                return path;
+            }
+
+            return string.Empty;
         }
 
         public async Task<string> OverwriteFileAsync(JsonElement arguments)

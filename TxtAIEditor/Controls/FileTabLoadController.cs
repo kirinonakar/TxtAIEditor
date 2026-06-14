@@ -66,6 +66,12 @@ namespace TxtAIEditor.Controls
 
         public async Task<OpenedTab?> LoadAsync(string filePath)
         {
+            var result = await LoadWithResultAsync(filePath);
+            return result.Tab;
+        }
+
+        public async Task<FileTabLoadResult> LoadWithResultAsync(string filePath)
+        {
             await _fileOpenSemaphore.WaitAsync();
             try
             {
@@ -79,28 +85,28 @@ namespace TxtAIEditor.Controls
                 if (existingTab != null)
                 {
                     QueueGitRefreshIfNeeded(repoRoot);
-                    return existingTab;
+                    return FileTabLoadResult.ActivatedExisting(existingTab);
                 }
 
                 if (IsSupportedImageFile(filePath))
                 {
                     var tab = _openImageTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
-                    return tab;
+                    return FileTabLoadResult.Opened(tab);
                 }
 
                 if (IsPdfFile(filePath))
                 {
                     var tab = _openPdfTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
-                    return tab;
+                    return FileTabLoadResult.Opened(tab);
                 }
 
                 if (IsReadOnlyDocumentFile(filePath))
                 {
                     var tab = await OpenReadOnlyDocumentFileAsync(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
-                    return tab;
+                    return FileTabLoadResult.Opened(tab);
                 }
 
                 bool isEncrypted = await _secureNoteEncryptionService.IsSecureNoteFileAsync(filePath);
@@ -110,8 +116,10 @@ namespace TxtAIEditor.Controls
                     if (tab != null)
                     {
                         QueueGitRefreshIfNeeded(repoRoot);
+                        return FileTabLoadResult.Opened(tab);
                     }
-                    return tab;
+
+                    return FileTabLoadResult.Failed(filePath, "opening encrypted file was cancelled.");
                 }
 
                 var readResult = await LineArrayTextModel.LoadFromFileAsync(filePath, "Auto");
@@ -125,12 +133,12 @@ namespace TxtAIEditor.Controls
                 });
 
                 QueueGitRefreshIfNeeded(repoRoot);
-                return openedTab;
+                return FileTabLoadResult.Opened(openedTab);
             }
             catch (Exception ex)
             {
                 _showErrorMessage("파일 로드 에러", ex.Message);
-                return null;
+                return FileTabLoadResult.Failed(filePath, ex.Message);
             }
             finally
             {
@@ -257,5 +265,42 @@ namespace TxtAIEditor.Controls
         public ITextModel? TextModel { get; set; }
         public bool IsEncrypted { get; set; }
         public string? EncryptionPassword { get; set; }
+    }
+
+    public sealed class FileTabLoadResult
+    {
+        public OpenedTab? Tab { get; init; }
+        public bool Success => Tab != null;
+        public bool ActivatedExistingTab { get; init; }
+        public string FullPath { get; init; } = string.Empty;
+        public string? ErrorMessage { get; init; }
+
+        public static FileTabLoadResult Opened(OpenedTab tab)
+        {
+            return new FileTabLoadResult
+            {
+                Tab = tab,
+                FullPath = tab.FilePath ?? string.Empty
+            };
+        }
+
+        public static FileTabLoadResult ActivatedExisting(OpenedTab tab)
+        {
+            return new FileTabLoadResult
+            {
+                Tab = tab,
+                ActivatedExistingTab = true,
+                FullPath = tab.FilePath ?? string.Empty
+            };
+        }
+
+        public static FileTabLoadResult Failed(string fullPath, string errorMessage)
+        {
+            return new FileTabLoadResult
+            {
+                FullPath = fullPath,
+                ErrorMessage = errorMessage
+            };
+        }
     }
 }

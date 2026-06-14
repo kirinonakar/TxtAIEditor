@@ -31,7 +31,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<object> _initializePickerWindow;
         private readonly Func<string, bool> _isGitRepoProvider;
         private readonly Func<string, Task>? _fileModifiedAsync;
-        private readonly Func<string, Task>? _openFileInEditorAsync;
+        private readonly Func<string, Task<AgentOpenFileResult>>? _openFileInEditorAsync;
         private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
@@ -78,7 +78,7 @@ namespace TxtAIEditor.Controls
             Func<string, bool> isGitRepoProvider,
             Func<AgentFileEditPreview, Task> openDiffViewAsync,
             Func<string, Task>? fileModifiedAsync = null,
-            Func<string, Task>? openFileInEditorAsync = null,
+            Func<string, Task<AgentOpenFileResult>>? openFileInEditorAsync = null,
             Action? beforeDialog = null,
             Action? afterDialog = null,
             Func<string, string, bool, Task>? revertTabOrFileAsync = null,
@@ -792,7 +792,13 @@ namespace TxtAIEditor.Controls
                         else if (normalizedName == "open_file")
                         {
                             string path = GetStringArgument(arguments, "path");
-                            displayResult = string.Format(_getString("AgentVerboseOpenFileOnly", "파일을 열었습니다: {0}"), path);
+                            string resourceKey = toolResult.StartsWith("open_file activated_existing:", StringComparison.OrdinalIgnoreCase)
+                                ? "AgentVerboseOpenFileExistingOnly"
+                                : "AgentVerboseOpenFileOnly";
+                            string fallback = toolResult.StartsWith("open_file activated_existing:", StringComparison.OrdinalIgnoreCase)
+                                ? "이미 열려 있던 파일을 활성화했습니다: {0}"
+                                : "파일을 열었습니다: {0}";
+                            displayResult = string.Format(_getString(resourceKey, fallback), path);
                         }
                         else if (normalizedName == "save_tab")
                         {

@@ -22,6 +22,42 @@ namespace TxtAIEditor.Controls
         public LlmMessageAttachment? Attachment { get; init; }
     }
 
+    public sealed class AgentOpenFileResult
+    {
+        public string FullPath { get; init; } = string.Empty;
+        public bool Success { get; init; }
+        public bool ActivatedExistingTab { get; init; }
+        public string? ErrorMessage { get; init; }
+
+        public static AgentOpenFileResult Opened(string fullPath)
+        {
+            return new AgentOpenFileResult
+            {
+                FullPath = fullPath,
+                Success = true
+            };
+        }
+
+        public static AgentOpenFileResult ActivatedExisting(string fullPath)
+        {
+            return new AgentOpenFileResult
+            {
+                FullPath = fullPath,
+                Success = true,
+                ActivatedExistingTab = true
+            };
+        }
+
+        public static AgentOpenFileResult Failed(string fullPath, string errorMessage)
+        {
+            return new AgentOpenFileResult
+            {
+                FullPath = fullPath,
+                ErrorMessage = errorMessage
+            };
+        }
+    }
+
     public sealed class AgentFileToolService
     {
         private readonly AgentWorkspaceFileResolver _workspace;
