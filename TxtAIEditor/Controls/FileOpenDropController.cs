@@ -145,6 +145,7 @@ namespace TxtAIEditor.Controls
         {
             e.Handled = true;
             e.AcceptedOperation = DataPackageOperation.Copy;
+            _dragOverlay.Visibility = Visibility.Collapsed;
 
             if (!e.DataView.Contains(StandardDataFormats.StorageItems))
             {
@@ -180,6 +181,10 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 _showError("드래그 앤 드롭 오류", ex.Message);
+            }
+            finally
+            {
+                _dragOverlay.Visibility = Visibility.Collapsed;
             }
         }
 

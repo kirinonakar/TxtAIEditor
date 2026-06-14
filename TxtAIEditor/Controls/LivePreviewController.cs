@@ -93,8 +93,7 @@ namespace TxtAIEditor.Controls
 
         private bool IsLivePreviewVisible =>
             _previewPane.Visibility == Visibility.Visible &&
-            (ReferenceEquals(_previewPane.RightTabs.SelectedItem, _previewPane.LivePreviewTabItem) ||
-             _previewPane.RightTabs.SelectedItem == null);
+            ReferenceEquals(_previewPane.RightTabs.SelectedItem, _previewPane.LivePreviewTabItem);
 
         private OpenedTab? PreviewTargetTab => _activeTabForPreview ?? _activeTabProvider();
 
@@ -182,7 +181,7 @@ namespace TxtAIEditor.Controls
 
         public void EnsureVisiblePreviewRendered()
         {
-            if (_initializeAndRenderQueued || !IsLivePreviewVisible)
+            if (_initializeAndRenderQueued || !EnsureLivePreviewVisibleForRender())
             {
                 return;
             }
@@ -194,7 +193,7 @@ namespace TxtAIEditor.Controls
                 try
                 {
                     await InitializeAsync();
-                    if (PreviewWebViewIfCreated?.CoreWebView2 != null && IsLivePreviewVisible)
+                    if (PreviewWebViewIfCreated?.CoreWebView2 != null && EnsureLivePreviewVisibleForRender())
                     {
                         RenderActiveTab();
                         QueueRenderActiveTabAfterLayout();
@@ -238,7 +237,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                if (!IsLivePreviewVisible)
+                if (!EnsureLivePreviewVisibleForRender())
                 {
                     return;
                 }
@@ -567,6 +566,21 @@ namespace TxtAIEditor.Controls
             {
                 EnsureVisiblePreviewRendered();
             }
+        }
+
+        private bool EnsureLivePreviewVisibleForRender()
+        {
+            if (_previewPane.Visibility != Visibility.Visible)
+            {
+                return false;
+            }
+
+            if (_previewPane.RightTabs.SelectedItem == null)
+            {
+                _previewPane.RightTabs.SelectedItem = _previewPane.LivePreviewTabItem;
+            }
+
+            return ReferenceEquals(_previewPane.RightTabs.SelectedItem, _previewPane.LivePreviewTabItem);
         }
 
         private void OnPreviewModeSelectionChanged(object sender, SelectionChangedEventArgs e)
