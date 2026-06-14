@@ -519,6 +519,11 @@ body.csv-table-mode:not(.wrap-enabled) .line-row.csv-row {
     background: transparent;
 }
 
+.inline-live-preview-enabled .line-row.live-preview-empty,
+.inline-live-preview-enabled .line-row.live-preview-empty .line-text {
+    min-height: var(--line-height);
+}
+
 .inline-live-preview-enabled .line-row.live-preview-source-block {
     contain: layout style;
 }

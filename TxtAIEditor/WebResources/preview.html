@@ -18,7 +18,7 @@
             --border: #3e3e3e;
             --font: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
             --row-height: 24px;
-            --empty-row-height: 12px;
+            --empty-row-height: var(--row-height);
         }
 
         * {
@@ -420,6 +420,8 @@
         let suppressPreviewScrollEvents = false;
         let scrollSuppressionToken = 0;
         let lastSetScrollTop = -1;
+        let lastPreviewUserScrollAt = 0;
+        let lastPreviewScrollPostedAt = 0;
 
         function suppressPreviewScrollUntilNextFrame() {
             const token = ++scrollSuppressionToken;
@@ -975,9 +977,11 @@
 
                 // Skip scroll position correction during active editor typing to avoid jump/jitter.
                 // The editor will shortly send a syncScroll message to set the correct scroll position.
-                const isRecentEditorUpdate = (Date.now() - state.lastUpdateFromEditor) < 500;
+                const now = Date.now();
+                const isRecentEditorUpdate = (now - state.lastUpdateFromEditor) < 500;
+                const isActivePreviewScroll = (now - lastPreviewUserScrollAt) < 160;
 
-                if (!isRecentEditorUpdate) {
+                if (!isRecentEditorUpdate && !isActivePreviewScroll) {
                     // Restore scroll position relative to anchor line
                     const newAnchorTop = rowTop(anchorLine);
                     const corrected = newAnchorTop + anchorOffset;
@@ -1066,6 +1070,10 @@
         }
 
         scroll.addEventListener('scroll', () => {
+            const now = Date.now();
+            if (!suppressPreviewScrollEvents && !isSyncingScroll) {
+                lastPreviewUserScrollAt = now;
+            }
             queueRender();
 
             if (lastSetScrollTop !== -1 && Math.abs(scroll.scrollTop - lastSetScrollTop) <= 1) {
@@ -1076,6 +1084,7 @@
             if (state.scrollSyncEnabled && !isSyncingScroll && !suppressPreviewScrollEvents) {
                 const firstVisible = lineAt(scroll.scrollTop);
                 const offset = scroll.scrollTop - rowTop(firstVisible);
+                lastPreviewScrollPostedAt = Date.now();
                 post({
                     type: 'previewScroll',
                     firstLine: firstVisible,
@@ -1100,6 +1109,9 @@
                 }
                 else if (message.action === 'syncScroll') {
                     if (state.scrollSyncEnabled && message.firstLine) {
+                        if (Date.now() - lastPreviewScrollPostedAt < 120) {
+                            return;
+                        }
                         isSyncingScroll = true;
                         const targetScrollTop = rowTop(message.firstLine) + (message.offset || 0);
                         setPreviewScrollTopSilently(targetScrollTop);

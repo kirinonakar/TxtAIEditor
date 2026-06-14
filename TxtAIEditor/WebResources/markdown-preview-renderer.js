@@ -1,4 +1,10 @@
 const mermaidCache = new Map();
+const DEFAULT_MAX_MERGED_PARAGRAPH_LINES = 12;
+
+function maxMergedParagraphLines(options = {}) {
+    const value = Number(options.maxMergedParagraphLines ?? DEFAULT_MAX_MERGED_PARAGRAPH_LINES);
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : DEFAULT_MAX_MERGED_PARAGRAPH_LINES;
+}
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -531,33 +537,57 @@ function findMarkdownTableBlockContaining(lineNumber, maxLine, getLine) {
     return null;
 }
 
-function paragraphBlockBoundsAt(lineNumber, maxLine, getLine, options = {}) {
-    const isEditableParagraphLine = line => {
-        if (!isParagraphLine(String(line ?? ''), options)) return false;
-        if (fencedCodeInfo(line)) return false;
-        if (htmlBlockTagName(line)) return false;
-        if (isDisplayMathFence(line)) return false;
-        return true;
-    };
+function isEditableParagraphLine(line, options = {}) {
+    if (!isParagraphLine(String(line ?? ''), options)) return false;
+    if (fencedCodeInfo(line)) return false;
+    if (htmlBlockTagName(line)) return false;
+    if (isDisplayMathFence(line)) return false;
+    return true;
+}
 
+function paragraphRunExceedsMergeLimit(lineNumber, maxLine, getLine, options = {}) {
+    const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), maxLine);
+    const limit = maxMergedParagraphLines(options);
+    let count = 1;
+
+    for (let line = targetLine - 1; line >= 1 && count <= limit; line--) {
+        const text = getLine(line);
+        if (text === undefined || !isEditableParagraphLine(text, options) || isMarkdownTableStart(line, getLine)) break;
+        count++;
+    }
+
+    for (let line = targetLine + 1; line <= maxLine && count <= limit; line++) {
+        const text = getLine(line);
+        if (text === undefined || !isEditableParagraphLine(text, options) || isMarkdownTableStart(line, getLine)) break;
+        count++;
+    }
+
+    return count > limit;
+}
+
+function paragraphBlockBoundsAt(lineNumber, maxLine, getLine, options = {}) {
     const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), maxLine);
     const targetText = getLine(targetLine);
-    if (targetText === undefined || !isEditableParagraphLine(targetText)) {
+    if (targetText === undefined || !isEditableParagraphLine(targetText, options)) {
         return null;
     }
 
     let startLine = targetLine;
     for (let line = targetLine - 1; line >= 1; line--) {
         const text = getLine(line);
-        if (text === undefined || !isEditableParagraphLine(text) || isMarkdownTableStart(line, getLine)) break;
+        if (text === undefined || !isEditableParagraphLine(text, options) || isMarkdownTableStart(line, getLine)) break;
         startLine = line;
     }
 
     let endLine = targetLine;
     for (let line = targetLine + 1; line <= maxLine; line++) {
         const text = getLine(line);
-        if (text === undefined || !isEditableParagraphLine(text) || isMarkdownTableStart(line, getLine)) break;
+        if (text === undefined || !isEditableParagraphLine(text, options) || isMarkdownTableStart(line, getLine)) break;
         endLine = line;
+    }
+
+    if (endLine - startLine + 1 > maxMergedParagraphLines(options)) {
+        return null;
     }
 
     return endLine > startLine ? { kind: 'paragraph', startLine, endLine } : null;
@@ -962,6 +992,11 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
     }
 
     if (isParagraphLine(line, options)) {
+        if (paragraphRunExceedsMergeLimit(lineNumber, maxLine, getLine, options)) {
+            return { html: renderMarkdownLine(line, options), endLine: lineNumber };
+        }
+
+        const paragraphLimit = maxMergedParagraphLines(options);
         let endLine = lineNumber;
         const paragraphLines = [line];
         for (let i = lineNumber + 1; i <= maxLine; i++) {
@@ -974,6 +1009,9 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
             if (options.renderListsAsBlocks !== false && isMarkdownListStart(i, getLine, options)) break;
             if (isMarkdownTableStart(i, getLine)) break;
             if (!isParagraphLine(nextLine, options)) break;
+            if (paragraphLines.length >= paragraphLimit) {
+                return { html: renderMarkdownLine(line, options), endLine: lineNumber };
+            }
             paragraphLines.push(nextLine);
             endLine = i;
         }

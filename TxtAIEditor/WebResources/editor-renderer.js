@@ -261,7 +261,11 @@ function createEditorRenderer({
                 if (!renderedLine.pending && !renderedLine.source) {
                     lineContent = renderedLine.html;
                     liveContentEditable = 'false';
-                    livePreviewClass = renderedLine.html ? ' live-preview-row' : ' live-preview-skipped';
+                    livePreviewClass = renderedLine.skipped
+                        ? ' live-preview-skipped'
+                        : renderedLine.empty
+                            ? ' live-preview-row live-preview-empty'
+                            : ' live-preview-row';
                 }
             }
             const dirtyType = state.dirtyLines.get(line);
