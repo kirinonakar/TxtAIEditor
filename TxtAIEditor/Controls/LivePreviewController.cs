@@ -194,16 +194,16 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public void EnsureVisiblePreviewRendered()
+        public void EnsureVisiblePreviewRendered(bool forceSelectPreviewTab = false)
         {
-            if (!EnsureLivePreviewVisibleForRender(forceSelectPreviewTab: true))
+            if (!EnsureLivePreviewVisibleForRender(forceSelectPreviewTab))
             {
                 return;
             }
 
             if (!IsPreviewPaneSizedForWebView)
             {
-                QueueEnsureVisiblePreviewRenderedAfterLayout(forceSelectPreviewTab: true);
+                QueueEnsureVisiblePreviewRenderedAfterLayout(forceSelectPreviewTab);
                 return;
             }
 
@@ -220,7 +220,7 @@ namespace TxtAIEditor.Controls
                 {
                     await InitializeAsync();
                     if (PreviewWebViewIfCreated?.CoreWebView2 != null &&
-                        EnsureLivePreviewVisibleForRender(forceSelectPreviewTab: true) &&
+                        EnsureLivePreviewVisibleForRender(forceSelectPreviewTab) &&
                         IsPreviewPaneSizedForWebView)
                     {
                         RenderActiveTab();
@@ -612,7 +612,7 @@ namespace TxtAIEditor.Controls
         {
             if (_previewPane.Visibility == Visibility.Visible && PreviewTargetTab != null)
             {
-                QueueEnsureVisiblePreviewRenderedAfterLayout(forceSelectPreviewTab: true);
+                QueueEnsureVisiblePreviewRenderedAfterLayout(forceSelectPreviewTab: false);
             }
         }
 
@@ -680,11 +680,11 @@ namespace TxtAIEditor.Controls
 
             if (forceSelectPreviewTab)
             {
-                EnsureVisiblePreviewRendered();
+                EnsureVisiblePreviewRendered(forceSelectPreviewTab: true);
             }
             else if (IsLivePreviewVisible)
             {
-                EnsureVisiblePreviewRendered();
+                EnsureVisiblePreviewRendered(forceSelectPreviewTab: false);
             }
         }
 
