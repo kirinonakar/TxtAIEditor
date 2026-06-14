@@ -42,6 +42,7 @@ namespace TxtAIEditor.Controls
         private string _mappedPreviewDocumentDirectory = string.Empty;
         private Task? _initializeTask;
         private bool _initializeAndRenderQueued;
+        private bool _renderAfterLayoutQueued;
         private bool _updatingPreviewModeSelection;
 
         public LivePreviewController(
@@ -83,6 +84,8 @@ namespace TxtAIEditor.Controls
             };
             _previewDebounceTimer.Tick += OnPreviewDebounceTimerTick;
             _previewPane.RightTabs.SelectionChanged += OnRightTabsSelectionChanged;
+            _previewPane.SizeChanged += OnPreviewPaneSizeChanged;
+            _previewPane.RegisterPropertyChangedCallback(UIElement.VisibilityProperty, OnPreviewPaneVisibilityChanged);
         }
 
         private WebView2 PreviewWebView => _previewPane.PreviewWebViewControl;
@@ -181,7 +184,18 @@ namespace TxtAIEditor.Controls
 
         public void EnsureVisiblePreviewRendered()
         {
-            if (_initializeAndRenderQueued || !EnsureLivePreviewVisibleForRender())
+            if (!EnsureLivePreviewVisibleForRender(forceSelectPreviewTab: true))
+            {
+                return;
+            }
+
+            if (!IsPreviewPaneSizedForWebView)
+            {
+                QueueEnsureVisiblePreviewRenderedAfterLayout(forceSelectPreviewTab: true);
+                return;
+            }
+
+            if (_initializeAndRenderQueued)
             {
                 return;
             }
@@ -193,7 +207,9 @@ namespace TxtAIEditor.Controls
                 try
                 {
                     await InitializeAsync();
-                    if (PreviewWebViewIfCreated?.CoreWebView2 != null && EnsureLivePreviewVisibleForRender())
+                    if (PreviewWebViewIfCreated?.CoreWebView2 != null &&
+                        EnsureLivePreviewVisibleForRender(forceSelectPreviewTab: true) &&
+                        IsPreviewPaneSizedForWebView)
                     {
                         RenderActiveTab();
                         QueueRenderActiveTabAfterLayout();
@@ -237,8 +253,14 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                if (!EnsureLivePreviewVisibleForRender())
+                if (!EnsureLivePreviewVisibleForRender(forceSelectPreviewTab: false))
                 {
+                    return;
+                }
+
+                if (!IsPreviewPaneSizedForWebView)
+                {
+                    QueueEnsureVisiblePreviewRenderedAfterLayout(forceSelectPreviewTab: false);
                     return;
                 }
 
@@ -568,14 +590,71 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private bool EnsureLivePreviewVisibleForRender()
+        private void OnPreviewPaneVisibilityChanged(DependencyObject sender, DependencyProperty dp)
+        {
+            if (_previewPane.Visibility == Visibility.Visible && PreviewTargetTab != null)
+            {
+                QueueEnsureVisiblePreviewRenderedAfterLayout(forceSelectPreviewTab: true);
+            }
+        }
+
+        private void OnPreviewPaneSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (_previewPane.Visibility == Visibility.Visible &&
+                IsPreviewPaneSizedForWebView &&
+                PreviewTargetTab != null)
+            {
+                EnsureVisiblePreviewRendered();
+            }
+        }
+
+        private bool IsPreviewPaneSizedForWebView =>
+            _previewPane.ActualWidth > 1 &&
+            _previewPane.ActualHeight > 1;
+
+        private void QueueEnsureVisiblePreviewRenderedAfterLayout(bool forceSelectPreviewTab)
+        {
+            if (_renderAfterLayoutQueued)
+            {
+                return;
+            }
+
+            _renderAfterLayoutQueued = true;
+            var dispatcher = _previewPane.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    _renderAfterLayoutQueued = false;
+                    if (!IsPreviewPaneSizedForWebView)
+                    {
+                        return;
+                    }
+
+                    if (forceSelectPreviewTab)
+                    {
+                        EnsureVisiblePreviewRendered();
+                    }
+                    else if (IsLivePreviewVisible && IsPreviewPaneSizedForWebView)
+                    {
+                        EnsureVisiblePreviewRendered();
+                    }
+                }) != true)
+            {
+                _renderAfterLayoutQueued = false;
+                if (forceSelectPreviewTab && IsPreviewPaneSizedForWebView)
+                {
+                    EnsureVisiblePreviewRendered();
+                }
+            }
+        }
+
+        private bool EnsureLivePreviewVisibleForRender(bool forceSelectPreviewTab)
         {
             if (_previewPane.Visibility != Visibility.Visible)
             {
                 return false;
             }
 
-            if (_previewPane.RightTabs.SelectedItem == null)
+            if (forceSelectPreviewTab || _previewPane.RightTabs.SelectedItem == null)
             {
                 _previewPane.RightTabs.SelectedItem = _previewPane.LivePreviewTabItem;
             }

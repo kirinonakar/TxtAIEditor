@@ -213,7 +213,11 @@ namespace TxtAIEditor.Controls
             }
             else if (startupPaths.Folders.Count == 0)
             {
-                _openNewTab();
+                if (_viewModel.Tabs.Count == 0)
+                {
+                    _openNewTab();
+                }
+
                 string homeFolder = _settingsService.CurrentSettings.HomeFolderPath;
                 if (string.IsNullOrWhiteSpace(homeFolder) || !Directory.Exists(homeFolder))
                 {
