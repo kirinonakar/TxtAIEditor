@@ -658,9 +658,13 @@ namespace TxtAIEditor.Controls
                             });
                         }
 
-                        await RunOnUIThreadAsync(() =>
+                        await RunOnUIThreadAsync(async () =>
                         {
                             AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
+                            if (_agentPane.StreamToTab)
+                            {
+                                await _insertIntoActiveEditorAsync("\n");
+                            }
                         });
 
                         AppendSessionHistoryLine($"[User Prompt]: {instruction}");
