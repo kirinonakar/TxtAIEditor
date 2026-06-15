@@ -650,61 +650,76 @@ scrollContainer.addEventListener('pointerdown', event => {
     const isEditable = position.element.getAttribute('contenteditable') === 'true';
     const isInlinePreviewRow = state.inlineLivePreviewEnabled && !isEditable;
     event.preventDefault();
-    scrollContainer.setPointerCapture?.(event.pointerId);
 
-    const hadSelection = hasCustomSelection();
-    const positionText = state.cache.get(position.line) ?? lineTextFromElement(position.element);
-    state.dragStartPosition = {
-        line: position.line,
-        column: position.column,
-        isEmptyLine: positionText.length === 0,
-        clientX: event.clientX,
-        clientY: event.clientY
-    };
-    const isColumnSelect = event.altKey;
-    const clickInsideSelection = hadSelection && !event.shiftKey && !isColumnSelect && isPositionInsideSelection(position);
-
-    if (clickInsideSelection) {
-        const sel = normalizeSelection();
-        state.dragSelectionData = {
-            start: { line: sel.start.line, column: sel.start.column },
-            end: { line: sel.end.line, column: sel.end.column },
-            isColumn: !!sel.isColumn,
-            text: ''
-        };
-        state.isDragPotential = true;
-        state.isDragMoving = false;
-        state.dragDropPosition = null;
-    } else {
+    if (isInlinePreviewRow) {
+        state.selection = null;
+        state.selectionAnchor = { line: position.line, column: position.column };
+        syncCustomSelectionClass();
+        state.isSelecting = false;
+        state.isLineSelecting = false;
         state.isDragPotential = false;
         state.isDragMoving = false;
         state.dragSelectionData = null;
         state.dragDropPosition = null;
-        const anchor = event.shiftKey && state.selectionAnchor
-            ? state.selectionAnchor
-            : { line: position.line, column: position.column };
-        state.selectionAnchor = anchor;
-        state.selection = event.shiftKey
-            ? { start: anchor, end: { line: position.line, column: position.column }, isColumn: isColumnSelect }
-            : null;
-    }
-    syncCustomSelectionClass();
-    state.isSelecting = true;
-    state.isLineSelecting = false;
-    document.body.classList.add('selecting');
-    if (!clickInsideSelection) {
+        state.dragStartPosition = null;
         state.currentLine = position.line;
         state.currentColumn = position.column + 1;
-        if (isEditable) {
-            keepEditablePreviewBlockFromElement(position.element);
-            setCaret(position.element, position.column);
-        } else if (isInlinePreviewRow) {
-            beginInlineLivePreviewEdit(position.line, position.column);
+        beginInlineLivePreviewEdit(position.line, position.column);
+    } else {
+        scrollContainer.setPointerCapture?.(event.pointerId);
+
+        const hadSelection = hasCustomSelection();
+        const positionText = state.cache.get(position.line) ?? lineTextFromElement(position.element);
+        state.dragStartPosition = {
+            line: position.line,
+            column: position.column,
+            isEmptyLine: positionText.length === 0,
+            clientX: event.clientX,
+            clientY: event.clientY
+        };
+        const isColumnSelect = event.altKey;
+        const clickInsideSelection = hadSelection && !event.shiftKey && !isColumnSelect && isPositionInsideSelection(position);
+
+        if (clickInsideSelection) {
+            const sel = normalizeSelection();
+            state.dragSelectionData = {
+                start: { line: sel.start.line, column: sel.start.column },
+                end: { line: sel.end.line, column: sel.end.column },
+                isColumn: !!sel.isColumn,
+                text: ''
+            };
+            state.isDragPotential = true;
+            state.isDragMoving = false;
+            state.dragDropPosition = null;
+        } else {
+            state.isDragPotential = false;
+            state.isDragMoving = false;
+            state.dragSelectionData = null;
+            state.dragDropPosition = null;
+            const anchor = event.shiftKey && state.selectionAnchor
+                ? state.selectionAnchor
+                : { line: position.line, column: position.column };
+            state.selectionAnchor = anchor;
+            state.selection = event.shiftKey
+                ? { start: anchor, end: { line: position.line, column: position.column }, isColumn: isColumnSelect }
+                : null;
         }
-    }
-    if (event.shiftKey || (hadSelection && !clickInsideSelection)) {
-        queueRender(true);
-        setTimeout(() => focusLine(state.currentLine, Math.max(0, state.currentColumn - 1)), 0);
+        syncCustomSelectionClass();
+        state.isSelecting = true;
+        state.isLineSelecting = false;
+        document.body.classList.add('selecting');
+        if (!clickInsideSelection) {
+            state.currentLine = position.line;
+            state.currentColumn = position.column + 1;
+            if (isEditable) {
+                keepEditablePreviewBlockFromElement(position.element);
+                setCaret(position.element, position.column);
+            }
+        }
+        if (event.shiftKey || (hadSelection && !clickInsideSelection)) {
+            queueRender(true);
+            setTimeout(() => focusLine(state.currentLine, Math.max(0, state.currentColumn - 1)), 0);
+        }
     }
     reportCursorAndSelection(position.element);
 });
