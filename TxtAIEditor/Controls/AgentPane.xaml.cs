@@ -125,8 +125,8 @@ namespace TxtAIEditor.Controls
         public TextBox Activity => AgentActivityText;
         public TextBlock ContextStats => AgentContextStatsText;
         public TextBlock TokenCount => AgentTokenCountText;
-        public CheckBox IncludeActiveFileCheckBox => AgentIncludeActiveFileCheckBox;
-        public bool IncludeActiveFile => AgentIncludeActiveFileCheckBox.IsChecked == true;
+        public CheckBox PlanningModeCheckBox => AgentPlanningModeCheckBox;
+        public bool PlanningMode => AgentPlanningModeCheckBox.IsChecked == true;
         public CheckBox StreamToTabCheckBox => AgentStreamToTabCheckBox;
         public bool StreamToTab => AgentStreamToTabCheckBox.IsChecked == true;
 
@@ -187,7 +187,7 @@ namespace TxtAIEditor.Controls
             }
 
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
-            AgentIncludeActiveFileCheckBox.Content = getString("AgentIncludeActiveFile", "현재 탭 포함");
+            AgentPlanningModeCheckBox.Content = getString("AgentIncludeActiveFile", "계획 모드 (Planning mode)");
             AgentStreamToTabCheckBox.Content = getString("AgentStreamToTab", "탭에 스트리밍");
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
@@ -237,7 +237,7 @@ namespace TxtAIEditor.Controls
             AgentHistoryButton.IsEnabled = !isBusy;
             AgentDeleteHistoryButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
-            AgentIncludeActiveFileCheckBox.IsEnabled = !isBusy;
+            AgentPlanningModeCheckBox.IsEnabled = !isBusy;
             AgentStreamToTabCheckBox.IsEnabled = !isBusy;
             AgentAddAttachmentButton.IsEnabled = !isBusy;
             AgentAttachmentsList.IsEnabled = !isBusy;

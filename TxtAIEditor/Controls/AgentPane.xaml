@@ -166,8 +166,8 @@
                                    Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
-                    <CheckBox x:Name="AgentIncludeActiveFileCheckBox"
-                              Content="현재 탭 포함"
+                    <CheckBox x:Name="AgentPlanningModeCheckBox"
+                              Content="계획 모드 (Planning mode)"
                               IsChecked="False"
                               FontSize="12"/>
                 </StackPanel>

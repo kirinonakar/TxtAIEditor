@@ -74,7 +74,7 @@ namespace TxtAIEditor.Controls
             else
             {
                 tabPart = Path.GetFileName(string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath);
-                if (_agentPane.IncludeActiveFile && AgentWorkspaceContextBuilder.IsPdfTab(activeTab))
+                if (AgentWorkspaceContextBuilder.IsPdfTab(activeTab))
                 {
                     tabPart = string.Format(_getString("AgentPdfActiveTabExcluded", "{0} (PDF 제외)"), tabPart);
                 }
@@ -141,7 +141,7 @@ namespace TxtAIEditor.Controls
         private double EstimateContextTokens()
         {
             string langCode = _displayText.LanguageCode;
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode);
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, _agentPane.PlanningMode);
 
             string instruction = _buildAgentInstruction(_agentPane.Prompt.Text?.Trim() ?? string.Empty);
             string workspaceContext = _buildWorkspaceContext(instruction);

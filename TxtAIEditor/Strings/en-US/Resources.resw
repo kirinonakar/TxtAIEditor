@@ -1779,7 +1779,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Model: {0} ({1})</value>
   </data>
   <data name="AgentIncludeActiveFile" xml:space="preserve">
-    <value>Include active tab</value>
+    <value>Planning mode</value>
   </data>
   <data name="AgentPdfActiveTabExcluded" xml:space="preserve">
     <value>{0} (PDF excluded)</value>

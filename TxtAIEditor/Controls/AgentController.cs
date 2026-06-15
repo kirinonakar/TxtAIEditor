@@ -309,8 +309,8 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentPresetImportRequested += async (_, _) => await _presetController.ImportPresetsAsync();
             
             _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
-            _agentPane.IncludeActiveFileCheckBox.Checked += (_, _) => UpdateContextStats();
-            _agentPane.IncludeActiveFileCheckBox.Unchecked += (_, _) => UpdateContextStats();
+            _agentPane.PlanningModeCheckBox.Checked += (_, _) => UpdateContextStats();
+            _agentPane.PlanningModeCheckBox.Unchecked += (_, _) => UpdateContextStats();
 
             _agentPane.DiffApproved += (_, _) => _confirmationController.ApprovePending();
             _agentPane.DiffCancelled += (_, _) => _confirmationController.CancelPending();
@@ -546,7 +546,8 @@ namespace TxtAIEditor.Controls
                             await Task.CompletedTask;
                         },
                         cancellationToken,
-                        GetImageAttachmentsForCurrentRun());
+                        GetImageAttachmentsForCurrentRun(),
+                        _agentPane.PlanningMode);
 
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
@@ -1209,7 +1210,7 @@ namespace TxtAIEditor.Controls
             return _workspaceContextBuilder.Build(
                 instruction,
                 GetActiveTabForContext(),
-                _agentPane.IncludeActiveFile,
+                true,
                 CaptureActiveSelectionSnapshot().HasLineRange);
         }
 

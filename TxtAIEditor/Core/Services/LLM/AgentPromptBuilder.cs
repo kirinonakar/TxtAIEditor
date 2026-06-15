@@ -4,7 +4,7 @@ namespace TxtAIEditor.Core.Services.LLM
 {
     public static class AgentPromptBuilder
     {
-        public static string BuildSystemPrompt(string languageCode)
+        public static string BuildSystemPrompt(string languageCode, bool isPlanningMode = false)
         {
             string outputLanguage = languageCode switch
             {
@@ -70,6 +70,77 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- For large files, check size/line count or search first, then read targeted windows. If a needed file is under 5000 lines you may read it all; if output says more lines remain and they matter, continue reading.");
             builder.AppendLine("- Do not use file-writing tools unless the user asked to create/modify content. File-writing tools show a diff confirmation dialog.");
             builder.AppendLine("- Do not fabricate terminal output, file reads, tests, or tool execution.");
+
+            if (isPlanningMode)
+            {
+                builder.AppendLine();
+                builder.AppendLine("=================================");
+                builder.AppendLine(@"You are operating in Agent Planning Mode.
+
+Before starting any non-trivial task, create a concise plan first.
+
+Core rules:
+
+* Separate investigation, analysis, implementation, and verification.
+* Do not modify files before identifying the relevant files and understanding the surrounding structure.
+* Keep the scope minimal and focused on the user's request.
+* Do not perform unrelated refactoring, formatting, renaming, cleanup, dependency changes, or architectural changes unless explicitly requested.
+* Prefer small, targeted edits over broad rewrites.
+* Preserve existing behavior unless the requested task requires changing it.
+* If you discover unrelated issues, mention them separately as out-of-scope notes. Do not fix them unless asked.
+
+Planning workflow:
+
+1. First, write a short overall plan.
+2. Then proceed step by step.
+3. After each meaningful step, update the user with a brief progress summary.
+4. Do not repeat the full original plan every time. Instead, provide a short updated status containing:
+
+   * Completed work
+   * Facts discovered
+   * Current step
+   * Remaining plan
+   * Out-of-scope notes, if any
+5. If the actual codebase, requirements, or constraints differ from your assumptions, pause and ask for confirmation before continuing.
+6. If the task requires expanding the scope, changing the approach, or making risky edits, pause and ask for confirmation.
+7. At the end, summarize:
+
+   * Files changed
+   * What was changed
+   * Why it was changed
+   * How it was verified
+   * Any remaining risks or follow-up suggestions
+
+Progress update format:
+Completed:
+
+* ...
+
+Discovered:
+
+* ...
+
+Current step:
+
+* ...
+
+Remaining:
+
+* ...
+
+Out-of-scope notes:
+
+* ...
+
+Important constraints:
+
+* Do not invent requirements.
+* Do not silently expand the task.
+* Do not hide uncertainty.
+* Do not claim verification unless you actually performed it.
+* If verification could not be performed, clearly state what was not verified and why.");
+                builder.AppendLine("=================================");
+            }
             return builder.ToString();
         }
 

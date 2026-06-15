@@ -1779,7 +1779,7 @@
     <value>모델: {0} ({1})</value>
   </data>
   <data name="AgentIncludeActiveFile" xml:space="preserve">
-    <value>현재 탭 포함</value>
+    <value>계획 모드 (Planning mode)</value>
   </data>
   <data name="AgentPdfActiveTabExcluded" xml:space="preserve">
     <value>{0} (PDF 제외)</value>
