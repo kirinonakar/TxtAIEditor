@@ -229,7 +229,8 @@ function createEditorRenderer({
                 baseHref: state.livePreviewBaseHref || '',
                 tabSize: state.tabSize || 4,
                 rangeEnd: renderEnd,
-                requireClosedFence: true
+                requireClosedFence: true,
+                sourceLine: sourceLine
             };
 
             if (state.inlineLivePreviewEnabled && hasLine && shouldShowSource && !isLong && !state.isComposing) {

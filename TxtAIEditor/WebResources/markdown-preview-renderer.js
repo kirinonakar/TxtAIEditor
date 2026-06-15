@@ -1050,6 +1050,17 @@ function renderPreviewLineAt(lineNumber, maxLine, getLine, options = {}, skipUnt
         };
     }
 
+    const sourceLine = Number(options.sourceLine || 0);
+    if (sourceLine > 0 && block && sourceLine >= lineNumber && sourceLine <= block.endLine) {
+        return {
+            html: '',
+            source: true,
+            skipped: false,
+            endLine: lineNumber,
+            extendRangeEnd: rangeEnd
+        };
+    }
+
     const rendered = block ? block.html : renderLine(line || '', options.mode || 'markdown', options);
     const endLine = block?.endLine || lineNumber;
     const newSkip = Math.max(skipUntilRef.val, endLine);
