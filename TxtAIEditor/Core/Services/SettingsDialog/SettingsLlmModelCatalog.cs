@@ -55,7 +55,10 @@ namespace TxtAIEditor.Core.Services
                 endpoint.Equals("http://localhost:1234/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://opencode.ai/zen/go/v1", StringComparison.OrdinalIgnoreCase) ||
-                endpoint.Equals("https://opencode.ai/zen/v1", StringComparison.OrdinalIgnoreCase);
+                endpoint.Equals("https://opencode.ai/zen/v1", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.Equals("http://localhost:11434/v1", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.Equals("https://ollama.com", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.Equals("https://ollama.com/v1", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string GetDefaultEndpoint(string provider, string fallback)
