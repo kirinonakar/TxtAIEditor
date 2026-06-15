@@ -67,86 +67,12 @@ namespace TxtAIEditor.Controls
                 return 1000000;
             }
 
-            if (model.Contains("claude"))
-            {
-                return 200000;
-            }
-
-            if (model.Contains("kimi"))
-            {
-                return 200000;
-            }
-
-            if (model.Contains("o1") || model.Contains("o3"))
-            {
-                return 200000;
-            }
-
-            if (model.Contains("gpt-5"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("gpt-4"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("gpt-3.5"))
-            {
-                return 16385;
-            }
-
-            if (model.Contains("gemma"))
-            {
-                return 8192;
-            }
-
-            if (model.Contains("llama-3") || model.Contains("llama3"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("deepseek"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("qwen"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("glm"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("minimax"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("mimo"))
-            {
-                return 128000;
-            }
-
-            if (model.Contains("grok"))
-            {
-                return 128000;
-            }
-
             if (provider.Contains("gemini"))
             {
                 return 1000000;
             }
-            if (provider.Contains("openai") || provider.Contains("openrouter") || provider.Contains("zen") || provider.Contains("go") || provider.Contains("ollama"))
-            {
-                return 128000;
-            }
 
-            return 0;
+            return 256000;
         }
 
         private async Task FetchLmStudioContextLimitAsync(
