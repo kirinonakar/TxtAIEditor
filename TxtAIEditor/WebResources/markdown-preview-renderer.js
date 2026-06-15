@@ -334,12 +334,16 @@ function collectFencedCodeBlock(startLine, maxLine, getLine, options = {}) {
 }
 
 function renderFencedCodeBlock(block) {
-    if ((block.language || '').toLowerCase() === 'mermaid') {
+    const lang = (block.language || '').toLowerCase();
+    if (lang === 'mermaid') {
         const cachedSvg = mermaidCache.get(block.code);
         if (cachedSvg) {
             return `<div class="mermaid-block rendered" data-code="${escapeAttribute(block.code)}">${cachedSvg}</div>`;
         }
         return `<div class="mermaid-block" data-code="${escapeAttribute(block.code)}">Rendering...</div>`;
+    }
+    if (lang === 'latex' || lang === 'math') {
+        return renderLatexLine(block.code);
     }
     const langClass = block.language ? ` class="language-${escapeAttribute(block.language)}"` : '';
     return `<pre><code${langClass}>${escapeHtml(block.code)}</code></pre>`;
