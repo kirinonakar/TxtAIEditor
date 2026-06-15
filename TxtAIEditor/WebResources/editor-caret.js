@@ -458,12 +458,17 @@ function focusLine(lineNumber, columnZeroBased = 0) {
     }
 
     queueRender(true);
-    setTimeout(() => {
+    let retries = 10;
+    function tryFocus() {
         const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
         if (element && element.getAttribute('contenteditable') === 'true') {
             setCaret(element, columnZeroBased);
+        } else if (retries > 0) {
+            retries--;
+            setTimeout(tryFocus, 20);
         }
-    }, 20);
+    }
+    setTimeout(tryFocus, 20);
 }
 
 function keepElementInView(element) {

@@ -395,8 +395,62 @@ function insertTextAtCaret(text) {
             setCaret(element, Math.max(0, state.currentColumn - 1));
         }
     }
-    if (!element || element.getAttribute('contenteditable') !== 'true') return;
     const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    if (!element || element.getAttribute('contenteditable') !== 'true') {
+        const targetLine = state.currentLine || 1;
+        const currentText = state.cache.get(targetLine) ?? '';
+        const caret = Math.max(0, Math.min(state.currentColumn - 1, currentText.length));
+
+        if (normalized.includes('\n')) {
+            const before = currentText.slice(0, caret);
+            const after = currentText.slice(caret);
+            const parts = normalized.split('\n');
+            const insertedCount = parts.length - 1;
+            const firstLine = before + parts[0];
+            const lastLineNumber = targetLine + insertedCount;
+
+            state.cache.set(targetLine, firstLine);
+            shiftCachedLines(targetLine + 1, insertedCount);
+            if (!cleanDirtyMarker(targetLine)) {
+                markDirty(targetLine, 'mod');
+            }
+            beginEditTransaction();
+            try {
+                post({ type: 'lineChanged', lineNumber: targetLine, text: firstLine });
+                for (let i = 1; i < parts.length; i++) {
+                    const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
+                    const nextLineNumber = targetLine + i;
+                    state.cache.set(nextLineNumber, nextText);
+                    state.dirtyLines.set(nextLineNumber, 'add');
+                    post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
+                }
+                post({ type: 'contentChanged' });
+            } finally {
+                endEditTransaction();
+            }
+            state.lineCount += insertedCount;
+            state.currentLine = lastLineNumber;
+            state.currentColumn = (parts[parts.length - 1]?.length || 0) + 1;
+            setupVirtualHeight();
+            focusLine(lastLineNumber, state.currentColumn - 1);
+        } else {
+            const nextText = currentText.slice(0, caret) + normalized + currentText.slice(caret);
+            state.cache.set(targetLine, nextText);
+            state.cacheVersion++;
+            invalidateMeasuredLineHeightsAround(targetLine);
+            state.currentColumn = caret + normalized.length + 1;
+            if (!cleanDirtyMarker(targetLine)) {
+                markDirty(targetLine, 'mod');
+            }
+            post({ type: 'lineChanged', lineNumber: targetLine, text: nextText });
+            post({ type: 'contentChanged' });
+            if (state.wordWrap) {
+                measureRenderedRows(false);
+            }
+            focusLine(targetLine, state.currentColumn - 1);
+        }
+        return;
+    }
     if (normalized.includes('\n')) {
         const lineNumber = Number(element.dataset.line || 1);
         const current = lineTextFromElement(element);
