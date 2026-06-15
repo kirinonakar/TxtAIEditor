@@ -588,6 +588,7 @@ function measureRenderedRows(renderOnChange = true) {
 
     const anchorLine = lineAt(scrollContainer.scrollTop);
     const anchorOffset = scrollContainer.scrollTop - lineTop(anchorLine);
+    const oldEditingLineTop = state.editingLine ? lineTop(state.editingLine) : null;
     let changed = false;
     for (const row of viewport.querySelectorAll('.line-row')) {
         const lineNumber = Number(row.dataset.line || 0);
@@ -606,7 +607,13 @@ function measureRenderedRows(renderOnChange = true) {
         setupVirtualHeight();
         if (state.inlineLivePreviewEnabled) {
             const maxScrollTop = Math.max(0, totalVirtualHeight() - scrollContainer.clientHeight);
-            const anchoredScrollTop = Math.min(maxScrollTop, Math.max(0, lineTop(anchorLine) + anchorOffset));
+            let anchoredScrollTop;
+            if (state.editingLine && oldEditingLineTop !== null) {
+                const newEditingLineTop = lineTop(state.editingLine);
+                anchoredScrollTop = Math.min(maxScrollTop, Math.max(0, scrollContainer.scrollTop + (newEditingLineTop - oldEditingLineTop)));
+            } else {
+                anchoredScrollTop = Math.min(maxScrollTop, Math.max(0, lineTop(anchorLine) + anchorOffset));
+            }
             if (Math.abs(scrollContainer.scrollTop - anchoredScrollTop) > 1) {
                 scrollContainer.scrollTop = anchoredScrollTop;
             }

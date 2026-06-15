@@ -660,6 +660,7 @@ scrollContainer.addEventListener('pointerdown', event => {
 
     if (isInlinePreviewRow) {
         const precisePos = getPreciseLivePreviewPosition(position.element, event);
+        state.alignCaretToY = event.clientY;
         state.selection = null;
         state.selectionAnchor = { line: precisePos.line, column: precisePos.column };
         syncCustomSelectionClass();

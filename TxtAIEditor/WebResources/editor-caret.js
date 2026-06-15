@@ -267,6 +267,19 @@ function setCaret(element, offset) {
     selection.removeAllRanges();
     selection.addRange(range);
     revealCaretHorizontally(element, offset);
+
+    if (state.alignCaretToY !== null && state.alignCaretToY !== undefined) {
+        const clickY = state.alignCaretToY;
+        state.alignCaretToY = null;
+        const caretRect = caretRectForOffset(element, offset);
+        if (caretRect) {
+            const caretCenter = caretRect.top + caretRect.height / 2;
+            const scrollDiff = caretCenter - clickY;
+            const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+            scrollContainer.scrollTop = Math.min(maxScroll, Math.max(0, scrollContainer.scrollTop + scrollDiff));
+        }
+    }
+
     reportCursorAndSelection(element);
 
     if (oldActiveLine !== null && oldActiveLine !== state.editingLine) {
