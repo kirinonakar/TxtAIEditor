@@ -2237,6 +2237,6 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
      <value>note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}</value>
   </data>
   <data name="AgentStreamToTab" xml:space="preserve">
-    <value>Input to Tab</value>
+    <value>Stream to Tab</value>
   </data>
 </root>

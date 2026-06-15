@@ -2238,6 +2238,6 @@
      <value>注: 指定された出力ファイルが既に存在するため、上書きせず新しいファイルとして保存しました: {0}</value>
    </data>
   <data name="AgentStreamToTab" xml:space="preserve">
-    <value>タブに入力</value>
+    <value>タブにストリーミング</value>
   </data>
  </root>

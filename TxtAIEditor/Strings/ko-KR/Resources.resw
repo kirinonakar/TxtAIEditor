@@ -2237,6 +2237,6 @@
      <value>참고: 요청한 출력 파일이 이미 있어 덮어쓰지 않고 새 파일로 저장했습니다: {0}</value>
    </data>
   <data name="AgentStreamToTab" xml:space="preserve">
-    <value>탭에 입력</value>
+    <value>탭에 스트리밍</value>
   </data>
 </root>

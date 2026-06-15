@@ -128,7 +128,7 @@
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <CheckBox x:Name="AgentStreamToTabCheckBox"
-                      Content="탭에 입력"
+                      Content="탭에 스트리밍"
                       IsChecked="False"
                       VerticalAlignment="Center"/>
             <Button x:Name="AgentInsertOutputButton"

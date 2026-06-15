@@ -188,7 +188,7 @@ namespace TxtAIEditor.Controls
 
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
             AgentIncludeActiveFileCheckBox.Content = getString("AgentIncludeActiveFile", "현재 탭 포함");
-            AgentStreamToTabCheckBox.Content = getString("AgentStreamToTab", "탭에 입력");
+            AgentStreamToTabCheckBox.Content = getString("AgentStreamToTab", "탭에 스트리밍");
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
             ToolTipService.SetToolTip(AgentPresetButton, getString("AgentPresetButtonTooltip", "페르소나/지침 프리셋"));
