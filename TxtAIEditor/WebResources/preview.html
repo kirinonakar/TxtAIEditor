@@ -437,10 +437,13 @@
 
         function setPreviewScrollTopSilently(value) {
             const target = Math.max(0, Number(value || 0));
-            if (Math.abs(scroll.scrollTop - target) <= 0.5) return;
+            if (Math.abs(scroll.scrollTop - target) <= 0.5) {
+                lastSetScrollTop = -1;
+                return;
+            }
             suppressPreviewScrollUntilNextFrame();
-            lastSetScrollTop = target;
             scroll.scrollTop = target;
+            lastSetScrollTop = scroll.scrollTop;
         }
 
         function trimRowHeights() {
@@ -988,8 +991,8 @@
                     if (Math.abs(scroll.scrollTop - corrected) > 1) {
                         suppressPreviewScrollUntilNextFrame();
                         const targetScrollTop = Math.max(0, corrected);
-                        lastSetScrollTop = targetScrollTop;
                         scroll.scrollTop = targetScrollTop;
+                        lastSetScrollTop = scroll.scrollTop;
                     }
                 }
 
