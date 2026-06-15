@@ -751,8 +751,11 @@ function recomputeDirtyLines() {
     state.dirtyLines = markers;
 }
 function reportCursorAndSelection(element = document.activeElement) {
+    if (element && !document.body.contains(element)) {
+        element = document.activeElement;
+    }
     const editable = element && element.closest ? element.closest('.line-text') : null;
-    if (editable) {
+    if (editable && document.body.contains(editable)) {
         state.currentLine = Number(editable.dataset.line || state.currentLine);
         state.currentColumn = runtime.getCaretOffset(editable) + 1;
     }
