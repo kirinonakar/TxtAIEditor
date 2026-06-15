@@ -1809,6 +1809,15 @@ namespace TxtAIEditor
                 return false;
             }
 
+            try
+            {
+                bridgeGroup.WebView.Focus(FocusState.Programmatic);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to focus editor: {ex.Message}");
+            }
+
             await bridgeGroup.Bridge.InsertTextAsync(text);
 
             var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
