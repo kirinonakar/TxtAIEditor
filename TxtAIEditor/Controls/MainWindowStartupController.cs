@@ -174,6 +174,10 @@ namespace TxtAIEditor.Controls
         private void ApplyInitialShellState()
         {
             var settings = _settingsService.CurrentSettings;
+            if (_window is MainWindow mainWindow)
+            {
+                mainWindow.ScrollSyncEnabled = settings.ScrollSyncEnabled;
+            }
             _topToolbar.WordWrapIsChecked = settings.WordWrap;
             _leftPanelToggle.IsChecked = settings.LeftSidebarVisible;
             _applyLeftSidebarVisibility(settings.LeftSidebarVisible);

@@ -149,6 +149,11 @@ namespace TxtAIEditor
         }
 
         private bool _scrollSyncEnabled = true;
+        public bool ScrollSyncEnabled
+        {
+            get => _scrollSyncEnabled;
+            set => _scrollSyncEnabled = value;
+        }
         private bool _csvTableModeEnabled = false;
         private bool _livePreviewEnabled = false;
         
@@ -803,7 +808,16 @@ namespace TxtAIEditor
                 _livePreviewController,
                 UpdateRightPanelSelectionContext,
                 () => _scrollSyncEnabled,
-                enabled => _scrollSyncEnabled = enabled);
+                async enabled =>
+                {
+                    _scrollSyncEnabled = enabled;
+                    var settings = _settingsService.CurrentSettings;
+                    if (settings.ScrollSyncEnabled != enabled)
+                    {
+                        settings.ScrollSyncEnabled = enabled;
+                        await _settingsService.SaveSettingsAsync(settings);
+                    }
+                });
             _editorTabOpenController = new EditorTabOpenController(
                 _settingsService,
                 _snippetService,

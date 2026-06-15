@@ -366,7 +366,29 @@ function revealLine(lineNumber, indexOfMatch = 0, matchLength = 0, query = '', p
     state.activeSearch = query
         ? { lineNumber: safeLine, indexOfMatch, matchLength, query }
         : null;
-    scrollContainer.scrollTop = Math.max(0, lineTop(safeLine) - Math.floor(scrollContainer.clientHeight / 2));
+
+    const targetScrollTop = Math.max(0, lineTop(safeLine) - Math.floor(scrollContainer.clientHeight / 2));
+
+    // Programmatic scroll starts here, prevent normal scroll sync loop
+    isSyncingScroll = true;
+    lastProgrammaticScrollTime = Date.now();
+    scrollContainer.scrollTop = targetScrollTop;
+    lastSetScrollTop = scrollContainer.scrollTop;
+
+    requestAnimationFrame(() => {
+        isSyncingScroll = false;
+    });
+
+    if (state.scrollSyncEnabled) {
+        const firstVisible = lineAt(targetScrollTop);
+        const offset = targetScrollTop - lineTop(firstVisible);
+        post({
+            type: 'editorScroll',
+            firstLine: firstVisible,
+            offset: offset
+        });
+    }
+
     requestLines(Math.max(1, safeLine - state.overscan), state.overscan * 2 + 1);
     queueRender(true);
     if (!preventFocus) {
