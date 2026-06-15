@@ -8,22 +8,17 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentWorkspaceContextBuilder
     {
-        private const int MaxActiveFileContextChars = 120_000;
-
         private readonly Func<string> _workspaceRootProvider;
         private readonly Func<IReadOnlyList<OpenedTab>> _openTabsProvider;
-        private readonly Func<OpenedTab, int, string> _getTabText;
         private readonly AgentAttachmentController _attachmentController;
 
         public AgentWorkspaceContextBuilder(
             Func<string> workspaceRootProvider,
             Func<IReadOnlyList<OpenedTab>> openTabsProvider,
-            Func<OpenedTab, int, string> getTabText,
             AgentAttachmentController attachmentController)
         {
             _workspaceRootProvider = workspaceRootProvider;
             _openTabsProvider = openTabsProvider;
-            _getTabText = getTabText;
             _attachmentController = attachmentController;
         }
 
@@ -93,25 +88,6 @@ namespace TxtAIEditor.Controls
             context.Add($"Path: {title}");
             context.Add($"Language: {activeTab.Language ?? "plaintext"}");
             context.Add($"Dirty: {activeTab.IsDirty}");
-
-            if (hasSelectionRangeContext)
-            {
-                context.Add("");
-                context.Add("[Active tab content omitted: selected_range_context provides the target line range; use read_file to inspect it.]");
-                return;
-            }
-
-            string content = _getTabText(activeTab, MaxActiveFileContextChars);
-            bool truncated = content.Length >= MaxActiveFileContextChars;
-
-            context.Add("");
-            context.Add("[Active tab content]");
-            context.Add(content);
-            if (truncated)
-            {
-                context.Add("");
-                context.Add("[Context truncated: active tab exceeded the maximum included length]");
-            }
         }
 
         private void AddAttachmentsContext(List<string> context)

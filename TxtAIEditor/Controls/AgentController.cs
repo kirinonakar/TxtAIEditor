@@ -154,7 +154,6 @@ namespace TxtAIEditor.Controls
             _workspaceContextBuilder = new AgentWorkspaceContextBuilder(
                 () => _fileTools.WorkspaceRoot,
                 openTabsProvider,
-                getTabText,
                 _attachmentController);
             _contextStatsController = new AgentContextStatsController(
                 _settingsService,
