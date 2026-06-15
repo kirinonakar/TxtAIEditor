@@ -625,7 +625,7 @@ function measureRenderedRows(renderOnChange = true) {
     }
 }
 
-function invalidateMeasuredLineHeightsAround(lineNumber, radius = 120) {
+function invalidateMeasuredLineHeightsAround(lineNumber, radius = 0) {
     if (!usesMeasuredLineHeights()) return;
 
     const center = Math.max(1, Number(lineNumber || 1));
