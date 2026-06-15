@@ -40,7 +40,7 @@ namespace TxtAIEditor.Core.Services
             _llmEndpointBox = new TextBox { PlaceholderText = getString("SettingsLlmEndpointPlaceholder", "예: http://localhost:1234/v1"), Text = settings.LlmEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
             _llmModelCombo = new ComboBox { PlaceholderText = getString("SettingsLlmSelectModel", "모델 선택"), HorizontalAlignment = HorizontalAlignment.Stretch, IsEditable = true, Tag = "LlmModelCombo" };
             _llmModelCombo.Loaded += (_, __) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(_llmModelCombo);
-            _llmApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsLlmCredentialPlaceholder", "API Key 또는 OAuth Access Token 입력 (비워두면 저장된 자격 증명 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
+            _llmApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsLlmCredentialPlaceholder", "API Key 입력 (비워두면 저장된 자격 증명 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
             _exaEndpointBox = new TextBox { PlaceholderText = getString("SettingsExaEndpointPlaceholder", "예: https://mcp.exa.ai/mcp"), Text = settings.ExaEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
             _exaApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsExaApiKeyPlaceholder", "Exa API Key 입력 (비워두면 저장된 Key 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
 
@@ -158,11 +158,11 @@ namespace TxtAIEditor.Core.Services
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmEndpoint", "LLM API Endpoint"));
             section.Children.Add(_llmEndpointBox);
 
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmCredential", "LLM API Key / OAuth Token"));
+            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmCredential", "LLM API Key"));
             section.Children.Add(_llmApiKeyBox);
             section.Children.Add(new TextBlock
             {
-                Text = _getString("SettingsLlmCredentialInfo", "API Key와 OAuth Access Token은 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다. OpenAI OAuth provider는 OpenAI API 호환 Bearer access token을 사용합니다."),
+                Text = _getString("SettingsLlmCredentialInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다."),
                 TextWrapping = TextWrapping.Wrap
             });
 

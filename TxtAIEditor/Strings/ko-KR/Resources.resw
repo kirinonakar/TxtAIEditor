@@ -429,13 +429,13 @@
     <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
   <data name="SettingsLlmCredential" xml:space="preserve">
-    <value>LLM API Key / OAuth Token</value>
+    <value>API Key</value>
   </data>
   <data name="SettingsLlmCredentialPlaceholder" xml:space="preserve">
-    <value>API Key 또는 OAuth Access Token 입력 (비워두면 저장된 자격 증명 삭제)</value>
+    <value>API Key 입력 (비워두면 저장된 자격 증명 삭제)</value>
   </data>
   <data name="SettingsLlmCredentialInfo" xml:space="preserve">
-    <value>API Key와 OAuth Access Token은 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다. OpenAI OAuth 공급자는 OpenAI API 호환 Bearer access token을 사용합니다.</value>
+    <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
   <data name="SettingsLlmApiKeyName" xml:space="preserve">
     <value>API Key</value>
@@ -2126,7 +2126,7 @@
      <value>API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.</value>
    </data>
    <data name="LlmErrorInvalidApiCredential" xml:space="preserve">
-     <value>API Key 또는 OAuth Access Token이 유효하지 않습니다. 설정을 먼저 확인해 주십시오.</value>
+     <value>API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.</value>
    </data>
    <data name="LlmErrorEmptyResponse" xml:space="preserve">
      <value>AI로부터 빈 응답을 수신했습니다.</value>
@@ -2192,7 +2192,7 @@
      <value>에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 API Key를 먼저 저장해 주십시오.</value>
    </data>
    <data name="LlmErrorNoApiKeyOrToken" xml:space="preserve">
-     <value>에러: 해당 LLM API Key 또는 OAuth Access Token이 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.</value>
+     <value>에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.</value>
    </data>
    <data name="LlmErrorCommunicationPrefix" xml:space="preserve">
      <value>AI 통신 오류가 발생했습니다: </value>

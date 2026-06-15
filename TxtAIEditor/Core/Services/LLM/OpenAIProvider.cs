@@ -32,7 +32,7 @@ namespace TxtAIEditor.Core.Services.LLM
             bool isLocalEndpoint = endpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
                                    endpoint.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(apiKey) && !isLocalEndpoint)
-                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key 또는 OAuth Access Token이 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
+                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
@@ -105,7 +105,7 @@ namespace TxtAIEditor.Core.Services.LLM
             bool isLocalEndpoint = endpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
                                    endpoint.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(apiKey) && !isLocalEndpoint)
-                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key 또는 OAuth Access Token이 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
+                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 

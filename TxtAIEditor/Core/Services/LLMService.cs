@@ -246,7 +246,7 @@ namespace TxtAIEditor.Core.Services
             string langCode = GetActiveLanguage();
             if (requiresApiKey && string.IsNullOrEmpty(apiKey))
             {
-                return _localizationService.GetString("LlmErrorNoApiKeyOrToken", "에러: 해당 LLM API Key 또는 OAuth Access Token이 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.");
+                return _localizationService.GetString("LlmErrorNoApiKeyOrToken", "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.");
             }
 
             ILLMProvider provider = providerName.ToLower() switch

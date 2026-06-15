@@ -429,13 +429,13 @@
     <value>API Keys are stored in the Windows Credential Manager, not in settings files.</value>
   </data>
   <data name="SettingsLlmCredential" xml:space="preserve">
-    <value>LLM API Key / OAuth Token</value>
+    <value>API Key</value>
   </data>
   <data name="SettingsLlmCredentialPlaceholder" xml:space="preserve">
-    <value>Enter API Key or OAuth Access Token (leave empty to delete saved credential)</value>
+    <value>Enter API Key (leave empty to delete saved credential)</value>
   </data>
   <data name="SettingsLlmCredentialInfo" xml:space="preserve">
-    <value>API Keys and OAuth Access Tokens are stored in the Windows Credential Manager, not in settings files. The OpenAI OAuth provider uses an OpenAI API-compatible Bearer access token.</value>
+    <value>API Keys are stored in the Windows Credential Manager, not in settings files.</value>
   </data>
   <data name="SettingsLlmApiKeyName" xml:space="preserve">
     <value>API Key</value>
@@ -2126,7 +2126,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
      <value>API Key is invalid. Please check your settings first.</value>
    </data>
    <data name="LlmErrorInvalidApiCredential" xml:space="preserve">
-     <value>API Key or OAuth Access Token is invalid. Please check your settings first.</value>
+     <value>API Key is invalid. Please check your settings first.</value>
    </data>
    <data name="LlmErrorEmptyResponse" xml:space="preserve">
      <value>Received an empty response from AI.</value>
@@ -2192,7 +2192,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
      <value>Error: The corresponding LLM API Key is not registered in the Credential Manager. Please open Settings and save your API Key first.</value>
    </data>
    <data name="LlmErrorNoApiKeyOrToken" xml:space="preserve">
-     <value>Error: The corresponding LLM API Key or OAuth Access Token is not registered in Credential Manager. Please open Settings and save the credential first.</value>
+     <value>Error: The corresponding LLM API Key is not registered in Credential Manager. Please open Settings and save the credential first.</value>
    </data>
    <data name="LlmErrorCommunicationPrefix" xml:space="preserve">
      <value>An AI communication error occurred: </value>
