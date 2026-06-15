@@ -413,6 +413,18 @@
   <data name="SettingsLlmOpenCodeZenInfo" xml:space="preserve">
     <value>OpenCode Zen는 https://opencode.ai/zen/v1/models 에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmLoadOllamaModels" xml:space="preserve">
+    <value>Ollama 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmOllamaInfo" xml:space="preserve">
+    <value>Ollama는 서버가 켜져 있을 때 http://localhost:11434/v1/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
+  <data name="SettingsLlmLoadOllamaCloudModels" xml:space="preserve">
+    <value>Ollama Cloud 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
+    <value>Ollama Cloud는 지정된 endpoint에서 모델 목록을 불러옵니다.</value>
+  </data>
   <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
     <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
@@ -2152,6 +2164,18 @@
    <data name="LmStudioErrorStreamCallFailed" xml:space="preserve">
      <value>LM Studio API 스트리밍 호출 실패 ({0}): {1}</value>
    </data>
+    <data name="OllamaErrorNoModelSelected" xml:space="preserve">
+      <value>Ollama 모델을 먼저 선택해 주십시오.</value>
+    </data>
+    <data name="OllamaErrorStreamCallFailed" xml:space="preserve">
+      <value>Ollama API 스트리밍 호출 실패 ({0}): {1}</value>
+    </data>
+    <data name="OllamaCloudErrorNoModelSelected" xml:space="preserve">
+      <value>Ollama Cloud 모델을 먼저 선택해 주십시오.</value>
+    </data>
+    <data name="OllamaCloudErrorStreamCallFailed" xml:space="preserve">
+      <value>Ollama Cloud API 스트리밍 호출 실패 ({0}): {1}</value>
+    </data>
    <data name="GoErrorApiCallFailed" xml:space="preserve">
      <value>OpenCode Go API 호출 실패 ({0}): {1}</value>
    </data>

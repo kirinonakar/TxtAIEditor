@@ -413,6 +413,18 @@
   <data name="SettingsLlmOpenCodeZenInfo" xml:space="preserve">
     <value>OpenCode Zen loads the list of models from https://opencode.ai/zen/v1/models.</value>
   </data>
+  <data name="SettingsLlmLoadOllamaModels" xml:space="preserve">
+    <value>Load Ollama Models</value>
+  </data>
+  <data name="SettingsLlmOllamaInfo" xml:space="preserve">
+    <value>Ollama loads the list of models from http://localhost:11434/v1/models when the server is running.</value>
+  </data>
+  <data name="SettingsLlmLoadOllamaCloudModels" xml:space="preserve">
+    <value>Load Ollama Cloud Models</value>
+  </data>
+  <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
+    <value>Ollama Cloud loads the list of models from the specified endpoint.</value>
+  </data>
   <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
     <value>API Keys are stored in the Windows Credential Manager, not in settings files.</value>
   </data>
@@ -2152,6 +2164,18 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
    <data name="LmStudioErrorStreamCallFailed" xml:space="preserve">
      <value>LM Studio API streaming call failed ({0}): {1}</value>
    </data>
+    <data name="OllamaErrorNoModelSelected" xml:space="preserve">
+      <value>Please select an Ollama model first.</value>
+    </data>
+    <data name="OllamaErrorStreamCallFailed" xml:space="preserve">
+      <value>Ollama API streaming call failed ({0}): {1}</value>
+    </data>
+    <data name="OllamaCloudErrorNoModelSelected" xml:space="preserve">
+      <value>Please select an Ollama Cloud model first.</value>
+    </data>
+    <data name="OllamaCloudErrorStreamCallFailed" xml:space="preserve">
+      <value>Ollama Cloud API streaming call failed ({0}): {1}</value>
+    </data>
    <data name="GoErrorApiCallFailed" xml:space="preserve">
      <value>OpenCode Go API call failed ({0}): {1}</value>
    </data>

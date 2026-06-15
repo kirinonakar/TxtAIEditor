@@ -239,6 +239,7 @@ namespace TxtAIEditor.Core.Services
             string apiKey = await GetApiKeyAsync(providerName);
             bool requiresApiKey = !providerName.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) &&
                                     !providerName.Equals("LMStudio", StringComparison.OrdinalIgnoreCase) &&
+                                    !providerName.Equals("Ollama", StringComparison.OrdinalIgnoreCase) &&
                                     !providerName.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) &&
                                     !providerName.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
 
@@ -256,6 +257,9 @@ namespace TxtAIEditor.Core.Services
                 "openrouter" => new OpenRouterProvider(_localizationService),
                 "lm studio" => new LMStudioProvider(_localizationService),
                 "lmstudio" => new LMStudioProvider(_localizationService),
+                "ollama" => new OllamaProvider(_localizationService, isCloud: false),
+                "ollama cloud" => new OllamaProvider(_localizationService, isCloud: true),
+                "ollamacloud" => new OllamaProvider(_localizationService, isCloud: true),
                 "opencode go" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
                 "opencodego" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
                 "go" => new GoProvider(_localizationService, settings.LlmThinkingLevel),

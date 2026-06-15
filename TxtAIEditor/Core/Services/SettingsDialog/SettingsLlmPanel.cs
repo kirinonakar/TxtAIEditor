@@ -278,7 +278,8 @@ namespace TxtAIEditor.Core.Services
             {
                 _refreshModelsButton.IsEnabled = false;
                 _modelStatusText.Text = string.Format(_getString("SettingsLlmLoadingModelsFormat", "{0} 모델 목록을 불러오는 중입니다..."), provider);
-                var models = await SettingsLlmModelFetcher.FetchModelsAsync(_llmEndpointBox.Text.Trim());
+                string apiKey = _llmApiKeyBox.Password.Trim();
+                var models = await SettingsLlmModelFetcher.FetchModelsAsync(_llmEndpointBox.Text.Trim(), apiKey);
 
                 _llmModelCombo.Items.Clear();
                 foreach (var model in models)
@@ -334,6 +335,20 @@ namespace TxtAIEditor.Core.Services
                 _refreshModelsButton.Content = _getString("SettingsLlmLoadOpenCodeZenModels", "OpenCode Zen 모델 불러오기");
                 _refreshModelsButton.Visibility = Visibility.Visible;
                 _modelStatusText.Text = _getString("SettingsLlmOpenCodeZenInfo", "OpenCode Zen는 https://opencode.ai/zen/v1/models 에서 모델 목록을 불러옵니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
+            else if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                _refreshModelsButton.Content = _getString("SettingsLlmLoadOllamaModels", "Ollama 모델 불러오기");
+                _refreshModelsButton.Visibility = Visibility.Visible;
+                _modelStatusText.Text = _getString("SettingsLlmOllamaInfo", "Ollama는 서버가 켜져 있을 때 http://localhost:11434/v1/models 에서 모델 목록을 불러옵니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
+            else if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            {
+                _refreshModelsButton.Content = _getString("SettingsLlmLoadOllamaCloudModels", "Ollama Cloud 모델 불러오기");
+                _refreshModelsButton.Visibility = Visibility.Visible;
+                _modelStatusText.Text = _getString("SettingsLlmOllamaCloudInfo", "Ollama Cloud는 지정된 endpoint에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
             else

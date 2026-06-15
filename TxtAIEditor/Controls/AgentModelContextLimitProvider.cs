@@ -141,7 +141,7 @@ namespace TxtAIEditor.Controls
             {
                 return 1000000;
             }
-            if (provider.Contains("openai") || provider.Contains("openrouter") || provider.Contains("zen") || provider.Contains("go"))
+            if (provider.Contains("openai") || provider.Contains("openrouter") || provider.Contains("zen") || provider.Contains("go") || provider.Contains("ollama"))
             {
                 return 128000;
             }

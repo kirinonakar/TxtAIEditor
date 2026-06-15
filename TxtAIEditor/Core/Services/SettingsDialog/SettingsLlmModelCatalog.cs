@@ -14,7 +14,9 @@ namespace TxtAIEditor.Core.Services
             "OpenRouter",
             "LM Studio",
             "OpenCode Go",
-            "OpenCode Zen"
+            "OpenCode Zen",
+            "Ollama",
+            "Ollama Cloud"
         };
 
         public static int GetProviderIndex(string provider)
@@ -30,7 +32,9 @@ namespace TxtAIEditor.Core.Services
             return provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase) ||
-                provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase);
+                provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool SupportsThinkingLevel(string provider)
@@ -65,6 +69,8 @@ namespace TxtAIEditor.Core.Services
                 "Gemini" => "https://generativelanguage.googleapis.com",
                 "OpenCode Go" => "https://opencode.ai/zen/go/v1",
                 "OpenCode Zen" => "https://opencode.ai/zen/v1",
+                "Ollama" => "http://localhost:11434/v1",
+                "Ollama Cloud" => "https://ollama.com",
                 _ => fallback
             };
         }
@@ -152,6 +158,19 @@ namespace TxtAIEditor.Core.Services
                 };
             }
 
+            if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            {
+                return new[]
+                {
+                    "llama3:latest",
+                    "gemma2:latest",
+                    "mistral:latest",
+                    "phi3:latest",
+                    "qwen2.5-coder:latest"
+                };
+            }
+
             return Array.Empty<string>();
         }
 
@@ -189,6 +208,16 @@ namespace TxtAIEditor.Core.Services
                 return string.IsNullOrEmpty(target) ? "gpt-5.5" : target;
             }
 
+            if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelOllama) ? settings.LlmModelOllama : selectedModel;
+            }
+
+            if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : selectedModel;
+            }
+
             return selectedModel;
         }
 
@@ -224,6 +253,16 @@ namespace TxtAIEditor.Core.Services
                 return !string.IsNullOrEmpty(settings.LlmModelOpenCodeZen) ? settings.LlmModelOpenCodeZen : "gpt-5.5";
             }
 
+            if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelOllama) ? settings.LlmModelOllama : "llama3:latest";
+            }
+
+            if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : "llama3:latest";
+            }
+
             return settings.LlmModel;
         }
 
@@ -242,6 +281,16 @@ namespace TxtAIEditor.Core.Services
             if (provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelOpenCodeZen) ? settings.LlmModelOpenCodeZen : settings.LlmModel;
+            }
+
+            if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelOllama) ? settings.LlmModelOllama : settings.LlmModel;
+            }
+
+            if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : settings.LlmModel;
             }
 
             return !string.IsNullOrEmpty(settings.LlmModelOpenRouter) ? settings.LlmModelOpenRouter : settings.LlmModel;
@@ -272,6 +321,14 @@ namespace TxtAIEditor.Core.Services
             else if (settings.LlmProvider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
             {
                 settings.LlmModelOpenCodeZen = settings.LlmModel;
+            }
+            else if (settings.LlmProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmModelOllama = settings.LlmModel;
+            }
+            else if (settings.LlmProvider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmModelOllamaCloud = settings.LlmModel;
             }
         }
 
