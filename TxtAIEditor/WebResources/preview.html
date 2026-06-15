@@ -978,13 +978,12 @@
 
                 setupVirtualHeight();
 
-                // Skip scroll position correction during active editor typing to avoid jump/jitter.
-                // The editor will shortly send a syncScroll message to set the correct scroll position.
+                // Restore scroll position relative to anchor line when the preview is not being scrolled by the user.
+                // Keeping this running during editor updates prevents scroll jitter from layout changes.
                 const now = Date.now();
-                const isRecentEditorUpdate = (now - state.lastUpdateFromEditor) < 500;
                 const isActivePreviewScroll = (now - lastPreviewUserScrollAt) < 160;
 
-                if (!isRecentEditorUpdate && !isActivePreviewScroll) {
+                if (!isActivePreviewScroll) {
                     // Restore scroll position relative to anchor line
                     const newAnchorTop = rowTop(anchorLine);
                     const corrected = newAnchorTop + anchorOffset;
