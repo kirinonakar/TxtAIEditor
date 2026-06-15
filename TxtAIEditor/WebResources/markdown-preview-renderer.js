@@ -1135,6 +1135,7 @@ export {
     findEditablePreviewBlockContaining,
     initializeMermaid,
     inlineMarkdown,
+    listItemInfo,
     renderBlockAt,
     renderLatex,
     renderLatexLine,
