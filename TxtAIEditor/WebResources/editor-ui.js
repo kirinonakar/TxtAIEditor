@@ -348,6 +348,7 @@ function handleCsharpMessage(msg) {
                     return;
                 }
                 isSyncingScroll = true;
+                lastProgrammaticScrollTime = Date.now();
                 scrollContainer.scrollTop = targetScrollTop;
                 lastSetScrollTop = scrollContainer.scrollTop;
                 requestAnimationFrame(() => {
@@ -1757,6 +1758,7 @@ document.addEventListener('selectionchange', () => {
 
 let isSyncingScroll = false;
 let lastSetScrollTop = -1;
+let lastProgrammaticScrollTime = 0;
 scrollContainer.addEventListener('scroll', () => {
     hideContextMenu();
     syncCsvHeaderScroll();
@@ -1767,6 +1769,10 @@ scrollContainer.addEventListener('scroll', () => {
         return;
     }
     lastSetScrollTop = -1;
+
+    if (Date.now() - lastProgrammaticScrollTime < 100) {
+        return;
+    }
 
     if (state.scrollSyncEnabled && !isSyncingScroll) {
         const firstVisible = lineAt(scrollContainer.scrollTop);

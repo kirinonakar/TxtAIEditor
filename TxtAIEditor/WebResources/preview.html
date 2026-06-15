@@ -422,6 +422,7 @@
         let lastSetScrollTop = -1;
         let lastPreviewUserScrollAt = 0;
         let lastPreviewScrollPostedAt = 0;
+        let lastProgrammaticScrollTime = 0;
 
         function suppressPreviewScrollUntilNextFrame() {
             const token = ++scrollSuppressionToken;
@@ -442,6 +443,7 @@
                 return;
             }
             suppressPreviewScrollUntilNextFrame();
+            lastProgrammaticScrollTime = Date.now();
             scroll.scrollTop = target;
             lastSetScrollTop = scroll.scrollTop;
         }
@@ -989,6 +991,7 @@
                     const corrected = newAnchorTop + anchorOffset;
                     if (Math.abs(scroll.scrollTop - corrected) > 1) {
                         suppressPreviewScrollUntilNextFrame();
+                        lastProgrammaticScrollTime = Date.now();
                         const targetScrollTop = Math.max(0, corrected);
                         scroll.scrollTop = targetScrollTop;
                         lastSetScrollTop = scroll.scrollTop;
@@ -1082,6 +1085,10 @@
                 return;
             }
             lastSetScrollTop = -1;
+
+            if (now - lastProgrammaticScrollTime < 100) {
+                return;
+            }
 
             if (state.scrollSyncEnabled && !isSyncingScroll && !suppressPreviewScrollEvents) {
                 const firstVisible = lineAt(scroll.scrollTop);
