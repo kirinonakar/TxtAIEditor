@@ -314,8 +314,25 @@ function handleCsharpMessage(msg) {
             state.inlineLivePreviewEnabled = !!msg.enabled;
             state.livePreviewBaseHref = msg.baseHref || '';
             clearPendingInlineLivePreviewFocus();
-            state.inlineLivePreviewSourceLine = null;
-            state.inlineLivePreviewEditableBlock = null;
+            if (state.inlineLivePreviewEnabled) {
+                const activeEl = document.activeElement?.closest?.('.line-text');
+                const activeLine = activeEl ? Number(activeEl.dataset.line) : state.currentLine;
+                if (activeLine) {
+                    state.inlineLivePreviewSourceLine = activeLine;
+                    state.inlineLivePreviewEditableBlock = findEditablePreviewBlockContaining(
+                        activeLine,
+                        state.lineCount,
+                        line => state.cache.get(line),
+                        { tabSize: state.tabSize || 4 }
+                    );
+                } else {
+                    state.inlineLivePreviewSourceLine = null;
+                    state.inlineLivePreviewEditableBlock = null;
+                }
+            } else {
+                state.inlineLivePreviewSourceLine = null;
+                state.inlineLivePreviewEditableBlock = null;
+            }
             state.lineHeights.clear();
             document.body.classList.toggle('inline-live-preview-enabled', state.inlineLivePreviewEnabled);
             setupVirtualHeight();
