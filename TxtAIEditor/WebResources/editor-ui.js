@@ -1573,7 +1573,7 @@ viewport.addEventListener('keyup', event => {
             'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
             'Enter', 'Escape', 'Tab', 'Shift', 'Control', 'Alt', 'Meta',
             'CapsLock', 'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete',
-            'Process'
+            'Process', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
         ];
         if (!ignoredKeys.includes(event.key) && event.keyCode !== 229 && !event.ctrlKey && !event.metaKey) {
             triggerAutocomplete(element);
