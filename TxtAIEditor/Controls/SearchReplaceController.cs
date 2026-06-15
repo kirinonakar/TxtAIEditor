@@ -85,6 +85,7 @@ namespace TxtAIEditor.Controls
 
             _lastSearchQuery = query;
             _viewModel.SearchResults.Clear();
+            _viewModel.SearchResultsGrouped.Clear();
 
             FileSearchSummary summary;
             try
@@ -196,6 +197,7 @@ namespace TxtAIEditor.Controls
             }
 
             _viewModel.SearchResults.Clear();
+            _viewModel.SearchResultsGrouped.Clear();
             _showError("바꾸기 완료", "모든 매칭 항목의 바꾸기 처리가 완료되었습니다.");
             await _refreshGitStatusAsync();
         }
@@ -251,6 +253,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 _viewModel.SearchResults.Remove(item);
+                UpdateGroupedResults();
                 await _refreshGitStatusAsync();
             }
             catch (Exception ex)
@@ -270,31 +273,7 @@ namespace TxtAIEditor.Controls
 
         public async Task HandleSearchQueryEnterAsync()
         {
-            string query = _searchQueryInput.Text;
-            if (string.IsNullOrWhiteSpace(query))
-            {
-                return;
-            }
-
-            if (_viewModel.SearchResults.Count == 0 || query != _lastSearchQuery)
-            {
-                await SearchAllFilesAsync();
-                return;
-            }
-
-            int nextIndex = 0;
-            if (_searchResultsList.SelectedIndex >= 0)
-            {
-                nextIndex = (_searchResultsList.SelectedIndex + 1) % _viewModel.SearchResults.Count;
-            }
-
-            _searchResultsList.SelectedIndex = nextIndex;
-            _searchResultsList.ScrollIntoView(_searchResultsList.SelectedItem);
-
-            if (_searchResultsList.SelectedItem is SearchResultItem selectedItem)
-            {
-                await _loadAndHighlightResultAsync(selectedItem, _lastSearchQuery);
-            }
+            await SearchAllFilesAsync();
         }
 
         private FileSearchOptions GetSearchOptions()
@@ -321,6 +300,48 @@ namespace TxtAIEditor.Controls
                     {
                         _viewModel.SearchResults.Add(item);
                     }
+                }
+                UpdateGroupedResults();
+            });
+        }
+
+        private void UpdateGroupedResults()
+        {
+            _searchResultsList.DispatcherQueue.TryEnqueue(() =>
+            {
+                string searchRoot = _searchRootProvider();
+                var groups = _viewModel.SearchResults
+                    .GroupBy(item => item.Path)
+                    .Select(g =>
+                    {
+                        string relDir = "";
+                        try
+                        {
+                            if (!string.IsNullOrEmpty(searchRoot) && g.Key.StartsWith(searchRoot, StringComparison.OrdinalIgnoreCase))
+                            {
+                                string relPath = Path.GetRelativePath(searchRoot, g.Key);
+                                string? dir = Path.GetDirectoryName(relPath);
+                                relDir = string.IsNullOrEmpty(dir) || dir == "." ? "" : dir.Replace('\\', '/');
+                            }
+                            else
+                            {
+                                string? dir = Path.GetDirectoryName(g.Key);
+                                relDir = string.IsNullOrEmpty(dir) ? "" : dir.Replace('\\', '/');
+                            }
+                        }
+                        catch
+                        {
+                            relDir = Path.GetDirectoryName(g.Key) ?? "";
+                        }
+
+                        return new SearchResultGroup(g.Key, g.ToList(), relDir);
+                    })
+                    .ToList();
+
+                _viewModel.SearchResultsGrouped.Clear();
+                foreach (var grp in groups)
+                {
+                    _viewModel.SearchResultsGrouped.Add(grp);
                 }
             });
         }

@@ -314,17 +314,39 @@
                                 </StackPanel>
     
                                 <ListView x:Name="SearchResultsList" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnSearchResultItemClick">
+                                    <ListView.GroupStyle>
+                                        <GroupStyle>
+                                            <GroupStyle.HeaderTemplate>
+                                                <DataTemplate x:DataType="models:SearchResultGroup">
+                                                    <Grid Padding="8,4,8,4" Background="{ThemeResource SystemControlBackgroundListLowBrush}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <FontIcon Glyph="&#xE7C3;" FontSize="11" Margin="0,0,6,0" Foreground="{ThemeResource SystemControlForegroundAccentBrush}" VerticalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" ToolTipService.ToolTip="{x:Bind Path}">
+                                                            <TextBlock Text="{x:Bind FileName}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{x:Bind RelativeDirectory}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <Border Grid.Column="2" Background="{ThemeResource SystemControlBackgroundAccentBrush}" CornerRadius="10" Padding="6,1,6,1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind MatchCount}" FontSize="8" FontWeight="Bold" Foreground="White"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </GroupStyle.HeaderTemplate>
+                                        </GroupStyle>
+                                    </ListView.GroupStyle>
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="models:SearchResultItem">
-                                            <Grid Padding="0,5,0,5">
+                                            <Grid Padding="12,3,0,3">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{x:Bind HeaderText}" FontWeight="Bold" FontSize="11" Foreground="{ThemeResource SystemControlForegroundAccentBrush}"/>
+                                                    <TextBlock Text="{x:Bind LineHeader}" FontWeight="SemiBold" FontSize="10" Foreground="{ThemeResource SystemControlForegroundAccentBrush}"/>
                                                     <TextBlock Text="{x:Bind LineContent}" FontSize="12" TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{x:Bind DisplayPath}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
                                                 <Button Grid.Column="1" Content="&#xE194;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnReplaceOneClick" Tag="{x:Bind}" Padding="4" Margin="5,0,0,0" VerticalAlignment="Center" ToolTipService.ToolTip="{Binding Path=ReplaceOneTooltip, Source={StaticResource LocBridge}}" FontSize="11"/>
                                             </Grid>

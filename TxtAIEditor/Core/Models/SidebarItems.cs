@@ -41,5 +41,21 @@ namespace TxtAIEditor.Core.Models
         public string LineContent { get; set; } = string.Empty;
         public int IndexOfMatch { get; set; }
         public int MatchLength { get; set; }
+        public string LineHeader => $"Line {LineNumber}";
+    }
+
+    public class SearchResultGroup : System.Collections.Generic.List<SearchResultItem>
+    {
+        public string Path { get; set; } = string.Empty;
+        public string FileName => System.IO.Path.GetFileName(Path);
+        public string DisplayPath => Path;
+        public string RelativeDirectory { get; set; } = string.Empty;
+        public int MatchCount => this.Count;
+
+        public SearchResultGroup(string path, System.Collections.Generic.IEnumerable<SearchResultItem> items, string relativeDirectory = "") : base(items)
+        {
+            Path = path;
+            RelativeDirectory = relativeDirectory;
+        }
     }
 }

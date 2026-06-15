@@ -948,7 +948,12 @@ namespace TxtAIEditor
 
             // Bind Left Sidebar Tab items
             FileListView.ItemsSource = _viewModel.ExplorerItems;
-            SearchResultsList.ItemsSource = _viewModel.SearchResults;
+            var groupedSource = new Microsoft.UI.Xaml.Data.CollectionViewSource
+            {
+                IsSourceGrouped = true,
+                Source = _viewModel.SearchResultsGrouped
+            };
+            SearchResultsList.ItemsSource = groupedSource.View;
             _statusBarController.InitializeEncodings(TextEncodingService.SupportedEncodingNames, "UTF-8");
             WireTopToolbarEvents();
             WireLeftSidebarEvents();
@@ -1964,7 +1969,7 @@ namespace TxtAIEditor
 
         private string GetSearchRoot()
         {
-            return !string.IsNullOrEmpty(_currentFolderPath) ? _currentFolderPath : _currentRepoPath;
+            return _currentFolderPath ?? string.Empty;
         }
 
         private long GetLargeFileThresholdBytes()
