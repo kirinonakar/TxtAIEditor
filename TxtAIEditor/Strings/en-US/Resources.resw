@@ -2235,5 +2235,8 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
    </data>
    <data name="AgentExtractDocumentOutputExistsNoteFormat" xml:space="preserve">
      <value>note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}</value>
-   </data>
- </root>
+  </data>
+  <data name="AgentStreamToTab" xml:space="preserve">
+    <value>Input to Tab</value>
+  </data>
+</root>
