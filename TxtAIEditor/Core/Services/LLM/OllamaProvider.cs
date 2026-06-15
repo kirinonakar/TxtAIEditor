@@ -51,6 +51,10 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string defaultEndpoint = _isCloud ? "https://ollama.com" : "http://localhost:11434/v1";
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? defaultEndpoint : endpoint.Trim();
+            if (baseEndpoint.Equals("https://ollama.com", StringComparison.OrdinalIgnoreCase))
+            {
+                baseEndpoint = "https://ollama.com/v1";
+            }
             string requestUrl = baseEndpoint.TrimEnd('/') + "/chat/completions";
 
             var payload = new

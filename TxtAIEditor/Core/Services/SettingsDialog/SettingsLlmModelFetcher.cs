@@ -11,6 +11,10 @@ namespace TxtAIEditor.Core.Services
         public static async Task<IReadOnlyList<string>> FetchModelsAsync(string endpoint, string? apiKey = null)
         {
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:11434/v1" : endpoint.Trim();
+            if (baseEndpoint.Equals("https://ollama.com", StringComparison.OrdinalIgnoreCase))
+            {
+                baseEndpoint = "https://ollama.com/v1";
+            }
             string requestUrl = baseEndpoint.TrimEnd('/') + "/models";
 
             var models = new List<string>();
