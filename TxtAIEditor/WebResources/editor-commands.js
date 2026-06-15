@@ -53,6 +53,8 @@ import { createEditorCompositionHandlers } from './editor-composition.js';
 import { createMarkdownCommandHandlers } from './editor-markdown-commands.js';
 import { createTextCommandActions } from './editor-text-command-actions.js';
 
+let verticalCaretVisualAnchor = null;
+
 function beginEditTransaction() {
     post({ type: 'editTransactionStarted' });
 }
@@ -117,6 +119,84 @@ function finishPendingImeBeforeCaretNavigation(element) {
     return false;
 }
 
+function anchoredCaretRectForVerticalMove(element, lineNumber, caret, fallbackRect) {
+    const anchor = verticalCaretVisualAnchor;
+    if (!anchor ||
+        anchor.line !== lineNumber ||
+        anchor.column !== caret ||
+        performance.now() - anchor.time > 2000 ||
+        document.activeElement?.closest?.('.line-text') !== element) {
+        return fallbackRect;
+    }
+
+    return {
+        left: anchor.left,
+        right: anchor.left,
+        top: anchor.top,
+        bottom: anchor.bottom,
+        height: anchor.height
+    };
+}
+
+function rememberVerticalCaretVisualAnchor(line, column, left, top, height) {
+    const safeHeight = Math.max(1, Number(height || state.lineHeight));
+    verticalCaretVisualAnchor = {
+        line,
+        column,
+        left,
+        top,
+        bottom: top + safeHeight,
+        height: safeHeight,
+        time: performance.now()
+    };
+}
+
+function clearVerticalCaretVisualAnchor() {
+    verticalCaretVisualAnchor = null;
+}
+
+function adjacentLogicalLineTarget(lineNumber, direction, preferredX, lineStep, fallbackColumn) {
+    const targetLine = lineNumber + direction;
+    if (targetLine < 1 || targetLine > state.lineCount) return null;
+
+    const targetText = state.cache.get(targetLine) || '';
+    const fallback = {
+        line: targetLine,
+        column: Math.min(Math.max(0, Number(fallbackColumn || 0)), targetText.length)
+    };
+
+    if (!state.wordWrap) {
+        return fallback;
+    }
+
+    const targetElement = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
+    if (!targetElement || targetElement.getAttribute('contenteditable') !== 'true') {
+        return fallback;
+    }
+
+    const targetRect = targetElement.getBoundingClientRect();
+    if (!targetRect || targetRect.height <= 0) {
+        return fallback;
+    }
+
+    const x = Math.max(targetRect.left + 1, Math.min(preferredX, targetRect.right - 1));
+    const y = direction < 0
+        ? targetRect.bottom - lineStep / 2
+        : targetRect.top + lineStep / 2;
+    const column = offsetFromPointInElement(targetElement, x, y);
+    const targetColumn = column === null ? fallback.column : column;
+    const visualTop = direction < 0
+        ? Math.max(targetRect.top, targetRect.bottom - lineStep)
+        : targetRect.top;
+    return {
+        line: targetLine,
+        column: targetColumn,
+        visualLeft: x,
+        visualTop,
+        visualHeight: lineStep
+    };
+}
+
 function moveCaretVertical(element, direction, extendSelection = false) {
     if (!element || element.getAttribute('contenteditable') !== 'true') return false;
     if (finishPendingImeBeforeCaretNavigation(element)) return true;
@@ -131,44 +211,52 @@ function moveCaretVertical(element, direction, extendSelection = false) {
 
     let target = null;
 
-    const caretRect = caretRectForOffset(element, caret);
+    let caretRect = caretRectForOffset(element, caret);
+    let preferredX = null;
+    let lineStep = state.lineHeight;
     if (!caretRect) {
-        if (direction < 0 && lineNumber > 1) {
-            const prevText = state.cache.get(lineNumber - 1) || '';
-            target = { line: lineNumber - 1, column: Math.min(caret, prevText.length) };
-        } else if (direction > 0 && lineNumber < state.lineCount) {
-            const nextText = state.cache.get(lineNumber + 1) || '';
-            target = { line: lineNumber + 1, column: Math.min(caret, nextText.length) };
-        }
+        target = adjacentLogicalLineTarget(lineNumber, direction, caret, lineStep, caret);
     } else {
+        caretRect = anchoredCaretRectForVerticalMove(element, lineNumber, caret, caretRect);
         const elementRect = element.getBoundingClientRect();
         const styles = window.getComputedStyle(element);
         const parsedLineHeight = Number.parseFloat(styles.lineHeight);
-        const lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || state.lineHeight));
-        const targetX = Math.max(elementRect.left + 1, Math.min(caretRect.left, elementRect.right - 1));
+        lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || state.lineHeight));
+        preferredX = Math.max(elementRect.left + 1, Math.min(caretRect.left, elementRect.right - 1));
         const targetY = direction < 0
             ? caretRect.top - lineStep / 2
             : caretRect.bottom + lineStep / 2;
 
         if (targetY >= elementRect.top && targetY <= elementRect.bottom) {
-            const targetColumn = offsetFromPointInElement(element, targetX, targetY, caretRect, direction, lineStep);
+            const targetColumn = offsetFromPointInElement(element, preferredX, targetY, caretRect, direction, lineStep);
             if (targetColumn !== null) {
-                target = { line: lineNumber, column: targetColumn };
+                target = {
+                    line: lineNumber,
+                    column: targetColumn,
+                    visualLeft: preferredX,
+                    visualTop: direction < 0 ? targetY - lineStep / 2 : targetY - lineStep / 2,
+                    visualHeight: lineStep
+                };
             }
         }
 
         if (!target) {
-            if (direction < 0 && lineNumber > 1) {
-                const prevText = state.cache.get(lineNumber - 1) || '';
-                target = { line: lineNumber - 1, column: Math.min(caret, prevText.length) };
-            } else if (direction > 0 && lineNumber < state.lineCount) {
-                const nextText = state.cache.get(lineNumber + 1) || '';
-                target = { line: lineNumber + 1, column: Math.min(caret, nextText.length) };
-            }
+            target = adjacentLogicalLineTarget(lineNumber, direction, preferredX ?? caret, lineStep, caret);
         }
     }
 
     if (target) {
+        if (Number.isFinite(target.visualTop) && Number.isFinite(target.visualLeft)) {
+            rememberVerticalCaretVisualAnchor(
+                target.line,
+                target.column,
+                target.visualLeft,
+                target.visualTop,
+                target.visualHeight ?? lineStep);
+        } else {
+            clearVerticalCaretVisualAnchor();
+        }
+
         if (extendSelection) {
             state.selectionAnchor = anchor;
             state.selection = (anchor.line === target.line && anchor.column === target.column)
@@ -608,6 +696,7 @@ function insertPlainTextByModel(element, text) {
 function moveCaretHorizontal(element, direction, extendSelection = false) {
     if (!element || element.getAttribute('contenteditable') !== 'true') return false;
     if (finishPendingImeBeforeCaretNavigation(element)) return true;
+    clearVerticalCaretVisualAnchor();
 
     const lineNumber = Number(element.dataset.line || state.currentLine || 1);
     const text = lineTextFromElement(element);

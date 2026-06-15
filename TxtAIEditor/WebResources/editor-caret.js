@@ -343,8 +343,9 @@ function caretRectForOffset(element, offset) {
     try {
         range.setStart(position.node, position.offset);
         range.collapse(true);
+        const maxCaretHeight = Math.max(state.lineHeight * 1.75, state.lineHeight + 8);
         let rect = range.getBoundingClientRect();
-        if (rect && (rect.width > 0 || rect.height > 0)) return rect;
+        if (rect && (rect.width > 0 || rect.height > 0) && rect.height <= maxCaretHeight) return rect;
 
         if (offset > 0) {
             const before = textPositionForOffset(element, offset - 1);

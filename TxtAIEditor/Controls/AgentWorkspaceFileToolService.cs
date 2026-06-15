@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace TxtAIEditor.Controls
@@ -41,14 +42,15 @@ namespace TxtAIEditor.Controls
 
             string root = _workspace.ResolveWorkspaceRoot();
             int limit = Math.Clamp(maxResults <= 0 ? 80 : maxResults, 1, 300);
+            Regex? queryRegex = CreateQueryRegex(query);
             var results = new List<string>();
             var contentSearchFiles = new List<string>();
 
             foreach (string filePath in _workspace.EnumerateWorkspaceFiles(root).Where(path => AgentWorkspaceFileResolver.GlobMatches(AgentWorkspaceFileResolver.RelativePath(root, path), glob)))
             {
                 string relativePath = AgentWorkspaceFileResolver.RelativePath(root, filePath);
-                if (relativePath.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    Path.GetFileName(filePath).Contains(query, StringComparison.OrdinalIgnoreCase))
+                if (MatchesSearchQuery(relativePath, query, queryRegex) ||
+                    MatchesSearchQuery(Path.GetFileName(filePath), query, queryRegex))
                 {
                     results.Add($"[path] {relativePath}");
                     if (results.Count >= limit)
@@ -77,7 +79,7 @@ namespace TxtAIEditor.Controls
 
                 for (int i = 0; i < lines.Length; i++)
                 {
-                    if (lines[i].Contains(query, StringComparison.OrdinalIgnoreCase))
+                    if (MatchesSearchQuery(lines[i], query, queryRegex))
                     {
                         string preview = lines[i].Trim();
                         if (preview.Length > 220)
@@ -189,6 +191,38 @@ namespace TxtAIEditor.Controls
             }
 
             return true;
+        }
+
+        private static Regex? CreateQueryRegex(string query)
+        {
+            try
+            {
+                return new Regex(
+                    query,
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                    TimeSpan.FromSeconds(2));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool MatchesSearchQuery(string value, string query, Regex? queryRegex)
+        {
+            if (queryRegex == null)
+            {
+                return value.Contains(query, StringComparison.OrdinalIgnoreCase);
+            }
+
+            try
+            {
+                return queryRegex.IsMatch(value);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return value.Contains(query, StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 }
