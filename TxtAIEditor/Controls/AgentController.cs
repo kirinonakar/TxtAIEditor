@@ -496,14 +496,7 @@ namespace TxtAIEditor.Controls
                                 {
                                     string textToPrint = streamedText.Substring(printedLength, toolCallIndex - printedLength);
                                     visibleTextFlushed = true;
-                                    _agentPane.DispatcherQueue.TryEnqueue(async () =>
-                                    {
-                                        _agentPane.AppendOutputText(textToPrint);
-                                        if (_agentPane.StreamToTab)
-                                        {
-                                            await _insertIntoActiveEditorAsync(textToPrint);
-                                        }
-                                    });
+                                    await AppendOutputTextAndStreamToTabAsync(textToPrint);
                                     printedLength = toolCallIndex;
                                 }
 
@@ -546,14 +539,7 @@ namespace TxtAIEditor.Controls
                                 {
                                     string textToPrint = streamedText.Substring(printedLength, safeLength - printedLength);
                                     visibleTextFlushed = true;
-                                    _agentPane.DispatcherQueue.TryEnqueue(async () =>
-                                    {
-                                        _agentPane.AppendOutputText(textToPrint);
-                                        if (_agentPane.StreamToTab)
-                                        {
-                                            await _insertIntoActiveEditorAsync(textToPrint);
-                                        }
-                                    });
+                                    await AppendOutputTextAndStreamToTabAsync(textToPrint);
                                     printedLength = safeLength;
                                 }
                             }
@@ -616,30 +602,27 @@ namespace TxtAIEditor.Controls
                         break;
                     }
 
-                    await RunOnUIThreadAsync(async () =>
+                    await RunOnUIThreadAsync(() =>
                     {
                         _agentPane.StopThinkingActivity();
-                        int endLength = response.Length;
-                        if (!_settingsService.CurrentSettings.LlmAgentVerbose)
-                        {
-                            int toolCallIndex = response.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
-                            if (toolCallIndex >= 0)
-                            {
-                                endLength = toolCallIndex;
-                            }
-                        }
-
-                        if (printedLength < endLength)
-                        {
-                            string remainingText = response.Substring(printedLength, endLength - printedLength);
-                            visibleTextFlushed = true;
-                            _agentPane.AppendOutputText(remainingText);
-                            if (_agentPane.StreamToTab)
-                            {
-                                await _insertIntoActiveEditorAsync(remainingText);
-                            }
-                        }
                     });
+
+                    int endLength = response.Length;
+                    if (!_settingsService.CurrentSettings.LlmAgentVerbose)
+                    {
+                        int toolCallIndex = response.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                        if (toolCallIndex >= 0)
+                        {
+                            endLength = toolCallIndex;
+                        }
+                    }
+
+                    if (printedLength < endLength)
+                    {
+                        string remainingText = response.Substring(printedLength, endLength - printedLength);
+                        visibleTextFlushed = true;
+                        await AppendOutputTextAndStreamToTabAsync(remainingText);
+                    }
 
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -647,15 +630,9 @@ namespace TxtAIEditor.Controls
                     {
                         if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
-                            await RunOnUIThreadAsync(async () =>
-                            {
-                                _agentPane.AppendOutputLine(_getString("AgentToolCallParseFailed", "도구 호출을 해석하지 못해 원문을 표시합니다."));
-                                _agentPane.AppendOutputText(response);
-                                if (_agentPane.StreamToTab)
-                                {
-                                    await _insertIntoActiveEditorAsync(response);
-                                }
-                            });
+                            await RunOnUIThreadAsync(() =>
+                                _agentPane.AppendOutputLine(_getString("AgentToolCallParseFailed", "도구 호출을 해석하지 못해 원문을 표시합니다.")));
+                            await AppendOutputTextAndStreamToTabAsync(response);
                         }
 
                         await RunOnUIThreadAsync(async () =>
@@ -962,6 +939,23 @@ namespace TxtAIEditor.Controls
                 _attachmentController.Clear();
                 UpdateContextStatsImmediate();
                 _historyController.UpdateUI(_currentSessionId);
+            });
+        }
+
+        private Task AppendOutputTextAndStreamToTabAsync(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return Task.CompletedTask;
+            }
+
+            return RunOnUIThreadAsync(async () =>
+            {
+                _agentPane.AppendOutputText(text);
+                if (_agentPane.StreamToTab)
+                {
+                    await _insertIntoActiveEditorAsync(text);
+                }
             });
         }
 

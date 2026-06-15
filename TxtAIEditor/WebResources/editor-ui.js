@@ -263,7 +263,7 @@ function handleCsharpMessage(msg) {
             break;
         case 'insertText':
             suppressNativePasteUntil = performance.now() + 250;
-            insertTextAtCaret(msg.text || '');
+            insertTextAtCaret(msg.text || '', { preferStateCaret: true });
             break;
         case 'markdownCommand':
             applyMarkdownCommand(msg.command, msg.color);

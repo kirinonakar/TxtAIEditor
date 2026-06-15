@@ -380,7 +380,7 @@ function mergeWithPrevious(element) {
     applyMergeLineBackward(lineNumber, previous, current);
 }
 
-function insertTextAtCaret(text) {
+function insertTextAtCaret(text, options = {}) {
     if (hasCustomSelection()) {
         const sel = normalizeSelection();
         if (sel) {
@@ -388,9 +388,10 @@ function insertTextAtCaret(text) {
             return;
         }
     }
-    let element = document.activeElement?.closest?.('.line-text');
+    const preferStateCaret = options?.preferStateCaret === true;
+    let element = preferStateCaret ? null : document.activeElement?.closest?.('.line-text');
     if (!element || element.getAttribute('contenteditable') !== 'true') {
-        element = activeEditableElement();
+        element = preferStateCaret ? null : activeEditableElement();
         if (element) {
             setCaret(element, Math.max(0, state.currentColumn - 1));
         }
@@ -483,6 +484,13 @@ function insertTextAtCaret(text) {
             endEditTransaction();
         }
         state.lineCount += insertedCount;
+        state.currentLine = lastLineNumber;
+        state.currentColumn = (parts[parts.length - 1]?.length || 0) + 1;
+        state.selection = null;
+        state.selectionAnchor = {
+            line: lastLineNumber,
+            column: state.currentColumn - 1
+        };
         setupVirtualHeight();
         queueRender(true);
         setTimeout(() => focusLine(lastLineNumber, parts[parts.length - 1]?.length || 0), 0);
