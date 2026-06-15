@@ -72,7 +72,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   `Enter` to commit input and move focus down (auto-appends a new blank row at the end of the file), and `Shift + Enter` to move focus up.
 
 ### 🤖 AI Assistant
-*   **Multi-Provider:** Connect with Gemini, OpenAI, OpenRouter, OpenCode Go/Zen or local LM Studio endpoints.
+*   **Multi-Provider:** Connect with Gemini, OpenAI, OpenRouter, OpenCode Go/Zen, Ollama/Ollama Cloud or local LM Studio endpoints.
 *   **Secure Storage:** API keys are securely saved via native Windows Credential Manager.
 *   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Chinese, French, Spanish, German, etc. while safely preserving code structure, markdown formatting, and commands. *(When translating with file context, it automatically performs chunk processing).*
 *   **Context Actions:** Quick AI actions (Explain, Refactor, Summarize, Fix) on selected text. *(When summarizing with file context, it automatically performs chunk processing to handle large documents).*
