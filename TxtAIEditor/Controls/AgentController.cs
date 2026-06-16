@@ -349,8 +349,8 @@ namespace TxtAIEditor.Controls
             _agentPane.BeginOutputBlock(BuildRunHeader(BuildInstructionDisplay(userInstruction)));
             AppendActivity(_getString("AgentActivityCollectingContext", "맥락 수집 중"));
 
-            await RunOnUIThreadAsync(() => { });
-
+            string initialTranscript = string.Empty;
+            string transcript = string.Empty;
             try
             {
                 await CaptureActiveTabForRunAsync();
@@ -374,9 +374,9 @@ namespace TxtAIEditor.Controls
                     initialTranscriptBuilder.AppendLine();
                 }
                 initialTranscriptBuilder.AppendLine(workspaceContext);
-                string initialTranscript = initialTranscriptBuilder.ToString();
+                initialTranscript = initialTranscriptBuilder.ToString();
 
-                string transcript = initialTranscript;
+                transcript = initialTranscript;
                 string response = string.Empty;
 
                 bool completed = false;
@@ -897,6 +897,16 @@ namespace TxtAIEditor.Controls
                     AppendActivity(_getString("AgentActivityStopped", "중단됨"));
                     _agentPane.AppendOutputLine(_getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
                 });
+
+                AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                string runTranscript = transcript.Substring(initialTranscript.Length);
+                if (!string.IsNullOrWhiteSpace(runTranscript))
+                {
+                    AppendSessionHistoryLine(runTranscript.Trim());
+                }
+                AppendSessionHistoryLine("[Agent Response]: Agent execution was interrupted by the user.");
+                AppendSessionHistoryLine();
+                _ = SaveCurrentSessionToHistoryAsync(userInstruction);
             }
             catch (Exception ex)
             {
