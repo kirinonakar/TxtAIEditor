@@ -13,6 +13,22 @@ namespace TxtAIEditor.Core.Services
 {
     public sealed class FileSearchService : IFileSearchService
     {
+        private static readonly HashSet<string> SkippedFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Compiled / native binaries
+            ".exe", ".dll", ".so", ".dylib", ".pdb", ".lib", ".obj", ".o", ".a", ".msixupload", ".msix", ".appx",
+            // Images
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp",
+            ".tiff", ".tif", ".heic", ".heif", ".raw", ".psd", ".ai", ".eps",
+            // Videos
+            ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v",
+            ".mpg", ".mpeg", ".3gp", ".ts", ".m2ts", ".vob",
+            // Compressed / archive containers
+            ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso",
+            ".jar", ".war", ".ear", ".cab", ".lzma", ".tgz", ".tbz2", ".txz",
+            ".zst", ".br", ".lz4", ".ace", ".arj"
+        };
+
         private readonly IFileService _fileService;
 
         public FileSearchService(IFileService fileService)
@@ -213,6 +229,16 @@ namespace TxtAIEditor.Core.Services
             return skippedNames.Any(name => dirName.Equals(name, StringComparison.OrdinalIgnoreCase));
         }
 
+        private static bool ShouldSkipFileExtension(string filePath)
+        {
+            string ext = Path.GetExtension(filePath);
+            if (string.IsNullOrEmpty(ext))
+            {
+                return false;
+            }
+            return SkippedFileExtensions.Contains(ext);
+        }
+
         private static bool IsPathIgnored(string absolutePath, List<GitIgnoreFile> gitIgnoreStack, bool isDir)
         {
             bool ignored = false;
@@ -293,6 +319,10 @@ namespace TxtAIEditor.Core.Services
             foreach (var file in files)
             {
                 if (IsPathIgnored(file, gitIgnoreStack, isDir: false))
+                {
+                    continue;
+                }
+                if (ShouldSkipFileExtension(file))
                 {
                     continue;
                 }
