@@ -40,6 +40,57 @@ namespace TxtAIEditor.Controls
             return value.Length > maxConfirmationChars ? value.Substring(0, maxConfirmationChars) + "..." : value;
         }
 
+        public static string WrapForConfirmation(string value, int maxCharsPerLine = 50)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "(empty)";
+            }
+
+            if (maxCharsPerLine <= 0)
+            {
+                maxCharsPerLine = 100;
+            }
+
+            string normalized = value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+            var outputLines = new List<string>();
+            foreach (string rawLine in normalized.Split('\n'))
+            {
+                string line = rawLine;
+                if (line.Length <= maxCharsPerLine)
+                {
+                    outputLines.Add(line);
+                    continue;
+                }
+
+                int currentIndex = 0;
+                while (currentIndex < line.Length)
+                {
+                    int remaining = line.Length - currentIndex;
+                    if (remaining <= maxCharsPerLine)
+                    {
+                        outputLines.Add(line.Substring(currentIndex));
+                        break;
+                    }
+
+                    int breakOffset = maxCharsPerLine;
+                    int lastSpace = line.LastIndexOf(' ', currentIndex + maxCharsPerLine, maxCharsPerLine);
+                    if (lastSpace > currentIndex)
+                    {
+                        breakOffset = lastSpace - currentIndex;
+                    }
+
+                    outputLines.Add(line.Substring(currentIndex, breakOffset).TrimEnd());
+                    currentIndex += breakOffset;
+                    while (currentIndex < line.Length && line[currentIndex] == ' ')
+                    {
+                        currentIndex++;
+                    }
+                }
+            }
+
+            return string.Join("\n", outputLines);
+        }
         public static string GetStringArgument(JsonElement arguments, string name)
         {
             if (arguments.ValueKind == JsonValueKind.String)

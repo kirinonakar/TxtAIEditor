@@ -55,91 +55,6 @@ namespace TxtAIEditor.Controls
 
         public string? ValidateSelectionEditScope(string normalizedToolName, JsonElement arguments)
         {
-            if (!_currentRunRestrictEditsToSelection ||
-                !IsFileEditingTool(normalizedToolName))
-            {
-                return null;
-            }
-
-            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            if (!selection.HasLineRange)
-            {
-                return null;
-            }
-
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return null;
-            }
-
-            if (!PathsReferToSameFile(path, selection.SourcePath!))
-            {
-                return string.Format(
-                    _getString(
-                        "AgentSelectionEditDifferentFileBlockedFormat",
-                        "{0} failed: selected_range_context limits edits to {1}, but the requested edit targets {2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
-                    normalizedToolName,
-                    FormatSelectionScope(selection),
-                    path);
-            }
-
-            if (normalizedToolName == "search_replace")
-            {
-                int searchReplaceStartLine = GetSearchReplaceStartLineArgument(arguments);
-                int searchReplaceEndLine = GetSearchReplaceEndLineArgument(arguments);
-                if (searchReplaceStartLine <= 0 && searchReplaceEndLine <= 0)
-                {
-                    return null;
-                }
-
-                if (searchReplaceStartLine <= 0)
-                {
-                    searchReplaceStartLine = selection.StartLine;
-                }
-
-                if (searchReplaceEndLine <= 0)
-                {
-                    searchReplaceEndLine = selection.EndLine;
-                }
-
-                if (searchReplaceStartLine < selection.StartLine || searchReplaceEndLine > selection.EndLine)
-                {
-                    return string.Format(
-                        _getString(
-                            "AgentSelectionSearchReplaceRangeBlockedFormat",
-                            "search_replace failed: selected_range_context limits edits to {0}, but the requested edit targets lines {1}-{2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
-                        FormatSelectionScope(selection),
-                        searchReplaceStartLine,
-                        searchReplaceEndLine);
-                }
-
-                return null;
-            }
-
-            if (normalizedToolName != "replace_range")
-            {
-                return string.Format(
-                    _getString(
-                        "AgentSelectionEditToolBlockedFormat",
-                        "{0} failed: selected_range_context limits file edits to {1}. Use replace_range or search_replace within the selected line range for selected-range edits. If the selected-range task is already complete, write the final answer."),
-                    normalizedToolName,
-                    FormatSelectionScope(selection));
-            }
-
-            int startLine = GetReplaceRangeStartLineArgument(arguments, path);
-            int endLine = GetReplaceRangeEndLineArgument(arguments, path);
-            if (startLine < selection.StartLine || endLine > selection.EndLine)
-            {
-                return string.Format(
-                    _getString(
-                        "AgentSelectionEditRangeBlockedFormat",
-                        "replace_range failed: selected_range_context limits edits to {0}, but the requested edit targets lines {1}-{2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
-                    FormatSelectionScope(selection),
-                    startLine,
-                    endLine);
-            }
-
             return null;
         }
 
@@ -334,28 +249,6 @@ namespace TxtAIEditor.Controls
 
             int startLine = GetSearchReplaceStartLineArgument(arguments);
             int endLine = GetSearchReplaceEndLineArgument(arguments);
-            int? allowedStartLine = null;
-            int? allowedEndLine = null;
-            if (_currentRunRestrictEditsToSelection)
-            {
-                AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-                if (selection.HasLineRange &&
-                    !string.IsNullOrWhiteSpace(selection.SourcePath) &&
-                    PathsReferToSameFile(path, selection.SourcePath))
-                {
-                    allowedStartLine = selection.StartLine;
-                    allowedEndLine = selection.EndLine;
-                    if (startLine <= 0)
-                    {
-                        startLine = selection.StartLine;
-                    }
-
-                    if (endLine <= 0)
-                    {
-                        endLine = selection.EndLine;
-                    }
-                }
-            }
 
             return await _fileTools.SearchReplaceAsync(
                 path,
@@ -367,8 +260,8 @@ namespace TxtAIEditor.Controls
                 maxReplacements,
                 startLine,
                 endLine,
-                allowedStartLine,
-                allowedEndLine);
+                null,
+                null);
         }
 
         public async Task<string> CreateFileAsync(JsonElement arguments)
@@ -615,28 +508,14 @@ namespace TxtAIEditor.Controls
                 return "replace_range failed: path is empty and no selected, recently read, or active file path could be inferred.";
             }
 
-            int? allowedStartLine = null;
-            int? allowedEndLine = null;
-            if (_currentRunRestrictEditsToSelection)
-            {
-                AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-                if (selection.HasLineRange &&
-                    !string.IsNullOrWhiteSpace(selection.SourcePath) &&
-                    PathsReferToSameFile(path, selection.SourcePath))
-                {
-                    allowedStartLine = selection.StartLine;
-                    allowedEndLine = selection.EndLine;
-                }
-            }
-
             return await _fileTools.ReplaceRangeAsync(
                 path,
                 GetReplaceRangeStartLineArgument(arguments, path),
                 GetReplaceRangeEndLineArgument(arguments, path),
                 GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
                 GetReplaceRangeExpectedSnippetArgument(arguments, path),
-                allowedStartLine,
-                allowedEndLine);
+                null,
+                null);
         }
 
         public async Task<string> ApplyPatchAsync(JsonElement arguments)
