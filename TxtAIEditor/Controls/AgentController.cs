@@ -436,6 +436,7 @@ namespace TxtAIEditor.Controls
                                             {
                                                 _agentPane.BeginThinkingActivity(label);
                                             });
+                                            printedLength = streamedText.Length;
                                         }
                                         else
                                         {
@@ -456,6 +457,7 @@ namespace TxtAIEditor.Controls
                                     {
                                         _agentPane.UpdateThinkingActivity(label);
                                     });
+                                    printedLength = streamedText.Length;
                                 }
                                 else
                                 {
