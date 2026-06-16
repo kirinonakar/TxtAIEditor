@@ -998,8 +998,7 @@
                     }
                 }
 
-                state.lastRangeKey = '';
-                requestAnimationFrame(() => render());
+                queueRender(true);
             }
         }
 
