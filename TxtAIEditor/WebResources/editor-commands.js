@@ -829,6 +829,13 @@ function clearPendingRepeatEdit() {
     state.repeatEdit.continuousKey = null;
 }
 
+function repeatEditDelayFromNow() {
+    const now = performance.now();
+    const boundaryWait = Math.max(0, state.repeatEdit.lineBoundaryUntil - now);
+    const intervalWait = Math.max(0, state.repeatEdit.intervalMs - (now - state.repeatEdit.lastRunAt));
+    return Math.max(boundaryWait, intervalWait);
+}
+
 function scheduleContinuousModelRepeatEdit(key, delayMs) {
     if (state.repeatEdit.continuousTimer) {
         clearTimeout(state.repeatEdit.continuousTimer);
@@ -841,6 +848,12 @@ function scheduleContinuousModelRepeatEdit(key, delayMs) {
             return;
         }
 
+        const wait = repeatEditDelayFromNow();
+        if (wait > 0) {
+            scheduleContinuousModelRepeatEdit(key, wait);
+            return;
+        }
+
         state.repeatEdit.lastRunAt = performance.now();
         runModelRepeatEdit(key);
         scheduleContinuousModelRepeatEdit(key, state.repeatEdit.intervalMs);
@@ -850,48 +863,19 @@ function scheduleContinuousModelRepeatEdit(key, delayMs) {
 function scheduleModelRepeatEdit(key, isRepeat) {
     if (state.readOnly || state.isComposing) return;
 
-    if (key === 'Enter') {
-        if (isRepeat && state.repeatEdit.continuousKey === key) {
-            return;
-        }
-
-        clearPendingRepeatEdit();
-        state.repeatEdit.continuousKey = key;
-        state.repeatEdit.lastRunAt = performance.now();
-        runModelRepeatEdit(key);
-        scheduleContinuousModelRepeatEdit(key, state.repeatEdit.continuousInitialDelayMs);
+    // Backspace/Delete/Enter are handled from one cancellable timer instead of
+    // browser key-repeat events.  This prevents queued keydown events from
+    // continuing to delete or split lines after the physical key is released.
+    if (state.repeatEdit.continuousKey === key) {
         return;
     }
 
-    const now = performance.now();
-    if (!isRepeat) {
-        clearPendingRepeatEdit();
-        state.repeatEdit.lastRunAt = now;
-        runModelRepeatEdit(key);
-        return;
-    }
-
-    const boundaryWait = Math.max(0, state.repeatEdit.lineBoundaryUntil - now);
-    const intervalWait = Math.max(0, state.repeatEdit.intervalMs - (now - state.repeatEdit.lastRunAt));
-    const wait = Math.max(boundaryWait, intervalWait);
-    state.repeatEdit.pending = key;
-
-    if (wait <= 0) {
-        clearPendingRepeatEdit();
-        state.repeatEdit.lastRunAt = now;
-        runModelRepeatEdit(key);
-        return;
-    }
-
-    if (state.repeatEdit.timer) return;
-    state.repeatEdit.timer = setTimeout(() => {
-        const pending = state.repeatEdit.pending;
-        state.repeatEdit.timer = 0;
-        state.repeatEdit.pending = null;
-        if (!pending || state.readOnly || state.isComposing) return;
-        state.repeatEdit.lastRunAt = performance.now();
-        runModelRepeatEdit(pending);
-    }, wait);
+    clearPendingRepeatEdit();
+    state.repeatEdit.continuousKey = key;
+    state.repeatEdit.pending = null;
+    state.repeatEdit.lastRunAt = performance.now();
+    runModelRepeatEdit(key);
+    scheduleContinuousModelRepeatEdit(key, state.repeatEdit.continuousInitialDelayMs);
 }
 
 function insertPlainTextByModel(element, text) {
