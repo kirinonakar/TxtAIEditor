@@ -607,7 +607,21 @@ function splitCurrentLine(element, options = {}) {
     const before = text.slice(0, caret);
     const after = text.slice(caret);
     const indent = (text.match(/^[ \t]*/) || [''])[0];
-    const indentedAfter = indent + after;
+    const afterStartsWithSpace = /^[ \t]/.test(after);
+    // If the caret is before/inside the line's existing leading spaces, `after`
+    // already contains that indentation.  Prepending `indent` again makes each
+    // repeated Enter before a space grow the line by one more space.
+    const shouldReuseExistingIndent = caret < indent.length;
+    const insertedIndent = shouldReuseExistingIndent ? '' : indent;
+    // When Enter is pressed immediately before a space in an already-indented
+    // line, the copied line indent and the boundary space both become leading
+    // whitespace on the new line.  Consume just that boundary whitespace so
+    // repeated Enter keeps the same indentation instead of adding one space
+    // on every split.  Non-indented plain text keeps its original space.
+    const shouldConsumeBoundarySpace = !shouldReuseExistingIndent && indent.length > 0 && afterStartsWithSpace;
+    const normalizedAfter = shouldConsumeBoundarySpace ? after.slice(1) : after;
+    const indentedAfter = insertedIndent + normalizedAfter;
+    const nextCaretColumn = insertedIndent.length;
     const nextLineNumber = lineNumber + 1;
 
     state.cache.set(lineNumber, before);
@@ -626,10 +640,10 @@ function splitCurrentLine(element, options = {}) {
     setupVirtualHeight();
     post({ type: 'splitLine', lineNumber, before, after: indentedAfter });
     post({ type: 'contentChanged' });
-    markLineBoundaryTransition(nextLineNumber, indent.length);
-    state.selectionAnchor = { line: nextLineNumber, column: indent.length };
+    markLineBoundaryTransition(nextLineNumber, nextCaretColumn);
+    state.selectionAnchor = { line: nextLineNumber, column: nextCaretColumn };
     state.currentLine = nextLineNumber;
-    state.currentColumn = indent.length + 1;
+    state.currentColumn = nextCaretColumn + 1;
     state.editingLine = nextLineNumber;
 
     if (useElementCaret && element.isConnected) {
@@ -639,14 +653,14 @@ function splitCurrentLine(element, options = {}) {
     const immediateTarget = viewport.querySelector(`.line-text[data-line="${nextLineNumber}"]`);
     if (immediateTarget && immediateTarget.getAttribute('contenteditable') === 'true') {
         immediateTarget.innerHTML = renderLineContent(nextLineNumber, indentedAfter);
-        setCaret(immediateTarget, indent.length);
+        setCaret(immediateTarget, nextCaretColumn);
     }
 
     queueRender(true);
     if (splitScrollAnchor) {
-        alignSplitCaretAfterRender(nextLineNumber, indent.length, splitScrollAnchor, splitRestoreToken);
+        alignSplitCaretAfterRender(nextLineNumber, nextCaretColumn, splitScrollAnchor, splitRestoreToken);
     } else {
-        focusLine(nextLineNumber, indent.length, 3 * state.lineHeight);
+        focusLine(nextLineNumber, nextCaretColumn, 3 * state.lineHeight);
     }
 }
 
