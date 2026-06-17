@@ -9,6 +9,8 @@ import {
     isStandaloneDelimiter,
     invalidateMeasuredLineHeightsAround,
     lineCommentSyntax,
+    lineHeightFor,
+    lineTop,
     markDirty,
     measureRenderedRows,
     orderedRange,
@@ -21,6 +23,7 @@ import {
     selectedText,
     setupVirtualHeight,
     shiftCachedLines,
+    totalVirtualHeight,
     state,
     syncCustomSelectionClass,
     writeClipboardText
@@ -463,6 +466,93 @@ function flushPendingEditForSave(requestId) {
     setTimeout(finish, 0);
 }
 
+
+function captureSplitScrollAnchor(element, caretOffset) {
+    if (!element || !element.isConnected || scrollContainer.clientHeight <= 0) return null;
+
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const caretRect = caretRectForOffset(element, caretOffset);
+    if (!caretRect) return null;
+
+    const caretViewportTop = caretRect.top - containerRect.top;
+    const caretViewportBottom = caretRect.bottom - containerRect.top;
+    const rowHeight = Math.max(1, Number(state.lineHeight || caretRect.height || 1));
+    const bottomGuard = 3 * rowHeight;
+    const bottomGap = scrollContainer.clientHeight - caretViewportBottom;
+    const tolerance = Math.max(2, rowHeight * 0.35);
+
+    // Preserve the caret Y only when Enter is pressed in the lower guard zone
+    // where the editor normally keeps about three rows below the caret. In the
+    // middle of the viewport, Enter must not pin the caret; otherwise every
+    // split feels like the document scroll position is being manually held.
+    if (bottomGap > bottomGuard + tolerance) return null;
+
+    return {
+        scrollTop: scrollContainer.scrollTop,
+        caretViewportTop,
+        caretViewportBottom,
+        bottomGap,
+        bottomGuard
+    };
+}
+
+function clampScrollTop(scrollTop) {
+    const maxScrollTop = Math.max(0, totalVirtualHeight() - scrollContainer.clientHeight);
+    return Math.min(maxScrollTop, Math.max(0, Number(scrollTop || 0)));
+}
+
+function preserveSplitCaretViewportY(targetLineNumber, anchor) {
+    if (!anchor || !Number.isFinite(anchor.caretViewportTop)) return false;
+
+    // Keep the *caret top* at the same viewport Y.  Using the line/caret bottom
+    // accumulates small errors when word-wrap height is remeasured after Enter.
+    const desiredScrollTop = lineTop(targetLineNumber) - anchor.caretViewportTop;
+    const nextScrollTop = clampScrollTop(desiredScrollTop);
+
+    if (Math.abs(scrollContainer.scrollTop - nextScrollTop) > 0.5) {
+        scrollContainer.scrollTop = nextScrollTop;
+    }
+    return true;
+}
+
+function restoreSplitCaretViewportYAfterRender(targetLineNumber, targetColumn, anchor, attempt = 0) {
+    if (!anchor || !Number.isFinite(anchor.caretViewportTop)) return;
+
+    const run = () => {
+        const element = viewport.querySelector(`.line-text[data-line="${targetLineNumber}"]`);
+        if (!element || element.getAttribute('contenteditable') !== 'true') {
+            if (attempt < 8) {
+                restoreSplitCaretViewportYAfterRender(targetLineNumber, targetColumn, anchor, attempt + 1);
+            }
+            return;
+        }
+
+        setCaret(element, targetColumn);
+        const caretRect = caretRectForOffset(element, targetColumn);
+        if (!caretRect) return;
+
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const currentViewportTop = caretRect.top - containerRect.top;
+        const delta = currentViewportTop - anchor.caretViewportTop;
+        if (Math.abs(delta) > 0.5) {
+            scrollContainer.scrollTop = clampScrollTop(scrollContainer.scrollTop + delta);
+        }
+
+        // One more pass catches the render that may be triggered by the scrollTop
+        // assignment above, but avoids the repeated focusLine margin correction
+        // that caused visible vertical drift on consecutive Enter presses.
+        if (attempt < 1) {
+            restoreSplitCaretViewportYAfterRender(targetLineNumber, targetColumn, anchor, attempt + 1);
+        }
+    };
+
+    if (attempt === 0) {
+        requestAnimationFrame(run);
+    } else {
+        setTimeout(run, 0);
+    }
+}
+
 function splitCurrentLine(element, options = {}) {
     if (hasCustomSelection()) {
         const sel = normalizeSelection();
@@ -494,6 +584,10 @@ function splitCurrentLine(element, options = {}) {
         state.cache.set(lineNumber, text);
     }
 
+    const splitScrollAnchor = useElementCaret
+        ? captureSplitScrollAnchor(element, caret)
+        : null;
+
     const before = text.slice(0, caret);
     const after = text.slice(caret);
     const indent = (text.match(/^[ \t]*/) || [''])[0];
@@ -524,6 +618,8 @@ function splitCurrentLine(element, options = {}) {
         element.innerHTML = renderLineContent(lineNumber, before);
     }
 
+    const preservedSplitScroll = preserveSplitCaretViewportY(nextLineNumber, splitScrollAnchor);
+
     const immediateTarget = viewport.querySelector(`.line-text[data-line="${nextLineNumber}"]`);
     if (immediateTarget && immediateTarget.getAttribute('contenteditable') === 'true') {
         immediateTarget.innerHTML = renderLineContent(nextLineNumber, indentedAfter);
@@ -531,7 +627,10 @@ function splitCurrentLine(element, options = {}) {
     }
 
     queueRender(true);
-    focusLine(nextLineNumber, indent.length, 3 * state.lineHeight);
+    focusLine(nextLineNumber, indent.length, preservedSplitScroll ? 0 : 3 * state.lineHeight);
+    if (preservedSplitScroll) {
+        restoreSplitCaretViewportYAfterRender(nextLineNumber, indent.length, splitScrollAnchor);
+    }
 }
 
 function mergeWithPrevious(element) {

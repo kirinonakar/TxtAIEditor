@@ -1588,7 +1588,7 @@ document.addEventListener('keydown', event => {
         event.preventDefault();
         const keyName = normalizedModelRepeatKey(event);
         if (keyName === 'Enter') {
-            markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph'], 120);
+            markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph', 'insertText', 'insertSpace'], 120);
         } else {
             state.lastDeleteKeyDown = {
                 key: keyName,
@@ -1606,7 +1606,7 @@ document.addEventListener('keydown', event => {
 
     if (event.key === 'Enter') {
         event.preventDefault();
-        markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph'], 120);
+        markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph', 'insertText', 'insertSpace'], 120);
         splitCurrentLine(element);
         return;
     }
