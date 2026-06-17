@@ -57,6 +57,7 @@ import { createMarkdownCommandHandlers } from './editor-markdown-commands.js';
 import { createTextCommandActions } from './editor-text-command-actions.js';
 
 let verticalCaretVisualAnchor = null;
+let splitScrollRestoreToken = 0;
 
 function beginEditTransaction() {
     post({ type: 'editTransactionStarted' });
@@ -467,6 +468,19 @@ function flushPendingEditForSave(requestId) {
 }
 
 
+function visualLineHeightFromCaret(element, caretRect) {
+    if (element) {
+        const parsedLineHeight = Number.parseFloat(window.getComputedStyle(element).lineHeight);
+        if (Number.isFinite(parsedLineHeight) && parsedLineHeight > 0) {
+            return parsedLineHeight;
+        }
+    }
+    if (caretRect && Number.isFinite(caretRect.height) && caretRect.height > 0) {
+        return caretRect.height;
+    }
+    return Math.max(1, Number(state.lineHeight || 1));
+}
+
 function captureSplitScrollAnchor(element, caretOffset) {
     if (!element || !element.isConnected || scrollContainer.clientHeight <= 0) return null;
 
@@ -474,25 +488,31 @@ function captureSplitScrollAnchor(element, caretOffset) {
     const caretRect = caretRectForOffset(element, caretOffset);
     if (!caretRect) return null;
 
+    const rowHeight = visualLineHeightFromCaret(element, caretRect);
+    const caretHeight = Math.max(1, Number(caretRect.height || rowHeight));
     const caretViewportTop = caretRect.top - containerRect.top;
     const caretViewportBottom = caretRect.bottom - containerRect.top;
-    const rowHeight = Math.max(1, Number(state.lineHeight || caretRect.height || 1));
     const bottomGuard = 3 * rowHeight;
-    const bottomGap = scrollContainer.clientHeight - caretViewportBottom;
-    const tolerance = Math.max(2, rowHeight * 0.35);
+    const guardBottom = Math.max(caretHeight, scrollContainer.clientHeight - bottomGuard);
 
-    // Preserve the caret Y only when Enter is pressed in the lower guard zone
-    // where the editor normally keeps about three rows below the caret. In the
-    // middle of the viewport, Enter must not pin the caret; otherwise every
-    // split feels like the document scroll position is being manually held.
-    if (bottomGap > bottomGuard + tolerance) return null;
+    // Enter must behave like ArrowDown: while there is room below, the caret
+    // moves down by one visual row without scrolling.  Only when that next row
+    // would cross the three-line bottom guard do we keep the caret pinned there.
+    // The previous implementation called focusLine() before the inserted row was
+    // measured, so the virtual lineTop estimate could over-scroll and make the
+    // caret jump 6-7 rows upward; repeated Enter then accumulated that error.
+    const naturalNextBottom = caretViewportBottom + rowHeight;
+    const desiredViewportBottom = Math.min(naturalNextBottom, guardBottom);
 
     return {
         scrollTop: scrollContainer.scrollTop,
         caretViewportTop,
         caretViewportBottom,
-        bottomGap,
-        bottomGuard
+        desiredViewportBottom,
+        desiredViewportTop: desiredViewportBottom - caretHeight,
+        bottomGuard,
+        rowHeight,
+        caretHeight
     };
 }
 
@@ -501,28 +521,19 @@ function clampScrollTop(scrollTop) {
     return Math.min(maxScrollTop, Math.max(0, Number(scrollTop || 0)));
 }
 
-function preserveSplitCaretViewportY(targetLineNumber, anchor) {
-    if (!anchor || !Number.isFinite(anchor.caretViewportTop)) return false;
-
-    // Keep the *caret top* at the same viewport Y.  Using the line/caret bottom
-    // accumulates small errors when word-wrap height is remeasured after Enter.
-    const desiredScrollTop = lineTop(targetLineNumber) - anchor.caretViewportTop;
-    const nextScrollTop = clampScrollTop(desiredScrollTop);
-
-    if (Math.abs(scrollContainer.scrollTop - nextScrollTop) > 0.5) {
-        scrollContainer.scrollTop = nextScrollTop;
-    }
-    return true;
-}
-
-function restoreSplitCaretViewportYAfterRender(targetLineNumber, targetColumn, anchor, attempt = 0) {
-    if (!anchor || !Number.isFinite(anchor.caretViewportTop)) return;
+function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, token, attempt = 0) {
+    if (!anchor || !Number.isFinite(anchor.desiredViewportBottom)) return;
+    if (token !== splitScrollRestoreToken) return;
 
     const run = () => {
+        if (token !== splitScrollRestoreToken) return;
+
         const element = viewport.querySelector(`.line-text[data-line="${targetLineNumber}"]`);
         if (!element || element.getAttribute('contenteditable') !== 'true') {
             if (attempt < 8) {
-                restoreSplitCaretViewportYAfterRender(targetLineNumber, targetColumn, anchor, attempt + 1);
+                alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, token, attempt + 1);
+            } else {
+                focusLine(targetLineNumber, targetColumn, 3 * anchor.rowHeight);
             }
             return;
         }
@@ -532,17 +543,17 @@ function restoreSplitCaretViewportYAfterRender(targetLineNumber, targetColumn, a
         if (!caretRect) return;
 
         const containerRect = scrollContainer.getBoundingClientRect();
-        const currentViewportTop = caretRect.top - containerRect.top;
-        const delta = currentViewportTop - anchor.caretViewportTop;
+        const currentViewportBottom = caretRect.bottom - containerRect.top;
+        const delta = currentViewportBottom - anchor.desiredViewportBottom;
         if (Math.abs(delta) > 0.5) {
             scrollContainer.scrollTop = clampScrollTop(scrollContainer.scrollTop + delta);
         }
 
-        // One more pass catches the render that may be triggered by the scrollTop
-        // assignment above, but avoids the repeated focusLine margin correction
-        // that caused visible vertical drift on consecutive Enter presses.
-        if (attempt < 1) {
-            restoreSplitCaretViewportYAfterRender(targetLineNumber, targetColumn, anchor, attempt + 1);
+        // A scrollTop write can cause one more virtual render.  Re-check once or
+        // twice so measured row heights cannot accumulate a vertical drift while
+        // Enter is held down.
+        if (attempt < 2) {
+            alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, token, attempt + 1);
         }
     };
 
@@ -554,6 +565,11 @@ function restoreSplitCaretViewportYAfterRender(targetLineNumber, targetColumn, a
 }
 
 function splitCurrentLine(element, options = {}) {
+    // A held Enter can start the next split before the previous render-pass
+    // restoration has fired.  Invalidate older restorations so they cannot move
+    // focus/scroll back to an earlier line and make the caret appear to climb.
+    const splitRestoreToken = ++splitScrollRestoreToken;
+
     if (hasCustomSelection()) {
         const sel = normalizeSelection();
         if (sel) {
@@ -612,13 +628,13 @@ function splitCurrentLine(element, options = {}) {
     post({ type: 'contentChanged' });
     markLineBoundaryTransition(nextLineNumber, indent.length);
     state.selectionAnchor = { line: nextLineNumber, column: indent.length };
+    state.currentLine = nextLineNumber;
+    state.currentColumn = indent.length + 1;
     state.editingLine = nextLineNumber;
 
     if (useElementCaret && element.isConnected) {
         element.innerHTML = renderLineContent(lineNumber, before);
     }
-
-    const preservedSplitScroll = preserveSplitCaretViewportY(nextLineNumber, splitScrollAnchor);
 
     const immediateTarget = viewport.querySelector(`.line-text[data-line="${nextLineNumber}"]`);
     if (immediateTarget && immediateTarget.getAttribute('contenteditable') === 'true') {
@@ -627,9 +643,10 @@ function splitCurrentLine(element, options = {}) {
     }
 
     queueRender(true);
-    focusLine(nextLineNumber, indent.length, preservedSplitScroll ? 0 : 3 * state.lineHeight);
-    if (preservedSplitScroll) {
-        restoreSplitCaretViewportYAfterRender(nextLineNumber, indent.length, splitScrollAnchor);
+    if (splitScrollAnchor) {
+        alignSplitCaretAfterRender(nextLineNumber, indent.length, splitScrollAnchor, splitRestoreToken);
+    } else {
+        focusLine(nextLineNumber, indent.length, 3 * state.lineHeight);
     }
 }
 

@@ -493,15 +493,13 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
 
         let caretTop = null;
         let caretBottom = null;
-        if (lineH > state.lineHeight) {
-            const existingEl = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
-            if (existingEl && existingEl.getAttribute('contenteditable') === 'true') {
-                const cr = caretRectForOffset(existingEl, columnZeroBased);
-                if (cr) {
-                    const containerRect = scrollContainer.getBoundingClientRect();
-                    caretTop = cr.top - containerRect.top + viewTop;
-                    caretBottom = cr.bottom - containerRect.top + viewTop;
-                }
+        const existingEl = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
+        if (existingEl && existingEl.getAttribute('contenteditable') === 'true') {
+            const cr = caretRectForOffset(existingEl, columnZeroBased);
+            if (cr) {
+                const containerRect = scrollContainer.getBoundingClientRect();
+                caretTop = cr.top - containerRect.top + viewTop;
+                caretBottom = cr.bottom - containerRect.top + viewTop;
             }
         }
 
