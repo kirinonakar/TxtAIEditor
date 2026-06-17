@@ -737,6 +737,126 @@ namespace TxtAIEditor.Controls
             return $"merged: {_workspace.RelativePath(targetFullPath)}";
         }
 
+        public async Task<string> InsertIntoFileAsync(string path, string content, string before, string after)
+        {
+            string fullPath = _workspace.ResolveInsideWorkspace(path);
+            if (!File.Exists(fullPath))
+            {
+                return $"insert_to_file failed: file not found: {path}";
+            }
+
+            if (string.IsNullOrEmpty(content))
+            {
+                return "insert_to_file failed: content is empty.";
+            }
+
+            string rawText = await File.ReadAllTextAsync(fullPath);
+            string lineEnding = DetectLineEnding(rawText);
+            string fileContent = NormalizeNewlines(rawText);
+
+            string normalizedContent = NormalizeNewlines(content);
+            string normalizedBefore = NormalizeNewlines(before ?? string.Empty);
+            string normalizedAfter = NormalizeNewlines(after ?? string.Empty);
+
+            if (string.IsNullOrEmpty(normalizedBefore) && string.IsNullOrEmpty(normalizedAfter))
+            {
+                return "insert_to_file failed: at least one of before or after context must be provided.";
+            }
+
+            int insertIndex = FindInsertionPoint(fileContent, normalizedBefore, normalizedAfter);
+            if (insertIndex < 0)
+            {
+                return "insert_to_file failed: could not find a unique insertion point matching the provided context lines.";
+            }
+
+            string updated = fileContent.Insert(insertIndex, normalizedContent);
+            if (string.Equals(updated, fileContent, StringComparison.Ordinal))
+            {
+                return BuildUnchangedEditResult("insert_to_file", fullPath);
+            }
+
+            var preview = new AgentFileEditPreview
+            {
+                ActionName = "insert_to_file",
+                RelativePath = _workspace.RelativePath(fullPath),
+                FullPath = fullPath,
+                OldContent = fileContent,
+                NewContent = updated
+            };
+
+            if (!await _confirmEditAsync(preview))
+            {
+                return $"insert_to_file cancelled: {path}";
+            }
+
+            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await _notifyFileModifiedAsync(fullPath);
+            return $"inserted: {_workspace.RelativePath(fullPath)}";
+        }
+
+        private static int FindInsertionPoint(string fileContent, string before, string after)
+        {
+            string[] lines = fileContent.Split('\n');
+            string[] beforeLines = string.IsNullOrEmpty(before) ? Array.Empty<string>() : before.Split('\n');
+            string[] afterLines = string.IsNullOrEmpty(after) ? Array.Empty<string>() : after.Split('\n');
+
+            var candidateLineIndices = new List<int>();
+
+            for (int i = 0; i <= lines.Length; i++)
+            {
+                bool beforeMatch = true;
+                if (beforeLines.Length > 0)
+                {
+                    int beforeStart = i - beforeLines.Length;
+                    if (beforeStart < 0) continue;
+                    for (int j = 0; j < beforeLines.Length; j++)
+                    {
+                        if (beforeStart + j >= lines.Length ||
+                            lines[beforeStart + j].TrimEnd() != beforeLines[j].TrimEnd())
+                        {
+                            beforeMatch = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (!beforeMatch) continue;
+
+                bool afterMatch = true;
+                if (afterLines.Length > 0)
+                {
+                    if (i + afterLines.Length > lines.Length) continue;
+                    for (int j = 0; j < afterLines.Length; j++)
+                    {
+                        if (lines[i + j].TrimEnd() != afterLines[j].TrimEnd())
+                        {
+                            afterMatch = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (beforeMatch && afterMatch)
+                {
+                    candidateLineIndices.Add(i);
+                }
+            }
+
+            if (candidateLineIndices.Count != 1)
+            {
+                return -1;
+            }
+
+            int insertLineIndex = candidateLineIndices[0];
+            int offset = 0;
+            for (int i = 0; i < insertLineIndex; i++)
+            {
+                offset += lines[i].Length + 1;
+            }
+
+            return offset;
+        }
+
         public async Task<string> SplitFileAsync(string path, List<AgentFileToolService.SplitRange>? ranges, int linesPerFile)
         {
             if (string.IsNullOrWhiteSpace(path))

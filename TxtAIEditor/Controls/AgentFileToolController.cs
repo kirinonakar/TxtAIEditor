@@ -66,7 +66,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (normalizedToolName is not ("read_file" or "read_image" or "extract_document" or "replace_in_file" or "search_replace" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file"))
+            if (normalizedToolName is not ("read_file" or "read_image" or "extract_document" or "replace_in_file" or "search_replace" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file" or "insert_to_file"))
             {
                 return;
             }
@@ -516,6 +516,21 @@ namespace TxtAIEditor.Controls
                 GetReplaceRangeExpectedSnippetArgument(arguments, path),
                 null,
                 null);
+        }
+
+        public async Task<string> InsertIntoFileAsync(JsonElement arguments)
+        {
+            string path = GetEditPathArgument(arguments);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "insert_to_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
+            }
+
+            return await _fileTools.InsertIntoFileAsync(
+                path,
+                GetFirstStringArgument(arguments, "content", "text", "newText", "new_text"),
+                GetFirstStringArgument(arguments, "before", "beforeLines", "before_lines", "previous"),
+                GetFirstStringArgument(arguments, "after", "afterLines", "after_lines", "next"));
         }
 
         public async Task<string> ApplyPatchAsync(JsonElement arguments)

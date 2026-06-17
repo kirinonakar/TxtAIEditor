@@ -1298,6 +1298,7 @@ namespace TxtAIEditor.Controls
                         "split_file" => await _fileToolController.SplitFileAsync(arguments),
                         "replace_range" => await _fileToolController.ReplaceRangeAsync(arguments),
                         "apply_patch" => await _fileToolController.ApplyPatchAsync(arguments),
+                        "insert_to_file" => await _fileToolController.InsertIntoFileAsync(arguments),
                         "insert_text" => await _tabToolController.InsertTextAsync(
                             GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
                         "create_tab" => await _tabToolController.CreateTabAsync(arguments),
@@ -1407,6 +1408,9 @@ namespace TxtAIEditor.Controls
                     GetEditPathArgument(arguments),
                     GetReplaceRangeStartLineArgument(arguments, GetEditPathArgument(arguments)),
                     GetReplaceRangeEndLineArgument(arguments, GetEditPathArgument(arguments))),
+                "insert_to_file" => string.Format(
+                    _getString("AgentActivityInsertIntoFileFormat", "파일에 내용 삽입 중: {0}"),
+                    GetEditPathArgument(arguments)),
                 "apply_patch" => string.Format(
                     _getString("AgentActivityApplyPatchFormat", "파일 패치 적용 중: {0}"),
                     GetEditPathArgument(arguments)),

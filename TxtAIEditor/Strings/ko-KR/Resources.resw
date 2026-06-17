@@ -1688,6 +1688,9 @@
   <data name="AgentActivityReplaceRangeFormat" xml:space="preserve">
     <value>파일 범위 수정 중: {0} ({1}줄부터 {2}줄)</value>
   </data>
+  <data name="AgentActivityInsertIntoFileFormat" xml:space="preserve">
+    <value>파일에 내용 삽입 중: {0}</value>
+  </data>
   <data name="AgentActivityApplyPatchFormat" xml:space="preserve">
     <value>파일 패치 적용 중: {0}</value>
   </data>

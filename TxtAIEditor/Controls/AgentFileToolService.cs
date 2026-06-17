@@ -214,6 +214,11 @@ namespace TxtAIEditor.Controls
             return _edits.MergeFilesAsync(paths, targetPath);
         }
 
+        public Task<string> InsertIntoFileAsync(string path, string content, string before, string after)
+        {
+            return _edits.InsertIntoFileAsync(path, content, before, after);
+        }
+
         public Task<string> SplitFileAsync(string path, List<SplitRange> ranges, int linesPerFile)
         {
             return _edits.SplitFileAsync(path, ranges, linesPerFile);

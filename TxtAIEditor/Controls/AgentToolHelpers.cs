@@ -188,6 +188,7 @@ namespace TxtAIEditor.Controls
                 or "merge_files"
                 or "split_file"
                 or "apply_patch"
+                or "insert_to_file"
                 or "insert_text"
                 or "web_search_exa"
                 or "web_fetch"
@@ -209,7 +210,8 @@ namespace TxtAIEditor.Controls
                 or "save_tab"
                 or "append_to_file"
                 or "merge_files"
-                or "split_file";
+                or "split_file"
+                or "insert_to_file";
         }
 
         public static void ClearCachedToolResults(Dictionary<string, string> toolResults, string normalizedToolName)
@@ -230,7 +232,8 @@ namespace TxtAIEditor.Controls
                 or "apply_patch"
                 or "append_to_file"
                 or "merge_files"
-                or "split_file";
+                or "split_file"
+                or "insert_to_file";
         }
 
         public static bool UserRequestAllowsEditsOutsideSelection(string instruction)
@@ -377,6 +380,10 @@ namespace TxtAIEditor.Controls
                 "exa_fetch" => "web_fetch_exa",
                 "fetch" => "web_fetch",
                 "web_fetch" => "web_fetch",
+                "insert_to_file" => "insert_to_file",
+                "insert_to_file_with_context" => "insert_to_file",
+                "insert_into_file" => "insert_to_file",
+                "file_insert" => "insert_to_file",
                 "patch" => "apply_patch",
                 "apply_diff" => "apply_patch",
                 "open" => "open_file",

@@ -1688,6 +1688,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityReplaceRangeFormat" xml:space="preserve">
     <value>Replacing range in file: {0} (lines {1} to {2})</value>
   </data>
+  <data name="AgentActivityInsertIntoFileFormat" xml:space="preserve">
+    <value>Inserting into file: {0}</value>
+  </data>
   <data name="AgentActivityApplyPatchFormat" xml:space="preserve">
     <value>Applying patch to file: {0}</value>
   </data>

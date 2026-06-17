@@ -1689,6 +1689,9 @@
   <data name="AgentActivityReplaceRangeFormat" xml:space="preserve">
     <value>ファイルの範囲を修正中: {0} ({1}行目から{2}行目)</value>
   </data>
+  <data name="AgentActivityInsertIntoFileFormat" xml:space="preserve">
+    <value>ファイルに挿入中: {0}</value>
+  </data>
   <data name="AgentActivityApplyPatchFormat" xml:space="preserve">
     <value>ファイルにパッチを適用中: {0}</value>
   </data>
