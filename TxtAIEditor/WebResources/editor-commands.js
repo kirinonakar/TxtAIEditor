@@ -484,7 +484,7 @@ function splitCurrentLine(element) {
     post({ type: 'contentChanged' });
     markLineBoundaryTransition(lineNumber + 1, indent.length);
     queueRender(true);
-    setTimeout(() => focusLine(lineNumber + 1, indent.length), 0);
+    setTimeout(() => focusLine(lineNumber + 1, indent.length, 3 * state.lineHeight), 0);
 }
 
 function mergeWithPrevious(element) {
@@ -767,12 +767,12 @@ function moveCaretHorizontal(element, direction, extendSelection = false) {
         state.currentColumn = target.column + 1;
         syncCustomSelectionClass();
         queueRender(true);
-        setTimeout(() => focusLine(target.line, target.column), 0);
+        setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
     } else {
         state.selection = null;
         state.selectionAnchor = { line: target.line, column: target.column };
         syncCustomSelectionClass();
-        focusLine(target.line, target.column);
+        focusLine(target.line, target.column, 3 * state.lineHeight);
     }
 
     return true;
@@ -848,7 +848,7 @@ function applyMergeLineForward(lineNumber, text, nextText) {
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber, text.length);
     queueRender(true);
-    setTimeout(() => focusLine(lineNumber, text.length), 0);
+    setTimeout(() => focusLine(lineNumber, text.length, 3 * state.lineHeight), 0);
 }
 
 function applyMergeLineBackward(lineNumber, previous, current) {
@@ -870,7 +870,7 @@ function applyMergeLineBackward(lineNumber, previous, current) {
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber - 1, previous.length);
     queueRender(true);
-    setTimeout(() => focusLine(lineNumber - 1, previous.length), 0);
+    setTimeout(() => focusLine(lineNumber - 1, previous.length, 3 * state.lineHeight), 0);
 }
 
 function queueLineAction(action) {
