@@ -129,11 +129,18 @@ function anchoredCaretRectForVerticalMove(element, lineNumber, caret, fallbackRe
         return fallbackRect;
     }
 
+    // Wrapped 줄 내부에서 ↑/↓를 계속 누르면 setCaret/focusLine이 scrollTop을 바꿀 수 있다.
+    // 저장된 visual anchor는 viewport 좌표이므로, 스크롤 변화량만큼 보정하지 않으면
+    // 다음 반복 이동이 현재 caret 위치보다 몇 visual line 아래/위를 기준으로 계산되어 건너뛰게 된다.
+    const scrollDelta = scrollContainer.scrollTop - Number(anchor.scrollTop || 0);
+    const top = anchor.top - scrollDelta;
+    const left = anchor.left;
+
     return {
-        left: anchor.left,
-        right: anchor.left,
-        top: anchor.top,
-        bottom: anchor.bottom,
+        left,
+        right: left,
+        top,
+        bottom: top + anchor.height,
         height: anchor.height
     };
 }
@@ -147,12 +154,35 @@ function rememberVerticalCaretVisualAnchor(line, column, left, top, height) {
         top,
         bottom: top + safeHeight,
         height: safeHeight,
+        scrollTop: scrollContainer.scrollTop,
         time: performance.now()
     };
 }
 
 function clearVerticalCaretVisualAnchor() {
     verticalCaretVisualAnchor = null;
+}
+
+function visualLineBoundsForElement(element) {
+    const textRect = element?.getBoundingClientRect?.();
+    const rowRect = element?.closest?.('.line-row')?.getBoundingClientRect?.();
+
+    if (!textRect && !rowRect) return null;
+    if (!rowRect || rowRect.height <= 0) return textRect;
+    if (!textRect || textRect.height <= 0) return rowRect;
+
+    // word-wrap 상태에서는 실제 visual line 높이가 .line-text가 아니라
+    // gutter를 포함한 .line-row 높이로 잡히는 경우가 있다.
+    // ↑/↓ 이동의 세로 범위를 .line-text rect만으로 판단하면
+    // 같은 원본 줄 안의 다음 wrap 줄을 건너뛰고 인접 원본 줄로 이동한다.
+    return {
+        left: textRect.left,
+        right: textRect.right,
+        top: Math.min(textRect.top, rowRect.top),
+        bottom: Math.max(textRect.bottom, rowRect.bottom),
+        width: textRect.width,
+        height: Math.max(textRect.height, rowRect.height)
+    };
 }
 
 function adjacentLogicalLineTarget(lineNumber, direction, preferredX, lineStep, fallbackColumn) {
@@ -174,20 +204,21 @@ function adjacentLogicalLineTarget(lineNumber, direction, preferredX, lineStep, 
         return fallback;
     }
 
-    const targetRect = targetElement.getBoundingClientRect();
-    if (!targetRect || targetRect.height <= 0) {
+    const targetTextRect = targetElement.getBoundingClientRect();
+    const targetBounds = visualLineBoundsForElement(targetElement);
+    if (!targetTextRect || !targetBounds || targetBounds.height <= 0) {
         return fallback;
     }
 
-    const x = Math.max(targetRect.left + 1, Math.min(preferredX, targetRect.right - 1));
+    const x = Math.max(targetTextRect.left + 1, Math.min(preferredX, targetTextRect.right - 1));
     const y = direction < 0
-        ? targetRect.bottom - lineStep / 2
-        : targetRect.top + lineStep / 2;
+        ? targetBounds.bottom - lineStep / 2
+        : targetBounds.top + lineStep / 2;
     const column = offsetFromPointInElement(targetElement, x, y);
     const targetColumn = column === null ? fallback.column : column;
     const visualTop = direction < 0
-        ? Math.max(targetRect.top, targetRect.bottom - lineStep)
-        : targetRect.top;
+        ? Math.max(targetBounds.top, targetBounds.bottom - lineStep)
+        : targetBounds.top;
     return {
         line: targetLine,
         column: targetColumn,
@@ -219,6 +250,7 @@ function moveCaretVertical(element, direction, extendSelection = false) {
     } else {
         caretRect = anchoredCaretRectForVerticalMove(element, lineNumber, caret, caretRect);
         const elementRect = element.getBoundingClientRect();
+        const visualBounds = visualLineBoundsForElement(element) || elementRect;
         const styles = window.getComputedStyle(element);
         const parsedLineHeight = Number.parseFloat(styles.lineHeight);
         lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || state.lineHeight));
@@ -227,14 +259,14 @@ function moveCaretVertical(element, direction, extendSelection = false) {
             ? caretRect.top - lineStep / 2
             : caretRect.bottom + lineStep / 2;
 
-        if (targetY >= elementRect.top && targetY <= elementRect.bottom) {
+        if (targetY >= visualBounds.top - 1 && targetY <= visualBounds.bottom + 1) {
             const targetColumn = offsetFromPointInElement(element, preferredX, targetY, caretRect, direction, lineStep);
             if (targetColumn !== null) {
                 target = {
                     line: lineNumber,
                     column: targetColumn,
                     visualLeft: preferredX,
-                    visualTop: direction < 0 ? targetY - lineStep / 2 : targetY - lineStep / 2,
+                    visualTop: targetY - lineStep / 2,
                     visualHeight: lineStep
                 };
             }
