@@ -20,6 +20,24 @@ namespace TxtAIEditor
         public bool IsFolder { get; set; } = false;
         public DateTime ModifiedTime { get; set; } = DateTime.MinValue;
 
+        private string _subPath = string.Empty;
+        public string SubPath
+        {
+            get => _subPath;
+            set
+            {
+                if (_subPath != value)
+                {
+                    _subPath = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(SubPathVisibility));
+                }
+            }
+        }
+
+        public Microsoft.UI.Xaml.Visibility SubPathVisibility =>
+            string.IsNullOrEmpty(_subPath) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+
         public enum GitStatusType
         {
             Clean,

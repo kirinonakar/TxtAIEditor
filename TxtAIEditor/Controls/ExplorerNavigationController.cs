@@ -129,6 +129,8 @@ namespace TxtAIEditor.Controls
             _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
             _leftSidebar.ExplorerHomeClick += OnExplorerHomeClick;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
+            _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
+            _leftSidebar.ExplorerFilterClearClick += OnExplorerFilterClearClick;
         }
 
         private async void OnSelectFolderClick(object sender, RoutedEventArgs e)
@@ -464,6 +466,154 @@ namespace TxtAIEditor.Controls
             sorted.AddRange(folderList);
             sorted.AddRange(fileList);
             return sorted;
+        }
+
+        private string _lastFilterQuery = string.Empty;
+
+        private async void OnExplorerFilterTextChanged(object sender, Microsoft.UI.Xaml.Controls.TextChangedEventArgs e)
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.TextBox textBox)
+            {
+                string query = textBox.Text;
+                _lastFilterQuery = query;
+                await ApplyFilterAsync(query);
+            }
+        }
+
+        private async void OnExplorerFilterClearClick(object sender, RoutedEventArgs e)
+        {
+            _lastFilterQuery = string.Empty;
+            await ApplyFilterAsync(string.Empty);
+        }
+
+        private async Task ApplyFilterAsync(string query)
+        {
+            if (string.IsNullOrEmpty(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                LoadDirectoryRoot(CurrentFolderPath);
+                return;
+            }
+
+            string currentRoot = CurrentFolderPath;
+            var matchedItems = await Task.Run(() => PerformRecursiveSearch(currentRoot, query));
+
+            if (query == _lastFilterQuery && currentRoot == CurrentFolderPath)
+            {
+                _leftSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _viewModel.ExplorerItems.Clear();
+                    bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                    foreach (var item in SortItems(matchedItems))
+                    {
+                        item.IsDark = isDark;
+                        _viewModel.ExplorerItems.Add(item);
+                    }
+
+                    _leftSidebar.ExplorerStatus.Text = $"{CurrentFolderPath}\n{FormatExplorerFilterResult(_viewModel.ExplorerItems.Count)}";
+                });
+
+                await UpdateGitStatusesAsync();
+            }
+        }
+
+        private System.Collections.Generic.List<ExplorerItem> PerformRecursiveSearch(string rootPath, string query)
+        {
+            var results = new System.Collections.Generic.List<ExplorerItem>();
+            var dirsToProcess = new System.Collections.Generic.Stack<string>();
+            dirsToProcess.Push(rootPath);
+
+            var ignoredFolderNames = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "node_modules", "obj", ".git", ".vs", ".idea", "dist", "build", "out"
+            };
+
+            while (dirsToProcess.Count > 0)
+            {
+                string currentDir = dirsToProcess.Pop();
+                try
+                {
+                    var dirInfo = new DirectoryInfo(currentDir);
+
+                    if (currentDir != rootPath)
+                    {
+                        if (dirInfo.Attributes.HasFlag(FileAttributes.Hidden) ||
+                            dirInfo.Name.StartsWith(".") ||
+                            ignoredFolderNames.Contains(dirInfo.Name))
+                        {
+                            continue;
+                        }
+                    }
+
+                    foreach (var file in dirInfo.GetFiles())
+                    {
+                        if (file.Attributes.HasFlag(FileAttributes.Hidden))
+                        {
+                            continue;
+                        }
+
+                        if (file.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string relPath = Path.GetRelativePath(rootPath, file.FullName);
+                            string? relativeDir = Path.GetDirectoryName(relPath);
+
+                            results.Add(new ExplorerItem
+                            {
+                                Name = file.Name,
+                                Path = file.FullName,
+                                IsFolder = false,
+                                ModifiedTime = file.LastWriteTime,
+                                SubPath = relativeDir ?? string.Empty
+                            });
+                        }
+                    }
+
+                    foreach (var subDir in dirInfo.GetDirectories())
+                    {
+                        if (subDir.Attributes.HasFlag(FileAttributes.Hidden) ||
+                            subDir.Name.StartsWith(".") ||
+                            ignoredFolderNames.Contains(subDir.Name))
+                        {
+                            continue;
+                        }
+
+                        if (subDir.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string relPath = Path.GetRelativePath(rootPath, subDir.FullName);
+                            string? relativeDir = Path.GetDirectoryName(relPath);
+
+                            results.Add(new ExplorerItem
+                            {
+                                Name = subDir.Name,
+                                Path = subDir.FullName,
+                                IsFolder = true,
+                                ModifiedTime = subDir.LastWriteTime,
+                                SubPath = relativeDir ?? string.Empty
+                            });
+                        }
+
+                        dirsToProcess.Push(subDir.FullName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error scanning folder {currentDir}: {ex.Message}");
+                }
+            }
+
+            return results;
+        }
+
+        private string FormatExplorerFilterResult(int matchCount)
+        {
+            string key = "ExplorerFilterResultFormat";
+            string fallback = "{0:N0}개 결과";
+            string format = _localizationService.GetString(key, fallback);
+            return string.Format(format, matchCount);
         }
 
         [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, ExactSpelling = true)]

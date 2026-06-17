@@ -2239,4 +2239,13 @@
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>탭에 스트리밍</value>
   </data>
+  <data name="ExplorerFilterPlaceholder" xml:space="preserve">
+    <value>파일명 필터 (하위 폴더 포함)...</value>
+  </data>
+  <data name="ExplorerFilterClearTooltip" xml:space="preserve">
+    <value>필터 지우기</value>
+  </data>
+  <data name="ExplorerFilterResultFormat" xml:space="preserve">
+    <value>{0:N0}개 결과</value>
+  </data>
 </root>

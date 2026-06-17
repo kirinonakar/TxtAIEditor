@@ -2240,4 +2240,13 @@
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>タブにストリーミング</value>
   </data>
+  <data name="ExplorerFilterPlaceholder" xml:space="preserve">
+    <value>ファイル名でフィルター (サブフォルダを含む)...</value>
+  </data>
+  <data name="ExplorerFilterClearTooltip" xml:space="preserve">
+    <value>フィルターをクリア</value>
+  </data>
+  <data name="ExplorerFilterResultFormat" xml:space="preserve">
+    <value>{0:N0}件の結果</value>
+  </data>
  </root>
