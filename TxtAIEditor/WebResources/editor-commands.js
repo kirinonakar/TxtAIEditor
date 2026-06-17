@@ -712,14 +712,14 @@ function moveCaretHorizontal(element, direction, extendSelection = false) {
         }
     } else if (direction < 0) {
         if (caret > 0) {
-            target = { line: lineNumber, column: caret - 1 };
+            target = { line: lineNumber, column: graphemeDeleteStart(text, caret) };
         } else if (lineNumber > 1) {
             const previousText = state.cache.get(lineNumber - 1) || '';
             target = { line: lineNumber - 1, column: previousText.length };
         }
     } else {
         if (caret < text.length) {
-            target = { line: lineNumber, column: caret + 1 };
+            target = { line: lineNumber, column: graphemeDeleteEnd(text, caret) };
         } else if (lineNumber < state.lineCount) {
             target = { line: lineNumber + 1, column: 0 };
         }
