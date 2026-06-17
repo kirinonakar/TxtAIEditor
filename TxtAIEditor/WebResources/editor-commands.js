@@ -463,28 +463,75 @@ function flushPendingEditForSave(requestId) {
     setTimeout(finish, 0);
 }
 
-function splitCurrentLine(element) {
-    const lineNumber = Number(element.dataset.line || 1);
-    const text = lineTextFromElement(element);
-    const caret = getCaretOffset(element);
+function splitCurrentLine(element, options = {}) {
+    if (hasCustomSelection()) {
+        const sel = normalizeSelection();
+        if (sel) {
+            replaceSelectionWith(sel, '\n');
+            return;
+        }
+    }
+
+    const preferStateCaret = options?.preferStateCaret === true;
+    const elementLineNumber = Number(element?.dataset?.line || 0);
+    const stateLineNumber = Math.min(Math.max(1, Number(state.currentLine || elementLineNumber || 1)), state.lineCount);
+    const useElementCaret = !preferStateCaret &&
+        element &&
+        element.getAttribute?.('contenteditable') === 'true' &&
+        elementLineNumber > 0;
+
+    const lineNumber = useElementCaret ? elementLineNumber : stateLineNumber;
+    const text = useElementCaret
+        ? lineTextFromElement(element)
+        : (state.cache.get(lineNumber) ?? '');
+    const caret = useElementCaret
+        ? getCaretOffset(element)
+        : Math.max(0, Math.min(Number(state.currentColumn || 1) - 1, text.length));
+
+    if (useElementCaret) {
+        // Keep the model in sync before splitting. This covers the last native
+        // composition/input that may still only exist in the contenteditable DOM.
+        state.cache.set(lineNumber, text);
+    }
+
     const before = text.slice(0, caret);
     const after = text.slice(caret);
     const indent = (text.match(/^[ \t]*/) || [''])[0];
     const indentedAfter = indent + after;
+    const nextLineNumber = lineNumber + 1;
+
     state.cache.set(lineNumber, before);
-    shiftCachedLines(lineNumber + 1, 1);
-    state.cache.set(lineNumber + 1, indentedAfter);
+    shiftCachedLines(nextLineNumber, 1);
+    state.cache.set(nextLineNumber, indentedAfter);
     state.lineCount++;
+    invalidateMeasuredLineHeightsAround(lineNumber);
+    invalidateMeasuredLineHeightsAround(nextLineNumber);
     if (!cleanDirtyMarker(lineNumber)) {
         markDirty(lineNumber, 'mod');
     }
-    state.dirtyLines.set(lineNumber + 1, 'add');
+    state.dirtyLines.set(nextLineNumber, 'add');
+    state.selection = null;
+    clearCustomSelectionVisuals();
+    syncCustomSelectionClass();
     setupVirtualHeight();
     post({ type: 'splitLine', lineNumber, before, after: indentedAfter });
     post({ type: 'contentChanged' });
-    markLineBoundaryTransition(lineNumber + 1, indent.length);
+    markLineBoundaryTransition(nextLineNumber, indent.length);
+    state.selectionAnchor = { line: nextLineNumber, column: indent.length };
+    state.editingLine = nextLineNumber;
+
+    if (useElementCaret && element.isConnected) {
+        element.innerHTML = renderLineContent(lineNumber, before);
+    }
+
+    const immediateTarget = viewport.querySelector(`.line-text[data-line="${nextLineNumber}"]`);
+    if (immediateTarget && immediateTarget.getAttribute('contenteditable') === 'true') {
+        immediateTarget.innerHTML = renderLineContent(nextLineNumber, indentedAfter);
+        setCaret(immediateTarget, indent.length);
+    }
+
     queueRender(true);
-    setTimeout(() => focusLine(lineNumber + 1, indent.length, 3 * state.lineHeight), 0);
+    focusLine(nextLineNumber, indent.length, 3 * state.lineHeight);
 }
 
 function mergeWithPrevious(element) {
@@ -622,6 +669,10 @@ function insertTextAtCaret(text, options = {}) {
 
 function isModelRepeatKey(event) {
     if (!event) return false;
+    if (event.key === 'Enter') {
+        return !event.ctrlKey && !event.metaKey && !event.altKey;
+    }
+
     const isDelOrBack = event.key === 'Backspace' || event.key === 'Delete';
     if (!isDelOrBack) return false;
     if (event.ctrlKey || event.metaKey || event.altKey) {
@@ -633,6 +684,7 @@ function isModelRepeatKey(event) {
 function normalizedModelRepeatKey(event) {
     if (event.key === 'Backspace') return 'Backspace';
     if (event.key === 'Delete') return 'Delete';
+    if (event.key === 'Enter') return 'Enter';
     return event.key;
 }
 
@@ -670,11 +722,47 @@ function clearPendingRepeatEdit() {
         clearTimeout(state.repeatEdit.timer);
         state.repeatEdit.timer = 0;
     }
+    if (state.repeatEdit.continuousTimer) {
+        clearTimeout(state.repeatEdit.continuousTimer);
+        state.repeatEdit.continuousTimer = 0;
+    }
     state.repeatEdit.pending = null;
+    state.repeatEdit.continuousKey = null;
+}
+
+function scheduleContinuousModelRepeatEdit(key, delayMs) {
+    if (state.repeatEdit.continuousTimer) {
+        clearTimeout(state.repeatEdit.continuousTimer);
+        state.repeatEdit.continuousTimer = 0;
+    }
+
+    state.repeatEdit.continuousTimer = setTimeout(() => {
+        state.repeatEdit.continuousTimer = 0;
+        if (state.repeatEdit.continuousKey !== key || state.readOnly || state.isComposing) {
+            return;
+        }
+
+        state.repeatEdit.lastRunAt = performance.now();
+        runModelRepeatEdit(key);
+        scheduleContinuousModelRepeatEdit(key, state.repeatEdit.intervalMs);
+    }, Math.max(0, Number(delayMs || 0)));
 }
 
 function scheduleModelRepeatEdit(key, isRepeat) {
     if (state.readOnly || state.isComposing) return;
+
+    if (key === 'Enter') {
+        if (isRepeat && state.repeatEdit.continuousKey === key) {
+            return;
+        }
+
+        clearPendingRepeatEdit();
+        state.repeatEdit.continuousKey = key;
+        state.repeatEdit.lastRunAt = performance.now();
+        runModelRepeatEdit(key);
+        scheduleContinuousModelRepeatEdit(key, state.repeatEdit.continuousInitialDelayMs);
+        return;
+    }
 
     const now = performance.now();
     if (!isRepeat) {
@@ -783,6 +871,12 @@ function runModelRepeatEdit(key) {
     let element = activeEditableElement();
     if (!element || element.getAttribute('contenteditable') !== 'true') {
         focusLine(state.currentLine, Math.max(0, state.currentColumn - 1));
+        return;
+    }
+
+    if (key === 'Enter') {
+        const elementLineNumber = Number(element.dataset.line || 0);
+        splitCurrentLine(element, { preferStateCaret: elementLineNumber !== state.currentLine });
         return;
     }
 

@@ -1587,21 +1587,26 @@ document.addEventListener('keydown', event => {
     if (isModelRepeatKey(event)) {
         event.preventDefault();
         const keyName = normalizedModelRepeatKey(event);
-        state.lastDeleteKeyDown = {
-            key: keyName,
-            line: Number(element.dataset.line || state.currentLine || 1),
-            column: getCaretOffset(element),
-            time: performance.now()
-        };
-        markNativeBeforeInputHandled(keyName === 'Backspace'
-            ? ['deleteContentBackward']
-            : ['deleteContentForward']);
+        if (keyName === 'Enter') {
+            markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph'], 120);
+        } else {
+            state.lastDeleteKeyDown = {
+                key: keyName,
+                line: Number(element.dataset.line || state.currentLine || 1),
+                column: getCaretOffset(element),
+                time: performance.now()
+            };
+            markNativeBeforeInputHandled(keyName === 'Backspace'
+                ? ['deleteContentBackward']
+                : ['deleteContentForward']);
+        }
         scheduleModelRepeatEdit(keyName, event.repeat);
         return;
     }
 
     if (event.key === 'Enter') {
         event.preventDefault();
+        markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph'], 120);
         splitCurrentLine(element);
         return;
     }
@@ -1772,6 +1777,10 @@ viewport.addEventListener('keyup', event => {
 });
 
 document.addEventListener('keyup', event => {
+    if (isModelRepeatKey(event)) {
+        clearPendingRepeatEdit();
+    }
+
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         stopKeyboardVerticalRepeat(event.key);
     } else if (event.key === 'Shift' && keyboardVerticalRepeat.key) {
@@ -1785,9 +1794,15 @@ document.addEventListener('keydown', event => {
     }
 });
 
-window.addEventListener('blur', () => stopKeyboardVerticalRepeat());
+window.addEventListener('blur', () => {
+    stopKeyboardVerticalRepeat();
+    clearPendingRepeatEdit();
+});
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stopKeyboardVerticalRepeat();
+    if (document.hidden) {
+        stopKeyboardVerticalRepeat();
+        clearPendingRepeatEdit();
+    }
 });
 
 

@@ -533,7 +533,11 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
             _focusRetryTimer = setTimeout(tryFocus, 20);
         }
     }
-    _focusRetryTimer = setTimeout(tryFocus, 20);
+
+    // If the target row is already rendered, move the DOM caret in the same
+    // key event.  Delaying even one macrotask lets held Enter keydown events
+    // hit the old focused row and split the wrong line.
+    tryFocus();
 }
 
 function keepElementInView(element) {
