@@ -1200,6 +1200,91 @@ function focusOrSelectEnd(extendSelection) {
     }
 }
 
+const KEYBOARD_VERTICAL_REPEAT_INITIAL_DELAY_MS = 140;
+const KEYBOARD_VERTICAL_REPEAT_INTERVAL_MS = 32;
+let keyboardVerticalRepeat = {
+    key: '',
+    direction: 0,
+    extendSelection: false,
+    timer: 0
+};
+
+function clearKeyboardVerticalRepeatTimer() {
+    if (keyboardVerticalRepeat.timer) {
+        clearTimeout(keyboardVerticalRepeat.timer);
+        keyboardVerticalRepeat.timer = 0;
+    }
+}
+
+function stopKeyboardVerticalRepeat(key = '') {
+    if (key && keyboardVerticalRepeat.key && keyboardVerticalRepeat.key !== key) return;
+    clearKeyboardVerticalRepeatTimer();
+    keyboardVerticalRepeat = {
+        key: '',
+        direction: 0,
+        extendSelection: false,
+        timer: 0
+    };
+}
+
+function editableElementForKeyboardVerticalRepeat() {
+    const currentLineElement = viewport.querySelector(`.line-text[data-line="${state.currentLine}"]`);
+    if (currentLineElement && currentLineElement.getAttribute('contenteditable') === 'true') {
+        return currentLineElement;
+    }
+
+    const active = activeEditableElement();
+    if (active && active.getAttribute('contenteditable') === 'true' &&
+        Number(active.dataset.line || 0) === state.currentLine) {
+        return active;
+    }
+
+    return null;
+}
+
+function scheduleKeyboardVerticalRepeat(delayMs) {
+    clearKeyboardVerticalRepeatTimer();
+    if (!keyboardVerticalRepeat.key) return;
+
+    keyboardVerticalRepeat.timer = setTimeout(() => {
+        keyboardVerticalRepeat.timer = 0;
+        if (!keyboardVerticalRepeat.key) return;
+
+        const repeatElement = editableElementForKeyboardVerticalRepeat();
+        if (repeatElement) {
+            moveCaretVertical(
+                repeatElement,
+                keyboardVerticalRepeat.direction,
+                keyboardVerticalRepeat.extendSelection);
+        }
+
+        scheduleKeyboardVerticalRepeat(KEYBOARD_VERTICAL_REPEAT_INTERVAL_MS);
+    }, delayMs);
+}
+
+function startKeyboardVerticalRepeat(event, element, direction) {
+    event.preventDefault();
+
+    const key = event.key;
+    const extendSelection = !!event.shiftKey;
+    const isSameRepeat = keyboardVerticalRepeat.key === key && keyboardVerticalRepeat.direction === direction;
+
+    keyboardVerticalRepeat.key = key;
+    keyboardVerticalRepeat.direction = direction;
+    keyboardVerticalRepeat.extendSelection = extendSelection;
+
+    // OS/browser key repeat can queue many keydown events while rendering/focusing is busy.
+    // Drive vertical navigation from one cancellable timer instead so release stops immediately.
+    if (event.repeat && isSameRepeat) {
+        return true;
+    }
+
+    clearKeyboardVerticalRepeatTimer();
+    moveCaretVertical(element, direction, extendSelection);
+    scheduleKeyboardVerticalRepeat(KEYBOARD_VERTICAL_REPEAT_INITIAL_DELAY_MS);
+    return true;
+}
+
 document.addEventListener('keydown', event => {
     const earlyCtrl = event.ctrlKey || event.metaKey;
     const earlyKey = event.key ? event.key.toLowerCase() : '';
@@ -1409,14 +1494,12 @@ document.addEventListener('keydown', event => {
     }
 
     if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        moveCaretVertical(element, -1, event.shiftKey);
+        startKeyboardVerticalRepeat(event, element, -1);
         return;
     }
 
     if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        moveCaretVertical(element, 1, event.shiftKey);
+        startKeyboardVerticalRepeat(event, element, 1);
         return;
     }
 
@@ -1654,6 +1737,10 @@ viewport.addEventListener('beforeinput', event => {
 });
 
 viewport.addEventListener('keyup', event => {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        stopKeyboardVerticalRepeat(event.key);
+    }
+
     if (isModelRepeatKey(event)) {
         clearPendingRepeatEdit();
     }
@@ -1683,6 +1770,26 @@ viewport.addEventListener('keyup', event => {
         }
     }
 });
+
+document.addEventListener('keyup', event => {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        stopKeyboardVerticalRepeat(event.key);
+    } else if (event.key === 'Shift' && keyboardVerticalRepeat.key) {
+        keyboardVerticalRepeat.extendSelection = false;
+    }
+});
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Shift' && keyboardVerticalRepeat.key) {
+        keyboardVerticalRepeat.extendSelection = true;
+    }
+});
+
+window.addEventListener('blur', () => stopKeyboardVerticalRepeat());
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopKeyboardVerticalRepeat();
+});
+
 
 viewport.addEventListener('click', event => {
     const element = lineElementFromEvent(event);
