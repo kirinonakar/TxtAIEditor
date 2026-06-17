@@ -230,7 +230,7 @@ function selectWordAtPointer(event) {
     return true;
 }
 
-function setCaret(element, offset) {
+function setCaret(element, offset, scrollMargin = 0) {
     const oldActiveElement = document.activeElement?.closest?.('.line-text');
     const oldActiveLine = oldActiveElement ? Number(oldActiveElement.dataset.line || 0) : null;
 
@@ -278,6 +278,17 @@ function setCaret(element, offset) {
             const scrollDiff = caretCenter - clickY;
             const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
             scrollContainer.scrollTop = Math.min(maxScroll, Math.max(0, scrollContainer.scrollTop + scrollDiff));
+        }
+    } else if (scrollMargin > 0) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const caretRect = caretRectForOffset(element, offset);
+        if (caretRect) {
+            const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+            if (caretRect.bottom > containerRect.bottom - scrollMargin) {
+                scrollContainer.scrollTop = Math.min(maxScroll, scrollContainer.scrollTop + (caretRect.bottom - (containerRect.bottom - scrollMargin)));
+            } else if (caretRect.top < containerRect.top + scrollMargin) {
+                scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - ((containerRect.top + scrollMargin) - caretRect.top));
+            }
         }
     }
 
@@ -480,11 +491,28 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
         const lineH = lineHeightFor(lineNumber);
         const targetBottom = wrappedTargetTop + lineH;
 
-        if (targetBottom >= viewBottom - scrollMargin) {
+        let caretTop = null;
+        let caretBottom = null;
+        if (lineH > state.lineHeight) {
+            const existingEl = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
+            if (existingEl && existingEl.getAttribute('contenteditable') === 'true') {
+                const cr = caretRectForOffset(existingEl, columnZeroBased);
+                if (cr) {
+                    const containerRect = scrollContainer.getBoundingClientRect();
+                    caretTop = cr.top - containerRect.top + viewTop;
+                    caretBottom = cr.bottom - containerRect.top + viewTop;
+                }
+            }
+        }
+
+        const checkTop = caretTop !== null ? caretTop : wrappedTargetTop;
+        const checkBottom = caretBottom !== null ? caretBottom : targetBottom;
+
+        if (checkBottom >= viewBottom - scrollMargin) {
             const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
-            scrollContainer.scrollTop = Math.min(maxScroll, scrollContainer.scrollTop + (targetBottom - (viewBottom - scrollMargin)));
-        } else if (wrappedTargetTop <= viewTop + scrollMargin) {
-            scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - ((viewTop + scrollMargin) - wrappedTargetTop));
+            scrollContainer.scrollTop = Math.min(maxScroll, scrollContainer.scrollTop + (checkBottom - (viewBottom - scrollMargin)));
+        } else if (checkTop <= viewTop + scrollMargin) {
+            scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - ((viewTop + scrollMargin) - checkTop));
         }
     } else {
         if (wrappedTargetTop < scrollContainer.scrollTop ||

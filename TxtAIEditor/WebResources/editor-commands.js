@@ -274,7 +274,7 @@ function moveCaretVertical(element, direction, extendSelection = false) {
             state.currentColumn = target.column + 1;
             syncCustomSelectionClass();
             if (target.line === lineNumber) {
-                setCaret(element, target.column);
+                setCaret(element, target.column, 3 * state.lineHeight);
             } else {
                 focusLine(target.line, target.column, 3 * state.lineHeight);
             }
