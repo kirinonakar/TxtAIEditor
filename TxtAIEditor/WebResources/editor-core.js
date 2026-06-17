@@ -860,9 +860,15 @@ function offsetFromNodeInElement(element, node, offset) {
 
 function activeEditableElement() {
     const active = document.activeElement?.closest?.('.line-text');
-    if (active && active.getAttribute('contenteditable') === 'true') return active;
+    if (active && active.isConnected && active.getAttribute('contenteditable') === 'true') return active;
     const current = viewport.querySelector(`.line-text[data-line="${state.currentLine}"]`);
-    return current && current.getAttribute('contenteditable') === 'true' ? current : null;
+    if (current && current.getAttribute('contenteditable') === 'true') {
+        if (document.activeElement !== current) {
+            current.focus({ preventScroll: true });
+        }
+        return current;
+    }
+    return null;
 }
 
 function isPlainTextKey(event) {
