@@ -8,6 +8,7 @@ using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
 using Windows.Storage.Pickers;
+using System.Text.RegularExpressions;
 
 namespace TxtAIEditor.Controls
 {
@@ -514,6 +515,23 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private static bool MatchesPattern(string name, string pattern)
+        {
+            if (string.IsNullOrEmpty(pattern))
+                return true;
+
+            if (pattern.Contains('*') || pattern.Contains('?'))
+            {
+                string regexPattern = "^" + Regex.Escape(pattern)
+                    .Replace("\\*", ".*")
+                    .Replace("\\?", ".") + "$";
+                return Regex.IsMatch(name, regexPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            }
+
+            return name.Contains(pattern, StringComparison.OrdinalIgnoreCase);
+        }
+
+
         private System.Collections.Generic.List<ExplorerItem> PerformRecursiveSearch(string rootPath, string query)
         {
             var results = new System.Collections.Generic.List<ExplorerItem>();
@@ -549,7 +567,7 @@ namespace TxtAIEditor.Controls
                             continue;
                         }
 
-                        if (file.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        if (MatchesPattern(file.Name, query))
                         {
                             string relPath = Path.GetRelativePath(rootPath, file.FullName);
                             string? relativeDir = Path.GetDirectoryName(relPath);
@@ -574,7 +592,7 @@ namespace TxtAIEditor.Controls
                             continue;
                         }
 
-                        if (subDir.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        if (MatchesPattern(subDir.Name, query))
                         {
                             string relPath = Path.GetRelativePath(rootPath, subDir.FullName);
                             string? relativeDir = Path.GetDirectoryName(relPath);
