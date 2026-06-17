@@ -1420,6 +1420,62 @@ document.addEventListener('keydown', event => {
         return;
     }
 
+    if (event.key === 'PageUp') {
+        event.preventDefault();
+        commitLine(element);
+        const pageLines = Math.max(1, Math.floor(scrollContainer.clientHeight / state.lineHeight) - 1);
+        const currentLineNum = Number(element.dataset.line || state.currentLine || 1);
+        const currentCol = getCaretOffset(element);
+        const targetLineNum = Math.max(1, currentLineNum - pageLines);
+        if (event.shiftKey) {
+            const anchor = state.selectionAnchor || { line: currentLineNum, column: currentCol };
+            state.selectionAnchor = anchor;
+            state.selection = (anchor.line === targetLineNum && anchor.column === currentCol)
+                ? null
+                : { start: anchor, end: { line: targetLineNum, column: currentCol } };
+            state.currentLine = targetLineNum;
+            state.currentColumn = currentCol + 1;
+            syncCustomSelectionClass();
+            queueRender(true);
+        } else {
+            state.selection = null;
+            state.selectionAnchor = { line: targetLineNum, column: currentCol };
+            state.currentLine = targetLineNum;
+            state.currentColumn = currentCol + 1;
+            syncCustomSelectionClass();
+        }
+        setTimeout(() => focusLine(targetLineNum, currentCol, 3 * state.lineHeight), 0);
+        return;
+    }
+
+    if (event.key === 'PageDown') {
+        event.preventDefault();
+        commitLine(element);
+        const pageLines = Math.max(1, Math.floor(scrollContainer.clientHeight / state.lineHeight) - 1);
+        const currentLineNum = Number(element.dataset.line || state.currentLine || 1);
+        const currentCol = getCaretOffset(element);
+        const targetLineNum = Math.min(state.lineCount, currentLineNum + pageLines);
+        if (event.shiftKey) {
+            const anchor = state.selectionAnchor || { line: currentLineNum, column: currentCol };
+            state.selectionAnchor = anchor;
+            state.selection = (anchor.line === targetLineNum && anchor.column === currentCol)
+                ? null
+                : { start: anchor, end: { line: targetLineNum, column: currentCol } };
+            state.currentLine = targetLineNum;
+            state.currentColumn = currentCol + 1;
+            syncCustomSelectionClass();
+            queueRender(true);
+        } else {
+            state.selection = null;
+            state.selectionAnchor = { line: targetLineNum, column: currentCol };
+            state.currentLine = targetLineNum;
+            state.currentColumn = currentCol + 1;
+            syncCustomSelectionClass();
+        }
+        setTimeout(() => focusLine(targetLineNum, currentCol, 3 * state.lineHeight), 0);
+        return;
+    }
+
     if ((event.key === ' ' || event.code === 'Space') && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         markNativeBeforeInputHandled(['insertSpace'], 80);

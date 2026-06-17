@@ -1,4 +1,5 @@
 import {
+    lineHeightFor,
     lineTop,
     orderedRange,
     queueRender,
@@ -449,7 +450,13 @@ function offsetFromPointInElement(element, clientX, clientY, referenceRect = nul
     return bestOffset;
 }
 
-function focusLine(lineNumber, columnZeroBased = 0) {
+let _focusRetryTimer = 0;
+
+function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
+    if (_focusRetryTimer) {
+        clearTimeout(_focusRetryTimer);
+        _focusRetryTimer = 0;
+    }
     state.editingLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
     if (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine) {
         state.inlineLivePreviewSourceLine = state.editingLine;
@@ -466,9 +473,24 @@ function focusLine(lineNumber, columnZeroBased = 0) {
         return;
     }
     const wrappedTargetTop = lineTop(lineNumber);
-    if (wrappedTargetTop < scrollContainer.scrollTop ||
-        wrappedTargetTop > scrollContainer.scrollTop + scrollContainer.clientHeight - state.lineHeight) {
-        scrollContainer.scrollTop = Math.max(0, wrappedTargetTop - Math.floor(scrollContainer.clientHeight / 2));
+
+    if (scrollMargin > 0) {
+        const viewTop = scrollContainer.scrollTop;
+        const viewBottom = viewTop + scrollContainer.clientHeight;
+        const lineH = lineHeightFor(lineNumber);
+        const targetBottom = wrappedTargetTop + lineH;
+
+        if (targetBottom >= viewBottom - scrollMargin) {
+            const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+            scrollContainer.scrollTop = Math.min(maxScroll, scrollContainer.scrollTop + (targetBottom - (viewBottom - scrollMargin)));
+        } else if (wrappedTargetTop <= viewTop + scrollMargin) {
+            scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - ((viewTop + scrollMargin) - wrappedTargetTop));
+        }
+    } else {
+        if (wrappedTargetTop < scrollContainer.scrollTop ||
+            wrappedTargetTop > scrollContainer.scrollTop + scrollContainer.clientHeight - state.lineHeight) {
+            scrollContainer.scrollTop = Math.max(0, wrappedTargetTop - Math.floor(scrollContainer.clientHeight / 2));
+        }
     }
 
     queueRender(true);
@@ -477,12 +499,13 @@ function focusLine(lineNumber, columnZeroBased = 0) {
         const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
         if (element && element.getAttribute('contenteditable') === 'true') {
             setCaret(element, columnZeroBased);
+            _focusRetryTimer = 0;
         } else if (retries > 0) {
             retries--;
-            setTimeout(tryFocus, 20);
+            _focusRetryTimer = setTimeout(tryFocus, 20);
         }
     }
-    setTimeout(tryFocus, 20);
+    _focusRetryTimer = setTimeout(tryFocus, 20);
 }
 
 function keepElementInView(element) {

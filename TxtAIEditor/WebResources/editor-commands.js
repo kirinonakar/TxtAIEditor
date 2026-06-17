@@ -266,7 +266,7 @@ function moveCaretVertical(element, direction, extendSelection = false) {
             state.currentColumn = target.column + 1;
             syncCustomSelectionClass();
             queueRender(true);
-            setTimeout(() => focusLine(target.line, target.column), 0);
+            setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
         } else {
             state.selection = null;
             state.selectionAnchor = { line: target.line, column: target.column };
@@ -276,7 +276,7 @@ function moveCaretVertical(element, direction, extendSelection = false) {
             if (target.line === lineNumber) {
                 setCaret(element, target.column);
             } else {
-                focusLine(target.line, target.column);
+                focusLine(target.line, target.column, 3 * state.lineHeight);
             }
         }
         return true;
