@@ -19,6 +19,7 @@ namespace TxtAIEditor.Core.Interfaces
         Task<bool> PushAsync(string repoPath);
         Task<IReadOnlyList<string>> GetRecentHistoryAsync(string repoPath, int maxCount = 50);
         Task<IReadOnlyList<string>> GetBranchesAsync(string repoPath);
+        Task<bool> InitRepositoryAsync(string repoPath);
         Task<string> RunGitCommandAsync(string workingDir, string arguments);
         Task<IReadOnlyList<(string Status, string Path)>> GetCommitChangedFilesAsync(string repoPath, string commitHash);
         Task<string> GetCommitFileContentAsync(string repoPath, string commitHash, string filePath);

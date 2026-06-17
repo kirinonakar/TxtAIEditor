@@ -575,6 +575,12 @@
   <data name="FavoritesPinTooltip" xml:space="preserve">
     <value>固定</value>
   </data>
+  <data name="GitCreateRepo" xml:space="preserve">
+    <value>Git作成</value>
+  </data>
+  <data name="GitCreateRepoTooltip" xml:space="preserve">
+    <value>Gitリポジトリを作成</value>
+  </data>
   <data name="GitNotDetected" xml:space="preserve">
     <value>Git: 検出されていません</value>
   </data>

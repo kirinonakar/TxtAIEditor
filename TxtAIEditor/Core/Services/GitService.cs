@@ -387,6 +387,15 @@ namespace TxtAIEditor.Core.Services
             return output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
         }
 
+        public async Task<bool> InitRepositoryAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath) || !Directory.Exists(repoPath))
+                return false;
+
+            string output = await RunGitCommandAsync(repoPath, "init");
+            return !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+        }
+
         public async Task<IReadOnlyList<string>> GetBranchesAsync(string repoPath)
         {
             if (string.IsNullOrEmpty(repoPath))

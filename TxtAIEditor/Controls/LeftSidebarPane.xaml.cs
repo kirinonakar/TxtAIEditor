@@ -90,6 +90,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? GitPushClick;
         public event RoutedEventHandler? GitRefreshClick;
         public event ItemClickEventHandler? GitHistoryItemClick;
+        public event RoutedEventHandler? GitInitRepoClick;
         public event KeyEventHandler? SearchQueryInputKeyDown;
         public event RoutedEventHandler? SearchAllFilesClick;
         public event RoutedEventHandler? ReplaceAllClick;
@@ -153,6 +154,7 @@ namespace TxtAIEditor.Controls
         public ListView TocList => TocListView;
 
         public TextBlock GitPanelBranch => GitPanelBranchText;
+        public Button GitInitRepoBtn => GitInitRepoButton;
         public ComboBox GitBranches => GitBranchesCombo;
         public TextBox GitCommitMessage => GitCommitMessageInput;
 
@@ -230,6 +232,8 @@ namespace TxtAIEditor.Controls
             }
 
             GitHeaderText.Text = getString("GitRepoHeader", "Git 저장소 관리");
+            GitInitRepoButton.Content = getString("GitCreateRepo", "Git 생성");
+            ToolTipService.SetToolTip(GitInitRepoButton, getString("GitCreateRepoTooltip", "Git 저장소 생성"));
             GitBranchesCombo.PlaceholderText = getString("GitBranchPlaceholder", "브랜치 목록");
             GitCommitMessageInput.PlaceholderText = getString("GitCommitPlaceholder", "커밋 메시지 입력...");
             GitCommitButton.Content = getString("GitCommit", "커밋 (Commit)");
@@ -317,6 +321,7 @@ namespace TxtAIEditor.Controls
         private void OnGitPushClick(object sender, RoutedEventArgs e) => GitPushClick?.Invoke(sender, e);
         private void OnGitRefreshClick(object sender, RoutedEventArgs e) => GitRefreshClick?.Invoke(sender, e);
         private void OnGitHistoryItemClick(object sender, ItemClickEventArgs e) => GitHistoryItemClick?.Invoke(sender, e);
+        private void OnGitInitRepoClick(object sender, RoutedEventArgs e) => GitInitRepoClick?.Invoke(sender, e);
         private void OnSearchQueryInputKeyDown(object sender, KeyRoutedEventArgs e) => SearchQueryInputKeyDown?.Invoke(sender, e);
         private void OnSearchAllFilesClick(object sender, RoutedEventArgs e) => SearchAllFilesClick?.Invoke(sender, e);
         private void OnReplaceAllClick(object sender, RoutedEventArgs e) => ReplaceAllClick?.Invoke(sender, e);

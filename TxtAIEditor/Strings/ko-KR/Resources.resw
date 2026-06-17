@@ -575,6 +575,12 @@
   <data name="FavoritesPinTooltip" xml:space="preserve">
     <value>고정</value>
   </data>
+  <data name="GitCreateRepo" xml:space="preserve">
+    <value>Git 생성</value>
+  </data>
+  <data name="GitCreateRepoTooltip" xml:space="preserve">
+    <value>Git 저장소 생성</value>
+  </data>
   <data name="GitNotDetected" xml:space="preserve">
     <value>Git: 감지 안됨</value>
   </data>

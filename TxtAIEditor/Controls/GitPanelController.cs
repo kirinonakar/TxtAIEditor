@@ -24,6 +24,7 @@ namespace TxtAIEditor.Controls
         private readonly LeftSidebarPane _leftSidebar;
         private readonly TextBlock _statusGitBranch;
         private readonly Func<string> _repoPathProvider;
+        private readonly Func<string> _folderPathProvider;
         private readonly Func<XamlRoot> _xamlRootProvider;
         private readonly Func<string, string, string> _getString;
         private readonly Func<string, bool> _isGitNotDetected;
@@ -41,6 +42,7 @@ namespace TxtAIEditor.Controls
             LeftSidebarPane leftSidebar,
             TextBlock statusGitBranch,
             Func<string> repoPathProvider,
+            Func<string> folderPathProvider,
             Func<XamlRoot> xamlRootProvider,
             Func<string, string, string> getString,
             Func<string, bool> isGitNotDetected,
@@ -57,6 +59,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar = leftSidebar;
             _statusGitBranch = statusGitBranch;
             _repoPathProvider = repoPathProvider;
+            _folderPathProvider = folderPathProvider;
             _xamlRootProvider = xamlRootProvider;
             _getString = getString;
             _isGitNotDetected = isGitNotDetected;
@@ -76,6 +79,11 @@ namespace TxtAIEditor.Controls
             return RefreshAsync(_repoPathProvider());
         }
 
+        private void UpdateInitButtonState(string? repoPath)
+        {
+            _leftSidebar.GitInitRepoBtn.IsEnabled = string.IsNullOrEmpty(repoPath);
+        }
+
         public async Task RefreshAsync(string repoPath)
         {
             if (string.IsNullOrEmpty(repoPath))
@@ -83,6 +91,7 @@ namespace TxtAIEditor.Controls
                 string notDetected = _getString("GitNotDetected", "Git: 감지 안됨");
                 _leftSidebar.GitPanelBranch.Text = notDetected;
                 _statusGitBranch.Text = notDetected;
+                UpdateInitButtonState(null);
                 _viewModel.GitFiles.Clear();
                 _leftSidebar.GitBranches.Items.Clear();
                 _leftSidebar.GitHistory.Items.Clear();
@@ -113,6 +122,7 @@ namespace TxtAIEditor.Controls
             // Update UI components in a single synchronous block to prevent duplicate display and empty states
             _leftSidebar.GitPanelBranch.Text = branchText;
             _statusGitBranch.Text = branchText;
+            UpdateInitButtonState(repoPath);
             _startAutoRefresh();
 
             _leftSidebar.GitBranches.Items.Clear();
@@ -579,6 +589,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitPushClick += OnGitPushClick;
             _leftSidebar.GitRefreshClick += OnGitRefreshClick;
             _leftSidebar.GitHistoryItemClick += OnGitHistoryItemClick;
+            _leftSidebar.GitInitRepoClick += OnGitInitRepoClick;
         }
 
         private async void OnGitStageAllClick(object sender, RoutedEventArgs e)
@@ -626,6 +637,26 @@ namespace TxtAIEditor.Controls
         {
             _leftSidebar.GitHistory.SelectedItem = e.ClickedItem;
             await ShowHistoryItemAsync(_repoPathProvider());
+        }
+
+        private async void OnGitInitRepoClick(object sender, RoutedEventArgs e)
+        {
+            string targetPath = _folderPathProvider();
+            if (string.IsNullOrEmpty(targetPath))
+            {
+                _showError("Git 초기화", "탐색기에서 폴더를 먼저 선택하세요.");
+                return;
+            }
+
+            bool success = await _gitService.InitRepositoryAsync(targetPath);
+            if (success)
+            {
+                await RefreshAsync(targetPath);
+            }
+            else
+            {
+                _showError("Git 초기화 실패", "Git 저장소 생성에 실패했습니다.");
+            }
         }
     }
 }

@@ -575,6 +575,12 @@
   <data name="FavoritesPinTooltip" xml:space="preserve">
     <value>Pin</value>
   </data>
+  <data name="GitCreateRepo" xml:space="preserve">
+    <value>Init Repo</value>
+  </data>
+  <data name="GitCreateRepoTooltip" xml:space="preserve">
+    <value>Initialize Git Repository</value>
+  </data>
   <data name="GitNotDetected" xml:space="preserve">
     <value>Git: Not Detected</value>
   </data>

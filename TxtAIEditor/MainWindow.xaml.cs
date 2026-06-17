@@ -391,6 +391,7 @@ namespace TxtAIEditor
                 LeftSidebarTabView,
                 StatusGitBranch,
                 GetCurrentRepoPathForGitRefresh,
+                () => _currentFolderPath,
                 () => this.Content.XamlRoot,
                 GetLocalizedString,
                 IsGitNotDetectedText,
