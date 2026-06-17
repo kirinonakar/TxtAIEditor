@@ -147,17 +147,49 @@ namespace TxtAIEditor.Controls
                 {
                     builder.AppendLine("[New File Content]");
                     builder.AppendLine(edit.NewContent);
+                    int newLineCount = CountLines(edit.NewContent);
+                    if (newLineCount > 0)
+                    {
+                        builder.AppendLine();
+                        builder.AppendLine($"[Summary: 0 lines \u2192 {newLineCount} lines (+{newLineCount} lines)]");
+                    }
                 }
                 else
                 {
+                    int oldLineCount = CountLines(edit.OldContent);
+                    int newLineCount = CountLines(edit.NewContent);
                     string diff = GenerateDiff(edit.OldContent, edit.NewContent);
                     builder.AppendLine(diff);
+
+                    int netChange = newLineCount - oldLineCount;
+                    string changeSummary = netChange >= 0
+                        ? $"+{netChange}"
+                        : $"{netChange}";
+                    builder.AppendLine();
+                    builder.AppendLine($"[Summary: {oldLineCount} lines \u2192 {newLineCount} lines ({changeSummary} lines)]");
+                    if (netChange != 0)
+                    {
+                        builder.AppendLine($"[Caution] Total line count changed from {oldLineCount} to {newLineCount}. Re-read this file if further modifications are needed to ensure correct line numbers.");
+                    }
                 }
 
                 builder.AppendLine();
             }
 
             return builder.ToString().TrimEnd();
+        }
+
+        private static int CountLines(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return 0;
+            int count = 1;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\n')
+                    count++;
+            }
+            return count;
         }
 
         private int FindLatestEditIndex(string fullPath)
