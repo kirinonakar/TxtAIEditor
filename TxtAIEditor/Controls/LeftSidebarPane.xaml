@@ -172,12 +172,10 @@
                                         </Button>
                                     </Grid>
 
-                                    <!-- 파일명 필터 검색창 -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <FontIcon Grid.Column="0" Glyph="&#xE721;" FontSize="10" Margin="8,0,6,0"
                                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
@@ -196,15 +194,6 @@
                                                  IsSpellCheckEnabled="False"
                                                  IsTextPredictionEnabled="False"
                                                  TextChanged="OnExplorerFilterTextChanged"/>
-                                        <Button x:Name="ExplorerFilterClearButton"
-                                                Grid.Column="2"
-                                                Click="OnExplorerFilterClearClick"
-                                                Padding="0" Width="24" MinWidth="24" Height="24"
-                                                Background="Transparent" BorderBrush="Transparent"
-                                                Visibility="Collapsed"
-                                                ToolTipService.ToolTip="필터 지우기">
-                                            <FontIcon Glyph="&#xE711;" FontSize="9"/>
-                                        </Button>
                                     </Grid>
                                 </StackPanel>
                                 <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFileListViewItemClick">

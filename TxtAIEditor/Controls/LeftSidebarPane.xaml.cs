@@ -99,7 +99,6 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? RemoveRecentFileClick;
         public event ItemClickEventHandler? TocItemClick;
         public event TextChangedEventHandler? ExplorerFilterTextChanged;
-        public event RoutedEventHandler? ExplorerFilterClearClick;
 
         public Grid ExplorerPage => ExplorerSidebarPage;
         public Grid FavoritesPage => FavoritesSidebarPage;
@@ -203,7 +202,6 @@ namespace TxtAIEditor.Controls
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerOpenInWindowsButton, openInWindowsExplorerText);
 
             ExplorerFilterBox.PlaceholderText = getString("ExplorerFilterPlaceholder", "파일명 필터 (하위 폴더 포함)...");
-            ToolTipService.SetToolTip(ExplorerFilterClearButton, getString("ExplorerFilterClearTooltip", "필터 지우기"));
 
             var homeFolderText = getString("ExplorerHomeFolderTooltip", "홈 폴더로 이동");
             ToolTipService.SetToolTip(ExplorerHomeButton, homeFolderText);
@@ -327,19 +325,7 @@ namespace TxtAIEditor.Controls
         private void OnRecentFileItemClick(object sender, ItemClickEventArgs e) => RecentFileItemClick?.Invoke(sender, e);
         private void OnRemoveRecentFileClick(object sender, RoutedEventArgs e) => RemoveRecentFileClick?.Invoke(sender, e);
         private void OnTocItemClick(object sender, ItemClickEventArgs e) => TocItemClick?.Invoke(sender, e);
-        private void OnExplorerFilterTextChanged(object sender, TextChangedEventArgs e)
-        {
-            ExplorerFilterClearButton.Visibility = string.IsNullOrEmpty(ExplorerFilterBox.Text)
-                ? Microsoft.UI.Xaml.Visibility.Collapsed
-                : Microsoft.UI.Xaml.Visibility.Visible;
-            ExplorerFilterTextChanged?.Invoke(sender, e);
-        }
-
-        private void OnExplorerFilterClearClick(object sender, RoutedEventArgs e)
-        {
-            ExplorerFilterBox.Text = string.Empty;
-            ExplorerFilterClearClick?.Invoke(sender, e);
-        }
+        private void OnExplorerFilterTextChanged(object sender, TextChangedEventArgs e) => ExplorerFilterTextChanged?.Invoke(sender, e);
     }
 
     public class LocalizationBridge : System.ComponentModel.INotifyPropertyChanged

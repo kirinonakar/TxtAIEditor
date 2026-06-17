@@ -130,7 +130,6 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerHomeClick += OnExplorerHomeClick;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
             _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
-            _leftSidebar.ExplorerFilterClearClick += OnExplorerFilterClearClick;
         }
 
         private async void OnSelectFolderClick(object sender, RoutedEventArgs e)
@@ -478,12 +477,6 @@ namespace TxtAIEditor.Controls
                 _lastFilterQuery = query;
                 await ApplyFilterAsync(query);
             }
-        }
-
-        private async void OnExplorerFilterClearClick(object sender, RoutedEventArgs e)
-        {
-            _lastFilterQuery = string.Empty;
-            await ApplyFilterAsync(string.Empty);
         }
 
         private async Task ApplyFilterAsync(string query)
