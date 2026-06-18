@@ -1,4 +1,7 @@
 using System;
+using System.Diagnostics;
+using System.IO;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -86,11 +89,11 @@ namespace TxtAIEditor.Controls
         {
             var image = new Image
             {
-                Source = new BitmapImage(new Uri(tab.FilePath!, UriKind.Absolute)),
                 Stretch = Stretch.Uniform,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch
             };
+            _ = LoadImageSourceAsync(image, tab.FilePath);
 
             var imageHost = new Grid
             {
@@ -116,6 +119,31 @@ namespace TxtAIEditor.Controls
             ApplyUiFont(tabItem, uiFontFamily);
 
             return tabItem;
+        }
+
+        private static async Task LoadImageSourceAsync(Image image, string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            try
+            {
+                using var fileStream = new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete);
+                using var randomAccessStream = fileStream.AsRandomAccessStream();
+                var bitmap = new BitmapImage();
+                await bitmap.SetSourceAsync(randomAccessStream);
+                image.Source = bitmap;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to load image viewer source: {ex.Message}");
+            }
         }
 
         public PdfViewerTabParts CreatePdfViewer(
