@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="using:TxtAIEditor"
+    xmlns:controls="using:TxtAIEditor.Controls"
     mc:Ignorable="d">
 
     <Grid x:Name="WorkspaceRoot" Background="{ThemeResource EditorSurfaceBackgroundBrush}">
@@ -38,10 +39,18 @@
                         <!-- Dynamic tabs go here -->
                     </TabView.TabItems>
                     <TabView.TabStripFooter>
-                        <Border Width="72" Height="32"/>
+                        <Border MinWidth="72"
+                                Width="{Binding ActualWidth, ElementName=PrimaryTabActions}"
+                                Height="32"/>
                     </TabView.TabStripFooter>
                 </TabView>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,8,0" Spacing="4" Height="32">
+                <StackPanel x:Name="PrimaryTabActions"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,4,8,0"
+                            Spacing="4"
+                            Height="32">
                     <Button x:Name="MoveTabLeftBtn"
                             Click="OnMoveTabLeftClick"
                             ToolTipService.ToolTip="왼쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)"
@@ -56,6 +65,8 @@
                             Width="28" Height="28" Padding="0" CornerRadius="4">
                         <FontIcon Glyph="&#xE761;" FontSize="12"/>
                     </Button>
+                    <controls:StickyNoteBar x:Name="StickyNoteBar"
+                                            Visibility="Collapsed"/>
                 </StackPanel>
             </Grid>
 
@@ -82,10 +93,18 @@
                         <!-- Dynamic tabs go here -->
                     </TabView.TabItems>
                     <TabView.TabStripFooter>
-                        <Border Width="72" Height="32"/>
+                        <Border MinWidth="72"
+                                Width="{Binding ActualWidth, ElementName=SecondaryTabActions}"
+                                Height="32"/>
                     </TabView.TabStripFooter>
                 </TabView>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,8,0" Spacing="4" Height="32">
+                <StackPanel x:Name="SecondaryTabActions"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,4,8,0"
+                            Spacing="4"
+                            Height="32">
                     <Button x:Name="MoveTab2LeftBtn"
                             Click="OnMoveTabLeftClick"
                             ToolTipService.ToolTip="왼쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)"

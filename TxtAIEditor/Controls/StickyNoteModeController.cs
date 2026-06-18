@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Windowing;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Services;
 
@@ -9,6 +11,7 @@ namespace TxtAIEditor.Controls
     {
         private readonly Window _window;
         private readonly UIElement _normalTitleBar;
+        private readonly RowDefinition _titleBarRow;
         private readonly StickyNoteBar _stickyNoteBar;
         private readonly TopCommandBarPane _topToolbar;
         private readonly FrameworkElement _markdownToolbar;
@@ -23,10 +26,14 @@ namespace TxtAIEditor.Controls
         private bool _wasLeftSidebarVisible;
         private bool _wasRightSidebarVisible;
         private bool _wasMarkdownToolbarVisible;
+        private GridLength _normalTitleBarHeight;
+        private bool _restorePresenterTitleBar = true;
+        private bool _restorePresenterBorder = true;
 
         public StickyNoteModeController(
             Window window,
             UIElement normalTitleBar,
+            RowDefinition titleBarRow,
             StickyNoteBar stickyNoteBar,
             TopCommandBarPane topToolbar,
             FrameworkElement markdownToolbar,
@@ -39,6 +46,7 @@ namespace TxtAIEditor.Controls
         {
             _window = window;
             _normalTitleBar = normalTitleBar;
+            _titleBarRow = titleBarRow;
             _stickyNoteBar = stickyNoteBar;
             _topToolbar = topToolbar;
             _markdownToolbar = markdownToolbar;
@@ -88,11 +96,13 @@ namespace TxtAIEditor.Controls
             _wasLeftSidebarVisible = _shellPanelLayoutService.IsLeftSidebarVisible;
             _wasRightSidebarVisible = _shellPanelLayoutService.IsRightSidebarVisible;
             _wasMarkdownToolbarVisible = _markdownToolbar.Visibility == Visibility.Visible;
+            _normalTitleBarHeight = _titleBarRow.Height;
 
             _stickyNoteBar.TopMostIsChecked = _topToolbar.TopMostIsChecked;
             _normalTitleBar.Visibility = Visibility.Collapsed;
+            _titleBarRow.Height = new GridLength(0);
             _stickyNoteBar.Visibility = Visibility.Visible;
-            _window.SetTitleBar(_stickyNoteBar);
+            ApplyPresenterChromeVisible(false);
 
             _topToolbar.Visibility = Visibility.Collapsed;
             _markdownToolbar.Visibility = Visibility.Collapsed;
@@ -115,7 +125,9 @@ namespace TxtAIEditor.Controls
             _stickyNoteService.ApplyTopMost(_window, topMost);
 
             _stickyNoteBar.Visibility = Visibility.Collapsed;
+            _titleBarRow.Height = _normalTitleBarHeight;
             _normalTitleBar.Visibility = Visibility.Visible;
+            ApplyPresenterChromeVisible(true);
             _window.SetTitleBar(_normalTitleBar);
 
             _topToolbar.Visibility = Visibility.Visible;
@@ -138,6 +150,24 @@ namespace TxtAIEditor.Controls
         {
             _stickyNoteService.ApplyTopMost(_window, topMost);
             _stickyNoteBar.TopMostIsChecked = topMost;
+        }
+
+        private void ApplyPresenterChromeVisible(bool visible)
+        {
+            if (_window.AppWindow.Presenter is not OverlappedPresenter presenter)
+            {
+                return;
+            }
+
+            if (!visible)
+            {
+                _restorePresenterTitleBar = presenter.HasTitleBar;
+                _restorePresenterBorder = presenter.HasBorder;
+                presenter.SetBorderAndTitleBar(_restorePresenterBorder, false);
+                return;
+            }
+
+            presenter.SetBorderAndTitleBar(_restorePresenterBorder, _restorePresenterTitleBar);
         }
     }
 }

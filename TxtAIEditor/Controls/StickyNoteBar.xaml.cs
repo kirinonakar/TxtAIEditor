@@ -22,7 +22,6 @@ namespace TxtAIEditor.Controls
 
         public void Localize(Func<string, string, string> getString)
         {
-            TitleText.Text = getString("StickyNoteTitle", "스티커 노트");
             ToolTipService.SetToolTip(TopMostButton, getString("TopMost", "항상위"));
             TopMostText.Text = getString("TopMost", "항상위");
             ToolTipService.SetToolTip(ExitButton, getString("ExitStickyNoteTooltip", "스티커 노트 모드 종료"));

@@ -60,6 +60,7 @@ namespace TxtAIEditor.Controls
 
         public TabView EditorTabViewControl => EditorTabView;
         public TabView EditorTabView2Control => EditorTabView2;
+        public StickyNoteBar StickyNoteBarControl => StickyNoteBar;
         public TerminalPane TerminalPaneControl => EnsureTerminalPane();
         private TerminalPane TerminalPane => EnsureTerminalPane();
 
@@ -243,6 +244,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(MoveTabRightBtn, rightTooltip);
             ToolTipService.SetToolTip(MoveTab2LeftBtn, leftTooltip);
             ToolTipService.SetToolTip(MoveTab2RightBtn, rightTooltip);
+            StickyNoteBar.Localize(getString);
             _terminalPane?.Localize(getString);
         }
 

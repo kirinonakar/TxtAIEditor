@@ -241,7 +241,8 @@ namespace TxtAIEditor
             _stickyNoteModeController = new StickyNoteModeController(
                 this,
                 AppTitleBar,
-                StickyNoteBar,
+                TitleBarRow,
+                EditorWorkspace.StickyNoteBarControl,
                 TopToolbar,
                 MarkdownToolbar,
                 StatusBarPane,
@@ -900,7 +901,7 @@ namespace TxtAIEditor
                 LeftSidebarTabView,
                 StatusBarPane,
                 PreviewGrid,
-                StickyNoteBar,
+                EditorWorkspace.StickyNoteBarControl,
                 LeftSplitter,
                 RightSplitter,
                 _tabBridges,

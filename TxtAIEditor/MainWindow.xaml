@@ -37,9 +37,6 @@
             </StackPanel>
         </Grid>
 
-        <!-- 0b. Exit Sticky Note Bar -->
-        <controls:StickyNoteBar x:Name="StickyNoteBar" Grid.Row="0" Visibility="Collapsed"/>
-
         <!-- 1. Top Command Toolbar (상단 툴바) -->
         <controls:TopCommandBarPane x:Name="TopToolbar" Grid.Row="1"/>
 
