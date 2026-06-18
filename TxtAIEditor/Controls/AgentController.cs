@@ -50,6 +50,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentTabToolController _tabToolController;
         private readonly AgentSelectionContextController _selectionContextController;
         private readonly AgentFileToolController _fileToolController;
+        private readonly AgentToolExecutionController _toolExecutionController;
         private readonly AgentContextStatsController _contextStatsController;
         private readonly AgentModelContextLimitProvider _modelContextLimits = new();
         private string _currentSessionId = Guid.NewGuid().ToString();
@@ -193,6 +194,14 @@ namespace TxtAIEditor.Controls
                 action => RunOnUIThreadAsync(action),
                 action => RunOnUIThreadAsync(action),
                 action => RunOnUIThreadAsync(action));
+            _toolExecutionController = new AgentToolExecutionController(
+                _llmService,
+                _fileTools,
+                _fileToolController,
+                _tabToolController,
+                AddCurrentRunImageToolAttachment,
+                AppendActivity,
+                _getString);
             _confirmationController = new AgentConfirmationController(
                 _settingsService,
                 _agentPane,
@@ -762,7 +771,7 @@ namespace TxtAIEditor.Controls
                     {
                         lastDuplicateToolInvocationKey = null;
                         repeatedDuplicateToolSkipCount = 0;
-                        toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
+                        toolResult = await _toolExecutionController.ExecuteAsync(toolName, arguments, cancellationToken);
                         toolResultForTranscript = toolResult;
                         if (IsSuccessfulToolResult(toolResult))
                         {
@@ -815,103 +824,12 @@ namespace TxtAIEditor.Controls
                         UpdateContextStatsImmediate(force: true);
                     });
                     
-                    string displayResult = toolResult;
-                    if (skippedDuplicateTool)
-                    {
-                        displayResult = _getString(
-                            "AgentDuplicateToolReused",
-                            "동일한 도구 호출이 이미 성공해 재실행하지 않았습니다.");
-                    }
-                    else if (!_settingsService.CurrentSettings.LlmAgentVerbose &&
-                             !toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string normalizedName = normalizedToolName;
-                        if (normalizedName == "read_file")
-                        {
-                            string path = GetStringArgument(arguments, "path");
-                            displayResult = string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
-                        }
-                        else if (normalizedName == "extract_document")
-                        {
-                            string path = GetStringArgument(arguments, "path");
-                            displayResult = string.Format(_getString("AgentVerboseExtractDocumentOnly", "문서 텍스트 추출을 완료했습니다: {0}"), path);
-                        }
-                        else if (normalizedName == "append_to_file")
-                        {
-                            string path = GetEditPathArgument(arguments);
-                            displayResult = string.Format(_getString("AgentVerboseAppendFileOnly", "파일에 내용을 덧붙였습니다: {0}"), path);
-                        }
-                        else if (normalizedName == "search_replace")
-                        {
-                            string path = GetEditPathArgument(arguments);
-                            displayResult = string.Format(_getString("AgentVerboseSearchReplaceOnly", "검색/치환을 완료했습니다: {0}"), path);
-                        }
-                        else if (normalizedName == "merge_files")
-                        {
-                            string target = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
-                            displayResult = string.Format(_getString("AgentVerboseMergeFilesOnly", "파일들을 합쳤습니다: {0}"), target);
-                        }
-                        else if (normalizedName == "split_file")
-                        {
-                            string source = GetEditPathArgument(arguments);
-                            displayResult = string.Format(_getString("AgentVerboseSplitFileOnly", "파일을 분리했습니다: {0}"), source);
-                        }
-                        else if (normalizedName == "list_files")
-                        {
-                            string glob = GetStringArgument(arguments, "glob");
-                            displayResult = string.Format(_getString("AgentVerboseListFilesOnly", "폴더를 읽었습니다: {0}"), glob);
-                        }
-                        else if (normalizedName == "search_text")
-                        {
-                            string query = GetStringArgument(arguments, "query");
-                            displayResult = string.Format(_getString("AgentVerboseSearchTextOnly", "텍스트 검색을 완료했습니다: {0}"), query);
-                        }
-                        else if (normalizedName == "run_rg")
-                        {
-                            string args = GetStringArgument(arguments, "arguments");
-                            displayResult = string.Format(_getString("AgentVerboseRunRgOnly", "Ripgrep 검색을 완료했습니다: {0}"), args);
-                        }
-                        else if (normalizedName == "run_rga")
-                        {
-                            string args = GetStringArgument(arguments, "arguments");
-                            displayResult = string.Format(_getString("AgentVerboseRunRgaOnly", "Ripgrep All 검색을 완료했습니다: {0}"), args);
-                        }
-                        else if (normalizedName == "web_search_exa")
-                        {
-                            string query = GetStringArgument(arguments, "query");
-                            displayResult = string.Format(_getString("AgentVerboseWebSearchOnly", "웹 검색을 완료했습니다: {0}"), query);
-                        }
-                        else if (normalizedName == "web_fetch" || normalizedName == "web_fetch_exa")
-                        {
-                            string[] urls = GetUrlsArgument(arguments);
-                            displayResult = string.Format(_getString("AgentVerboseWebFetchOnly", "웹페이지를 읽었습니다: {0}"), string.Join(", ", urls));
-                        }
-                        else if (normalizedName == "open_file")
-                        {
-                            string path = GetStringArgument(arguments, "path");
-                            string resourceKey = toolResult.StartsWith("open_file activated_existing:", StringComparison.OrdinalIgnoreCase)
-                                ? "AgentVerboseOpenFileExistingOnly"
-                                : "AgentVerboseOpenFileOnly";
-                            string fallback = toolResult.StartsWith("open_file activated_existing:", StringComparison.OrdinalIgnoreCase)
-                                ? "이미 열려 있던 파일을 활성화했습니다: {0}"
-                                : "파일을 열었습니다: {0}";
-                            displayResult = string.Format(_getString(resourceKey, fallback), path);
-                        }
-                        else if (normalizedName == "save_tab")
-                        {
-                            string path = GetFirstStringArgument(arguments, "path", "filePath", "file_path");
-                            if (string.IsNullOrEmpty(path))
-                            {
-                                path = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
-                            }
-                            displayResult = string.Format(_getString("AgentVerboseSaveTabOnly", "탭을 저장했습니다: {0}"), path);
-                        }
-                        else if (normalizedName == "edit_tab")
-                        {
-                            string path = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
-                            displayResult = string.Format(_getString("AgentVerboseEditTabOnly", "탭 내용을 수정했습니다: {0}"), path);
-                        }
-                    }
+                    string displayResult = _toolExecutionController.FormatDisplayResult(
+                        normalizedToolName,
+                        arguments,
+                        toolResult,
+                        skippedDuplicateTool,
+                        _settingsService.CurrentSettings.LlmAgentVerbose);
 
                     await RunOnUIThreadAsync(() =>
                     {
@@ -1364,127 +1282,11 @@ namespace TxtAIEditor.Controls
             return attachments;
         }
 
-        private async Task<string> ExecuteToolAsync(string toolName, JsonElement arguments, CancellationToken cancellationToken)
+        private void AddCurrentRunImageToolAttachment(LlmMessageAttachment attachment)
         {
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string normalizedToolName = NormalizeToolName(toolName);
-                string? selectionScopeError = _fileToolController.ValidateSelectionEditScope(normalizedToolName, arguments);
-                if (!string.IsNullOrEmpty(selectionScopeError))
-                {
-                    AppendActivity(string.Format(
-                        _getString("AgentActivityToolBlockedFormat", "도구 차단: {0}"),
-                        normalizedToolName));
-                    return selectionScopeError;
-                }
-
-                AppendActivity(GetToolStartMessage(normalizedToolName, arguments));
-
-                string result;
-                if (normalizedToolName == "replace_in_file")
-                {
-                    result = await _fileToolController.ReplaceInFileAsync(arguments);
-                }
-                else if (normalizedToolName == "search_replace")
-                {
-                    result = await _fileToolController.SearchReplaceAsync(arguments);
-                }
-                else
-                {
-                    result = normalizedToolName switch
-                    {
-                        "list_files" => await _fileTools.ListFilesAsync(
-                            GetStringArgument(arguments, "glob"),
-                            GetIntArgument(arguments, "maxResults", 80)),
-                        "search_text" => await _fileTools.SearchTextAsync(
-                            GetStringArgument(arguments, "query"),
-                            GetStringArgument(arguments, "glob"),
-                            GetIntArgument(arguments, "maxResults", 80)),
-                        "run_rg" => await _fileTools.RunRgAsync(
-                            GetStringArgument(arguments, "arguments"),
-                            GetIntArgument(arguments, "timeoutMs", 10000),
-                            cancellationToken),
-                        "run_rga" => await _fileTools.RunRgaAsync(
-                            GetStringArgument(arguments, "arguments"),
-                            GetIntArgument(arguments, "timeoutMs", 10000),
-                            cancellationToken),
-                        "run_powershell" => await _fileTools.RunPowerShellAsync(
-                            GetStringArgument(arguments, "command"),
-                            GetIntArgument(arguments, "timeoutMs", 10000),
-                            cancellationToken),
-                        "read_file" => await _fileTools.ReadFileAsync(
-                            GetStringArgument(arguments, "path"),
-                            GetIntArgument(arguments, "startLine", 1),
-                            GetIntArgument(arguments, "lineCount", 160)),
-                        "read_image" => await ReadImageToolAsync(arguments),
-                        "extract_document" => await _fileTools.ExtractDocumentAsync(
-                            GetExtractDocumentInputPathArgument(arguments),
-                            GetExtractDocumentOutputPathArgument(arguments),
-                            GetIntArgument(arguments, "maxChars", 5000000)),
-                        "create_file" => await _fileToolController.CreateFileAsync(arguments),
-                        "overwrite_file" => await _fileToolController.OverwriteFileAsync(arguments),
-                        "append_to_file" => await _fileToolController.AppendToFileAsync(arguments),
-                        "merge_files" => await _fileToolController.MergeFilesAsync(arguments),
-                        "split_file" => await _fileToolController.SplitFileAsync(arguments),
-                        "replace_range" => await _fileToolController.ReplaceRangeAsync(arguments),
-                        "apply_patch" => await _fileToolController.ApplyPatchAsync(arguments),
-                        "insert_to_file" => await _fileToolController.InsertIntoFileAsync(arguments),
-                        "insert_text" => await _tabToolController.InsertTextAsync(
-                            GetFirstStringArgument(arguments, "content", "text", "newText", "new_text")),
-                        "create_tab" => await _tabToolController.CreateTabAsync(arguments),
-                        "edit_tab" => await _tabToolController.EditTabAsync(arguments),
-                        "save_tab" => await _tabToolController.SaveTabAsync(arguments),
-                        "open_file" => await _fileToolController.OpenFileAsync(arguments),
-                        "web_search_exa" => await _llmService.SearchExaAsync(
-                            GetStringArgument(arguments, "query"),
-                            GetIntArgument(arguments, "numResults", 5),
-                            cancellationToken),
-                        "web_fetch" => await _llmService.FetchExaAsync(
-                            GetUrlsArgument(arguments),
-                            cancellationToken),
-                        "web_fetch_exa" => await _llmService.FetchExaAsync(
-                            GetUrlsArgument(arguments),
-                            cancellationToken),
-                        _ => $"Unknown tool: {toolName}"
-                    };
-                }
-                cancellationToken.ThrowIfCancellationRequested();
-                _fileToolController.TrackSuccessfulFileToolPath(normalizedToolName, arguments, result);
-                AppendActivity(string.Format(
-                    _getString("AgentActivityToolDoneFormat", "도구 완료: {0}"),
-                    normalizedToolName));
-
-                return result;
-            }
-            catch (OperationCanceledException)
-            {
-                AppendActivity(_getString("AgentActivityToolCancelled", "도구 실행 중단됨"));
-                throw;
-            }
-            catch (Exception ex)
-            {
-                string result = $"Tool failed: {ex.Message}";
-                AppendActivity(string.Format(
-                    _getString("AgentActivityToolFailedFormat", "도구 실패: {0}"),
-                    toolName));
-                return result;
-            }
-        }
-
-        private async Task<string> ReadImageToolAsync(JsonElement arguments)
-        {
-            AgentReadImageResult imageResult = await _fileTools.ReadImageAsync(
-                GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path"));
-
-            if (imageResult.Attachment != null)
-            {
-                _currentRunImageToolAttachments.RemoveAll(existing =>
-                    string.Equals(existing.DisplayName, imageResult.Attachment.DisplayName, StringComparison.OrdinalIgnoreCase));
-                _currentRunImageToolAttachments.Add(imageResult.Attachment);
-            }
-
-            return imageResult.TranscriptText;
+            _currentRunImageToolAttachments.RemoveAll(existing =>
+                string.Equals(existing.DisplayName, attachment.DisplayName, StringComparison.OrdinalIgnoreCase));
+            _currentRunImageToolAttachments.Add(attachment);
         }
 
         private void AppendActivity(string message)
@@ -1493,232 +1295,6 @@ namespace TxtAIEditor.Controls
             {
                 _agentPane.AppendActivity(message);
             });
-        }
-
-        private string GetToolStartMessage(string toolName, JsonElement arguments)
-        {
-            return toolName switch
-            {
-                "list_files" => string.Format(
-                    _getString("AgentActivityListFilesFormat", "파일 목록 조회 중: {0}"),
-                    GetStringArgument(arguments, "glob")),
-                "search_text" => string.Format(
-                    _getString("AgentActivitySearchTextFormat", "텍스트 검색 중: {0}"),
-                    GetStringArgument(arguments, "query")),
-                "run_rg" => string.Format(
-                    _getString("AgentActivityRunRgFormat", "rg 실행 중: {0}"),
-                    TruncateForActivity(GetStringArgument(arguments, "arguments"))),
-                "run_rga" => string.Format(
-                    _getString("AgentActivityRunRgaFormat", "rga 실행 중: {0}"),
-                    TruncateForActivity(GetStringArgument(arguments, "arguments"))),
-                "run_powershell" => string.Format(
-                    _getString("AgentActivityRunPowerShellFormat", "PowerShell 실행 중: {0}"),
-                    TruncateForActivity(GetStringArgument(arguments, "command"))),
-                "read_file" => string.Format(
-                    _getString("AgentActivityReadFileFormat", "파일 읽는 중: {0} ({1}줄부터 {2}줄)"),
-                    GetStringArgument(arguments, "path"),
-                    GetIntArgument(arguments, "startLine", 1),
-                    GetIntArgument(arguments, "lineCount", 160)),
-                "read_image" => string.Format(
-                    _getString("AgentActivityReadImageFormat", "이미지 읽는 중: {0}"),
-                    GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path")),
-                "extract_document" => string.Format(
-                    _getString("AgentActivityExtractDocumentFormat", "문서 텍스트 추출 중: {0}"),
-                    GetExtractDocumentInputPathArgument(arguments)),
-                "create_file" => string.Format(
-                    _getString("AgentActivityCreateFileFormat", "파일 만드는 중: {0}"),
-                    GetStringArgument(arguments, "path")),
-                "replace_in_file" => string.Format(
-                    _getString("AgentActivityReplaceFileFormat", "파일 수정 중: {0}"),
-                    GetEditPathArgument(arguments)),
-                "search_replace" => string.Format(
-                    _getString("AgentActivitySearchReplaceFormat", "검색/치환 중: {0}"),
-                    GetEditPathArgument(arguments)),
-                "replace_range" => string.Format(
-                    _getString("AgentActivityReplaceRangeFormat", "파일 범위 수정 중: {0} ({1}줄부터 {2}줄)"),
-                    GetEditPathArgument(arguments),
-                    GetReplaceRangeStartLineArgument(arguments, GetEditPathArgument(arguments)),
-                    GetReplaceRangeEndLineArgument(arguments, GetEditPathArgument(arguments))),
-                "insert_to_file" => string.Format(
-                    _getString("AgentActivityInsertIntoFileFormat", "파일에 내용 삽입 중: {0}"),
-                    GetEditPathArgument(arguments)),
-                "apply_patch" => string.Format(
-                    _getString("AgentActivityApplyPatchFormat", "파일 패치 적용 중: {0}"),
-                    GetEditPathArgument(arguments)),
-                "overwrite_file" => string.Format(
-                    _getString("AgentActivityOverwriteFileFormat", "파일 덮어쓰는 중: {0}"),
-                    GetEditPathArgument(arguments)),
-                "append_to_file" => string.Format(
-                    _getString("AgentActivityAppendFileFormat", "파일 덧붙이는 중: {0}"),
-                    GetEditPathArgument(arguments)),
-                "merge_files" => string.Format(
-                    _getString("AgentActivityMergeFilesFormat", "파일 합치는 중: {0}"),
-                    GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target")),
-                "split_file" => string.Format(
-                    _getString("AgentActivitySplitFileFormat", "파일 분리하는 중: {0}"),
-                    GetEditPathArgument(arguments)),
-                "insert_text" => _getString("AgentActivityInsertText", "현재 편집기에 입력 중"),
-                "create_tab" => string.Format(
-                    _getString("AgentActivityCreateTabFormat", "새 탭에 입력 중: {0}"),
-                    TruncateForActivity(GetFirstStringArgument(arguments, "title", "name", "fileName", "file_name"))),
-                "save_tab" => string.Format(
-                    _getString("AgentActivitySaveTabFormat", "탭 저장 중: {0}"),
-                    TruncateForActivity(GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id", "path", "filePath", "file_path"))),
-                "edit_tab" => string.Format(
-                    _getString("AgentActivityEditTabFormat", "탭 수정 중: {0}"),
-                    TruncateForActivity(GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id"))),
-                "open_file" => string.Format(
-                    _getString("AgentActivityOpenFileFormat", "파일 여는 중: {0}"),
-                    GetStringArgument(arguments, "path")),
-                "web_search_exa" => string.Format(
-                    _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
-                    GetStringArgument(arguments, "query")),
-                "web_fetch" => string.Format(
-                    _getString("AgentActivityWebFetchFormat", "웹 페이지 읽는 중: {0}"),
-                    string.Join(", ", GetUrlsArgument(arguments))),
-                "web_fetch_exa" => string.Format(
-                    _getString("AgentActivityWebFetchExaFormat", "Exa 웹 페이지 읽는 중: {0}"),
-                    string.Join(", ", GetUrlsArgument(arguments))),
-                _ => string.Format(
-                    _getString("AgentActivityUnknownToolFormat", "도구 실행 중: {0}"),
-                    toolName)
-            };
-        }
-
-        private string GetExtractDocumentInputPathArgument(JsonElement arguments)
-        {
-            string explicitPath = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path", "source", "input");
-            if (!string.IsNullOrWhiteSpace(explicitPath))
-            {
-                return explicitPath;
-            }
-
-            string legacyArguments = GetStringArgument(arguments, "arguments");
-            if (string.IsNullOrWhiteSpace(legacyArguments))
-            {
-                return string.Empty;
-            }
-
-            foreach (string token in SplitCommandLineArguments(legacyArguments))
-            {
-                if (IsSupportedDocumentPathToken(token))
-                {
-                    return token;
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private string GetExtractDocumentOutputPathArgument(JsonElement arguments)
-        {
-            string explicitOutput = GetFirstStringArgument(arguments, "outputPath", "output_path", "targetPath", "target_path", "target", "output");
-            if (!string.IsNullOrWhiteSpace(explicitOutput))
-            {
-                return explicitOutput;
-            }
-
-            string legacyArguments = GetStringArgument(arguments, "arguments");
-            if (string.IsNullOrWhiteSpace(legacyArguments))
-            {
-                return string.Empty;
-            }
-
-            var tokens = SplitCommandLineArguments(legacyArguments);
-            int sourceIndex = tokens.FindIndex(IsSupportedDocumentPathToken);
-            if (sourceIndex < 0)
-            {
-                return string.Empty;
-            }
-
-            for (int i = sourceIndex + 1; i < tokens.Count; i++)
-            {
-                string token = tokens[i];
-                if (string.IsNullOrWhiteSpace(token) ||
-                    token.StartsWith("-", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                return token;
-            }
-
-            return string.Empty;
-        }
-
-        private static List<string> SplitCommandLineArguments(string arguments)
-        {
-            var tokens = new List<string>();
-            if (string.IsNullOrWhiteSpace(arguments))
-            {
-                return tokens;
-            }
-
-            var builder = new StringBuilder();
-            char quote = '\0';
-
-            foreach (char ch in arguments)
-            {
-                if ((ch == '"' || ch == '\'') && (quote == '\0' || quote == ch))
-                {
-                    quote = quote == '\0' ? ch : '\0';
-                    continue;
-                }
-
-                if (char.IsWhiteSpace(ch) && quote == '\0')
-                {
-                    if (builder.Length > 0)
-                    {
-                        tokens.Add(builder.ToString());
-                        builder.Clear();
-                    }
-                    continue;
-                }
-
-                builder.Append(ch);
-            }
-
-            if (builder.Length > 0)
-            {
-                tokens.Add(builder.ToString());
-            }
-
-            return tokens;
-        }
-
-        private static bool IsSupportedDocumentPathToken(string token)
-        {
-            if (string.IsNullOrWhiteSpace(token) || token.StartsWith("-", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            string extension = Path.GetExtension(token);
-            return extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase) ||
-                extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
-                extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
-                extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private string GetPathArgument(JsonElement arguments)
-        {
-            return _fileToolController.GetPathArgument(arguments);
-        }
-
-        private string GetEditPathArgument(JsonElement arguments)
-        {
-            return _fileToolController.GetEditPathArgument(arguments);
-        }
-
-        private int GetReplaceRangeStartLineArgument(JsonElement arguments, string path)
-        {
-            return _fileToolController.GetReplaceRangeStartLineArgument(arguments, path);
-        }
-
-        private int GetReplaceRangeEndLineArgument(JsonElement arguments, string path)
-        {
-            return _fileToolController.GetReplaceRangeEndLineArgument(arguments, path);
         }
 
         public void UpdateContextStats()
