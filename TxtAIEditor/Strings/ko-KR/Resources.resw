@@ -1595,6 +1595,12 @@
   <data name="AgentToolCallParseFailed" xml:space="preserve">
     <value>도구 호출을 해석하지 못해 원문을 표시합니다.</value>
   </data>
+  <data name="AgentToolCallFormatRetry" xml:space="preserve">
+    <value>도구 호출 형식이 섞여 다시 요청합니다.</value>
+  </data>
+  <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
+    <value>도구 호출 형식 오류가 반복되어 Agent 실행을 중단했습니다. 작업을 다시 실행해 주세요.</value>
+  </data>
   <data name="AgentActivityFinalAnswer" xml:space="preserve">
     <value>최종 응답 작성 완료</value>
   </data>
@@ -1609,6 +1615,12 @@
   </data>
   <data name="AgentDuplicateToolSkippedFormat" xml:space="preserve">
     <value>동일한 {0} 도구 호출이 이미 성공해서 다시 실행하지 않았습니다. 이전 결과를 사용하고, 필요한 다음 단계가 없으면 최종 응답을 작성하세요.</value>
+  </data>
+  <data name="AgentDuplicateToolReused" xml:space="preserve">
+    <value>동일한 도구 호출이 이미 성공해 재실행하지 않았습니다. 캐시된 결과를 다시 제공합니다.</value>
+  </data>
+  <data name="AgentLoopGuardStopped" xml:space="preserve">
+    <value>동일한 도구 호출 반복 루프가 감지되어 Agent 실행을 중단했습니다. 출력된 결과를 확인한 뒤 다시 실행해 주세요.</value>
   </data>
   <data name="AgentSelectedRangeEditComplete" xml:space="preserve">
     <value>선택 영역 변경을 적용했습니다.</value>

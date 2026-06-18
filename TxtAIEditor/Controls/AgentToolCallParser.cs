@@ -10,6 +10,82 @@ namespace TxtAIEditor.Controls
 {
     internal static class AgentToolCallParser
     {
+        private const string ToolCallOpenTag = "<tool_call>";
+        private const string ToolCallCloseTag = "</tool_call>";
+
+        public static bool ContainsToolCallSyntax(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return false;
+            }
+
+            string text = response.Trim();
+            return text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                LooksLikeBareToolCallEnvelope(text);
+        }
+
+        public static bool IsPureToolCallResponse(string response, out string formatError)
+        {
+            formatError = string.Empty;
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                formatError = "The response is empty.";
+                return false;
+            }
+
+            string text = response.Trim();
+            int openTagIndex = text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
+            int closeTagIndex = text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase);
+            if (openTagIndex >= 0 || closeTagIndex >= 0)
+            {
+                if (openTagIndex < 0)
+                {
+                    formatError = "The response contains a closing </tool_call> tag without an opening <tool_call> tag.";
+                    return false;
+                }
+
+                if (!string.IsNullOrWhiteSpace(text.Substring(0, openTagIndex)))
+                {
+                    formatError = "The response contains normal text before the <tool_call> tag.";
+                    return false;
+                }
+
+                int payloadStart = openTagIndex + ToolCallOpenTag.Length;
+                int payloadEnd = text.IndexOf(ToolCallCloseTag, payloadStart, StringComparison.OrdinalIgnoreCase);
+                if (payloadEnd < 0)
+                {
+                    formatError = "The response is missing the closing </tool_call> tag.";
+                    return false;
+                }
+
+                string afterTag = text.Substring(payloadEnd + ToolCallCloseTag.Length);
+                if (!string.IsNullOrWhiteSpace(afterTag))
+                {
+                    formatError = "The response contains normal text after the </tool_call> tag.";
+                    return false;
+                }
+
+                string payload = text.Substring(payloadStart, payloadEnd - payloadStart).Trim();
+                if (string.IsNullOrWhiteSpace(payload))
+                {
+                    formatError = "The <tool_call> payload is empty.";
+                    return false;
+                }
+
+                return true;
+            }
+
+            if (LooksLikeBareToolCallEnvelope(text))
+            {
+                return true;
+            }
+
+            formatError = "The response does not contain a complete tool_call envelope.";
+            return false;
+        }
+
         public static bool TryParse(string response, out string toolName, out JsonElement arguments)
         {
             toolName = string.Empty;
@@ -477,10 +553,14 @@ namespace TxtAIEditor.Controls
             }
 
             string text = response.Trim();
-            int toolCallIndex = text.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+            int toolCallIndex = text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
             if (toolCallIndex >= 0)
             {
-                text = text.Substring(toolCallIndex + "<tool_call>".Length).TrimStart();
+                text = text.Substring(toolCallIndex + ToolCallOpenTag.Length).TrimStart();
+            }
+            else if (!text.StartsWith("{", StringComparison.Ordinal))
+            {
+                return false;
             }
 
             int jsonStart = text.IndexOf('{');
@@ -501,24 +581,22 @@ namespace TxtAIEditor.Controls
             }
 
             string text = response.Trim();
-            int toolCallIndex = text.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+            int toolCallIndex = text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
             if (toolCallIndex >= 0)
             {
-                int payloadStart = toolCallIndex + "<tool_call>".Length;
-                int payloadEnd = text.IndexOf("</tool_call>", payloadStart, StringComparison.OrdinalIgnoreCase);
+                int payloadStart = toolCallIndex + ToolCallOpenTag.Length;
+                int payloadEnd = text.IndexOf(ToolCallCloseTag, payloadStart, StringComparison.OrdinalIgnoreCase);
                 payload = payloadEnd >= 0
                     ? text.Substring(payloadStart, payloadEnd - payloadStart).Trim()
                     : text.Substring(payloadStart).Trim();
             }
+            else if (TryExtractBareToolCallPayload(text, out string barePayload))
+            {
+                payload = barePayload;
+            }
             else
             {
-                int jsonStart = text.IndexOf('{');
-                if (jsonStart < 0)
-                {
-                    return false;
-                }
-
-                payload = text.Substring(jsonStart).Trim();
+                return false;
             }
 
             if (payload.StartsWith("{", StringComparison.Ordinal))
@@ -534,6 +612,69 @@ namespace TxtAIEditor.Controls
 
             string possibleName = payload.Substring(0, openBraceIndex).Trim();
             return Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$");
+        }
+
+        private static bool LooksLikeBareToolCallEnvelope(string text)
+        {
+            if (!TryExtractBareToolCallPayload(text, out string payload))
+            {
+                return false;
+            }
+
+            if (!payload.StartsWith("{", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(payload);
+                return document.RootElement.ValueKind == JsonValueKind.Object &&
+                    document.RootElement.TryGetProperty("name", out var nameProperty) &&
+                    nameProperty.ValueKind == JsonValueKind.String &&
+                    !string.IsNullOrWhiteSpace(nameProperty.GetString());
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryExtractBareToolCallPayload(string text, out string payload)
+        {
+            payload = string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            string trimmed = text.Trim();
+            if (trimmed.StartsWith("{", StringComparison.Ordinal))
+            {
+                return TryExtractBalancedJsonObject(trimmed, 0, out payload) &&
+                    payload.Length == trimmed.Length;
+            }
+
+            int openBraceIndex = trimmed.IndexOf('{');
+            if (openBraceIndex <= 0)
+            {
+                return false;
+            }
+
+            string possibleName = trimmed.Substring(0, openBraceIndex).Trim();
+            if (!Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$"))
+            {
+                return false;
+            }
+
+            if (!TryExtractBalancedJsonObject(trimmed, openBraceIndex, out string json) ||
+                openBraceIndex + json.Length != trimmed.Length)
+            {
+                return false;
+            }
+
+            payload = trimmed;
+            return true;
         }
 
         private static bool TryExtractBalancedJsonObject(string text, int jsonStart, out string json)

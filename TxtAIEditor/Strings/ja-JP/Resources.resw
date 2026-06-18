@@ -1596,6 +1596,12 @@
   <data name="AgentToolCallParseFailed" xml:space="preserve">
     <value>ツールの呼び出しを解析できませんでした。原文を表示します。</value>
   </data>
+  <data name="AgentToolCallFormatRetry" xml:space="preserve">
+    <value>ツール呼び出しに通常テキストが混在していたため、形式を再要求しています。</value>
+  </data>
+  <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
+    <value>ツール呼び出し形式のエラーが繰り返されたため、Agentの実行を停止しました。タスクを再実行してください。</value>
+  </data>
   <data name="AgentActivityFinalAnswer" xml:space="preserve">
     <value>最終回答の作成完了</value>
   </data>
@@ -1610,6 +1616,12 @@
   </data>
   <data name="AgentDuplicateToolSkippedFormat" xml:space="preserve">
     <value>同じ {0} ツール呼び出しはすでに成功しているため、再実行しませんでした。前回の結果を使用し、必要な次のステップがなければ最終回答を作成してください。</value>
+  </data>
+  <data name="AgentDuplicateToolReused" xml:space="preserve">
+    <value>同じツール呼び出しはすでに成功しているため、再実行しませんでした。キャッシュ済みの結果を再提示します。</value>
+  </data>
+  <data name="AgentLoopGuardStopped" xml:space="preserve">
+    <value>同じツール呼び出しの繰り返しループを検出したため、Agentの実行を停止しました。出力を確認してから再実行してください。</value>
   </data>
   <data name="AgentSelectedRangeEditComplete" xml:space="preserve">
     <value>選択範囲の変更を適用しました。</value>

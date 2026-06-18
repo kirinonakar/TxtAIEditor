@@ -1595,6 +1595,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentToolCallParseFailed" xml:space="preserve">
     <value>Failed to parse tool call, displaying raw response.</value>
   </data>
+  <data name="AgentToolCallFormatRetry" xml:space="preserve">
+    <value>Tool call text was mixed with normal output, so the Agent is retrying the format.</value>
+  </data>
+  <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
+    <value>Tool call format errors repeated, so Agent execution was stopped. Please run the task again.</value>
+  </data>
   <data name="AgentActivityFinalAnswer" xml:space="preserve">
     <value>Final answer generated</value>
   </data>
@@ -1609,6 +1615,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="AgentDuplicateToolSkippedFormat" xml:space="preserve">
     <value>The same {0} tool call already succeeded, so it was not run again. Use the previous result; write the final answer if no necessary next step remains.</value>
+  </data>
+  <data name="AgentDuplicateToolReused" xml:space="preserve">
+    <value>The same tool call already succeeded, so it was not run again. The cached result is provided again.</value>
+  </data>
+  <data name="AgentLoopGuardStopped" xml:space="preserve">
+    <value>A repeated identical tool-call loop was detected, so Agent execution was stopped. Review the output and run the task again.</value>
   </data>
   <data name="AgentSelectedRangeEditComplete" xml:space="preserve">
     <value>Applied the selected range change.</value>

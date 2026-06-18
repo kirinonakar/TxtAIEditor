@@ -20,8 +20,11 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("Tool call format:");
             builder.AppendLine("- When a tool is needed, output exactly one tag and no other text:");
             builder.AppendLine("<tool_call>{\"name\":\"read_file\",\"arguments\":{\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":1,\"lineCount\":120}}</tool_call>");
+            builder.AppendLine("- A response must be either plain text with no tool_call tag, or exactly one tool_call tag with no other text.");
+            builder.AppendLine("- If the next step needs a tool, the tool_call format overrides plans, progress updates, markdown, and explanations.");
             builder.AppendLine("- Tool names must match exactly. Arguments are JSON. Escape Windows backslashes as \\\\ or use /.");
             builder.AppendLine("- After a tool result, continue from that result. Do not repeat identical successful calls.");
+            builder.AppendLine("- If the host skips a duplicate tool call and provides a cached result, use that cached result and choose a different next action or final answer. A later mutating tool may change state, so rereading after edits is allowed when needed.");
             builder.AppendLine("- When no tool is needed, write the final answer without a tool_call tag.");
             builder.AppendLine();
             builder.AppendLine("Tools (internal, not PowerShell):");
@@ -56,6 +59,8 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- If [User-referenced file names] is present, prefer listed workspace matches for reads and the exact mentioned name for requested outputs.");
             builder.AppendLine("- File-writing tools require an explicit path. If you read a file or use [Active tab] Path, copy that exact path into the write tool.");
             builder.AppendLine("- After any file edit or editor input/save, read the next prompt's [Diff log of changes made in this session]. If it satisfies the task, final-answer and stop; otherwise fix only what is still wrong.");
+            builder.AppendLine("- If the diff log is absent, trust the successful writing tool result as the source of truth. Do not re-read the same file range only to confirm a successful write unless the next edit depends on exact surrounding code or line numbers.");
+            builder.AppendLine("- [Current workspace context snapshot] is only a compact context summary. If it says unchanged after a write, the write may still have succeeded; check the tool result and diff log.");
             builder.AppendLine();
             builder.AppendLine("Context priority:");
             builder.AppendLine("- selected_range_context > active tab > open tabs; search the workspace only when supplied context is insufficient.");
@@ -78,7 +83,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 builder.AppendLine("=================================");
                 builder.AppendLine(@"You are operating in Agent Planning Mode.
 
-Before starting any non-trivial task, create a concise plan first.
+Before starting any non-trivial task, create a concise internal plan first.
 
 Core rules:
 
@@ -92,19 +97,20 @@ Core rules:
 
 Planning workflow:
 
-1. First, write a short overall plan.
+1. Keep a short overall plan before acting.
 2. Then proceed step by step.
-3. After each meaningful step, update the user with a brief progress summary.
-4. Do not repeat the full original plan every time. Instead, provide a short updated status containing:
+3. When the next step needs a tool, output only the tool_call. Do not emit standalone progress updates while more tool work is needed, because the host treats plain-text responses as final answers.
+4. Progress summaries are allowed only when no tool_call is included in that response.
+5. Do not repeat the full original plan every time. Instead, provide a short updated status containing:
 
    * Completed work
    * Facts discovered
    * Current step
    * Remaining plan
    * Out-of-scope notes, if any
-5. If the actual codebase, requirements, or constraints differ from your assumptions, pause and ask for confirmation before continuing.
-6. If the task requires expanding the scope, changing the approach, or making risky edits, pause and ask for confirmation.
-7. At the end, summarize:
+6. If the actual codebase, requirements, or constraints differ from your assumptions, pause and ask for confirmation before continuing.
+7. If the task requires expanding the scope, changing the approach, or making risky edits, pause and ask for confirmation.
+8. At the end, summarize:
 
    * Files changed
    * What was changed
@@ -112,7 +118,7 @@ Planning workflow:
    * How it was verified
    * Any remaining risks or follow-up suggestions
 
-Progress update format:
+Progress update format, only for plain-text responses that contain no tool_call:
 Completed:
 
 * ...

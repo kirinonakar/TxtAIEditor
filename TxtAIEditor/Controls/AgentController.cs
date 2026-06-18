@@ -383,9 +383,14 @@ namespace TxtAIEditor.Controls
                 bool reachedToolStepLimit = false;
                 int emptyResponseRetryCount = 0;
                 const int maxEmptyResponseRetries = 1;
+                int toolCallFormatRetryCount = 0;
+                const int maxToolCallFormatRetries = 2;
+                int repeatedDuplicateToolSkipCount = 0;
+                string? lastDuplicateToolInvocationKey = null;
+                const int maxRepeatedDuplicateToolSkips = 3;
+                bool planningMode = _agentPane.PlanningMode;
                 int maxToolSteps = _settingsService.CurrentSettings.LlmMaxToolCalls > 0 ? _settingsService.CurrentSettings.LlmMaxToolCalls : 50;
-                string? lastSuccessfulToolInvocationKey = null;
-                string? lastSuccessfulToolResult = null;
+                var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
@@ -399,6 +404,7 @@ namespace TxtAIEditor.Controls
                     bool visibleTextFlushed = false;
                     bool? isJsonToolCall = null;
                     bool hasToolCall = false;
+                    bool suppressStreamingText = planningMode;
 
                     string currentTranscript = transcript;
                     string sessionDiffLog = _sessionEditController.BuildDiffLog();
@@ -496,8 +502,11 @@ namespace TxtAIEditor.Controls
                                 if (printedLength < toolCallIndex)
                                 {
                                     string textToPrint = streamedText.Substring(printedLength, toolCallIndex - printedLength);
-                                    visibleTextFlushed = true;
-                                    await AppendOutputTextAndStreamToTabAsync(textToPrint);
+                                    if (!suppressStreamingText)
+                                    {
+                                        visibleTextFlushed = true;
+                                        await AppendOutputTextAndStreamToTabAsync(textToPrint);
+                                    }
                                     printedLength = toolCallIndex;
                                 }
 
@@ -539,8 +548,11 @@ namespace TxtAIEditor.Controls
                                 if (printedLength < safeLength)
                                 {
                                     string textToPrint = streamedText.Substring(printedLength, safeLength - printedLength);
-                                    visibleTextFlushed = true;
-                                    await AppendOutputTextAndStreamToTabAsync(textToPrint);
+                                    if (!suppressStreamingText)
+                                    {
+                                        visibleTextFlushed = true;
+                                        await AppendOutputTextAndStreamToTabAsync(textToPrint);
+                                    }
                                     printedLength = safeLength;
                                 }
                             }
@@ -548,7 +560,7 @@ namespace TxtAIEditor.Controls
                         },
                         cancellationToken,
                         GetImageAttachmentsForCurrentRun(),
-                        _agentPane.PlanningMode);
+                        planningMode);
 
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
@@ -609,6 +621,53 @@ namespace TxtAIEditor.Controls
                         _agentPane.StopThinkingActivity();
                     });
 
+                    bool responseHasToolSyntax = AgentToolCallParser.ContainsToolCallSyntax(response);
+                    if (responseHasToolSyntax &&
+                        !AgentToolCallParser.IsPureToolCallResponse(response, out string toolCallFormatError))
+                    {
+                        toolCallFormatRetryCount++;
+                        string retryNote = BuildToolCallFormatRetryNote(toolCallFormatError);
+                        transcript += "\n\n" + retryNote;
+                        _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+
+                        string retryMessage = _getString(
+                            "AgentToolCallFormatRetry",
+                            "도구 호출 형식이 섞여 다시 요청합니다.");
+                        await RunOnUIThreadAsync(() =>
+                        {
+                            AppendActivity(retryMessage);
+                            _agentPane.AppendOutputLine(retryMessage);
+                            UpdateContextStatsImmediate(force: true);
+                        });
+
+                        if (toolCallFormatRetryCount > maxToolCallFormatRetries)
+                        {
+                            string limitMessage = _getString(
+                                "AgentToolCallFormatRetryLimit",
+                                "도구 호출 형식 오류가 반복되어 Agent 실행을 중단했습니다. 작업을 다시 실행해 주세요.");
+                            await RunOnUIThreadAsync(() =>
+                            {
+                                AppendActivity(limitMessage);
+                                _agentPane.AppendOutputLine(limitMessage);
+                            });
+
+                            AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                            string formatRunTranscript = transcript.Substring(initialTranscript.Length);
+                            if (!string.IsNullOrWhiteSpace(formatRunTranscript))
+                            {
+                                AppendSessionHistoryLine(formatRunTranscript.Trim());
+                            }
+                            AppendSessionHistoryLine($"[Agent Response]: {limitMessage}");
+                            AppendSessionHistoryLine();
+                            _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+
+                            completed = true;
+                            break;
+                        }
+
+                        continue;
+                    }
+
                     int endLength = response.Length;
                     if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                     {
@@ -619,7 +678,12 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    if (printedLength < endLength)
+                    if (!responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(response))
+                    {
+                        visibleTextFlushed = true;
+                        await AppendOutputTextAndStreamToTabAsync(response);
+                    }
+                    else if (!responseHasToolSyntax && printedLength < endLength)
                     {
                         string remainingText = response.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;
@@ -630,13 +694,57 @@ namespace TxtAIEditor.Controls
 
                     if (!AgentToolCallParser.TryParse(response, out string toolName, out JsonElement arguments))
                     {
+                        if (responseHasToolSyntax)
+                        {
+                            toolCallFormatRetryCount++;
+                            string retryNote = BuildToolCallFormatRetryNote("The tool_call JSON could not be parsed.");
+                            transcript += "\n\n" + retryNote;
+                            _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+
+                            string retryMessage = _getString(
+                                "AgentToolCallFormatRetry",
+                                "도구 호출 형식이 섞여 다시 요청합니다.");
+                            await RunOnUIThreadAsync(() =>
+                            {
+                                AppendActivity(retryMessage);
+                                _agentPane.AppendOutputLine(retryMessage);
+                                UpdateContextStatsImmediate(force: true);
+                            });
+
+                            if (toolCallFormatRetryCount > maxToolCallFormatRetries)
+                            {
+                                string limitMessage = _getString(
+                                    "AgentToolCallFormatRetryLimit",
+                                    "도구 호출 형식 오류가 반복되어 Agent 실행을 중단했습니다. 작업을 다시 실행해 주세요.");
+                                await RunOnUIThreadAsync(() =>
+                                {
+                                    AppendActivity(limitMessage);
+                                    _agentPane.AppendOutputLine(limitMessage);
+                                });
+
+                                AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                                string formatRunTranscript = transcript.Substring(initialTranscript.Length);
+                                if (!string.IsNullOrWhiteSpace(formatRunTranscript))
+                                {
+                                    AppendSessionHistoryLine(formatRunTranscript.Trim());
+                                }
+                                AppendSessionHistoryLine($"[Agent Response]: {limitMessage}");
+                                AppendSessionHistoryLine();
+                                _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+
+                                completed = true;
+                                break;
+                            }
+
+                            continue;
+                        }
+
                         if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
-                            await RunOnUIThreadAsync(() =>
-                                _agentPane.AppendOutputLine(_getString("AgentToolCallParseFailed", "도구 호출을 해석하지 못해 원문을 표시합니다.")));
                             await AppendOutputTextAndStreamToTabAsync(response);
                         }
 
+                        toolCallFormatRetryCount = 0;
                         await RunOnUIThreadAsync(async () =>
                         {
                             AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
@@ -663,34 +771,61 @@ namespace TxtAIEditor.Controls
                     string normalizedToolName = NormalizeToolName(toolName);
                     string toolInvocationKey = BuildToolInvocationKey(normalizedToolName, arguments);
                     bool skippedDuplicateTool = false;
+                    bool stopAfterDuplicateLoopGuard = false;
                     string toolResult;
                     string toolResultForTranscript;
+                    toolCallFormatRetryCount = 0;
 
-                    if (string.Equals(lastSuccessfulToolInvocationKey, toolInvocationKey, StringComparison.Ordinal) &&
-                        lastSuccessfulToolResult != null &&
-                        ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
+                    if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
+                        successfulToolResults.TryGetValue(toolInvocationKey, out string? cachedToolResult))
                     {
                         skippedDuplicateTool = true;
-                        toolResult = lastSuccessfulToolResult;
-                        toolResultForTranscript = "[Tool execution skipped: identical successful call was the previous agent tool call. Reused the immediately previous result.]";
+                        toolResult = cachedToolResult ?? string.Empty;
+                        if (string.Equals(lastDuplicateToolInvocationKey, toolInvocationKey, StringComparison.Ordinal))
+                        {
+                            repeatedDuplicateToolSkipCount++;
+                        }
+                        else
+                        {
+                            lastDuplicateToolInvocationKey = toolInvocationKey;
+                            repeatedDuplicateToolSkipCount = 1;
+                        }
+
+                        var duplicateResultBuilder = new StringBuilder();
+                        duplicateResultBuilder.AppendLine("[Tool execution skipped: identical successful call already ran earlier in this agent run. Cached result follows; use it instead of calling the tool again.]");
+                        duplicateResultBuilder.AppendLine(toolResult);
+                        if (repeatedDuplicateToolSkipCount >= 2)
+                        {
+                            duplicateResultBuilder.AppendLine();
+                            duplicateResultBuilder.AppendLine("[Loop guard] You repeated the same skipped tool call. Choose exactly one different next action, or write the final answer. Do not call this tool again unless a later mutating tool changes the relevant files or workspace state.");
+                        }
+
+                        stopAfterDuplicateLoopGuard = repeatedDuplicateToolSkipCount >= maxRepeatedDuplicateToolSkips;
+                        toolResultForTranscript = duplicateResultBuilder.ToString().TrimEnd();
                     }
                     else
                     {
+                        lastDuplicateToolInvocationKey = null;
+                        repeatedDuplicateToolSkipCount = 0;
                         toolResult = await ExecuteToolAsync(toolName, arguments, cancellationToken);
                         toolResultForTranscript = toolResult;
                         if (IsSuccessfulToolResult(toolResult))
                         {
-                            lastSuccessfulToolInvocationKey = toolInvocationKey;
-                            lastSuccessfulToolResult = toolResult;
+                            if (IsMutatingTool(normalizedToolName) ||
+                                string.Equals(normalizedToolName, "run_powershell", StringComparison.Ordinal))
+                            {
+                                successfulToolResults.Clear();
+                            }
+
                             if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                             {
+                                successfulToolResults[toolInvocationKey] = toolResult;
                                 toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
                             }
                         }
                         else
                         {
-                            lastSuccessfulToolInvocationKey = null;
-                            lastSuccessfulToolResult = null;
+                            successfulToolResults.Remove(toolInvocationKey);
                         }
                     }
 
@@ -708,10 +843,10 @@ namespace TxtAIEditor.Controls
                         addedPartBuilder.AppendLine($"[Tool result: {toolName}]");
                         addedPartBuilder.AppendLine(toolResultForTranscript);
                         addedPartBuilder.AppendLine();
-                        addedPartBuilder.AppendLine("[Current workspace state]");
+                        addedPartBuilder.AppendLine("[Current workspace context snapshot]");
                         if (string.Equals(refreshedContext, lastWorkspaceContext, StringComparison.Ordinal))
                         {
-                            addedPartBuilder.AppendLine("Unchanged since the previous workspace context.");
+                            addedPartBuilder.AppendLine("Context summary unchanged since the previous snapshot. File edits, if any, are tracked in the next [Diff log of changes made in this session].");
                         }
                         else
                         {
@@ -831,6 +966,31 @@ namespace TxtAIEditor.Controls
                         _agentPane.AppendOutputLine($"{outputHeader}: {toolName}");
                         _agentPane.AppendOutputText(displayResult.TrimEnd() + Environment.NewLine);
                     });
+
+                    if (stopAfterDuplicateLoopGuard)
+                    {
+                        string loopMessage = _getString(
+                            "AgentLoopGuardStopped",
+                            "동일한 도구 호출 반복 루프가 감지되어 Agent 실행을 중단했습니다. 출력된 결과를 확인한 뒤 다시 실행해 주세요.");
+                        await RunOnUIThreadAsync(() =>
+                        {
+                            AppendActivity(loopMessage);
+                            _agentPane.AppendOutputLine(loopMessage);
+                        });
+
+                        AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                        string loopRunTranscript = transcript.Substring(initialTranscript.Length);
+                        if (!string.IsNullOrWhiteSpace(loopRunTranscript))
+                        {
+                            AppendSessionHistoryLine(loopRunTranscript.Trim());
+                        }
+                        AppendSessionHistoryLine($"[Agent Response]: {loopMessage}");
+                        AppendSessionHistoryLine();
+                        _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+
+                        completed = true;
+                        break;
+                    }
 
 
 
@@ -1070,6 +1230,22 @@ namespace TxtAIEditor.Controls
             string modeText = _getString("AgentModeRun", "실행");
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             return $"{timestamp}  Agent {modeText}: {TruncateForActivity(instruction)}";
+        }
+
+        private static string BuildToolCallFormatRetryNote(string detail)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("[Agent tool call format error]");
+            builder.AppendLine("The previous assistant response was not executed.");
+            builder.AppendLine("A tool turn must be exactly one <tool_call>...</tool_call> tag and no other text.");
+            builder.AppendLine("Progress updates, plans, markdown, and explanations must be in a separate plain-text response with no tool_call tag.");
+            builder.AppendLine("Re-emit only the tool_call now, or write the final answer with no tool_call tag.");
+            if (!string.IsNullOrWhiteSpace(detail))
+            {
+                builder.AppendLine($"Parser detail: {detail}");
+            }
+
+            return builder.ToString().TrimEnd();
         }
 
         private string BuildInstructionDisplay(string userInstruction)
