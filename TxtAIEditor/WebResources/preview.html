@@ -416,13 +416,69 @@
             }
         }
 
+        const EDITOR_SYNC_SCROLL_SETTLE_MS = 900;
+
         let isSyncingScroll = false;
         let suppressPreviewScrollEvents = false;
         let scrollSuppressionToken = 0;
+        let scrollSyncReleaseToken = 0;
         let lastSetScrollTop = -1;
         let lastPreviewUserScrollAt = 0;
         let lastPreviewScrollPostedAt = 0;
         let lastProgrammaticScrollTime = 0;
+        let activeEditorSyncTarget = null;
+
+        function maxPreviewScrollTop() {
+            return Math.max(0, totalVirtualHeight() - scroll.clientHeight);
+        }
+
+        function clampPreviewScrollTop(value) {
+            return Math.min(maxPreviewScrollTop(), Math.max(0, Number(value || 0)));
+        }
+
+        function holdSyncingScrollForFrames() {
+            const token = ++scrollSyncReleaseToken;
+            isSyncingScroll = true;
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (token === scrollSyncReleaseToken) {
+                        isSyncingScroll = false;
+                    }
+                });
+            });
+        }
+
+        function rememberEditorSyncTarget(firstLine, offset) {
+            activeEditorSyncTarget = {
+                firstLine: Math.min(state.lineCount, Math.max(1, Number(firstLine || 1))),
+                offset: Math.max(0, Number(offset || 0)),
+                expiresAt: Date.now() + EDITOR_SYNC_SCROLL_SETTLE_MS
+            };
+            return activeEditorSyncTarget;
+        }
+
+        function currentEditorSyncTarget() {
+            if (!activeEditorSyncTarget) return null;
+            if (Date.now() > activeEditorSyncTarget.expiresAt) {
+                activeEditorSyncTarget = null;
+                return null;
+            }
+            return activeEditorSyncTarget;
+        }
+
+        function clearEditorSyncTarget() {
+            activeEditorSyncTarget = null;
+        }
+
+        function applyEditorSyncTarget(target, extendSettleWindow = false) {
+            if (!target) return false;
+            if (extendSettleWindow) {
+                target.expiresAt = Date.now() + EDITOR_SYNC_SCROLL_SETTLE_MS;
+            }
+            holdSyncingScrollForFrames();
+            setPreviewScrollTopSilently(rowTop(target.firstLine) + target.offset);
+            return true;
+        }
 
         function suppressPreviewScrollUntilNextFrame() {
             const token = ++scrollSuppressionToken;
@@ -437,7 +493,7 @@
         }
 
         function setPreviewScrollTopSilently(value) {
-            const target = Math.max(0, Number(value || 0));
+            const target = clampPreviewScrollTop(value);
             if (Math.abs(scroll.scrollTop - target) <= 0.5) {
                 lastSetScrollTop = -1;
                 return;
@@ -973,28 +1029,33 @@
             });
 
             if (changed) {
-                // Anchor scroll to the first visible line to prevent jump
-                const anchorLine = lineAt(scroll.scrollTop);
-                const anchorTop = rowTop(anchorLine);
-                const anchorOffset = scroll.scrollTop - anchorTop;
+                const editorSyncTarget = currentEditorSyncTarget();
+                if (editorSyncTarget) {
+                    setupVirtualHeight();
+                    applyEditorSyncTarget(editorSyncTarget, true);
+                } else {
+                    // Anchor scroll to the first visible line to prevent jump
+                    const anchorLine = lineAt(scroll.scrollTop);
+                    const anchorTop = rowTop(anchorLine);
+                    const anchorOffset = scroll.scrollTop - anchorTop;
 
-                setupVirtualHeight();
+                    setupVirtualHeight();
 
-                // Restore scroll position relative to anchor line when the preview is not being scrolled by the user.
-                // Keeping this running during editor updates prevents scroll jitter from layout changes.
-                const now = Date.now();
-                const isActivePreviewScroll = (now - lastPreviewUserScrollAt) < 160;
+                    // Restore scroll position relative to anchor line when the preview is not being scrolled by the user.
+                    // Keeping this running during editor updates prevents scroll jitter from layout changes.
+                    const now = Date.now();
+                    const isActivePreviewScroll = (now - lastPreviewUserScrollAt) < 160;
 
-                if (!isActivePreviewScroll) {
-                    // Restore scroll position relative to anchor line
-                    const newAnchorTop = rowTop(anchorLine);
-                    const corrected = newAnchorTop + anchorOffset;
-                    if (Math.abs(scroll.scrollTop - corrected) > 1) {
-                        suppressPreviewScrollUntilNextFrame();
-                        lastProgrammaticScrollTime = Date.now();
-                        const targetScrollTop = Math.max(0, corrected);
-                        scroll.scrollTop = targetScrollTop;
-                        lastSetScrollTop = scroll.scrollTop;
+                    if (!isActivePreviewScroll) {
+                        // Restore scroll position relative to anchor line
+                        const newAnchorTop = rowTop(anchorLine);
+                        const corrected = newAnchorTop + anchorOffset;
+                        if (Math.abs(scroll.scrollTop - corrected) > 1) {
+                            suppressPreviewScrollUntilNextFrame();
+                            lastProgrammaticScrollTime = Date.now();
+                            scroll.scrollTop = clampPreviewScrollTop(corrected);
+                            lastSetScrollTop = scroll.scrollTop;
+                        }
                     }
                 }
 
@@ -1077,6 +1138,7 @@
             const now = Date.now();
             if (!suppressPreviewScrollEvents && !isSyncingScroll) {
                 lastPreviewUserScrollAt = now;
+                clearEditorSyncTarget();
             }
             queueRender();
 
@@ -1120,12 +1182,7 @@
                         if (Date.now() - lastPreviewScrollPostedAt < 120) {
                             return;
                         }
-                        isSyncingScroll = true;
-                        const targetScrollTop = rowTop(message.firstLine) + (message.offset || 0);
-                        setPreviewScrollTopSilently(targetScrollTop);
-                        requestAnimationFrame(() => {
-                            isSyncingScroll = false;
-                        });
+                        applyEditorSyncTarget(rememberEditorSyncTarget(message.firstLine, message.offset));
                     }
                 }
             });
