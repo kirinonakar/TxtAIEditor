@@ -29,6 +29,7 @@ namespace TxtAIEditor.Controls
         private GridLength _normalTitleBarHeight;
         private bool _restorePresenterTitleBar = true;
         private bool _restorePresenterBorder = true;
+        private bool _restoreExtendsContentIntoTitleBar = true;
 
         public StickyNoteModeController(
             Window window,
@@ -97,11 +98,14 @@ namespace TxtAIEditor.Controls
             _wasRightSidebarVisible = _shellPanelLayoutService.IsRightSidebarVisible;
             _wasMarkdownToolbarVisible = _markdownToolbar.Visibility == Visibility.Visible;
             _normalTitleBarHeight = _titleBarRow.Height;
+            _restoreExtendsContentIntoTitleBar = _window.ExtendsContentIntoTitleBar;
 
             _stickyNoteBar.TopMostIsChecked = _topToolbar.TopMostIsChecked;
             _normalTitleBar.Visibility = Visibility.Collapsed;
             _titleBarRow.Height = new GridLength(0);
             _stickyNoteBar.Visibility = Visibility.Visible;
+            _window.SetTitleBar(null);
+            _window.ExtendsContentIntoTitleBar = false;
             ApplyPresenterChromeVisible(false);
 
             _topToolbar.Visibility = Visibility.Collapsed;
@@ -128,6 +132,7 @@ namespace TxtAIEditor.Controls
             _titleBarRow.Height = _normalTitleBarHeight;
             _normalTitleBar.Visibility = Visibility.Visible;
             ApplyPresenterChromeVisible(true);
+            _window.ExtendsContentIntoTitleBar = _restoreExtendsContentIntoTitleBar;
             _window.SetTitleBar(_normalTitleBar);
 
             _topToolbar.Visibility = Visibility.Visible;

@@ -24,7 +24,7 @@ namespace TxtAIEditor.Controls
         {
             ToolTipService.SetToolTip(TopMostButton, getString("TopMost", "항상위"));
             TopMostText.Text = getString("TopMost", "항상위");
-            ToolTipService.SetToolTip(ExitButton, getString("ExitStickyNoteTooltip", "스티커 노트 모드 종료"));
+            ToolTipService.SetToolTip(ExitButton, getString("ExitStickyNoteTooltip", "스티커 노트 모드 종료 (F12)"));
             ExitText.Text = getString("ExitStickyNoteText", "나가기");
         }
 

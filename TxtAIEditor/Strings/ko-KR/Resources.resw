@@ -1395,7 +1395,7 @@
     <value>스티커 노트</value>
   </data>
   <data name="ExitStickyNoteTooltip" xml:space="preserve">
-    <value>스티커 노트 모드 종료</value>
+    <value>스티커 노트 모드 종료 (F12)</value>
   </data>
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>나가기</value>

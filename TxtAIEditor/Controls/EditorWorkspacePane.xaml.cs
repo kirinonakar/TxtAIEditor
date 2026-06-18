@@ -39,6 +39,9 @@ namespace TxtAIEditor.Controls
         {
             InitializeComponent();
             SizeChanged += OnWorkspaceSizeChanged;
+            PrimaryTabActions.SizeChanged += (_, _) => UpdateTabActionSpacers();
+            SecondaryTabActions.SizeChanged += (_, _) => UpdateTabActionSpacers();
+            StickyNoteBar.RegisterPropertyChangedCallback(VisibilityProperty, (_, __) => UpdateTabActionSpacers());
             ActiveTabView = EditorTabView;
             Loaded += (_, __) => DisableTabItemTransitions();
         }
@@ -97,6 +100,12 @@ namespace TxtAIEditor.Controls
         {
             TryDisableTabItemTransitions(EditorTabView);
             TryDisableTabItemTransitions(EditorTabView2);
+        }
+
+        private void UpdateTabActionSpacers()
+        {
+            PrimaryTabActionsSpacer.Width = Math.Max(72, PrimaryTabActions.ActualWidth + 12);
+            SecondaryTabActionsSpacer.Width = Math.Max(72, SecondaryTabActions.ActualWidth + 12);
         }
 
         private static void TryDisableTabItemTransitions(TabView tabView)

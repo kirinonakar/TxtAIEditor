@@ -1395,7 +1395,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Sticky Note</value>
   </data>
   <data name="ExitStickyNoteTooltip" xml:space="preserve">
-    <value>Exit Sticky Note Mode</value>
+    <value>Exit Sticky Note Mode (F12)</value>
   </data>
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>Exit</value>

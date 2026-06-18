@@ -1396,7 +1396,7 @@
     <value>付箋モード</value>
   </data>
   <data name="ExitStickyNoteTooltip" xml:space="preserve">
-    <value>付箋モード終了</value>
+    <value>付箋モード終了 (F12)</value>
   </data>
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>終了</value>

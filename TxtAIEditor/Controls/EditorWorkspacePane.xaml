@@ -39,8 +39,8 @@
                         <!-- Dynamic tabs go here -->
                     </TabView.TabItems>
                     <TabView.TabStripFooter>
-                        <Border MinWidth="72"
-                                Width="{Binding ActualWidth, ElementName=PrimaryTabActions}"
+                        <Border x:Name="PrimaryTabActionsSpacer"
+                                Width="72"
                                 Height="32"/>
                     </TabView.TabStripFooter>
                 </TabView>
@@ -93,8 +93,8 @@
                         <!-- Dynamic tabs go here -->
                     </TabView.TabItems>
                     <TabView.TabStripFooter>
-                        <Border MinWidth="72"
-                                Width="{Binding ActualWidth, ElementName=SecondaryTabActions}"
+                        <Border x:Name="SecondaryTabActionsSpacer"
+                                Width="72"
                                 Height="32"/>
                     </TabView.TabStripFooter>
                 </TabView>
