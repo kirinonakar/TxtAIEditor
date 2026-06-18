@@ -510,9 +510,7 @@ namespace TxtAIEditor.Controls
                 "git status",
                 "git diff",
                 "git log",
-                "dotnet --info",
-                "dotnet build",
-                "dotnet test"
+                "dotnet --info"
             };
 
             bool startsWithSafePrefix = safePrefixes.Any(prefix =>
