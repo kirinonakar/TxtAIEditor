@@ -26,66 +26,6 @@ namespace TxtAIEditor.Controls
                 LooksLikeBareToolCallEnvelope(text);
         }
 
-        public static bool IsPureToolCallResponse(string response, out string formatError)
-        {
-            formatError = string.Empty;
-            if (string.IsNullOrWhiteSpace(response))
-            {
-                formatError = "The response is empty.";
-                return false;
-            }
-
-            string text = response.Trim();
-            int openTagIndex = text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
-            int closeTagIndex = text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase);
-            if (openTagIndex >= 0 || closeTagIndex >= 0)
-            {
-                if (openTagIndex < 0)
-                {
-                    formatError = "The response contains a closing </tool_call> tag without an opening <tool_call> tag.";
-                    return false;
-                }
-
-                if (!string.IsNullOrWhiteSpace(text.Substring(0, openTagIndex)))
-                {
-                    formatError = "The response contains normal text before the <tool_call> tag.";
-                    return false;
-                }
-
-                int payloadStart = openTagIndex + ToolCallOpenTag.Length;
-                int payloadEnd = text.IndexOf(ToolCallCloseTag, payloadStart, StringComparison.OrdinalIgnoreCase);
-                if (payloadEnd < 0)
-                {
-                    formatError = "The response is missing the closing </tool_call> tag.";
-                    return false;
-                }
-
-                string afterTag = text.Substring(payloadEnd + ToolCallCloseTag.Length);
-                if (!string.IsNullOrWhiteSpace(afterTag))
-                {
-                    formatError = "The response contains normal text after the </tool_call> tag.";
-                    return false;
-                }
-
-                string payload = text.Substring(payloadStart, payloadEnd - payloadStart).Trim();
-                if (string.IsNullOrWhiteSpace(payload))
-                {
-                    formatError = "The <tool_call> payload is empty.";
-                    return false;
-                }
-
-                return true;
-            }
-
-            if (LooksLikeBareToolCallEnvelope(text))
-            {
-                return true;
-            }
-
-            formatError = "The response does not contain a complete tool_call envelope.";
-            return false;
-        }
-
         public static bool TryParse(string response, out string toolName, out JsonElement arguments)
         {
             toolName = string.Empty;

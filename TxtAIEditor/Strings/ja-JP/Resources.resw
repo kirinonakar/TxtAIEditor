@@ -1597,7 +1597,7 @@
     <value>ツールの呼び出しを解析できませんでした。原文を表示します。</value>
   </data>
   <data name="AgentToolCallFormatRetry" xml:space="preserve">
-    <value>ツール呼び出しに通常テキストが混在していたため、形式を再要求しています。</value>
+    <value>ツール呼び出しを解析できなかったため、形式を再要求しています。</value>
   </data>
   <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
     <value>ツール呼び出し形式のエラーが繰り返されたため、Agentの実行を停止しました。タスクを再実行してください。</value>

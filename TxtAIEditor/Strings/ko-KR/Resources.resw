@@ -1596,7 +1596,7 @@
     <value>도구 호출을 해석하지 못해 원문을 표시합니다.</value>
   </data>
   <data name="AgentToolCallFormatRetry" xml:space="preserve">
-    <value>도구 호출 형식이 섞여 다시 요청합니다.</value>
+    <value>도구 호출을 해석하지 못해 다시 요청합니다.</value>
   </data>
   <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
     <value>도구 호출 형식 오류가 반복되어 Agent 실행을 중단했습니다. 작업을 다시 실행해 주세요.</value>

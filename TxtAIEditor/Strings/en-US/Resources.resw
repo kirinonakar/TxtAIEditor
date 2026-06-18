@@ -1596,7 +1596,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Failed to parse tool call, displaying raw response.</value>
   </data>
   <data name="AgentToolCallFormatRetry" xml:space="preserve">
-    <value>Tool call text was mixed with normal output, so the Agent is retrying the format.</value>
+    <value>Could not parse the tool call, so the Agent is retrying the format.</value>
   </data>
   <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
     <value>Tool call format errors repeated, so Agent execution was stopped. Please run the task again.</value>

@@ -622,51 +622,6 @@ namespace TxtAIEditor.Controls
                     });
 
                     bool responseHasToolSyntax = AgentToolCallParser.ContainsToolCallSyntax(response);
-                    if (responseHasToolSyntax &&
-                        !AgentToolCallParser.IsPureToolCallResponse(response, out string toolCallFormatError))
-                    {
-                        toolCallFormatRetryCount++;
-                        string retryNote = BuildToolCallFormatRetryNote(toolCallFormatError);
-                        transcript += "\n\n" + retryNote;
-                        _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
-
-                        string retryMessage = _getString(
-                            "AgentToolCallFormatRetry",
-                            "도구 호출 형식이 섞여 다시 요청합니다.");
-                        await RunOnUIThreadAsync(() =>
-                        {
-                            AppendActivity(retryMessage);
-                            _agentPane.AppendOutputLine(retryMessage);
-                            UpdateContextStatsImmediate(force: true);
-                        });
-
-                        if (toolCallFormatRetryCount > maxToolCallFormatRetries)
-                        {
-                            string limitMessage = _getString(
-                                "AgentToolCallFormatRetryLimit",
-                                "도구 호출 형식 오류가 반복되어 Agent 실행을 중단했습니다. 작업을 다시 실행해 주세요.");
-                            await RunOnUIThreadAsync(() =>
-                            {
-                                AppendActivity(limitMessage);
-                                _agentPane.AppendOutputLine(limitMessage);
-                            });
-
-                            AppendSessionHistoryLine($"[User Prompt]: {instruction}");
-                            string formatRunTranscript = transcript.Substring(initialTranscript.Length);
-                            if (!string.IsNullOrWhiteSpace(formatRunTranscript))
-                            {
-                                AppendSessionHistoryLine(formatRunTranscript.Trim());
-                            }
-                            AppendSessionHistoryLine($"[Agent Response]: {limitMessage}");
-                            AppendSessionHistoryLine();
-                            _ = SaveCurrentSessionToHistoryAsync(userInstruction);
-
-                            completed = true;
-                            break;
-                        }
-
-                        continue;
-                    }
 
                     int endLength = response.Length;
                     if (!_settingsService.CurrentSettings.LlmAgentVerbose)
