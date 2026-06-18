@@ -50,17 +50,20 @@ import {
 import {
     applyMarkdownCommand,
     beginColumnComposition,
+    beginHostStreamInsert,
     clearPendingImeSelectionCollapse,
     clearPendingRepeatEdit,
     commitLine,
     compositionSelectionRange,
     finishColumnComposition,
+    endHostStreamInsert,
     finishRangeComposition,
     flushPendingEditForSave,
     focusLine,
     getCaretOffset,
     inputRangeInElement,
     insertPlainTextByModel,
+    insertHostStreamText,
     insertTextAtCaret,
     isLineInColumnComposition,
     isModelRepeatKey,
@@ -266,6 +269,17 @@ function handleCsharpMessage(msg) {
         case 'insertText':
             suppressNativePasteUntil = performance.now() + 250;
             insertTextAtCaret(msg.text || '', { preferStateCaret: true });
+            break;
+        case 'beginStreamInsert':
+            hideAutocomplete();
+            beginHostStreamInsert();
+            break;
+        case 'insertStreamText':
+            suppressNativePasteUntil = performance.now() + 250;
+            insertHostStreamText(msg.text || '');
+            break;
+        case 'endStreamInsert':
+            endHostStreamInsert();
             break;
         case 'markdownCommand':
             applyMarkdownCommand(msg.command, msg.color);

@@ -98,6 +98,7 @@ namespace TxtAIEditor
         private bool _startupInitializationComplete;
         private string _currentFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         private string _currentRepoPath = string.Empty;
+        private string? _activeEditorStreamTabId;
 
         private string CurrentFolderPath
         {
@@ -747,7 +748,10 @@ namespace TxtAIEditor
                     _tabDirtyStateController.MarkTabDirty(tab);
                     UpdateWindowTitle();
                     return true;
-                });
+                },
+                beginStreamIntoActiveEditorAsync: BeginStreamIntoActiveEditorAsync,
+                streamTextIntoActiveEditorAsync: InsertStreamTextIntoActiveEditorAsync,
+                endStreamIntoActiveEditorAsync: EndStreamIntoActiveEditorAsync);
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,
@@ -1756,6 +1760,93 @@ namespace TxtAIEditor
             }
 
             return true;
+        }
+
+        private bool TryGetCurrentActiveEditorBridge(
+            out string tabId,
+            out TabViewItem? activeTabItem,
+            out (WebView2 WebView, MonacoBridge Bridge) bridgeGroup)
+        {
+            tabId = string.Empty;
+            activeTabItem = null;
+            bridgeGroup = default;
+
+            var activeTabView = _tabNavigationController.GetCurrentActiveTabView();
+            if (activeTabView.SelectedItem is not TabViewItem selectedTabItem ||
+                selectedTabItem.Tag is not string selectedTabId ||
+                !_tabBridges.TryGetValue(selectedTabId, out var selectedBridgeGroup) ||
+                selectedBridgeGroup.Bridge == null)
+            {
+                return false;
+            }
+
+            tabId = selectedTabId;
+            activeTabItem = selectedTabItem;
+            bridgeGroup = selectedBridgeGroup;
+            return true;
+        }
+
+        private async Task<bool> BeginStreamIntoActiveEditorAsync()
+        {
+            await EndStreamIntoActiveEditorAsync();
+
+            if (!TryGetCurrentActiveEditorBridge(out string tabId, out _, out var bridgeGroup))
+            {
+                return false;
+            }
+
+            _activeEditorStreamTabId = tabId;
+            try
+            {
+                bridgeGroup.WebView.Focus(FocusState.Programmatic);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to focus editor for stream insert: {ex.Message}");
+            }
+
+            await bridgeGroup.Bridge.BeginStreamInsertAsync();
+            return true;
+        }
+
+        private async Task<bool> InsertStreamTextIntoActiveEditorAsync(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return true;
+            }
+
+            string? tabId = _activeEditorStreamTabId;
+            if (string.IsNullOrEmpty(tabId) ||
+                !_tabBridges.TryGetValue(tabId, out var bridgeGroup) ||
+                bridgeGroup.Bridge == null)
+            {
+                return false;
+            }
+
+            await bridgeGroup.Bridge.InsertStreamTextAsync(text);
+
+            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
+            if (tab != null)
+            {
+                _tabDirtyStateController.MarkTabDirty(tab);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
+            }
+
+            return true;
+        }
+
+        private async Task EndStreamIntoActiveEditorAsync()
+        {
+            string? tabId = _activeEditorStreamTabId;
+            _activeEditorStreamTabId = null;
+
+            if (!string.IsNullOrEmpty(tabId) &&
+                _tabBridges.TryGetValue(tabId, out var bridgeGroup) &&
+                bridgeGroup.Bridge != null)
+            {
+                await bridgeGroup.Bridge.EndStreamInsertAsync();
+            }
         }
 
         private string GetTabTextForLlmContext(OpenedTab tab, int maxChars)

@@ -494,6 +494,22 @@ namespace TxtAIEditor.Editor
             await SendMessageAsync(msg);
         }
 
+        public async Task BeginStreamInsertAsync()
+        {
+            await SendMessageAsync(new { action = "beginStreamInsert" });
+        }
+
+        public async Task InsertStreamTextAsync(string text)
+        {
+            var msg = new { action = "insertStreamText", text = text };
+            await SendMessageAsync(msg);
+        }
+
+        public async Task EndStreamInsertAsync()
+        {
+            await SendMessageAsync(new { action = "endStreamInsert" });
+        }
+
         public async Task UpdateSnippetsAsync(IReadOnlyList<SnippetItem> snippets)
         {
             var msg = new

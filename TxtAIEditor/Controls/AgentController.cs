@@ -39,6 +39,9 @@ namespace TxtAIEditor.Controls
         private readonly Action<string>? _closeTabById;
         private readonly Func<string, Task>? _navigateToFolderAsync;
         private readonly Func<string, Task<bool>> _insertIntoActiveEditorAsync;
+        private readonly Func<Task<bool>>? _beginStreamIntoActiveEditorAsync;
+        private readonly Func<string, Task<bool>>? _streamTextIntoActiveEditorAsync;
+        private readonly Func<Task>? _endStreamIntoActiveEditorAsync;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentPresetController _presetController;
@@ -62,6 +65,7 @@ namespace TxtAIEditor.Controls
         private readonly DispatcherTimer _statsDebounceTimer;
         private double _currentRunTranscriptTokens;
         private readonly List<LlmMessageAttachment> _currentRunImageToolAttachments = new();
+        private bool _streamToTabActive;
 
         public AgentController(
             ILLMService llmService,
@@ -87,7 +91,10 @@ namespace TxtAIEditor.Controls
             Action<string>? closeTabById = null,
             Func<string, Task>? navigateToFolderAsync = null,
             Func<OpenedTab, string?, Task<bool>>? saveTabAsync = null,
-            Func<OpenedTab, string, Task<bool>>? editTabAsync = null)
+            Func<OpenedTab, string, Task<bool>>? editTabAsync = null,
+            Func<Task<bool>>? beginStreamIntoActiveEditorAsync = null,
+            Func<string, Task<bool>>? streamTextIntoActiveEditorAsync = null,
+            Func<Task>? endStreamIntoActiveEditorAsync = null)
         {
             _llmService = llmService;
             _settingsService = settingsService;
@@ -107,6 +114,9 @@ namespace TxtAIEditor.Controls
             _closeTabById = closeTabById;
             _navigateToFolderAsync = navigateToFolderAsync;
             _insertIntoActiveEditorAsync = insertIntoActiveEditorAsync;
+            _beginStreamIntoActiveEditorAsync = beginStreamIntoActiveEditorAsync;
+            _streamTextIntoActiveEditorAsync = streamTextIntoActiveEditorAsync;
+            _endStreamIntoActiveEditorAsync = endStreamIntoActiveEditorAsync;
             _displayText = new AgentDisplayLocalizer(_getString);
             _attachmentController = new AgentAttachmentController(
                 _agentPane,
@@ -714,7 +724,7 @@ namespace TxtAIEditor.Controls
                             AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                             if (_agentPane.StreamToTab)
                             {
-                                await _insertIntoActiveEditorAsync("\n");
+                                await StreamTextToTabAsync("\n");
                             }
                         });
 
@@ -964,6 +974,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 cancellationSource.Dispose();
+                await RunOnUIThreadAsync(async () => await FinishStreamToTabAsync());
                 _agentPane.SetBusy(false);
                 UpdateContextStatsImmediate();
             }
@@ -999,9 +1010,51 @@ namespace TxtAIEditor.Controls
                 _agentPane.AppendOutputText(text);
                 if (_agentPane.StreamToTab)
                 {
-                    await _insertIntoActiveEditorAsync(text);
+                    await StreamTextToTabAsync(text);
                 }
             });
+        }
+
+        private async Task StreamTextToTabAsync(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            if (!_streamToTabActive)
+            {
+                bool started = _beginStreamIntoActiveEditorAsync == null
+                    ? true
+                    : await _beginStreamIntoActiveEditorAsync();
+                if (!started)
+                {
+                    return;
+                }
+                _streamToTabActive = true;
+            }
+
+            if (_streamTextIntoActiveEditorAsync != null)
+            {
+                await _streamTextIntoActiveEditorAsync(text);
+                return;
+            }
+
+            await _insertIntoActiveEditorAsync(text);
+        }
+
+        private async Task FinishStreamToTabAsync()
+        {
+            if (!_streamToTabActive)
+            {
+                return;
+            }
+
+            _streamToTabActive = false;
+            if (_endStreamIntoActiveEditorAsync != null)
+            {
+                await _endStreamIntoActiveEditorAsync();
+            }
         }
 
         private Task RunOnUIThreadAsync(Action action)
