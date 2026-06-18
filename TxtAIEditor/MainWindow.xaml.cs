@@ -49,6 +49,7 @@ namespace TxtAIEditor
         private readonly FavoritesRecentController _favoritesRecentController;
         private readonly ExplorerFileActionsController _explorerFileActionsController;
         private readonly TabContextMenuController _tabContextMenuController;
+        private readonly TabNavigationController _tabNavigationController;
         private readonly TabEncryptionController _tabEncryptionController;
         private readonly EditorTabViewItemFactory _editorTabViewItemFactory;
         private readonly EditorTabDocumentFactory _editorTabDocumentFactory;
@@ -220,6 +221,11 @@ namespace TxtAIEditor
                 RightSplitter,
                 LeftSidebarTabView,
                 PreviewGrid);
+            _tabNavigationController = new TabNavigationController(
+                _viewModel,
+                EditorWorkspace,
+                EditorTabView,
+                EditorTabView2);
             _terminalShortcutService = new TerminalShortcutService(WindowNative.GetWindowHandle(this));
             _terminalShortcutService.ToggleRequested += (_, _) => ToggleTerminal();
             _dialogController = new WindowDialogController(
@@ -231,7 +237,7 @@ namespace TxtAIEditor
             _windowTitleController = new WindowTitleController(
                 this,
                 AppTitleTextBlock,
-                GetActiveTab);
+                _tabNavigationController.GetActiveTab);
             _tabEncryptionController = new TabEncryptionController(
                 GetLocalizedString,
                 _dialogController.WaitForDialogXamlRootAsync,
@@ -253,8 +259,8 @@ namespace TxtAIEditor
                 ApplyPreviewVisibility);
             _statusBarController = new StatusBarController(
                 StatusBarPane,
-                GetActiveTab,
-                tab => GetActiveTab() == tab,
+                _tabNavigationController.GetActiveTab,
+                tab => _tabNavigationController.GetActiveTab() == tab,
                 tabId => _editorSessions.TryGetValue(tabId, out var session) ? session : null,
                 _languageDetectionService,
                 _tabBridges,
@@ -281,7 +287,7 @@ namespace TxtAIEditor
                 PreviewGrid,
                 _settingsService,
                 _tabBridges,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 tabId => _editorSessions.TryGetValue(tabId, out var session) ? session : null,
                 () => _currentFolderPath,
                 () => _currentRepoPath,
@@ -299,10 +305,10 @@ namespace TxtAIEditor
                 _tabBridges);
             _pdfViewerController = new PdfViewerController(
                 _settingsService,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 UpdateRightPanelSelectionContext);
             _editorLinkNavigationController = new EditorLinkNavigationController(
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 NavigateExplorerToFolderAndRevealAsync);
             _tabReloadController = new TabReloadController(
                 _secureNoteEncryptionService,
@@ -349,7 +355,7 @@ namespace TxtAIEditor
                 _tabBridges,
                 _editorSessions,
                 _tabDirtyStateController,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 LoadFileIntoTabAsync,
                 UpdateLivePreview,
                 _editorLineNavigationController);
@@ -467,7 +473,7 @@ namespace TxtAIEditor
                 _secureNoteEncryptionService,
                 _languageDetectionService,
                 _statusBarController,
-                IsTabOpen,
+                _tabNavigationController.IsOpen,
                 tabId => _editorSessions.TryGetValue(tabId, out var session) ? session : null,
                 tabId => _tabBridges.TryGetValue(tabId, out var bridgeGroup) ? bridgeGroup : null,
                 FlushPendingSplitImeSyncAsync,
@@ -508,7 +514,7 @@ namespace TxtAIEditor
                 UpdateWindowTitle);
             _tabMoveController = new TabMoveController(
                 _viewModel,
-                GetCurrentActiveTabView);
+                _tabNavigationController.GetCurrentActiveTabView);
             _windowCloseController = new WindowCloseController(
                 _viewModel,
                 _unsavedChangesDialogService,
@@ -527,7 +533,7 @@ namespace TxtAIEditor
                 EditorTabView,
                 EditorTabView2,
                 () => _currentFolderPath,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 LoadDirectoryRoot,
                 LoadFileIntoTabAsync,
                 InsertTextIntoActiveEditorAsync,
@@ -550,7 +556,8 @@ namespace TxtAIEditor
                 _tabEncryptionController.RemoveEncryptionAsync,
                 OnCloseRightTabs,
                 OnCloseLeftTabs,
-                OnCloseOtherTabs);
+                OnCloseOtherTabs,
+                _tabNavigationController.GetTabViewForItem);
             _fileOpenDropController = new FileOpenDropController(
                 DragOverlay,
                 InitializePickerWindow,
@@ -604,7 +611,7 @@ namespace TxtAIEditor
                 _languageDetectionService,
                 PreviewGrid,
                 () => this.Content.XamlRoot,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 GetTabTextForLlmContext,
                 InsertTextIntoActiveEditorAsync,
                 (title, content) =>
@@ -658,7 +665,7 @@ namespace TxtAIEditor
                 _llmService,
                 _settingsService,
                 PreviewGrid.AgentPane,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 () => _viewModel.Tabs.ToList(),
                 GetTabTextForLlmContext,
                 InsertTextIntoActiveEditorAsync,
@@ -744,12 +751,12 @@ namespace TxtAIEditor
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 tab => _editorSessions.TryGetValue(tab.Id, out var s) ? s : null,
                 () => PreviewModeCombo.SelectedIndex == 3,
                 async targetLine =>
                 {
-                    var activeTab = GetActiveTab();
+                    var activeTab = _tabNavigationController.GetActiveTab();
                     if (activeTab != null)
                     {
                         await _editorLineNavigationController.RevealTabLineAsync(activeTab.Id, targetLine);
@@ -773,7 +780,7 @@ namespace TxtAIEditor
                 SearchQueryInput,
                 SaveSidebarVisibilitySettingsAsync,
                 () => _favoritesRecentController.RefreshFavorites(true),
-                () => _tocController.RefreshToc(GetActiveTab()),
+                () => _tocController.RefreshToc(_tabNavigationController.GetActiveTab()),
                 RefreshActivePreview);
             _markdownToolbarController = new MarkdownToolbarController(
                 TopToolbar,
@@ -804,7 +811,7 @@ namespace TxtAIEditor
                 EditorTabView2,
                 _tabBridges,
                 DispatcherQueue,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 _statusBarController,
                 _tabSelectionController,
                 _livePreviewController,
@@ -840,9 +847,9 @@ namespace TxtAIEditor
                 _tabBridges,
                 _editorSessions,
                 DispatcherQueue,
-                GetCurrentActiveTabView,
-                GetActiveTab,
-                GetTabViewForTabItem,
+                _tabNavigationController.GetCurrentActiveTabView,
+                _tabNavigationController.GetActiveTab,
+                _tabNavigationController.GetTabViewForItem,
                 () => _currentFolderPath,
                 () => _livePreviewEnabled,
                 () => _scrollSyncEnabled,
@@ -852,7 +859,7 @@ namespace TxtAIEditor
                 ApplyEditorSurfaceBackground,
                 UpdateLanguageUI,
                 UpdateWindowTitle,
-                ShowTabContextMenu,
+                _tabContextMenuController.ShowContextMenu,
                 InitialEditorLineWarmupCount);
             _editorSplitLayoutController = new EditorSplitLayoutController(
                 TopToolbar,
@@ -862,7 +869,7 @@ namespace TxtAIEditor
                 EditorTabView2,
                 _tabBridges,
                 _editorSessions,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 () => OpenNewTab(),
                 (filePath, content, isReadOnly, encodingName, encodingWasAutoDetected, isEncrypted, encryptionPassword) =>
                     OpenNewTab(filePath, content, isReadOnly, encodingName, encodingWasAutoDetected, isEncrypted: isEncrypted, encryptionPassword: encryptionPassword),
@@ -910,7 +917,7 @@ namespace TxtAIEditor
                 _livePreviewController,
                 _llmAssistantController,
                 _agentController,
-                GetActiveTab,
+                _tabNavigationController.GetActiveTab,
                 () => _currentFolderPath,
                 GetLocalizedString,
                 IsGitNotDetectedText,
@@ -1181,8 +1188,8 @@ namespace TxtAIEditor
 
         private void ActivateLoadedTab(OpenedTab tab)
         {
-            var tabView = GetTabViewForTab(tab);
-            var tabItem = tabView != null ? FindTabItem(tabView, tab.Id) : null;
+            var tabView = _tabNavigationController.GetTabView(tab);
+            var tabItem = tabView != null ? TabNavigationController.FindItem(tabView, tab.Id) : null;
 
             if (tabView != null && tabItem != null)
             {
@@ -1200,29 +1207,19 @@ namespace TxtAIEditor
 
         private async void OnSaveFileClick(object sender, RoutedEventArgs e)
         {
-            var activeTabView = GetCurrentActiveTabView();
-            if (activeTabView.SelectedItem is TabViewItem activeTabItem &&
-                activeTabItem.Tag is string tabId)
+            var tab = _tabNavigationController.GetActiveTab();
+            if (tab != null)
             {
-                var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-                if (tab != null)
-                {
-                    await SaveTabAsync(tab);
-                }
+                await SaveTabAsync(tab);
             }
         }
 
         private async void OnSaveAsFileClick(object sender, RoutedEventArgs e)
         {
-            var activeTabView = GetCurrentActiveTabView();
-            if (activeTabView.SelectedItem is TabViewItem activeTabItem &&
-                activeTabItem.Tag is string tabId)
+            var tab = _tabNavigationController.GetActiveTab();
+            if (tab != null)
             {
-                var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-                if (tab != null)
-                {
-                    await SaveAsTabAsync(tab);
-                }
+                await SaveAsTabAsync(tab);
             }
         }
 
@@ -1469,11 +1466,6 @@ namespace TxtAIEditor
 
         #region Split Editor Layout
 
-        private TabView GetCurrentActiveTabView()
-        {
-            return EditorWorkspace.GetCurrentActiveTabView();
-        }
-
         private void OnMoveTabLeftClick(object sender, RoutedEventArgs e)
         {
             _tabMoveController.MoveLeft();
@@ -1650,7 +1642,7 @@ namespace TxtAIEditor
 
         private void SyncPreviewScrollToEditors(int firstLine, double offset)
         {
-            var activeTab = GetActiveTab();
+            var activeTab = _tabNavigationController.GetActiveTab();
             if (activeTab == null)
             {
                 return;
@@ -1666,15 +1658,7 @@ namespace TxtAIEditor
                 return;
             }
 
-            TabView? otherTabView = null;
-            if (IsTabInTabView(EditorTabView, activeTab.Id))
-            {
-                otherTabView = EditorTabView2;
-            }
-            else if (IsTabInTabView(EditorTabView2, activeTab.Id))
-            {
-                otherTabView = EditorTabView;
-            }
+            var otherTabView = _tabNavigationController.GetOppositeTabView(activeTab);
 
             if (otherTabView?.SelectedItem is TabViewItem otherItem &&
                 otherItem.Tag is string otherTabId &&
@@ -1721,83 +1705,6 @@ namespace TxtAIEditor
             }
         }
 
-        private OpenedTab? GetActiveTab()
-        {
-            var activeTabView = GetCurrentActiveTabView();
-            if (activeTabView.SelectedItem is TabViewItem activeTabItem &&
-                activeTabItem.Tag is string tabId)
-            {
-                return _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-            }
-
-            return null;
-        }
-
-        private bool IsTabInTabView(TabView tabView, string tabId)
-        {
-            return FindTabItem(tabView, tabId) != null;
-        }
-
-        private static TabViewItem? FindTabItem(TabView tabView, string tabId)
-        {
-            foreach (var item in tabView.TabItems)
-            {
-                if (item is TabViewItem tvi && string.Equals(tvi.Tag as string, tabId, StringComparison.Ordinal))
-                {
-                    return tvi;
-                }
-            }
-
-            return null;
-        }
-
-        private bool IsTabOpen(OpenedTab tab)
-        {
-            return IsTabInTabView(EditorTabView, tab.Id) || IsTabInTabView(EditorTabView2, tab.Id);
-        }
-
-        private TabView? GetTabViewForTab(OpenedTab tab)
-        {
-            if (IsTabInTabView(EditorTabView, tab.Id)) return EditorTabView;
-            if (IsTabInTabView(EditorTabView2, tab.Id)) return EditorTabView2;
-            return null;
-        }
-
-        private TabView? GetTabViewForTabItem(TabViewItem tabItem)
-        {
-            if (EditorTabView.TabItems.Contains(tabItem))
-            {
-                return EditorTabView;
-            }
-
-            if (EditorTabView2.TabItems.Contains(tabItem))
-            {
-                return EditorTabView2;
-            }
-
-            return null;
-        }
-
-        private void ShowTabContextMenu(
-            OpenedTab tab,
-            TabViewItem tabItem,
-            TabView fallbackTabView,
-            FrameworkElement target,
-            RightTappedRoutedEventArgs args)
-        {
-            args.Handled = true;
-
-            var ownerTabView = GetTabViewForTabItem(tabItem) ?? fallbackTabView;
-            var flyout = _tabContextMenuController.CreateContextFlyout(tab, tabItem, ownerTabView);
-            CursorResetHelper.AttachToFlyout(flyout, target);
-            CursorResetHelper.ResetToArrow(target);
-            flyout.ShowAt(target, new FlyoutShowOptions
-            {
-                Position = args.GetPosition(target)
-            });
-            CursorResetHelper.ResetToArrow(target);
-        }
-
         private async void OnToggleLivePreviewClick(object sender, RoutedEventArgs e)
         {
             _livePreviewEnabled = TopToolbar.LivePreviewIsChecked;
@@ -1821,7 +1728,7 @@ namespace TxtAIEditor
 
         private async Task<bool> InsertTextIntoActiveEditorAsync(string text)
         {
-            var activeTabView = GetCurrentActiveTabView();
+            var activeTabView = _tabNavigationController.GetCurrentActiveTabView();
             if (activeTabView.SelectedItem is not TabViewItem activeTabItem ||
                 activeTabItem.Tag is not string tabId ||
                 !_tabBridges.TryGetValue(tabId, out var bridgeGroup) ||
@@ -1936,7 +1843,7 @@ namespace TxtAIEditor
             }
             else
             {
-                string? activeFilePath = GetActiveTab()?.FilePath;
+                string? activeFilePath = _tabNavigationController.GetActiveTab()?.FilePath;
                 if (!string.IsNullOrWhiteSpace(activeFilePath))
                 {
                     searchPath = File.Exists(activeFilePath)
@@ -2000,7 +1907,7 @@ namespace TxtAIEditor
         private void OnCloseActiveTabShortcutInvoked(Microsoft.UI.Xaml.Input.KeyboardAccelerator sender, Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
         {
             if (args != null) args.Handled = true;
-            _tabCloseController.CloseActive(GetCurrentActiveTabView());
+            _tabCloseController.CloseActive(_tabNavigationController.GetCurrentActiveTabView());
         }
 
         private async void OnAppWindowClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)

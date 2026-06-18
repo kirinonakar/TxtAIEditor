@@ -1,7 +1,10 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using TxtAIEditor.Core.Models;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -20,6 +23,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeRightTabs;
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeLeftTabs;
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeOtherTabs;
+        private readonly Func<TabViewItem, TabView?> _tabViewResolver;
 
         public TabContextMenuController(
             FavoritesRecentController favoritesRecentController,
@@ -32,7 +36,8 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab, Task> removeEncryptionAsync,
             Action<OpenedTab, TabViewItem, TabView> closeRightTabs,
             Action<OpenedTab, TabViewItem, TabView> closeLeftTabs,
-            Action<OpenedTab, TabViewItem, TabView> closeOtherTabs)
+            Action<OpenedTab, TabViewItem, TabView> closeOtherTabs,
+            Func<TabViewItem, TabView?> tabViewResolver)
         {
             _favoritesRecentController = favoritesRecentController;
             _getString = getString;
@@ -45,6 +50,7 @@ namespace TxtAIEditor.Controls
             _closeRightTabs = closeRightTabs;
             _closeLeftTabs = closeLeftTabs;
             _closeOtherTabs = closeOtherTabs;
+            _tabViewResolver = tabViewResolver;
         }
 
         public MenuFlyout CreateContextFlyout(OpenedTab tab, TabViewItem tabItem, TabView targetTabView)
@@ -116,6 +122,26 @@ namespace TxtAIEditor.Controls
             menu.Items.Add(closeOthersItem);
 
             return menu;
+        }
+
+        public void ShowContextMenu(
+            OpenedTab tab,
+            TabViewItem tabItem,
+            TabView fallbackTabView,
+            FrameworkElement target,
+            RightTappedRoutedEventArgs args)
+        {
+            args.Handled = true;
+
+            var ownerTabView = _tabViewResolver(tabItem) ?? fallbackTabView;
+            var flyout = CreateContextFlyout(tab, tabItem, ownerTabView);
+            CursorResetHelper.AttachToFlyout(flyout, target);
+            CursorResetHelper.ResetToArrow(target);
+            flyout.ShowAt(target, new FlyoutShowOptions
+            {
+                Position = args.GetPosition(target)
+            });
+            CursorResetHelper.ResetToArrow(target);
         }
 
         private static void CopyFileName(OpenedTab tab)
