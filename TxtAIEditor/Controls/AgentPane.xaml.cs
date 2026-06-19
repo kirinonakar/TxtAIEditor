@@ -141,6 +141,8 @@ namespace TxtAIEditor.Controls
         public CheckBox StreamToTabCheckBox => AgentStreamToTabCheckBox;
         public bool StreamToTab => AgentStreamToTabCheckBox.IsChecked == true;
 
+        public bool HideHtmlCodeBlocks { get; set; }
+
         private bool _isBusy;
         private string _runButtonText = string.Empty;
         private string _stopButtonText = string.Empty;
@@ -177,7 +179,14 @@ namespace TxtAIEditor.Controls
 
                 _rawOutputText += text;
                 _outputLength += text.Length;
-                AppendRenderedText(text);
+                if (!HideHtmlCodeBlocks)
+                {
+                    AppendRenderedText(text);
+                }
+                else
+                {
+                    UpdateRichText(_rawOutputText);
+                }
             }
             else
             {
@@ -967,29 +976,62 @@ namespace TxtAIEditor.Controls
             string normalized = (rawText ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
             string[] lines = normalized.Split('\n');
 
-            // Adjust the number of blocks in AgentOutputText and cache to match lines.Length
-            while (AgentOutputText.Blocks.Count > lines.Length)
+            List<string> displayLines = new List<string>();
+            if (HideHtmlCodeBlocks)
+            {
+                bool inHtmlBlock = false;
+                foreach (var line in lines)
+                {
+                    string trimmed = line.Trim();
+                    if (!inHtmlBlock)
+                    {
+                        if (trimmed.StartsWith("```html", StringComparison.OrdinalIgnoreCase))
+                        {
+                            inHtmlBlock = true;
+                            displayLines.Add(_getString?.Invoke("AgentHtmlCodeBlockHidden", "[HTML 코드 블록 숨겨짐 (상세 출력 비활성화)]") ?? "[HTML 코드 블록 숨겨짐 (상세 출력 비활성화)]");
+                        }
+                        else
+                        {
+                            displayLines.Add(line);
+                        }
+                    }
+                    else
+                    {
+                        if (trimmed.StartsWith("```", StringComparison.Ordinal))
+                        {
+                            inHtmlBlock = false;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                displayLines.AddRange(lines);
+            }
+
+            // Adjust the number of blocks in AgentOutputText and cache to match displayLines.Count
+            while (AgentOutputText.Blocks.Count > displayLines.Count)
             {
                 AgentOutputText.Blocks.RemoveAt(AgentOutputText.Blocks.Count - 1);
             }
-            while (_renderedLines.Count > lines.Length)
+            while (_renderedLines.Count > displayLines.Count)
             {
                 _renderedLines.RemoveAt(_renderedLines.Count - 1);
             }
 
-            while (AgentOutputText.Blocks.Count < lines.Length)
+            while (AgentOutputText.Blocks.Count < displayLines.Count)
             {
                 AgentOutputText.Blocks.Add(new Paragraph());
             }
-            while (_renderedLines.Count < lines.Length)
+            while (_renderedLines.Count < displayLines.Count)
             {
                 _renderedLines.Add(null!);
             }
 
             // Update only the changed lines
-            for (int k = 0; k < lines.Length; k++)
+            for (int k = 0; k < displayLines.Count; k++)
             {
-                string line = lines[k];
+                string line = displayLines[k];
                 if (_renderedLines[k] != line)
                 {
                     if (AgentOutputText.Blocks[k] is Paragraph paragraph)

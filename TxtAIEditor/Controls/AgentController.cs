@@ -244,6 +244,7 @@ namespace TxtAIEditor.Controls
                 UpdateContextStatsImmediate();
             };
 
+            _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
             WireEvents();
             UpdateContextStatsImmediate();
             QueueDeferredStartupDataLoad();
@@ -365,6 +366,7 @@ namespace TxtAIEditor.Controls
             }
   
             _isRunning = true;
+            _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
             _fileToolController.StartRun();
             _currentRunImageToolAttachments.Clear();
             _selectionContextController.ClearRunSnapshots();
@@ -1574,6 +1576,7 @@ namespace TxtAIEditor.Controls
 
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
+                _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
                 string formatted = AgentHistoryFormatter.Format(item.SessionHistoryText, _settingsService.CurrentSettings.LlmAgentVerbose);
                 _agentPane.ResetOutput(formatted);
                 _agentPane.ClearActivity(_getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨"));
@@ -1615,6 +1618,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
             string formatted = AgentHistoryFormatter.Format(text, _settingsService.CurrentSettings.LlmAgentVerbose);
             _agentPane.ResetOutput(formatted);
         }

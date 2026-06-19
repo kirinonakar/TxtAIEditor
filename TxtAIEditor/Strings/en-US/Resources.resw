@@ -1978,6 +1978,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
     <value>Read file: {0}</value>
   </data>
+  <data name="AgentVerboseReadSkillOnly" xml:space="preserve">
+    <value>Referencing skill: {0}</value>
+  </data>
+  <data name="AgentHtmlCodeBlockHidden" xml:space="preserve">
+    <value>[HTML Code Block Hidden (Verbose Disabled)]</value>
+  </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
     <value>Appended content to file: {0}</value>
   </data>

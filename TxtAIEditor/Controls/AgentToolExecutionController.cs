@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
@@ -162,6 +163,29 @@ namespace TxtAIEditor.Controls
                     "동일한 도구 호출이 이미 성공해 재실행하지 않았습니다.");
             }
 
+            if (normalizedToolName == "read_file")
+            {
+                string path = GetStringArgument(arguments, "path");
+                string? skillName = TryGetSkillNameFromPath(path);
+                if (skillName != null)
+                {
+                    return string.Format(_getString("AgentVerboseReadSkillOnly", "{0} 스킬을 참고합니다."), skillName);
+                }
+            }
+            else if (normalizedToolName == "run_powershell")
+            {
+                string command = GetStringArgument(arguments, "command");
+                string? path = TryGetPathFromGetContent(command);
+                if (path != null)
+                {
+                    string? skillName = TryGetSkillNameFromPath(path);
+                    if (skillName != null)
+                    {
+                        return string.Format(_getString("AgentVerboseReadSkillOnly", "{0} 스킬을 참고합니다."), skillName);
+                    }
+                }
+            }
+
             if (verbose || toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
             {
                 return toolResult;
@@ -171,6 +195,16 @@ namespace TxtAIEditor.Controls
             {
                 string path = GetStringArgument(arguments, "path");
                 return string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
+            }
+
+            if (normalizedToolName == "run_powershell" && !verbose)
+            {
+                string command = GetStringArgument(arguments, "command");
+                string? path = TryGetPathFromGetContent(command);
+                if (path != null)
+                {
+                    return string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
+                }
             }
 
             if (normalizedToolName == "extract_document")
@@ -487,6 +521,83 @@ namespace TxtAIEditor.Controls
                 extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string? TryGetSkillNameFromPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+
+            string normPath = path.Replace('/', '\\');
+
+            int skillIdx = normPath.LastIndexOf(@"\skills\", StringComparison.OrdinalIgnoreCase);
+            if (skillIdx >= 0)
+            {
+                string sub = normPath.Substring(skillIdx + @"\skills\".Length);
+                string[] parts = sub.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0)
+                {
+                    string candidate = parts[0];
+                    if (candidate.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Path.GetFileNameWithoutExtension(candidate);
+                    }
+                    return candidate;
+                }
+            }
+
+            int agentIdx = normPath.LastIndexOf(@"\.agents\", StringComparison.OrdinalIgnoreCase);
+            if (agentIdx >= 0)
+            {
+                string sub = normPath.Substring(agentIdx + @"\.agents\".Length);
+                string[] parts = sub.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0)
+                {
+                    return Path.GetFileNameWithoutExtension(parts[0]);
+                }
+            }
+
+            if (Path.GetFileName(normPath).Equals("SKILL.md", StringComparison.OrdinalIgnoreCase))
+            {
+                string? dirName = Path.GetFileName(Path.GetDirectoryName(normPath));
+                if (!string.IsNullOrEmpty(dirName))
+                {
+                    return dirName;
+                }
+            }
+
+            return null;
+        }
+
+        private static string? TryGetPathFromGetContent(string command)
+        {
+            if (string.IsNullOrWhiteSpace(command)) return null;
+
+            string lower = command.ToLowerInvariant();
+            
+            bool hasGetContent = Regex.IsMatch(lower, @"\b(get-content|gc|cat)\b");
+            if (!hasGetContent) return null;
+
+            var matches = Regex.Matches(command, @"[""']([^""']+)[""']");
+            foreach (Match match in matches)
+            {
+                string path = match.Groups[1].Value;
+                if (path.Contains('\\') || path.Contains('/') || path.Contains('.'))
+                {
+                    return path;
+                }
+            }
+
+            string[] tokens = command.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string token in tokens)
+            {
+                if (token.StartsWith('-')) continue;
+                if (token.Contains('\\') || token.Contains('/') || token.Contains('.'))
+                {
+                    return token;
+                }
+            }
+
+            return null;
         }
     }
 }

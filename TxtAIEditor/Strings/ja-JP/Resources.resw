@@ -1976,6 +1976,12 @@
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>Gitフォルダー内でのファイル変更・作成を自動承認する</value>
   </data>
+  <data name="AgentVerboseReadSkillOnly" xml:space="preserve">
+    <value>{0}  スキルを参考にします。</value>
+  </data>
+  <data name="AgentHtmlCodeBlockHidden" xml:space="preserve">
+    <value>[HTML コードブロック非表示 (詳細出力が無効)]</value>
+  </data>
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
     <value>ファイルを読み込みました: {0}</value>
   </data>

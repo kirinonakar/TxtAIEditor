@@ -1978,6 +1978,12 @@
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
     <value>파일을 읽었습니다: {0}</value>
   </data>
+  <data name="AgentVerboseReadSkillOnly" xml:space="preserve">
+    <value>{0} 스킬을 참고합니다.</value>
+  </data>
+  <data name="AgentHtmlCodeBlockHidden" xml:space="preserve">
+    <value>[HTML 코드 블록 숨겨짐 (상세 출력 비활성화)]</value>
+  </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
     <value>파일에 내용을 덧붙였습니다: {0}</value>
   </data>
