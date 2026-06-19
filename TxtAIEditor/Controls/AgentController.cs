@@ -422,6 +422,7 @@ namespace TxtAIEditor.Controls
                     int printedLength = 0;
                     bool toolCallPlaceholderShown = false;
                     bool visibleTextFlushed = false;
+                    bool heldPotentialToolCallText = false;
                     bool? isJsonToolCall = null;
                     bool hasToolCall = false;
                     bool suppressStreamingText = planningMode;
@@ -444,12 +445,13 @@ namespace TxtAIEditor.Controls
                                 string trimmed = streamedText.TrimStart();
                                 if (!string.IsNullOrEmpty(trimmed))
                                 {
-                                    isJsonToolCall = trimmed.StartsWith("{", StringComparison.Ordinal);
+                                    isJsonToolCall = LooksLikeStreamedToolCallEnvelopeStart(trimmed);
                                     if (isJsonToolCall.Value)
                                     {
                                         toolCallPlaceholderShown = true;
                                         if (!_settingsService.CurrentSettings.LlmAgentVerbose)
                                         {
+                                            heldPotentialToolCallText = true;
                                             int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
                                             string label = _displayText.FormatPreparingToolLabel(tokenCount);
                                             _agentPane.DispatcherQueue.TryEnqueue(() =>
@@ -647,7 +649,12 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    if (!responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(response))
+                    if (!responseHasToolSyntax && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(response))
+                    {
+                        visibleTextFlushed = true;
+                        await AppendOutputTextAndStreamToTabAsync(response);
+                    }
+                    else if (!responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(response))
                     {
                         visibleTextFlushed = true;
                         await AppendOutputTextAndStreamToTabAsync(response);
@@ -1214,6 +1221,40 @@ namespace TxtAIEditor.Controls
             }
 
             return builder.ToString().TrimEnd();
+        }
+
+        private static bool LooksLikeStreamedToolCallEnvelopeStart(string trimmed)
+        {
+            if (trimmed.StartsWith("{", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string fenceInfo = trimmed.Substring(3).TrimStart();
+            return StartsWithFenceLanguage(fenceInfo, "json") ||
+                StartsWithFenceLanguage(fenceInfo, "jsonc") ||
+                StartsWithFenceLanguage(fenceInfo, "tool_call") ||
+                StartsWithFenceLanguage(fenceInfo, "tool-call");
+        }
+
+        private static bool StartsWithFenceLanguage(string fenceInfo, string language)
+        {
+            if (!fenceInfo.StartsWith(language, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (fenceInfo.Length == language.Length)
+            {
+                return true;
+            }
+
+            return char.IsWhiteSpace(fenceInfo[language.Length]);
         }
 
         private string BuildInstructionDisplay(string userInstruction)

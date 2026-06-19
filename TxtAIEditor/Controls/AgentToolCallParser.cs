@@ -589,6 +589,11 @@ namespace TxtAIEditor.Controls
             }
 
             string trimmed = text.Trim();
+            if (TryExtractSingleMarkdownCodeFencePayload(trimmed, out string fencedPayload))
+            {
+                return TryExtractBareToolCallPayload(fencedPayload, out payload);
+            }
+
             if (trimmed.StartsWith("{", StringComparison.Ordinal))
             {
                 return TryExtractBalancedJsonObject(trimmed, 0, out payload) &&
@@ -615,6 +620,93 @@ namespace TxtAIEditor.Controls
 
             payload = trimmed;
             return true;
+        }
+
+        private static bool TryExtractSingleMarkdownCodeFencePayload(string text, out string payload)
+        {
+            payload = string.Empty;
+            string trimmed = text.Trim();
+            if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            int infoLineEnd = FindFirstLineEnd(trimmed, 3);
+            if (infoLineEnd < 0)
+            {
+                return false;
+            }
+
+            string info = trimmed.Substring(3, infoLineEnd - 3).Trim();
+            if (!IsToolCallFenceInfo(info))
+            {
+                return false;
+            }
+
+            int closingFenceIndex = trimmed.LastIndexOf("```", StringComparison.Ordinal);
+            if (closingFenceIndex <= infoLineEnd ||
+                !IsAtLineStart(trimmed, closingFenceIndex) ||
+                !string.IsNullOrWhiteSpace(trimmed.Substring(closingFenceIndex + 3)))
+            {
+                return false;
+            }
+
+            int contentStart = infoLineEnd;
+            if (contentStart < trimmed.Length && trimmed[contentStart] == '\r')
+            {
+                contentStart++;
+            }
+
+            if (contentStart < trimmed.Length && trimmed[contentStart] == '\n')
+            {
+                contentStart++;
+            }
+
+            payload = trimmed.Substring(contentStart, closingFenceIndex - contentStart).Trim();
+            return !string.IsNullOrWhiteSpace(payload);
+        }
+
+        private static bool IsToolCallFenceInfo(string info)
+        {
+            if (string.IsNullOrWhiteSpace(info))
+            {
+                return true;
+            }
+
+            string language = info.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault() ?? string.Empty;
+            return language.Equals("json", StringComparison.OrdinalIgnoreCase) ||
+                language.Equals("jsonc", StringComparison.OrdinalIgnoreCase) ||
+                language.Equals("tool_call", StringComparison.OrdinalIgnoreCase) ||
+                language.Equals("tool-call", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int FindFirstLineEnd(string text, int startIndex)
+        {
+            int lineFeedIndex = text.IndexOf('\n', startIndex);
+            int carriageReturnIndex = text.IndexOf('\r', startIndex);
+            if (lineFeedIndex < 0)
+            {
+                return carriageReturnIndex;
+            }
+
+            if (carriageReturnIndex < 0)
+            {
+                return lineFeedIndex;
+            }
+
+            return Math.Min(lineFeedIndex, carriageReturnIndex);
+        }
+
+        private static bool IsAtLineStart(string text, int index)
+        {
+            if (index <= 0)
+            {
+                return true;
+            }
+
+            char previous = text[index - 1];
+            return previous == '\n' || previous == '\r';
         }
 
         private static bool TryExtractBalancedJsonObject(string text, int jsonStart, out string json)
