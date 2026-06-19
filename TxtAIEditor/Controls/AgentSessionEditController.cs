@@ -40,6 +40,7 @@ namespace TxtAIEditor.Controls
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
+        public int EditCount => _sessionEdits.Count;
 
         public void Track(AgentFileEditPreview preview)
         {
@@ -134,13 +135,20 @@ namespace TxtAIEditor.Controls
 
         public string BuildDiffLog()
         {
-            if (_sessionEdits.Count == 0)
+            return BuildDiffLog(0, _sessionEdits.Count);
+        }
+
+        public string BuildDiffLog(int startIndex, int endIndex)
+        {
+            startIndex = Math.Max(0, startIndex);
+            endIndex = Math.Min(_sessionEdits.Count, Math.Max(startIndex, endIndex));
+            if (startIndex >= endIndex)
             {
                 return string.Empty;
             }
 
             var builder = new StringBuilder();
-            foreach (var edit in _sessionEdits)
+            foreach (var edit in _sessionEdits.Skip(startIndex).Take(endIndex - startIndex))
             {
                 builder.AppendLine($"--- File: {edit.RelativePath} (Action: {edit.ActionName}) ---");
                 if (edit.IsNewFile)

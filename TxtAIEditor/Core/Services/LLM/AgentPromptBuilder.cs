@@ -41,8 +41,10 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- Preserve user-provided file names exactly, including non-English names: 자산.csv stays 자산.csv, 분석2.md stays 분석2.md.");
             builder.AppendLine("- If [User-referenced file names] is present, prefer listed workspace matches for reads and the exact mentioned name for requested outputs.");
             builder.AppendLine("- For writes, provide an explicit path from the user, [Active tab] Path, or a prior file/tool result. Use replace_range for line-scoped edits and overwrite_file only for explicit full rewrites.");
-            builder.AppendLine("- After a write, rely on the tool result and the next [Diff log of changes made in this session]. Do not reread only to confirm a successful write unless the next edit needs exact context.");
-            builder.AppendLine("- [Current workspace context snapshot] is compact; unchanged context does not mean a write failed.");
+            builder.AppendLine("- After a write, rely on the tool result and the edit ledger sections. Do not reread only to confirm a successful write unless the next edit needs exact context.");
+            builder.AppendLine("- [Accepted file edits before this user task] records earlier accepted edits. [File edits made during this user task] records edits made by your tool calls for the current user request.");
+            builder.AppendLine("- If a mutating tool result says modified/created/inserted, describe the final result as a change you made in this run. Only say no edit was needed when the tool result explicitly says unchanged/already applied.");
+            builder.AppendLine("- [Current workspace context snapshot] is compact; unchanged context does not mean a write failed or that the requested edit was already present.");
             builder.AppendLine();
             builder.AppendLine("Context and scope:");
             builder.AppendLine("- To locate the user's target, prefer selected_range_context, then active tab, open tabs, and workspace search only when needed.");

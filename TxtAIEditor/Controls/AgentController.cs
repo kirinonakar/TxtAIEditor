@@ -410,6 +410,7 @@ namespace TxtAIEditor.Controls
                 bool planningMode = _agentPane.PlanningMode;
                 int maxToolSteps = _settingsService.CurrentSettings.LlmMaxToolCalls > 0 ? _settingsService.CurrentSettings.LlmMaxToolCalls : 50;
                 var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
+                int currentTaskStartEditIndex = _sessionEditController.EditCount;
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
@@ -425,13 +426,7 @@ namespace TxtAIEditor.Controls
                     bool hasToolCall = false;
                     bool suppressStreamingText = planningMode;
 
-                    string currentTranscript = transcript;
-                    string sessionDiffLog = _sessionEditController.BuildDiffLog();
-                    if (string.IsNullOrEmpty(sessionDiffLog))
-                    {
-                        sessionDiffLog = "(No changes have been made in this session yet.)";
-                    }
-                    currentTranscript = $"{transcript}\n\n[Diff log of changes made in this session]\n{sessionDiffLog}";
+                    string currentTranscript = BuildTranscriptWithEditLedger(transcript, currentTaskStartEditIndex);
 
                     response = await _llmService.RunAgentAsync(
                         instruction,
@@ -801,6 +796,11 @@ namespace TxtAIEditor.Controls
                         {
                             successfulToolResults.Remove(toolInvocationKey);
                         }
+
+                        toolResultForTranscript = AddToolTimingNote(
+                            normalizedToolName,
+                            toolResultForTranscript,
+                            toolResult);
                     }
 
                     cancellationToken.ThrowIfCancellationRequested();
@@ -820,7 +820,7 @@ namespace TxtAIEditor.Controls
                         addedPartBuilder.AppendLine("[Current workspace context snapshot]");
                         if (string.Equals(refreshedContext, lastWorkspaceContext, StringComparison.Ordinal))
                         {
-                            addedPartBuilder.AppendLine("Context summary unchanged since the previous snapshot. File edits, if any, are tracked in the next [Diff log of changes made in this session].");
+                            addedPartBuilder.AppendLine("Context summary unchanged since the previous snapshot. This only means compact workspace metadata did not change; use the tool result and [File edits made during this user task] to determine whether this run edited files.");
                         }
                         else
                         {
@@ -978,6 +978,48 @@ namespace TxtAIEditor.Controls
                 _agentPane.SetBusy(false);
                 UpdateContextStatsImmediate();
             }
+        }
+
+        private string BuildTranscriptWithEditLedger(string transcript, int currentTaskStartEditIndex)
+        {
+            var builder = new StringBuilder(transcript);
+            string earlierEdits = _sessionEditController.BuildDiffLog(0, currentTaskStartEditIndex);
+            string currentTaskEdits = _sessionEditController.BuildDiffLog(
+                currentTaskStartEditIndex,
+                _sessionEditController.EditCount);
+
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.AppendLine("[Accepted file edits before this user task]");
+            builder.AppendLine(string.IsNullOrEmpty(earlierEdits)
+                ? "(No earlier accepted file edits in this agent session.)"
+                : earlierEdits);
+            builder.AppendLine();
+            builder.AppendLine("[File edits made during this user task]");
+            builder.AppendLine(string.IsNullOrEmpty(currentTaskEdits)
+                ? "(No file edits have been made for this user task yet.)"
+                : currentTaskEdits);
+            builder.AppendLine();
+            builder.AppendLine("[Edit timing guidance]");
+            builder.AppendLine("Use the two edit sections to distinguish timing. Edits under [File edits made during this user task] were made by your tool calls for the current request; do not describe them as already done before the request.");
+            return builder.ToString();
+        }
+
+        private static string AddToolTimingNote(
+            string normalizedToolName,
+            string toolResultForTranscript,
+            string toolResult)
+        {
+            if (!IsMutatingTool(normalizedToolName) || !IsSuccessfulToolResult(toolResult))
+            {
+                return toolResultForTranscript;
+            }
+
+            string timingNote = IsUnchangedEditCompletionResult(toolResult)
+                ? "[Edit timing: this tool call did not write a file because the target already matched before this tool call.]"
+                : "[Edit timing: this tool call changed state for the current user task. In the final answer, describe it as a change made in this run, not as something that was already done before the request.]";
+
+            return AppendToolStatusMessage(toolResultForTranscript, timingNote);
         }
 
         private void ClearSession()
