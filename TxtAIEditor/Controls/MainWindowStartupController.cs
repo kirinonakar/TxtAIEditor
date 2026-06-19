@@ -35,6 +35,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _openNewTab;
         private readonly Action<bool> _applyLeftSidebarVisibility;
         private readonly Action<bool> _applyPreviewVisibility;
+        private readonly Action<EditorSettings> _applySavedPanelWidths;
         private readonly Action<EditorSettings> _applyUiPersonalization;
         private readonly Action _localizeUi;
         private readonly Action<EditorSettings> _applyToolbarSettings;
@@ -63,6 +64,7 @@ namespace TxtAIEditor.Controls
             Action openNewTab,
             Action<bool> applyLeftSidebarVisibility,
             Action<bool> applyPreviewVisibility,
+            Action<EditorSettings> applySavedPanelWidths,
             Action<EditorSettings> applyUiPersonalization,
             Action localizeUi,
             Action<EditorSettings> applyToolbarSettings,
@@ -89,6 +91,7 @@ namespace TxtAIEditor.Controls
             _openNewTab = openNewTab;
             _applyLeftSidebarVisibility = applyLeftSidebarVisibility;
             _applyPreviewVisibility = applyPreviewVisibility;
+            _applySavedPanelWidths = applySavedPanelWidths;
             _applyUiPersonalization = applyUiPersonalization;
             _localizeUi = localizeUi;
             _applyToolbarSettings = applyToolbarSettings;
@@ -179,6 +182,7 @@ namespace TxtAIEditor.Controls
                 mainWindow.ScrollSyncEnabled = settings.ScrollSyncEnabled;
             }
             _topToolbar.WordWrapIsChecked = settings.WordWrap;
+            _applySavedPanelWidths(settings);
             _leftPanelToggle.IsChecked = settings.LeftSidebarVisible;
             _applyLeftSidebarVisibility(settings.LeftSidebarVisible);
 

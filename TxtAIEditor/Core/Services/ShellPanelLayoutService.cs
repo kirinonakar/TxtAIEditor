@@ -54,6 +54,27 @@ namespace TxtAIEditor.Core.Services
         public bool IsLeftSidebarVisible => _leftSidebar.Visibility == Visibility.Visible;
         public bool IsRightSidebarVisible => _rightSidebar.Visibility == Visibility.Visible;
         public bool IsPreviewExpanded => _isPreviewExpanded;
+        public double LeftSidebarWidth => ResolveExplorerWidth();
+        public double RightSidebarWidth => ResolvePreviewWidth();
+
+        public event EventHandler? PanelWidthsChanged;
+
+        public void ApplySavedPanelWidths(double leftSidebarWidth, double rightSidebarWidth)
+        {
+            _lastExplorerWidth = ClampExplorerWidth(leftSidebarWidth);
+            _lastPreviewWidth = ClampPreviewWidth(rightSidebarWidth);
+
+            if (IsLeftSidebarVisible)
+            {
+                _explorerColumn.Width = new GridLength(_lastExplorerWidth);
+            }
+
+            if (IsRightSidebarVisible)
+            {
+                _previewColumn.Width = new GridLength(_lastPreviewWidth);
+                EnsurePreviewWidthWithinBounds();
+            }
+        }
 
         public void ApplyLeftSidebarVisibility(bool show)
         {
@@ -61,7 +82,7 @@ namespace TxtAIEditor.Core.Services
             if (show)
             {
                 _explorerColumn.MinWidth = ExplorerPanelMinWidth;
-                _explorerColumn.Width = new GridLength(Math.Max(_lastExplorerWidth, _explorerColumn.MinWidth));
+                _explorerColumn.Width = new GridLength(ClampExplorerWidth(_lastExplorerWidth));
                 _leftSplitter.Visibility = Visibility.Visible;
                 _leftSidebar.Visibility = Visibility.Visible;
 
@@ -72,7 +93,7 @@ namespace TxtAIEditor.Core.Services
                 double currentWidth = _leftSidebar.ActualWidth > 0 ? _leftSidebar.ActualWidth : _explorerColumn.Width.Value;
                 if (currentWidth > 0)
                 {
-                    _lastExplorerWidth = currentWidth;
+                    _lastExplorerWidth = ClampExplorerWidth(currentWidth);
                 }
 
                 _explorerColumn.MinWidth = 0;
@@ -89,7 +110,7 @@ namespace TxtAIEditor.Core.Services
                 double currentWidth = _rightSidebar.ActualWidth > 0 ? _rightSidebar.ActualWidth : _previewColumn.Width.Value;
                 if (currentWidth > 0)
                 {
-                    _lastPreviewWidth = currentWidth;
+                    _lastPreviewWidth = ClampPreviewWidth(currentWidth);
                 }
 
                 _previewColumn.MinWidth = 0;
@@ -100,7 +121,7 @@ namespace TxtAIEditor.Core.Services
             else
             {
                 _previewColumn.MinWidth = PreviewPanelMinWidth;
-                _previewColumn.Width = new GridLength(Math.Max(_lastPreviewWidth, _previewColumn.MinWidth));
+                _previewColumn.Width = new GridLength(ClampPreviewWidth(_lastPreviewWidth));
                 _rightSplitter.Visibility = Visibility.Visible;
                 _rightSidebar.Visibility = Visibility.Visible;
             }
@@ -129,6 +150,7 @@ namespace TxtAIEditor.Core.Services
             if (currentWidth > maxAvailable)
             {
                 _previewColumn.Width = new GridLength(maxAvailable);
+                _lastPreviewWidth = maxAvailable;
             }
         }
 
@@ -147,6 +169,7 @@ namespace TxtAIEditor.Core.Services
 
             _previewColumn.Width = new GridLength(targetWidth);
             _lastPreviewWidth = targetWidth;
+            PanelWidthsChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void OnLeftSplitterPointerPressed(object sender, PointerRoutedEventArgs e)
@@ -183,7 +206,9 @@ namespace TxtAIEditor.Core.Services
             if (_isDraggingLeftSplitter && sender is UIElement splitter)
             {
                 _isDraggingLeftSplitter = false;
+                _lastExplorerWidth = ResolveExplorerWidth();
                 splitter.ReleasePointerCapture(e.Pointer);
+                PanelWidthsChanged?.Invoke(this, EventArgs.Empty);
                 e.Handled = true;
             }
         }
@@ -222,9 +247,37 @@ namespace TxtAIEditor.Core.Services
             if (_isDraggingRightSplitter && sender is UIElement splitter)
             {
                 _isDraggingRightSplitter = false;
+                _lastPreviewWidth = ResolvePreviewWidth();
                 splitter.ReleasePointerCapture(e.Pointer);
+                PanelWidthsChanged?.Invoke(this, EventArgs.Empty);
                 e.Handled = true;
             }
+        }
+
+        private double ResolveExplorerWidth()
+        {
+            double currentWidth = _leftSidebar.ActualWidth > 0 ? _leftSidebar.ActualWidth : _explorerColumn.Width.Value;
+            return ClampExplorerWidth(currentWidth > 0 ? currentWidth : _lastExplorerWidth);
+        }
+
+        private double ResolvePreviewWidth()
+        {
+            double currentWidth = _rightSidebar.ActualWidth > 0 ? _rightSidebar.ActualWidth : _previewColumn.Width.Value;
+            return ClampPreviewWidth(currentWidth > 0 ? currentWidth : _lastPreviewWidth);
+        }
+
+        private double ClampExplorerWidth(double width)
+        {
+            return Math.Clamp(width, ExplorerPanelMinWidth, _explorerColumn.MaxWidth);
+        }
+
+        private double ClampPreviewWidth(double width)
+        {
+            double maxAvailable = _mainWorkGrid.ActualWidth > 0
+                ? GetMaxAvailablePreviewWidth()
+                : _previewColumn.MaxWidth;
+            double maxWidth = Math.Min(_previewColumn.MaxWidth, maxAvailable);
+            return Math.Clamp(width, PreviewPanelMinWidth, maxWidth);
         }
     }
 }

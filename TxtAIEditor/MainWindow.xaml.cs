@@ -221,6 +221,7 @@ namespace TxtAIEditor
                 RightSplitter,
                 LeftSidebarTabView,
                 PreviewGrid);
+            _shellPanelLayoutService.PanelWidthsChanged += async (_, _) => await SaveUiLayoutSettingsAsync();
             _tabNavigationController = new TabNavigationController(
                 _viewModel,
                 EditorWorkspace,
@@ -952,6 +953,7 @@ namespace TxtAIEditor
                 () => OpenNewTab(),
                 ApplyLeftSidebarVisibility,
                 ApplyPreviewVisibility,
+                ApplySavedPanelWidths,
                 ApplyUiPersonalization,
                 LocalizeUi,
                 ApplyToolbarSettings,
@@ -1070,6 +1072,8 @@ namespace TxtAIEditor
                 settings.TerminalPanelHeight = EditorWorkspace.PersistedTerminalPanelHeight;
                 settings.LeftSidebarVisible = _shellPanelLayoutService.IsLeftSidebarVisible;
                 settings.RightSidebarVisible = _shellPanelLayoutService.IsRightSidebarVisible;
+                settings.LeftSidebarWidth = _shellPanelLayoutService.LeftSidebarWidth;
+                settings.RightSidebarWidth = _shellPanelLayoutService.RightSidebarWidth;
 
                 await _settingsService.SaveSettingsAsync(settings);
             }
@@ -1086,6 +1090,8 @@ namespace TxtAIEditor
                 var settings = _settingsService.CurrentSettings;
                 settings.LeftSidebarVisible = _shellPanelLayoutService.IsLeftSidebarVisible;
                 settings.RightSidebarVisible = _shellPanelLayoutService.IsRightSidebarVisible;
+                settings.LeftSidebarWidth = _shellPanelLayoutService.LeftSidebarWidth;
+                settings.RightSidebarWidth = _shellPanelLayoutService.RightSidebarWidth;
                 await _settingsService.SaveSettingsAsync(settings);
             }
             catch (Exception ex)
@@ -1249,6 +1255,11 @@ namespace TxtAIEditor
         private void ApplyLeftSidebarVisibility(bool show)
         {
             _shellPaneController.ApplyLeftSidebarVisibility(show);
+        }
+
+        private void ApplySavedPanelWidths(EditorSettings settings)
+        {
+            _shellPanelLayoutService.ApplySavedPanelWidths(settings.LeftSidebarWidth, settings.RightSidebarWidth);
         }
 
         private async Task ToggleLeftPanelAsync()

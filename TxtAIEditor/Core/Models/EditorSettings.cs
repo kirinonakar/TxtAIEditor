@@ -33,6 +33,8 @@ namespace TxtAIEditor.Core.Models
         public string ExternalViewerArguments { get; set; } = string.Empty;
         public bool LeftSidebarVisible { get; set; } = true;
         public bool RightSidebarVisible { get; set; } = true;
+        public double LeftSidebarWidth { get; set; } = 260;
+        public double RightSidebarWidth { get; set; } = 400;
         public bool ScrollSyncEnabled { get; set; } = true;
         public bool DefaultMarkdownEnabled { get; set; } = true;
         public bool DefaultMarkdownToolbarEnabled { get; set; } = true;
