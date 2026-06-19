@@ -1146,6 +1146,8 @@ th.row-header {
     min-width: 54px;
     width: 54px;
     text-align: right;
+    user-select: none;
+    -webkit-user-select: none;
 }
 td.row-header {
     position: sticky;
@@ -1157,6 +1159,8 @@ td.row-header {
     color: var(--muted);
     background: var(--header);
     font-weight: 600;
+    user-select: none;
+    -webkit-user-select: none;
 }
 .empty { padding: 28px; color: var(--muted); }
 .truncated { color: var(--accent); }

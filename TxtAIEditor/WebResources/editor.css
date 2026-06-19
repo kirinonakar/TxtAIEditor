@@ -247,6 +247,8 @@ body.csv-table-mode #scroll-container {
 
 .csv-column-spacer {
     pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .csv-column-heading {
@@ -329,6 +331,8 @@ body.csv-table-mode .line-row {
     background: var(--gutter-bg);
     border-right: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
     cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .csv-row .line-number.selected-row-heading {
@@ -406,6 +410,7 @@ body.csv-table-mode .line-row {
     font-size: 12px;
     text-align: right;
     user-select: none;
+    -webkit-user-select: none;
 }
 
 .line-row.dirty-mod::before,
