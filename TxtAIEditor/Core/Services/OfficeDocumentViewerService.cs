@@ -201,6 +201,7 @@ body { padding: 28px 16px 40px; }
 }
 .ppt-shape {
     display: flex;
+    flex-direction: column;
     align-items: flex-start;
     color: #111827;
     white-space: pre-wrap;
