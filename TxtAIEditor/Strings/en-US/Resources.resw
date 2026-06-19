@@ -542,6 +542,18 @@
   <data name="GitPushMenuTooltip" xml:space="preserve">
     <value>Git actions</value>
   </data>
+  <data name="GitPushSuccessTitle" xml:space="preserve">
+    <value>Git Push</value>
+  </data>
+  <data name="GitPushSuccessMessage" xml:space="preserve">
+    <value>Push completed.</value>
+  </data>
+  <data name="GitPushFailureTitle" xml:space="preserve">
+    <value>Git Push Failed</value>
+  </data>
+  <data name="GitPushFailureMessage" xml:space="preserve">
+    <value>Push failed. Check the remote repository, authentication, or upstream setting.</value>
+  </data>
   <data name="GitPull" xml:space="preserve">
     <value>Pull</value>
   </data>

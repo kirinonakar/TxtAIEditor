@@ -542,6 +542,18 @@
   <data name="GitPushMenuTooltip" xml:space="preserve">
     <value>Git 작업</value>
   </data>
+  <data name="GitPushSuccessTitle" xml:space="preserve">
+    <value>Git Push</value>
+  </data>
+  <data name="GitPushSuccessMessage" xml:space="preserve">
+    <value>Push가 완료되었습니다.</value>
+  </data>
+  <data name="GitPushFailureTitle" xml:space="preserve">
+    <value>Git Push 실패</value>
+  </data>
+  <data name="GitPushFailureMessage" xml:space="preserve">
+    <value>Push 처리에 실패했습니다. 원격 저장소/인증/업스트림 설정을 확인하십시오.</value>
+  </data>
   <data name="GitPull" xml:space="preserve">
     <value>Pull</value>
   </data>

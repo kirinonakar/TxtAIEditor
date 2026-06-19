@@ -303,11 +303,15 @@ namespace TxtAIEditor.Controls
             if (success)
             {
                 await RefreshAsync(repoPath);
-                _showError("Git Push", "Push가 완료되었습니다.");
+                _showError(
+                    _getString("GitPushSuccessTitle", "Git Push"),
+                    _getString("GitPushSuccessMessage", "Push가 완료되었습니다."));
             }
             else
             {
-                _showError("Git Push 실패", "Push 처리에 실패했습니다. 원격 저장소/인증/업스트림 설정을 확인하십시오.");
+                _showError(
+                    _getString("GitPushFailureTitle", "Git Push 실패"),
+                    _getString("GitPushFailureMessage", "Push 처리에 실패했습니다. 원격 저장소/인증/업스트림 설정을 확인하십시오."));
             }
         }
 
