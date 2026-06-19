@@ -38,6 +38,8 @@ namespace TxtAIEditor.Core.Services
         {
             public string? BackgroundColor { get; init; }
             public string? TextColor { get; init; }
+            public int NumberFormatId { get; init; }
+            public string? NumberFormatCode { get; init; }
             public bool Bold { get; init; }
             public bool Italic { get; init; }
         }
@@ -495,6 +497,7 @@ renderSheet(0);
             IReadOnlyList<string> themeColors = await LoadWorkbookThemeColorsAsync(archive).ConfigureAwait(false);
             IReadOnlyList<ViewerCellStyle> styles = await LoadWorkbookStylesAsync(archive, themeColors).ConfigureAwait(false);
             IReadOnlyDictionary<string, string> sheetNamesByPath = await LoadWorkbookSheetNamesByPathAsync(archive).ConfigureAwait(false);
+            bool use1904Dates = await LoadWorkbookUses1904DatesAsync(archive).ConfigureAwait(false);
 
             var sheetEntries = archive.Entries
                 .Where(entry => Regex.IsMatch(entry.FullName, @"^xl/worksheets/sheet\d+\.xml$", RegexOptions.IgnoreCase))
@@ -528,7 +531,7 @@ renderSheet(0);
                         ViewerCellStyle style = ReadWorkbookCellStyle(cellElement, styles);
                         row.Add(new ViewerWorkbookCell
                         {
-                            Value = GetWorkbookCellText(cellElement, sharedStrings),
+                            Value = GetWorkbookCellText(cellElement, sharedStrings, style, use1904Dates),
                             BackgroundColor = style.BackgroundColor,
                             TextColor = style.TextColor,
                             Bold = style.Bold,
@@ -615,6 +618,7 @@ renderSheet(0);
             }
 
             XDocument stylesDoc = await LoadXmlEntryAsync(entry).ConfigureAwait(false);
+            IReadOnlyDictionary<int, string> numberFormats = LoadWorkbookNumberFormats(stylesDoc);
             var fontStyles = stylesDoc.Descendants()
                 .FirstOrDefault(e => e.Name.LocalName == "fonts")
                 ?.Elements().Where(e => e.Name.LocalName == "font")
@@ -637,6 +641,7 @@ renderSheet(0);
             {
                 int fillId = TryReadInt(xf, "fillId");
                 int fontId = TryReadInt(xf, "fontId");
+                int numberFormatId = TryReadInt(xf, "numFmtId");
                 ViewerCellStyle fontStyle = fontId >= 0 && fontId < fontStyles.Count
                     ? fontStyles[fontId]
                     : new ViewerCellStyle();
@@ -645,12 +650,72 @@ renderSheet(0);
                 {
                     BackgroundColor = fillId >= 0 && fillId < fillColors.Count ? fillColors[fillId] : null,
                     TextColor = fontStyle.TextColor,
+                    NumberFormatId = numberFormatId,
+                    NumberFormatCode = numberFormats.TryGetValue(numberFormatId, out string? numberFormatCode) ? numberFormatCode : null,
                     Bold = fontStyle.Bold,
                     Italic = fontStyle.Italic
                 });
             }
 
             return result;
+        }
+
+        private static IReadOnlyDictionary<int, string> LoadWorkbookNumberFormats(XDocument stylesDoc)
+        {
+            var formats = new Dictionary<int, string>
+            {
+                [0] = "General",
+                [1] = "0",
+                [2] = "0.00",
+                [3] = "#,##0",
+                [4] = "#,##0.00",
+                [9] = "0%",
+                [10] = "0.00%",
+                [11] = "0.00E+00",
+                [12] = "# ?/?",
+                [13] = "# ??/??",
+                [14] = "m/d/yy",
+                [15] = "d-mmm-yy",
+                [16] = "d-mmm",
+                [17] = "mmm-yy",
+                [18] = "h:mm AM/PM",
+                [19] = "h:mm:ss AM/PM",
+                [20] = "h:mm",
+                [21] = "h:mm:ss",
+                [22] = "m/d/yy h:mm",
+                [37] = "#,##0;(#,##0)",
+                [38] = "#,##0;[Red](#,##0)",
+                [39] = "#,##0.00;(#,##0.00)",
+                [40] = "#,##0.00;[Red](#,##0.00)",
+                [45] = "mm:ss",
+                [46] = "[h]:mm:ss",
+                [47] = "mm:ss.0",
+                [48] = "##0.0E+0",
+                [49] = "@"
+            };
+
+            foreach (XElement numFmt in stylesDoc.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "numFmts")
+                ?.Elements().Where(e => e.Name.LocalName == "numFmt") ?? Enumerable.Empty<XElement>())
+            {
+                int id = TryReadInt(numFmt, "numFmtId");
+                string code = numFmt.Attribute("formatCode")?.Value ?? string.Empty;
+                if (id >= 0 && !string.IsNullOrWhiteSpace(code))
+                {
+                    formats[id] = code;
+                }
+            }
+
+            return formats;
+        }
+
+        private static async Task<bool> LoadWorkbookUses1904DatesAsync(ZipArchive archive)
+        {
+            XDocument? workbook = await TryLoadXmlEntryAsync(archive, "xl/workbook.xml").ConfigureAwait(false);
+            XElement? workbookProperties = workbook?.Descendants().FirstOrDefault(e => e.Name.LocalName == "workbookPr");
+            string value = workbookProperties?.Attribute("date1904")?.Value ?? string.Empty;
+            return value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
         private static async Task<IReadOnlyList<string>> LoadWorkbookThemeColorsAsync(ZipArchive archive)
@@ -712,7 +777,11 @@ renderSheet(0);
                 : new ViewerCellStyle();
         }
 
-        private static string GetWorkbookCellText(XElement cell, IReadOnlyList<string> sharedStrings)
+        private static string GetWorkbookCellText(
+            XElement cell,
+            IReadOnlyList<string> sharedStrings,
+            ViewerCellStyle style,
+            bool use1904Dates)
         {
             string type = cell.Attribute("t")?.Value ?? string.Empty;
             if (type.Equals("inlineStr", StringComparison.OrdinalIgnoreCase))
@@ -730,8 +799,434 @@ renderSheet(0);
             {
                 "s" when int.TryParse(rawValue, out int index) && index >= 0 && index < sharedStrings.Count => sharedStrings[index],
                 "b" => rawValue == "1" ? "TRUE" : "FALSE",
-                _ => rawValue
+                "str" => rawValue,
+                _ => FormatWorkbookCellValue(rawValue, style, use1904Dates)
             };
+        }
+
+        private static string FormatWorkbookCellValue(string rawValue, ViewerCellStyle style, bool use1904Dates)
+        {
+            string formatCode = style.NumberFormatCode ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(formatCode) ||
+                formatCode.Equals("General", StringComparison.OrdinalIgnoreCase) ||
+                !double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out double numericValue))
+            {
+                return rawValue;
+            }
+
+            if (IsWorkbookDateFormat(formatCode) &&
+                TryConvertExcelSerialDate(numericValue, use1904Dates, out DateTime dateTime))
+            {
+                return FormatWorkbookDateValue(dateTime, numericValue, formatCode);
+            }
+
+            return FormatWorkbookNumberValue(numericValue, formatCode, rawValue);
+        }
+
+        private static bool IsWorkbookDateFormat(string formatCode)
+        {
+            string cleaned = RemoveWorkbookFormatLiterals(formatCode);
+            cleaned = Regex.Replace(cleaned, @"\[[^\]]+\]", string.Empty);
+            return Regex.IsMatch(cleaned, @"(?<!\\)[ymdhHsS]", RegexOptions.IgnoreCase) &&
+                !Regex.IsMatch(cleaned, @"[0#?](?:\.[0#?]+)?\s*%?");
+        }
+
+        private static bool TryConvertExcelSerialDate(double serial, bool use1904Dates, out DateTime dateTime)
+        {
+            dateTime = default;
+            if (double.IsNaN(serial) || double.IsInfinity(serial))
+            {
+                return false;
+            }
+
+            try
+            {
+                dateTime = use1904Dates
+                    ? new DateTime(1904, 1, 1).AddDays(serial)
+                    : new DateTime(1899, 12, 30).AddDays(serial);
+                return dateTime.Year >= 1 && dateTime.Year <= 9999;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string FormatWorkbookDateValue(DateTime dateTime, double serial, string formatCode)
+        {
+            if (ShouldUseIsoDateFormat(formatCode))
+            {
+                return dateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            }
+
+            string section = SelectWorkbookFormatSection(formatCode, serial);
+            section = CleanWorkbookFormatSection(section);
+            section = Regex.Replace(section, @"\[\$-[^\]]+\]", string.Empty);
+            section = Regex.Replace(section, @"\[[^\]]+\]", match =>
+            {
+                string token = match.Value.Trim('[', ']');
+                return token.Equals("h", StringComparison.OrdinalIgnoreCase) ||
+                    token.Equals("hh", StringComparison.OrdinalIgnoreCase) ||
+                    token.Equals("m", StringComparison.OrdinalIgnoreCase) ||
+                    token.Equals("mm", StringComparison.OrdinalIgnoreCase) ||
+                    token.Equals("s", StringComparison.OrdinalIgnoreCase) ||
+                    token.Equals("ss", StringComparison.OrdinalIgnoreCase)
+                    ? token
+                    : string.Empty;
+            });
+
+            string dotNetFormat = ConvertExcelDateFormatToDotNet(section);
+            if (string.IsNullOrWhiteSpace(dotNetFormat))
+            {
+                return dateTime.ToString(CultureInfo.CurrentCulture);
+            }
+
+            try
+            {
+                return dateTime.ToString(dotNetFormat, CultureInfo.CurrentCulture);
+            }
+            catch
+            {
+                return dateTime.ToString(CultureInfo.CurrentCulture);
+            }
+        }
+
+        private static bool ShouldUseIsoDateFormat(string formatCode)
+        {
+            string cleaned = RemoveWorkbookFormatLiterals(formatCode);
+            cleaned = Regex.Replace(cleaned, @"\[[^\]]+\]", string.Empty);
+            return Regex.IsMatch(cleaned, @"(?<!\\)[yd]", RegexOptions.IgnoreCase);
+        }
+
+        private static string ConvertExcelDateFormatToDotNet(string format)
+        {
+            var builder = new StringBuilder();
+            bool hasAmPm = format.Contains("AM/PM", StringComparison.OrdinalIgnoreCase) ||
+                format.Contains("A/P", StringComparison.OrdinalIgnoreCase);
+
+            for (int i = 0; i < format.Length;)
+            {
+                char ch = format[i];
+                if (ch == '"')
+                {
+                    int end = format.IndexOf('"', i + 1);
+                    string literal = end > i ? format.Substring(i + 1, end - i - 1) : string.Empty;
+                    AppendDateLiteral(builder, literal);
+                    i = end > i ? end + 1 : format.Length;
+                    continue;
+                }
+
+                if (ch == '\\')
+                {
+                    if (i + 1 < format.Length)
+                    {
+                        AppendDateLiteral(builder, format.Substring(i + 1, 1));
+                    }
+
+                    i += 2;
+                    continue;
+                }
+
+                if (ch == '_' || ch == '*')
+                {
+                    i += 2;
+                    continue;
+                }
+
+                string remaining = format.Substring(i);
+                if (remaining.StartsWith("AM/PM", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Append("tt");
+                    i += 5;
+                    continue;
+                }
+
+                if (remaining.StartsWith("A/P", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Append("tt");
+                    i += 3;
+                    continue;
+                }
+
+                int runLength = CountRepeatedDateFormatChars(format, i);
+                char lower = char.ToLowerInvariant(ch);
+                switch (lower)
+                {
+                    case 'y':
+                        builder.Append(runLength <= 2 ? "yy" : "yyyy");
+                        i += runLength;
+                        break;
+                    case 'd':
+                        builder.Append(runLength switch
+                        {
+                            1 => "d",
+                            2 => "dd",
+                            3 => "ddd",
+                            _ => "dddd"
+                        });
+                        i += runLength;
+                        break;
+                    case 'h':
+                        builder.Append(runLength <= 1 ? (hasAmPm ? "h" : "H") : (hasAmPm ? "hh" : "HH"));
+                        i += runLength;
+                        break;
+                    case 's':
+                        builder.Append(runLength <= 1 ? "s" : "ss");
+                        i += runLength;
+                        break;
+                    case 'm':
+                        bool minute = IsMinuteToken(format, i);
+                        builder.Append(minute
+                            ? (runLength <= 1 ? "m" : "mm")
+                            : runLength switch
+                            {
+                                1 => "M",
+                                2 => "MM",
+                                3 => "MMM",
+                                _ => "MMMM"
+                            });
+                        i += runLength;
+                        break;
+                    default:
+                        AppendDateLiteral(builder, ch.ToString());
+                        i++;
+                        break;
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static int CountRepeatedDateFormatChars(string format, int start)
+        {
+            char ch = char.ToLowerInvariant(format[start]);
+            int count = 0;
+            while (start + count < format.Length &&
+                char.ToLowerInvariant(format[start + count]) == ch)
+            {
+                count++;
+            }
+
+            return count;
+        }
+
+        private static bool IsMinuteToken(string format, int index)
+        {
+            int previous = FindPreviousDateFormatToken(format, index);
+            int next = FindNextDateFormatToken(format, index);
+            return (previous >= 0 && "hHsS".IndexOf(format[previous]) >= 0) ||
+                (next >= 0 && "hHsS".IndexOf(format[next]) >= 0);
+        }
+
+        private static int FindPreviousDateFormatToken(string format, int index)
+        {
+            for (int i = index - 1; i >= 0; i--)
+            {
+                char ch = format[i];
+                if (char.IsWhiteSpace(ch) || ch == ':' || ch == '/' || ch == '-' || ch == '.')
+                {
+                    continue;
+                }
+
+                if ("yYmMdDhHsS".IndexOf(ch) >= 0)
+                {
+                    return i;
+                }
+
+                return -1;
+            }
+
+            return -1;
+        }
+
+        private static int FindNextDateFormatToken(string format, int index)
+        {
+            for (int i = index + 1; i < format.Length; i++)
+            {
+                char ch = format[i];
+                if (char.IsWhiteSpace(ch) || ch == ':' || ch == '/' || ch == '-' || ch == '.')
+                {
+                    continue;
+                }
+
+                if ("yYmMdDhHsS".IndexOf(ch) >= 0)
+                {
+                    return i;
+                }
+
+                return -1;
+            }
+
+            return -1;
+        }
+
+        private static void AppendDateLiteral(StringBuilder builder, string literal)
+        {
+            foreach (char ch in literal)
+            {
+                if (ch == '\'')
+                {
+                    builder.Append("''");
+                }
+                else if (char.IsLetter(ch))
+                {
+                    builder.Append('\'').Append(ch).Append('\'');
+                }
+                else
+                {
+                    builder.Append(ch);
+                }
+            }
+        }
+
+        private static string FormatWorkbookNumberValue(double numericValue, string formatCode, string rawValue)
+        {
+            List<string> sections = SplitWorkbookFormatSections(formatCode);
+            bool usesNegativeSection = numericValue < 0 && sections.Count > 1;
+            string section = CleanWorkbookFormatSection(SelectWorkbookFormatSection(formatCode, numericValue));
+            if (string.IsNullOrWhiteSpace(section) ||
+                section.Equals("General", StringComparison.OrdinalIgnoreCase) ||
+                section.Contains("/", StringComparison.Ordinal) && section.Contains("?", StringComparison.Ordinal))
+            {
+                return rawValue;
+            }
+
+            try
+            {
+                double valueToFormat = usesNegativeSection ? Math.Abs(numericValue) : numericValue;
+                return valueToFormat.ToString(section, CultureInfo.CurrentCulture);
+            }
+            catch
+            {
+                return rawValue;
+            }
+        }
+
+        private static string SelectWorkbookFormatSection(string formatCode, double value)
+        {
+            List<string> sections = SplitWorkbookFormatSections(formatCode);
+            if (sections.Count == 0)
+            {
+                return formatCode;
+            }
+
+            if (sections.Count == 1)
+            {
+                return sections[0];
+            }
+
+            if (value > 0)
+            {
+                return sections[0];
+            }
+
+            if (value < 0)
+            {
+                return sections.Count > 1 ? sections[1] : sections[0];
+            }
+
+            return sections.Count > 2 ? sections[2] : sections[0];
+        }
+
+        private static List<string> SplitWorkbookFormatSections(string formatCode)
+        {
+            var sections = new List<string>();
+            var current = new StringBuilder();
+            bool inQuote = false;
+            bool escaped = false;
+            foreach (char ch in formatCode)
+            {
+                if (escaped)
+                {
+                    current.Append(ch);
+                    escaped = false;
+                    continue;
+                }
+
+                if (ch == '\\')
+                {
+                    current.Append(ch);
+                    escaped = true;
+                    continue;
+                }
+
+                if (ch == '"')
+                {
+                    inQuote = !inQuote;
+                    current.Append(ch);
+                    continue;
+                }
+
+                if (ch == ';' && !inQuote)
+                {
+                    sections.Add(current.ToString());
+                    current.Clear();
+                    continue;
+                }
+
+                current.Append(ch);
+            }
+
+            sections.Add(current.ToString());
+            return sections;
+        }
+
+        private static string CleanWorkbookFormatSection(string section)
+        {
+            section = Regex.Replace(section, @"\[[^\]]+\]", match =>
+            {
+                string value = match.Value.Trim('[', ']');
+                return value.Equals("h", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("hh", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("m", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("mm", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("s", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("ss", StringComparison.OrdinalIgnoreCase)
+                    ? match.Value
+                    : string.Empty;
+            });
+            section = Regex.Replace(section, @"\[\$-[^\]]+\]", string.Empty);
+            section = section.Replace("_-", string.Empty, StringComparison.Ordinal)
+                .Replace("_)", string.Empty, StringComparison.Ordinal)
+                .Replace("_(", string.Empty, StringComparison.Ordinal)
+                .Replace("_ ", string.Empty, StringComparison.Ordinal);
+            section = Regex.Replace(section, @"_.", string.Empty);
+            section = Regex.Replace(section, @"\*.", string.Empty);
+            return section.Trim();
+        }
+
+        private static string RemoveWorkbookFormatLiterals(string formatCode)
+        {
+            var builder = new StringBuilder();
+            bool inQuote = false;
+            bool escaped = false;
+            foreach (char ch in formatCode)
+            {
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+
+                if (ch == '\\')
+                {
+                    escaped = true;
+                    continue;
+                }
+
+                if (ch == '"')
+                {
+                    inQuote = !inQuote;
+                    continue;
+                }
+
+                if (!inQuote)
+                {
+                    builder.Append(ch);
+                }
+            }
+
+            return builder.ToString();
         }
 
         private static string? ReadWorkbookColor(XElement? colorElement, IReadOnlyList<string> themeColors)
