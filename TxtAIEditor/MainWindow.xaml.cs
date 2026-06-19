@@ -94,6 +94,7 @@ namespace TxtAIEditor
         private readonly WindowCloseController _windowCloseController;
         private readonly WindowTitleController _windowTitleController;
         private readonly MainWindowSettingsController _settingsController;
+        private MainWindowToolbarCommandController? _toolbarCommandController;
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private bool _startupInitializationComplete;
         private string _currentFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -156,8 +157,6 @@ namespace TxtAIEditor
             get => _scrollSyncEnabled;
             set => _scrollSyncEnabled = value;
         }
-        private bool _csvTableModeEnabled = false;
-        private bool _livePreviewEnabled = false;
         
         // Dynamic tabs collection
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges = 
@@ -228,7 +227,7 @@ namespace TxtAIEditor
                 EditorTabView,
                 EditorTabView2);
             _terminalShortcutService = new TerminalShortcutService(WindowNative.GetWindowHandle(this));
-            _terminalShortcutService.ToggleRequested += (_, _) => ToggleTerminal();
+            _terminalShortcutService.ToggleRequested += (_, _) => _toolbarCommandController?.ToggleTerminal();
             _dialogController = new WindowDialogController(
                 () => this.Content.XamlRoot,
                 GetCurrentElementTheme,
@@ -331,20 +330,20 @@ namespace TxtAIEditor
                 _editorSessions,
                 UpdateWindowTitle);
             _editorBridgeShortcutController = new EditorBridgeShortcutController(
-                ToggleLivePreview,
+                () => _toolbarCommandController?.ToggleLivePreview(),
                 _stickyNoteModeController.ToggleTopMostFromShortcut,
-                () => OnToggleThemeClick(this, new RoutedEventArgs()),
+                () => _toolbarCommandController?.ToggleTheme(),
                 ToggleMaximize,
                 _stickyNoteModeController.ToggleMode,
                 ToggleLeftPanelAsync,
                 ToggleRightPanelAsync,
                 TogglePreviewWidth,
                 () => OpenNewTab(),
-                () => OnSaveFileClick(this, new RoutedEventArgs()),
-                () => OnOpenFileClick(this, new RoutedEventArgs()),
+                () => _toolbarCommandController?.SaveActive(),
+                () => _toolbarCommandController?.OpenFile(),
                 _terminalShortcutService.RequestToggle,
                 () => OnCloseActiveTabShortcutInvoked(null!, null!),
-                () => OnPrintClick(this, new RoutedEventArgs()),
+                () => _toolbarCommandController?.Print(),
                 FocusSearchPanel,
                 _tabDirtyStateController,
                 SchedulePreview,
@@ -386,7 +385,7 @@ namespace TxtAIEditor
                 _tabDirtyStateController.SetDirtyStateForFileGroup);
             _functionKeyShortcutService = new FunctionKeyShortcutService(WindowNative.GetWindowHandle(this));
             _functionKeyShortcutService.TopMostRequested += (_, _) => _stickyNoteModeController.ToggleTopMostFromShortcut();
-            _functionKeyShortcutService.ThemeRequested += (_, _) => OnToggleThemeClick(this, new RoutedEventArgs());
+            _functionKeyShortcutService.ThemeRequested += (_, _) => _toolbarCommandController?.ToggleTheme();
             _functionKeyShortcutService.StickyNoteRequested += (_, _) => _stickyNoteModeController.ToggleMode();
             _gitAutoRefreshTimer = new DispatcherTimer
             {
@@ -572,17 +571,17 @@ namespace TxtAIEditor
                 ToggleRightPanelAsync,
                 FocusSearchPanel,
                 () => OnCloseActiveTabShortcutInvoked(null!, null!),
-                () => OnSaveFileClick(this, new RoutedEventArgs()),
-                () => OnSaveAsFileClick(this, new RoutedEventArgs()),
-                () => OnOpenFileClick(this, new RoutedEventArgs()),
-                () => OnFindClick(this, new RoutedEventArgs()),
-                () => OnPrintClick(this, new RoutedEventArgs()),
-                IsActiveTabPdfViewer,
+                () => _toolbarCommandController?.SaveActive(),
+                () => _toolbarCommandController?.SaveActiveAs(),
+                () => _toolbarCommandController?.OpenFile(),
+                () => _toolbarCommandController?.Find(),
+                () => _toolbarCommandController?.Print(),
+                () => _pdfViewerController.IsActiveViewer(),
                 _stickyNoteModeController.ToggleTopMostFromShortcut,
-                () => OnToggleThemeClick(this, new RoutedEventArgs()),
+                () => _toolbarCommandController?.ToggleTheme(),
                 _stickyNoteModeController.ToggleMode,
                 _terminalShortcutService,
-                ToggleLivePreview,
+                () => _toolbarCommandController?.ToggleLivePreview(),
                 TogglePreviewWidth,
                 ToggleMaximize);
             _terminalPanelController = new TerminalPanelController(
@@ -855,9 +854,9 @@ namespace TxtAIEditor
                 _tabNavigationController.GetActiveTab,
                 _tabNavigationController.GetTabViewForItem,
                 () => _currentFolderPath,
-                () => _livePreviewEnabled,
+                () => _toolbarCommandController?.LivePreviewEnabled == true,
                 () => _scrollSyncEnabled,
-                () => _csvTableModeEnabled,
+                () => _toolbarCommandController?.CsvTableModeEnabled == true,
                 GetPreviewBaseHref,
                 GetLocalizedString,
                 ApplyEditorSurfaceBackground,
@@ -982,7 +981,33 @@ namespace TxtAIEditor
             };
             SearchResultsList.ItemsSource = groupedSource.View;
             _statusBarController.InitializeEncodings(TextEncodingService.SupportedEncodingNames, "UTF-8");
-            WireTopToolbarEvents();
+            _toolbarCommandController = new MainWindowToolbarCommandController(
+                this,
+                TopToolbar,
+                EditorTabView,
+                SearchQueryInput,
+                _viewModel,
+                _settingsService,
+                _fileOpenDropController,
+                _tabNavigationController,
+                _tabSaveController,
+                _terminalPanelController,
+                _settingsController,
+                _stickyNoteModeController,
+                _pdfViewerController,
+                _shellPaneController,
+                _compareSelectionDialogService,
+                _compareTabController,
+                _dialogController,
+                _tabBridges,
+                _editorSessions,
+                () => this.Content.XamlRoot,
+                GetCurrentElementTheme,
+                GetLocalizedString,
+                GetPreviewBaseHref,
+                () => EditorWorkspace.IsTerminalVisible,
+                () => TerminalPane.SuspendNativeWindows(),
+                () => TerminalPane.ResumeNativeWindows());
             WireLeftSidebarEvents();
             WireEditorWorkspaceEvents();
 
@@ -996,8 +1021,8 @@ namespace TxtAIEditor
             this.AppWindow.Closing += OnAppWindowClosing;
             _lifecycleController.StartShortcuts();
 
-            PreviewGrid.ModelNameClick += OnModelNameClick;
-            PreviewGrid.AgentPane.ModelNameClick += OnModelNameClick;
+            PreviewGrid.ModelNameClick += (_, _) => _toolbarCommandController?.ShowModelSettings();
+            PreviewGrid.AgentPane.ModelNameClick += (_, _) => _toolbarCommandController?.ShowModelSettings();
         }
 
         public async Task PrepareForInitialActivationAsync()
@@ -1026,23 +1051,6 @@ namespace TxtAIEditor
             LeftSidebarTabView.SearchResultItemClick += OnSearchResultItemClick;
         }
 
-        private void WireTopToolbarEvents()
-        {
-            TopToolbar.OpenFileClick += OnOpenFileClick;
-            TopToolbar.SaveFileClick += OnSaveFileClick;
-            TopToolbar.SaveAsFileClick += OnSaveAsFileClick;
-            TopToolbar.CompareFilesClick += OnCompareFilesClick;
-            TopToolbar.OpenTerminalClick += OnOpenTerminalClick;
-            TopToolbar.PrintClick += OnPrintClick;
-            TopToolbar.TopMostToggleClick += (_, _) => _stickyNoteModeController.ApplyTopMostFromToolbar();
-            TopToolbar.StickyNoteClick += (_, _) => _stickyNoteModeController.ToggleMode();
-            TopToolbar.WordWrapToggleClick += OnWordWrapToggleClick;
-            TopToolbar.FindClick += OnFindClick;
-            TopToolbar.ToggleLivePreviewClick += OnToggleLivePreviewClick;
-            TopToolbar.ToggleCsvTableClick += OnToggleCsvTableClick;
-            TopToolbar.ToggleThemeClick += OnToggleThemeClick;
-            TopToolbar.SettingsClick += OnSettingsClick;
-        }
 
         private void WireEditorWorkspaceEvents()
         {
@@ -1149,10 +1157,6 @@ namespace TxtAIEditor
 
         #region XAML Interactive Handlers
 
-        private async void OnOpenFileClick(object sender, RoutedEventArgs e)
-        {
-            await _fileOpenDropController.OpenFileAsync();
-        }
 
         internal Task LoadFileIntoTabAsync(string filePath) => LoadFileIntoTabAsync(filePath, 0);
 
@@ -1209,62 +1213,6 @@ namespace TxtAIEditor
             _livePreviewController.Render(tab);
         }
 
-        private async void OnSaveFileClick(object sender, RoutedEventArgs e)
-        {
-            var tab = _tabNavigationController.GetActiveTab();
-            if (tab != null)
-            {
-                await SaveTabAsync(tab);
-            }
-        }
-
-        private async void OnSaveAsFileClick(object sender, RoutedEventArgs e)
-        {
-            var tab = _tabNavigationController.GetActiveTab();
-            if (tab != null)
-            {
-                await SaveAsTabAsync(tab);
-            }
-        }
-
-        private async void OnWordWrapToggleClick(object sender, RoutedEventArgs e)
-        {
-            var settings = _settingsService.CurrentSettings;
-            settings.WordWrap = TopToolbar.WordWrapIsChecked;
-            await _settingsService.SaveSettingsAsync(settings);
-
-            await _settingsController.ApplySettingsToOpenEditorsAsync(settings);
-        }
-
-        private async void OnFindClick(object sender, RoutedEventArgs e)
-        {
-            if (await _pdfViewerController.FocusFindInActiveViewerAsync())
-            {
-                return;
-            }
-
-            if (EditorTabView.SelectedItem is TabViewItem activeTabItem &&
-                activeTabItem.Tag is string tabId &&
-                _tabBridges.TryGetValue(tabId, out var bridgeGroup))
-            {
-                if (bridgeGroup.Bridge != null)
-                {
-                    bridgeGroup.WebView.Focus(FocusState.Programmatic);
-                    await bridgeGroup.Bridge.TriggerFindAsync();
-                    return;
-                }
-            }
-
-            EnsureLeftPanelVisible();
-            ShowLeftSidebarPage(3);
-            SearchQueryInput.Focus(FocusState.Programmatic);
-            SearchQueryInput.Focus(FocusState.Keyboard);
-        }
-
-        private bool IsActiveTabPdfViewer()
-        {
-            return _pdfViewerController.IsActiveViewer();
-        }
 
         private void UpdateRightPanelSelectionContext(string selectedText, OpenedTab tab, int startLine, int endLine)
         {
@@ -1282,18 +1230,6 @@ namespace TxtAIEditor
             _statusBarController.UpdateSelectionStats(selectedText);
         }
 
-        private async void OnToggleCsvTableClick(object sender, RoutedEventArgs e)
-        {
-            _csvTableModeEnabled = TopToolbar.CsvTableIsChecked;
-
-            foreach (var grp in _tabBridges.Values)
-            {
-                if (grp.Bridge != null)
-                {
-                    await grp.Bridge.SetCsvTableModeAsync(_csvTableModeEnabled);
-                }
-            }
-        }
 
         private void ShowLeftSidebarPage(int index)
         {
@@ -1325,11 +1261,6 @@ namespace TxtAIEditor
             await _shellPaneController.ToggleRightPanelAsync();
         }
 
-        private void ToggleLivePreview()
-        {
-            TopToolbar.LivePreviewIsChecked = !TopToolbar.LivePreviewIsChecked;
-            OnToggleLivePreviewClick(this, new RoutedEventArgs());
-        }
 
         private void TogglePreviewWidth()
         {
@@ -1352,10 +1283,6 @@ namespace TxtAIEditor
             }
         }
 
-        private async void OnToggleThemeClick(object sender, RoutedEventArgs e)
-        {
-            await _settingsController.ToggleThemeAsync();
-        }
 
         private string GetLocalizedString(string key, string fallback)
         {
@@ -1374,15 +1301,6 @@ namespace TxtAIEditor
                    text.Equals("Git: 検出されていません", StringComparison.OrdinalIgnoreCase);
         }
 
-        private async void OnSettingsClick(object sender, RoutedEventArgs e)
-        {
-            await _settingsController.ShowSettingsAsync();
-        }
-
-        private async void OnModelNameClick(object sender, RoutedEventArgs e)
-        {
-            await _settingsController.ShowSettingsAsync("LLM");
-        }
 
         private async Task SyncSnippetsToOpenEditorsAsync()
         {
@@ -1447,19 +1365,11 @@ namespace TxtAIEditor
             }
         }
 
-        private void OnOpenTerminalClick(object sender, RoutedEventArgs e)
-        {
-            ToggleTerminal();
-        }
 
         #endregion
 
         #region Terminal Panel Layout
 
-        private void ToggleTerminal()
-        {
-            _terminalPanelController.Toggle();
-        }
 
         private IReadOnlyList<AgentFileEditPreview> GetAgentSessionEdits()
         {
@@ -1677,11 +1587,11 @@ namespace TxtAIEditor
         {
             if (string.Equals(name, "find", StringComparison.Ordinal))
             {
-                OnFindClick(null!, null!);
+                _toolbarCommandController?.Find();
             }
             else if (string.Equals(name, "f4", StringComparison.Ordinal))
             {
-                ToggleLivePreview();
+                _toolbarCommandController?.ToggleLivePreview();
             }
             else if (string.Equals(name, "f9", StringComparison.Ordinal))
             {
@@ -1689,7 +1599,7 @@ namespace TxtAIEditor
             }
             else if (string.Equals(name, "f10", StringComparison.Ordinal))
             {
-                OnToggleThemeClick(this, new RoutedEventArgs());
+                _toolbarCommandController?.ToggleTheme();
             }
             else if (string.Equals(name, "f11", StringComparison.Ordinal))
             {
@@ -1701,7 +1611,7 @@ namespace TxtAIEditor
             }
             else if (string.Equals(name, "print", StringComparison.Ordinal))
             {
-                OnPrintClick(this, new RoutedEventArgs());
+                _toolbarCommandController?.Print();
             }
             else if (string.Equals(name, "expandRightPanel", StringComparison.Ordinal))
             {
@@ -1709,26 +1619,6 @@ namespace TxtAIEditor
             }
         }
 
-        private async void OnToggleLivePreviewClick(object sender, RoutedEventArgs e)
-        {
-            _livePreviewEnabled = TopToolbar.LivePreviewIsChecked;
-
-            foreach (var tab in _viewModel.Tabs)
-            {
-                tab.InlineLivePreviewEnabled = _livePreviewEnabled;
-                await ApplyInlineLivePreviewAsync(tab);
-            }
-        }
-
-        private async Task ApplyInlineLivePreviewAsync(OpenedTab tab)
-        {
-            if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-            {
-                await bridgeGroup.Bridge.SetInlineLivePreviewAsync(
-                    tab.InlineLivePreviewEnabled,
-                    GetPreviewBaseHref(tab));
-            }
-        }
 
         private async Task<bool> InsertTextIntoActiveEditorAsync(string text)
         {
@@ -2046,28 +1936,6 @@ namespace TxtAIEditor
             }
         }
 
-        private async void OnCompareFilesClick(object sender, RoutedEventArgs e)
-        {
-            bool terminalWasVisible = EditorWorkspace.IsTerminalVisible;
-            if (terminalWasVisible)
-                TerminalPane.SuspendNativeWindows();
-            var selection = await _compareSelectionDialogService.ShowAsync(this, this.Content.XamlRoot, _viewModel.Tabs, GetCurrentElementTheme(), GetLocalizedString);
-            if (terminalWasVisible)
-                TerminalPane.ResumeNativeWindows();
-            if (selection == null)
-            {
-                return;
-            }
-
-            if (selection.IsValid)
-            {
-                await _compareTabController.OpenCompareTabAsync(selection.PathA, selection.PathB, selection.ContentA, selection.ContentB);
-            }
-            else
-            {
-                _dialogController.ShowErrorMessage("비교 오류", "올바른 두 파일 혹은 탭을 선택해 주세요.");
-            }
-        }
 
         private async Task OnTabReloadAsync(OpenedTab tab, TabViewItem tabItem)
         {
@@ -2098,20 +1966,6 @@ namespace TxtAIEditor
             _tabCloseController.CloseLeftTabs(tabItem, tabView);
         }
 
-        private async void OnPrintClick(object sender, RoutedEventArgs e)
-        {
-            if (EditorTabView.SelectedItem is TabViewItem activeTabItem &&
-                activeTabItem.Tag is string tabId &&
-                _editorSessions.TryGetValue(tabId, out var session) &&
-                _tabBridges.TryGetValue(tabId, out var bridgeGroup) &&
-                bridgeGroup.WebView.CoreWebView2 != null)
-            {
-                string fullText = session.GetText();
-                string jsonText = System.Text.Json.JsonSerializer.Serialize(fullText);
-                await bridgeGroup.WebView.CoreWebView2.ExecuteScriptAsync(
-                    $"printDocument({jsonText})");
-            }
-        }
 
         private async Task PerformLineNavigationAsync(string tabId, int targetLine)
         {
