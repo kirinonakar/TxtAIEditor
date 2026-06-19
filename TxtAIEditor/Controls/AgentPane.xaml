@@ -172,48 +172,19 @@
                               FontSize="12"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="0"
-                            Grid.Column="1"
-                            Spacing="4"
-                            VerticalAlignment="Top">
-                    <Button x:Name="AgentAddAttachmentButton"
-                            Width="30"
-                            Height="30"
-                            Padding="0"
-                            Click="OnAddAttachmentClick"
-                            ToolTipService.ToolTip="이미지 또는 파일 추가"
-                            Style="{StaticResource AgentButtonStyle}">
-                        <FontIcon Glyph="&#xE710;" FontSize="14"/>
-                    </Button>
-                    <Button x:Name="AgentSkillButton"
-                            Width="30"
-                            Height="30"
-                            Padding="0"
-                            ToolTipService.ToolTip="스킬"
-                            Style="{StaticResource AgentButtonStyle}">
-                        <FontIcon Glyph="&#xE82D;" FontSize="14"/>
-                        <Button.Flyout>
-                            <Flyout x:Name="AgentSkillFlyout" Opened="OnAgentSkillFlyoutOpened">
-                                <Grid Width="240" RowSpacing="8">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    <TextBlock x:Name="AgentSkillTitleText"
-                                               Grid.Row="0"
-                                               Text="스킬"
-                                               FontWeight="SemiBold"
-                                               FontSize="12"/>
-                                    <MenuFlyoutSeparator Grid.Row="1"/>
-                                    <ScrollViewer Grid.Row="2" MaxHeight="260" VerticalScrollBarVisibility="Auto">
-                                        <StackPanel x:Name="AgentSkillListPanel" Spacing="4"/>
-                                    </ScrollViewer>
-                                </Grid>
-                            </Flyout>
-                        </Button.Flyout>
-                    </Button>
-                </StackPanel>
+                <Button x:Name="AgentAddAttachmentButton"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Width="30"
+                        Height="30"
+                        Padding="0"
+                        VerticalAlignment="Top"
+                        Click="OnAddAttachmentClick"
+                        ToolTipService.ToolTip="이미지 또는 파일 추가"
+                        Style="{StaticResource AgentButtonStyle}">
+                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                </Button>
+
 
                 <ListView x:Name="AgentAttachmentsList"
                           Grid.Row="1"
@@ -470,14 +441,51 @@
                   </Button>
             </Grid>
             <Grid Grid.Row="1" Grid.Column="1"
-                  Width="64"
+                  Width="68"
+                  ColumnSpacing="4"
+                  RowSpacing="4"
                   VerticalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="AgentSkillButton"
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        MinHeight="0"
+                        Padding="0"
+                        Style="{StaticResource AgentButtonStyle}">
+                    <FontIcon Glyph="&#xE82D;" FontSize="14"/>
+                    <Button.Flyout>
+                        <Flyout x:Name="AgentSkillFlyout" Opened="OnAgentSkillFlyoutOpened">
+                            <Grid Width="240" RowSpacing="8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock x:Name="AgentSkillTitleText"
+                                           Grid.Row="0"
+                                           Text="스킬"
+                                           FontWeight="SemiBold"
+                                           FontSize="12"/>
+                                <MenuFlyoutSeparator Grid.Row="1"/>
+                                <ScrollViewer Grid.Row="2" MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="AgentSkillListPanel" Spacing="4"/>
+                                </ScrollViewer>
+                            </Grid>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
                 <Button x:Name="AgentPresetButton"
                         Grid.Row="0"
+                        Grid.Column="1"
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         MinHeight="0"
@@ -540,6 +548,8 @@
                 </Button>
                 <Button x:Name="AgentRunButton"
                         Grid.Row="1"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
                         Content="실행"
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
