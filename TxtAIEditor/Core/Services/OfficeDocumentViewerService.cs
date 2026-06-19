@@ -17,6 +17,7 @@ namespace TxtAIEditor.Core.Services
     {
         private const long DefaultSlideWidthEmu = 9144000;
         private const long DefaultSlideHeightEmu = 5143500;
+        private const double PresentationBaseWidthPx = 960;
 
         public async Task<string> BuildHtmlAsync(string filePath)
         {
@@ -65,23 +66,34 @@ namespace TxtAIEditor.Core.Services
                     GetRelationshipsPath(slidePaths[i]),
                     Path.GetDirectoryName(slidePaths[i])?.Replace('\\', '/') ?? string.Empty).ConfigureAwait(false);
 
+                double baseHeightPx = PresentationBaseWidthPx * slideHeight / Math.Max(1.0, slideWidth);
                 string background = ReadSlideBackground(slide) ?? "#ffffff";
                 slides.Append("<section class=\"slide\" style=\"--slide-ratio:")
                     .Append(FormatInvariant(slideWidth / (double)Math.Max(1, slideHeight)))
+                    .Append(";--base-width:")
+                    .Append(FormatInvariant(PresentationBaseWidthPx))
+                    .Append(";--base-width-px:")
+                    .Append(FormatInvariant(PresentationBaseWidthPx))
+                    .Append("px;--base-height-px:")
+                    .Append(FormatInvariant(baseHeightPx))
+                    .Append("px")
                     .Append(";background:")
                     .Append(Html(background))
                     .Append("\">");
+                slides.Append("<div class=\"slide-canvas\">");
+
                 slides.Append("<div class=\"slide-number\">")
                     .Append(i + 1)
                     .Append(" / ")
                     .Append(slidePaths.Count)
                     .Append("</div>");
 
-                foreach (string elementHtml in ReadSlideElements(archive, slide, relationships, slideWidth, slideHeight))
+                foreach (string elementHtml in ReadSlideElements(archive, slide, relationships, slideWidth, slideHeight, PresentationBaseWidthPx, baseHeightPx))
                 {
                     slides.Append(elementHtml);
                 }
 
+                slides.Append("</div>");
                 slides.Append("</section>");
             }
 
@@ -125,6 +137,13 @@ body { padding: 28px 16px 40px; }
     box-shadow: var(--slide-shadow);
     border: 1px solid rgba(148, 163, 184, .35);
 }
+.slide-canvas {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: var(--base-width-px);
+    height: var(--base-height-px);
+    transform-origin: top left;
+}
 .slide-number {
     position: absolute;
     right: 12px;
@@ -149,9 +168,10 @@ body { padding: 28px 16px 40px; }
     color: #111827;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    padding: .45em .55em;
+    padding: 4px 6px;
+    line-height: 1.16;
 }
-.ppt-shape p { margin: 0 0 .25em; }
+.ppt-shape p { margin: 0 0 .24em; line-height: inherit; }
 .ppt-shape p:last-child { margin-bottom: 0; }
 .ppt-image img {
     width: 100%;
@@ -180,6 +200,21 @@ body { padding: 28px 16px 40px; }
 <main class="deck">
 {{slides}}
 </main>
+<script>
+function fitSlide(slide) {
+    const canvas = slide.querySelector('.slide-canvas');
+    if (!canvas) return;
+    const baseWidth = parseFloat(getComputedStyle(slide).getPropertyValue('--base-width')) || 960;
+    canvas.style.transform = `scale(${slide.clientWidth / baseWidth})`;
+}
+const observer = new ResizeObserver(entries => {
+    for (const entry of entries) fitSlide(entry.target);
+});
+document.querySelectorAll('.slide').forEach(slide => {
+    fitSlide(slide);
+    observer.observe(slide);
+});
+</script>
 </body>
 </html>
 """;
@@ -259,7 +294,7 @@ select {
     font: 14px/1.2 "Segoe UI", Arial, sans-serif;
 }
 .meta { color: var(--muted); font-size: 13px; white-space: nowrap; }
-.table-wrap { flex: 1; overflow: auto; padding: 14px; }
+.table-wrap { flex: 1; overflow: auto; padding: 0; }
 table {
     border-collapse: separate;
     border-spacing: 0;
@@ -440,66 +475,77 @@ renderSheet(0);
             XDocument slide,
             IReadOnlyDictionary<string, string> relationships,
             long slideWidth,
-            long slideHeight)
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx)
         {
-            foreach (XElement picture in slide.Descendants().Where(e => e.Name.LocalName == "pic"))
+            XElement? shapeTree = slide.Descendants().FirstOrDefault(e => e.Name.LocalName == "spTree");
+            IEnumerable<XElement> elements = shapeTree?.Elements() ?? slide.Root?.Elements() ?? Enumerable.Empty<XElement>();
+
+            foreach (XElement element in elements)
             {
-                if (!TryReadBounds(picture, slideWidth, slideHeight, out string bounds))
+                if (element.Name.LocalName == "pic")
                 {
+                    if (!TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, out string bounds))
+                    {
+                        continue;
+                    }
+
+                    string? relationshipId = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "blip")
+                        ?.Attributes().FirstOrDefault(a => a.Name.LocalName == "embed")?.Value;
+                    if (string.IsNullOrWhiteSpace(relationshipId) ||
+                        !relationships.TryGetValue(relationshipId, out string? imagePath))
+                    {
+                        continue;
+                    }
+
+                    string? dataUri = TryReadImageDataUri(archive, imagePath);
+                    if (string.IsNullOrEmpty(dataUri))
+                    {
+                        continue;
+                    }
+
+                    yield return "<div class=\"ppt-image\" style=\"" + bounds + "\"><img src=\"" + Html(dataUri) + "\"></div>";
                     continue;
                 }
 
-                string? relationshipId = picture.Descendants().FirstOrDefault(e => e.Name.LocalName == "blip")
-                    ?.Attributes().FirstOrDefault(a => a.Name.LocalName == "embed")?.Value;
-                if (string.IsNullOrWhiteSpace(relationshipId) ||
-                    !relationships.TryGetValue(relationshipId, out string? imagePath))
+                if (element.Name.LocalName == "graphicFrame" && element.Descendants().Any(d => d.Name.LocalName == "tbl"))
                 {
+                    if (!TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, out string bounds))
+                    {
+                        continue;
+                    }
+
+                    XElement? table = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "tbl");
+                    if (table == null)
+                    {
+                        continue;
+                    }
+
+                    string tableHtml = BuildTableHtml(table);
+                    if (!string.IsNullOrWhiteSpace(tableHtml))
+                    {
+                        yield return "<div class=\"ppt-table\" style=\"" + bounds + "\">" + tableHtml + "</div>";
+                    }
+
                     continue;
                 }
 
-                string? dataUri = TryReadImageDataUri(archive, imagePath);
-                if (string.IsNullOrEmpty(dataUri))
+                if (element.Name.LocalName == "sp" && element.Descendants().Any(d => d.Name.LocalName == "txBody"))
                 {
-                    continue;
+                    string textHtml = BuildShapeTextHtml(element);
+                    if (string.IsNullOrWhiteSpace(textHtml))
+                    {
+                        continue;
+                    }
+
+                    string bounds = TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, out string readBounds)
+                        ? readBounds
+                        : "left:48px;top:27px;width:864px;height:auto;";
+                    string fill = ReadSolidFill(element.Elements().FirstOrDefault(e => e.Name.LocalName == "spPr"));
+                    string textStyle = ReadTextStyle(element, slideWidth, baseWidthPx);
+                    yield return "<div class=\"ppt-shape\" style=\"" + bounds + fill + textStyle + "\">" + textHtml + "</div>";
                 }
-
-                yield return "<div class=\"ppt-image\" style=\"" + bounds + "\"><img src=\"" + Html(dataUri) + "\"></div>";
-            }
-
-            foreach (XElement tableFrame in slide.Descendants().Where(e => e.Name.LocalName == "graphicFrame" && e.Descendants().Any(d => d.Name.LocalName == "tbl")))
-            {
-                if (!TryReadBounds(tableFrame, slideWidth, slideHeight, out string bounds))
-                {
-                    continue;
-                }
-
-                XElement? table = tableFrame.Descendants().FirstOrDefault(e => e.Name.LocalName == "tbl");
-                if (table == null)
-                {
-                    continue;
-                }
-
-                string tableHtml = BuildTableHtml(table);
-                if (!string.IsNullOrWhiteSpace(tableHtml))
-                {
-                    yield return "<div class=\"ppt-table\" style=\"" + bounds + "\">" + tableHtml + "</div>";
-                }
-            }
-
-            foreach (XElement shape in slide.Descendants().Where(e => e.Name.LocalName == "sp" && e.Descendants().Any(d => d.Name.LocalName == "txBody")))
-            {
-                string textHtml = BuildShapeTextHtml(shape);
-                if (string.IsNullOrWhiteSpace(textHtml))
-                {
-                    continue;
-                }
-
-                string bounds = TryReadBounds(shape, slideWidth, slideHeight, out string readBounds)
-                    ? readBounds
-                    : "left:5%;top:5%;width:90%;height:auto;";
-                string fill = ReadSolidFill(shape.Elements().FirstOrDefault(e => e.Name.LocalName == "spPr"));
-                string textStyle = ReadTextStyle(shape);
-                yield return "<div class=\"ppt-shape\" style=\"" + bounds + fill + textStyle + "\">" + textHtml + "</div>";
             }
         }
 
@@ -576,21 +622,24 @@ renderSheet(0);
             return builder.ToString();
         }
 
-        private static string ReadTextStyle(XElement shape)
+        private static string ReadTextStyle(XElement shape, long slideWidth, double baseWidthPx)
         {
             XElement? runProperties = shape.Descendants().FirstOrDefault(e => e.Name.LocalName == "rPr");
             var style = new StringBuilder();
+            double pixelsPerInch = baseWidthPx / (slideWidth / 914400.0);
             if (runProperties?.Attribute("sz")?.Value is string sizeValue &&
                 int.TryParse(sizeValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int size) &&
                 size > 0)
             {
-                style.Append("font-size:clamp(9px,")
-                    .Append(FormatInvariant(size / 100.0 * 1.333))
-                    .Append("px,96px);");
+                style.Append("font-size:")
+                    .Append(FormatInvariant(size / 100.0 / 72.0 * pixelsPerInch))
+                    .Append("px;");
             }
             else
             {
-                style.Append("font-size:clamp(11px,1.8vw,28px);");
+                style.Append("font-size:")
+                    .Append(FormatInvariant(18.0 / 72.0 * pixelsPerInch))
+                    .Append("px;");
             }
 
             if (string.Equals(runProperties?.Attribute("b")?.Value, "1", StringComparison.Ordinal))
@@ -647,7 +696,13 @@ renderSheet(0);
             return null;
         }
 
-        private static bool TryReadBounds(XElement element, long slideWidth, long slideHeight, out string bounds)
+        private static bool TryReadBounds(
+            XElement element,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            out string bounds)
         {
             bounds = string.Empty;
             XElement? xfrm = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "xfrm");
@@ -664,10 +719,10 @@ renderSheet(0);
                 return false;
             }
 
-            bounds = "left:" + Percent(x, slideWidth) +
-                ";top:" + Percent(y, slideHeight) +
-                ";width:" + Percent(cx, slideWidth) +
-                ";height:" + Percent(cy, slideHeight) + ";";
+            bounds = "left:" + Pixels(x, slideWidth, baseWidthPx) +
+                ";top:" + Pixels(y, slideHeight, baseHeightPx) +
+                ";width:" + Pixels(cx, slideWidth, baseWidthPx) +
+                ";height:" + Pixels(cy, slideHeight, baseHeightPx) + ";";
             return true;
         }
 
@@ -677,9 +732,9 @@ renderSheet(0);
             return long.TryParse(element.Attribute(attributeName)?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
         }
 
-        private static string Percent(long value, long total)
+        private static string Pixels(long value, long total, double baseSizePx)
         {
-            return FormatInvariant(value / (double)Math.Max(1, total) * 100) + "%";
+            return FormatInvariant(value / (double)Math.Max(1, total) * baseSizePx) + "px";
         }
 
         private static string? TryReadImageDataUri(ZipArchive archive, string imagePath)
