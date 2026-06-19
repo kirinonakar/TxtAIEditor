@@ -2129,6 +2129,24 @@
   <data name="AgentPresetDuplicateMessage" xml:space="preserve">
     <value>同じ名前のプリセットが既に存在します。上書きしますか?</value>
   </data>
+  <data name="AgentSkillButtonTooltip" xml:space="preserve">
+    <value>スキル</value>
+  </data>
+  <data name="AgentSkillTitle" xml:space="preserve">
+    <value>スキル</value>
+  </data>
+  <data name="AgentSkillEmptyText" xml:space="preserve">
+    <value>インストール済みスキルなし</value>
+  </data>
+  <data name="AgentSkillRemoveTooltip" xml:space="preserve">
+    <value>スキルの選択を解除</value>
+  </data>
+  <data name="AgentSkillChipPrefix" xml:space="preserve">
+    <value>Skill: </value>
+  </data>
+  <data name="AgentSkillDisplayLabelFormat" xml:space="preserve">
+    <value>Skill: {0}</value>
+  </data>
   <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
     <value>Markdownを挿入</value>
   </data>

@@ -45,6 +45,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentPresetController _presetController;
+        private readonly AgentSkillController _skillController;
         private readonly AgentHistoryController _historyController;
         private readonly AgentSessionEditController _sessionEditController;
         private readonly AgentWorkspaceContextBuilder _workspaceContextBuilder;
@@ -148,6 +149,10 @@ namespace TxtAIEditor.Controls
                 () => UpdateContextStatsImmediate(),
                 _beforeDialog,
                 _afterDialog);
+            _skillController = new AgentSkillController(
+                _agentPane,
+                _getString,
+                () => UpdateContextStatsImmediate());
             _historyController = new AgentHistoryController(_agentPane);
             _sessionEditController = new AgentSessionEditController(
                 _agentPane,
@@ -260,6 +265,7 @@ namespace TxtAIEditor.Controls
         private async Task LoadStartupDataAsync()
         {
             await _presetController.LoadAsync();
+            await _skillController.LoadAsync();
             await _historyController.LoadAsync(_currentSessionId);
         }
 
@@ -325,6 +331,9 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentPresetRemoved += (_, presetName) => _presetController.RemoveSelectedPreset(presetName);
             _agentPane.AgentPresetExportRequested += async (_, _) => await _presetController.ExportPresetsAsync();
             _agentPane.AgentPresetImportRequested += async (_, _) => await _presetController.ImportPresetsAsync();
+            _agentPane.AgentSkillFlyoutOpened += async (_, _) => await _skillController.LoadAsync();
+            _agentPane.AgentSkillToggled += (_, skillName) => _skillController.ToggleSkill(skillName);
+            _agentPane.AgentSkillRemoved += (_, skillName) => _skillController.RemoveSelectedSkill(skillName);
             
             _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
             _agentPane.PlanningModeCheckBox.Checked += (_, _) => UpdateContextStats();
@@ -1259,12 +1268,63 @@ namespace TxtAIEditor.Controls
 
         private string BuildInstructionDisplay(string userInstruction)
         {
-            return _presetController.BuildInstructionDisplay(userInstruction);
+            var labels = new List<string>();
+            string presetLabel = _presetController.GetSelectedPresetLabel();
+            if (!string.IsNullOrEmpty(presetLabel))
+            {
+                labels.Add(presetLabel);
+            }
+
+            string skillLabel = _skillController.GetSelectedSkillLabel();
+            if (!string.IsNullOrEmpty(skillLabel))
+            {
+                labels.Add(string.Format(_getString("AgentSkillDisplayLabelFormat", "Skill: {0}"), skillLabel));
+            }
+
+            if (labels.Count == 0)
+            {
+                return userInstruction;
+            }
+
+            string prefix = $"[{string.Join(" · ", labels)}]";
+            if (string.IsNullOrWhiteSpace(userInstruction))
+            {
+                return prefix;
+            }
+
+            return $"{prefix} {userInstruction}";
         }
 
         private string BuildAgentInstruction(string userInstruction)
         {
-            return _presetController.BuildAgentInstruction(userInstruction);
+            string presetSection = _presetController.BuildSelectedPresetSection();
+            string skillSection = _skillController.BuildSelectedSkillSection();
+            if (string.IsNullOrWhiteSpace(presetSection) &&
+                string.IsNullOrWhiteSpace(skillSection))
+            {
+                return userInstruction;
+            }
+
+            var builder = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(presetSection))
+            {
+                builder.AppendLine(presetSection);
+                builder.AppendLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(skillSection))
+            {
+                builder.AppendLine(skillSection);
+                builder.AppendLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(userInstruction))
+            {
+                builder.AppendLine("[User request]");
+                builder.Append(userInstruction);
+            }
+
+            return builder.ToString().Trim();
         }
 
         private string BuildSessionHistoryForPrompt(

@@ -172,18 +172,48 @@
                               FontSize="12"/>
                 </StackPanel>
 
-                <Button x:Name="AgentAddAttachmentButton"
-                        Grid.Row="0"
-                        Grid.Column="1"
-                        Width="30"
-                        Height="30"
-                        Padding="0"
-                        VerticalAlignment="Top"
-                        Click="OnAddAttachmentClick"
-                        ToolTipService.ToolTip="이미지 또는 파일 추가"
-                        Style="{StaticResource AgentButtonStyle}">
-                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
-                </Button>
+                <StackPanel Grid.Row="0"
+                            Grid.Column="1"
+                            Spacing="4"
+                            VerticalAlignment="Top">
+                    <Button x:Name="AgentAddAttachmentButton"
+                            Width="30"
+                            Height="30"
+                            Padding="0"
+                            Click="OnAddAttachmentClick"
+                            ToolTipService.ToolTip="이미지 또는 파일 추가"
+                            Style="{StaticResource AgentButtonStyle}">
+                        <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                    </Button>
+                    <Button x:Name="AgentSkillButton"
+                            Width="30"
+                            Height="30"
+                            Padding="0"
+                            ToolTipService.ToolTip="스킬"
+                            Style="{StaticResource AgentButtonStyle}">
+                        <FontIcon Glyph="&#xE82D;" FontSize="14"/>
+                        <Button.Flyout>
+                            <Flyout x:Name="AgentSkillFlyout" Opened="OnAgentSkillFlyoutOpened">
+                                <Grid Width="240" RowSpacing="8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock x:Name="AgentSkillTitleText"
+                                               Grid.Row="0"
+                                               Text="스킬"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"/>
+                                    <MenuFlyoutSeparator Grid.Row="1"/>
+                                    <ScrollViewer Grid.Row="2" MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                                        <StackPanel x:Name="AgentSkillListPanel" Spacing="4"/>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
 
                 <ListView x:Name="AgentAttachmentsList"
                           Grid.Row="1"

@@ -2128,6 +2128,24 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentPresetDuplicateMessage" xml:space="preserve">
     <value>A preset with this name already exists. Do you want to overwrite it?</value>
   </data>
+  <data name="AgentSkillButtonTooltip" xml:space="preserve">
+    <value>Skills</value>
+  </data>
+  <data name="AgentSkillTitle" xml:space="preserve">
+    <value>Skills</value>
+  </data>
+  <data name="AgentSkillEmptyText" xml:space="preserve">
+    <value>No installed skills</value>
+  </data>
+  <data name="AgentSkillRemoveTooltip" xml:space="preserve">
+    <value>Deselect skill</value>
+  </data>
+  <data name="AgentSkillChipPrefix" xml:space="preserve">
+    <value>Skill: </value>
+  </data>
+  <data name="AgentSkillDisplayLabelFormat" xml:space="preserve">
+    <value>Skill: {0}</value>
+  </data>
   <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
     <value>Insert Markdown</value>
   </data>

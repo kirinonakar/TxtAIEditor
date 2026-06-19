@@ -95,10 +95,31 @@ namespace TxtAIEditor.Controls
 
         public string BuildAgentInstruction(string userInstruction)
         {
+            string presetSection = BuildSelectedPresetSection();
+            if (string.IsNullOrWhiteSpace(presetSection))
+            {
+                return userInstruction;
+            }
+
+            var builder = new StringBuilder();
+            builder.AppendLine(presetSection);
+
+            if (!string.IsNullOrWhiteSpace(userInstruction))
+            {
+                builder.AppendLine();
+                builder.AppendLine("[User request]");
+                builder.Append(userInstruction);
+            }
+
+            return builder.ToString().Trim();
+        }
+
+        public string BuildSelectedPresetSection()
+        {
             var selectedPresets = GetSelectedPresets();
             if (selectedPresets.Count == 0)
             {
-                return userInstruction;
+                return string.Empty;
             }
 
             var builder = new StringBuilder();
@@ -108,12 +129,6 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine($"## {preset.Name}");
                 builder.AppendLine(preset.Content);
                 builder.AppendLine();
-            }
-
-            if (!string.IsNullOrWhiteSpace(userInstruction))
-            {
-                builder.AppendLine("[User request]");
-                builder.Append(userInstruction);
             }
 
             return builder.ToString().Trim();

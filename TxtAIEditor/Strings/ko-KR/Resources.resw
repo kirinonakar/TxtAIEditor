@@ -2128,6 +2128,24 @@
   <data name="AgentPresetDuplicateMessage" xml:space="preserve">
     <value>이미 동일한 이름의 프리셋이 존재합니다. 덮어쓰시겠습니까?</value>
   </data>
+  <data name="AgentSkillButtonTooltip" xml:space="preserve">
+    <value>스킬</value>
+  </data>
+  <data name="AgentSkillTitle" xml:space="preserve">
+    <value>스킬</value>
+  </data>
+  <data name="AgentSkillEmptyText" xml:space="preserve">
+    <value>설치된 스킬 없음</value>
+  </data>
+  <data name="AgentSkillRemoveTooltip" xml:space="preserve">
+    <value>스킬 선택 해제</value>
+  </data>
+  <data name="AgentSkillChipPrefix" xml:space="preserve">
+    <value>Skill: </value>
+  </data>
+  <data name="AgentSkillDisplayLabelFormat" xml:space="preserve">
+    <value>Skill: {0}</value>
+  </data>
   <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
     <value>마크다운 삽입</value>
   </data>

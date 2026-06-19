@@ -39,6 +39,12 @@ namespace TxtAIEditor.Controls
         public string TimeText { get; set; } = string.Empty;
     }
 
+    public sealed class AgentSkillItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+
     public sealed partial class AgentPane : UserControl
     {
         private int _outputLength;
@@ -56,6 +62,8 @@ namespace TxtAIEditor.Controls
         private bool _hasExplicitOutputSelection;
         private List<string> _agentPresetNames = new List<string>();
         private HashSet<string> _selectedAgentPresetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private List<AgentSkillItem> _agentSkillItems = new List<AgentSkillItem>();
+        private HashSet<string> _selectedAgentSkillNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Func<string, string, string>? _getString;
 
         public string RawOutputText => GetRawOutputText();
@@ -107,6 +115,9 @@ namespace TxtAIEditor.Controls
         public event EventHandler<string>? AgentPresetRemoved;
         public event RoutedEventHandler? AgentPresetExportRequested;
         public event RoutedEventHandler? AgentPresetImportRequested;
+        public event EventHandler? AgentSkillFlyoutOpened;
+        public event EventHandler<string>? AgentSkillToggled;
+        public event EventHandler<string>? AgentSkillRemoved;
         public event RoutedEventHandler? DiffApproved;
         public event RoutedEventHandler? DiffCancelled;
         public event EventHandler<AgentFileEditPreview>? FileRevertRequested;
@@ -191,6 +202,8 @@ namespace TxtAIEditor.Controls
             AgentStreamToTabCheckBox.Content = getString("AgentStreamToTab", "탭에 스트리밍");
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
+            ToolTipService.SetToolTip(AgentSkillButton, getString("AgentSkillButtonTooltip", "스킬"));
+            AgentSkillTitleText.Text = getString("AgentSkillTitle", "스킬");
             ToolTipService.SetToolTip(AgentPresetButton, getString("AgentPresetButtonTooltip", "페르소나/지침 프리셋"));
             AgentAddPresetText.Text = getString("AgentPresetAddText", "프리셋 추가");
             AgentExportPresetText.Text = getString("PresetExportText", "내보내기");
@@ -219,6 +232,7 @@ namespace TxtAIEditor.Controls
             AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (클릭 시 비교)");
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
             ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
+            RebuildAgentSkillMenu();
             RebuildAgentPresetMenu();
             RebuildSelectedAgentPresetChips();
         }
@@ -240,6 +254,7 @@ namespace TxtAIEditor.Controls
             AgentPlanningModeCheckBox.IsEnabled = !isBusy;
             AgentStreamToTabCheckBox.IsEnabled = !isBusy;
             AgentAddAttachmentButton.IsEnabled = !isBusy;
+            AgentSkillButton.IsEnabled = !isBusy;
             AgentAttachmentsList.IsEnabled = !isBusy;
             AgentPresetButton.IsEnabled = !isBusy;
             AgentSelectedPresetScrollViewer.IsHitTestVisible = !isBusy;
@@ -873,6 +888,12 @@ namespace TxtAIEditor.Controls
             RebuildAgentPresetMenu();
         }
 
+        private void OnAgentSkillFlyoutOpened(object sender, object e)
+        {
+            AgentSkillFlyoutOpened?.Invoke(this, EventArgs.Empty);
+            RebuildAgentSkillMenu();
+        }
+
         private void OnRemoveAttachmentClick(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is AgentAttachmentItem item)
@@ -1258,6 +1279,60 @@ namespace TxtAIEditor.Controls
             RebuildSelectedAgentPresetChips();
         }
 
+        public void UpdateAgentSkillsMenu(
+            IReadOnlyList<AgentSkillItem> skills,
+            IReadOnlyCollection<string> selectedSkillNames,
+            Func<string, string, string> getString)
+        {
+            _getString = getString;
+            _agentSkillItems = new List<AgentSkillItem>(skills);
+            _selectedAgentSkillNames = new HashSet<string>(selectedSkillNames, StringComparer.OrdinalIgnoreCase);
+            RebuildAgentSkillMenu();
+            RebuildSelectedAgentPresetChips();
+        }
+
+        private void RebuildAgentSkillMenu()
+        {
+            if (AgentSkillListPanel == null)
+            {
+                return;
+            }
+
+            AgentSkillListPanel.Children.Clear();
+            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
+            Func<string, string, string> getString = _getString ?? _displayText.GetString;
+
+            if (_agentSkillItems.Count == 0)
+            {
+                AgentSkillListPanel.Children.Add(new TextBlock
+                {
+                    Text = getString("AgentSkillEmptyText", "설치된 스킬 없음"),
+                    FontSize = 11,
+                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
+                    Margin = new Thickness(4, 2, 4, 2)
+                });
+                return;
+            }
+
+            foreach (var skill in _agentSkillItems)
+            {
+                bool isSelected = _selectedAgentSkillNames.Contains(skill.Name);
+                var selectBtn = new Button
+                {
+                    Content = isSelected ? $"✓ {skill.Name}" : skill.Name,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    Height = 28,
+                    FontSize = 11,
+                    Padding = new Thickness(8, 0, 8, 0),
+                    Style = buttonStyle
+                };
+                string currentName = skill.Name;
+                selectBtn.Click += (_, _) => AgentSkillToggled?.Invoke(this, currentName);
+                AgentSkillListPanel.Children.Add(selectBtn);
+            }
+        }
+
         private void RebuildAgentPresetMenu()
         {
             if (AgentPresetListPanel == null)
@@ -1346,7 +1421,6 @@ namespace TxtAIEditor.Controls
             }
 
             AgentSelectedPresetPanel.Children.Clear();
-            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
             Func<string, string, string> getString = _getString ?? _displayText.GetString;
 
             foreach (string presetName in _agentPresetNames)
@@ -1356,50 +1430,73 @@ namespace TxtAIEditor.Controls
                     continue;
                 }
 
-                var chip = new Border
-                {
-                    Background = (Brush)Application.Current.Resources["SystemControlBackgroundAltMediumLowBrush"],
-                    BorderBrush = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(4),
-                    Padding = new Thickness(6, 2, 2, 2)
-                };
+                AgentSelectedPresetPanel.Children.Add(CreateSelectedChip(
+                    presetName,
+                    getString("AgentPresetRemoveTooltip", "선택 해제"),
+                    () => AgentPresetRemoved?.Invoke(this, presetName)));
+            }
 
-                var chipContent = new StackPanel
+            string skillPrefix = getString("AgentSkillChipPrefix", "Skill: ");
+            foreach (var skill in _agentSkillItems)
+            {
+                if (!_selectedAgentSkillNames.Contains(skill.Name))
                 {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 4,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                chipContent.Children.Add(new TextBlock
-                {
-                    Text = presetName,
-                    FontSize = 11,
-                    MaxWidth = 120,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
+                    continue;
+                }
 
-                var removeBtn = new Button
-                {
-                    Content = "x",
-                    Tag = presetName,
-                    Width = 20,
-                    Height = 20,
-                    Padding = new Thickness(0),
-                    FontSize = 10,
-                    Style = buttonStyle
-                };
-                ToolTipService.SetToolTip(removeBtn, getString("AgentPresetRemoveTooltip", "선택 해제"));
-                removeBtn.Click += (_, _) => AgentPresetRemoved?.Invoke(this, presetName);
-                chipContent.Children.Add(removeBtn);
-
-                chip.Child = chipContent;
-                AgentSelectedPresetPanel.Children.Add(chip);
+                string currentName = skill.Name;
+                AgentSelectedPresetPanel.Children.Add(CreateSelectedChip(
+                    skillPrefix + skill.Name,
+                    getString("AgentSkillRemoveTooltip", "스킬 선택 해제"),
+                    () => AgentSkillRemoved?.Invoke(this, currentName)));
             }
 
             AgentSelectedPresetScrollViewer.Visibility =
                 AgentSelectedPresetPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private Border CreateSelectedChip(string text, string tooltip, Action removeAction)
+        {
+            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
+            var chip = new Border
+            {
+                Background = (Brush)Application.Current.Resources["SystemControlBackgroundAltMediumLowBrush"],
+                BorderBrush = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 2, 2)
+            };
+
+            var chipContent = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 4,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            chipContent.Children.Add(new TextBlock
+            {
+                Text = text,
+                FontSize = 11,
+                MaxWidth = 140,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            var removeBtn = new Button
+            {
+                Content = "x",
+                Width = 20,
+                Height = 20,
+                Padding = new Thickness(0),
+                FontSize = 10,
+                Style = buttonStyle
+            };
+            ToolTipService.SetToolTip(removeBtn, tooltip);
+            removeBtn.Click += (_, _) => removeAction();
+            chipContent.Children.Add(removeBtn);
+
+            chip.Child = chipContent;
+            return chip;
         }
 
         public void ShowDiffConfirm(string header, string description)
