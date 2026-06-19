@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
@@ -528,7 +529,7 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath))
                 return Array.Empty<string>();
 
-            string output = await RunGitCommandAsync(repoPath, "branch --all --no-color");
+            string output = await RunGitCommandAsync(repoPath, "branch --no-color");
             if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
             {
                 string currentBranch = await RunGitCommandAsync(repoPath, "symbolic-ref --quiet --short HEAD");
@@ -545,7 +546,15 @@ namespace TxtAIEditor.Core.Services
                 return new[] { $"* {currentBranch.Trim()}" };
             }
 
-            return output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            return output
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(branch =>
+                {
+                    string normalized = branch.TrimStart('*', ' ').Trim();
+                    return !normalized.StartsWith("remotes/", StringComparison.OrdinalIgnoreCase) &&
+                           !normalized.StartsWith("origin/", StringComparison.OrdinalIgnoreCase);
+                })
+                .ToArray();
         }
 
         public async Task<IReadOnlyList<(string Status, string Path)>> GetCommitChangedFilesAsync(string repoPath, string commitHash)
