@@ -27,6 +27,7 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowSettingsController _settingsController;
         private readonly StickyNoteModeController _stickyNoteModeController;
         private readonly PdfViewerController _pdfViewerController;
+        private readonly OfficeDocumentViewerController _officeDocumentViewerController;
         private readonly ShellPaneController _shellPaneController;
         private readonly CompareSelectionDialogService _compareSelectionDialogService;
         private readonly CompareTabController _compareTabController;
@@ -55,6 +56,7 @@ namespace TxtAIEditor.Controls
             MainWindowSettingsController settingsController,
             StickyNoteModeController stickyNoteModeController,
             PdfViewerController pdfViewerController,
+            OfficeDocumentViewerController officeDocumentViewerController,
             ShellPaneController shellPaneController,
             CompareSelectionDialogService compareSelectionDialogService,
             CompareTabController compareTabController,
@@ -82,6 +84,7 @@ namespace TxtAIEditor.Controls
             _settingsController = settingsController;
             _stickyNoteModeController = stickyNoteModeController;
             _pdfViewerController = pdfViewerController;
+            _officeDocumentViewerController = officeDocumentViewerController;
             _shellPaneController = shellPaneController;
             _compareSelectionDialogService = compareSelectionDialogService;
             _compareTabController = compareTabController;
@@ -203,6 +206,11 @@ namespace TxtAIEditor.Controls
         private async Task FindAsync()
         {
             if (await _pdfViewerController.FocusFindInActiveViewerAsync())
+            {
+                return;
+            }
+
+            if (await _officeDocumentViewerController.FocusFindInActiveViewerAsync())
             {
                 return;
             }

@@ -150,7 +150,9 @@ namespace TxtAIEditor
                 ".txt" => "\uE8A5", // Document icon
                 ".md" => "\uE8A5",
                 ".markdown" => "\uE8A5",
-                ".csv" => "\uE8A5",
+                ".csv" => "\uE9D2",
+                ".xlsx" => "\uE9D2",
+                ".pptx" => "\uE161",
                 ".html" => "\uE743", // Web icon
                 ".htm" => "\uE743",
                 ".css" => "\uE743",

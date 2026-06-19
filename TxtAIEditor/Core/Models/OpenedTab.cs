@@ -117,7 +117,8 @@ namespace TxtAIEditor.Core.Models
         public bool IsImageViewer { get; set; } = false;
         public bool IsPdfViewer { get; set; } = false;
         public bool IsDocxViewer { get; set; } = false;
-        public bool IsReadOnlyViewer => IsImageViewer || IsPdfViewer || IsDocxViewer;
+        public bool IsOfficeDocumentViewer { get; set; } = false;
+        public bool IsReadOnlyViewer => IsImageViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer;
         public string? EncryptionPassword { get; set; }
 
         private bool _isEncrypted = false;

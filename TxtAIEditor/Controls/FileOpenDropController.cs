@@ -67,6 +67,8 @@ namespace TxtAIEditor.Controls
             ".webp",
             ".pdf",
             ".docx",
+            ".pptx",
+            ".xlsx",
             ".hwpx"
         };
 

@@ -189,6 +189,49 @@ namespace TxtAIEditor.Controls
             return new PdfViewerTabParts(tabItem, pdfWebView);
         }
 
+        public PdfViewerTabParts CreateOfficeDocumentViewer(
+            OpenedTab tab,
+            Windows.UI.Color editorBackgroundColor,
+            string? uiFontFamily,
+            string encryptedTooltip,
+            Action<OpenedTab, FrameworkElement, RightTappedRoutedEventArgs> showEncryptionMenu,
+            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu,
+            string? workspaceFolderPath = null)
+        {
+            var officeWebView = new WebView2
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                DefaultBackgroundColor = editorBackgroundColor,
+                UseSystemFocusVisuals = false
+            };
+
+            var officeHost = new Grid
+            {
+                Background = new SolidColorBrush(editorBackgroundColor)
+            };
+            officeHost.Children.Add(officeWebView);
+
+            var tabHeader = new TabHeaderControl();
+            tabHeader.Configure(tab, encryptedTooltip, workspaceFolderPath);
+            tabHeader.EncryptionMenuRequested += (_, args) =>
+                showEncryptionMenu(args.Tab, args.Target, args.RoutedArgs);
+
+            var tabItem = new TabViewItem
+            {
+                Content = officeHost,
+                Tag = tab.Id,
+                Header = tabHeader,
+                ContentTransitions = new TransitionCollection(),
+                Transitions = new TransitionCollection(),
+                Opacity = 1
+            };
+            tabItem.RightTapped += (_, args) => showTabContextMenu(tabItem, args);
+            ApplyUiFont(tabItem, uiFontFamily);
+
+            return new PdfViewerTabParts(tabItem, officeWebView);
+        }
+
         private static void ApplyUiFont(TabViewItem tabItem, string? uiFontFamily)
         {
             try

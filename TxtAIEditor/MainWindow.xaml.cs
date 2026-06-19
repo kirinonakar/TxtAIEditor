@@ -68,6 +68,7 @@ namespace TxtAIEditor
         private readonly CompareTabController _compareTabController;
         private readonly LivePreviewController _livePreviewController;
         private readonly PdfViewerController _pdfViewerController;
+        private readonly OfficeDocumentViewerController _officeDocumentViewerController;
         private readonly TabSelectionController _tabSelectionController;
         private readonly EditorSplitLayoutController _editorSplitLayoutController;
         private readonly EditorBridgeShortcutController _editorBridgeShortcutController;
@@ -308,6 +309,9 @@ namespace TxtAIEditor
                 _settingsService,
                 _tabNavigationController.GetActiveTab,
                 UpdateRightPanelSelectionContext);
+            _officeDocumentViewerController = new OfficeDocumentViewerController(
+                _settingsService,
+                _tabNavigationController.GetActiveTab);
             _editorLinkNavigationController = new EditorLinkNavigationController(
                 _tabNavigationController.GetActiveTab,
                 NavigateExplorerToFolderAndRevealAsync);
@@ -442,6 +446,7 @@ namespace TxtAIEditor
                     request.EncryptionPassword),
                 OpenImageTab,
                 OpenPdfTab,
+                OpenOfficeDocumentTab,
                 QueueGitStatusRefresh,
                 _dialogController.ShowErrorMessage);
             _explorerNavigationController = new ExplorerNavigationController(
@@ -577,7 +582,7 @@ namespace TxtAIEditor
                 () => _toolbarCommandController?.OpenFile(),
                 () => _toolbarCommandController?.Find(),
                 () => _toolbarCommandController?.Print(),
-                () => _pdfViewerController.IsActiveViewer(),
+                () => _pdfViewerController.IsActiveViewer() || _officeDocumentViewerController.IsActiveViewer(),
                 _stickyNoteModeController.ToggleTopMostFromShortcut,
                 () => _toolbarCommandController?.ToggleTheme(),
                 _stickyNoteModeController.ToggleMode,
@@ -842,6 +847,7 @@ namespace TxtAIEditor
                 _statusBarController,
                 _tabEncryptionController,
                 _pdfViewerController,
+                _officeDocumentViewerController,
                 _editorWebViewInitializationController,
                 _editorBridgeShortcutController,
                 _editorBridgeDocumentController,
@@ -917,6 +923,7 @@ namespace TxtAIEditor
                 RightSplitter,
                 _tabBridges,
                 _pdfViewerController,
+                _officeDocumentViewerController,
                 _statusBarController,
                 _livePreviewController,
                 _llmAssistantController,
@@ -997,6 +1004,7 @@ namespace TxtAIEditor
                 _settingsController,
                 _stickyNoteModeController,
                 _pdfViewerController,
+                _officeDocumentViewerController,
                 _shellPaneController,
                 _compareSelectionDialogService,
                 _compareTabController,
@@ -1139,6 +1147,11 @@ namespace TxtAIEditor
         private OpenedTab OpenPdfTab(string filePath)
         {
             return _editorTabOpenController.OpenPdfTab(filePath);
+        }
+
+        private OpenedTab OpenOfficeDocumentTab(string filePath)
+        {
+            return _editorTabOpenController.OpenOfficeDocumentTab(filePath);
         }
 
         private OpenedTab OpenImageTab(string filePath)
@@ -1428,6 +1441,7 @@ namespace TxtAIEditor
         private void CloseReadOnlyViewer(string tabId)
         {
             _pdfViewerController.Close(tabId);
+            _officeDocumentViewerController.Close(tabId);
         }
 
         #endregion
@@ -1769,6 +1783,23 @@ namespace TxtAIEditor
                 return extracted;
             }
 
+            if (tab.IsOfficeDocumentViewer && !string.IsNullOrWhiteSpace(tab.FilePath))
+            {
+                string cached = tab.Content ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(cached))
+                {
+                    return cached.Length > maxChars ? cached.Substring(0, maxChars) : cached;
+                }
+
+                string extracted = new DocumentTextExtractionService()
+                    .ExtractTextAsync(tab.FilePath, maxChars)
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
+                tab.Content = extracted;
+                return extracted;
+            }
+
             if (_editorSessions.TryGetValue(tab.Id, out var session))
             {
                 return session.GetText(maxChars);
@@ -1951,6 +1982,15 @@ namespace TxtAIEditor
         private async Task OnTabReloadAsync(OpenedTab tab, TabViewItem tabItem)
         {
             if (_pdfViewerController.Reload(tab))
+            {
+                _statusBarController.UpdateFileStats(tab);
+                _statusBarController.UpdateTotalLines(tab);
+                UpdateLanguageUI(tab);
+                UpdateWindowTitle();
+                return;
+            }
+
+            if (_officeDocumentViewerController.Reload(tab))
             {
                 _statusBarController.UpdateFileStats(tab);
                 _statusBarController.UpdateTotalLines(tab);

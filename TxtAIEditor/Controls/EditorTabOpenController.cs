@@ -27,6 +27,7 @@ namespace TxtAIEditor.Controls
         private readonly StatusBarController _statusBarController;
         private readonly TabEncryptionController _tabEncryptionController;
         private readonly PdfViewerController _pdfViewerController;
+        private readonly OfficeDocumentViewerController _officeDocumentViewerController;
         private readonly EditorWebViewInitializationController _editorWebViewInitializationController;
         private readonly EditorBridgeShortcutController _editorBridgeShortcutController;
         private readonly EditorBridgeDocumentController _editorBridgeDocumentController;
@@ -62,6 +63,7 @@ namespace TxtAIEditor.Controls
             StatusBarController statusBarController,
             TabEncryptionController tabEncryptionController,
             PdfViewerController pdfViewerController,
+            OfficeDocumentViewerController officeDocumentViewerController,
             EditorWebViewInitializationController editorWebViewInitializationController,
             EditorBridgeShortcutController editorBridgeShortcutController,
             EditorBridgeDocumentController editorBridgeDocumentController,
@@ -96,6 +98,7 @@ namespace TxtAIEditor.Controls
             _statusBarController = statusBarController;
             _tabEncryptionController = tabEncryptionController;
             _pdfViewerController = pdfViewerController;
+            _officeDocumentViewerController = officeDocumentViewerController;
             _editorWebViewInitializationController = editorWebViewInitializationController;
             _editorBridgeShortcutController = editorBridgeShortcutController;
             _editorBridgeDocumentController = editorBridgeDocumentController;
@@ -208,6 +211,44 @@ namespace TxtAIEditor.Controls
                 _getCurrentFolderPath());
 
             _pdfViewerController.Register(tab, tabParts.WebView);
+
+            AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
+            UpdateTabStatus(tab, updateLanguageUi: true);
+
+            return tab;
+        }
+
+        public OpenedTab OpenOfficeDocumentTab(string filePath)
+        {
+            string extension = Path.GetExtension(filePath).ToLowerInvariant();
+            var tab = new OpenedTab
+            {
+                FilePath = filePath,
+                Title = Path.GetFileName(filePath),
+                Content = string.Empty,
+                Language = extension.TrimStart('.'),
+                EncodingName = string.Empty,
+                EncodingWasAutoDetected = false,
+                IsOfficeDocumentViewer = true
+            };
+
+            AddOpenTab(tab);
+
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+            _applyEditorSurfaceBackground(settings);
+
+            var targetTabView = _getCurrentActiveTabView();
+            var tabParts = _editorTabViewItemFactory.CreateOfficeDocumentViewer(
+                tab,
+                editorBgColor,
+                settings.UiFontFamily,
+                _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                _tabEncryptionController.ShowMenu,
+                (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
+                _getCurrentFolderPath());
+
+            _officeDocumentViewerController.Register(tab, tabParts.WebView);
 
             AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
             UpdateTabStatus(tab, updateLanguageUi: true);

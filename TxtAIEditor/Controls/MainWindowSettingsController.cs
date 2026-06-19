@@ -36,6 +36,7 @@ namespace TxtAIEditor.Controls
         private readonly CustomSplitter _rightSplitter;
         private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly PdfViewerController _pdfViewerController;
+        private readonly OfficeDocumentViewerController _officeDocumentViewerController;
         private readonly StatusBarController _statusBarController;
         private readonly LivePreviewController _livePreviewController;
         private readonly LlmAssistantController _llmAssistantController;
@@ -74,6 +75,7 @@ namespace TxtAIEditor.Controls
             CustomSplitter rightSplitter,
             IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             PdfViewerController pdfViewerController,
+            OfficeDocumentViewerController officeDocumentViewerController,
             StatusBarController statusBarController,
             LivePreviewController livePreviewController,
             LlmAssistantController llmAssistantController,
@@ -111,6 +113,7 @@ namespace TxtAIEditor.Controls
             _rightSplitter = rightSplitter;
             _tabBridges = tabBridges;
             _pdfViewerController = pdfViewerController;
+            _officeDocumentViewerController = officeDocumentViewerController;
             _statusBarController = statusBarController;
             _livePreviewController = livePreviewController;
             _llmAssistantController = llmAssistantController;
@@ -272,6 +275,7 @@ namespace TxtAIEditor.Controls
                 WebViewAppearanceService.ApplyPreferredColorScheme(grp.WebView?.CoreWebView2, theme);
             }
             _pdfViewerController.ApplyPreferredColorScheme(theme);
+            _officeDocumentViewerController.ApplyPreferredColorScheme(theme);
         }
 
         private void ApplyMarkdownToolbarBackground(Windows.UI.Color color)

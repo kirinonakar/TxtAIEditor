@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<FileTabOpenRequest, OpenedTab> _openNewTab;
         private readonly Func<string, OpenedTab> _openImageTab;
         private readonly Func<string, OpenedTab> _openPdfTab;
+        private readonly Func<string, OpenedTab> _openOfficeDocumentTab;
         private readonly Action _queueGitStatusRefresh;
         private readonly Action<string, string> _showErrorMessage;
         private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
@@ -45,6 +46,7 @@ namespace TxtAIEditor.Controls
             Func<FileTabOpenRequest, OpenedTab> openNewTab,
             Func<string, OpenedTab> openImageTab,
             Func<string, OpenedTab> openPdfTab,
+            Func<string, OpenedTab> openOfficeDocumentTab,
             Action queueGitStatusRefresh,
             Action<string, string> showErrorMessage)
         {
@@ -60,6 +62,7 @@ namespace TxtAIEditor.Controls
             _openNewTab = openNewTab;
             _openImageTab = openImageTab;
             _openPdfTab = openPdfTab;
+            _openOfficeDocumentTab = openOfficeDocumentTab;
             _queueGitStatusRefresh = queueGitStatusRefresh;
             _showErrorMessage = showErrorMessage;
         }
@@ -98,6 +101,13 @@ namespace TxtAIEditor.Controls
                 if (IsPdfFile(filePath))
                 {
                     var tab = _openPdfTab(filePath);
+                    QueueGitRefreshIfNeeded(repoRoot);
+                    return FileTabLoadResult.Opened(tab);
+                }
+
+                if (IsOfficeDocumentFile(filePath))
+                {
+                    var tab = _openOfficeDocumentTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return FileTabLoadResult.Opened(tab);
                 }
@@ -229,6 +239,13 @@ namespace TxtAIEditor.Controls
             string extension = Path.GetExtension(filePath);
             return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsOfficeDocumentFile(string filePath)
+        {
+            string extension = Path.GetExtension(filePath);
+            return extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<OpenedTab> OpenReadOnlyDocumentFileAsync(string filePath)
