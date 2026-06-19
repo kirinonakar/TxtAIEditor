@@ -19,6 +19,36 @@ namespace TxtAIEditor.Core.Services
         private const long DefaultSlideHeightEmu = 5143500;
         private const double PresentationBaseWidthPx = 960;
 
+        private sealed class ViewerWorkbookSheet
+        {
+            public string Name { get; init; } = string.Empty;
+            public List<List<ViewerWorkbookCell>> Rows { get; } = new();
+        }
+
+        private sealed class ViewerWorkbookCell
+        {
+            public string Value { get; init; } = string.Empty;
+            public string? BackgroundColor { get; init; }
+            public string? TextColor { get; init; }
+            public bool Bold { get; init; }
+            public bool Italic { get; init; }
+        }
+
+        private sealed class ViewerCellStyle
+        {
+            public string? BackgroundColor { get; init; }
+            public string? TextColor { get; init; }
+            public bool Bold { get; init; }
+            public bool Italic { get; init; }
+        }
+
+        private sealed class PresentationPlaceholderBounds
+        {
+            public string? Type { get; init; }
+            public string? Index { get; init; }
+            public string BoundsStyle { get; init; } = string.Empty;
+        }
+
         public async Task<string> BuildHtmlAsync(string filePath)
         {
             string extension = Path.GetExtension(filePath);
@@ -65,6 +95,13 @@ namespace TxtAIEditor.Core.Services
                     archive,
                     GetRelationshipsPath(slidePaths[i]),
                     Path.GetDirectoryName(slidePaths[i])?.Replace('\\', '/') ?? string.Empty).ConfigureAwait(false);
+                IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds = await LoadSlidePlaceholderBoundsAsync(
+                    archive,
+                    relationships,
+                    slideWidth,
+                    slideHeight,
+                    PresentationBaseWidthPx,
+                    PresentationBaseWidthPx * slideHeight / Math.Max(1.0, slideWidth)).ConfigureAwait(false);
 
                 double baseHeightPx = PresentationBaseWidthPx * slideHeight / Math.Max(1.0, slideWidth);
                 string background = ReadSlideBackground(slide) ?? "#ffffff";
@@ -88,7 +125,7 @@ namespace TxtAIEditor.Core.Services
                     .Append(slidePaths.Count)
                     .Append("</div>");
 
-                foreach (string elementHtml in ReadSlideElements(archive, slide, relationships, slideWidth, slideHeight, PresentationBaseWidthPx, baseHeightPx))
+                foreach (string elementHtml in ReadSlideElements(archive, slide, relationships, slideWidth, slideHeight, PresentationBaseWidthPx, baseHeightPx, placeholderBounds))
                 {
                     slides.Append(elementHtml);
                 }
@@ -222,8 +259,7 @@ document.querySelectorAll('.slide').forEach(slide => {
 
         private static async Task<string> BuildWorkbookHtmlAsync(string filePath)
         {
-            IReadOnlyList<ExtractedSpreadsheetSheet> sheets =
-                await DocumentTextExtractionService.ExtractXlsxSheetsAsync(filePath, 50_000_000).ConfigureAwait(false);
+            IReadOnlyList<ViewerWorkbookSheet> sheets = await ExtractWorkbookSheetsAsync(filePath).ConfigureAwait(false);
             if (sheets.Count == 0)
             {
                 return BuildErrorHtml("표시할 시트가 없습니다.");
@@ -231,8 +267,15 @@ document.querySelectorAll('.slide').forEach(slide => {
 
             var sheetPayload = sheets.Select(sheet => new
             {
-                name = string.IsNullOrWhiteSpace(sheet.Name) ? $"Sheet {sheet.Index}" : sheet.Name,
-                csv = sheet.CsvContent ?? string.Empty
+                name = sheet.Name,
+                rows = sheet.Rows.Select(row => row.Select(cell => new
+                {
+                    value = cell.Value,
+                    backgroundColor = cell.BackgroundColor,
+                    textColor = cell.TextColor,
+                    bold = cell.Bold,
+                    italic = cell.Italic
+                }).ToArray()).ToArray()
             }).ToArray();
             string sheetsJson = JsonSerializer.Serialize(sheetPayload);
 
@@ -358,47 +401,6 @@ const select = document.getElementById('sheetSelect');
 const meta = document.getElementById('sheetMeta');
 const wrap = document.getElementById('tableWrap');
 
-function parseCsv(text) {
-    const rows = [];
-    let row = [];
-    let value = '';
-    let quoted = false;
-    for (let i = 0; i < text.length; i++) {
-        const ch = text[i];
-        if (quoted) {
-            if (ch === '"') {
-                if (text[i + 1] === '"') {
-                    value += '"';
-                    i++;
-                } else {
-                    quoted = false;
-                }
-            } else {
-                value += ch;
-            }
-            continue;
-        }
-        if (ch === '"') {
-            quoted = true;
-        } else if (ch === ',') {
-            row.push(value);
-            value = '';
-        } else if (ch === '\n') {
-            row.push(value);
-            rows.push(row);
-            row = [];
-            value = '';
-        } else if (ch !== '\r') {
-            value += ch;
-        }
-    }
-    if (value.length || row.length) {
-        row.push(value);
-        rows.push(row);
-    }
-    return rows;
-}
-
 function colName(index) {
     let n = index + 1;
     let name = '';
@@ -417,9 +419,21 @@ function cell(tag, text, className) {
     return el;
 }
 
+function valueOf(cell) {
+    return cell && typeof cell === 'object' ? (cell.value ?? '') : (cell ?? '');
+}
+
+function applyCellStyle(td, cell) {
+    if (!cell || typeof cell !== 'object') return;
+    if (cell.backgroundColor) td.style.backgroundColor = cell.backgroundColor;
+    if (cell.textColor) td.style.color = cell.textColor;
+    if (cell.bold) td.style.fontWeight = '700';
+    if (cell.italic) td.style.fontStyle = 'italic';
+}
+
 function renderSheet(index) {
     const sheet = sheets[index];
-    const rows = parseCsv(sheet.csv || '');
+    const rows = sheet.rows || [];
     const visibleRows = rows.slice(0, maxRows);
     const columnCount = Math.max(1, ...visibleRows.map(row => row.length));
     wrap.textContent = '';
@@ -445,7 +459,10 @@ function renderSheet(index) {
         const tr = document.createElement('tr');
         tr.appendChild(cell('td', String(r + 1), 'row-header'));
         for (let c = 0; c < columnCount; c++) {
-            tr.appendChild(cell('td', row[c] ?? ''));
+            const sourceCell = row[c] || null;
+            const td = cell('td', valueOf(sourceCell));
+            applyCellStyle(td, sourceCell);
+            tr.appendChild(td);
         }
         tbody.appendChild(tr);
     });
@@ -470,6 +487,362 @@ renderSheet(0);
 """;
         }
 
+        private static async Task<IReadOnlyList<ViewerWorkbookSheet>> ExtractWorkbookSheetsAsync(string filePath)
+        {
+            using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
+            IReadOnlyList<string> sharedStrings = await LoadWorkbookSharedStringsAsync(archive).ConfigureAwait(false);
+            IReadOnlyList<string> themeColors = await LoadWorkbookThemeColorsAsync(archive).ConfigureAwait(false);
+            IReadOnlyList<ViewerCellStyle> styles = await LoadWorkbookStylesAsync(archive, themeColors).ConfigureAwait(false);
+            IReadOnlyDictionary<string, string> sheetNamesByPath = await LoadWorkbookSheetNamesByPathAsync(archive).ConfigureAwait(false);
+
+            var sheetEntries = archive.Entries
+                .Where(entry => Regex.IsMatch(entry.FullName, @"^xl/worksheets/sheet\d+\.xml$", RegexOptions.IgnoreCase))
+                .OrderBy(entry => GetTrailingNumber(entry.FullName))
+                .ToList();
+
+            var sheets = new List<ViewerWorkbookSheet>();
+            for (int sheetIndex = 0; sheetIndex < sheetEntries.Count; sheetIndex++)
+            {
+                ZipArchiveEntry sheetEntry = sheetEntries[sheetIndex];
+                string sheetName = sheetNamesByPath.TryGetValue(sheetEntry.FullName, out string? mappedName)
+                    ? mappedName
+                    : $"Sheet {sheetIndex + 1}";
+
+                var sheet = new ViewerWorkbookSheet { Name = sheetName };
+                XDocument sheetDoc = await LoadXmlEntryAsync(sheetEntry).ConfigureAwait(false);
+                foreach (XElement rowElement in sheetDoc.Descendants().Where(e => e.Name.LocalName == "row"))
+                {
+                    var row = new List<ViewerWorkbookCell>();
+                    foreach (XElement cellElement in rowElement.Elements().Where(e => e.Name.LocalName == "c"))
+                    {
+                        int columnIndex = GetCellColumnIndex(cellElement);
+                        if (columnIndex > 0)
+                        {
+                            while (row.Count < columnIndex - 1)
+                            {
+                                row.Add(new ViewerWorkbookCell());
+                            }
+                        }
+
+                        ViewerCellStyle style = ReadWorkbookCellStyle(cellElement, styles);
+                        row.Add(new ViewerWorkbookCell
+                        {
+                            Value = GetWorkbookCellText(cellElement, sharedStrings),
+                            BackgroundColor = style.BackgroundColor,
+                            TextColor = style.TextColor,
+                            Bold = style.Bold,
+                            Italic = style.Italic
+                        });
+                    }
+
+                    if (row.Any(cell =>
+                        !string.IsNullOrWhiteSpace(cell.Value) ||
+                        !string.IsNullOrWhiteSpace(cell.BackgroundColor) ||
+                        !string.IsNullOrWhiteSpace(cell.TextColor)))
+                    {
+                        sheet.Rows.Add(row);
+                    }
+                }
+
+                sheets.Add(sheet);
+            }
+
+            return sheets;
+        }
+
+        private static async Task<IReadOnlyList<string>> LoadWorkbookSharedStringsAsync(ZipArchive archive)
+        {
+            ZipArchiveEntry? entry = archive.GetEntry("xl/sharedStrings.xml");
+            if (entry == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            XDocument doc = await LoadXmlEntryAsync(entry).ConfigureAwait(false);
+            return doc.Descendants()
+                .Where(e => e.Name.LocalName == "si")
+                .Select(item => string.Concat(item.Descendants().Where(e => e.Name.LocalName == "t").Select(e => e.Value)))
+                .ToList();
+        }
+
+        private static async Task<IReadOnlyDictionary<string, string>> LoadWorkbookSheetNamesByPathAsync(ZipArchive archive)
+        {
+            ZipArchiveEntry? workbookEntry = archive.GetEntry("xl/workbook.xml");
+            ZipArchiveEntry? relsEntry = archive.GetEntry("xl/_rels/workbook.xml.rels");
+            if (workbookEntry == null || relsEntry == null)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            XDocument workbook = await LoadXmlEntryAsync(workbookEntry).ConfigureAwait(false);
+            XDocument rels = await LoadXmlEntryAsync(relsEntry).ConfigureAwait(false);
+            XNamespace relNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+            var targetsById = rels.Descendants()
+                .Where(e => e.Name.LocalName == "Relationship")
+                .Select(e => new
+                {
+                    Id = e.Attribute("Id")?.Value ?? string.Empty,
+                    Target = NormalizeZipPath("xl", e.Attribute("Target")?.Value ?? string.Empty)
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Id) && !string.IsNullOrWhiteSpace(x.Target))
+                .ToDictionary(x => x.Id, x => x.Target, StringComparer.OrdinalIgnoreCase);
+
+            var namesByPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (XElement sheet in workbook.Descendants().Where(e => e.Name.LocalName == "sheet"))
+            {
+                string name = sheet.Attribute("name")?.Value ?? string.Empty;
+                string id = sheet.Attribute(relNs + "id")?.Value ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(name) &&
+                    targetsById.TryGetValue(id, out string? targetPath))
+                {
+                    namesByPath[targetPath] = name;
+                }
+            }
+
+            return namesByPath;
+        }
+
+        private static async Task<IReadOnlyList<ViewerCellStyle>> LoadWorkbookStylesAsync(
+            ZipArchive archive,
+            IReadOnlyList<string> themeColors)
+        {
+            ZipArchiveEntry? entry = archive.GetEntry("xl/styles.xml");
+            if (entry == null)
+            {
+                return Array.Empty<ViewerCellStyle>();
+            }
+
+            XDocument stylesDoc = await LoadXmlEntryAsync(entry).ConfigureAwait(false);
+            var fontStyles = stylesDoc.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "fonts")
+                ?.Elements().Where(e => e.Name.LocalName == "font")
+                .Select(font => new ViewerCellStyle
+                {
+                    TextColor = ReadWorkbookColor(font.Elements().FirstOrDefault(e => e.Name.LocalName == "color"), themeColors),
+                    Bold = font.Elements().Any(e => e.Name.LocalName == "b"),
+                    Italic = font.Elements().Any(e => e.Name.LocalName == "i")
+                })
+                .ToList() ?? new List<ViewerCellStyle>();
+
+            var fillColors = stylesDoc.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "fills")
+                ?.Elements().Where(e => e.Name.LocalName == "fill")
+                .Select(fill => ReadWorkbookFillColor(fill, themeColors))
+                .ToList() ?? new List<string?>();
+
+            var result = new List<ViewerCellStyle>();
+            foreach (XElement xf in stylesDoc.Descendants().FirstOrDefault(e => e.Name.LocalName == "cellXfs")?.Elements().Where(e => e.Name.LocalName == "xf") ?? Enumerable.Empty<XElement>())
+            {
+                int fillId = TryReadInt(xf, "fillId");
+                int fontId = TryReadInt(xf, "fontId");
+                ViewerCellStyle fontStyle = fontId >= 0 && fontId < fontStyles.Count
+                    ? fontStyles[fontId]
+                    : new ViewerCellStyle();
+
+                result.Add(new ViewerCellStyle
+                {
+                    BackgroundColor = fillId >= 0 && fillId < fillColors.Count ? fillColors[fillId] : null,
+                    TextColor = fontStyle.TextColor,
+                    Bold = fontStyle.Bold,
+                    Italic = fontStyle.Italic
+                });
+            }
+
+            return result;
+        }
+
+        private static async Task<IReadOnlyList<string>> LoadWorkbookThemeColorsAsync(ZipArchive archive)
+        {
+            XDocument? theme = await TryLoadXmlEntryAsync(archive, "xl/theme/theme1.xml").ConfigureAwait(false);
+            XElement? clrScheme = theme?.Descendants().FirstOrDefault(e => e.Name.LocalName == "clrScheme");
+            if (clrScheme == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            var order = new[] { "lt1", "dk1", "lt2", "dk2", "accent1", "accent2", "accent3", "accent4", "accent5", "accent6", "hlink", "folHlink" };
+            var colors = new List<string>();
+            foreach (string name in order)
+            {
+                XElement? item = clrScheme.Elements().FirstOrDefault(e => e.Name.LocalName == name);
+                string? color = item == null ? null : ReadThemeColor(item);
+                colors.Add(color ?? "#000000");
+            }
+
+            return colors;
+        }
+
+        private static string? ReadThemeColor(XElement element)
+        {
+            XElement? srgb = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "srgbClr");
+            string? value = srgb?.Attribute("val")?.Value;
+            if (!string.IsNullOrWhiteSpace(value) && Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$"))
+            {
+                return "#" + value;
+            }
+
+            XElement? sys = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "sysClr");
+            value = sys?.Attribute("lastClr")?.Value;
+            return !string.IsNullOrWhiteSpace(value) && Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$")
+                ? "#" + value
+                : null;
+        }
+
+        private static string? ReadWorkbookFillColor(XElement fill, IReadOnlyList<string> themeColors)
+        {
+            XElement? pattern = fill.Descendants().FirstOrDefault(e => e.Name.LocalName == "patternFill");
+            string? patternType = pattern?.Attribute("patternType")?.Value;
+            if (pattern == null ||
+                string.Equals(patternType, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return ReadWorkbookColor(pattern.Elements().FirstOrDefault(e => e.Name.LocalName == "fgColor"), themeColors) ??
+                ReadWorkbookColor(pattern.Elements().FirstOrDefault(e => e.Name.LocalName == "bgColor"), themeColors);
+        }
+
+        private static ViewerCellStyle ReadWorkbookCellStyle(XElement cell, IReadOnlyList<ViewerCellStyle> styles)
+        {
+            int styleIndex = TryReadInt(cell, "s");
+            return styleIndex >= 0 && styleIndex < styles.Count
+                ? styles[styleIndex]
+                : new ViewerCellStyle();
+        }
+
+        private static string GetWorkbookCellText(XElement cell, IReadOnlyList<string> sharedStrings)
+        {
+            string type = cell.Attribute("t")?.Value ?? string.Empty;
+            if (type.Equals("inlineStr", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Concat(cell.Descendants().Where(e => e.Name.LocalName == "t").Select(e => e.Value));
+            }
+
+            string rawValue = cell.Elements().FirstOrDefault(e => e.Name.LocalName == "v")?.Value ?? string.Empty;
+            if (string.IsNullOrEmpty(rawValue))
+            {
+                return string.Empty;
+            }
+
+            return type switch
+            {
+                "s" when int.TryParse(rawValue, out int index) && index >= 0 && index < sharedStrings.Count => sharedStrings[index],
+                "b" => rawValue == "1" ? "TRUE" : "FALSE",
+                _ => rawValue
+            };
+        }
+
+        private static string? ReadWorkbookColor(XElement? colorElement, IReadOnlyList<string> themeColors)
+        {
+            if (colorElement == null)
+            {
+                return null;
+            }
+
+            string? rgb = colorElement.Attribute("rgb")?.Value;
+            if (!string.IsNullOrWhiteSpace(rgb))
+            {
+                rgb = rgb.Trim();
+                if (rgb.Length == 8)
+                {
+                    rgb = rgb.Substring(2);
+                }
+
+                if (Regex.IsMatch(rgb, "^[0-9A-Fa-f]{6}$"))
+                {
+                    return "#" + rgb;
+                }
+            }
+
+            if (int.TryParse(colorElement.Attribute("indexed")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int indexed))
+            {
+                return IndexedWorkbookColor(indexed);
+            }
+
+            if (int.TryParse(colorElement.Attribute("theme")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int themeIndex) &&
+                themeIndex >= 0 &&
+                themeIndex < themeColors.Count)
+            {
+                double tint = 0;
+                _ = double.TryParse(colorElement.Attribute("tint")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out tint);
+                return ApplyTint(themeColors[themeIndex], tint);
+            }
+
+            return null;
+        }
+
+        private static string? IndexedWorkbookColor(int index)
+        {
+            string[] colors =
+            {
+                "#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
+                "#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
+                "#800000", "#008000", "#000080", "#808000", "#800080", "#008080", "#C0C0C0", "#808080",
+                "#9999FF", "#993366", "#FFFFCC", "#CCFFFF", "#660066", "#FF8080", "#0066CC", "#CCCCFF",
+                "#000080", "#FF00FF", "#FFFF00", "#00FFFF", "#800080", "#800000", "#008080", "#0000FF",
+                "#00CCFF", "#CCFFFF", "#CCFFCC", "#FFFF99", "#99CCFF", "#FF99CC", "#CC99FF", "#FFCC99",
+                "#3366FF", "#33CCCC", "#99CC00", "#FFCC00", "#FF9900", "#FF6600", "#666699", "#969696",
+                "#003366", "#339966", "#003300", "#333300", "#993300", "#993366", "#333399", "#333333"
+            };
+
+            return index >= 0 && index < colors.Length ? colors[index] : null;
+        }
+
+        private static string ApplyTint(string hex, double tint)
+        {
+            if (string.IsNullOrEmpty(hex) || !Regex.IsMatch(hex, "^#[0-9A-Fa-f]{6}$"))
+            {
+                return hex ?? "#000000";
+            }
+
+            string normalized = hex;
+            int r = Convert.ToInt32(normalized.Substring(1, 2), 16);
+            int g = Convert.ToInt32(normalized.Substring(3, 2), 16);
+            int b = Convert.ToInt32(normalized.Substring(5, 2), 16);
+            r = ApplyTintComponent(r, tint);
+            g = ApplyTintComponent(g, tint);
+            b = ApplyTintComponent(b, tint);
+            return $"#{r:X2}{g:X2}{b:X2}";
+        }
+
+        private static int ApplyTintComponent(int value, double tint)
+        {
+            double adjusted = tint < 0
+                ? value * (1 + tint)
+                : value + (255 - value) * tint;
+            return Math.Max(0, Math.Min(255, (int)Math.Round(adjusted)));
+        }
+
+        private static int GetCellColumnIndex(XElement cell)
+        {
+            string reference = cell.Attribute("r")?.Value ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                return 0;
+            }
+
+            int column = 0;
+            foreach (char ch in reference)
+            {
+                if (ch >= 'A' && ch <= 'Z')
+                {
+                    column = (column * 26) + (ch - 'A' + 1);
+                    continue;
+                }
+
+                if (ch >= 'a' && ch <= 'z')
+                {
+                    column = (column * 26) + (ch - 'a' + 1);
+                    continue;
+                }
+
+                break;
+            }
+
+            return column;
+        }
+
         private static IEnumerable<string> ReadSlideElements(
             ZipArchive archive,
             XDocument slide,
@@ -477,7 +850,8 @@ renderSheet(0);
             long slideWidth,
             long slideHeight,
             double baseWidthPx,
-            double baseHeightPx)
+            double baseHeightPx,
+            IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds)
         {
             XElement? shapeTree = slide.Descendants().FirstOrDefault(e => e.Name.LocalName == "spTree");
             IEnumerable<XElement> elements = shapeTree?.Elements() ?? slide.Root?.Elements() ?? Enumerable.Empty<XElement>();
@@ -539,7 +913,7 @@ renderSheet(0);
                         continue;
                     }
 
-                    string bounds = TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, out string readBounds)
+                    string bounds = TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, placeholderBounds, out string readBounds)
                         ? readBounds
                         : "left:48px;top:27px;width:864px;height:auto;";
                     string fill = ReadSolidFill(element.Elements().FirstOrDefault(e => e.Name.LocalName == "spPr"));
@@ -678,6 +1052,141 @@ renderSheet(0);
             return ReadSolidColor(bg);
         }
 
+        private static async Task<IReadOnlyList<PresentationPlaceholderBounds>> LoadSlidePlaceholderBoundsAsync(
+            ZipArchive archive,
+            IReadOnlyDictionary<string, string> slideRelationships,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx)
+        {
+            string? layoutPath = slideRelationships.Values.FirstOrDefault(path =>
+                path.Contains("/slideLayouts/", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("slideLayouts/", StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrWhiteSpace(layoutPath))
+            {
+                return Array.Empty<PresentationPlaceholderBounds>();
+            }
+
+            var result = new List<PresentationPlaceholderBounds>();
+            XDocument? layout = await TryLoadXmlEntryAsync(archive, layoutPath).ConfigureAwait(false);
+            if (layout != null)
+            {
+                result.AddRange(ReadPlaceholderBoundsFromPart(layout, slideWidth, slideHeight, baseWidthPx, baseHeightPx));
+            }
+
+            IReadOnlyDictionary<string, string> layoutRelationships = await LoadRelationshipsAsync(
+                archive,
+                GetRelationshipsPath(layoutPath),
+                Path.GetDirectoryName(layoutPath)?.Replace('\\', '/') ?? string.Empty).ConfigureAwait(false);
+            string? masterPath = layoutRelationships.Values.FirstOrDefault(path =>
+                path.Contains("/slideMasters/", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("slideMasters/", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(masterPath))
+            {
+                XDocument? master = await TryLoadXmlEntryAsync(archive, masterPath).ConfigureAwait(false);
+                if (master != null)
+                {
+                    result.AddRange(ReadPlaceholderBoundsFromPart(master, slideWidth, slideHeight, baseWidthPx, baseHeightPx));
+                }
+            }
+
+            return result;
+        }
+
+        private static IEnumerable<PresentationPlaceholderBounds> ReadPlaceholderBoundsFromPart(
+            XDocument part,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx)
+        {
+            XElement? shapeTree = part.Descendants().FirstOrDefault(e => e.Name.LocalName == "spTree");
+            foreach (XElement element in shapeTree?.Elements() ?? Enumerable.Empty<XElement>())
+            {
+                if (!TryReadPlaceholderInfo(element, out string? type, out string? index) ||
+                    !TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, out string bounds))
+                {
+                    continue;
+                }
+
+                yield return new PresentationPlaceholderBounds
+                {
+                    Type = type,
+                    Index = index,
+                    BoundsStyle = bounds
+                };
+            }
+        }
+
+        private static bool TryReadPlaceholderBounds(
+            XElement element,
+            IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds,
+            out string bounds)
+        {
+            bounds = string.Empty;
+            if (!TryReadPlaceholderInfo(element, out string? type, out string? index))
+            {
+                return false;
+            }
+
+            PresentationPlaceholderBounds? match = null;
+            if (!string.IsNullOrWhiteSpace(index))
+            {
+                match = placeholderBounds.FirstOrDefault(item =>
+                    string.Equals(item.Index, index, StringComparison.OrdinalIgnoreCase));
+            }
+
+            match ??= placeholderBounds.FirstOrDefault(item =>
+                PlaceholderTypesMatch(item.Type, type));
+            if (match == null && string.IsNullOrWhiteSpace(type))
+            {
+                match = placeholderBounds.FirstOrDefault(item =>
+                    PlaceholderTypesMatch(item.Type, "body"));
+            }
+
+            if (match == null)
+            {
+                return false;
+            }
+
+            bounds = match.BoundsStyle;
+            return true;
+        }
+
+        private static bool TryReadPlaceholderInfo(XElement element, out string? type, out string? index)
+        {
+            XElement? placeholder = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "ph");
+            type = placeholder?.Attribute("type")?.Value;
+            index = placeholder?.Attribute("idx")?.Value;
+            return placeholder != null;
+        }
+
+        private static bool PlaceholderTypesMatch(string? candidate, string? requested)
+        {
+            candidate = NormalizePlaceholderType(candidate);
+            requested = NormalizePlaceholderType(requested);
+            return !string.IsNullOrWhiteSpace(candidate) &&
+                !string.IsNullOrWhiteSpace(requested) &&
+                string.Equals(candidate, requested, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? NormalizePlaceholderType(string? type)
+        {
+            if (string.IsNullOrWhiteSpace(type))
+            {
+                return "body";
+            }
+
+            return type switch
+            {
+                "ctrTitle" => "title",
+                "subTitle" => "subtitle",
+                "obj" => "body",
+                _ => type
+            };
+        }
+
         private static string? ReadSolidColor(XElement? parent)
         {
             if (parent == null)
@@ -704,6 +1213,18 @@ renderSheet(0);
             double baseHeightPx,
             out string bounds)
         {
+            return TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, null, out bounds);
+        }
+
+        private static bool TryReadBounds(
+            XElement element,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            IReadOnlyList<PresentationPlaceholderBounds>? placeholderBounds,
+            out string bounds)
+        {
             bounds = string.Empty;
             XElement? xfrm = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "xfrm");
             XElement? off = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "off");
@@ -716,6 +1237,12 @@ renderSheet(0);
                 cx <= 0 ||
                 cy <= 0)
             {
+                if (placeholderBounds != null && TryReadPlaceholderBounds(element, placeholderBounds, out string inheritedBounds))
+                {
+                    bounds = inheritedBounds;
+                    return true;
+                }
+
                 return false;
             }
 
@@ -730,6 +1257,21 @@ renderSheet(0);
         {
             value = 0;
             return long.TryParse(element.Attribute(attributeName)?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static int TryReadInt(XElement element, string attributeName)
+        {
+            return int.TryParse(element.Attribute(attributeName)?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value)
+                ? value
+                : -1;
+        }
+
+        private static int GetTrailingNumber(string value)
+        {
+            Match match = Regex.Match(value, @"(\d+)(?=\.[^.]+$)");
+            return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int number)
+                ? number
+                : int.MaxValue;
         }
 
         private static string Pixels(long value, long total, double baseSizePx)
