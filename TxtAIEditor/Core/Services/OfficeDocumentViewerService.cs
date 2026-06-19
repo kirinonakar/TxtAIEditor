@@ -51,6 +51,38 @@ namespace TxtAIEditor.Core.Services
             public string BoundsStyle { get; init; } = string.Empty;
         }
 
+        private sealed class PresentationGroupTransform
+        {
+            public double X { get; init; }
+            public double Y { get; init; }
+            public double Cx { get; init; }
+            public double Cy { get; init; }
+            public double ChildX { get; init; }
+            public double ChildY { get; init; }
+            public double ChildCx { get; init; }
+            public double ChildCy { get; init; }
+
+            public double MapX(double x)
+            {
+                return X + ((x - ChildX) / Math.Max(1.0, ChildCx)) * Cx;
+            }
+
+            public double MapY(double y)
+            {
+                return Y + ((y - ChildY) / Math.Max(1.0, ChildCy)) * Cy;
+            }
+
+            public double MapCx(double cx)
+            {
+                return cx / Math.Max(1.0, ChildCx) * Cx;
+            }
+
+            public double MapCy(double cy)
+            {
+                return cy / Math.Max(1.0, ChildCy) * Cy;
+            }
+        }
+
         public async Task<string> BuildHtmlAsync(string filePath)
         {
             string extension = Path.GetExtension(filePath);
@@ -77,6 +109,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             (long slideWidth, long slideHeight) = ReadSlideSize(presentation);
+            IReadOnlyList<string> themeColors = await LoadPresentationThemeColorsAsync(archive).ConfigureAwait(false);
             List<string> slidePaths = await ReadPresentationSlidePathsAsync(archive, presentation).ConfigureAwait(false);
             if (slidePaths.Count == 0)
             {
@@ -106,7 +139,7 @@ namespace TxtAIEditor.Core.Services
                     PresentationBaseWidthPx * slideHeight / Math.Max(1.0, slideWidth)).ConfigureAwait(false);
 
                 double baseHeightPx = PresentationBaseWidthPx * slideHeight / Math.Max(1.0, slideWidth);
-                string background = ReadSlideBackground(slide) ?? "#ffffff";
+                string background = ReadSlideBackground(slide, themeColors) ?? "#ffffff";
                 slides.Append("<section class=\"slide\" style=\"--slide-ratio:")
                     .Append(FormatInvariant(slideWidth / (double)Math.Max(1, slideHeight)))
                     .Append(";--base-width:")
@@ -127,7 +160,7 @@ namespace TxtAIEditor.Core.Services
                     .Append(slidePaths.Count)
                     .Append("</div>");
 
-                foreach (string elementHtml in ReadSlideElements(archive, slide, relationships, slideWidth, slideHeight, PresentationBaseWidthPx, baseHeightPx, placeholderBounds))
+                foreach (string elementHtml in ReadSlideElements(archive, slide, relationships, themeColors, slideWidth, slideHeight, PresentationBaseWidthPx, baseHeightPx, placeholderBounds))
                 {
                     slides.Append(elementHtml);
                 }
@@ -200,23 +233,24 @@ body { padding: 28px 16px 40px; }
 .ppt-shape, .ppt-image, .ppt-table {
     position: absolute;
     overflow: hidden;
+    transform-origin: center center;
 }
 .ppt-shape {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    display: block;
     color: #111827;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     padding: 4px 6px;
     line-height: 1.16;
 }
-.ppt-shape p { margin: 0 0 .24em; line-height: inherit; }
+.ppt-shape p { width: 100%; margin: 0 0 .24em; line-height: inherit; }
 .ppt-shape p:last-child { margin-bottom: 0; }
+.ppt-shape span { white-space: pre-wrap; }
+.ppt-box { padding: 0; }
 .ppt-image img {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: fill;
     display: block;
 }
 .ppt-table table {
@@ -234,6 +268,11 @@ body { padding: 28px 16px 40px; }
     vertical-align: top;
     overflow-wrap: anywhere;
 }
+.ppt-table p {
+    margin: 0 0 .2em;
+    line-height: 1.16;
+}
+.ppt-table p:last-child { margin-bottom: 0; }
 </style>
 </head>
 <body>
@@ -720,7 +759,17 @@ renderSheet(0);
 
         private static async Task<IReadOnlyList<string>> LoadWorkbookThemeColorsAsync(ZipArchive archive)
         {
-            XDocument? theme = await TryLoadXmlEntryAsync(archive, "xl/theme/theme1.xml").ConfigureAwait(false);
+            return await LoadThemeColorsAsync(archive, "xl/theme/theme1.xml").ConfigureAwait(false);
+        }
+
+        private static async Task<IReadOnlyList<string>> LoadPresentationThemeColorsAsync(ZipArchive archive)
+        {
+            return await LoadThemeColorsAsync(archive, "ppt/theme/theme1.xml").ConfigureAwait(false);
+        }
+
+        private static async Task<IReadOnlyList<string>> LoadThemeColorsAsync(ZipArchive archive, string themePath)
+        {
+            XDocument? theme = await TryLoadXmlEntryAsync(archive, themePath).ConfigureAwait(false);
             XElement? clrScheme = theme?.Descendants().FirstOrDefault(e => e.Name.LocalName == "clrScheme");
             if (clrScheme == null)
             {
@@ -1343,6 +1392,7 @@ renderSheet(0);
             ZipArchive archive,
             XDocument slide,
             IReadOnlyDictionary<string, string> relationships,
+            IReadOnlyList<string> themeColors,
             long slideWidth,
             long slideHeight,
             double baseWidthPx,
@@ -1354,72 +1404,136 @@ renderSheet(0);
 
             foreach (XElement element in elements)
             {
-                if (element.Name.LocalName == "pic")
+                foreach (string elementHtml in ReadSlideElement(
+                    archive,
+                    element,
+                    relationships,
+                    themeColors,
+                    slideWidth,
+                    slideHeight,
+                    baseWidthPx,
+                    baseHeightPx,
+                    placeholderBounds,
+                    null))
                 {
-                    if (!TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, out string bounds))
-                    {
-                        continue;
-                    }
-
-                    string? relationshipId = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "blip")
-                        ?.Attributes().FirstOrDefault(a => a.Name.LocalName == "embed")?.Value;
-                    if (string.IsNullOrWhiteSpace(relationshipId) ||
-                        !relationships.TryGetValue(relationshipId, out string? imagePath))
-                    {
-                        continue;
-                    }
-
-                    string? dataUri = TryReadImageDataUri(archive, imagePath);
-                    if (string.IsNullOrEmpty(dataUri))
-                    {
-                        continue;
-                    }
-
-                    yield return "<div class=\"ppt-image\" style=\"" + bounds + "\"><img src=\"" + Html(dataUri) + "\"></div>";
-                    continue;
-                }
-
-                if (element.Name.LocalName == "graphicFrame" && element.Descendants().Any(d => d.Name.LocalName == "tbl"))
-                {
-                    if (!TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, out string bounds))
-                    {
-                        continue;
-                    }
-
-                    XElement? table = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "tbl");
-                    if (table == null)
-                    {
-                        continue;
-                    }
-
-                    string tableHtml = BuildTableHtml(table);
-                    if (!string.IsNullOrWhiteSpace(tableHtml))
-                    {
-                        yield return "<div class=\"ppt-table\" style=\"" + bounds + "\">" + tableHtml + "</div>";
-                    }
-
-                    continue;
-                }
-
-                if (element.Name.LocalName == "sp" && element.Descendants().Any(d => d.Name.LocalName == "txBody"))
-                {
-                    string textHtml = BuildShapeTextHtml(element);
-                    if (string.IsNullOrWhiteSpace(textHtml))
-                    {
-                        continue;
-                    }
-
-                    string bounds = TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, placeholderBounds, out string readBounds)
-                        ? readBounds
-                        : "left:48px;top:27px;width:864px;height:auto;";
-                    string fill = ReadSolidFill(element.Elements().FirstOrDefault(e => e.Name.LocalName == "spPr"));
-                    string textStyle = ReadTextStyle(element, slideWidth, baseWidthPx);
-                    yield return "<div class=\"ppt-shape\" style=\"" + bounds + fill + textStyle + "\">" + textHtml + "</div>";
+                    yield return elementHtml;
                 }
             }
         }
 
-        private static string BuildShapeTextHtml(XElement shape)
+        private static IEnumerable<string> ReadSlideElement(
+            ZipArchive archive,
+            XElement element,
+            IReadOnlyDictionary<string, string> relationships,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds,
+            PresentationGroupTransform? groupTransform)
+        {
+            if (element.Name.LocalName == "grpSp")
+            {
+                PresentationGroupTransform? nextTransform = TryReadGroupTransform(element, groupTransform, out PresentationGroupTransform? readTransform)
+                    ? readTransform
+                    : groupTransform;
+                foreach (XElement child in element.Elements().Where(e => e.Name.LocalName != "nvGrpSpPr" && e.Name.LocalName != "grpSpPr"))
+                {
+                    foreach (string childHtml in ReadSlideElement(
+                        archive,
+                        child,
+                        relationships,
+                        themeColors,
+                        slideWidth,
+                        slideHeight,
+                        baseWidthPx,
+                        baseHeightPx,
+                        placeholderBounds,
+                        nextTransform))
+                    {
+                        yield return childHtml;
+                    }
+                }
+
+                yield break;
+            }
+
+            if (element.Name.LocalName == "pic")
+            {
+                if (!TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, groupTransform, out string bounds))
+                {
+                    yield break;
+                }
+
+                string? relationshipId = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "blip")
+                    ?.Attributes().FirstOrDefault(a => a.Name.LocalName == "embed")?.Value;
+                if (string.IsNullOrWhiteSpace(relationshipId) ||
+                    !relationships.TryGetValue(relationshipId, out string? imagePath))
+                {
+                    yield break;
+                }
+
+                string? dataUri = TryReadImageDataUri(archive, imagePath);
+                if (string.IsNullOrEmpty(dataUri))
+                {
+                    yield break;
+                }
+
+                yield return "<div class=\"ppt-image\" style=\"" + bounds + "\"><img src=\"" + Html(dataUri) + "\"></div>";
+                yield break;
+            }
+
+            if (element.Name.LocalName == "graphicFrame" && element.Descendants().Any(d => d.Name.LocalName == "tbl"))
+            {
+                if (!TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, groupTransform, out string bounds))
+                {
+                    yield break;
+                }
+
+                XElement? table = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "tbl");
+                if (table == null)
+                {
+                    yield break;
+                }
+
+                string tableHtml = BuildTableHtml(table, themeColors, slideWidth, slideHeight, baseWidthPx, baseHeightPx);
+                if (!string.IsNullOrWhiteSpace(tableHtml))
+                {
+                    yield return "<div class=\"ppt-table\" style=\"" + bounds + "\">" + tableHtml + "</div>";
+                }
+
+                yield break;
+            }
+
+            if (element.Name.LocalName != "sp")
+            {
+                yield break;
+            }
+
+            XElement? shapeProperties = element.Elements().FirstOrDefault(e => e.Name.LocalName == "spPr");
+            string boxStyle = ReadShapeBoxStyle(shapeProperties, themeColors);
+            string boundsStyle = TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, groupTransform, placeholderBounds, out string readBounds)
+                ? readBounds
+                : "left:48px;top:27px;width:864px;height:auto;";
+            string textHtml = BuildShapeTextHtml(element, themeColors, slideWidth, baseWidthPx);
+            if (!string.IsNullOrWhiteSpace(textHtml))
+            {
+                yield return "<div class=\"ppt-shape\" style=\"" + boundsStyle + boxStyle + "\">" + textHtml + "</div>";
+                yield break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(boxStyle))
+            {
+                yield return "<div class=\"ppt-shape ppt-box\" style=\"" + boundsStyle + boxStyle + "\"></div>";
+            }
+        }
+
+        private static string BuildShapeTextHtml(
+            XElement shape,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            double baseWidthPx)
         {
             var paragraphs = new StringBuilder();
             XElement? txBody = shape.Descendants().FirstOrDefault(e => e.Name.LocalName == "txBody");
@@ -1437,35 +1551,233 @@ renderSheet(0);
                 }
 
                 bool hasBullet = paragraph.Descendants().Any(e => e.Name.LocalName == "buChar" || e.Name.LocalName == "buAutoNum");
-                paragraphs.Append("<p>");
-                if (hasBullet)
+                string paragraphStyle = ReadParagraphStyle(paragraph, slideWidth, baseWidthPx);
+                paragraphs.Append("<p");
+                if (!string.IsNullOrWhiteSpace(paragraphStyle))
                 {
-                    paragraphs.Append("• ");
+                    paragraphs.Append(" style=\"").Append(Html(paragraphStyle)).Append('"');
                 }
 
-                paragraphs.Append(Html(text));
+                paragraphs.Append('>');
+                if (hasBullet)
+                {
+                    string bullet = paragraph.Descendants().FirstOrDefault(e => e.Name.LocalName == "buChar")?.Attribute("char")?.Value ?? "•";
+                    paragraphs.Append("<span>").Append(Html(bullet)).Append(' ').Append("</span>");
+                }
+
+                paragraphs.Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx));
                 paragraphs.Append("</p>");
             }
 
             return paragraphs.ToString();
         }
 
-        private static string BuildTableHtml(XElement table)
+        private static string BuildParagraphRunsHtml(
+            XElement paragraph,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            double baseWidthPx)
         {
-            var builder = new StringBuilder("<table><tbody>");
-            foreach (XElement row in table.Descendants().Where(e => e.Name.LocalName == "tr"))
+            var builder = new StringBuilder();
+            XElement? defaultRunProperties = paragraph.Elements().FirstOrDefault(e => e.Name.LocalName == "pPr")
+                ?.Elements().FirstOrDefault(e => e.Name.LocalName == "defRPr");
+            foreach (XElement element in paragraph.Elements())
             {
-                builder.Append("<tr>");
+                if (element.Name.LocalName == "r" || element.Name.LocalName == "fld")
+                {
+                    XElement? runProperties = element.Elements().FirstOrDefault(e => e.Name.LocalName == "rPr") ?? defaultRunProperties;
+                    string runStyle = ReadRunTextStyle(runProperties, themeColors, slideWidth, baseWidthPx);
+                    string text = string.Concat(element.Descendants().Where(e => e.Name.LocalName == "t").Select(e => e.Value));
+                    if (string.IsNullOrEmpty(text))
+                    {
+                        continue;
+                    }
+
+                    builder.Append("<span");
+                    if (!string.IsNullOrWhiteSpace(runStyle))
+                    {
+                        builder.Append(" style=\"").Append(Html(runStyle)).Append('"');
+                    }
+
+                    builder.Append('>').Append(Html(text)).Append("</span>");
+                    continue;
+                }
+
+                if (element.Name.LocalName == "br" || element.Name.LocalName == "cr")
+                {
+                    builder.Append("<br>");
+                }
+            }
+
+            if (builder.Length == 0)
+            {
+                builder.Append(Html(ReadParagraphText(paragraph)));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string BuildTableHtml(
+            XElement table,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx)
+        {
+            var builder = new StringBuilder("<table>");
+            List<XElement> rows = table.Elements().Where(e => e.Name.LocalName == "tr").ToList();
+            if (rows.Count == 0)
+            {
+                rows = table.Descendants().Where(e => e.Name.LocalName == "tr").ToList();
+            }
+
+            IReadOnlyList<long> columnWidths = ReadTableColumnWidths(table);
+            if (columnWidths.Count > 0)
+            {
+                long totalWidth = Math.Max(1, columnWidths.Sum());
+                builder.Append("<colgroup>");
+                foreach (long width in columnWidths)
+                {
+                    builder.Append("<col style=\"width:")
+                        .Append(FormatInvariant(width / (double)totalWidth * 100))
+                        .Append("%\">");
+                }
+
+                builder.Append("</colgroup>");
+            }
+
+            builder.Append("<tbody>");
+            long totalHeight = Math.Max(1, rows.Sum(row => Math.Max(0, ReadTableRowHeight(row))));
+            foreach (XElement row in rows)
+            {
+                long rowHeight = ReadTableRowHeight(row);
+                builder.Append("<tr");
+                if (rowHeight > 0 && totalHeight > 1)
+                {
+                    builder.Append(" style=\"height:")
+                        .Append(FormatInvariant(rowHeight / (double)totalHeight * 100))
+                        .Append("%\"");
+                }
+
+                builder.Append('>');
                 foreach (XElement cell in row.Elements().Where(e => e.Name.LocalName == "tc"))
                 {
-                    string text = string.Join("\n", cell.Descendants().Where(e => e.Name.LocalName == "p").Select(ReadParagraphText).Where(t => !string.IsNullOrWhiteSpace(t)));
-                    builder.Append("<td>").Append(Html(text)).Append("</td>");
+                    if (IsMergedTableCellContinuation(cell))
+                    {
+                        continue;
+                    }
+
+                    string style = ReadTableCellStyle(cell, themeColors);
+                    builder.Append("<td");
+                    int colspan = ReadTableSpan(cell, "gridSpan", "colSpan");
+                    int rowspan = ReadTableSpan(cell, "rowSpan", "vSpan");
+                    if (colspan > 1)
+                    {
+                        builder.Append(" colspan=\"").Append(colspan).Append('"');
+                    }
+
+                    if (rowspan > 1)
+                    {
+                        builder.Append(" rowspan=\"").Append(rowspan).Append('"');
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(style))
+                    {
+                        builder.Append(" style=\"").Append(Html(style)).Append('"');
+                    }
+
+                    builder.Append('>')
+                        .Append(BuildTableCellTextHtml(cell, themeColors, slideWidth, baseWidthPx))
+                        .Append("</td>");
                 }
 
                 builder.Append("</tr>");
             }
 
             builder.Append("</tbody></table>");
+            return builder.ToString();
+        }
+
+        private static IReadOnlyList<long> ReadTableColumnWidths(XElement table)
+        {
+            return table.Descendants()
+                .Where(e => e.Name.LocalName == "tblGrid")
+                .Elements()
+                .Where(e => e.Name.LocalName == "gridCol")
+                .Select(col => TryReadLong(col, "w", out long width) ? width : 0)
+                .Where(width => width > 0)
+                .ToList();
+        }
+
+        private static long ReadTableRowHeight(XElement row)
+        {
+            return TryReadLong(row, "h", out long height) ? height : 0;
+        }
+
+        private static int ReadTableSpan(XElement cell, params string[] names)
+        {
+            foreach (string name in names)
+            {
+                if (int.TryParse(cell.Attribute(name)?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int attributeSpan) &&
+                    attributeSpan > 1)
+                {
+                    return attributeSpan;
+                }
+
+                XElement? spanElement = cell.Descendants().FirstOrDefault(e => e.Name.LocalName == name);
+                if (spanElement != null &&
+                    int.TryParse(spanElement.Attribute("val")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int childSpan) &&
+                    childSpan > 1)
+                {
+                    return childSpan;
+                }
+            }
+
+            return 1;
+        }
+
+        private static bool IsMergedTableCellContinuation(XElement cell)
+        {
+            return IsTableMergeFlag(cell, "hMerge") || IsTableMergeFlag(cell, "vMerge");
+        }
+
+        private static bool IsTableMergeFlag(XElement cell, string name)
+        {
+            string value = cell.Attribute(name)?.Value ??
+                cell.Descendants().FirstOrDefault(e => e.Name.LocalName == name)?.Attribute("val")?.Value ??
+                string.Empty;
+            return value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string BuildTableCellTextHtml(
+            XElement cell,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            double baseWidthPx)
+        {
+            var builder = new StringBuilder();
+            foreach (XElement paragraph in cell.Descendants().Where(e => e.Name.LocalName == "p"))
+            {
+                string text = ReadParagraphText(paragraph);
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                string paragraphStyle = ReadParagraphStyle(paragraph, slideWidth, baseWidthPx);
+                builder.Append("<p");
+                if (!string.IsNullOrWhiteSpace(paragraphStyle))
+                {
+                    builder.Append(" style=\"").Append(Html(paragraphStyle)).Append('"');
+                }
+
+                builder.Append('>')
+                    .Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx))
+                    .Append("</p>");
+            }
+
             return builder.ToString();
         }
 
@@ -1492,9 +1804,51 @@ renderSheet(0);
             return builder.ToString();
         }
 
-        private static string ReadTextStyle(XElement shape, long slideWidth, double baseWidthPx)
+        private static string ReadParagraphStyle(XElement paragraph, long slideWidth, double baseWidthPx)
         {
-            XElement? runProperties = shape.Descendants().FirstOrDefault(e => e.Name.LocalName == "rPr");
+            XElement? paragraphProperties = paragraph.Elements().FirstOrDefault(e => e.Name.LocalName == "pPr");
+            if (paragraphProperties == null)
+            {
+                return string.Empty;
+            }
+
+            var style = new StringBuilder();
+            string align = paragraphProperties.Attribute("algn")?.Value ?? string.Empty;
+            string? cssAlign = align switch
+            {
+                "ctr" => "center",
+                "r" => "right",
+                "just" or "dist" => "justify",
+                _ => null
+            };
+            if (!string.IsNullOrWhiteSpace(cssAlign))
+            {
+                style.Append("text-align:").Append(cssAlign).Append(';');
+            }
+
+            if (TryReadLong(paragraphProperties, "marL", out long marginLeft) && marginLeft > 0)
+            {
+                style.Append("padding-left:")
+                    .Append(FormatInvariant(TextMarginToPixels(marginLeft, slideWidth, baseWidthPx)))
+                    .Append("px;");
+            }
+
+            if (TryReadLong(paragraphProperties, "indent", out long indent) && indent != 0)
+            {
+                style.Append("text-indent:")
+                    .Append(FormatInvariant(TextMarginToPixels(indent, slideWidth, baseWidthPx)))
+                    .Append("px;");
+            }
+
+            return style.ToString();
+        }
+
+        private static string ReadRunTextStyle(
+            XElement? runProperties,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            double baseWidthPx)
+        {
             var style = new StringBuilder();
             double pixelsPerInch = baseWidthPx / (slideWidth / 914400.0);
             if (runProperties?.Attribute("sz")?.Value is string sizeValue &&
@@ -1503,12 +1857,6 @@ renderSheet(0);
             {
                 style.Append("font-size:")
                     .Append(FormatInvariant(size / 100.0 / 72.0 * pixelsPerInch))
-                    .Append("px;");
-            }
-            else
-            {
-                style.Append("font-size:")
-                    .Append(FormatInvariant(18.0 / 72.0 * pixelsPerInch))
                     .Append("px;");
             }
 
@@ -1522,30 +1870,108 @@ renderSheet(0);
                 style.Append("font-style:italic;");
             }
 
-            string? color = ReadSolidColor(runProperties);
+            if (string.Equals(runProperties?.Attribute("u")?.Value, "sng", StringComparison.OrdinalIgnoreCase))
+            {
+                style.Append("text-decoration:underline;");
+            }
+
+            string? color = ReadPresentationColor(runProperties, themeColors);
             if (!string.IsNullOrWhiteSpace(color))
             {
                 style.Append("color:").Append(color).Append(';');
             }
 
+            string? typeface = runProperties?.Descendants().FirstOrDefault(e => e.Name.LocalName == "latin")?.Attribute("typeface")?.Value;
+            if (!string.IsNullOrWhiteSpace(typeface) && !typeface.Contains('+', StringComparison.Ordinal))
+            {
+                style.Append("font-family:'").Append(typeface.Replace("'", "\\'", StringComparison.Ordinal)).Append("','Segoe UI',Arial,sans-serif;");
+            }
+
             return style.ToString();
         }
 
-        private static string ReadSolidFill(XElement? parent)
+        private static string ReadShapeBoxStyle(XElement? shapeProperties, IReadOnlyList<string> themeColors)
         {
-            string? fill = ReadSolidColor(parent);
-            if (string.IsNullOrWhiteSpace(fill))
+            if (shapeProperties == null)
             {
                 return string.Empty;
             }
 
-            return "background:" + fill + ";";
+            var style = new StringBuilder();
+            XElement? fillElement = shapeProperties.Elements().FirstOrDefault(e => e.Name.LocalName == "solidFill");
+            bool hasShapeNoFill = shapeProperties.Elements().Any(e => e.Name.LocalName == "noFill");
+            string? fill = ReadPresentationColor(fillElement, themeColors);
+            if (!string.IsNullOrWhiteSpace(fill) && !hasShapeNoFill)
+            {
+                style.Append("background:").Append(fill).Append(';');
+            }
+
+            XElement? line = shapeProperties.Elements().FirstOrDefault(e => e.Name.LocalName == "ln");
+            if (line != null && !line.Descendants().Any(e => e.Name.LocalName == "noFill"))
+            {
+                string? lineColor = ReadPresentationColor(line, themeColors);
+                if (!string.IsNullOrWhiteSpace(lineColor))
+                {
+                    double widthPx = 1;
+                    if (TryReadLong(line, "w", out long width) && width > 0)
+                    {
+                        widthPx = Math.Max(.5, width / 12700.0);
+                    }
+
+                    style.Append("border:")
+                        .Append(FormatInvariant(widthPx))
+                        .Append("px solid ")
+                        .Append(lineColor)
+                        .Append(';');
+                }
+            }
+
+            return style.ToString();
         }
 
-        private static string? ReadSlideBackground(XDocument slide)
+        private static string ReadTableCellStyle(XElement cell, IReadOnlyList<string> themeColors)
+        {
+            XElement? properties = cell.Elements().FirstOrDefault(e => e.Name.LocalName == "tcPr");
+            if (properties == null)
+            {
+                return string.Empty;
+            }
+
+            var style = new StringBuilder();
+            string? fill = ReadPresentationColor(properties.Elements().FirstOrDefault(e => e.Name.LocalName == "solidFill"), themeColors);
+            if (!string.IsNullOrWhiteSpace(fill))
+            {
+                style.Append("background:").Append(fill).Append(';');
+            }
+
+            string? borderColor = properties.Elements()
+                .Where(e => e.Name.LocalName.StartsWith("ln", StringComparison.Ordinal))
+                .Select(line => ReadPresentationColor(line, themeColors))
+                .FirstOrDefault(color => !string.IsNullOrWhiteSpace(color));
+            if (!string.IsNullOrWhiteSpace(borderColor))
+            {
+                style.Append("border-color:").Append(borderColor).Append(';');
+            }
+
+            string anchor = properties.Attribute("anchor")?.Value ?? string.Empty;
+            string? verticalAlign = anchor switch
+            {
+                "ctr" => "middle",
+                "b" => "bottom",
+                _ => null
+            };
+            if (!string.IsNullOrWhiteSpace(verticalAlign))
+            {
+                style.Append("vertical-align:").Append(verticalAlign).Append(';');
+            }
+
+            return style.ToString();
+        }
+
+        private static string? ReadSlideBackground(XDocument slide, IReadOnlyList<string> themeColors)
         {
             XElement? bg = slide.Descendants().FirstOrDefault(e => e.Name.LocalName == "bg");
-            return ReadSolidColor(bg);
+            return ReadPresentationColor(bg, themeColors);
         }
 
         private static async Task<IReadOnlyList<PresentationPlaceholderBounds>> LoadSlidePlaceholderBoundsAsync(
@@ -1683,22 +2109,101 @@ renderSheet(0);
             };
         }
 
-        private static string? ReadSolidColor(XElement? parent)
+        private static string? ReadPresentationColor(XElement? parent, IReadOnlyList<string> themeColors)
         {
             if (parent == null)
             {
                 return null;
             }
 
-            XElement? solidFill = parent.Descendants().FirstOrDefault(e => e.Name.LocalName == "solidFill");
-            XElement? srgb = solidFill?.Descendants().FirstOrDefault(e => e.Name.LocalName == "srgbClr");
-            string? value = srgb?.Attribute("val")?.Value;
-            if (!string.IsNullOrWhiteSpace(value) && Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$"))
+            XElement? solidFill = parent.Name.LocalName == "solidFill"
+                ? parent
+                : parent.Descendants().FirstOrDefault(e => e.Name.LocalName == "solidFill");
+            if (solidFill == null)
             {
-                return "#" + value;
+                return null;
             }
 
-            return null;
+            XElement? srgb = solidFill.Descendants().FirstOrDefault(e => e.Name.LocalName == "srgbClr");
+            string? value = srgb?.Attribute("val")?.Value;
+            string? color = !string.IsNullOrWhiteSpace(value) && Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$")
+                ? "#" + value
+                : null;
+
+            if (string.IsNullOrWhiteSpace(color))
+            {
+                XElement? scheme = solidFill.Descendants().FirstOrDefault(e => e.Name.LocalName == "schemeClr");
+                string? schemeName = scheme?.Attribute("val")?.Value;
+                color = ReadPresentationThemeColor(schemeName, themeColors);
+            }
+
+            return string.IsNullOrWhiteSpace(color)
+                ? null
+                : ApplyColorTransforms(color, solidFill);
+        }
+
+        private static string? ReadPresentationThemeColor(string? schemeName, IReadOnlyList<string> themeColors)
+        {
+            if (string.IsNullOrWhiteSpace(schemeName) || themeColors.Count == 0)
+            {
+                return null;
+            }
+
+            int index = schemeName switch
+            {
+                "bg1" or "lt1" => 0,
+                "tx1" or "dk1" => 1,
+                "bg2" or "lt2" => 2,
+                "tx2" or "dk2" => 3,
+                "accent1" => 4,
+                "accent2" => 5,
+                "accent3" => 6,
+                "accent4" => 7,
+                "accent5" => 8,
+                "accent6" => 9,
+                "hlink" => 10,
+                "folHlink" => 11,
+                _ => -1
+            };
+
+            return index >= 0 && index < themeColors.Count ? themeColors[index] : null;
+        }
+
+        private static string ApplyColorTransforms(string color, XElement parent)
+        {
+            if (string.IsNullOrWhiteSpace(color) || !Regex.IsMatch(color, "^#[0-9A-Fa-f]{6}$"))
+            {
+                return color;
+            }
+
+            int r = Convert.ToInt32(color.Substring(1, 2), 16);
+            int g = Convert.ToInt32(color.Substring(3, 2), 16);
+            int b = Convert.ToInt32(color.Substring(5, 2), 16);
+            double lumMod = ReadPercentageTransform(parent, "lumMod", 100000) / 100000.0;
+            double lumOff = ReadPercentageTransform(parent, "lumOff", 0) / 100000.0;
+            r = ApplyLumTransform(r, lumMod, lumOff);
+            g = ApplyLumTransform(g, lumMod, lumOff);
+            b = ApplyLumTransform(b, lumMod, lumOff);
+            return $"#{r:X2}{g:X2}{b:X2}";
+        }
+
+        private static int ReadPercentageTransform(XElement parent, string localName, int fallback)
+        {
+            XElement? element = parent.Descendants().FirstOrDefault(e => e.Name.LocalName == localName);
+            return element != null && int.TryParse(element.Attribute("val")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value)
+                ? value
+                : fallback;
+        }
+
+        private static int ApplyLumTransform(int value, double lumMod, double lumOff)
+        {
+            return Math.Max(0, Math.Min(255, (int)Math.Round((value * lumMod) + (255 * lumOff))));
+        }
+
+        private static double TextMarginToPixels(long value, long slideWidth, double baseWidthPx)
+        {
+            double pixelsPerInch = baseWidthPx / (slideWidth / 914400.0);
+            return value / 1000.0 / 72.0 * pixelsPerInch;
         }
 
         private static bool TryReadBounds(
@@ -1709,7 +2214,19 @@ renderSheet(0);
             double baseHeightPx,
             out string bounds)
         {
-            return TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, null, out bounds);
+            return TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, (IReadOnlyList<PresentationPlaceholderBounds>?)null, out bounds);
+        }
+
+        private static bool TryReadBounds(
+            XElement element,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            PresentationGroupTransform? groupTransform,
+            out string bounds)
+        {
+            return TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, groupTransform, null, out bounds);
         }
 
         private static bool TryReadBounds(
@@ -1721,15 +2238,21 @@ renderSheet(0);
             IReadOnlyList<PresentationPlaceholderBounds>? placeholderBounds,
             out string bounds)
         {
+            return TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, null, placeholderBounds, out bounds);
+        }
+
+        private static bool TryReadBounds(
+            XElement element,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            PresentationGroupTransform? groupTransform,
+            IReadOnlyList<PresentationPlaceholderBounds>? placeholderBounds,
+            out string bounds)
+        {
             bounds = string.Empty;
-            XElement? xfrm = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "xfrm");
-            XElement? off = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "off");
-            XElement? ext = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "ext");
-            if (off == null || ext == null ||
-                !TryReadLong(off, "x", out long x) ||
-                !TryReadLong(off, "y", out long y) ||
-                !TryReadLong(ext, "cx", out long cx) ||
-                !TryReadLong(ext, "cy", out long cy) ||
+            if (!TryReadRawBounds(element, out long x, out long y, out long cx, out long cy, out int rotation) ||
                 cx <= 0 ||
                 cy <= 0)
             {
@@ -1742,11 +2265,91 @@ renderSheet(0);
                 return false;
             }
 
-            bounds = "left:" + Pixels(x, slideWidth, baseWidthPx) +
-                ";top:" + Pixels(y, slideHeight, baseHeightPx) +
-                ";width:" + Pixels(cx, slideWidth, baseWidthPx) +
-                ";height:" + Pixels(cy, slideHeight, baseHeightPx) + ";";
+            double mappedX = groupTransform?.MapX(x) ?? x;
+            double mappedY = groupTransform?.MapY(y) ?? y;
+            double mappedCx = groupTransform?.MapCx(cx) ?? cx;
+            double mappedCy = groupTransform?.MapCy(cy) ?? cy;
+            bounds = "left:" + Pixels(mappedX, slideWidth, baseWidthPx) +
+                ";top:" + Pixels(mappedY, slideHeight, baseHeightPx) +
+                ";width:" + Pixels(mappedCx, slideWidth, baseWidthPx) +
+                ";height:" + Pixels(mappedCy, slideHeight, baseHeightPx) + ";";
+            if (rotation != 0)
+            {
+                bounds += "transform:rotate(" + FormatInvariant(rotation / 60000.0) + "deg);";
+            }
+
             return true;
+        }
+
+        private static bool TryReadGroupTransform(
+            XElement group,
+            PresentationGroupTransform? parent,
+            out PresentationGroupTransform? transform)
+        {
+            transform = null;
+            XElement? groupProperties = group.Elements().FirstOrDefault(e => e.Name.LocalName == "grpSpPr");
+            XElement? xfrm = groupProperties?.Elements().FirstOrDefault(e => e.Name.LocalName == "xfrm");
+            XElement? off = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "off");
+            XElement? ext = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "ext");
+            XElement? childOff = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "chOff");
+            XElement? childExt = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "chExt");
+            if (off == null || ext == null || childOff == null || childExt == null ||
+                !TryReadLong(off, "x", out long x) ||
+                !TryReadLong(off, "y", out long y) ||
+                !TryReadLong(ext, "cx", out long cx) ||
+                !TryReadLong(ext, "cy", out long cy) ||
+                !TryReadLong(childOff, "x", out long childX) ||
+                !TryReadLong(childOff, "y", out long childY) ||
+                !TryReadLong(childExt, "cx", out long childCx) ||
+                !TryReadLong(childExt, "cy", out long childCy) ||
+                cx <= 0 ||
+                cy <= 0 ||
+                childCx <= 0 ||
+                childCy <= 0)
+            {
+                return false;
+            }
+
+            double mappedX = parent?.MapX(x) ?? x;
+            double mappedY = parent?.MapY(y) ?? y;
+            double mappedCx = parent?.MapCx(cx) ?? cx;
+            double mappedCy = parent?.MapCy(cy) ?? cy;
+            transform = new PresentationGroupTransform
+            {
+                X = mappedX,
+                Y = mappedY,
+                Cx = mappedCx,
+                Cy = mappedCy,
+                ChildX = childX,
+                ChildY = childY,
+                ChildCx = childCx,
+                ChildCy = childCy
+            };
+            return true;
+        }
+
+        private static bool TryReadRawBounds(XElement element, out long x, out long y, out long cx, out long cy, out int rotation)
+        {
+            x = 0;
+            y = 0;
+            cx = 0;
+            cy = 0;
+            rotation = 0;
+            XElement? properties = element.Elements().FirstOrDefault(e =>
+                e.Name.LocalName == "spPr" ||
+                e.Name.LocalName == "picPr" ||
+                e.Name.LocalName == "grpSpPr");
+            XElement? xfrm = properties?.Elements().FirstOrDefault(e => e.Name.LocalName == "xfrm") ??
+                element.Elements().FirstOrDefault(e => e.Name.LocalName == "xfrm");
+            XElement? off = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "off");
+            XElement? ext = xfrm?.Elements().FirstOrDefault(e => e.Name.LocalName == "ext");
+            rotation = TryReadInt(xfrm ?? element, "rot");
+            return off != null &&
+                ext != null &&
+                TryReadLong(off, "x", out x) &&
+                TryReadLong(off, "y", out y) &&
+                TryReadLong(ext, "cx", out cx) &&
+                TryReadLong(ext, "cy", out cy);
         }
 
         private static bool TryReadLong(XElement element, string attributeName, out long value)
@@ -1773,6 +2376,11 @@ renderSheet(0);
         private static string Pixels(long value, long total, double baseSizePx)
         {
             return FormatInvariant(value / (double)Math.Max(1, total) * baseSizePx) + "px";
+        }
+
+        private static string Pixels(double value, long total, double baseSizePx)
+        {
+            return FormatInvariant(value / Math.Max(1.0, total) * baseSizePx) + "px";
         }
 
         private static string? TryReadImageDataUri(ZipArchive archive, string imagePath)
