@@ -7,6 +7,7 @@ import {
     isHangulImeKeyEvent,
     isPlainTextKey,
     lineTop,
+    post,
     queueRender,
     reportCursorAndSelection,
     requestLines,
