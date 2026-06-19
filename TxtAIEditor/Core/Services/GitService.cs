@@ -370,7 +370,23 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
-            string output = await RunGitCommandAsync(repoPath, "push");
+            string upstream = await RunGitCommandAsync(repoPath, "rev-parse --abbrev-ref --symbolic-full-name @{u}");
+            string output;
+            if (string.IsNullOrWhiteSpace(upstream) || upstream.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                string branch = await GetCurrentBranchNameAsync(repoPath);
+                if (string.IsNullOrEmpty(branch))
+                {
+                    return false;
+                }
+
+                output = await RunGitCommandAsync(repoPath, $"push -u origin \"{QuotePath(branch)}\"");
+            }
+            else
+            {
+                output = await RunGitCommandAsync(repoPath, "push");
+            }
+
             return !output.StartsWith("fatal:");
         }
 
@@ -379,7 +395,7 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
-            string output = await RunGitCommandAsync(repoPath, "pull");
+            string output = await RunUpstreamAwarePullAsync(repoPath, rebase: false);
             return !output.StartsWith("fatal:");
         }
 
@@ -388,7 +404,7 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
-            string output = await RunGitCommandAsync(repoPath, "pull --rebase");
+            string output = await RunUpstreamAwarePullAsync(repoPath, rebase: true);
             return !output.StartsWith("fatal:");
         }
 
@@ -418,7 +434,71 @@ namespace TxtAIEditor.Core.Services
                 : $"remote set-url {remoteName} \"{escapedUrl}\"";
 
             string output = await RunGitCommandAsync(repoPath, command);
+            if (output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            await LinkCurrentBranchToRemoteAsync(repoPath, remoteName);
+            return true;
+        }
+
+        public async Task<bool> LinkCurrentBranchToRemoteAsync(string repoPath, string remoteName = "origin")
+        {
+            if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(remoteName))
+                return false;
+
+            string branch = await GetCurrentBranchNameAsync(repoPath);
+            if (string.IsNullOrEmpty(branch))
+            {
+                return false;
+            }
+
+            string output = await RunGitCommandAsync(
+                repoPath,
+                $"branch --set-upstream-to=\"{remoteName}/{QuotePath(branch)}\" \"{QuotePath(branch)}\"");
             return !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<string> RunUpstreamAwarePullAsync(string repoPath, bool rebase)
+        {
+            string upstream = await RunGitCommandAsync(repoPath, "rev-parse --abbrev-ref --symbolic-full-name @{u}");
+            if (!string.IsNullOrWhiteSpace(upstream) && !upstream.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                return await RunGitCommandAsync(repoPath, rebase ? "pull --rebase" : "pull");
+            }
+
+            string branch = await GetCurrentBranchNameAsync(repoPath);
+            if (string.IsNullOrEmpty(branch))
+            {
+                return "fatal: current branch could not be detected";
+            }
+
+            string command = rebase
+                ? $"pull --rebase origin \"{QuotePath(branch)}\""
+                : $"pull origin \"{QuotePath(branch)}\"";
+            string output = await RunGitCommandAsync(repoPath, command);
+            if (!output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                await LinkCurrentBranchToRemoteAsync(repoPath);
+            }
+
+            return output;
+        }
+
+        private async Task<string> GetCurrentBranchNameAsync(string repoPath)
+        {
+            string branch = await RunGitCommandAsync(repoPath, "symbolic-ref --quiet --short HEAD");
+            if (string.IsNullOrWhiteSpace(branch) || branch.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                branch = await RunGitCommandAsync(repoPath, "rev-parse --abbrev-ref HEAD");
+            }
+
+            branch = branch.Trim();
+            return branch.Equals("HEAD", StringComparison.OrdinalIgnoreCase) ||
+                   branch.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : branch;
         }
 
         public async Task<IReadOnlyList<string>> GetRecentHistoryAsync(string repoPath, int maxCount = 50)
