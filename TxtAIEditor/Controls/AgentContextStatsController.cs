@@ -131,10 +131,15 @@ namespace TxtAIEditor.Controls
                 _modelContextLimits.ResetLmStudioCache();
             }
 
-            string provider = settings.LlmProvider ?? string.Empty;
-            string model = settings.LlmModel ?? string.Empty;
-            string format = _getString("AgentModelFormat", "모델: {0} ({1})");
-            _agentPane.UpdateModelName(string.Format(format, model, provider));
+                string provider = settings.LlmProvider ?? string.Empty;
+                string model = settings.LlmModel ?? string.Empty;
+                string format = _getString("AgentModelFormat", "모델: {0} ({1})");
+                string result = string.Format(format, model, provider);
+                if (settings.LlmAgentVerbose)
+                {
+                    result += " -v";
+                }
+                _agentPane.UpdateModelName(result);
             _refreshOutputDisplay();
         }
 
