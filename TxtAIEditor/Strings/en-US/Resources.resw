@@ -551,6 +551,57 @@
   <data name="GitRemote" xml:space="preserve">
     <value>Remote</value>
   </data>
+  <data name="GitPullSuccessTitle" xml:space="preserve">
+    <value>Git Pull</value>
+  </data>
+  <data name="GitPullSuccessMessage" xml:space="preserve">
+    <value>Pull completed.</value>
+  </data>
+  <data name="GitPullFailureTitle" xml:space="preserve">
+    <value>Git Pull Failed</value>
+  </data>
+  <data name="GitPullFailureMessage" xml:space="preserve">
+    <value>Pull failed. Check the remote repository, authentication, or conflict state.</value>
+  </data>
+  <data name="GitRebaseSuccessTitle" xml:space="preserve">
+    <value>Git Rebase</value>
+  </data>
+  <data name="GitRebaseSuccessMessage" xml:space="preserve">
+    <value>Rebase completed.</value>
+  </data>
+  <data name="GitRebaseFailureTitle" xml:space="preserve">
+    <value>Git Rebase Failed</value>
+  </data>
+  <data name="GitRebaseFailureMessage" xml:space="preserve">
+    <value>Rebase failed. Check the remote repository, authentication, or conflict state.</value>
+  </data>
+  <data name="GitRemoteDialogTitle" xml:space="preserve">
+    <value>Git Remote</value>
+  </data>
+  <data name="GitRemoteDialogLabel" xml:space="preserve">
+    <value>origin remote URL</value>
+  </data>
+  <data name="GitRemoteDialogConnect" xml:space="preserve">
+    <value>Connect</value>
+  </data>
+  <data name="GitRemoteDialogCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="GitRemoteNoRepoMessage" xml:space="preserve">
+    <value>Select or create a Git repository first.</value>
+  </data>
+  <data name="GitRemoteInvalidUrlMessage" xml:space="preserve">
+    <value>Enter a valid GitHub remote URL.</value>
+  </data>
+  <data name="GitRemoteSuccessMessage" xml:space="preserve">
+    <value>The origin remote has been connected.</value>
+  </data>
+  <data name="GitRemoteFailureTitle" xml:space="preserve">
+    <value>Git Remote Failed</value>
+  </data>
+  <data name="GitRemoteFailureMessage" xml:space="preserve">
+    <value>Failed to connect the remote URL.</value>
+  </data>
   <data name="GitRefresh" xml:space="preserve">
     <value>Refresh</value>
   </data>

@@ -551,6 +551,57 @@
   <data name="GitRemote" xml:space="preserve">
     <value>Remote</value>
   </data>
+  <data name="GitPullSuccessTitle" xml:space="preserve">
+    <value>Git Pull</value>
+  </data>
+  <data name="GitPullSuccessMessage" xml:space="preserve">
+    <value>Pull이 완료되었습니다.</value>
+  </data>
+  <data name="GitPullFailureTitle" xml:space="preserve">
+    <value>Git Pull 실패</value>
+  </data>
+  <data name="GitPullFailureMessage" xml:space="preserve">
+    <value>Pull 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오.</value>
+  </data>
+  <data name="GitRebaseSuccessTitle" xml:space="preserve">
+    <value>Git Rebase</value>
+  </data>
+  <data name="GitRebaseSuccessMessage" xml:space="preserve">
+    <value>Rebase가 완료되었습니다.</value>
+  </data>
+  <data name="GitRebaseFailureTitle" xml:space="preserve">
+    <value>Git Rebase 실패</value>
+  </data>
+  <data name="GitRebaseFailureMessage" xml:space="preserve">
+    <value>Rebase 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오.</value>
+  </data>
+  <data name="GitRemoteDialogTitle" xml:space="preserve">
+    <value>Git Remote</value>
+  </data>
+  <data name="GitRemoteDialogLabel" xml:space="preserve">
+    <value>origin remote URL</value>
+  </data>
+  <data name="GitRemoteDialogConnect" xml:space="preserve">
+    <value>연결</value>
+  </data>
+  <data name="GitRemoteDialogCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="GitRemoteNoRepoMessage" xml:space="preserve">
+    <value>Git 저장소를 먼저 선택하거나 생성하세요.</value>
+  </data>
+  <data name="GitRemoteInvalidUrlMessage" xml:space="preserve">
+    <value>올바른 GitHub remote URL을 입력하세요.</value>
+  </data>
+  <data name="GitRemoteSuccessMessage" xml:space="preserve">
+    <value>origin remote가 연결되었습니다.</value>
+  </data>
+  <data name="GitRemoteFailureTitle" xml:space="preserve">
+    <value>Git Remote 실패</value>
+  </data>
+  <data name="GitRemoteFailureMessage" xml:space="preserve">
+    <value>remote URL 연결에 실패했습니다.</value>
+  </data>
   <data name="GitRefresh" xml:space="preserve">
     <value>새로고침</value>
   </data>

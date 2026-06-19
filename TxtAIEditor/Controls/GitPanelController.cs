@@ -317,11 +317,15 @@ namespace TxtAIEditor.Controls
             if (success)
             {
                 await RefreshAsync(repoPath);
-                _showError("Git Pull", "Pull이 완료되었습니다.");
+                _showError(
+                    _getString("GitPullSuccessTitle", "Git Pull"),
+                    _getString("GitPullSuccessMessage", "Pull이 완료되었습니다."));
             }
             else
             {
-                _showError("Git Pull 실패", "Pull 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오.");
+                _showError(
+                    _getString("GitPullFailureTitle", "Git Pull 실패"),
+                    _getString("GitPullFailureMessage", "Pull 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오."));
             }
         }
 
@@ -331,11 +335,15 @@ namespace TxtAIEditor.Controls
             if (success)
             {
                 await RefreshAsync(repoPath);
-                _showError("Git Rebase", "Rebase가 완료되었습니다.");
+                _showError(
+                    _getString("GitRebaseSuccessTitle", "Git Rebase"),
+                    _getString("GitRebaseSuccessMessage", "Rebase가 완료되었습니다."));
             }
             else
             {
-                _showError("Git Rebase 실패", "Rebase 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오.");
+                _showError(
+                    _getString("GitRebaseFailureTitle", "Git Rebase 실패"),
+                    _getString("GitRebaseFailureMessage", "Rebase 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오."));
             }
         }
 
@@ -343,16 +351,13 @@ namespace TxtAIEditor.Controls
         {
             if (string.IsNullOrEmpty(repoPath))
             {
-                _showError("Git Remote", "Git 저장소를 먼저 선택하거나 생성하세요.");
+                _showError(
+                    _getString("GitRemoteDialogTitle", "Git Remote"),
+                    _getString("GitRemoteNoRepoMessage", "Git 저장소를 먼저 선택하거나 생성하세요."));
                 return;
             }
 
-            bool isDarkTheme = false;
-            if (_xamlRootProvider()?.Content is FrameworkElement fe)
-            {
-                isDarkTheme = fe.ActualTheme == ElementTheme.Dark;
-            }
-
+            ElementTheme dialogTheme = GetCurrentDialogTheme();
             string currentUrl = await _gitService.GetRemoteUrlAsync(repoPath);
             const double RemoteDialogContentWidth = 420;
             var remoteInput = new TextBox
@@ -362,6 +367,7 @@ namespace TxtAIEditor.Controls
                 Width = RemoteDialogContentWidth,
                 FontSize = 12,
                 TextWrapping = TextWrapping.NoWrap,
+                RequestedTheme = dialogTheme,
                 IsSpellCheckEnabled = false,
                 IsTextPredictionEnabled = false
             };
@@ -373,12 +379,14 @@ namespace TxtAIEditor.Controls
             var content = new StackPanel
             {
                 Spacing = 8,
-                Width = RemoteDialogContentWidth
+                Width = RemoteDialogContentWidth,
+                RequestedTheme = dialogTheme
             };
             content.Children.Add(new TextBlock
             {
-                Text = "origin remote URL",
+                Text = _getString("GitRemoteDialogLabel", "origin remote URL"),
                 FontSize = 11,
+                RequestedTheme = dialogTheme,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             });
             content.Children.Add(remoteInput);
@@ -386,12 +394,12 @@ namespace TxtAIEditor.Controls
             _beforeDialog?.Invoke();
             var dialog = new ContentDialog
             {
-                Title = "Git Remote",
+                Title = _getString("GitRemoteDialogTitle", "Git Remote"),
                 Content = content,
-                PrimaryButtonText = "연결",
-                CloseButtonText = "취소",
+                PrimaryButtonText = _getString("GitRemoteDialogConnect", "연결"),
+                CloseButtonText = _getString("GitRemoteDialogCancel", "취소"),
                 XamlRoot = _xamlRootProvider(),
-                RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light
+                RequestedTheme = dialogTheme
             };
 
             ContentDialogResult result = await dialog.ShowAsync();
@@ -404,18 +412,24 @@ namespace TxtAIEditor.Controls
             string remoteUrl = remoteInput.Text.Trim();
             if (string.IsNullOrWhiteSpace(remoteUrl) || remoteUrl.Contains(' '))
             {
-                _showError("Git Remote", "올바른 GitHub remote URL을 입력하세요.");
+                _showError(
+                    _getString("GitRemoteDialogTitle", "Git Remote"),
+                    _getString("GitRemoteInvalidUrlMessage", "올바른 GitHub remote URL을 입력하세요."));
                 return;
             }
 
             bool success = await _gitService.SetRemoteUrlAsync(repoPath, remoteUrl);
             if (success)
             {
-                _showError("Git Remote", "origin remote가 연결되었습니다.");
+                _showError(
+                    _getString("GitRemoteDialogTitle", "Git Remote"),
+                    _getString("GitRemoteSuccessMessage", "origin remote가 연결되었습니다."));
             }
             else
             {
-                _showError("Git Remote 실패", "remote URL 연결에 실패했습니다.");
+                _showError(
+                    _getString("GitRemoteFailureTitle", "Git Remote 실패"),
+                    _getString("GitRemoteFailureMessage", "remote URL 연결에 실패했습니다."));
             }
         }
 
@@ -686,6 +700,22 @@ namespace TxtAIEditor.Controls
             string normalizedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             string name = Path.GetFileName(normalizedPath);
             return string.IsNullOrWhiteSpace(name) ? normalizedPath : name;
+        }
+
+        private ElementTheme GetCurrentDialogTheme()
+        {
+            if (_leftSidebar.ActualTheme is ElementTheme.Light or ElementTheme.Dark)
+            {
+                return _leftSidebar.ActualTheme;
+            }
+
+            if (_xamlRootProvider()?.Content is FrameworkElement fe &&
+                fe.ActualTheme is ElementTheme.Light or ElementTheme.Dark)
+            {
+                return fe.ActualTheme;
+            }
+
+            return ElementTheme.Default;
         }
 
         private void WireEvents()

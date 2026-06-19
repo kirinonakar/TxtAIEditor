@@ -551,6 +551,57 @@
   <data name="GitRemote" xml:space="preserve">
     <value>Remote</value>
   </data>
+  <data name="GitPullSuccessTitle" xml:space="preserve">
+    <value>Git Pull</value>
+  </data>
+  <data name="GitPullSuccessMessage" xml:space="preserve">
+    <value>Pull が完了しました。</value>
+  </data>
+  <data name="GitPullFailureTitle" xml:space="preserve">
+    <value>Git Pull 失敗</value>
+  </data>
+  <data name="GitPullFailureMessage" xml:space="preserve">
+    <value>Pull に失敗しました。リモートリポジトリ、認証、または競合状態を確認してください。</value>
+  </data>
+  <data name="GitRebaseSuccessTitle" xml:space="preserve">
+    <value>Git Rebase</value>
+  </data>
+  <data name="GitRebaseSuccessMessage" xml:space="preserve">
+    <value>Rebase が完了しました。</value>
+  </data>
+  <data name="GitRebaseFailureTitle" xml:space="preserve">
+    <value>Git Rebase 失敗</value>
+  </data>
+  <data name="GitRebaseFailureMessage" xml:space="preserve">
+    <value>Rebase に失敗しました。リモートリポジトリ、認証、または競合状態を確認してください。</value>
+  </data>
+  <data name="GitRemoteDialogTitle" xml:space="preserve">
+    <value>Git Remote</value>
+  </data>
+  <data name="GitRemoteDialogLabel" xml:space="preserve">
+    <value>origin remote URL</value>
+  </data>
+  <data name="GitRemoteDialogConnect" xml:space="preserve">
+    <value>接続</value>
+  </data>
+  <data name="GitRemoteDialogCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="GitRemoteNoRepoMessage" xml:space="preserve">
+    <value>先に Git リポジトリを選択または作成してください。</value>
+  </data>
+  <data name="GitRemoteInvalidUrlMessage" xml:space="preserve">
+    <value>有効な GitHub remote URL を入力してください。</value>
+  </data>
+  <data name="GitRemoteSuccessMessage" xml:space="preserve">
+    <value>origin remote を接続しました。</value>
+  </data>
+  <data name="GitRemoteFailureTitle" xml:space="preserve">
+    <value>Git Remote 失敗</value>
+  </data>
+  <data name="GitRemoteFailureMessage" xml:space="preserve">
+    <value>remote URL の接続に失敗しました。</value>
+  </data>
   <data name="GitRefresh" xml:space="preserve">
     <value>更新</value>
   </data>
