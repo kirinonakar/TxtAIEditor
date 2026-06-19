@@ -354,16 +354,27 @@ namespace TxtAIEditor.Controls
             }
 
             string currentUrl = await _gitService.GetRemoteUrlAsync(repoPath);
+            const double RemoteDialogContentWidth = 420;
             var remoteInput = new TextBox
             {
                 Text = currentUrl,
                 PlaceholderText = "https://github.com/user/repo.git",
+                Width = RemoteDialogContentWidth,
                 FontSize = 12,
+                TextWrapping = TextWrapping.NoWrap,
                 IsSpellCheckEnabled = false,
                 IsTextPredictionEnabled = false
             };
+            ScrollViewer.SetHorizontalScrollMode(remoteInput, ScrollMode.Auto);
+            ScrollViewer.SetHorizontalScrollBarVisibility(remoteInput, ScrollBarVisibility.Auto);
+            ScrollViewer.SetVerticalScrollMode(remoteInput, ScrollMode.Disabled);
+            ScrollViewer.SetVerticalScrollBarVisibility(remoteInput, ScrollBarVisibility.Disabled);
 
-            var content = new StackPanel { Spacing = 8 };
+            var content = new StackPanel
+            {
+                Spacing = 8,
+                Width = RemoteDialogContentWidth
+            };
             content.Children.Add(new TextBlock
             {
                 Text = "origin remote URL",
