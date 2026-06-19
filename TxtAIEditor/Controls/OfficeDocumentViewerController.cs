@@ -16,16 +16,18 @@ namespace TxtAIEditor.Controls
     {
         private readonly ISettingsService _settingsService;
         private readonly Func<OpenedTab?> _activeTabProvider;
-        private readonly OfficeDocumentViewerService _viewerService = new();
+        private readonly OfficeDocumentViewerService _viewerService;
         private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
         private readonly Dictionary<string, string> _viewerHtmlPaths = new Dictionary<string, string>();
 
         public OfficeDocumentViewerController(
             ISettingsService settingsService,
-            Func<OpenedTab?> activeTabProvider)
+            Func<OpenedTab?> activeTabProvider,
+            Func<string, string, string> getString)
         {
             _settingsService = settingsService;
             _activeTabProvider = activeTabProvider;
+            _viewerService = new OfficeDocumentViewerService(getString);
         }
 
         public void Register(OpenedTab tab, WebView2 webView)

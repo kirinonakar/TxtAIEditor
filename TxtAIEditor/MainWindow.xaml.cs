@@ -311,7 +311,8 @@ namespace TxtAIEditor
                 UpdateRightPanelSelectionContext);
             _officeDocumentViewerController = new OfficeDocumentViewerController(
                 _settingsService,
-                _tabNavigationController.GetActiveTab);
+                _tabNavigationController.GetActiveTab,
+                GetLocalizedString);
             _editorLinkNavigationController = new EditorLinkNavigationController(
                 _tabNavigationController.GetActiveTab,
                 NavigateExplorerToFolderAndRevealAsync);

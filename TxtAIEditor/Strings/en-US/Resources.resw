@@ -2344,4 +2344,46 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExplorerFilterResultFormat" xml:space="preserve">
     <value>{0:N0} results</value>
   </data>
+  <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
+    <value>Unsupported Office document.</value>
+  </data>
+  <data name="OfficeViewerDocxStructureError" xml:space="preserve">
+    <value>Could not read the DOCX document structure.</value>
+  </data>
+  <data name="OfficeViewerHwpxStructureError" xml:space="preserve">
+    <value>Could not read the HWPX document structure.</value>
+  </data>
+  <data name="OfficeViewerPptxStructureError" xml:space="preserve">
+    <value>Could not read the PPTX presentation structure.</value>
+  </data>
+  <data name="OfficeViewerNoBody" xml:space="preserve">
+    <value>No document body to display.</value>
+  </data>
+  <data name="OfficeViewerNoContent" xml:space="preserve">
+    <value>No content to display.</value>
+  </data>
+  <data name="OfficeViewerNoSlides" xml:space="preserve">
+    <value>No slides to display.</value>
+  </data>
+  <data name="OfficeViewerSlideRenderError" xml:space="preserve">
+    <value>Could not render any slides.</value>
+  </data>
+  <data name="OfficeViewerNoSheets" xml:space="preserve">
+    <value>No sheets to display.</value>
+  </data>
+  <data name="OfficeViewerEmptySheet" xml:space="preserve">
+    <value>Empty sheet.</value>
+  </data>
+  <data name="OfficeViewerRowsLabel" xml:space="preserve">
+    <value>rows</value>
+  </data>
+  <data name="OfficeViewerColumnsLabel" xml:space="preserve">
+    <value>columns</value>
+  </data>
+  <data name="OfficeViewerFirstRowsShownFormat" xml:space="preserve">
+    <value>first {0} shown</value>
+  </data>
+  <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
+    <value>Sheet</value>
+  </data>
 </root>

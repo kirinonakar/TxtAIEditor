@@ -244,7 +244,9 @@ namespace TxtAIEditor.Controls
         private static bool IsOfficeDocumentFile(string filePath)
         {
             string extension = Path.GetExtension(filePath);
-            return extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
+            return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
         }
 

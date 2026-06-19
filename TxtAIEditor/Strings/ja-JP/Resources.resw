@@ -2345,4 +2345,46 @@
   <data name="ExplorerFilterResultFormat" xml:space="preserve">
     <value>{0:N0}件の結果</value>
   </data>
+  <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
+    <value>サポートされていない Office 文書です。</value>
+  </data>
+  <data name="OfficeViewerDocxStructureError" xml:space="preserve">
+    <value>DOCX 文書の構造を読み取れません。</value>
+  </data>
+  <data name="OfficeViewerHwpxStructureError" xml:space="preserve">
+    <value>HWPX 文書の構造を読み取れません。</value>
+  </data>
+  <data name="OfficeViewerPptxStructureError" xml:space="preserve">
+    <value>PPTX プレゼンテーションの構造を読み取れません。</value>
+  </data>
+  <data name="OfficeViewerNoBody" xml:space="preserve">
+    <value>表示する本文がありません。</value>
+  </data>
+  <data name="OfficeViewerNoContent" xml:space="preserve">
+    <value>表示する内容がありません。</value>
+  </data>
+  <data name="OfficeViewerNoSlides" xml:space="preserve">
+    <value>表示するスライドがありません。</value>
+  </data>
+  <data name="OfficeViewerSlideRenderError" xml:space="preserve">
+    <value>表示するスライドをレンダリングできませんでした。</value>
+  </data>
+  <data name="OfficeViewerNoSheets" xml:space="preserve">
+    <value>表示するシートがありません。</value>
+  </data>
+  <data name="OfficeViewerEmptySheet" xml:space="preserve">
+    <value>空のシートです。</value>
+  </data>
+  <data name="OfficeViewerRowsLabel" xml:space="preserve">
+    <value>行</value>
+  </data>
+  <data name="OfficeViewerColumnsLabel" xml:space="preserve">
+    <value>列</value>
+  </data>
+  <data name="OfficeViewerFirstRowsShownFormat" xml:space="preserve">
+    <value>最初の {0} 件を表示</value>
+  </data>
+  <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
+    <value>シート</value>
+  </data>
  </root>

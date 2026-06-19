@@ -2344,4 +2344,46 @@
   <data name="ExplorerFilterResultFormat" xml:space="preserve">
     <value>{0:N0}개 결과</value>
   </data>
+  <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
+    <value>지원하지 않는 Office 문서입니다.</value>
+  </data>
+  <data name="OfficeViewerDocxStructureError" xml:space="preserve">
+    <value>DOCX 문서 구조를 읽을 수 없습니다.</value>
+  </data>
+  <data name="OfficeViewerHwpxStructureError" xml:space="preserve">
+    <value>HWPX 본문 구조를 읽을 수 없습니다.</value>
+  </data>
+  <data name="OfficeViewerPptxStructureError" xml:space="preserve">
+    <value>PPTX 프레젠테이션 구조를 읽을 수 없습니다.</value>
+  </data>
+  <data name="OfficeViewerNoBody" xml:space="preserve">
+    <value>표시할 본문이 없습니다.</value>
+  </data>
+  <data name="OfficeViewerNoContent" xml:space="preserve">
+    <value>표시할 내용이 없습니다.</value>
+  </data>
+  <data name="OfficeViewerNoSlides" xml:space="preserve">
+    <value>표시할 슬라이드가 없습니다.</value>
+  </data>
+  <data name="OfficeViewerSlideRenderError" xml:space="preserve">
+    <value>표시할 슬라이드를 렌더링하지 못했습니다.</value>
+  </data>
+  <data name="OfficeViewerNoSheets" xml:space="preserve">
+    <value>표시할 시트가 없습니다.</value>
+  </data>
+  <data name="OfficeViewerEmptySheet" xml:space="preserve">
+    <value>빈 시트입니다.</value>
+  </data>
+  <data name="OfficeViewerRowsLabel" xml:space="preserve">
+    <value>행</value>
+  </data>
+  <data name="OfficeViewerColumnsLabel" xml:space="preserve">
+    <value>열</value>
+  </data>
+  <data name="OfficeViewerFirstRowsShownFormat" xml:space="preserve">
+    <value>처음 {0}개 표시</value>
+  </data>
+  <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
+    <value>시트</value>
+  </data>
 </root>
