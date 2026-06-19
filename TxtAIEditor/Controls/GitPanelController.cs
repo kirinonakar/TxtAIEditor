@@ -82,6 +82,8 @@ namespace TxtAIEditor.Controls
         private void UpdateInitButtonState(string? repoPath)
         {
             _leftSidebar.GitInitRepoBtn.IsEnabled = string.IsNullOrEmpty(repoPath);
+            _leftSidebar.GitPushBtn.IsEnabled = !string.IsNullOrEmpty(repoPath);
+            _leftSidebar.GitRemoteBtn.IsEnabled = !string.IsNullOrEmpty(repoPath);
         }
 
         public async Task RefreshAsync(string repoPath)
@@ -306,6 +308,103 @@ namespace TxtAIEditor.Controls
             else
             {
                 _showError("Git Push 실패", "Push 처리에 실패했습니다. 원격 저장소/인증/업스트림 설정을 확인하십시오.");
+            }
+        }
+
+        public async Task PullAsync(string repoPath)
+        {
+            bool success = await _gitService.PullAsync(repoPath);
+            if (success)
+            {
+                await RefreshAsync(repoPath);
+                _showError("Git Pull", "Pull이 완료되었습니다.");
+            }
+            else
+            {
+                _showError("Git Pull 실패", "Pull 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오.");
+            }
+        }
+
+        public async Task RebaseAsync(string repoPath)
+        {
+            bool success = await _gitService.RebaseAsync(repoPath);
+            if (success)
+            {
+                await RefreshAsync(repoPath);
+                _showError("Git Rebase", "Rebase가 완료되었습니다.");
+            }
+            else
+            {
+                _showError("Git Rebase 실패", "Rebase 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오.");
+            }
+        }
+
+        public async Task ConfigureRemoteAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+            {
+                _showError("Git Remote", "Git 저장소를 먼저 선택하거나 생성하세요.");
+                return;
+            }
+
+            bool isDarkTheme = false;
+            if (_xamlRootProvider()?.Content is FrameworkElement fe)
+            {
+                isDarkTheme = fe.ActualTheme == ElementTheme.Dark;
+            }
+
+            string currentUrl = await _gitService.GetRemoteUrlAsync(repoPath);
+            var remoteInput = new TextBox
+            {
+                Text = currentUrl,
+                PlaceholderText = "https://github.com/user/repo.git",
+                FontSize = 12,
+                IsSpellCheckEnabled = false,
+                IsTextPredictionEnabled = false
+            };
+
+            var content = new StackPanel { Spacing = 8 };
+            content.Children.Add(new TextBlock
+            {
+                Text = "origin remote URL",
+                FontSize = 11,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            content.Children.Add(remoteInput);
+
+            _beforeDialog?.Invoke();
+            var dialog = new ContentDialog
+            {
+                Title = "Git Remote",
+                Content = content,
+                PrimaryButtonText = "연결",
+                CloseButtonText = "취소",
+                XamlRoot = _xamlRootProvider(),
+                RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light
+            };
+
+            ContentDialogResult result = await dialog.ShowAsync();
+            _afterDialog?.Invoke();
+            if (result != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            string remoteUrl = remoteInput.Text.Trim();
+            if (string.IsNullOrWhiteSpace(remoteUrl) || remoteUrl.Contains(' '))
+            {
+                _showError("Git Remote", "올바른 GitHub remote URL을 입력하세요.");
+                return;
+            }
+
+            bool success = await _gitService.SetRemoteUrlAsync(repoPath, remoteUrl);
+            if (success)
+            {
+                _showError("Git Remote", "origin remote가 연결되었습니다.");
+            }
+            else
+            {
+                _showError("Git Remote 실패", "remote URL 연결에 실패했습니다.");
             }
         }
 
@@ -587,6 +686,9 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitStageAllClick += OnGitStageAllClick;
             _leftSidebar.GitRestoreAllClick += OnGitRestoreAllClick;
             _leftSidebar.GitPushClick += OnGitPushClick;
+            _leftSidebar.GitPullClick += OnGitPullClick;
+            _leftSidebar.GitRebaseClick += OnGitRebaseClick;
+            _leftSidebar.GitRemoteClick += OnGitRemoteClick;
             _leftSidebar.GitRefreshClick += OnGitRefreshClick;
             _leftSidebar.GitHistoryItemClick += OnGitHistoryItemClick;
             _leftSidebar.GitInitRepoClick += OnGitInitRepoClick;
@@ -621,6 +723,21 @@ namespace TxtAIEditor.Controls
         private async void OnGitPushClick(object sender, RoutedEventArgs e)
         {
             await PushAsync(_repoPathProvider());
+        }
+
+        private async void OnGitPullClick(object sender, RoutedEventArgs e)
+        {
+            await PullAsync(_repoPathProvider());
+        }
+
+        private async void OnGitRebaseClick(object sender, RoutedEventArgs e)
+        {
+            await RebaseAsync(_repoPathProvider());
+        }
+
+        private async void OnGitRemoteClick(object sender, RoutedEventArgs e)
+        {
+            await ConfigureRemoteAsync(_repoPathProvider());
         }
 
         private async void OnGitRestoreAllClick(object sender, RoutedEventArgs e)

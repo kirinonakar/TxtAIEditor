@@ -374,6 +374,53 @@ namespace TxtAIEditor.Core.Services
             return !output.StartsWith("fatal:");
         }
 
+        public async Task<bool> PullAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+                return false;
+
+            string output = await RunGitCommandAsync(repoPath, "pull");
+            return !output.StartsWith("fatal:");
+        }
+
+        public async Task<bool> RebaseAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+                return false;
+
+            string output = await RunGitCommandAsync(repoPath, "pull --rebase");
+            return !output.StartsWith("fatal:");
+        }
+
+        public async Task<string> GetRemoteUrlAsync(string repoPath, string remoteName = "origin")
+        {
+            if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(remoteName))
+                return string.Empty;
+
+            string output = await RunGitCommandAsync(repoPath, $"remote get-url {remoteName}");
+            if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            return output.Trim();
+        }
+
+        public async Task<bool> SetRemoteUrlAsync(string repoPath, string remoteUrl, string remoteName = "origin")
+        {
+            if (string.IsNullOrEmpty(repoPath) || string.IsNullOrWhiteSpace(remoteUrl) || string.IsNullOrEmpty(remoteName))
+                return false;
+
+            string existingUrl = await GetRemoteUrlAsync(repoPath, remoteName);
+            string escapedUrl = QuotePath(remoteUrl.Trim());
+            string command = string.IsNullOrEmpty(existingUrl)
+                ? $"remote add {remoteName} \"{escapedUrl}\""
+                : $"remote set-url {remoteName} \"{escapedUrl}\"";
+
+            string output = await RunGitCommandAsync(repoPath, command);
+            return !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+        }
+
         public async Task<IReadOnlyList<string>> GetRecentHistoryAsync(string repoPath, int maxCount = 50)
         {
             if (string.IsNullOrEmpty(repoPath))

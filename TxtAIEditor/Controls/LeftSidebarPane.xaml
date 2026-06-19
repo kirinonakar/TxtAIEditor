@@ -405,9 +405,13 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="GitPanelBranchText" Text="Git: 감지 안됨" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         <Button x:Name="GitInitRepoButton" Grid.Column="1" Content="Git 생성" FontSize="10" Padding="6,2" Height="22" MinWidth="0" Click="OnGitInitRepoClick" ToolTipService.ToolTip="Git 저장소 생성"/>
+                                        <Button x:Name="GitRefreshButton" Grid.Column="2" Width="24" MinWidth="24" Height="24" Margin="4,0,0,0" HorizontalAlignment="Right" Click="OnGitRefreshClick" Padding="0" CornerRadius="4" ToolTipService.ToolTip="새로고침">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="10"/>
+                                        </Button>
                                     </Grid>
                                     <ComboBox x:Name="GitBranchesCombo" PlaceholderText="브랜치 목록" Height="24" FontSize="10" Padding="6,0,4,0" HorizontalAlignment="Stretch"/>
                                 </StackPanel>
@@ -453,10 +457,17 @@
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <Button x:Name="GitPushButton" Content="Push" HorizontalAlignment="Stretch" Click="OnGitPushClick" FontSize="11"/>
-                                    <Button x:Name="GitRefreshButton" Grid.Column="1" Content="새로고침" HorizontalAlignment="Stretch" Click="OnGitRefreshClick" FontSize="11"/>
+                                        <SplitButton x:Name="GitPushButton" Content="Push" HorizontalAlignment="Stretch" Click="OnGitPushClick" FontSize="11" Height="30" Padding="10,3" CornerRadius="4">
+                                            <SplitButton.Flyout>
+                                                <MenuFlyout>
+                                                    <MenuFlyoutItem x:Name="GitPullMenuItem" Text="Pull" Click="OnGitPullClick"/>
+                                                    <MenuFlyoutItem x:Name="GitRebaseMenuItem" Text="Rebase" Click="OnGitRebaseClick"/>
+                                                </MenuFlyout>
+                                            </SplitButton.Flyout>
+                                        </SplitButton>
+                                        <Button x:Name="GitRemoteButton" Grid.Column="1" Content="Remote" MinWidth="64" Height="30" Padding="10,3" HorizontalAlignment="Stretch" Click="OnGitRemoteClick" FontSize="11" IsEnabled="False"/>
                                     </Grid>
                                 </StackPanel>
     

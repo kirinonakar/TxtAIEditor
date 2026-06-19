@@ -539,6 +539,18 @@
   <data name="GitPush" xml:space="preserve">
     <value>Push</value>
   </data>
+  <data name="GitPushMenuTooltip" xml:space="preserve">
+    <value>Git 操作</value>
+  </data>
+  <data name="GitPull" xml:space="preserve">
+    <value>Pull</value>
+  </data>
+  <data name="GitRebase" xml:space="preserve">
+    <value>Rebase</value>
+  </data>
+  <data name="GitRemote" xml:space="preserve">
+    <value>Remote</value>
+  </data>
   <data name="GitRefresh" xml:space="preserve">
     <value>更新</value>
   </data>

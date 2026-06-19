@@ -88,6 +88,9 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? GitStageAllClick;
         public event RoutedEventHandler? GitRestoreAllClick;
         public event RoutedEventHandler? GitPushClick;
+        public event RoutedEventHandler? GitPullClick;
+        public event RoutedEventHandler? GitRebaseClick;
+        public event RoutedEventHandler? GitRemoteClick;
         public event RoutedEventHandler? GitRefreshClick;
         public event ItemClickEventHandler? GitHistoryItemClick;
         public event RoutedEventHandler? GitInitRepoClick;
@@ -133,7 +136,8 @@ namespace TxtAIEditor.Controls
         public Button GitCommitBtn => GitCommitButton;
         public Button GitStageAllBtn => GitStageAllButton;
         public Button GitRestoreAllBtn => GitRestoreAllButton;
-        public Button GitPushBtn => GitPushButton;
+        public SplitButton GitPushBtn => GitPushButton;
+        public Button GitRemoteBtn => GitRemoteButton;
         public Button GitRefreshBtn => GitRefreshButton;
         public TextBlock GitHistoryHeaderLabel => GitHistoryHeader;
         public Button ExplorerUpBtn => ExplorerUpButton;
@@ -240,7 +244,14 @@ namespace TxtAIEditor.Controls
             GitStageAllButton.Content = getString("GitStageAll", "전체 Stage");
             GitRestoreAllButton.Content = getString("GitRestoreAll", "전체 Restore");
             GitPushButton.Content = getString("GitPush", "Push");
-            GitRefreshButton.Content = getString("GitRefresh", "새로고침");
+            ToolTipService.SetToolTip(GitPushButton, getString("GitPushMenuTooltip", "Git 작업"));
+            GitPullMenuItem.Text = getString("GitPull", "Pull");
+            GitRebaseMenuItem.Text = getString("GitRebase", "Rebase");
+            GitRemoteButton.Content = getString("GitRemote", "Remote");
+            var gitRefreshText = getString("GitRefresh", "새로고침");
+            GitRefreshButton.Content = new FontIcon { Glyph = "\xE72C", FontSize = 10 };
+            ToolTipService.SetToolTip(GitRefreshButton, gitRefreshText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(GitRefreshButton, gitRefreshText);
             GitHistoryHeader.Text = getString("GitHistory", "과거 기록");
 
             if (isGitNotDetected(GitPanelBranchText.Text))
@@ -318,7 +329,10 @@ namespace TxtAIEditor.Controls
         private void OnGitCommitClick(object sender, RoutedEventArgs e) => GitCommitClick?.Invoke(sender, e);
         private void OnGitStageAllClick(object sender, RoutedEventArgs e) => GitStageAllClick?.Invoke(sender, e);
         private void OnGitRestoreAllClick(object sender, RoutedEventArgs e) => GitRestoreAllClick?.Invoke(sender, e);
-        private void OnGitPushClick(object sender, RoutedEventArgs e) => GitPushClick?.Invoke(sender, e);
+        private void OnGitPushClick(SplitButton sender, SplitButtonClickEventArgs e) => GitPushClick?.Invoke(sender, new RoutedEventArgs());
+        private void OnGitPullClick(object sender, RoutedEventArgs e) => GitPullClick?.Invoke(sender, e);
+        private void OnGitRebaseClick(object sender, RoutedEventArgs e) => GitRebaseClick?.Invoke(sender, e);
+        private void OnGitRemoteClick(object sender, RoutedEventArgs e) => GitRemoteClick?.Invoke(sender, e);
         private void OnGitRefreshClick(object sender, RoutedEventArgs e) => GitRefreshClick?.Invoke(sender, e);
         private void OnGitHistoryItemClick(object sender, ItemClickEventArgs e) => GitHistoryItemClick?.Invoke(sender, e);
         private void OnGitInitRepoClick(object sender, RoutedEventArgs e) => GitInitRepoClick?.Invoke(sender, e);

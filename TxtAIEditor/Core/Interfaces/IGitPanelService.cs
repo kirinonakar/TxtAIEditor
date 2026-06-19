@@ -32,6 +32,8 @@ namespace TxtAIEditor.Core.Interfaces
         Task<bool> RestoreFileAsync(string repoPath, string filePath);
         Task<bool> CommitAsync(string repoPath, string message);
         Task<bool> PushAsync(string repoPath);
+        Task<bool> PullAsync(string repoPath);
+        Task<bool> RebaseAsync(string repoPath);
         Task<bool> RestoreAllAsync(string repoPath);
     }
 }

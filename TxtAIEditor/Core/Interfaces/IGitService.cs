@@ -17,6 +17,10 @@ namespace TxtAIEditor.Core.Interfaces
         Task<bool> RestoreAllAsync(string repoPath);
         Task<bool> CommitAsync(string repoPath, string message);
         Task<bool> PushAsync(string repoPath);
+        Task<bool> PullAsync(string repoPath);
+        Task<bool> RebaseAsync(string repoPath);
+        Task<string> GetRemoteUrlAsync(string repoPath, string remoteName = "origin");
+        Task<bool> SetRemoteUrlAsync(string repoPath, string remoteUrl, string remoteName = "origin");
         Task<IReadOnlyList<string>> GetRecentHistoryAsync(string repoPath, int maxCount = 50);
         Task<IReadOnlyList<string>> GetBranchesAsync(string repoPath);
         Task<bool> InitRepositoryAsync(string repoPath);
