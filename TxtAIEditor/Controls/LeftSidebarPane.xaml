@@ -272,8 +272,12 @@
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
                                                     <TextBlock Text="{Binding Path}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
-                                                <Button Grid.Column="2" x:Name="FavoritePinButton" Content="📌" FontSize="10" Background="Transparent" BorderBrush="Transparent" Padding="3" VerticalAlignment="Center" Opacity="{Binding PinOpacity}" Click="OnFavoritePinClick" Tag="{Binding}" ToolTipService.ToolTip="고정"/>
-                                                <Button Grid.Column="3" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnRemoveFavoriteClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" FontSize="10"/>
+                                                <Button Grid.Column="2" x:Name="FavoritePinButton" Background="Transparent" BorderBrush="Transparent" Padding="3" VerticalAlignment="Center" Opacity="{Binding PinOpacity}" Click="OnFavoritePinClick" Tag="{Binding}" ToolTipService.ToolTip="고정">
+                                                    <FontIcon Glyph="&#xE718;" FontSize="10"/>
+                                                </Button>
+                                                <Button Grid.Column="3" Background="Transparent" BorderBrush="Transparent" Click="OnRemoveFavoriteClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" ToolTipService.ToolTip="즐겨찾기에서 제거">
+                                                    <FontIcon Glyph="&#xE74D;" FontSize="10"/>
+                                                </Button>
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>
@@ -301,7 +305,9 @@
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
                                                 <TextBlock Text="{Binding Path}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
-                                            <Button Grid.Column="2" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnRemoveRecentFileClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" FontSize="10"/>
+                                            <Button Grid.Column="2" Background="Transparent" BorderBrush="Transparent" Click="OnRemoveRecentFileClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" ToolTipService.ToolTip="최근 파일 목록에서 제거">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="10"/>
+                                            </Button>
                                         </Grid>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
@@ -490,8 +496,12 @@
                                                     <TextBlock Text="{Binding Description}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                                                    <Button Content="&#xE70F;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnEditSnippetClick" Padding="3" FontSize="10" ToolTipService.ToolTip="{Binding Path=SnippetEditTooltip, Source={StaticResource LocBridge}}"/>
-                                                    <Button Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnDeleteSnippetClick" Tag="{Binding Title}" Padding="3" FontSize="10" ToolTipService.ToolTip="{Binding Path=SnippetDeleteTooltip, Source={StaticResource LocBridge}}"/>
+                                                    <Button Background="Transparent" BorderBrush="Transparent" Click="OnEditSnippetClick" Padding="3" ToolTipService.ToolTip="{Binding Path=SnippetEditTooltip, Source={StaticResource LocBridge}}">
+                                                        <FontIcon Glyph="&#xE70F;" FontSize="10"/>
+                                                    </Button>
+                                                    <Button Background="Transparent" BorderBrush="Transparent" Click="OnDeleteSnippetClick" Tag="{Binding Title}" Padding="3" ToolTipService.ToolTip="{Binding Path=SnippetDeleteTooltip, Source={StaticResource LocBridge}}">
+                                                        <FontIcon Glyph="&#xE74D;" FontSize="10"/>
+                                                    </Button>
                                                 </StackPanel>
                                             </Grid>
                                         </DataTemplate>
