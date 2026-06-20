@@ -1385,7 +1385,7 @@ namespace TxtAIEditor.Controls
                 {
                     Text = getString("AgentMcpEmptyText", "등록된 MCP 없음"),
                     FontSize = 11,
-                    Foreground = GetBrushResource("AgentOutputForeground", Windows.UI.Color.FromArgb(255, 212, 212, 212)),
+                    Foreground = CreateMcpEmptyTextBrush(),
                     Margin = new Thickness(4, 2, 4, 2)
                 });
                 return;
@@ -1445,6 +1445,16 @@ namespace TxtAIEditor.Controls
 
                 AgentMcpListPanel.Children.Add(rowGrid);
             }
+        }
+
+        private Brush CreateMcpEmptyTextBrush()
+        {
+            bool isLightTheme = ActualTheme == ElementTheme.Light ||
+                (ActualTheme == ElementTheme.Default && Application.Current.RequestedTheme == ApplicationTheme.Light);
+
+            return new SolidColorBrush(isLightTheme
+                ? Windows.UI.Color.FromArgb(255, 31, 41, 55)
+                : Windows.UI.Color.FromArgb(255, 255, 255, 255));
         }
 
         private void RebuildAgentSkillMenu()
