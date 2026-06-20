@@ -2449,6 +2449,18 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP Address</value>
   </data>
+  <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
+    <value>API Key Header Name</value>
+  </data>
+  <data name="AgentMcpHeaderNamePlaceholder" xml:space="preserve">
+    <value>CONTEXT7_API_KEY</value>
+  </data>
+  <data name="AgentMcpApiKeyLabel" xml:space="preserve">
+    <value>API Key</value>
+  </data>
+  <data name="AgentMcpApiKeyPlaceholder" xml:space="preserve">
+    <value>Enter API Key...</value>
+  </data>
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>Add</value>
   </data>
@@ -2469,6 +2481,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>The MCP address must be an http or https URL.</value>
+  </data>
+  <data name="AgentMcpHeaderPairRequired" xml:space="preserve">
+    <value>Enter a header name when entering an API Key.</value>
   </data>
   <data name="AgentMcpExportErrorTitle" xml:space="preserve">
     <value>Export MCP Error</value>

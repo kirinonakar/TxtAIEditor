@@ -21,6 +21,7 @@ namespace TxtAIEditor.Controls
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Name { get; set; } = string.Empty;
         public string Endpoint { get; set; } = string.Empty;
+        public Dictionary<string, string> Headers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     public sealed class AgentMcpItem
@@ -107,6 +108,7 @@ namespace TxtAIEditor.Controls
 
                                 s.Name = s.Name.Trim();
                                 s.Endpoint = s.Endpoint.Trim();
+                                s.Headers = NormalizeHeaders(s.Headers);
                                 return s;
                             }));
                     }
@@ -126,11 +128,17 @@ namespace TxtAIEditor.Controls
         {
             var nameBox = CreateTextBox(_getString("AgentMcpNamePlaceholder", "MCP 이름 입력..."));
             var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
+            var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "CONTEXT7_API_KEY"));
+            var apiKeyBox = CreatePasswordBox(_getString("AgentMcpApiKeyPlaceholder", "API Key 입력..."));
             var stack = new StackPanel { Spacing = 10, Width = 420 };
             stack.Children.Add(new TextBlock { Text = _getString("AgentMcpNameLabel", "MCP 이름") });
             stack.Children.Add(nameBox);
             stack.Children.Add(new TextBlock { Text = _getString("AgentMcpEndpointLabel", "MCP 주소") });
             stack.Children.Add(endpointBox);
+            stack.Children.Add(new TextBlock { Text = _getString("AgentMcpHeaderNameLabel", "API Key Header 이름") });
+            stack.Children.Add(headerNameBox);
+            stack.Children.Add(new TextBlock { Text = _getString("AgentMcpApiKeyLabel", "API Key") });
+            stack.Children.Add(apiKeyBox);
 
             var dialog = new ContentDialog
             {
@@ -167,10 +175,19 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (!TryBuildHeaders(headerNameBox.Text, apiKeyBox.Password, out var headers))
+            {
+                _showError(
+                    _getString("AgentMcpAddErrorTitle", "MCP 추가 오류"),
+                    _getString("AgentMcpHeaderPairRequired", "API Key를 입력하려면 Header 이름도 함께 입력해주세요."));
+                return;
+            }
+
             var existing = _servers.FirstOrDefault(server => server.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
                 existing.Endpoint = endpoint;
+                existing.Headers = headers;
                 _sessions.Remove(existing.Id);
                 _serverStatus.Remove(existing.Id);
             }
@@ -179,7 +196,8 @@ namespace TxtAIEditor.Controls
                 _servers.Add(new AgentMcpServer
                 {
                     Name = name,
-                    Endpoint = endpoint
+                    Endpoint = endpoint,
+                    Headers = headers
                 });
             }
 
@@ -227,12 +245,21 @@ namespace TxtAIEditor.Controls
             nameBox.Text = server.Name;
             var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
             endpointBox.Text = server.Endpoint;
+            var existingHeader = server.Headers.FirstOrDefault();
+            var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "CONTEXT7_API_KEY"));
+            headerNameBox.Text = existingHeader.Key ?? string.Empty;
+            var apiKeyBox = CreatePasswordBox(_getString("AgentMcpApiKeyPlaceholder", "API Key 입력..."));
+            apiKeyBox.Password = existingHeader.Value ?? string.Empty;
 
             var stack = new StackPanel { Spacing = 10, Width = 420 };
             stack.Children.Add(new TextBlock { Text = _getString("AgentMcpNameLabel", "MCP 이름") });
             stack.Children.Add(nameBox);
             stack.Children.Add(new TextBlock { Text = _getString("AgentMcpEndpointLabel", "MCP 주소") });
             stack.Children.Add(endpointBox);
+            stack.Children.Add(new TextBlock { Text = _getString("AgentMcpHeaderNameLabel", "API Key Header 이름") });
+            stack.Children.Add(headerNameBox);
+            stack.Children.Add(new TextBlock { Text = _getString("AgentMcpApiKeyLabel", "API Key") });
+            stack.Children.Add(apiKeyBox);
 
             var dialog = new ContentDialog
             {
@@ -269,6 +296,14 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (!TryBuildHeaders(headerNameBox.Text, apiKeyBox.Password, out var headers))
+            {
+                _showError(
+                    _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"),
+                    _getString("AgentMcpHeaderPairRequired", "API Key를 입력하려면 Header 이름도 함께 입력해주세요."));
+                return;
+            }
+
             var duplicate = _servers.FirstOrDefault(item =>
                 !item.Id.Equals(server.Id, StringComparison.OrdinalIgnoreCase) &&
                 item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
@@ -282,6 +317,7 @@ namespace TxtAIEditor.Controls
 
             server.Name = name;
             server.Endpoint = endpoint;
+            server.Headers = headers;
             _sessions.Remove(server.Id);
             _serverStatus.Remove(server.Id);
             await SaveAsync();
@@ -306,8 +342,8 @@ namespace TxtAIEditor.Controls
             try
             {
                 string json = await File.ReadAllTextAsync(file.Path);
-                var imported = JsonSerializer.Deserialize<List<AgentMcpServer>>(json);
-                if (imported == null)
+                var imported = DeserializeImportedServers(json);
+                if (imported.Count == 0)
                 {
                     throw new InvalidDataException(_getString("AgentMcpImportInvalidFile", "가져올 수 있는 MCP JSON이 아닙니다."));
                 }
@@ -327,6 +363,7 @@ namespace TxtAIEditor.Controls
                     if (existing != null)
                     {
                         existing.Endpoint = endpoint;
+                        existing.Headers = NormalizeHeaders(item.Headers);
                         _sessions.Remove(existing.Id);
                         _serverStatus.Remove(existing.Id);
                     }
@@ -335,7 +372,8 @@ namespace TxtAIEditor.Controls
                         _servers.Add(new AgentMcpServer
                         {
                             Name = name,
-                            Endpoint = endpoint
+                            Endpoint = endpoint,
+                            Headers = NormalizeHeaders(item.Headers)
                         });
                     }
                 }
@@ -671,6 +709,14 @@ namespace TxtAIEditor.Controls
             };
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            foreach (var header in server.Headers)
+            {
+                if (!string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value))
+                {
+                    request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                }
+            }
+
             if (!string.IsNullOrEmpty(session.SessionId))
             {
                 request.Headers.TryAddWithoutValidation("Mcp-Session-Id", session.SessionId);
@@ -776,6 +822,11 @@ namespace TxtAIEditor.Controls
                     string detail = _serverStatus.TryGetValue(server.Id, out string? status) && !string.IsNullOrWhiteSpace(status)
                         ? $"{server.Endpoint} - {status}"
                         : server.Endpoint;
+                    if (server.Headers.Count > 0)
+                    {
+                        detail += $" - headers: {string.Join(", ", server.Headers.Keys)}";
+                    }
+
                     return new AgentMcpItem
                     {
                         Name = server.Name,
@@ -815,6 +866,114 @@ namespace TxtAIEditor.Controls
             UpdateUI();
         }
 
+        private static List<AgentMcpServer> DeserializeImportedServers(string json)
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                return JsonSerializer.Deserialize<List<AgentMcpServer>>(json) ?? new List<AgentMcpServer>();
+            }
+
+            var servers = new List<AgentMcpServer>();
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("mcpServers", out var mcpServers) ||
+                mcpServers.ValueKind != JsonValueKind.Object)
+            {
+                return servers;
+            }
+
+            foreach (var property in mcpServers.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                string endpoint = TryGetStringProperty(property.Value, "url");
+                if (string.IsNullOrWhiteSpace(endpoint))
+                {
+                    endpoint = TryGetStringProperty(property.Value, "endpoint");
+                }
+
+                servers.Add(new AgentMcpServer
+                {
+                    Name = property.Name,
+                    Endpoint = endpoint,
+                    Headers = ReadHeadersProperty(property.Value)
+                });
+            }
+
+            return servers;
+        }
+
+        private static Dictionary<string, string> ReadHeadersProperty(JsonElement element)
+        {
+            if (element.ValueKind != JsonValueKind.Object ||
+                !element.TryGetProperty("headers", out var headersElement) ||
+                headersElement.ValueKind != JsonValueKind.Object)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in headersElement.EnumerateObject())
+            {
+                string key = property.Name?.Trim() ?? string.Empty;
+                string value = property.Value.ValueKind == JsonValueKind.String
+                    ? property.Value.GetString() ?? string.Empty
+                    : property.Value.GetRawText();
+                if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
+                {
+                    headers[key] = value.Trim();
+                }
+            }
+
+            return headers;
+        }
+
+        private static Dictionary<string, string> NormalizeHeaders(Dictionary<string, string>? headers)
+        {
+            var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (headers == null)
+            {
+                return normalized;
+            }
+
+            foreach (var header in headers)
+            {
+                string key = header.Key?.Trim() ?? string.Empty;
+                string value = header.Value?.Trim() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
+                {
+                    normalized[key] = value;
+                }
+            }
+
+            return normalized;
+        }
+
+        private static bool TryBuildHeaders(string headerName, string apiKey, out Dictionary<string, string> headers)
+        {
+            headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            headerName = headerName?.Trim() ?? string.Empty;
+            apiKey = apiKey?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(headerName) && string.IsNullOrWhiteSpace(apiKey))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(headerName) || string.IsNullOrWhiteSpace(apiKey))
+            {
+                return false;
+            }
+
+            headers[headerName] = apiKey;
+            return true;
+        }
+
         private AgentMcpServer? FindServer(string name)
         {
             return _servers.FirstOrDefault(server => server.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
@@ -842,6 +1001,18 @@ namespace TxtAIEditor.Controls
                 Height = 32,
                 IsSpellCheckEnabled = false,
                 IsTextPredictionEnabled = false,
+                FontFamily = new FontFamily("Segoe UI, Malgun Gothic"),
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private PasswordBox CreatePasswordBox(string placeholder)
+        {
+            return new PasswordBox
+            {
+                PlaceholderText = placeholder,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = 32,
                 FontFamily = new FontFamily("Segoe UI, Malgun Gothic"),
                 VerticalContentAlignment = VerticalAlignment.Center
             };

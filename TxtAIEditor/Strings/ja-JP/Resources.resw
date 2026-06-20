@@ -2450,6 +2450,18 @@
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP アドレス</value>
   </data>
+  <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
+    <value>API Key ヘッダー名</value>
+  </data>
+  <data name="AgentMcpHeaderNamePlaceholder" xml:space="preserve">
+    <value>CONTEXT7_API_KEY</value>
+  </data>
+  <data name="AgentMcpApiKeyLabel" xml:space="preserve">
+    <value>API Key</value>
+  </data>
+  <data name="AgentMcpApiKeyPlaceholder" xml:space="preserve">
+    <value>API Key を入力...</value>
+  </data>
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>追加</value>
   </data>
@@ -2470,6 +2482,9 @@
   </data>
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>MCP アドレスは http または https URL である必要があります。</value>
+  </data>
+  <data name="AgentMcpHeaderPairRequired" xml:space="preserve">
+    <value>API Key を入力する場合はヘッダー名も入力してください。</value>
   </data>
   <data name="AgentMcpExportErrorTitle" xml:space="preserve">
     <value>MCP エクスポート エラー</value>
