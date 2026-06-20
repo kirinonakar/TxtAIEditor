@@ -553,7 +553,6 @@ namespace TxtAIEditor.Controls
                     if (currentDir != rootPath)
                     {
                         if (dirInfo.Attributes.HasFlag(FileAttributes.Hidden) ||
-                            dirInfo.Name.StartsWith(".") ||
                             ignoredFolderNames.Contains(dirInfo.Name))
                         {
                             continue;
@@ -586,7 +585,6 @@ namespace TxtAIEditor.Controls
                     foreach (var subDir in dirInfo.GetDirectories())
                     {
                         if (subDir.Attributes.HasFlag(FileAttributes.Hidden) ||
-                            subDir.Name.StartsWith(".") ||
                             ignoredFolderNames.Contains(subDir.Name))
                         {
                             continue;

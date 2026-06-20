@@ -21,7 +21,7 @@ namespace TxtAIEditor.Core.Services
 
                 foreach (var dir in dirInfo.EnumerateDirectories("*", enumerationOptions))
                 {
-                    if (dir.Attributes.HasFlag(FileAttributes.Hidden) || dir.Name.StartsWith("."))
+                    if (dir.Attributes.HasFlag(FileAttributes.Hidden))
                     {
                         continue;
                     }

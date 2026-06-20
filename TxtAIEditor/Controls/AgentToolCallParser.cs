@@ -12,6 +12,7 @@ namespace TxtAIEditor.Controls
     {
         private const string ToolCallOpenTag = "<tool_call>";
         private const string ToolCallCloseTag = "</tool_call>";
+        private const int PlaywrightCliCommandTimeoutMs = 60000;
 
         public static bool ContainsToolCallSyntax(string response)
         {
@@ -23,7 +24,8 @@ namespace TxtAIEditor.Controls
             string text = response.Trim();
             return text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                LooksLikeBareToolCallEnvelope(text);
+                LooksLikeBareToolCallEnvelope(text) ||
+                TryExtractSupportedCommandFence(text, out _);
         }
 
         public static bool TryParse(string response, out string toolName, out JsonElement arguments)
@@ -33,7 +35,7 @@ namespace TxtAIEditor.Controls
 
             if (!TryExtractToolCallPayload(response, out string payload))
             {
-                return false;
+                return TryParseSupportedCommandFence(response, out toolName, out arguments);
             }
 
             string fixedPayload = FixJsonCarriageReturnEscapes(payload);
@@ -83,6 +85,26 @@ namespace TxtAIEditor.Controls
             }
 
             return TryParseLenient(trimmedPayload, out toolName, out arguments);
+        }
+
+        private static bool TryParseSupportedCommandFence(string response, out string toolName, out JsonElement arguments)
+        {
+            toolName = string.Empty;
+            arguments = default;
+
+            if (!TryExtractSupportedCommandFence(response, out string command))
+            {
+                return false;
+            }
+
+            toolName = "run_powershell";
+            using var document = JsonDocument.Parse(JsonSerializer.Serialize(new
+            {
+                command,
+                timeoutMs = PlaywrightCliCommandTimeoutMs
+            }));
+            arguments = document.RootElement.Clone();
+            return true;
         }
 
         private static JsonElement BuildArgumentsElement(JsonElement root, bool stripNameProperty)
@@ -510,6 +532,117 @@ namespace TxtAIEditor.Controls
             }
 
             return TryExtractBalancedJsonObject(text, jsonStart, out json);
+        }
+
+        private static bool TryExtractSupportedCommandFence(string response, out string command)
+        {
+            command = string.Empty;
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return false;
+            }
+
+            string normalized = response.Replace("\r\n", "\n").Replace('\r', '\n');
+            foreach (Match match in Regex.Matches(
+                normalized,
+                @"(?ms)^[ \t]*```(?<info>[^\n`]*)\n(?<body>.*?)(?:\n)[ \t]*```[ \t]*$"))
+            {
+                string info = match.Groups["info"].Value.Trim();
+                string body = match.Groups["body"].Value;
+                if (IsShellCommandFenceInfo(info) &&
+                    TryNormalizeSupportedCommandFenceBody(body, out command))
+                {
+                    return true;
+                }
+            }
+
+            foreach (Match match in Regex.Matches(
+                normalized,
+                @"(?ms)^[ \t]*`(?<info>bash|sh|shell|powershell|pwsh|ps1)[ \t]*\n(?<body>.*?)(?:\n)[ \t]*`[ \t]*$"))
+            {
+                string info = match.Groups["info"].Value.Trim();
+                string body = match.Groups["body"].Value;
+                if (IsShellCommandFenceInfo(info) &&
+                    TryNormalizeSupportedCommandFenceBody(body, out command))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsShellCommandFenceInfo(string info)
+        {
+            if (string.IsNullOrWhiteSpace(info))
+            {
+                return false;
+            }
+
+            string language = info.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault() ?? string.Empty;
+            return language.Equals("bash", StringComparison.OrdinalIgnoreCase) ||
+                language.Equals("sh", StringComparison.OrdinalIgnoreCase) ||
+                language.Equals("shell", StringComparison.OrdinalIgnoreCase) ||
+                language.Equals("powershell", StringComparison.OrdinalIgnoreCase) ||
+                language.Equals("pwsh", StringComparison.OrdinalIgnoreCase) ||
+                language.Equals("ps1", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryNormalizeSupportedCommandFenceBody(string body, out string command)
+        {
+            command = string.Empty;
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return false;
+            }
+
+            var lines = new List<string>();
+            foreach (string rawLine in body.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+            {
+                string line = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                if (line.StartsWith("$ ", StringComparison.Ordinal))
+                {
+                    line = line.Substring(2).TrimStart();
+                }
+
+                if (!IsSupportedPlaywrightCliCommand(line))
+                {
+                    return false;
+                }
+
+                lines.Add(line);
+            }
+
+            if (lines.Count == 0)
+            {
+                return false;
+            }
+
+            command = string.Join("\n", lines);
+            return true;
+        }
+
+        private static bool IsSupportedPlaywrightCliCommand(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return false;
+            }
+
+            if (!line.Equals("playwright-cli", StringComparison.OrdinalIgnoreCase) &&
+                !line.StartsWith("playwright-cli ", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string[] blockedTokens = { ";", "&&", "||", "|", ">", "<", "`", "$(", "@(", "&" };
+            return !blockedTokens.Any(token => line.Contains(token, StringComparison.Ordinal));
         }
 
         private static bool TryExtractToolCallPayload(string response, out string payload)
