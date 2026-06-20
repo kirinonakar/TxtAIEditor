@@ -174,6 +174,7 @@ namespace TxtAIEditor.Controls
             bool inToolCall = false;
             bool inToolResult = false;
             bool inUserPromptInstructionMetadata = false;
+            bool suppressInstructionMetadataSection = false;
             bool afterUserRequest = false;
 
             foreach (var line in lines)
@@ -184,7 +185,9 @@ namespace TxtAIEditor.Controls
                     inToolResult = false;
                     inUserPromptInstructionMetadata =
                         line.Contains("[Agent persona/instruction presets]", StringComparison.OrdinalIgnoreCase) ||
+                        line.Contains("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase) ||
                         line.Contains("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase);
+                    suppressInstructionMetadataSection = line.Contains("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase);
                     afterUserRequest = false;
                     result.AppendLine(inUserPromptInstructionMetadata ? "[User Prompt]:" : line);
                 }
@@ -193,6 +196,7 @@ namespace TxtAIEditor.Controls
                     inToolCall = true;
                     inToolResult = false;
                     inUserPromptInstructionMetadata = false;
+                    suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
                     continue;
                 }
@@ -201,6 +205,7 @@ namespace TxtAIEditor.Controls
                     inToolCall = false;
                     inToolResult = true;
                     inUserPromptInstructionMetadata = false;
+                    suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
 
                     string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
@@ -212,6 +217,7 @@ namespace TxtAIEditor.Controls
                     inToolCall = false;
                     inToolResult = false;
                     inUserPromptInstructionMetadata = false;
+                    suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
                     result.AppendLine(line);
                 }
@@ -219,14 +225,24 @@ namespace TxtAIEditor.Controls
                 {
                     if (line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
                     {
+                        suppressInstructionMetadataSection = false;
                         afterUserRequest = true;
                         result.AppendLine(line);
+                    }
+                    else if (line.StartsWith("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        suppressInstructionMetadataSection = true;
+                    }
+                    else if (line.StartsWith("[Agent persona/instruction presets]", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        suppressInstructionMetadataSection = false;
                     }
                     else if (afterUserRequest)
                     {
                         result.AppendLine(line);
                     }
-                    else if (line.StartsWith("## ", StringComparison.Ordinal))
+                    else if (!suppressInstructionMetadataSection && line.StartsWith("## ", StringComparison.Ordinal))
                     {
                         result.AppendLine(line);
                     }
