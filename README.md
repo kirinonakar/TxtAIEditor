@@ -91,6 +91,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Model Context Protocol (MCP) Tools:** Register Streamable HTTP MCP servers directly from the Agent panel, enable selected servers for the current agent run, and let the agent discover and call their tools through the standard MCP `initialize`, `tools/list`, and `tools/call` flow.
     *   **MCP Management:** Add an MCP server by name and endpoint URL, toggle registered servers on/off from the MCP menu, remove servers, and import/export the MCP server list as JSON for easy backup or sharing.
     *   **Agent Integration:** Enabled MCP tools are exposed to the agent as `mcp_*` tool aliases. In non-verbose mode, MCP tool schemas and server metadata are hidden from the visible session output while still being supplied to the model as agent context.
+    *   **Built-in ComfyUI Tool:** A built-in MCP-compatible plugin  that generates and modifies images using ComfyUI workflows exported in API format.
 *   **Persona & System Instructions:** You can specify custom personas and system instructions for the AI agent.
 *   **Custom Agent Skills:** Extend the agent's capabilities by installing custom skills into the skills directory.
     *   **Skill Creator:** To create a new skill, open the skill list, check and enable `skill-creator`, then ask the agent to create a skill for a specific task. The agent will generate the skill and it will be registered automatically in the skill list.
