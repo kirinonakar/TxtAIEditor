@@ -64,6 +64,7 @@ namespace TxtAIEditor.Controls
         private HashSet<string> _selectedAgentPresetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private List<AgentSkillItem> _agentSkillItems = new List<AgentSkillItem>();
         private HashSet<string> _selectedAgentSkillNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Button> _agentSkillButtons = new Dictionary<string, Button>(StringComparer.OrdinalIgnoreCase);
         private List<AgentMcpItem> _agentMcpItems = new List<AgentMcpItem>();
         private HashSet<string> _selectedAgentMcpNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Func<string, string, string>? _getString;
@@ -1376,6 +1377,16 @@ namespace TxtAIEditor.Controls
             RebuildSelectedAgentPresetChips();
         }
 
+        public void UpdateAgentSkillSelection(
+            IReadOnlyCollection<string> selectedSkillNames,
+            Func<string, string, string> getString)
+        {
+            _getString = getString;
+            _selectedAgentSkillNames = new HashSet<string>(selectedSkillNames, StringComparer.OrdinalIgnoreCase);
+            UpdateAgentSkillButtonStates();
+            RebuildSelectedAgentPresetChips();
+        }
+
         public void UpdateAgentMcpMenu(
             IReadOnlyList<AgentMcpItem> mcpItems,
             IReadOnlyCollection<string> selectedMcpNames,
@@ -1508,6 +1519,7 @@ namespace TxtAIEditor.Controls
             }
 
             AgentSkillListPanel.Children.Clear();
+            _agentSkillButtons.Clear();
             Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
             Func<string, string, string> getString = _getString ?? _displayText.GetString;
 
@@ -1538,7 +1550,17 @@ namespace TxtAIEditor.Controls
                 };
                 string currentName = skill.Name;
                 selectBtn.Click += (_, _) => AgentSkillToggled?.Invoke(this, currentName);
+                _agentSkillButtons[currentName] = selectBtn;
                 AgentSkillListPanel.Children.Add(selectBtn);
+            }
+        }
+
+        private void UpdateAgentSkillButtonStates()
+        {
+            foreach (var pair in _agentSkillButtons)
+            {
+                bool isSelected = _selectedAgentSkillNames.Contains(pair.Key);
+                pair.Value.Content = isSelected ? $"✓ {pair.Key}" : pair.Key;
             }
         }
 
@@ -1661,16 +1683,13 @@ namespace TxtAIEditor.Controls
             }
 
             string skillPrefix = getString("AgentSkillChipPrefix", "Skill: ");
-            foreach (var skill in _agentSkillItems)
+            var selectedSkillNames = new List<string>(_selectedAgentSkillNames);
+            selectedSkillNames.Sort(StringComparer.CurrentCultureIgnoreCase);
+            foreach (string skillName in selectedSkillNames)
             {
-                if (!_selectedAgentSkillNames.Contains(skill.Name))
-                {
-                    continue;
-                }
-
-                string currentName = skill.Name;
+                string currentName = skillName;
                 AgentSelectedPresetPanel.Children.Add(CreateSelectedChip(
-                    skillPrefix + skill.Name,
+                    skillPrefix + skillName,
                     getString("AgentSkillRemoveTooltip", "스킬 선택 해제"),
                     () => AgentSkillRemoved?.Invoke(this, currentName)));
             }

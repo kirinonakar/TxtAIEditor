@@ -191,13 +191,13 @@ namespace TxtAIEditor.Controls
                 _selectedSkillNames.Remove(skillName);
             }
 
-            UpdateUI();
+            UpdateSelectionUI();
         }
 
         public void RemoveSelectedSkill(string skillName)
         {
             _selectedSkillNames.Remove(skillName);
-            UpdateUI();
+            UpdateSelectionUI();
         }
 
         private List<AgentSkill> GetSelectedSkills()
@@ -268,6 +268,31 @@ namespace TxtAIEditor.Controls
             }
 
             _contextChanged();
+        }
+
+        private void UpdateSelectionUI()
+        {
+            var selectedNames = _selectedSkillNames.ToList();
+
+            void ApplyUI()
+            {
+                _agentPane.UpdateAgentSkillSelection(selectedNames, _getString);
+                QueueContextChanged();
+            }
+
+            var dispatcher = _agentPane.DispatcherQueue;
+            if (dispatcher?.HasThreadAccess == true)
+            {
+                ApplyUI();
+                return;
+            }
+
+            if (dispatcher?.TryEnqueue(ApplyUI) == true)
+            {
+                return;
+            }
+
+            ApplyUI();
         }
 
         private static IEnumerable<string> EnumerateSkillFiles(string skillsDirectory)

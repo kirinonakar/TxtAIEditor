@@ -20,6 +20,8 @@ namespace TxtAIEditor.Controls
     {
         private const int FallbackSessionHistoryPromptChars = 80_000;
         private const double PromptContextSafetyRatio = 0.95;
+        private const int DefaultContextStatsDelayMs = 250;
+        private const int SlowContextStatsDelayMs = 900;
 
         private readonly ILLMService _llmService;
         private readonly ISettingsService _settingsService;
@@ -150,20 +152,20 @@ namespace TxtAIEditor.Controls
                 _initializePickerWindow,
                 _showError,
                 _getString,
-                () => UpdateContextStats(),
+                () => UpdateContextStatsSlow(),
                 _beforeDialog,
                 _afterDialog);
             _skillController = new AgentSkillController(
                 _agentPane,
                 _getString,
-                () => UpdateContextStats());
+                () => UpdateContextStatsSlow());
             _mcpController = new AgentMcpController(
                 _agentPane,
                 _initializePickerWindow,
                 _credentialService,
                 _showError,
                 _getString,
-                () => UpdateContextStats(),
+                () => UpdateContextStatsSlow(),
                 _beforeDialog,
                 _afterDialog);
             _historyController = new AgentHistoryController(_agentPane);
@@ -251,7 +253,7 @@ namespace TxtAIEditor.Controls
 
             _statsDebounceTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(250)
+                Interval = TimeSpan.FromMilliseconds(DefaultContextStatsDelayMs)
             };
             _statsDebounceTimer.Tick += (s, e) =>
             {
@@ -1536,12 +1538,23 @@ namespace TxtAIEditor.Controls
 
         public void UpdateContextStats()
         {
+            UpdateContextStatsAfterDelay(DefaultContextStatsDelayMs);
+        }
+
+        private void UpdateContextStatsSlow()
+        {
+            UpdateContextStatsAfterDelay(SlowContextStatsDelayMs);
+        }
+
+        private void UpdateContextStatsAfterDelay(int delayMilliseconds)
+        {
             if (_isRunning)
             {
                 return;
             }
 
             _statsDebounceTimer.Stop();
+            _statsDebounceTimer.Interval = TimeSpan.FromMilliseconds(delayMilliseconds);
             _statsDebounceTimer.Start();
         }
 
