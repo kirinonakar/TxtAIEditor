@@ -2426,6 +2426,9 @@
   <data name="AgentMcpDeleteText" xml:space="preserve">
     <value>削除</value>
   </data>
+  <data name="AgentMcpEditText" xml:space="preserve">
+    <value>編集</value>
+  </data>
   <data name="AgentMcpRemoveTooltip" xml:space="preserve">
     <value>MCP 選択解除</value>
   </data>
@@ -2450,8 +2453,17 @@
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>追加</value>
   </data>
+  <data name="AgentMcpEditTitle" xml:space="preserve">
+    <value>MCP 編集</value>
+  </data>
+  <data name="AgentMcpEditSaveButton" xml:space="preserve">
+    <value>保存</value>
+  </data>
   <data name="AgentMcpAddErrorTitle" xml:space="preserve">
     <value>MCP 追加エラー</value>
+  </data>
+  <data name="AgentMcpEditErrorTitle" xml:space="preserve">
+    <value>MCP 編集エラー</value>
   </data>
   <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
     <value>MCP 名とアドレスを入力してください。</value>

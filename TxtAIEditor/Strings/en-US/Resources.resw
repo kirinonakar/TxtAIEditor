@@ -2425,6 +2425,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentMcpDeleteText" xml:space="preserve">
     <value>Delete</value>
   </data>
+  <data name="AgentMcpEditText" xml:space="preserve">
+    <value>Edit</value>
+  </data>
   <data name="AgentMcpRemoveTooltip" xml:space="preserve">
     <value>Disable MCP</value>
   </data>
@@ -2449,8 +2452,17 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>Add</value>
   </data>
+  <data name="AgentMcpEditTitle" xml:space="preserve">
+    <value>Edit MCP</value>
+  </data>
+  <data name="AgentMcpEditSaveButton" xml:space="preserve">
+    <value>Save</value>
+  </data>
   <data name="AgentMcpAddErrorTitle" xml:space="preserve">
     <value>Add MCP Error</value>
+  </data>
+  <data name="AgentMcpEditErrorTitle" xml:space="preserve">
+    <value>Edit MCP Error</value>
   </data>
   <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
     <value>Enter both the MCP name and address.</value>

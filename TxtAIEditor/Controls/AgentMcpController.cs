@@ -215,6 +215,78 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public async Task EditMcpAsync(string serverName)
+        {
+            var server = FindServer(serverName);
+            if (server == null)
+            {
+                return;
+            }
+
+            var nameBox = CreateTextBox(_getString("AgentMcpNamePlaceholder", "MCP 이름 입력..."));
+            nameBox.Text = server.Name;
+            var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
+            endpointBox.Text = server.Endpoint;
+
+            var stack = new StackPanel { Spacing = 10, Width = 420 };
+            stack.Children.Add(new TextBlock { Text = _getString("AgentMcpNameLabel", "MCP 이름") });
+            stack.Children.Add(nameBox);
+            stack.Children.Add(new TextBlock { Text = _getString("AgentMcpEndpointLabel", "MCP 주소") });
+            stack.Children.Add(endpointBox);
+
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AgentMcpEditTitle", "MCP 수정"),
+                Content = stack,
+                PrimaryButtonText = _getString("AgentMcpEditSaveButton", "저장"),
+                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.None,
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+
+            var result = await ShowDialogAsync(dialog);
+            if (result != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            string name = nameBox.Text?.Trim() ?? string.Empty;
+            string endpoint = endpointBox.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(endpoint))
+            {
+                _showError(
+                    _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"),
+                    _getString("AgentMcpNameEndpointRequired", "MCP 이름과 주소를 입력해주세요."));
+                return;
+            }
+
+            if (!IsValidHttpEndpoint(endpoint))
+            {
+                _showError(
+                    _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"),
+                    _getString("AgentMcpEndpointInvalid", "MCP 주소는 http 또는 https URL이어야 합니다."));
+                return;
+            }
+
+            var duplicate = _servers.FirstOrDefault(item =>
+                !item.Id.Equals(server.Id, StringComparison.OrdinalIgnoreCase) &&
+                item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (duplicate != null)
+            {
+                _servers.Remove(duplicate);
+                _selectedServerIds.Remove(duplicate.Id);
+                _sessions.Remove(duplicate.Id);
+                _serverStatus.Remove(duplicate.Id);
+            }
+
+            server.Name = name;
+            server.Endpoint = endpoint;
+            _sessions.Remove(server.Id);
+            _serverStatus.Remove(server.Id);
+            await SaveAsync();
+        }
+
         public async Task ImportMcpAsync()
         {
             var picker = new FileOpenPicker

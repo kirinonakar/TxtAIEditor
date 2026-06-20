@@ -125,6 +125,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? AgentMcpExportRequested;
         public event RoutedEventHandler? AgentMcpImportRequested;
         public event EventHandler<string>? AgentMcpToggled;
+        public event EventHandler<string>? AgentMcpEdited;
         public event EventHandler<string>? AgentMcpDeleted;
         public event EventHandler<string>? AgentMcpRemoved;
         public event RoutedEventHandler? DiffApproved;
@@ -1412,6 +1413,7 @@ namespace TxtAIEditor.Controls
                 var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                 bool isSelected = _selectedAgentMcpNames.Contains(item.Name);
                 var selectBtn = new Button
@@ -1446,6 +1448,23 @@ namespace TxtAIEditor.Controls
                 Grid.SetColumn(selectBtn, 0);
                 rowGrid.Children.Add(selectBtn);
 
+                var editBtn = new Button
+                {
+                    Content = new FontIcon { Glyph = "\uE70F", FontSize = 10 },
+                    Width = 28,
+                    Height = 34,
+                    Padding = new Thickness(0),
+                    Style = buttonStyle
+                };
+                ToolTipService.SetToolTip(editBtn, getString("AgentMcpEditText", "수정"));
+                editBtn.Click += (_, _) =>
+                {
+                    AgentMcpEdited?.Invoke(this, currentName);
+                    AgentMcpFlyout.Hide();
+                };
+                Grid.SetColumn(editBtn, 1);
+                rowGrid.Children.Add(editBtn);
+
                 var deleteBtn = new Button
                 {
                     Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
@@ -1456,7 +1475,7 @@ namespace TxtAIEditor.Controls
                 };
                 ToolTipService.SetToolTip(deleteBtn, getString("AgentMcpDeleteText", "삭제"));
                 deleteBtn.Click += (_, _) => AgentMcpDeleted?.Invoke(this, currentName);
-                Grid.SetColumn(deleteBtn, 1);
+                Grid.SetColumn(deleteBtn, 2);
                 rowGrid.Children.Add(deleteBtn);
 
                 AgentMcpListPanel.Children.Add(rowGrid);
