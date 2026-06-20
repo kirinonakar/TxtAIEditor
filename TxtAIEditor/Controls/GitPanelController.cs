@@ -107,18 +107,24 @@ namespace TxtAIEditor.Controls
             var branchesTask = _gitService.GetBranchesAsync(repoPath);
             var historyTask = _gitService.GetRecentHistoryAsync(repoPath);
             var fileStatusesTask = _gitService.GetFileStatusesAsync(repoPath);
+            var unpushedCountTask = _gitService.GetUnpushedCommitCountAsync(repoPath);
 
-            await Task.WhenAll(branchesTask, historyTask, fileStatusesTask);
+            await Task.WhenAll(branchesTask, historyTask, fileStatusesTask, unpushedCountTask);
 
             var branches = await branchesTask;
             var historyList = await historyTask;
             var fileStatuses = await fileStatusesTask;
+            int unpushedCount = await unpushedCountTask;
 
             int changedCount = fileStatuses.Count(kvp => kvp.Value != "!!" && kvp.Value.Trim() != "!!");
             string branchText = localizedBranch;
             if (!_isGitNotDetected(branch))
             {
                 branchText = $"{localizedBranch} ({changedCount})";
+                if (unpushedCount > 0)
+                {
+                    branchText = $"{localizedBranch} ({changedCount}, \u2191 {unpushedCount})";
+                }
             }
 
             // Update UI components in a single synchronous block to prevent duplicate display and empty states

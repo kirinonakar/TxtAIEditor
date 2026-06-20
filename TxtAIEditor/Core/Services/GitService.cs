@@ -502,6 +502,17 @@ namespace TxtAIEditor.Core.Services
                 : branch;
         }
 
+        public async Task<int> GetUnpushedCommitCountAsync(string repoPath)
+        {
+            if (!await HasRemoteAsync(repoPath))
+            {
+                return 0;
+            }
+
+            string output = await RunGitCommandAsync(repoPath, "rev-list --count HEAD --not --remotes");
+            return int.TryParse(output.Trim(), out int count) ? count : 0;
+        }
+
         public async Task<IReadOnlyList<string>> GetRecentHistoryAsync(string repoPath, int maxCount = 50)
         {
             if (string.IsNullOrEmpty(repoPath))
@@ -512,7 +523,75 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                 return Array.Empty<string>();
 
-            return output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            string[] lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var unpushedHashes = await GetUnpushedCommitShortHashesAsync(repoPath, maxCount);
+            if (unpushedHashes.Count == 0)
+            {
+                return lines;
+            }
+
+            return lines
+                .Select(line => MarkUnpushedHistoryLine(line, unpushedHashes))
+                .ToArray();
+        }
+
+        private async Task<HashSet<string>> GetUnpushedCommitShortHashesAsync(string repoPath, int maxCount)
+        {
+            var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!await HasRemoteAsync(repoPath))
+            {
+                return hashes;
+            }
+
+            string output = await RunGitCommandAsync(repoPath, $"log --format:%h -n {Math.Max(1, maxCount)} HEAD --not --remotes");
+            if (string.IsNullOrWhiteSpace(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                return hashes;
+            }
+
+            foreach (string line in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string hash = line.Trim();
+                if (!string.IsNullOrEmpty(hash))
+                {
+                    hashes.Add(hash);
+                }
+            }
+
+            return hashes;
+        }
+
+        private async Task<bool> HasRemoteAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+            {
+                return false;
+            }
+
+            string output = await RunGitCommandAsync(repoPath, "remote");
+            return !string.IsNullOrWhiteSpace(output) && !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string MarkUnpushedHistoryLine(string line, HashSet<string> unpushedHashes)
+        {
+            bool isUnpushed = unpushedHashes.Any(hash => line.Contains($"({hash})", StringComparison.OrdinalIgnoreCase));
+            if (!isUnpushed)
+            {
+                return line;
+            }
+
+            int insertIndex = 0;
+            while (insertIndex < line.Length && IsGitGraphCharacter(line[insertIndex]))
+            {
+                insertIndex++;
+            }
+
+            return line.Insert(insertIndex, "\u2191 ");
+        }
+
+        private static bool IsGitGraphCharacter(char value)
+        {
+            return value is ' ' or '*' or '|' or '/' or '\\' or '_' or '-';
         }
 
         public async Task<bool> InitRepositoryAsync(string repoPath)
