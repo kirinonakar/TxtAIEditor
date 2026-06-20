@@ -2453,13 +2453,16 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>API Key Header Name</value>
   </data>
   <data name="AgentMcpHeaderNamePlaceholder" xml:space="preserve">
-    <value>CONTEXT7_API_KEY</value>
+    <value>Authorization</value>
   </data>
   <data name="AgentMcpApiKeyLabel" xml:space="preserve">
     <value>API Key</value>
   </data>
   <data name="AgentMcpApiKeyPlaceholder" xml:space="preserve">
     <value>Enter API Key...</value>
+  </data>
+  <data name="AgentMcpApiKeyInfo" xml:space="preserve">
+    <value>API keys are stored in Windows Credential Manager, not in the MCP settings file.</value>
   </data>
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>Add</value>

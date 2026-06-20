@@ -671,6 +671,7 @@ namespace TxtAIEditor
             _agentController = new AgentController(
                 _llmService,
                 _settingsService,
+                _credentialService,
                 PreviewGrid.AgentPane,
                 _tabNavigationController.GetActiveTab,
                 () => _viewModel.Tabs.ToList(),

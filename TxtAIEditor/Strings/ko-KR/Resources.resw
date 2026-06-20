@@ -2453,13 +2453,16 @@
     <value>API Key Header 이름</value>
   </data>
   <data name="AgentMcpHeaderNamePlaceholder" xml:space="preserve">
-    <value>CONTEXT7_API_KEY</value>
+    <value>Authorization</value>
   </data>
   <data name="AgentMcpApiKeyLabel" xml:space="preserve">
     <value>API Key</value>
   </data>
   <data name="AgentMcpApiKeyPlaceholder" xml:space="preserve">
     <value>API Key 입력...</value>
+  </data>
+  <data name="AgentMcpApiKeyInfo" xml:space="preserve">
+    <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>추가</value>

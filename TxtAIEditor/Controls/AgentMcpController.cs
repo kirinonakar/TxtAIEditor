@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using TxtAIEditor.Core.Interfaces;
 using Windows.Storage.Pickers;
 
 namespace TxtAIEditor.Controls
@@ -52,6 +53,7 @@ namespace TxtAIEditor.Controls
 
         private readonly AgentPane _agentPane;
         private readonly Action<object> _initializePickerWindow;
+        private readonly ICredentialService _credentialService;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly Action _contextChanged;
@@ -67,6 +69,7 @@ namespace TxtAIEditor.Controls
         public AgentMcpController(
             AgentPane agentPane,
             Action<object> initializePickerWindow,
+            ICredentialService credentialService,
             Action<string, string> showError,
             Func<string, string, string> getString,
             Action contextChanged,
@@ -75,6 +78,7 @@ namespace TxtAIEditor.Controls
         {
             _agentPane = agentPane;
             _initializePickerWindow = initializePickerWindow;
+            _credentialService = credentialService;
             _showError = showError;
             _getString = getString;
             _contextChanged = contextChanged;
@@ -88,6 +92,7 @@ namespace TxtAIEditor.Controls
 
         public async Task LoadAsync()
         {
+            bool migratedPlaintextHeaders = false;
             try
             {
                 if (File.Exists(_mcpFilePath))
@@ -109,6 +114,8 @@ namespace TxtAIEditor.Controls
                                 s.Name = s.Name.Trim();
                                 s.Endpoint = s.Endpoint.Trim();
                                 s.Headers = NormalizeHeaders(s.Headers);
+                                migratedPlaintextHeaders |= s.Headers.Values.Any(value => !string.IsNullOrWhiteSpace(value));
+                                MoveInlineHeaderValuesToCredential(s);
                                 return s;
                             }));
                     }
@@ -120,6 +127,12 @@ namespace TxtAIEditor.Controls
             }
 
             _selectedServerIds.RemoveWhere(id => _servers.All(server => !server.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
+            if (migratedPlaintextHeaders)
+            {
+                await SaveAsync();
+                return;
+            }
+
             RebuildAliases();
             UpdateUI();
         }
@@ -128,7 +141,7 @@ namespace TxtAIEditor.Controls
         {
             var nameBox = CreateTextBox(_getString("AgentMcpNamePlaceholder", "MCP 이름 입력..."));
             var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
-            var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "CONTEXT7_API_KEY"));
+            var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "Authorization"));
             var apiKeyBox = CreatePasswordBox(_getString("AgentMcpApiKeyPlaceholder", "API Key 입력..."));
             var stack = new StackPanel { Spacing = 10, Width = 420 };
             stack.Children.Add(new TextBlock { Text = _getString("AgentMcpNameLabel", "MCP 이름") });
@@ -139,6 +152,7 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(headerNameBox);
             stack.Children.Add(new TextBlock { Text = _getString("AgentMcpApiKeyLabel", "API Key") });
             stack.Children.Add(apiKeyBox);
+            stack.Children.Add(CreateInfoText(_getString("AgentMcpApiKeyInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
 
             var dialog = new ContentDialog
             {
@@ -186,19 +200,21 @@ namespace TxtAIEditor.Controls
             var existing = _servers.FirstOrDefault(server => server.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
+                DeleteCredentialsForRemovedHeaders(existing, headers);
                 existing.Endpoint = endpoint;
-                existing.Headers = headers;
+                existing.Headers = StoreHeaderSecrets(existing, headers, deleteEmptySecrets: true);
                 _sessions.Remove(existing.Id);
                 _serverStatus.Remove(existing.Id);
             }
             else
             {
-                _servers.Add(new AgentMcpServer
+                var server = new AgentMcpServer
                 {
                     Name = name,
-                    Endpoint = endpoint,
-                    Headers = headers
-                });
+                    Endpoint = endpoint
+                };
+                server.Headers = StoreHeaderSecrets(server, headers, deleteEmptySecrets: true);
+                _servers.Add(server);
             }
 
             await SaveAsync();
@@ -246,10 +262,12 @@ namespace TxtAIEditor.Controls
             var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
             endpointBox.Text = server.Endpoint;
             var existingHeader = server.Headers.FirstOrDefault();
-            var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "CONTEXT7_API_KEY"));
+            var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "Authorization"));
             headerNameBox.Text = existingHeader.Key ?? string.Empty;
             var apiKeyBox = CreatePasswordBox(_getString("AgentMcpApiKeyPlaceholder", "API Key 입력..."));
-            apiKeyBox.Password = existingHeader.Value ?? string.Empty;
+            apiKeyBox.Password = string.IsNullOrWhiteSpace(existingHeader.Key)
+                ? string.Empty
+                : GetHeaderSecret(server, existingHeader.Key, existingHeader.Value);
 
             var stack = new StackPanel { Spacing = 10, Width = 420 };
             stack.Children.Add(new TextBlock { Text = _getString("AgentMcpNameLabel", "MCP 이름") });
@@ -260,6 +278,7 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(headerNameBox);
             stack.Children.Add(new TextBlock { Text = _getString("AgentMcpApiKeyLabel", "API Key") });
             stack.Children.Add(apiKeyBox);
+            stack.Children.Add(CreateInfoText(_getString("AgentMcpApiKeyInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
 
             var dialog = new ContentDialog
             {
@@ -309,6 +328,7 @@ namespace TxtAIEditor.Controls
                 item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (duplicate != null)
             {
+                DeleteAllCredentials(duplicate);
                 _servers.Remove(duplicate);
                 _selectedServerIds.Remove(duplicate.Id);
                 _sessions.Remove(duplicate.Id);
@@ -317,7 +337,8 @@ namespace TxtAIEditor.Controls
 
             server.Name = name;
             server.Endpoint = endpoint;
-            server.Headers = headers;
+            DeleteCredentialsForRemovedHeaders(server, headers);
+            server.Headers = StoreHeaderSecrets(server, headers, deleteEmptySecrets: true);
             _sessions.Remove(server.Id);
             _serverStatus.Remove(server.Id);
             await SaveAsync();
@@ -362,19 +383,22 @@ namespace TxtAIEditor.Controls
                     var existing = FindServer(name);
                     if (existing != null)
                     {
+                        var headers = NormalizeHeaders(item.Headers);
+                        DeleteCredentialsForRemovedHeaders(existing, headers);
                         existing.Endpoint = endpoint;
-                        existing.Headers = NormalizeHeaders(item.Headers);
+                        existing.Headers = StoreHeaderSecrets(existing, headers);
                         _sessions.Remove(existing.Id);
                         _serverStatus.Remove(existing.Id);
                     }
                     else
                     {
-                        _servers.Add(new AgentMcpServer
+                        var server = new AgentMcpServer
                         {
                             Name = name,
-                            Endpoint = endpoint,
-                            Headers = NormalizeHeaders(item.Headers)
-                        });
+                            Endpoint = endpoint
+                        };
+                        server.Headers = StoreHeaderSecrets(server, NormalizeHeaders(item.Headers));
+                        _servers.Add(server);
                     }
                 }
 
@@ -418,6 +442,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            DeleteAllCredentials(server);
             _servers.Remove(server);
             _selectedServerIds.Remove(server.Id);
             _sessions.Remove(server.Id);
@@ -696,7 +721,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static async Task<string> PostAsync(
+        private async Task<string> PostAsync(
             AgentMcpServer server,
             AgentMcpSession session,
             object payload,
@@ -711,9 +736,10 @@ namespace TxtAIEditor.Controls
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
             foreach (var header in server.Headers)
             {
-                if (!string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value))
+                string headerValue = GetHeaderSecret(server, header.Key, header.Value);
+                if (!string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(headerValue))
                 {
-                    request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    request.Headers.TryAddWithoutValidation(header.Key, headerValue);
                 }
             }
 
@@ -924,7 +950,7 @@ namespace TxtAIEditor.Controls
                 string value = property.Value.ValueKind == JsonValueKind.String
                     ? property.Value.GetString() ?? string.Empty
                     : property.Value.GetRawText();
-                if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
+                if (!string.IsNullOrWhiteSpace(key))
                 {
                     headers[key] = value.Trim();
                 }
@@ -945,7 +971,7 @@ namespace TxtAIEditor.Controls
             {
                 string key = header.Key?.Trim() ?? string.Empty;
                 string value = header.Value?.Trim() ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
+                if (!string.IsNullOrWhiteSpace(key))
                 {
                     normalized[key] = value;
                 }
@@ -972,6 +998,90 @@ namespace TxtAIEditor.Controls
 
             headers[headerName] = apiKey;
             return true;
+        }
+
+        private Dictionary<string, string> StoreHeaderSecrets(
+            AgentMcpServer server,
+            Dictionary<string, string> headers,
+            bool deleteEmptySecrets = false)
+        {
+            var storedHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var header in headers)
+            {
+                string key = header.Key?.Trim() ?? string.Empty;
+                string value = header.Value?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                storedHeaders[key] = string.Empty;
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    _credentialService.WriteCredential(
+                        GetHeaderCredentialTarget(server, key),
+                        "TxtAIEditor_mcp",
+                        value);
+                }
+                else if (deleteEmptySecrets)
+                {
+                    _credentialService.DeleteCredential(GetHeaderCredentialTarget(server, key));
+                }
+            }
+
+            return storedHeaders;
+        }
+
+        private void MoveInlineHeaderValuesToCredential(AgentMcpServer server)
+        {
+            server.Headers = StoreHeaderSecrets(server, NormalizeHeaders(server.Headers));
+        }
+
+        private void DeleteCredentialsForRemovedHeaders(AgentMcpServer server, Dictionary<string, string> nextHeaders)
+        {
+            var nextHeaderNames = new HashSet<string>(nextHeaders.Keys, StringComparer.OrdinalIgnoreCase);
+            foreach (string oldHeaderName in server.Headers.Keys.ToList())
+            {
+                if (!nextHeaderNames.Contains(oldHeaderName))
+                {
+                    _credentialService.DeleteCredential(GetHeaderCredentialTarget(server, oldHeaderName));
+                }
+            }
+        }
+
+        private void DeleteAllCredentials(AgentMcpServer server)
+        {
+            foreach (string headerName in server.Headers.Keys.ToList())
+            {
+                _credentialService.DeleteCredential(GetHeaderCredentialTarget(server, headerName));
+            }
+        }
+
+        private string GetHeaderSecret(AgentMcpServer server, string headerName, string fallbackValue)
+        {
+            if (string.IsNullOrWhiteSpace(headerName))
+            {
+                return string.Empty;
+            }
+
+            string? credential = _credentialService.ReadCredential(GetHeaderCredentialTarget(server, headerName));
+            if (!string.IsNullOrEmpty(credential))
+            {
+                return credential;
+            }
+
+            return fallbackValue ?? string.Empty;
+        }
+
+        private static string GetHeaderCredentialTarget(AgentMcpServer server, string headerName)
+        {
+            return $"TxtAIEditor_MCP_{server.Id}_{SanitizeCredentialSegment(headerName)}";
+        }
+
+        private static string SanitizeCredentialSegment(string value)
+        {
+            string normalized = Regex.Replace(value ?? string.Empty, @"[^A-Za-z0-9_.-]+", "_").Trim('_');
+            return string.IsNullOrWhiteSpace(normalized) ? "header" : normalized;
         }
 
         private AgentMcpServer? FindServer(string name)
@@ -1015,6 +1125,17 @@ namespace TxtAIEditor.Controls
                 Height = 32,
                 FontFamily = new FontFamily("Segoe UI, Malgun Gothic"),
                 VerticalContentAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private TextBlock CreateInfoText(string text)
+        {
+            return new TextBlock
+            {
+                Text = text,
+                FontSize = 11,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"]
             };
         }
 

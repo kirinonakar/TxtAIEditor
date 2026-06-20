@@ -23,6 +23,7 @@ namespace TxtAIEditor.Controls
 
         private readonly ILLMService _llmService;
         private readonly ISettingsService _settingsService;
+        private readonly ICredentialService _credentialService;
         private readonly AgentPane _agentPane;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Action<string, string> _showError;
@@ -72,6 +73,7 @@ namespace TxtAIEditor.Controls
         public AgentController(
             ILLMService llmService,
             ISettingsService settingsService,
+            ICredentialService credentialService,
             AgentPane agentPane,
             Func<OpenedTab?> activeTabProvider,
             Func<IReadOnlyList<OpenedTab>> openTabsProvider,
@@ -100,6 +102,7 @@ namespace TxtAIEditor.Controls
         {
             _llmService = llmService;
             _settingsService = settingsService;
+            _credentialService = credentialService;
             _agentPane = agentPane;
             _activeTabProvider = activeTabProvider;
             _showError = showError;
@@ -157,6 +160,7 @@ namespace TxtAIEditor.Controls
             _mcpController = new AgentMcpController(
                 _agentPane,
                 _initializePickerWindow,
+                _credentialService,
                 _showError,
                 _getString,
                 () => UpdateContextStatsImmediate(),
