@@ -123,7 +123,7 @@ namespace TxtAIEditor.Controls
 
         public void UpdateModelDisplay(bool forceClearCache = false)
         {
-            var settings = _settingsService.CurrentSettings;
+            var settings = _settingsProvider();
             if (settings == null)
             {
                 return;
@@ -183,7 +183,7 @@ namespace TxtAIEditor.Controls
         private int GetModelContextLimit()
         {
             return _modelContextLimits.GetContextLimit(
-                _settingsService.CurrentSettings,
+                _settingsProvider(),
                 () => _agentPane.DispatcherQueue.TryEnqueue(() => Update(true)));
         }
     }

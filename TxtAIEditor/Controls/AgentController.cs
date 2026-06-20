@@ -1270,48 +1270,10 @@ namespace TxtAIEditor.Controls
             };
         }
 
-        private async Task<EditorSettings> ResolveRunSessionSettingsAsync(AgentOpenSessionState session)
+        private Task<EditorSettings> ResolveRunSessionSettingsAsync(AgentOpenSessionState session)
         {
-            EditorSettings sessionSettings = CloneSessionSettings(session.LlmSettings ?? _settingsService.CurrentSettings);
-            if (!RequiresApiKey(sessionSettings.LlmProvider))
-            {
-                return sessionSettings;
-            }
-
-            string sessionApiKey = await _llmService.GetApiKeyAsync(sessionSettings.LlmProvider);
-            if (!string.IsNullOrEmpty(sessionApiKey))
-            {
-                return sessionSettings;
-            }
-
-            EditorSettings currentSettings = CreateSessionSettingsSnapshot();
-            bool sameProvider = string.Equals(
-                sessionSettings.LlmProvider,
-                currentSettings.LlmProvider,
-                StringComparison.OrdinalIgnoreCase);
-            if (sameProvider)
-            {
-                return sessionSettings;
-            }
-
-            if (!RequiresApiKey(currentSettings.LlmProvider) ||
-                !string.IsNullOrEmpty(await _llmService.GetApiKeyAsync(currentSettings.LlmProvider)))
-            {
-                session.LlmSettings = currentSettings;
-                return currentSettings;
-            }
-
-            return sessionSettings;
-        }
-
-        private static bool RequiresApiKey(string? providerName)
-        {
-            string provider = providerName ?? string.Empty;
-            return !provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) &&
-                !provider.Equals("LMStudio", StringComparison.OrdinalIgnoreCase) &&
-                !provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) &&
-                !provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) &&
-                !provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
+            session.LlmSettings ??= CreateSessionSettingsSnapshot();
+            return Task.FromResult(CloneSessionSettings(session.LlmSettings));
         }
 
         private string GetUntitledOpenSessionTitle()
