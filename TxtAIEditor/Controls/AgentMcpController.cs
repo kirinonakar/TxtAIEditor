@@ -91,6 +91,15 @@ namespace TxtAIEditor.Controls
               "type": "string",
               "description": "Positive image prompt. If no explicit parameter path is provided, TxtAIEditor analyzes the workflow and fills a positive prompt text slot such as an empty StringConcatenate inputs.string_a linked from CLIPTextEncode."
             },
+            "inputImagePath": {
+              "type": "string",
+              "description": "Optional local image path to upload to the ComfyUI input folder before running the workflow."
+            },
+            "inputImages": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Optional local image paths to upload to the ComfyUI input folder. Empty LoadImage inputs are filled in workflow order."
+            },
             "outputFileName": {
               "type": "string",
               "description": "File name or path for the generated image. Relative paths are saved under the current workspace."
@@ -937,7 +946,11 @@ namespace TxtAIEditor.Controls
                 10_000);
 
             JsonObject parameters = ExtractJsonObjectArgument(arguments, "parameters", "params");
-            JsonObject promptPayload = BuildComfyPromptPayload(apiJson, parameters, promptText);
+            IReadOnlyList<ComfyInputImageRef> inputImages = await UploadComfyInputImagesAsync(
+                endpoint,
+                ExtractComfyInputImagePaths(arguments),
+                cancellationToken);
+            JsonObject promptPayload = BuildComfyPromptPayload(apiJson, parameters, promptText, inputImages);
             using JsonDocument promptResponse = await PostComfyJsonAsync(endpoint, "prompt", promptPayload, cancellationToken);
             string promptId = TryGetStringProperty(promptResponse.RootElement, "prompt_id");
             if (string.IsNullOrWhiteSpace(promptId))
@@ -970,7 +983,10 @@ namespace TxtAIEditor.Controls
             string displayPath = AgentWorkspaceFileResolver.IsInsideRoot(root, fullPath)
                 ? AgentWorkspaceFileResolver.RelativePath(root, fullPath)
                 : fullPath;
-            return $"MCP tool result: ComfyUI image saved: {displayPath}\nprompt_id: {promptId}\nsource_image: {image.FileName}";
+            string uploadedText = inputImages.Count == 0
+                ? string.Empty
+                : "\ninput_images: " + string.Join(", ", inputImages.Select(item => item.FileName));
+            return $"MCP tool result: ComfyUI image saved: {displayPath}\nprompt_id: {promptId}\nsource_image: {image.FileName}{uploadedText}";
         }
 
         private async Task RefreshServerToolsAsync(AgentMcpServer server, CancellationToken cancellationToken)
@@ -1279,7 +1295,11 @@ namespace TxtAIEditor.Controls
             return new JsonObject();
         }
 
-        private static JsonObject BuildComfyPromptPayload(string apiJson, JsonObject parameters, string promptText)
+        private static JsonObject BuildComfyPromptPayload(
+            string apiJson,
+            JsonObject parameters,
+            string promptText,
+            IReadOnlyList<ComfyInputImageRef> inputImages)
         {
             JsonNode workflowNode = JsonNode.Parse(apiJson) ??
                 throw new InvalidOperationException("ComfyUI apiJson is not valid JSON.");
@@ -1294,6 +1314,7 @@ namespace TxtAIEditor.Controls
             {
                 ApplyComfyParameters(promptNode, parameters);
                 ApplyComfyPromptText(promptNode, promptText);
+                ApplyComfyInputImages(promptNode, inputImages);
                 if (!workflowObject.ContainsKey("client_id"))
                 {
                     workflowObject["client_id"] = clientId;
@@ -1304,6 +1325,7 @@ namespace TxtAIEditor.Controls
 
             ApplyComfyParameters(workflowObject, parameters);
             ApplyComfyPromptText(workflowObject, promptText);
+            ApplyComfyInputImages(workflowObject, inputImages);
             return new JsonObject
             {
                 ["prompt"] = workflowObject,
@@ -1376,6 +1398,68 @@ namespace TxtAIEditor.Controls
             }
 
             return false;
+        }
+
+        private static int ApplyComfyInputImages(JsonNode workflowNode, IReadOnlyList<ComfyInputImageRef> inputImages)
+        {
+            if (inputImages.Count == 0 || workflowNode is not JsonObject workflowObject)
+            {
+                return 0;
+            }
+
+            int imageIndex = 0;
+            foreach (var node in workflowObject)
+            {
+                if (imageIndex >= inputImages.Count)
+                {
+                    return imageIndex;
+                }
+
+                if (node.Value is JsonObject nodeObject &&
+                    IsLoadImageNode(nodeObject) &&
+                    TryApplyInputImageToNode(nodeObject, inputImages[imageIndex]))
+                {
+                    imageIndex++;
+                }
+            }
+
+            foreach (var node in workflowObject)
+            {
+                if (imageIndex >= inputImages.Count)
+                {
+                    return imageIndex;
+                }
+
+                if (node.Value is JsonObject nodeObject &&
+                    !IsLoadImageNode(nodeObject) &&
+                    TryApplyInputImageToNode(nodeObject, inputImages[imageIndex]))
+                {
+                    imageIndex++;
+                }
+            }
+
+            return imageIndex;
+        }
+
+        private static bool TryApplyInputImageToNode(JsonObject nodeObject, ComfyInputImageRef image)
+        {
+            if (!TryGetInputsObject(nodeObject, out var inputs) ||
+                !inputs.TryGetPropertyValue("image", out JsonNode? imageNode) ||
+                !IsEmptyJsonString(imageNode))
+            {
+                return false;
+            }
+
+            inputs["image"] = JsonValue.Create(image.FileName);
+            return true;
+        }
+
+        private static bool IsLoadImageNode(JsonObject nodeObject)
+        {
+            string classType = GetJsonObjectString(nodeObject, "class_type");
+            string title = GetNodeTitle(nodeObject);
+            return classType.Contains("LoadImage", StringComparison.OrdinalIgnoreCase) ||
+                title.Contains("Load Image", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryApplyPromptToClipTextInput(JsonObject workflowObject, JsonObject clipNode, string promptText)
@@ -1664,6 +1748,218 @@ namespace TxtAIEditor.Controls
             return TryGetJsonString(value, out string text)
                 ? text ?? string.Empty
                 : value.ToJsonString();
+        }
+
+        private async Task<IReadOnlyList<ComfyInputImageRef>> UploadComfyInputImagesAsync(
+            string endpoint,
+            IReadOnlyList<string> imagePaths,
+            CancellationToken cancellationToken)
+        {
+            if (imagePaths.Count == 0)
+            {
+                return Array.Empty<ComfyInputImageRef>();
+            }
+
+            var uploadedImages = new List<ComfyInputImageRef>();
+            foreach (string imagePath in imagePaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string fullPath = ResolveComfyInputImagePath(imagePath);
+                uploadedImages.Add(await UploadComfyInputImageAsync(endpoint, fullPath, cancellationToken));
+            }
+
+            return uploadedImages;
+        }
+
+        private async Task<ComfyInputImageRef> UploadComfyInputImageAsync(
+            string endpoint,
+            string fullPath,
+            CancellationToken cancellationToken)
+        {
+            string fileName = Path.GetFileName(fullPath);
+            using var content = new MultipartFormDataContent();
+            await using var fileStream = File.OpenRead(fullPath);
+            using var imageContent = new StreamContent(fileStream);
+            imageContent.Headers.ContentType = new MediaTypeHeaderValue(GetImageMediaType(fullPath));
+            content.Add(imageContent, "image", fileName);
+            content.Add(new StringContent("input"), "type");
+            content.Add(new StringContent("true"), "overwrite");
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildComfyUrl(endpoint, "upload/image"))
+            {
+                Content = content
+            };
+            using HttpResponseMessage response = await HttpClient.SendAsync(request, cancellationToken);
+            string body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"ComfyUI input image upload failed: {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+            }
+
+            string uploadedName = fileName;
+            string uploadedSubfolder = string.Empty;
+            string uploadedType = "input";
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                try
+                {
+                    using JsonDocument uploadResponse = JsonDocument.Parse(body);
+                    uploadedName = TryGetStringProperty(uploadResponse.RootElement, "name");
+                    uploadedSubfolder = TryGetStringProperty(uploadResponse.RootElement, "subfolder");
+                    uploadedType = TryGetStringProperty(uploadResponse.RootElement, "type");
+                }
+                catch (JsonException)
+                {
+                }
+            }
+
+            return new ComfyInputImageRef
+            {
+                FileName = string.IsNullOrWhiteSpace(uploadedName) ? fileName : uploadedName,
+                LocalPath = fullPath,
+                Subfolder = uploadedSubfolder,
+                Type = string.IsNullOrWhiteSpace(uploadedType) ? "input" : uploadedType
+            };
+        }
+
+        private string ResolveComfyInputImagePath(string requestedPath)
+        {
+            if (string.IsNullOrWhiteSpace(requestedPath))
+            {
+                throw new InvalidOperationException("ComfyUI input image path is empty.");
+            }
+
+            string path = requestedPath.Trim();
+            string fullPath = Path.IsPathRooted(path)
+                ? Path.GetFullPath(path)
+                : Path.GetFullPath(Path.Combine(ResolveWorkspaceRoot(), path));
+            if (!File.Exists(fullPath))
+            {
+                throw new FileNotFoundException("ComfyUI input image file was not found.", requestedPath);
+            }
+
+            return fullPath;
+        }
+
+        private static IReadOnlyList<string> ExtractComfyInputImagePaths(JsonElement arguments)
+        {
+            if (arguments.ValueKind != JsonValueKind.Object)
+            {
+                return Array.Empty<string>();
+            }
+
+            var paths = new List<string>();
+            foreach (string name in new[]
+            {
+                "inputImagePath",
+                "input_image_path",
+                "imagePath",
+                "image_path",
+                "initImagePath",
+                "init_image_path",
+                "sourceImage",
+                "source_image",
+                "inputImage",
+                "input_image"
+            })
+            {
+                AddComfyInputImageArgument(arguments, name, paths);
+            }
+
+            foreach (string name in new[]
+            {
+                "inputImages",
+                "input_images",
+                "imagePaths",
+                "image_paths",
+                "images",
+                "sourceImages",
+                "source_images"
+            })
+            {
+                AddComfyInputImageArgument(arguments, name, paths);
+            }
+
+            return paths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static void AddComfyInputImageArgument(JsonElement arguments, string propertyName, List<string> paths)
+        {
+            if (!arguments.TryGetProperty(propertyName, out JsonElement value))
+            {
+                return;
+            }
+
+            if (value.ValueKind == JsonValueKind.String)
+            {
+                string path = value.GetString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    paths.Add(path);
+                }
+                return;
+            }
+
+            if (value.ValueKind == JsonValueKind.Object)
+            {
+                string path = TryGetStringProperty(value, "path");
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    path = TryGetStringProperty(value, "file");
+                }
+
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    paths.Add(path);
+                }
+                return;
+            }
+
+            if (value.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var item in value.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    string path = item.GetString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        paths.Add(path);
+                    }
+                }
+                else if (item.ValueKind == JsonValueKind.Object)
+                {
+                    string path = TryGetStringProperty(item, "path");
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        path = TryGetStringProperty(item, "file");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        paths.Add(path);
+                    }
+                }
+            }
+        }
+
+        private static string GetImageMediaType(string path)
+        {
+            return Path.GetExtension(path).ToLowerInvariant() switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".webp" => "image/webp",
+                ".bmp" => "image/bmp",
+                ".gif" => "image/gif",
+                ".tif" or ".tiff" => "image/tiff",
+                _ => "image/png"
+            };
         }
 
         private async Task<JsonDocument> PostComfyJsonAsync(
@@ -3015,6 +3311,14 @@ namespace TxtAIEditor.Controls
             public string FileName { get; set; } = string.Empty;
             public string Subfolder { get; set; } = string.Empty;
             public string Type { get; set; } = string.Empty;
+        }
+
+        private sealed class ComfyInputImageRef
+        {
+            public string FileName { get; set; } = string.Empty;
+            public string LocalPath { get; set; } = string.Empty;
+            public string Subfolder { get; set; } = string.Empty;
+            public string Type { get; set; } = "input";
         }
 
         private sealed class AgentMcpAuthSettings
