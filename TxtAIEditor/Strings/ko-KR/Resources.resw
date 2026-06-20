@@ -2584,6 +2584,12 @@
   <data name="AgentMcpStatusFailedFormat" xml:space="preserve">
     <value>연결 실패: {0}</value>
   </data>
+  <data name="AgentMcpComfyUiDetail" xml:space="preserve">
+    <value>내장 플러그인 - API JSON/파라미터로 이미지 생성</value>
+  </data>
+  <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
+    <value>내장 플러그인은 수정하거나 삭제할 수 없습니다.</value>
+  </data>
   <data name="AgentActivityMcpToolFormat" xml:space="preserve">
     <value>MCP 도구 실행 중: {0} ({1})</value>
   </data>

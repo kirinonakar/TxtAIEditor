@@ -166,6 +166,8 @@ namespace TxtAIEditor.Controls
                 _showError,
                 _getString,
                 () => UpdateContextStatsSlow(),
+                () => _fileTools.WorkspaceRoot,
+                _fileModifiedAsync,
                 _beforeDialog,
                 _afterDialog);
             _historyController = new AgentHistoryController(_agentPane);

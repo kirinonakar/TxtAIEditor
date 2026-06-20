@@ -2584,6 +2584,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentMcpStatusFailedFormat" xml:space="preserve">
     <value>Connection failed: {0}</value>
   </data>
+  <data name="AgentMcpComfyUiDetail" xml:space="preserve">
+    <value>Built-in plugin - generate images from API JSON/parameters</value>
+  </data>
+  <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
+    <value>Built-in plugins cannot be edited or deleted.</value>
+  </data>
   <data name="AgentActivityMcpToolFormat" xml:space="preserve">
     <value>Running MCP tool: {0} ({1})</value>
   </data>

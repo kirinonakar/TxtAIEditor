@@ -1462,6 +1462,23 @@ namespace TxtAIEditor.Controls
                 Grid.SetColumn(selectBtn, 0);
                 rowGrid.Children.Add(selectBtn);
 
+                if (!item.CanEdit && !item.CanDelete)
+                {
+                    var lockIcon = new FontIcon
+                    {
+                        Glyph = "\uE72E",
+                        FontSize = 10,
+                        Foreground = CreateMcpSecondaryTextBrush(),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    ToolTipService.SetToolTip(lockIcon, getString("AgentMcpBuiltInLockedTooltip", "내장 플러그인은 수정하거나 삭제할 수 없습니다."));
+                    Grid.SetColumn(lockIcon, 1);
+                    rowGrid.Children.Add(lockIcon);
+                    AgentMcpListPanel.Children.Add(rowGrid);
+                    continue;
+                }
+
                 var editBtn = new Button
                 {
                     Content = new FontIcon { Glyph = "\uE70F", FontSize = 10 },
@@ -1471,6 +1488,7 @@ namespace TxtAIEditor.Controls
                     Style = buttonStyle
                 };
                 ToolTipService.SetToolTip(editBtn, getString("AgentMcpEditText", "수정"));
+                editBtn.IsEnabled = item.CanEdit;
                 editBtn.Click += (_, _) =>
                 {
                     AgentMcpEdited?.Invoke(this, currentName);
@@ -1488,6 +1506,7 @@ namespace TxtAIEditor.Controls
                     Style = buttonStyle
                 };
                 ToolTipService.SetToolTip(deleteBtn, getString("AgentMcpDeleteText", "삭제"));
+                deleteBtn.IsEnabled = item.CanDelete;
                 deleteBtn.Click += (_, _) => AgentMcpDeleted?.Invoke(this, currentName);
                 Grid.SetColumn(deleteBtn, 2);
                 rowGrid.Children.Add(deleteBtn);

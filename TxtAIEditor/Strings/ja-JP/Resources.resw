@@ -2585,6 +2585,12 @@
   <data name="AgentMcpStatusFailedFormat" xml:space="preserve">
     <value>接続失敗: {0}</value>
   </data>
+  <data name="AgentMcpComfyUiDetail" xml:space="preserve">
+    <value>組み込みプラグイン - API JSON/パラメーターから画像生成</value>
+  </data>
+  <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
+    <value>組み込みプラグインは編集または削除できません。</value>
+  </data>
   <data name="AgentActivityMcpToolFormat" xml:space="preserve">
     <value>MCP ツール実行中: {0} ({1})</value>
   </data>
