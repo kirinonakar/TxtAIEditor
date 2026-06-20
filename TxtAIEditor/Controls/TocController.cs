@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -13,6 +14,9 @@ namespace TxtAIEditor.Controls
 {
     public sealed class TocController
     {
+        private const long MaxAutoTocFileBytes = 8L * 1024L * 1024L;
+        private const int MaxAutoTocLines = 50000;
+
         private readonly MainWindowViewModel _viewModel;
         private readonly LeftSidebarPane _leftSidebar;
         private readonly Func<OpenedTab?> _getActiveTab;
@@ -55,6 +59,12 @@ namespace TxtAIEditor.Controls
             }
 
             int lineCount = session.Model.LineCount;
+            if (ShouldSkipAutomaticTocRefresh(tab, lineCount))
+            {
+                _viewModel.TocItems.Clear();
+                return;
+            }
+
             var lines = session.GetLines(1, lineCount);
             if (lines == null || lines.Count == 0)
             {
@@ -124,6 +134,31 @@ namespace TxtAIEditor.Controls
                     }
                 }
             }
+        }
+
+        private static bool ShouldSkipAutomaticTocRefresh(OpenedTab tab, int lineCount)
+        {
+            if (lineCount > MaxAutoTocLines)
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(tab.FilePath))
+            {
+                try
+                {
+                    var info = new FileInfo(tab.FilePath);
+                    if (info.Exists && info.Length > MaxAutoTocFileBytes)
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return false;
         }
 
         private bool HasAozoraTags(IReadOnlyList<string> lines)

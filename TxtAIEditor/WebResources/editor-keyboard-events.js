@@ -493,8 +493,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
 
         if ((event.key === ' ' || event.code === 'Space') && !event.ctrlKey && !event.metaKey && !event.altKey) {
             event.preventDefault();
-            markNativeBeforeInputHandled(['insertSpace'], 80);
-            insertPlainTextByModel(element, ' ');
+            markNativeBeforeInputHandled(['insertSpace', 'insertText'], 120);
+            scheduleModelRepeatEdit('Space', event.repeat);
             return;
         }
 
@@ -510,9 +510,11 @@ export function bindKeyboardEvents({ openFindPanel }) {
 
         if (isPlainTextKey(event)) {
             event.preventDefault();
-            markNativeBeforeInputHandled(['insertText'], 80);
-            insertPlainTextByModel(element, event.key);
-            triggerAutocomplete(activeEditableElement() || element);
+            markNativeBeforeInputHandled(['insertText'], 120);
+            scheduleModelRepeatEdit(normalizedModelRepeatKey(event), event.repeat);
+            if (!event.repeat) {
+                triggerAutocomplete(activeEditableElement() || element);
+            }
             return;
         }
 
@@ -550,7 +552,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
         }
 
         if (isModelRepeatKey(event)) {
-            clearPendingRepeatEdit();
+            clearPendingRepeatEdit(normalizedModelRepeatKey(event));
         }
 
         const element = lineElementFromEvent(event);
@@ -581,7 +583,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
 
     document.addEventListener('keyup', event => {
         if (isModelRepeatKey(event)) {
-            clearPendingRepeatEdit();
+            clearPendingRepeatEdit(normalizedModelRepeatKey(event));
         }
 
         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {

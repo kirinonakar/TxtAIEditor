@@ -6,6 +6,7 @@ import {
     graphemeDeleteEnd,
     graphemeDeleteStart,
     hasTextAt,
+    isPlainTextKey,
     isStandaloneDelimiter,
     invalidateMeasuredLineHeightsAround,
     lineCommentSyntax,
@@ -58,6 +59,27 @@ import { createTextCommandActions } from './editor-text-command-actions.js';
 
 let verticalCaretVisualAnchor = null;
 let splitScrollRestoreToken = 0;
+let postEditFocusToken = 0;
+
+function queuePostEditFocus(callback) {
+    const token = ++postEditFocusToken;
+    setTimeout(() => {
+        if (token === postEditFocusToken) {
+            callback();
+        }
+    }, 0);
+}
+
+function cancelPendingRepeatFollowUps(key) {
+    if (!key) return;
+    postEditFocusToken++;
+    if (key === 'Enter') {
+        splitScrollRestoreToken++;
+    }
+    if (key === 'Backspace' || key === 'Delete') {
+        state.pendingLineActions = [];
+    }
+}
 
 function beginEditTransaction() {
     post({ type: 'editTransactionStarted' });
@@ -920,6 +942,12 @@ function insertTextAtCaret(text, options = {}) {
 
 function isModelRepeatKey(event) {
     if (!event) return false;
+    if (event.key === ' ' || event.code === 'Space' || event.key === 'Spacebar') {
+        return !event.ctrlKey && !event.metaKey && !event.altKey;
+    }
+    if (isPlainTextKey(event)) {
+        return true;
+    }
     if (event.key === 'Enter') {
         return !event.ctrlKey && !event.metaKey && !event.altKey;
     }
@@ -933,6 +961,8 @@ function isModelRepeatKey(event) {
 }
 
 function normalizedModelRepeatKey(event) {
+    if (event.key === ' ' || event.code === 'Space' || event.key === 'Spacebar') return 'Space';
+    if (isPlainTextKey(event)) return `Text:${event.key}`;
     if (event.key === 'Backspace') return 'Backspace';
     if (event.key === 'Delete') return 'Delete';
     if (event.key === 'Enter') return 'Enter';
@@ -951,12 +981,69 @@ function markNativeBeforeInputHandled(inputTypes, durationMs = 120) {
 }
 
 function shouldSuppressNativeBeforeInput(event) {
-    if (!event || performance.now() > state.repeatEdit.suppressBeforeInputUntil) return false;
+    if (!event) return false;
+    const now = performance.now();
     const inputType = event.inputType || '';
+
+    if (state.repeatEdit.continuousKey && beforeInputMatchesRepeatKey(event, state.repeatEdit.continuousKey)) {
+        return true;
+    }
+
+    for (const [key, until] of state.repeatEdit.releasedKeys.entries()) {
+        if (now > until) {
+            state.repeatEdit.releasedKeys.delete(key);
+            continue;
+        }
+        if (beforeInputMatchesRepeatKey(event, key)) {
+            return true;
+        }
+    }
+
+    if (now > state.repeatEdit.suppressBeforeInputUntil) return false;
     const types = state.repeatEdit.suppressBeforeInputTypes;
     if (types.has(inputType)) return true;
     if (types.has('insertSpace') && inputType.startsWith('insert') && event.data === ' ') return true;
     return false;
+}
+
+function beforeInputMatchesRepeatKey(event, key) {
+    const inputType = event.inputType || '';
+    if (key?.startsWith?.('Text:')) {
+        return inputType === 'insertText' && event.data === key.slice(5);
+    }
+
+    switch (key) {
+        case 'Space':
+            return (inputType === 'insertText' || inputType === 'insertSpace') && event.data === ' ';
+        case 'Enter':
+            return inputType === 'insertLineBreak' ||
+                inputType === 'insertParagraph' ||
+                (inputType === 'insertText' && (event.data === '\n' || event.data === '\r')) ||
+                (inputType === 'insertText' && event.data === null);
+        case 'Backspace':
+            return inputType === 'deleteContentBackward';
+        case 'Delete':
+            return inputType === 'deleteContentForward';
+        default:
+            return false;
+    }
+}
+
+function rememberReleasedRepeatKey(key) {
+    if (!key) return;
+    const until = performance.now() + state.repeatEdit.releaseGuardMs;
+    state.repeatEdit.releasedKeys.set(key, until);
+}
+
+function isReleaseGuardedRepeatKey(key) {
+    if (!key) return false;
+    const until = state.repeatEdit.releasedKeys.get(key);
+    if (!until) return false;
+    if (performance.now() > until) {
+        state.repeatEdit.releasedKeys.delete(key);
+        return false;
+    }
+    return true;
 }
 
 function markLineBoundaryTransition(targetLine, targetColumn) {
@@ -968,7 +1055,10 @@ function markLineBoundaryTransition(targetLine, targetColumn) {
     );
 }
 
-function clearPendingRepeatEdit() {
+function clearPendingRepeatEdit(releasedKey = null, addReleaseGuard = true) {
+    const activeKey = state.repeatEdit.continuousKey;
+    const keyToGuard = releasedKey || activeKey;
+    const hadContinuousRun = state.repeatEdit.hasContinuousRun;
     if (state.repeatEdit.timer) {
         clearTimeout(state.repeatEdit.timer);
         state.repeatEdit.timer = 0;
@@ -979,6 +1069,21 @@ function clearPendingRepeatEdit() {
     }
     state.repeatEdit.pending = null;
     state.repeatEdit.continuousKey = null;
+    state.repeatEdit.hasContinuousRun = false;
+    state.repeatEdit.hasPhysicalRepeatSignal = false;
+    state.repeatEdit.lastKeyDownAt = 0;
+    if (addReleaseGuard) {
+        rememberReleasedRepeatKey(keyToGuard);
+        if (hadContinuousRun) {
+            cancelPendingRepeatFollowUps(keyToGuard);
+        }
+        if (activeKey && activeKey !== keyToGuard) {
+            rememberReleasedRepeatKey(activeKey);
+            if (hadContinuousRun) {
+                cancelPendingRepeatFollowUps(activeKey);
+            }
+        }
+    }
 }
 
 function repeatEditDelayFromNow() {
@@ -1000,6 +1105,12 @@ function scheduleContinuousModelRepeatEdit(key, delayMs) {
             return;
         }
 
+        if (state.repeatEdit.hasPhysicalRepeatSignal &&
+            performance.now() - state.repeatEdit.lastKeyDownAt > state.repeatEdit.keyDownSilenceMs) {
+            clearPendingRepeatEdit(key);
+            return;
+        }
+
         const wait = repeatEditDelayFromNow();
         if (wait > 0) {
             scheduleContinuousModelRepeatEdit(key, wait);
@@ -1007,6 +1118,7 @@ function scheduleContinuousModelRepeatEdit(key, delayMs) {
         }
 
         state.repeatEdit.lastRunAt = performance.now();
+        state.repeatEdit.hasContinuousRun = true;
         runModelRepeatEdit(key);
         scheduleContinuousModelRepeatEdit(key, state.repeatEdit.intervalMs);
     }, Math.max(0, Number(delayMs || 0)));
@@ -1014,20 +1126,36 @@ function scheduleContinuousModelRepeatEdit(key, delayMs) {
 
 function scheduleModelRepeatEdit(key, isRepeat) {
     if (state.readOnly || state.isComposing) return;
+    if (isRepeat && isReleaseGuardedRepeatKey(key)) return;
+    if (!isRepeat) {
+        state.repeatEdit.releasedKeys.delete(key);
+    }
 
     // Backspace/Delete/Enter are handled from one cancellable timer instead of
     // browser key-repeat events.  This prevents queued keydown events from
     // continuing to delete or split lines after the physical key is released.
     if (state.repeatEdit.continuousKey === key) {
+        state.repeatEdit.lastKeyDownAt = performance.now();
+        if (isRepeat) {
+            state.repeatEdit.hasPhysicalRepeatSignal = true;
+            if (!state.repeatEdit.continuousTimer) {
+                scheduleContinuousModelRepeatEdit(key, repeatEditDelayFromNow());
+            }
+        }
         return;
     }
 
-    clearPendingRepeatEdit();
+    clearPendingRepeatEdit(null, false);
     state.repeatEdit.continuousKey = key;
     state.repeatEdit.pending = null;
+    state.repeatEdit.hasContinuousRun = false;
+    state.repeatEdit.hasPhysicalRepeatSignal = !!isRepeat;
+    state.repeatEdit.lastKeyDownAt = performance.now();
     state.repeatEdit.lastRunAt = performance.now();
     runModelRepeatEdit(key);
-    scheduleContinuousModelRepeatEdit(key, state.repeatEdit.continuousInitialDelayMs);
+    if (isRepeat) {
+        scheduleContinuousModelRepeatEdit(key, repeatEditDelayFromNow());
+    }
 }
 
 function insertPlainTextByModel(element, text) {
@@ -1115,6 +1243,16 @@ function runModelRepeatEdit(key) {
         return;
     }
 
+    if (key === 'Space') {
+        insertPlainTextByModel(element, ' ');
+        return;
+    }
+
+    if (key?.startsWith?.('Text:')) {
+        insertPlainTextByModel(element, key.slice(5));
+        return;
+    }
+
     makeEditablePlainText(element);
     if (key === 'Backspace') {
         deleteBackwardAtCaret(element);
@@ -1177,7 +1315,7 @@ function applyMergeLineForward(lineNumber, text, nextText) {
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber, text.length);
     queueRender(true);
-    setTimeout(() => focusLine(lineNumber, text.length, 3 * state.lineHeight), 0);
+    queuePostEditFocus(() => focusLine(lineNumber, text.length, 3 * state.lineHeight));
 }
 
 function applyMergeLineBackward(lineNumber, previous, current) {
@@ -1199,7 +1337,7 @@ function applyMergeLineBackward(lineNumber, previous, current) {
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber - 1, previous.length);
     queueRender(true);
-    setTimeout(() => focusLine(lineNumber - 1, previous.length, 3 * state.lineHeight), 0);
+    queuePostEditFocus(() => focusLine(lineNumber - 1, previous.length, 3 * state.lineHeight));
 }
 
 function queueLineAction(action) {

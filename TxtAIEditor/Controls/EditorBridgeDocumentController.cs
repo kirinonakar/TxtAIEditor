@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Editor;
@@ -18,6 +20,21 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab> _scheduleDeferredPendingSplitImeSync;
         private readonly Func<OpenedTab, int, string, bool, Task> _syncLineChangeToOtherTabsAsync;
         private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
+        private readonly Dictionary<string, DeferredContentRefresh> _contentRefreshTimers = new();
+        private static readonly TimeSpan ContentRefreshDebounce = TimeSpan.FromMilliseconds(350);
+
+        private sealed class DeferredContentRefresh
+        {
+            public DeferredContentRefresh(DispatcherQueueTimer timer, OpenedTab tab)
+            {
+                Timer = timer;
+                Tab = tab;
+            }
+
+            public DispatcherQueueTimer Timer { get; }
+
+            public OpenedTab Tab { get; set; }
+        }
 
         public EditorBridgeDocumentController(
             TabDirtyStateController tabDirtyStateController,
@@ -171,13 +188,48 @@ namespace TxtAIEditor.Controls
             if (!isComposing)
             {
                 MarkDirty(tab, tabItem);
-                _updateLanguage(tab);
-                _tocController.RefreshToc(tab);
-                _statusBarController.UpdateTotalLines(tab);
-                _scheduleDeferredPendingSplitImeSync(tab);
+                ScheduleDeferredContentRefresh(tab, tabItem);
             }
 
             _schedulePreview(tab);
+        }
+
+        private void ScheduleDeferredContentRefresh(OpenedTab tab, TabViewItem tabItem)
+        {
+            if (!_contentRefreshTimers.TryGetValue(tab.Id, out var refresh))
+            {
+                var timer = tabItem.DispatcherQueue.CreateTimer();
+                timer.IsRepeating = false;
+                timer.Interval = ContentRefreshDebounce;
+                refresh = new DeferredContentRefresh(timer, tab);
+                _contentRefreshTimers[tab.Id] = refresh;
+                string tabId = tab.Id;
+                timer.Tick += (_, _) => RunDeferredContentRefresh(tabId);
+            }
+            else
+            {
+                refresh.Timer.Stop();
+                refresh.Tab = tab;
+            }
+
+            refresh.Timer.Start();
+        }
+
+        private void RunDeferredContentRefresh(string tabId)
+        {
+            if (!_contentRefreshTimers.TryGetValue(tabId, out var refresh))
+            {
+                return;
+            }
+
+            refresh.Timer.Stop();
+            _contentRefreshTimers.Remove(tabId);
+
+            OpenedTab tab = refresh.Tab;
+            _updateLanguage(tab);
+            _tocController.RefreshToc(tab);
+            _statusBarController.UpdateTotalLines(tab);
+            _scheduleDeferredPendingSplitImeSync(tab);
         }
 
         private async Task CompleteStructuralEditAsync(
