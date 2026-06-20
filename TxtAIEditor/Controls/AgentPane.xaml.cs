@@ -293,7 +293,7 @@ namespace TxtAIEditor.Controls
             _isBusy = isBusy;
             AgentRunButton.IsEnabled = true;
             AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
-            AgentNewSessionButton.IsEnabled = !isBusy;
+            AgentNewSessionButton.IsEnabled = true;
             AgentOpenSessionsButton.IsEnabled = true;
             AgentHistoryButton.IsEnabled = !isBusy;
             AgentDeleteHistoryButton.IsEnabled = !isBusy;
