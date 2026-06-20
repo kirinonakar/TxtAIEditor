@@ -123,7 +123,7 @@ namespace TxtAIEditor.Controls
 
         public void UpdateModelDisplay(bool forceClearCache = false)
         {
-            var settings = _settingsProvider();
+            var settings = _settingsService.CurrentSettings;
             if (settings == null)
             {
                 return;

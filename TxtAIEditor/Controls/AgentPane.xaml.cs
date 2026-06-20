@@ -1941,7 +1941,17 @@ namespace TxtAIEditor.Controls
         {
             _openSessionItems = items;
             _selectedOpenSessionId = selectedId;
+            UpdateOpenSessionButtonChrome();
             RebuildOpenSessionMenu();
+        }
+
+        private void UpdateOpenSessionButtonChrome()
+        {
+            bool showSessionList = _openSessionItems.Count > 1;
+            AgentOpenSessionsButton.Visibility = showSessionList ? Visibility.Visible : Visibility.Collapsed;
+            AgentNewSessionButton.CornerRadius = showSessionList
+                ? new CornerRadius(4, 0, 0, 4)
+                : new CornerRadius(4);
         }
 
         private void RebuildOpenSessionMenu()
@@ -1951,6 +1961,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            UpdateOpenSessionButtonChrome();
             AgentOpenSessionsListPanel.Children.Clear();
             Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
             Func<string, string, string> getString = _getString ?? _displayText.GetString;

@@ -74,7 +74,10 @@
                         Grid.Column="1"
                         Width="34"
                         Height="32"
+                        Margin="-1,0,0,0"
                         Padding="0"
+                        CornerRadius="0,4,4,0"
+                        Visibility="Collapsed"
                         ToolTipService.ToolTip="열린 세션"
                         Style="{StaticResource AgentButtonStyle}">
                     <FontIcon Glyph="&#xE70D;" FontSize="12"/>
