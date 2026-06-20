@@ -58,6 +58,7 @@ namespace TxtAIEditor.Core.Services
         {
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems = await LoadHwpxBinaryItemsAsync(archive).ConfigureAwait(false);
+            IReadOnlyDictionary<string, string> characterStyles = await LoadHwpxCharacterStylesAsync(archive).ConfigureAwait(false);
             var sectionEntries = archive.Entries
                 .Where(entry => Regex.IsMatch(entry.FullName, @"^Contents/section\d+\.xml$", RegexOptions.IgnoreCase))
                 .OrderBy(entry => GetTrailingNumber(entry.FullName))
@@ -83,7 +84,7 @@ namespace TxtAIEditor.Core.Services
             foreach (ZipArchiveEntry sectionEntry in sectionEntries)
             {
                 XDocument section = await LoadXmlEntryAsync(sectionEntry).ConfigureAwait(false);
-                AppendHwpxChildrenHtml(content, archive, binaryItems, section.Root?.Elements() ?? Enumerable.Empty<XElement>());
+                AppendHwpxChildrenHtml(content, archive, binaryItems, characterStyles, section.Root?.Elements() ?? Enumerable.Empty<XElement>());
             }
 
             if (content.Length == 0)
@@ -348,11 +349,12 @@ namespace TxtAIEditor.Core.Services
             StringBuilder builder,
             ZipArchive archive,
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
+            IReadOnlyDictionary<string, string> characterStyles,
             IEnumerable<XElement> elements)
         {
             foreach (XElement element in elements)
             {
-                AppendHwpxBlockHtml(builder, archive, binaryItems, element);
+                AppendHwpxBlockHtml(builder, archive, binaryItems, characterStyles, element);
             }
         }
 
@@ -360,23 +362,24 @@ namespace TxtAIEditor.Core.Services
             StringBuilder builder,
             ZipArchive archive,
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
+            IReadOnlyDictionary<string, string> characterStyles,
             XElement block)
         {
             switch (block.Name.LocalName)
             {
                 case "p":
-                    builder.Append(BuildHwpxParagraphHtml(archive, binaryItems, block));
+                    builder.Append(BuildHwpxParagraphHtml(archive, binaryItems, characterStyles, block));
                     foreach (XElement table in block.Descendants().Where(e => e.Name.LocalName == "tbl"))
                     {
-                        builder.Append(BuildHwpxTableHtml(archive, binaryItems, table));
+                        builder.Append(BuildHwpxTableHtml(archive, binaryItems, characterStyles, table));
                     }
 
                     break;
                 case "tbl":
-                    builder.Append(BuildHwpxTableHtml(archive, binaryItems, block));
+                    builder.Append(BuildHwpxTableHtml(archive, binaryItems, characterStyles, block));
                     break;
                 default:
-                    AppendHwpxChildrenHtml(builder, archive, binaryItems, block.Elements());
+                    AppendHwpxChildrenHtml(builder, archive, binaryItems, characterStyles, block.Elements());
                     break;
             }
         }
@@ -384,6 +387,7 @@ namespace TxtAIEditor.Core.Services
         private static string BuildHwpxParagraphHtml(
             ZipArchive archive,
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
+            IReadOnlyDictionary<string, string> characterStyles,
             XElement paragraph)
         {
             var content = new StringBuilder();
@@ -397,7 +401,7 @@ namespace TxtAIEditor.Core.Services
 
                 if (node is XText textNode && textNode.Parent?.Name.LocalName == "t")
                 {
-                    content.Append(Html(textNode.Value));
+                    AppendStyledText(content, textNode.Value, GetHwpxTextStyle(textNode, characterStyles));
                     continue;
                 }
 
@@ -437,6 +441,7 @@ namespace TxtAIEditor.Core.Services
         private static string BuildHwpxTableHtml(
             ZipArchive archive,
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
+            IReadOnlyDictionary<string, string> characterStyles,
             XElement table)
         {
             var rows = table.Elements().Where(e => e.Name.LocalName == "tr").ToList();
@@ -473,7 +478,7 @@ namespace TxtAIEditor.Core.Services
 
                     builder.Append('>');
                     int before = builder.Length;
-                    AppendHwpxChildrenHtml(builder, archive, binaryItems, cell.Elements());
+                    AppendHwpxChildrenHtml(builder, archive, binaryItems, characterStyles, cell.Elements());
                     if (builder.Length == before)
                     {
                         builder.Append("&nbsp;");
@@ -513,6 +518,23 @@ namespace TxtAIEditor.Core.Services
                 .Append("\" alt=\"\"></figure>");
         }
 
+        private static string GetHwpxTextStyle(XText textNode, IReadOnlyDictionary<string, string> characterStyles)
+        {
+            XElement? parent = textNode.Parent;
+            while (parent != null)
+            {
+                if (parent.Name.LocalName == "run")
+                {
+                    string styleId = GetAttributeValue(parent, "charPrIDRef");
+                    return characterStyles.TryGetValue(styleId, out string? style) ? style : string.Empty;
+                }
+
+                parent = parent.Parent;
+            }
+
+            return string.Empty;
+        }
+
         private static string ResolveHwpxImagePath(XElement element, IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems)
         {
             foreach (string attributeName in new[] { "binaryItemIDRef", "binItemIDRef", "refID", "refId" })
@@ -543,6 +565,140 @@ namespace TxtAIEditor.Core.Services
             }
 
             return string.Empty;
+        }
+
+        private static async Task<IReadOnlyDictionary<string, string>> LoadHwpxCharacterStylesAsync(ZipArchive archive)
+        {
+            XDocument? header = await TryLoadXmlEntryAsync(archive, "Contents/header.xml").ConfigureAwait(false);
+            if (header == null)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            IReadOnlyDictionary<string, string> fontNames = LoadHwpxFontNames(header);
+            var styles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (XElement element in header.Descendants().Where(e => e.Name.LocalName == "charPr"))
+            {
+                string id = GetAttributeValue(element, "id");
+                string style = BuildHwpxCharacterStyle(element, fontNames);
+                if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(style))
+                {
+                    styles[id] = style;
+                }
+            }
+
+            return styles;
+        }
+
+        private static IReadOnlyDictionary<string, string> LoadHwpxFontNames(XDocument header)
+        {
+            XElement? fontFace = header.Descendants()
+                .FirstOrDefault(e =>
+                    e.Name.LocalName == "fontface" &&
+                    GetAttributeValue(e, "lang").Equals("HANGUL", StringComparison.OrdinalIgnoreCase)) ??
+                header.Descendants().FirstOrDefault(e => e.Name.LocalName == "fontface");
+
+            if (fontFace == null)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return fontFace.Elements()
+                .Where(e => e.Name.LocalName == "font")
+                .Select(e => new
+                {
+                    Id = GetAttributeValue(e, "id"),
+                    Face = GetAttributeValue(e, "face")
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Id) && !string.IsNullOrWhiteSpace(x.Face))
+                .ToDictionary(x => x.Id, x => x.Face, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string BuildHwpxCharacterStyle(XElement charPr, IReadOnlyDictionary<string, string> fontNames)
+        {
+            var styles = new List<string>();
+
+            string textColor = GetAttributeValue(charPr, "textColor");
+            if (IsCssColor(textColor) && !IsDefaultTextColor(textColor))
+            {
+                styles.Add("color:" + textColor);
+            }
+
+            string shadeColor = GetAttributeValue(charPr, "shadeColor");
+            if (IsCssColor(shadeColor) && !IsDefaultShadeColor(shadeColor))
+            {
+                styles.Add("background-color:" + shadeColor);
+            }
+
+            if (int.TryParse(GetAttributeValue(charPr, "height"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int height) &&
+                height > 0)
+            {
+                styles.Add("font-size:" + (height / 100.0).ToString("0.###", CultureInfo.InvariantCulture) + "pt");
+            }
+
+            XElement? fontRef = charPr.Elements().FirstOrDefault(e => e.Name.LocalName == "fontRef");
+            string fontId = GetAttributeValue(fontRef, "hangul");
+            if (!string.IsNullOrWhiteSpace(fontId) && fontNames.TryGetValue(fontId, out string? face))
+            {
+                styles.Add("font-family:" + QuoteCssFontFamily(face) + ", \"Malgun Gothic\", sans-serif");
+            }
+
+            if (charPr.Elements().Any(e => e.Name.LocalName == "bold"))
+            {
+                styles.Add("font-weight:700");
+            }
+
+            if (charPr.Elements().Any(e => e.Name.LocalName == "italic"))
+            {
+                styles.Add("font-style:italic");
+            }
+
+            var decorations = new List<string>();
+            XElement? underline = charPr.Elements().FirstOrDefault(e => e.Name.LocalName == "underline");
+            if (underline != null && !GetAttributeValue(underline, "type").Equals("NONE", StringComparison.OrdinalIgnoreCase))
+            {
+                decorations.Add("underline");
+            }
+
+            XElement? strikeout = charPr.Elements().FirstOrDefault(e => e.Name.LocalName == "strikeout");
+            if (strikeout != null && !GetAttributeValue(strikeout, "shape").Equals("NONE", StringComparison.OrdinalIgnoreCase))
+            {
+                decorations.Add("line-through");
+            }
+
+            if (decorations.Count > 0)
+            {
+                styles.Add("text-decoration:" + string.Join(' ', decorations));
+            }
+
+            XElement? spacing = charPr.Elements().FirstOrDefault(e => e.Name.LocalName == "spacing");
+            if (int.TryParse(GetAttributeValue(spacing, "hangul"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int spacingValue) &&
+                spacingValue != 0)
+            {
+                styles.Add("letter-spacing:" + (spacingValue / 100.0).ToString("0.###", CultureInfo.InvariantCulture) + "em");
+            }
+
+            return string.Join(';', styles);
+        }
+
+        private static bool IsCssColor(string value)
+        {
+            return Regex.IsMatch(value ?? string.Empty, "^#[0-9A-Fa-f]{6}$");
+        }
+
+        private static bool IsDefaultTextColor(string value)
+        {
+            return value.Equals("#000000", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsDefaultShadeColor(string value)
+        {
+            return value.Equals("#FFFFFF", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string QuoteCssFontFamily(string value)
+        {
+            return "\"" + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
         }
 
         private static async Task<IReadOnlyDictionary<string, HwpxBinaryItem>> LoadHwpxBinaryItemsAsync(ZipArchive archive)
@@ -577,7 +733,32 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
+            foreach (ZipArchiveEntry entry in archive.Entries.Where(e =>
+                e.FullName.StartsWith("BinData/", StringComparison.OrdinalIgnoreCase) &&
+                IsSupportedImagePath(e.FullName)))
+            {
+                string fileName = Path.GetFileName(entry.FullName);
+                string stem = Path.GetFileNameWithoutExtension(entry.FullName);
+                AddHwpxBinaryItem(items, stem, entry.FullName);
+                AddHwpxBinaryItem(items, fileName, entry.FullName);
+                AddHwpxBinaryItem(items, entry.FullName, entry.FullName);
+            }
+
             return items;
+        }
+
+        private static void AddHwpxBinaryItem(IDictionary<string, HwpxBinaryItem> items, string id, string path)
+        {
+            if (string.IsNullOrWhiteSpace(id) || items.ContainsKey(id))
+            {
+                return;
+            }
+
+            items[id] = new HwpxBinaryItem
+            {
+                Path = NormalizeZipPath(string.Empty, path),
+                MimeType = GetImageMimeType(path)
+            };
         }
 
         private static string NormalizeHwpxBinaryPath(string path)
@@ -594,6 +775,18 @@ namespace TxtAIEditor.Core.Services
             }
 
             return "BinData/" + path;
+        }
+
+        private static bool IsSupportedImagePath(string path)
+        {
+            string extension = Path.GetExtension(path);
+            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".svg", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsInsideNestedElement(XElement root, XNode node, string localName)
@@ -752,8 +945,13 @@ body { padding: 28px 16px 44px; }
             using Stream stream = entry.Open();
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
+            return "data:" + GetImageMimeType(imagePath) + ";base64," + Convert.ToBase64String(memory.ToArray());
+        }
+
+        private static string GetImageMimeType(string imagePath)
+        {
             string extension = Path.GetExtension(imagePath).ToLowerInvariant();
-            string mime = extension switch
+            return extension switch
             {
                 ".jpg" or ".jpeg" => "image/jpeg",
                 ".gif" => "image/gif",
@@ -762,8 +960,6 @@ body { padding: 28px 16px 44px; }
                 ".svg" => "image/svg+xml",
                 _ => "image/png"
             };
-
-            return "data:" + mime + ";base64," + Convert.ToBase64String(memory.ToArray());
         }
 
         private static async Task<IReadOnlyDictionary<string, string>> LoadRelationshipsAsync(
