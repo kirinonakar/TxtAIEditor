@@ -24,6 +24,7 @@ const state = {
     cache: new Map(),
     pending: new Set(),
     lineHeights: new Map(),
+    lineHeightIndex: null,
     requestSeq: 1,
     currentLine: 1,
     currentColumn: 1,
@@ -238,6 +239,7 @@ function applyOptions(msg) {
     const fg = resolveReadableColor(bg, preferredFg, theme === 'Light' ? '#111111' : '#d4d4d4');
     const fontSize = Number(msg.fontSize || 14);
     const baseLineHeight = Math.max(18, Math.ceil(fontSize + 8));
+    const previousLineHeight = state.lineHeight;
     state.lineHeight = snapCssPixelsToDevicePixels(baseLineHeight);
     state.tabSize = Number(msg.tabSize || 4);
     state.readOnly = !!msg.readOnly;
@@ -308,8 +310,8 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--bracket-depth-5', '#c586c0');
     }
 
-    if (!state.wordWrap) {
-        state.lineHeights.clear();
+    if (!state.wordWrap || previousLineHeight !== state.lineHeight) {
+        clearMeasuredLineHeights();
     }
 
     // Apply localized strings for Find & Replace panel if present
@@ -397,7 +399,7 @@ function setupModel(lineCount) {
     state.lineCount = Math.max(1, Number(lineCount || 1));
     state.cache.clear();
     state.pending.clear();
-    state.lineHeights.clear();
+    clearMeasuredLineHeights();
     state.cacheVersion++;
     state.lastRangeKey = '';
     state.dirtyLines.clear();
@@ -488,37 +490,147 @@ function lineHeightFor(lineNumber) {
     return usesMeasuredLineHeights() ? (state.lineHeights.get(lineNumber) || state.lineHeight) : state.lineHeight;
 }
 
+function createLineHeightIndex() {
+    const size = Math.max(2, state.lineCount + 2);
+    return {
+        size,
+        tree: new Map(),
+        totalDelta: 0
+    };
+}
+
+function measuredLineHeightDelta(height) {
+    return Math.max(0, Number(height || 0)) - state.lineHeight;
+}
+
+function resetLineHeightIndex() {
+    state.lineHeightIndex = createLineHeightIndex();
+}
+
+function rebuildLineHeightIndex() {
+    const index = createLineHeightIndex();
+    state.lineHeightIndex = index;
+    for (const [line, height] of state.lineHeights.entries()) {
+        addMeasuredLineHeightDelta(line, measuredLineHeightDelta(height));
+    }
+}
+
+function ensureLineHeightIndex() {
+    const requiredSize = Math.max(2, state.lineCount + 2);
+    if (!state.lineHeightIndex || state.lineHeightIndex.size < requiredSize) {
+        rebuildLineHeightIndex();
+    }
+}
+
+function addMeasuredLineHeightDelta(lineNumber, delta) {
+    if (!delta) return;
+    ensureLineHeightIndex();
+    const index = state.lineHeightIndex;
+    const line = Math.max(1, Math.min(Number(lineNumber || 1), index.size));
+    for (let i = line; i <= index.size; i += i & -i) {
+        const next = (index.tree.get(i) || 0) + delta;
+        if (Math.abs(next) < 0.0001) {
+            index.tree.delete(i);
+        } else {
+            index.tree.set(i, next);
+        }
+    }
+    index.totalDelta += delta;
+}
+
+function measuredLineHeightDeltaBefore(lineNumber) {
+    if (!usesMeasuredLineHeights() || state.lineHeights.size === 0) return 0;
+    ensureLineHeightIndex();
+    const index = state.lineHeightIndex;
+    let i = Math.max(0, Math.min(Number(lineNumber || 1) - 1, index.size));
+    let sum = 0;
+    while (i > 0) {
+        sum += index.tree.get(i) || 0;
+        i -= i & -i;
+    }
+    return sum;
+}
+
+function setMeasuredLineHeight(lineNumber, height) {
+    const line = Math.max(1, Number(lineNumber || 1));
+    const measured = Math.max(0, Number(height || 0));
+    const previous = state.lineHeights.get(line);
+    if (previous === measured) return false;
+
+    state.lineHeights.set(line, measured);
+    const previousDelta = previous === undefined ? 0 : measuredLineHeightDelta(previous);
+    const nextDelta = measuredLineHeightDelta(measured);
+    addMeasuredLineHeightDelta(line, nextDelta - previousDelta);
+    return true;
+}
+
+function deleteMeasuredLineHeight(lineNumber) {
+    const line = Math.max(1, Number(lineNumber || 1));
+    const previous = state.lineHeights.get(line);
+    if (previous === undefined) return false;
+
+    state.lineHeights.delete(line);
+    addMeasuredLineHeightDelta(line, -measuredLineHeightDelta(previous));
+    return true;
+}
+
+function clearMeasuredLineHeights() {
+    state.lineHeights.clear();
+    resetLineHeightIndex();
+}
+
+function shiftMeasuredLineHeights(fromLine, delta) {
+    const entries = [...state.lineHeights.entries()]
+        .filter(([line]) => line >= fromLine)
+        .sort((a, b) => delta > 0 ? b[0] - a[0] : a[0] - b[0]);
+    if (entries.length === 0) return;
+
+    for (const [line] of entries) {
+        state.lineHeights.delete(line);
+    }
+    for (const [line, value] of entries) {
+        const nextLine = line + delta;
+        if (nextLine >= 1 && nextLine <= state.lineCount + Math.max(delta, 0)) {
+            state.lineHeights.set(nextLine, value);
+        }
+    }
+    rebuildLineHeightIndex();
+}
+
 function totalVirtualHeight() {
     let total = Math.max(1, state.lineCount) * state.lineHeight;
     if (usesMeasuredLineHeights()) {
-        for (const height of state.lineHeights.values()) {
-            total += Math.max(0, height) - state.lineHeight;
-        }
+        ensureLineHeightIndex();
+        total += state.lineHeightIndex.totalDelta;
     }
     return Math.max(1, total);
 }
 
 function lineTop(lineNumber) {
     let top = (Math.max(1, lineNumber) - 1) * state.lineHeight;
-    if (usesMeasuredLineHeights()) {
-        for (const [line, height] of state.lineHeights.entries()) {
-            if (line < lineNumber) {
-                top += Math.max(0, height) - state.lineHeight;
-            }
-        }
-    }
+    top += measuredLineHeightDeltaBefore(lineNumber);
     return Math.max(0, top);
 }
 
 function lineAt(scrollTop) {
-    let line = Math.min(state.lineCount, Math.max(1, Math.floor(scrollTop / state.lineHeight) + 1));
-    while (line < state.lineCount && lineTop(line + 1) <= scrollTop) {
-        line++;
+    if (!usesMeasuredLineHeights() || state.lineHeights.size === 0) {
+        return Math.min(state.lineCount, Math.max(1, Math.floor(scrollTop / state.lineHeight) + 1));
     }
-    while (line > 1 && lineTop(line) > scrollTop) {
-        line--;
+
+    const targetTop = Math.max(0, Number(scrollTop || 0));
+    let low = 1;
+    let high = state.lineCount;
+    let result = 1;
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        if (lineTop(mid) <= targetTop) {
+            result = mid;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
     }
-    return line;
+    return Math.min(state.lineCount, Math.max(1, result));
 }
 
 function visibleRange() {
@@ -600,8 +712,7 @@ function measureRenderedRows(renderOnChange = true) {
         const minimum = isSkipped ? 0 : state.lineHeight;
         const measuredHeight = Math.max(row.getBoundingClientRect().height || 0, row.scrollHeight || 0);
         const measured = Math.max(minimum, Math.ceil(measuredHeight));
-        if (state.lineHeights.get(lineNumber) !== measured) {
-            state.lineHeights.set(lineNumber, measured);
+        if (setMeasuredLineHeight(lineNumber, measured)) {
             changed = true;
         }
     }
@@ -636,7 +747,7 @@ function invalidateMeasuredLineHeightsAround(lineNumber, radius = 0) {
     const end = Math.min(state.lineCount, center + radius);
     let changed = false;
     for (let line = start; line <= end; line++) {
-        changed = state.lineHeights.delete(line) || changed;
+        changed = deleteMeasuredLineHeight(line) || changed;
     }
 
     if (changed) {
@@ -647,7 +758,7 @@ function invalidateMeasuredLineHeightsAround(lineNumber, radius = 0) {
 
 function shiftCachedLines(fromLine, delta) {
     shiftLineMap(state.cache, fromLine, delta);
-    shiftLineMap(state.lineHeights, fromLine, delta);
+    shiftMeasuredLineHeights(fromLine, delta);
     shiftLineMap(state.dirtyLines, fromLine, delta);
 }
 
@@ -1043,6 +1154,7 @@ export {
     applyOptions,
     activeEditableElement,
     cleanDirtyMarker,
+    clearMeasuredLineHeights,
     clearCustomSelectionVisuals,
     comparePositions,
     configureEditorCoreRuntime,

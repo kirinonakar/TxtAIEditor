@@ -1,6 +1,7 @@
 import { findInput } from './editor-dom.js';
 import {
     applyOptions,
+    clearMeasuredLineHeights,
     post,
     queueRender,
     receiveLineBlock,
@@ -242,7 +243,7 @@ export function createHostMessageHandler({
                 state.inlineLivePreviewSourceLine = null;
                 state.inlineLivePreviewEditableBlock = null;
             }
-            state.lineHeights.clear();
+            clearMeasuredLineHeights();
             document.body.classList.toggle('inline-live-preview-enabled', state.inlineLivePreviewEnabled);
             setupVirtualHeight();
             queueRender(true);
