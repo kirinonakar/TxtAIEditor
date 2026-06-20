@@ -146,6 +146,8 @@ th, td {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-size: 13px;
+    user-select: none;
+    -webkit-user-select: none;
 }
 th {
     position: sticky;
@@ -154,6 +156,7 @@ th {
     background: var(--header);
     color: var(--muted);
     font-weight: 600;
+    cursor: cell;
 }
 th.row-header {
     left: 0;
@@ -161,8 +164,7 @@ th.row-header {
     min-width: 54px;
     width: 54px;
     text-align: right;
-    user-select: none;
-    -webkit-user-select: none;
+    cursor: default;
 }
 td.row-header {
     position: sticky;
@@ -174,8 +176,22 @@ td.row-header {
     color: var(--muted);
     background: var(--header);
     font-weight: 600;
-    user-select: none;
-    -webkit-user-select: none;
+    cursor: cell;
+}
+td:not(.row-header) { cursor: cell; }
+th.selected-column-heading,
+td.selected-row-heading {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 22%, var(--header));
+}
+td.selected-cell {
+    background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+    outline: 1px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    outline-offset: -1px;
+}
+td.selected-cell.active-cell {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 .empty { padding: 28px; color: var(--muted); }
 .truncated { color: var(--accent); }
@@ -198,6 +214,10 @@ const maxRows = 5000;
 const select = document.getElementById('sheetSelect');
 const meta = document.getElementById('sheetMeta');
 const wrap = document.getElementById('tableWrap');
+let activeSheetIndex = 0;
+let columnCount = 1;
+let selectionState = null;
+let dragState = null;
 select.setAttribute('aria-label', sheetAriaLabel);
 
 function colName(index) {
@@ -235,56 +255,214 @@ function escapeCsvValue(value) {
     return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+function sheetRows() {
+    return sheets[activeSheetIndex]?.rows || [];
+}
+
+function cellValue(rowIndex, columnIndex) {
+    const row = sheetRows()[rowIndex] || [];
+    return valueOf(row[columnIndex] || null);
+}
+
+function createCellSelection(startRow, startColumn, endRow = startRow, endColumn = startColumn) {
+    return {
+        mode: 'cells',
+        startRow: Math.max(0, Number(startRow || 0)),
+        startColumn: Math.max(0, Number(startColumn || 0)),
+        endRow: Math.max(0, Number(endRow || 0)),
+        endColumn: Math.max(0, Number(endColumn || 0))
+    };
+}
+
+function selectedCellRect() {
+    const sel = selectionState;
+    if (!sel || sel.mode !== 'cells') return null;
+    return {
+        startRow: Math.min(sel.startRow, sel.endRow),
+        endRow: Math.max(sel.startRow, sel.endRow),
+        startColumn: Math.min(sel.startColumn, sel.endColumn),
+        endColumn: Math.max(sel.startColumn, sel.endColumn)
+    };
+}
+
 function selectedCellsAsCsv() {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return '';
+    const rows = sheetRows();
+    if (!selectionState || !rows.length) return '';
 
-    const selectedCells = [];
-    const cells = wrap.querySelectorAll('tbody td[data-csv-row][data-csv-column]');
-    cells.forEach(td => {
-        for (let i = 0; i < selection.rangeCount; i++) {
-            const range = selection.getRangeAt(i);
-            if (range.intersectsNode(td)) {
-                selectedCells.push(td);
-                break;
-            }
-        }
-    });
-
-    if (!selectedCells.length) return '';
-
-    const rowIndexes = selectedCells.map(td => Number(td.dataset.csvRow));
-    const columnIndexes = selectedCells.map(td => Number(td.dataset.csvColumn));
-    const minRow = Math.min(...rowIndexes);
-    const maxRow = Math.max(...rowIndexes);
-    const minColumn = Math.min(...columnIndexes);
-    const maxColumn = Math.max(...columnIndexes);
-
-    const values = new Map();
-    selectedCells.forEach(td => {
-        values.set(`${td.dataset.csvRow}:${td.dataset.csvColumn}`, td.textContent ?? '');
-    });
-
-    const lines = [];
-    for (let r = minRow; r <= maxRow; r++) {
-        const line = [];
-        for (let c = minColumn; c <= maxColumn; c++) {
-            line.push(escapeCsvValue(values.get(`${r}:${c}`) ?? ''));
-        }
-        lines.push(line.join(','));
+    let rowIndexes = [];
+    let columnIndexes = [];
+    if (selectionState.mode === 'rows') {
+        rowIndexes = [...selectionState.rows].filter(row => row >= 0 && row < rows.length).sort((a, b) => a - b);
+        columnIndexes = Array.from({ length: columnCount }, (_, index) => index);
+    } else if (selectionState.mode === 'columns') {
+        rowIndexes = Array.from({ length: rows.length }, (_, index) => index);
+        columnIndexes = [...selectionState.columns].filter(column => column >= 0 && column < columnCount).sort((a, b) => a - b);
+    } else {
+        const rect = selectedCellRect();
+        if (!rect) return '';
+        rowIndexes = Array.from({ length: rect.endRow - rect.startRow + 1 }, (_, index) => rect.startRow + index)
+            .filter(row => row >= 0 && row < rows.length);
+        columnIndexes = Array.from({ length: rect.endColumn - rect.startColumn + 1 }, (_, index) => rect.startColumn + index)
+            .filter(column => column >= 0 && column < columnCount);
     }
 
+    if (!rowIndexes.length || !columnIndexes.length) return '';
+
+    const lines = [];
+    rowIndexes.forEach(rowIndex => {
+        lines.push(columnIndexes.map(columnIndex => escapeCsvValue(cellValue(rowIndex, columnIndex))).join(','));
+    });
+
     return lines.join('\r\n');
+}
+
+function isSelectedCell(rowIndex, columnIndex) {
+    if (!selectionState) return false;
+    if (selectionState.mode === 'rows') return selectionState.rows.has(rowIndex);
+    if (selectionState.mode === 'columns') return selectionState.columns.has(columnIndex);
+
+    const rect = selectedCellRect();
+    return !!rect &&
+        rowIndex >= rect.startRow &&
+        rowIndex <= rect.endRow &&
+        columnIndex >= rect.startColumn &&
+        columnIndex <= rect.endColumn;
+}
+
+function isActiveCell(rowIndex, columnIndex) {
+    return selectionState?.mode === 'cells' &&
+        rowIndex === selectionState.endRow &&
+        columnIndex === selectionState.endColumn;
+}
+
+function applySelectionClasses() {
+    wrap.querySelectorAll('tbody td[data-csv-row][data-csv-column]').forEach(td => {
+        const rowIndex = Number(td.dataset.csvRow);
+        const columnIndex = Number(td.dataset.csvColumn);
+        td.classList.toggle('selected-cell', isSelectedCell(rowIndex, columnIndex));
+        td.classList.toggle('active-cell', isActiveCell(rowIndex, columnIndex));
+    });
+    wrap.querySelectorAll('thead th[data-csv-column]').forEach(th => {
+        th.classList.toggle('selected-column-heading',
+            selectionState?.mode === 'columns' && selectionState.columns.has(Number(th.dataset.csvColumn)));
+    });
+    wrap.querySelectorAll('tbody td.row-header[data-csv-row]').forEach(td => {
+        td.classList.toggle('selected-row-heading',
+            selectionState?.mode === 'rows' && selectionState.rows.has(Number(td.dataset.csvRow)));
+    });
+}
+
+function clearNativeSelection() {
+    window.getSelection()?.removeAllRanges();
+}
+
+function setCellSelection(startRow, startColumn, endRow = startRow, endColumn = startColumn) {
+    selectionState = createCellSelection(startRow, startColumn, endRow, endColumn);
+    clearNativeSelection();
+    applySelectionClasses();
+}
+
+function setColumnSelection(columnIndex, event) {
+    const column = Math.max(0, Math.min(columnCount - 1, Number(columnIndex || 0)));
+    const ctrl = !!(event?.ctrlKey || event?.metaKey);
+    const shift = !!event?.shiftKey;
+    const current = selectionState?.mode === 'columns' ? new Set(selectionState.columns) : new Set();
+    const anchor = Math.max(0, Math.min(columnCount - 1, Number(selectionState?.columnAnchor ?? column)));
+
+    if (shift) {
+        if (!ctrl) current.clear();
+        const start = Math.min(anchor, column);
+        const end = Math.max(anchor, column);
+        for (let c = start; c <= end; c++) current.add(c);
+    } else if (ctrl) {
+        current.has(column) ? current.delete(column) : current.add(column);
+    } else {
+        current.clear();
+        current.add(column);
+    }
+
+    if (!current.size) current.add(column);
+    selectionState = {
+        mode: 'columns',
+        columns: current,
+        columnAnchor: shift ? anchor : column
+    };
+    clearNativeSelection();
+    applySelectionClasses();
+}
+
+function setRowSelection(rowIndex, event) {
+    const rows = sheetRows();
+    const row = Math.max(0, Math.min(rows.length - 1, Number(rowIndex || 0)));
+    const ctrl = !!(event?.ctrlKey || event?.metaKey);
+    const shift = !!event?.shiftKey;
+    const current = selectionState?.mode === 'rows' ? new Set(selectionState.rows) : new Set();
+    const anchor = Math.max(0, Math.min(rows.length - 1, Number(selectionState?.rowAnchor ?? row)));
+
+    if (shift) {
+        if (!ctrl) current.clear();
+        const start = Math.min(anchor, row);
+        const end = Math.max(anchor, row);
+        for (let r = start; r <= end; r++) current.add(r);
+    } else if (ctrl) {
+        current.has(row) ? current.delete(row) : current.add(row);
+    } else {
+        current.clear();
+        current.add(row);
+    }
+
+    if (!current.size) current.add(row);
+    selectionState = {
+        mode: 'rows',
+        rows: current,
+        rowAnchor: shift ? anchor : row
+    };
+    clearNativeSelection();
+    applySelectionClasses();
+}
+
+function cellFromPoint(event) {
+    return document.elementFromPoint(event.clientX, event.clientY)
+        ?.closest?.('td[data-csv-row][data-csv-column]');
+}
+
+function handleCellPointerDown(event) {
+    const td = event.target.closest?.('td[data-csv-row][data-csv-column]');
+    if (!td || event.button !== 0) return;
+
+    const row = Number(td.dataset.csvRow);
+    const column = Number(td.dataset.csvColumn);
+    const anchor = event.shiftKey && selectionState?.mode === 'cells'
+        ? { row: selectionState.startRow, column: selectionState.startColumn }
+        : { row, column };
+    dragState = anchor;
+    setCellSelection(anchor.row, anchor.column, row, column);
+    event.preventDefault();
+}
+
+function handleCellPointerMove(event) {
+    if (!dragState || (event.buttons & 1) !== 1) return;
+
+    const td = cellFromPoint(event);
+    if (!td) return;
+
+    setCellSelection(dragState.row, dragState.column, Number(td.dataset.csvRow), Number(td.dataset.csvColumn));
+    event.preventDefault();
+}
+
+function handlePointerUp() {
+    dragState = null;
 }
 
 function renderSheet(index) {
     const sheet = sheets[index];
     const rows = sheet.rows || [];
     const visibleRows = rows.slice(0, maxRows);
-    const columnCount = Math.max(1, ...visibleRows.map(row => row.length));
+    columnCount = Math.max(1, ...visibleRows.map(row => row.length));
     wrap.textContent = '';
 
     if (!rows.length) {
+        selectionState = null;
         wrap.appendChild(cell('div', emptySheetText, 'empty'));
         meta.textContent = `0 ${rowsText}`;
         return;
@@ -295,7 +473,9 @@ function renderSheet(index) {
     const headRow = document.createElement('tr');
     headRow.appendChild(cell('th', '', 'row-header'));
     for (let c = 0; c < columnCount; c++) {
-        headRow.appendChild(cell('th', colName(c)));
+        const th = cell('th', colName(c));
+        th.dataset.csvColumn = String(c);
+        headRow.appendChild(th);
     }
     thead.appendChild(headRow);
     table.appendChild(thead);
@@ -303,7 +483,9 @@ function renderSheet(index) {
     const tbody = document.createElement('tbody');
     visibleRows.forEach((row, r) => {
         const tr = document.createElement('tr');
-        tr.appendChild(cell('td', String(r + 1), 'row-header'));
+        const rowHeader = cell('td', String(r + 1), 'row-header');
+        rowHeader.dataset.csvRow = String(r);
+        tr.appendChild(rowHeader);
         for (let c = 0; c < columnCount; c++) {
             const sourceCell = row[c] || null;
             const td = cell('td', valueOf(sourceCell));
@@ -320,6 +502,11 @@ function renderSheet(index) {
     const firstShown = firstShownText.replace('{0}', maxRows.toLocaleString());
     meta.innerHTML = `${rows.length.toLocaleString()} ${rowsText} x ${columnCount.toLocaleString()} ${columnsText}` +
         (rows.length > maxRows ? ` <span class="truncated">${firstShown}</span>` : '');
+
+    if (!selectionState) {
+        selectionState = createCellSelection(0, 0);
+    }
+    applySelectionClasses();
 }
 
 sheets.forEach((sheet, index) => {
@@ -328,13 +515,41 @@ sheets.forEach((sheet, index) => {
     option.textContent = sheet.name || `Sheet ${index + 1}`;
     select.appendChild(option);
 });
-select.addEventListener('change', () => renderSheet(Number(select.value || 0)));
+select.addEventListener('change', () => {
+    activeSheetIndex = Number(select.value || 0);
+    selectionState = null;
+    renderSheet(activeSheetIndex);
+});
+wrap.addEventListener('pointerdown', event => {
+    const columnHeader = event.target.closest?.('th[data-csv-column]');
+    if (columnHeader) {
+        setColumnSelection(Number(columnHeader.dataset.csvColumn), event);
+        event.preventDefault();
+        return;
+    }
+
+    const rowHeader = event.target.closest?.('td.row-header[data-csv-row]');
+    if (rowHeader) {
+        setRowSelection(Number(rowHeader.dataset.csvRow), event);
+        event.preventDefault();
+        return;
+    }
+
+    handleCellPointerDown(event);
+});
+document.addEventListener('pointermove', handleCellPointerMove);
+document.addEventListener('pointerup', handlePointerUp);
 document.addEventListener('copy', event => {
     const csv = selectedCellsAsCsv();
     if (!csv) return;
 
     event.clipboardData?.setData('text/plain', csv);
     event.preventDefault();
+});
+document.addEventListener('selectstart', event => {
+    if (event.target?.closest?.('#tableWrap')) {
+        event.preventDefault();
+    }
 });
 renderSheet(0);
 </script>
