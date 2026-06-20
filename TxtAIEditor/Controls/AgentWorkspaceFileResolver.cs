@@ -68,6 +68,11 @@ namespace TxtAIEditor.Controls
                 return candidate;
             }
 
+            if (AgentSkillDirectories.IsInsideUserSkillsDirectory(candidate))
+            {
+                return candidate;
+            }
+
             if (allowOutside && Path.IsPathRooted(path) && File.Exists(candidate))
             {
                 return candidate;

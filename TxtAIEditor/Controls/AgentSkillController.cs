@@ -20,7 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentPane _agentPane;
         private readonly Func<string, string, string> _getString;
         private readonly Action _contextChanged;
-        private readonly string _skillsDirectory;
+        private readonly IReadOnlyList<string> _skillDirectories;
         private readonly List<AgentSkill> _skills = new();
         private readonly HashSet<string> _selectedSkillNames = new(StringComparer.OrdinalIgnoreCase);
 
@@ -32,38 +32,53 @@ namespace TxtAIEditor.Controls
             _agentPane = agentPane;
             _getString = getString;
             _contextChanged = contextChanged;
-
-            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            _skillsDirectory = Path.Combine(userProfile, ".agents", "skills");
+            _skillDirectories = AgentSkillDirectories.GetSkillSearchDirectories();
         }
 
         public async Task LoadAsync()
         {
-            var loaded = new List<AgentSkill>();
-            try
+            var loadedByName = new Dictionary<string, AgentSkill>(StringComparer.OrdinalIgnoreCase);
+            foreach (string skillsDirectory in _skillDirectories)
             {
-                if (Directory.Exists(_skillsDirectory))
+                try
                 {
-                    foreach (string skillFilePath in EnumerateSkillFiles(_skillsDirectory))
+                    if (!Directory.Exists(skillsDirectory))
                     {
-                        string content = await File.ReadAllTextAsync(skillFilePath);
-                        string name = GetSkillName(skillFilePath);
-                        loaded.Add(new AgentSkill
+                        continue;
+                    }
+
+                    foreach (string skillFilePath in EnumerateSkillFiles(skillsDirectory))
+                    {
+                        try
                         {
-                            Name = name,
-                            Description = ExtractDescription(content),
-                            SkillFilePath = skillFilePath
-                        });
+                            string content = await File.ReadAllTextAsync(skillFilePath);
+                            string name = GetSkillName(skillFilePath);
+                            if (string.IsNullOrWhiteSpace(name) || loadedByName.ContainsKey(name))
+                            {
+                                continue;
+                            }
+
+                            loadedByName.Add(name, new AgentSkill
+                            {
+                                Name = name,
+                                Description = ExtractDescription(content),
+                                SkillFilePath = skillFilePath
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Failed to load agent skill '{skillFilePath}': {ex.Message}");
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to load agent skills: {ex.Message}");
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to load agent skills from '{skillsDirectory}': {ex.Message}");
+                }
             }
 
             _skills.Clear();
-            _skills.AddRange(loaded
+            _skills.AddRange(loadedByName.Values
                 .Where(skill => !string.IsNullOrWhiteSpace(skill.Name))
                 .OrderBy(skill => skill.Name, StringComparer.CurrentCultureIgnoreCase));
 

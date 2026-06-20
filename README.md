@@ -86,10 +86,11 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   **Document Extraction:** The agent can convert PDF, DOCX, PPTX, XLSX, and HWPX files into readable workspace files via `extract_document`. PDF/DOCX/PPTX/HWPX are saved as `.txt`, XLSX is exported as CSV, and multi-sheet XLSX files are split into `_sheet1.csv`, `_sheet2.csv`, etc. The agent records only the source and generated file paths, then reads targeted ranges from the converted files to avoid overflowing model context.
 *   **Persona & System Instructions:** You can specify custom personas and system instructions for the AI agent.
 *   **Custom Agent Skills:** Extend the agent's capabilities by installing custom skills into the skills directory.
-    *   **Skill Directory:** The agent loads skills from the user profile folder: `%USERPROFILE%\.agents\skills\`.
+    *   **Skill Directories:** The agent loads built-in skills from the app's `md\skills\` directory, user skills from `%USERPROFILE%\.TxtAIEditor\skills\`, and legacy user skills from `%USERPROFILE%\.agents\skills\`.
+    *   **Default User Skill Directory:** New TxtAIEditor skills should be saved under `%USERPROFILE%\.TxtAIEditor\skills\`.
     *   **Skill Structure:** Skills can be structured in two ways:
-        *   **Folder-based Skills:** A subfolder under `%USERPROFILE%\.agents\skills\<SkillName>\` containing a `SKILL.md` file. The folder name is used as the skill name.
-        *   **File-based Skills:** A single `.md` file directly under `%USERPROFILE%\.agents\skills\` (e.g., `MySkill.md`). The file name (without extension) is used as the skill name.
+        *   **Folder-based Skills:** A subfolder under a skills directory (for example, `%USERPROFILE%\.TxtAIEditor\skills\<SkillName>\`) containing a `SKILL.md` file. The folder name is used as the skill name.
+        *   **File-based Skills:** A single `.md` file directly under a skills directory (for example, `%USERPROFILE%\.TxtAIEditor\skills\MySkill.md`). The file name (without extension) is used as the skill name.
     *   **Description Parsing:** The skill description shown in the user interface is extracted from:
         *   YAML frontmatter (e.g., `description: ...` or `Description: ...`) at the top of the file.
         *   A Markdown heading named `# Description`.
