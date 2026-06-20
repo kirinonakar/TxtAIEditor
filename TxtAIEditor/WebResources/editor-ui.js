@@ -1,4 +1,4 @@
-import { scrollContainer } from './editor-dom.js';
+import { scrollContainer, viewport } from './editor-dom.js';
 import {
     configureEditorCoreRuntime,
     lineAt,
@@ -84,6 +84,74 @@ const handleCsharpMessage = createHostMessageHandler({
     clearPendingInlineLivePreviewFocus
 });
 
+const REVEAL_SCROLL_TOLERANCE = 1;
+const REVEAL_SCROLL_RETRY_DELAY_MS = 40;
+const REVEAL_SCROLL_MAX_RETRIES = 8;
+let revealScrollToken = 0;
+
+function maxScrollTop() {
+    return Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+}
+
+function clampScrollTop(value) {
+    return Math.min(maxScrollTop(), Math.max(0, Number(value || 0)));
+}
+
+function centeredScrollTopForLine(lineNumber) {
+    return clampScrollTop(lineTop(lineNumber) - Math.floor(scrollContainer.clientHeight / 2));
+}
+
+function postEditorScroll(scrollTop = scrollContainer.scrollTop) {
+    if (!state.scrollSyncEnabled) return;
+
+    const firstVisible = lineAt(scrollTop);
+    post({
+        type: 'editorScroll',
+        firstLine: firstVisible,
+        offset: scrollTop - lineTop(firstVisible)
+    });
+}
+
+function alignRenderedLineInView(lineNumber) {
+    const row = viewport.querySelector(`.line-row[data-line="${lineNumber}"]`);
+    if (!row) {
+        return { found: false, adjusted: false, loading: false };
+    }
+
+    const rowRect = row.getBoundingClientRect();
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const rowTopInContent = scrollContainer.scrollTop + rowRect.top - containerRect.top;
+    const targetScrollTop = rowRect.height >= scrollContainer.clientHeight
+        ? rowTopInContent
+        : rowTopInContent - Math.floor((scrollContainer.clientHeight - rowRect.height) / 2);
+    const nextScrollTop = clampScrollTop(targetScrollTop);
+    const adjusted = Math.abs(scrollContainer.scrollTop - nextScrollTop) > REVEAL_SCROLL_TOLERANCE;
+
+    if (adjusted) {
+        editorEvents.beginProgrammaticScroll(nextScrollTop);
+        postEditorScroll(nextScrollTop);
+    }
+
+    return {
+        found: true,
+        adjusted,
+        loading: !!row.querySelector('.line-text.loading')
+    };
+}
+
+function scheduleRevealLineAlignment(lineNumber, token, retries = REVEAL_SCROLL_MAX_RETRIES) {
+    requestAnimationFrame(() => {
+        if (token !== revealScrollToken) return;
+
+        const result = alignRenderedLineInView(lineNumber);
+        if (retries > 0 && (!result.found || result.adjusted || result.loading)) {
+            setTimeout(
+                () => scheduleRevealLineAlignment(lineNumber, token, retries - 1),
+                REVEAL_SCROLL_RETRY_DELAY_MS);
+        }
+    });
+}
+
 function revealLine(lineNumber, indexOfMatch = 0, matchLength = 0, query = '', preventFocus = false) {
     const safeLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
     state.currentLine = safeLine;
@@ -92,21 +160,13 @@ function revealLine(lineNumber, indexOfMatch = 0, matchLength = 0, query = '', p
         ? { lineNumber: safeLine, indexOfMatch, matchLength, query }
         : null;
 
-    const targetScrollTop = Math.max(0, lineTop(safeLine) - Math.floor(scrollContainer.clientHeight / 2));
+    const targetScrollTop = centeredScrollTopForLine(safeLine);
     editorEvents.beginProgrammaticScroll(targetScrollTop);
-
-    if (state.scrollSyncEnabled) {
-        const firstVisible = lineAt(targetScrollTop);
-        const offset = targetScrollTop - lineTop(firstVisible);
-        post({
-            type: 'editorScroll',
-            firstLine: firstVisible,
-            offset: offset
-        });
-    }
+    postEditorScroll();
 
     requestLines(Math.max(1, safeLine - state.overscan), state.overscan * 2 + 1);
     queueRender(true);
+    scheduleRevealLineAlignment(safeLine, ++revealScrollToken);
     if (!preventFocus) {
         focusLineWithRetry(safeLine, Math.max(0, indexOfMatch || 0));
     }
