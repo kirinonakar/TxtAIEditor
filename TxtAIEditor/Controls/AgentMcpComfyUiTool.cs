@@ -27,11 +27,11 @@ namespace TxtAIEditor.Controls
           "properties": {
             "apiJson": {
               "type": "string",
-              "description": "ComfyUI workflow API JSON. Pass either a raw workflow object or a /prompt payload containing prompt."
+              "description": "ComfyUI workflow API JSON. Pass either a raw workflow object or a /prompt payload. IMPORTANT: DO NOT write local file paths (e.g. D:\\path\\img.png) inside LoadImage nodes in apiJson. Instead, pass local paths to 'inputImagePath' or 'inputImages', and set the target 'image' values inside apiJson to empty string (\"\"). The system uploads files and automatically maps them to empty LoadImage nodes in order."
             },
             "parameters": {
               "type": "object",
-              "description": "Optional replacements. Keys replace {{key}} placeholders and dot paths such as 6.inputs.text."
+              "description": "Optional replacements. Keys replace {{key}} placeholders and dot paths such as 6.inputs.text. You can set 6.inputs.image to \"\" to clear default workflow image names so that uploaded input images can be mapped."
             },
             "prompt": {
               "type": "string",
@@ -39,12 +39,12 @@ namespace TxtAIEditor.Controls
             },
             "inputImagePath": {
               "type": "string",
-              "description": "Optional local image path to upload to the ComfyUI input folder before running the workflow."
+              "description": "Optional local image path to upload to the ComfyUI input folder before running the workflow. TxtAIEditor uploads the file and automatically populates the first LoadImage node's image parameter that has an empty string value (\"\") in the workflow. DO NOT put local file paths inside the apiJson."
             },
             "inputImages": {
               "type": "array",
               "items": { "type": "string" },
-              "description": "Optional local image paths to upload to the ComfyUI input folder. Empty LoadImage inputs are filled in workflow order."
+              "description": "Optional local image paths to upload to the ComfyUI input folder. Empty LoadImage inputs (those with \"\" as the value in apiJson) are filled with the uploaded filenames in workflow order. DO NOT put local file paths inside the apiJson."
             },
             "outputFileName": {
               "type": "string",
@@ -110,7 +110,7 @@ namespace TxtAIEditor.Controls
                 ServerId = BuiltInComfyUiId,
                 ServerName = BuiltInComfyUiName,
                 ToolName = BuiltInComfyUiToolName,
-                Description = "Generate an image through a local or remote ComfyUI HTTP API workflow, then download and save the produced image file.",
+                Description = "Generate an image through a local or remote ComfyUI HTTP API workflow, then download and save the produced image file. IMPORTANT for image inputs: if input images are used, do NOT modify apiJson directly to include local absolute paths. Instead, set the target image properties inside apiJson (or via parameters replacement) to \"\" and pass local image paths through inputImagePath or inputImages so the tool can upload and map them automatically.",
                 InputSchemaJson = BuiltInComfyUiInputSchemaJson,
                 IsBuiltIn = true
             };
