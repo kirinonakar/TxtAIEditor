@@ -966,6 +966,7 @@ namespace TxtAIEditor
                 ApplyUiPersonalization,
                 LocalizeUi,
                 ApplyToolbarSettings,
+                SyncAgentSettingsAfterLoad,
                 RefreshGitStatusUIAsync,
                 UpdateAutoSaveStatus,
                 _dialogController.ShowErrorMessage);
@@ -1047,6 +1048,7 @@ namespace TxtAIEditor
                 }
 
                 WindowPlacementService.ApplySavedWindowPlacement(AppWindow, _settingsService.CurrentSettings);
+                SyncAgentSettingsAfterLoad();
             }
             catch (Exception ex)
             {
@@ -1061,6 +1063,12 @@ namespace TxtAIEditor
             LeftSidebarTabView.ReplaceAllClick += OnReplaceAllClick;
             LeftSidebarTabView.ReplaceOneClick += OnReplaceOneClick;
             LeftSidebarTabView.SearchResultItemClick += OnSearchResultItemClick;
+        }
+
+        private void SyncAgentSettingsAfterLoad()
+        {
+            _agentController.UpdateModelDisplay(true);
+            _agentController.UpdateContextStats();
         }
 
 

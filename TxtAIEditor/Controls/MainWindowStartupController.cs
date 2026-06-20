@@ -39,6 +39,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<EditorSettings> _applyUiPersonalization;
         private readonly Action _localizeUi;
         private readonly Action<EditorSettings> _applyToolbarSettings;
+        private readonly Action _syncAgentSettingsAfterLoad;
         private readonly Func<Task> _refreshGitStatusUiAsync;
         private readonly Action _updateAutoSaveStatus;
         private readonly Action<string, string> _showErrorMessage;
@@ -68,6 +69,7 @@ namespace TxtAIEditor.Controls
             Action<EditorSettings> applyUiPersonalization,
             Action localizeUi,
             Action<EditorSettings> applyToolbarSettings,
+            Action syncAgentSettingsAfterLoad,
             Func<Task> refreshGitStatusUiAsync,
             Action updateAutoSaveStatus,
             Action<string, string> showErrorMessage)
@@ -95,6 +97,7 @@ namespace TxtAIEditor.Controls
             _applyUiPersonalization = applyUiPersonalization;
             _localizeUi = localizeUi;
             _applyToolbarSettings = applyToolbarSettings;
+            _syncAgentSettingsAfterLoad = syncAgentSettingsAfterLoad;
             _refreshGitStatusUiAsync = refreshGitStatusUiAsync;
             _updateAutoSaveStatus = updateAutoSaveStatus;
             _showErrorMessage = showErrorMessage;
@@ -146,6 +149,7 @@ namespace TxtAIEditor.Controls
             }
 
             _editorWorkspace.ApplyTerminalSettings(_settingsService.CurrentSettings);
+            _syncAgentSettingsAfterLoad();
         }
 
         private void LoadRecentFilesForStartup()
