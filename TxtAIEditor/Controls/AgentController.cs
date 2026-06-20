@@ -214,6 +214,7 @@ namespace TxtAIEditor.Controls
                 _fileTools,
                 _fileToolController,
                 _tabToolController,
+                _skillController,
                 AddCurrentRunImageToolAttachment,
                 AppendActivity,
                 _getString);

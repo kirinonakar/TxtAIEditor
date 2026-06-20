@@ -1766,6 +1766,9 @@
   <data name="AgentActivityReadFileFormat" xml:space="preserve">
     <value>파일 읽는 중: {0} ({1}줄부터 {2}줄)</value>
   </data>
+  <data name="AgentActivitySkillUseFormat" xml:space="preserve">
+    <value>스킬 참고 중: {0}</value>
+  </data>
   <data name="AgentActivityCreateFileFormat" xml:space="preserve">
     <value>파일 만드는 중: {0}</value>
   </data>

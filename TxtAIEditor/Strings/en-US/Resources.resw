@@ -1766,6 +1766,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityReadFileFormat" xml:space="preserve">
     <value>Reading file: {0} (lines {1} to {2})</value>
   </data>
+  <data name="AgentActivitySkillUseFormat" xml:space="preserve">
+    <value>Referencing skill: {0}</value>
+  </data>
   <data name="AgentActivityCreateFileFormat" xml:space="preserve">
     <value>Creating file: {0}</value>
   </data>

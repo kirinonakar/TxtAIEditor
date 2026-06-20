@@ -101,10 +101,57 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine($"## {skill.Name}");
                 builder.AppendLine($"Description: {GetDescriptionForPrompt(skill)}");
                 builder.AppendLine($"SKILL.md: {skill.SkillFilePath}");
+                builder.AppendLine($"Use tool: skill_use {{\"name\":\"{skill.Name}\"}} to read the full SKILL.md before applying this skill.");
                 builder.AppendLine();
             }
 
             return builder.ToString().Trim();
+        }
+
+        public async Task<string> UseSkillAsync(string nameOrPath)
+        {
+            if (string.IsNullOrWhiteSpace(nameOrPath))
+            {
+                return "skill_use failed: provide a skill name or SKILL.md path.";
+            }
+
+            if (_skills.Count == 0)
+            {
+                await LoadAsync();
+            }
+
+            AgentSkill? skill = FindSkill(nameOrPath) ?? FindSkillByPath(nameOrPath);
+            if (skill == null)
+            {
+                string availableSkills = string.Join(", ", _skills.Select(item => item.Name));
+                return string.IsNullOrWhiteSpace(availableSkills)
+                    ? $"skill_use failed: skill not found: {nameOrPath}. No installed skills were found."
+                    : $"skill_use failed: skill not found: {nameOrPath}. Available skills: {availableSkills}";
+            }
+
+            if (!File.Exists(skill.SkillFilePath))
+            {
+                return $"skill_use failed: SKILL.md not found for {skill.Name}: {skill.SkillFilePath}";
+            }
+
+            string content = await File.ReadAllTextAsync(skill.SkillFilePath);
+            var builder = new StringBuilder();
+            builder.AppendLine($"[Skill: {skill.Name}]");
+            builder.AppendLine($"SKILL.md: {skill.SkillFilePath}");
+            builder.AppendLine();
+            builder.Append(content);
+            return builder.ToString();
+        }
+
+        public string GetSkillDisplayName(string nameOrPath)
+        {
+            if (string.IsNullOrWhiteSpace(nameOrPath))
+            {
+                return string.Empty;
+            }
+
+            AgentSkill? skill = FindSkill(nameOrPath) ?? FindSkillByPath(nameOrPath);
+            return skill?.Name ?? nameOrPath;
         }
 
         public string GetSelectedSkillLabel()
@@ -143,6 +190,21 @@ namespace TxtAIEditor.Controls
         private AgentSkill? FindSkill(string name)
         {
             return _skills.FirstOrDefault(skill => skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private AgentSkill? FindSkillByPath(string path)
+        {
+            string normalizedPath = NormalizePathForCompare(path);
+            if (string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                return null;
+            }
+
+            return _skills.FirstOrDefault(skill =>
+                string.Equals(
+                    NormalizePathForCompare(skill.SkillFilePath),
+                    normalizedPath,
+                    StringComparison.OrdinalIgnoreCase));
         }
 
         private void UpdateUI()
@@ -318,6 +380,23 @@ namespace TxtAIEditor.Controls
             }
 
             return normalized.Substring(0, maxDescriptionChars).TrimEnd() + "...";
+        }
+
+        private static string NormalizePathForCompare(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return Path.GetFullPath(path.Replace('/', Path.DirectorySeparatorChar));
+            }
+            catch
+            {
+                return path.Replace('/', Path.DirectorySeparatorChar).Trim();
+            }
         }
 
         private static string GetDescriptionForPrompt(AgentSkill skill)

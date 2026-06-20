@@ -19,6 +19,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentFileToolService _fileTools;
         private readonly AgentFileToolController _fileToolController;
         private readonly AgentTabToolController _tabToolController;
+        private readonly AgentSkillController _skillController;
         private readonly Action<LlmMessageAttachment> _addImageAttachment;
         private readonly Action<string> _appendActivity;
         private readonly Func<string, string, string> _getString;
@@ -28,6 +29,7 @@ namespace TxtAIEditor.Controls
             AgentFileToolService fileTools,
             AgentFileToolController fileToolController,
             AgentTabToolController tabToolController,
+            AgentSkillController skillController,
             Action<LlmMessageAttachment> addImageAttachment,
             Action<string> appendActivity,
             Func<string, string, string> getString)
@@ -36,6 +38,7 @@ namespace TxtAIEditor.Controls
             _fileTools = fileTools;
             _fileToolController = fileToolController;
             _tabToolController = tabToolController;
+            _skillController = skillController;
             _addImageAttachment = addImageAttachment;
             _appendActivity = appendActivity;
             _getString = getString;
@@ -94,6 +97,8 @@ namespace TxtAIEditor.Controls
                             GetStringArgument(arguments, "path"),
                             GetIntArgument(arguments, "startLine", 1),
                             GetIntArgument(arguments, "lineCount", 160)),
+                        "skill_use" => await _skillController.UseSkillAsync(
+                            GetFirstStringArgument(arguments, "name", "skill", "skillName", "skill_name", "path", "filePath", "file_path")),
                         "read_image" => await ReadImageToolAsync(arguments),
                         "extract_document" => await _fileTools.ExtractDocumentAsync(
                             GetExtractDocumentInputPathArgument(arguments),
@@ -171,6 +176,12 @@ namespace TxtAIEditor.Controls
                 {
                     return string.Format(_getString("AgentVerboseReadSkillOnly", "{0} 스킬을 참고합니다."), skillName);
                 }
+            }
+            else if (normalizedToolName == "skill_use")
+            {
+                string skillName = _skillController.GetSkillDisplayName(
+                    GetFirstStringArgument(arguments, "name", "skill", "skillName", "skill_name", "path", "filePath", "file_path"));
+                return string.Format(_getString("AgentVerboseReadSkillOnly", "{0} 스킬을 참고합니다."), skillName);
             }
             else if (normalizedToolName == "run_powershell")
             {
@@ -341,6 +352,9 @@ namespace TxtAIEditor.Controls
                     GetStringArgument(arguments, "path"),
                     GetIntArgument(arguments, "startLine", 1),
                     GetIntArgument(arguments, "lineCount", 160)),
+                "skill_use" => string.Format(
+                    _getString("AgentActivitySkillUseFormat", "스킬 참고 중: {0}"),
+                    _skillController.GetSkillDisplayName(GetFirstStringArgument(arguments, "name", "skill", "skillName", "skill_name", "path", "filePath", "file_path"))),
                 "read_image" => string.Format(
                     _getString("AgentActivityReadImageFormat", "이미지 읽는 중: {0}"),
                     GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path")),

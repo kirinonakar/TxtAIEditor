@@ -173,6 +173,7 @@ namespace TxtAIEditor.Controls
         public static bool ShouldSkipDuplicateSuccessfulTool(string normalizedToolName)
         {
             return normalizedToolName is "read_file"
+                or "skill_use"
                 or "run_powershell"
                 or "run_rg"
                 or "run_rga"
@@ -355,6 +356,11 @@ namespace TxtAIEditor.Controls
                 "save_file" => "save_tab",
                 "save_tab" => "save_tab",
                 "read" => "read_file",
+                "skill" => "skill_use",
+                "use_skill" => "skill_use",
+                "skill_use" => "skill_use",
+                "read_skill" => "skill_use",
+                "load_skill" => "skill_use",
                 "read_image" => "read_image",
                 "view_image" => "read_image",
                 "image" => "read_image",
@@ -476,6 +482,8 @@ namespace TxtAIEditor.Controls
                 or "url"
                 or "uri"
                 or "address"
+                or "name"
+                or "skill"
                 or "path"
                 or "content"
                 or "text";
