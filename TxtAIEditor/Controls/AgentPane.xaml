@@ -59,12 +59,47 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button x:Name="AgentNewSessionButton"
-                    Grid.Column="0"
-                    Content="새 세션"
-                    HorizontalAlignment="Stretch"
-                    Click="OnNewSessionClick"
-                    Style="{StaticResource AgentButtonStyle}"/>
+            <Grid Grid.Column="0" ColumnSpacing="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="AgentNewSessionButton"
+                        Grid.Column="0"
+                        Content="새 세션"
+                        HorizontalAlignment="Stretch"
+                        Click="OnNewSessionClick"
+                        Style="{StaticResource AgentButtonStyle}"/>
+                <Button x:Name="AgentOpenSessionsButton"
+                        Grid.Column="1"
+                        Width="34"
+                        Height="32"
+                        Padding="0"
+                        ToolTipService.ToolTip="열린 세션"
+                        Style="{StaticResource AgentButtonStyle}">
+                    <FontIcon Glyph="&#xE70D;" FontSize="12"/>
+                    <Button.Flyout>
+                        <Flyout x:Name="AgentOpenSessionsFlyout" Opened="OnAgentOpenSessionsFlyoutOpened">
+                            <Grid Width="280" RowSpacing="8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock x:Name="AgentOpenSessionsTitleText"
+                                           Grid.Row="0"
+                                           Text="열린 세션"
+                                           FontWeight="SemiBold"
+                                           FontSize="12"/>
+                                <MenuFlyoutSeparator Grid.Row="1"/>
+                                <ScrollViewer Grid.Row="2" MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="AgentOpenSessionsListPanel" Spacing="4"/>
+                                </ScrollViewer>
+                            </Grid>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
             <Button x:Name="AgentHistoryButton"
                     Grid.Column="1"
                     Width="36"

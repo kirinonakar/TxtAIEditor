@@ -16,6 +16,38 @@ using static TxtAIEditor.Controls.AgentToolHelpers;
 
 namespace TxtAIEditor.Controls
 {
+    internal sealed class AgentOpenSessionState
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Title { get; set; } = string.Empty;
+        public string PromptText { get; set; } = string.Empty;
+        public string OutputText { get; set; } = string.Empty;
+        public string ActivityText { get; set; } = string.Empty;
+        public string SessionHistoryText { get; set; } = string.Empty;
+        public double SessionHistoryTokenCount { get; set; }
+        public double CurrentRunTranscriptTokens { get; set; }
+        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        public List<AgentAttachmentState> Attachments { get; set; } = new();
+        public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
+        public bool IsRunning { get; set; }
+        public EditorSettings? LlmSettings { get; set; }
+    }
+
+    internal sealed class AgentRunContext
+    {
+        public string SessionId { get; set; } = string.Empty;
+        public CancellationTokenSource? Cancellation { get; set; }
+        public StringBuilder SessionHistory { get; } = new();
+        public double SessionHistoryTokenCount { get; set; }
+        public double CurrentRunTranscriptTokens { get; set; }
+        public List<AgentAttachmentState> Attachments { get; set; } = new();
+        public List<LlmMessageAttachment> ImageToolAttachments { get; } = new();
+        public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
+        public bool StreamToTabActive { get; set; }
+        public bool StreamToTab { get; set; }
+        public EditorSettings LlmSettings { get; set; } = new();
+    }
+
     public sealed class AgentController
     {
         private const int FallbackSessionHistoryPromptChars = 80_000;
@@ -61,7 +93,14 @@ namespace TxtAIEditor.Controls
         private readonly AgentToolExecutionController _toolExecutionController;
         private readonly AgentContextStatsController _contextStatsController;
         private readonly AgentModelContextLimitProvider _modelContextLimits = new();
+        private readonly List<AgentOpenSessionState> _openSessions = new();
+        private readonly Dictionary<string, AgentRunContext> _runningSessions = new(StringComparer.Ordinal);
+        private readonly SemaphoreSlim _toolExecutionSessionGate = new(1, 1);
+        private readonly AsyncLocal<AgentRunContext?> _activeToolRunContext = new();
         private string _currentSessionId = Guid.NewGuid().ToString();
+        private string? _runningSessionId;
+        private string? _pendingCloseSessionId;
+        private bool _restoringOpenSession;
 
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
@@ -70,7 +109,6 @@ namespace TxtAIEditor.Controls
         private readonly DispatcherTimer _statsDebounceTimer;
         private double _currentRunTranscriptTokens;
         private readonly List<LlmMessageAttachment> _currentRunImageToolAttachments = new();
-        private bool _streamToTabActive;
 
         public AgentController(
             ILLMService llmService,
@@ -131,7 +169,7 @@ namespace TxtAIEditor.Controls
                 _showError,
                 _getString,
                 _displayText,
-                () => _isRunning,
+                IsCurrentSessionRunning,
                 UpdateContextStats,
                 AgentTokenEstimator.Estimate,
                 pdfTextExtractionService,
@@ -193,7 +231,7 @@ namespace TxtAIEditor.Controls
                 _agentPane,
                 _displayText,
                 _attachmentController,
-                () => _isRunning,
+                IsCurrentSessionRunning,
                 GetActiveTabForContext,
                 GetActiveSelectionText,
                 BuildActiveSelectionContext,
@@ -203,7 +241,8 @@ namespace TxtAIEditor.Controls
                 () => _currentRunTranscriptTokens,
                 RefreshOutputDisplay,
                 _getString,
-                _modelContextLimits);
+                _modelContextLimits,
+                GetCurrentSessionSettings);
             _outputInsertController = new AgentOutputInsertController(
                 _agentPane,
                 insertIntoActiveEditorAsync,
@@ -265,6 +304,8 @@ namespace TxtAIEditor.Controls
 
             _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
             WireEvents();
+            EnsureOpenSession(_currentSessionId);
+            UpdateOpenSessionsUI();
             UpdateContextStatsImmediate();
             QueueDeferredStartupDataLoad();
         }
@@ -308,36 +349,60 @@ namespace TxtAIEditor.Controls
             UpdateContextStats();
         }
 
+        private bool IsCurrentSessionRunning()
+        {
+            return _runningSessions.ContainsKey(_currentSessionId);
+        }
+
+        private bool IsAnySessionRunning()
+        {
+            return _runningSessions.Count > 0;
+        }
+
+        private EditorSettings GetCurrentSessionSettings()
+        {
+            var session = EnsureOpenSession(_currentSessionId);
+            session.LlmSettings ??= CreateSessionSettingsSnapshot();
+            return session.LlmSettings;
+        }
+
         private OpenedTab? GetActiveTabForContext()
         {
-            return _selectionContextController.GetActiveTabForContext(_isRunning);
+            return _selectionContextController.GetActiveTabForContext(IsCurrentSessionRunning());
         }
 
         private Task<OpenedTab?> CaptureActiveTabForRunAsync()
         {
-            return RunOnUIThreadAsync(() => _selectionContextController.CaptureActiveTabForRun(_isRunning));
+            return RunOnUIThreadAsync(() => _selectionContextController.CaptureActiveTabForRun(IsCurrentSessionRunning()));
         }
 
         private string GetActiveSelectionText()
         {
-            return _selectionContextController.GetActiveSelectionText(_isRunning);
+            return _selectionContextController.GetActiveSelectionText(IsCurrentSessionRunning());
         }
 
         private string BuildActiveSelectionContext()
         {
-            return _selectionContextController.BuildActiveSelectionContext(_isRunning);
+            return _selectionContextController.BuildActiveSelectionContext(IsCurrentSessionRunning());
         }
 
         private AgentSelectionSnapshot CaptureActiveSelectionSnapshot()
         {
-            return _selectionContextController.CaptureActiveSelectionSnapshot(_isRunning);
+            return _selectionContextController.CaptureActiveSelectionSnapshot(IsCurrentSessionRunning());
         }
 
         private void WireEvents()
         {
             _agentPane.RunRequested += async (_, _) => await RunAgentAsync();
             _agentPane.StopRequested += (_, _) => StopAgent();
-            _agentPane.NewSessionRequested += (_, _) => ClearSession();
+            _agentPane.NewSessionRequested += (_, _) => CreateNewOpenSession();
+            _agentPane.OpenSessionsFlyoutOpened += (_, _) =>
+            {
+                SaveOpenSessionPromptTitleFromUI();
+                UpdateOpenSessionsUI();
+            };
+            _agentPane.OpenSessionSelected += (_, sessionId) => SwitchOpenSession(sessionId);
+            _agentPane.OpenSessionClosed += (_, sessionId) => CloseOpenSession(sessionId);
             _agentPane.HistorySelected += (_, historyId) => LoadHistorySession(historyId);
             _agentPane.HistoryDeleted += async (_, historyId) => await DeleteHistorySessionAsync(historyId);
             _agentPane.HistoryToolbarDeleteClicked += async (_, _) => await ClearAllHistoryAsync();
@@ -364,7 +429,11 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentSkillToggled += (_, skillName) => _skillController.ToggleSkill(skillName);
             _agentPane.AgentSkillRemoved += (_, skillName) => _skillController.RemoveSelectedSkill(skillName);
             
-            _agentPane.Prompt.TextChanged += (_, _) => UpdateContextStats();
+            _agentPane.Prompt.TextChanged += (_, _) =>
+            {
+                SaveOpenSessionPromptTitleFromUI();
+                UpdateContextStats();
+            };
             _agentPane.PlanningModeCheckBox.Checked += (_, _) => UpdateContextStats();
             _agentPane.PlanningModeCheckBox.Unchecked += (_, _) => UpdateContextStats();
 
@@ -376,7 +445,7 @@ namespace TxtAIEditor.Controls
  
         private async Task RunAgentAsync()
         {
-            if (_isRunning)
+            if (_runningSessions.ContainsKey(_currentSessionId))
             {
                 return;
             }
@@ -393,23 +462,57 @@ namespace TxtAIEditor.Controls
                     _getString("AgentEmptyPrompt", "Agent에게 맡길 작업을 입력해 주세요."));
                 return;
             }
+
+            var activeOpenSession = EnsureOpenSession(_currentSessionId);
+            SaveActiveOpenSessionFromUI();
+            UpdateOpenSessionTitle(activeOpenSession, userInstruction);
+            activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
+            activeOpenSession.UpdatedAt = DateTime.Now;
+            activeOpenSession.IsRunning = true;
+
+            var runContext = new AgentRunContext
+            {
+                SessionId = activeOpenSession.Id,
+                SessionHistoryTokenCount = activeOpenSession.SessionHistoryTokenCount,
+                CurrentRunTranscriptTokens = 0,
+                Attachments = activeOpenSession.Attachments.ToList(),
+                SessionEdits = activeOpenSession.SessionEdits.ToList(),
+                StreamToTab = _agentPane.StreamToTab,
+                LlmSettings = CloneSessionSettings(activeOpenSession.LlmSettings ?? _settingsService.CurrentSettings)
+            };
+            runContext.SessionHistory.Append(activeOpenSession.SessionHistoryText ?? string.Empty);
   
             _isRunning = true;
+            _runningSessionId = activeOpenSession.Id;
+            _runningSessions[activeOpenSession.Id] = runContext;
+            UpdateOpenSessionsUI();
             _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
             _fileToolController.StartRun();
             _currentRunImageToolAttachments.Clear();
             _selectionContextController.ClearRunSnapshots();
             _currentRunTranscriptTokens = 0;
             var cancellationSource = new CancellationTokenSource();
+            runContext.Cancellation = cancellationSource;
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
-            _agentPane.SetBusy(true);
-            _agentPane.ClearActivity(_getString("AgentActivityStarting", "시작 중"));
-            _agentPane.BeginOutputBlock(BuildRunHeader(BuildInstructionDisplay(userInstruction)));
-            AppendActivity(_getString("AgentActivityCollectingContext", "맥락 수집 중"));
+            UpdateActiveSessionBusyState();
+            await ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
+            await BeginRunOutputBlockAsync(runContext, BuildRunHeader(BuildInstructionDisplay(userInstruction)));
+            await AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
 
             string initialTranscript = string.Empty;
             string transcript = string.Empty;
+            void AppendRunSessionHistoryLine(string line = "")
+            {
+                runContext.SessionHistory.AppendLine(line);
+                runContext.SessionHistoryTokenCount += AgentTokenEstimator.Estimate(line + Environment.NewLine);
+            }
+
+            Task PersistRunSessionToHistoryAsync()
+            {
+                return SaveRunSessionToHistoryAsync(runContext, userInstruction);
+            }
+
             try
             {
                 await CaptureActiveTabForRunAsync();
@@ -448,15 +551,15 @@ namespace TxtAIEditor.Controls
                 string? lastDuplicateToolInvocationKey = null;
                 const int maxRepeatedDuplicateToolSkips = 3;
                 bool planningMode = _agentPane.PlanningMode;
-                int maxToolSteps = _settingsService.CurrentSettings.LlmMaxToolCalls > 0 ? _settingsService.CurrentSettings.LlmMaxToolCalls : 50;
+                int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls > 0 ? runContext.LlmSettings.LlmMaxToolCalls : 50;
                 var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
-                int currentTaskStartEditIndex = _sessionEditController.EditCount;
+                int currentTaskStartEditIndex = runContext.SessionEdits.Count;
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string thinkingLabel = _getString("AgentActivityThinking", "생각중");
-                    await RunOnUIThreadAsync(() => _agentPane.BeginThinkingActivity(thinkingLabel));
+                    await BeginRunThinkingActivityAsync(runContext, thinkingLabel);
 
                     var responseBuilder = new StringBuilder();
                     int printedLength = 0;
@@ -467,9 +570,13 @@ namespace TxtAIEditor.Controls
                     bool hasToolCall = false;
                     bool suppressStreamingText = planningMode;
 
-                    string currentTranscript = BuildTranscriptWithEditLedger(transcript, currentTaskStartEditIndex);
+                    string currentTranscript = BuildTranscriptWithEditLedger(
+                        transcript,
+                        currentTaskStartEditIndex,
+                        runContext.SessionEdits);
 
                     response = await _llmService.RunAgentAsync(
+                        runContext.LlmSettings,
                         instruction,
                         currentTranscript,
                         runSelectionContext,
@@ -489,20 +596,20 @@ namespace TxtAIEditor.Controls
                                     if (isJsonToolCall.Value)
                                     {
                                         toolCallPlaceholderShown = true;
-                                        if (!_settingsService.CurrentSettings.LlmAgentVerbose)
+                                        if (!runContext.LlmSettings.LlmAgentVerbose)
                                         {
                                             heldPotentialToolCallText = true;
                                             int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
                                             string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                            _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                            {
-                                                _agentPane.BeginThinkingActivity(label);
-                                            });
+                                            EnqueueRunUi(runContext, () => _agentPane.BeginThinkingActivity(label));
                                             printedLength = streamedText.Length;
                                         }
                                         else
                                         {
-                                            _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(streamedText));
+                                            EnqueueRunUi(
+                                                runContext,
+                                                () => _agentPane.AppendOutputText(streamedText),
+                                                session => session.OutputText = NormalizePlaceholderOutput(session.OutputText) + streamedText);
                                             printedLength = streamedText.Length;
                                         }
                                     }
@@ -511,19 +618,19 @@ namespace TxtAIEditor.Controls
 
                             if (isJsonToolCall == true)
                             {
-                                if (!_settingsService.CurrentSettings.LlmAgentVerbose)
+                                if (!runContext.LlmSettings.LlmAgentVerbose)
                                 {
                                     int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
                                     string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                    _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                    {
-                                        _agentPane.UpdateThinkingActivity(label);
-                                    });
+                                    EnqueueRunUi(runContext, () => _agentPane.UpdateThinkingActivity(label));
                                     printedLength = streamedText.Length;
                                 }
                                 else
                                 {
-                                    _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(chunk));
+                                    EnqueueRunUi(
+                                        runContext,
+                                        () => _agentPane.AppendOutputText(chunk),
+                                        session => session.OutputText = NormalizePlaceholderOutput(session.OutputText) + chunk);
                                     printedLength = streamedText.Length;
                                 }
                                 return;
@@ -531,20 +638,20 @@ namespace TxtAIEditor.Controls
 
                             if (hasToolCall)
                             {
-                                if (!_settingsService.CurrentSettings.LlmAgentVerbose)
+                                if (!runContext.LlmSettings.LlmAgentVerbose)
                                 {
                                     int idx = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
                                     string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
                                     int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(toolCallText));
                                     string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                    _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                    {
-                                        _agentPane.UpdateThinkingActivity(label);
-                                    });
+                                    EnqueueRunUi(runContext, () => _agentPane.UpdateThinkingActivity(label));
                                 }
                                 else
                                 {
-                                    _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(chunk));
+                                    EnqueueRunUi(
+                                        runContext,
+                                        () => _agentPane.AppendOutputText(chunk),
+                                        session => session.OutputText = NormalizePlaceholderOutput(session.OutputText) + chunk);
                                     printedLength = streamedText.Length;
                                 }
                                 return;
@@ -561,28 +668,28 @@ namespace TxtAIEditor.Controls
                                     if (!suppressStreamingText)
                                     {
                                         visibleTextFlushed = true;
-                                        await AppendOutputTextAndStreamToTabAsync(textToPrint);
+                                        await AppendOutputTextAndStreamToTabAsync(runContext, textToPrint);
                                     }
                                     printedLength = toolCallIndex;
                                 }
 
-                                if (!_settingsService.CurrentSettings.LlmAgentVerbose)
+                                if (!runContext.LlmSettings.LlmAgentVerbose)
                                 {
                                     if (!toolCallPlaceholderShown)
                                     {
                                         toolCallPlaceholderShown = true;
                                         int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText.Substring(toolCallIndex)));
                                         string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                        _agentPane.DispatcherQueue.TryEnqueue(() =>
-                                        {
-                                            _agentPane.BeginThinkingActivity(label);
-                                        });
+                                        EnqueueRunUi(runContext, () => _agentPane.BeginThinkingActivity(label));
                                     }
                                 }
                                 else
                                 {
                                     string toolCallText = streamedText.Substring(toolCallIndex);
-                                    _agentPane.DispatcherQueue.TryEnqueue(() => _agentPane.AppendOutputText(toolCallText));
+                                    EnqueueRunUi(
+                                        runContext,
+                                        () => _agentPane.AppendOutputText(toolCallText),
+                                        session => session.OutputText = NormalizePlaceholderOutput(session.OutputText) + toolCallText);
                                     printedLength = streamedText.Length;
                                 }
                             }
@@ -607,7 +714,7 @@ namespace TxtAIEditor.Controls
                                     if (!suppressStreamingText)
                                     {
                                         visibleTextFlushed = true;
-                                        await AppendOutputTextAndStreamToTabAsync(textToPrint);
+                                        await AppendOutputTextAndStreamToTabAsync(runContext, textToPrint);
                                     }
                                     printedLength = safeLength;
                                 }
@@ -615,7 +722,7 @@ namespace TxtAIEditor.Controls
                             await Task.CompletedTask;
                         },
                         cancellationToken,
-                        GetImageAttachmentsForCurrentRun(),
+                        GetImageAttachmentsForRun(runContext),
                         planningMode);
 
                     cancellationToken.ThrowIfCancellationRequested();
@@ -623,10 +730,7 @@ namespace TxtAIEditor.Controls
 
                     if (string.IsNullOrWhiteSpace(response))
                     {
-                        await RunOnUIThreadAsync(() =>
-                        {
-                            _agentPane.StopThinkingActivity();
-                        });
+                        await StopRunThinkingActivityAsync(runContext);
 
                         if (emptyResponseRetryCount < maxEmptyResponseRetries)
                         {
@@ -638,7 +742,7 @@ namespace TxtAIEditor.Controls
                             await RunOnUIThreadAsync(() =>
                             {
                                 transcript += retryNote;
-                                _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
                                 UpdateContextStatsImmediate(force: true);
                                 AppendActivity(_getString(
                                     "AgentActivityEmptyResponseRetry",
@@ -652,35 +756,29 @@ namespace TxtAIEditor.Controls
                             "LlmErrorEmptyResponse",
                             "AI로부터 빈 응답을 수신했습니다.");
 
-                        await RunOnUIThreadAsync(() =>
-                        {
-                            AppendActivity(emptyResponseMessage);
-                            _agentPane.AppendOutputLine(emptyResponseMessage);
-                        });
+                            await AppendRunActivityAsync(runContext, emptyResponseMessage);
+                            await AppendRunOutputLineAsync(runContext, emptyResponseMessage);
 
-                        AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                         string emptyRunTranscript = transcript.Substring(initialTranscript.Length);
                         if (!string.IsNullOrWhiteSpace(emptyRunTranscript))
                         {
-                            AppendSessionHistoryLine(emptyRunTranscript.Trim());
+                            AppendRunSessionHistoryLine(emptyRunTranscript.Trim());
                         }
-                        AppendSessionHistoryLine($"[Agent Response]: {emptyResponseMessage}");
-                        AppendSessionHistoryLine();
-                        _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+                        AppendRunSessionHistoryLine($"[Agent Response]: {emptyResponseMessage}");
+                        AppendRunSessionHistoryLine();
+                        _ = PersistRunSessionToHistoryAsync();
 
                         completed = true;
                         break;
                     }
 
-                    await RunOnUIThreadAsync(() =>
-                    {
-                        _agentPane.StopThinkingActivity();
-                    });
+                    await StopRunThinkingActivityAsync(runContext);
 
                     bool responseHasToolSyntax = AgentToolCallParser.ContainsToolCallSyntax(response);
 
                     int endLength = response.Length;
-                    if (!_settingsService.CurrentSettings.LlmAgentVerbose)
+                    if (!runContext.LlmSettings.LlmAgentVerbose)
                     {
                         int toolCallIndex = response.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
                         if (toolCallIndex >= 0)
@@ -692,18 +790,18 @@ namespace TxtAIEditor.Controls
                     if (!responseHasToolSyntax && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(response))
                     {
                         visibleTextFlushed = true;
-                        await AppendOutputTextAndStreamToTabAsync(response);
+                        await AppendOutputTextAndStreamToTabAsync(runContext, response);
                     }
                     else if (!responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(response))
                     {
                         visibleTextFlushed = true;
-                        await AppendOutputTextAndStreamToTabAsync(response);
+                        await AppendOutputTextAndStreamToTabAsync(runContext, response);
                     }
                     else if (!responseHasToolSyntax && printedLength < endLength)
                     {
                         string remainingText = response.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;
-                        await AppendOutputTextAndStreamToTabAsync(remainingText);
+                        await AppendOutputTextAndStreamToTabAsync(runContext, remainingText);
                     }
 
                     cancellationToken.ThrowIfCancellationRequested();
@@ -715,38 +813,35 @@ namespace TxtAIEditor.Controls
                             toolCallFormatRetryCount++;
                             string retryNote = BuildToolCallFormatRetryNote("The tool_call JSON could not be parsed.");
                             transcript += "\n\n" + retryNote;
-                            _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
 
                             string retryMessage = _getString(
                                 "AgentToolCallFormatRetry",
                                 "도구 호출 형식이 섞여 다시 요청합니다.");
-                            await RunOnUIThreadAsync(() =>
+                            await AppendRunActivityAsync(runContext, retryMessage);
+                            await AppendRunOutputLineAsync(runContext, retryMessage);
+                            if (IsSessionVisible(runContext.SessionId))
                             {
-                                AppendActivity(retryMessage);
-                                _agentPane.AppendOutputLine(retryMessage);
                                 UpdateContextStatsImmediate(force: true);
-                            });
+                            }
 
                             if (toolCallFormatRetryCount > maxToolCallFormatRetries)
                             {
                                 string limitMessage = _getString(
                                     "AgentToolCallFormatRetryLimit",
                                     "도구 호출 형식 오류가 반복되어 Agent 실행을 중단했습니다. 작업을 다시 실행해 주세요.");
-                                await RunOnUIThreadAsync(() =>
-                                {
-                                    AppendActivity(limitMessage);
-                                    _agentPane.AppendOutputLine(limitMessage);
-                                });
+                                await AppendRunActivityAsync(runContext, limitMessage);
+                                await AppendRunOutputLineAsync(runContext, limitMessage);
 
-                                AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                                AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                                 string formatRunTranscript = transcript.Substring(initialTranscript.Length);
                                 if (!string.IsNullOrWhiteSpace(formatRunTranscript))
                                 {
-                                    AppendSessionHistoryLine(formatRunTranscript.Trim());
+                                    AppendRunSessionHistoryLine(formatRunTranscript.Trim());
                                 }
-                                AppendSessionHistoryLine($"[Agent Response]: {limitMessage}");
-                                AppendSessionHistoryLine();
-                                _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+                                AppendRunSessionHistoryLine($"[Agent Response]: {limitMessage}");
+                                AppendRunSessionHistoryLine();
+                                _ = PersistRunSessionToHistoryAsync();
 
                                 completed = true;
                                 break;
@@ -757,28 +852,25 @@ namespace TxtAIEditor.Controls
 
                         if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
-                            await AppendOutputTextAndStreamToTabAsync(response);
+                            await AppendOutputTextAndStreamToTabAsync(runContext, response);
                         }
 
                         toolCallFormatRetryCount = 0;
-                        await RunOnUIThreadAsync(async () =>
+                        await AppendRunActivityAsync(runContext, _getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
+                        if (runContext.StreamToTab)
                         {
-                            AppendActivity(_getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
-                            if (_agentPane.StreamToTab)
-                            {
-                                await StreamTextToTabAsync("\n");
-                            }
-                        });
+                            await StreamTextToTabAsync(runContext, "\n");
+                        }
 
-                        AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                         string runTranscript = transcript.Substring(initialTranscript.Length);
                         if (!string.IsNullOrWhiteSpace(runTranscript))
                         {
-                            AppendSessionHistoryLine(runTranscript.Trim());
+                            AppendRunSessionHistoryLine(runTranscript.Trim());
                         }
-                        AppendSessionHistoryLine($"[Agent Response]: {response.Trim()}");
-                        AppendSessionHistoryLine();
-                        _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+                        AppendRunSessionHistoryLine($"[Agent Response]: {response.Trim()}");
+                        AppendRunSessionHistoryLine();
+                        _ = PersistRunSessionToHistoryAsync();
 
                         completed = true;
                         break;
@@ -823,7 +915,31 @@ namespace TxtAIEditor.Controls
                     {
                         lastDuplicateToolInvocationKey = null;
                         repeatedDuplicateToolSkipCount = 0;
-                        toolResult = await _toolExecutionController.ExecuteAsync(toolName, arguments, cancellationToken);
+                        await _toolExecutionSessionGate.WaitAsync(cancellationToken);
+                        try
+                        {
+                            _activeToolRunContext.Value = runContext;
+                            await RunOnUIThreadAsync(() =>
+                            {
+                                _sessionEditController.Replace(runContext.SessionEdits);
+                            });
+                            toolResult = await _toolExecutionController.ExecuteAsync(toolName, arguments, cancellationToken);
+                            runContext.SessionEdits = _sessionEditController.SessionEdits.ToList();
+                            EnsureOpenSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
+                            if (!IsSessionVisible(runContext.SessionId))
+                            {
+                                await RunOnUIThreadAsync(() =>
+                                {
+                                    var visibleSession = EnsureOpenSession(_currentSessionId);
+                                    _sessionEditController.Replace(visibleSession.SessionEdits);
+                                });
+                            }
+                        }
+                        finally
+                        {
+                            _activeToolRunContext.Value = null;
+                            _toolExecutionSessionGate.Release();
+                        }
                         toolResultForTranscript = toolResult;
                         if (IsSuccessfulToolResult(toolResult))
                         {
@@ -877,7 +993,7 @@ namespace TxtAIEditor.Controls
 
                         string addedPart = addedPartBuilder.ToString();
                         transcript += addedPart;
-                        _currentRunTranscriptTokens += AgentTokenEstimator.Estimate(addedPart);
+                        runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(addedPart);
                         UpdateContextStatsImmediate(force: true);
                     });
                     
@@ -886,37 +1002,31 @@ namespace TxtAIEditor.Controls
                         arguments,
                         toolResult,
                         skippedDuplicateTool,
-                        _settingsService.CurrentSettings.LlmAgentVerbose);
+                        runContext.LlmSettings.LlmAgentVerbose);
 
-                    await RunOnUIThreadAsync(() =>
-                    {
-                        string outputHeader = skippedDuplicateTool
-                            ? _getString("AgentDuplicateToolSkipped", "도구 중복 호출 건너뜀")
-                            : _getString("AgentToolRunning", "도구 실행 중");
-                        _agentPane.AppendOutputLine($"{outputHeader}: {toolName}");
-                        _agentPane.AppendOutputText(displayResult.TrimEnd() + Environment.NewLine);
-                    });
+                    string outputHeader = skippedDuplicateTool
+                        ? _getString("AgentDuplicateToolSkipped", "도구 중복 호출 건너뜀")
+                        : _getString("AgentToolRunning", "도구 실행 중");
+                    await AppendRunOutputLineAsync(runContext, $"{outputHeader}: {toolName}");
+                    await AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
 
                     if (stopAfterDuplicateLoopGuard)
                     {
                         string loopMessage = _getString(
                             "AgentLoopGuardStopped",
                             "동일한 도구 호출 반복 루프가 감지되어 Agent 실행을 중단했습니다. 출력된 결과를 확인한 뒤 다시 실행해 주세요.");
-                        await RunOnUIThreadAsync(() =>
-                        {
-                            AppendActivity(loopMessage);
-                            _agentPane.AppendOutputLine(loopMessage);
-                        });
+                        await AppendRunActivityAsync(runContext, loopMessage);
+                        await AppendRunOutputLineAsync(runContext, loopMessage);
 
-                        AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                         string loopRunTranscript = transcript.Substring(initialTranscript.Length);
                         if (!string.IsNullOrWhiteSpace(loopRunTranscript))
                         {
-                            AppendSessionHistoryLine(loopRunTranscript.Trim());
+                            AppendRunSessionHistoryLine(loopRunTranscript.Trim());
                         }
-                        AppendSessionHistoryLine($"[Agent Response]: {loopMessage}");
-                        AppendSessionHistoryLine();
-                        _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+                        AppendRunSessionHistoryLine($"[Agent Response]: {loopMessage}");
+                        AppendRunSessionHistoryLine();
+                        _ = PersistRunSessionToHistoryAsync();
 
                         completed = true;
                         break;
@@ -935,19 +1045,16 @@ namespace TxtAIEditor.Controls
 
                         transcript += "\n\n[File edit verification: requested content already matches the current file. Task complete.]";
 
-                        await RunOnUIThreadAsync(() =>
-                        {
-                            _agentPane.AppendOutputLine(completeMsg);
-                        });
+                        await AppendRunOutputLineAsync(runContext, completeMsg);
 
-                        AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                         string unchangedRunTranscript = transcript.Substring(initialTranscript.Length);
                         if (!string.IsNullOrWhiteSpace(unchangedRunTranscript))
                         {
-                            AppendSessionHistoryLine(unchangedRunTranscript.Trim());
+                            AppendRunSessionHistoryLine(unchangedRunTranscript.Trim());
                         }
-                        AppendSessionHistoryLine();
-                        _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+                        AppendRunSessionHistoryLine();
+                        _ = PersistRunSessionToHistoryAsync();
 
                         completed = true;
                         break;
@@ -965,55 +1072,48 @@ namespace TxtAIEditor.Controls
                         "AgentToolStepLimitReached",
                         "도구 호출 한도에 도달해 작업을 중단했습니다. 지금까지의 결과를 검토한 뒤 다시 실행해 주세요.");
 
-                    await RunOnUIThreadAsync(() =>
-                    {
-                        AppendActivity(limitMsg);
-                        _agentPane.AppendOutputLine(limitMsg);
-                    });
+                    await AppendRunActivityAsync(runContext, limitMsg);
+                    await AppendRunOutputLineAsync(runContext, limitMsg);
 
-                    AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                    AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                     string runTranscript = transcript.Substring(initialTranscript.Length);
                     if (!string.IsNullOrWhiteSpace(runTranscript))
                     {
-                        AppendSessionHistoryLine(runTranscript.Trim());
+                        AppendRunSessionHistoryLine(runTranscript.Trim());
                     }
-                    AppendSessionHistoryLine("[Agent Response]: Tool step limit reached before a final answer.");
-                    AppendSessionHistoryLine();
-                    _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+                    AppendRunSessionHistoryLine("[Agent Response]: Tool step limit reached before a final answer.");
+                    AppendRunSessionHistoryLine();
+                    _ = PersistRunSessionToHistoryAsync();
                 }
             }
             catch (OperationCanceledException)
             {
-                await RunOnUIThreadAsync(() =>
-                {
-                    AppendActivity(_getString("AgentActivityStopped", "중단됨"));
-                    _agentPane.AppendOutputLine(_getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
-                });
+                await AppendRunActivityAsync(runContext, _getString("AgentActivityStopped", "중단됨"));
+                await AppendRunOutputLineAsync(runContext, _getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
 
-                AppendSessionHistoryLine($"[User Prompt]: {instruction}");
+                AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                 string runTranscript = transcript.Substring(initialTranscript.Length);
                 if (!string.IsNullOrWhiteSpace(runTranscript))
                 {
-                    AppendSessionHistoryLine(runTranscript.Trim());
+                    AppendRunSessionHistoryLine(runTranscript.Trim());
                 }
-                AppendSessionHistoryLine("[Agent Response]: Agent execution was interrupted by the user.");
-                AppendSessionHistoryLine();
-                _ = SaveCurrentSessionToHistoryAsync(userInstruction);
+                AppendRunSessionHistoryLine("[Agent Response]: Agent execution was interrupted by the user.");
+                AppendRunSessionHistoryLine();
+                _ = PersistRunSessionToHistoryAsync();
             }
             catch (Exception ex)
             {
-                await RunOnUIThreadAsync(() =>
-                {
-                    _agentPane.AppendOutputLine(string.Format(
-                        _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
-                        ex.Message));
-                });
+                await AppendRunOutputLineAsync(runContext, string.Format(
+                    _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
+                    ex.Message));
             }
             finally
             {
-                _isRunning = false;
+                activeOpenSession.IsRunning = false;
+                _runningSessions.Remove(runContext.SessionId);
+                _isRunning = IsAnySessionRunning();
+                _runningSessionId = _runningSessions.Keys.FirstOrDefault();
                 _selectionContextController.ClearRunSnapshots();
-                _currentRunImageToolAttachments.Clear();
                 _fileToolController.FinishRun();
                 if (ReferenceEquals(_runCancellation, cancellationSource))
                 {
@@ -1021,19 +1121,39 @@ namespace TxtAIEditor.Controls
                 }
 
                 cancellationSource.Dispose();
-                await RunOnUIThreadAsync(async () => await FinishStreamToTabAsync());
-                _agentPane.SetBusy(false);
-                UpdateContextStatsImmediate();
+                await RunOnUIThreadAsync(async () => await FinishStreamToTabAsync(runContext));
+                activeOpenSession.SessionHistoryText = runContext.SessionHistory.ToString();
+                activeOpenSession.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
+                activeOpenSession.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
+                activeOpenSession.SessionEdits = runContext.SessionEdits.ToList();
+                activeOpenSession.Attachments = runContext.Attachments.ToList();
+                UpdateActiveSessionBusyState();
+
+                if (string.Equals(_pendingCloseSessionId, runContext.SessionId, StringComparison.Ordinal))
+                {
+                    string closingSessionId = _pendingCloseSessionId ?? string.Empty;
+                    _pendingCloseSessionId = null;
+                    CloseOpenSession(closingSessionId);
+                }
+                else
+                {
+                    UpdateContextStatsImmediate();
+                    UpdateOpenSessionsUI();
+                }
             }
         }
 
-        private string BuildTranscriptWithEditLedger(string transcript, int currentTaskStartEditIndex)
+        private string BuildTranscriptWithEditLedger(
+            string transcript,
+            int currentTaskStartEditIndex,
+            IReadOnlyList<AgentFileEditPreview> sessionEdits)
         {
             var builder = new StringBuilder(transcript);
-            string earlierEdits = _sessionEditController.BuildDiffLog(0, currentTaskStartEditIndex);
-            string currentTaskEdits = _sessionEditController.BuildDiffLog(
+            string earlierEdits = BuildDiffLog(sessionEdits, 0, currentTaskStartEditIndex);
+            string currentTaskEdits = BuildDiffLog(
+                sessionEdits,
                 currentTaskStartEditIndex,
-                _sessionEditController.EditCount);
+                sessionEdits.Count);
 
             builder.AppendLine();
             builder.AppendLine();
@@ -1050,6 +1170,29 @@ namespace TxtAIEditor.Controls
             builder.AppendLine("[Edit timing guidance]");
             builder.AppendLine("Use the two edit sections to distinguish timing. Edits under [File edits made during this user task] were made by your tool calls for the current request; do not describe them as already done before the request.");
             return builder.ToString();
+        }
+
+        private static string BuildDiffLog(IReadOnlyList<AgentFileEditPreview> edits, int startIndex, int endIndex)
+        {
+            startIndex = Math.Max(0, startIndex);
+            endIndex = Math.Min(edits.Count, Math.Max(startIndex, endIndex));
+            if (startIndex >= endIndex)
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder();
+            for (int i = startIndex; i < endIndex; i++)
+            {
+                AgentFileEditPreview edit = edits[i];
+                builder.AppendLine($"--- File: {edit.RelativePath} (Action: {edit.ActionName}) ---");
+                builder.AppendLine(edit.IsNewFile ? "[New File]" : "[Modified File]");
+                builder.AppendLine($"Old chars: {edit.OldContent?.Length ?? 0:N0}");
+                builder.AppendLine($"New chars: {edit.NewContent?.Length ?? 0:N0}");
+                builder.AppendLine();
+            }
+
+            return builder.ToString().TrimEnd();
         }
 
         private static string AddToolTimingNote(
@@ -1069,25 +1212,464 @@ namespace TxtAIEditor.Controls
             return AppendToolStatusMessage(toolResultForTranscript, timingNote);
         }
 
-        private void ClearSession()
+        private AgentOpenSessionState EnsureOpenSession(string sessionId)
         {
-            _currentSessionId = Guid.NewGuid().ToString();
-            _sessionHistory.Clear();
-            _sessionHistoryTokenCount = 0;
-            _currentRunTranscriptTokens = 0;
-            _sessionEditController.Clear();
+            var session = _openSessions.FirstOrDefault(item =>
+                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+            if (session != null)
+            {
+                return session;
+            }
+
+            session = CreateBlankOpenSession(sessionId);
+            _openSessions.Insert(0, session);
+            return session;
+        }
+
+        private AgentOpenSessionState CreateBlankOpenSession(string? sessionId = null)
+        {
+            return new AgentOpenSessionState
+            {
+                Id = string.IsNullOrWhiteSpace(sessionId) ? Guid.NewGuid().ToString() : sessionId,
+                Title = GetUntitledOpenSessionTitle(),
+                OutputText = _displayText.OutputPlaceholder,
+                ActivityText = _displayText.ActivityIdle,
+                LlmSettings = CreateSessionSettingsSnapshot()
+            };
+        }
+
+        private EditorSettings CreateSessionSettingsSnapshot()
+        {
+            return CloneSessionSettings(_settingsService.CurrentSettings);
+        }
+
+        private static EditorSettings CloneSessionSettings(EditorSettings settings)
+        {
+            return new EditorSettings
+            {
+                Language = settings.Language,
+                LlmProvider = settings.LlmProvider,
+                LlmEndpoint = settings.LlmEndpoint,
+                LlmModel = settings.LlmModel,
+                LlmModelGemini = settings.LlmModelGemini,
+                LlmModelOpenAI = settings.LlmModelOpenAI,
+                LlmModelOpenRouter = settings.LlmModelOpenRouter,
+                LlmModelLmStudio = settings.LlmModelLmStudio,
+                LlmModelOpenCodeGo = settings.LlmModelOpenCodeGo,
+                LlmModelOpenCodeZen = settings.LlmModelOpenCodeZen,
+                LlmModelOllama = settings.LlmModelOllama,
+                LlmModelOllamaCloud = settings.LlmModelOllamaCloud,
+                LlmThinkingLevel = settings.LlmThinkingLevel,
+                LlmConfirmBeforeSending = settings.LlmConfirmBeforeSending,
+                LlmAgentVerbose = settings.LlmAgentVerbose,
+                LlmAgentAutoApproveGitEdits = settings.LlmAgentAutoApproveGitEdits,
+                LlmMaxToolCalls = settings.LlmMaxToolCalls,
+                LlmSourceLanguage = settings.LlmSourceLanguage,
+                LlmTargetLanguage = settings.LlmTargetLanguage
+            };
+        }
+
+        private string GetUntitledOpenSessionTitle()
+        {
+            return _getString("AgentOpenSessionUntitled", "새 세션");
+        }
+
+        private void SaveOpenSessionPromptTitleFromUI()
+        {
+            if (_restoringOpenSession)
+            {
+                return;
+            }
+
+            var session = EnsureOpenSession(_currentSessionId);
+            session.PromptText = _agentPane.Prompt.Text ?? string.Empty;
+            UpdateOpenSessionTitle(session, session.PromptText);
+            session.UpdatedAt = DateTime.Now;
+            UpdateOpenSessionsUI();
+        }
+
+        private void SaveActiveOpenSessionFromUI()
+        {
+            if (_restoringOpenSession)
+            {
+                return;
+            }
+
+            var session = EnsureOpenSession(_currentSessionId);
+            session.PromptText = _agentPane.Prompt.Text ?? string.Empty;
+            session.OutputText = _agentPane.GetRawOutputText();
+            session.ActivityText = _agentPane.Activity.Text ?? string.Empty;
+            bool saveSharedState = !IsAnySessionRunning() ||
+                string.Equals(_runningSessionId, session.Id, StringComparison.Ordinal);
+            if (saveSharedState)
+            {
+                session.SessionHistoryText = _sessionHistory.ToString();
+                session.SessionHistoryTokenCount = _sessionHistoryTokenCount;
+                session.CurrentRunTranscriptTokens = _currentRunTranscriptTokens;
+                session.Attachments = _attachmentController.GetState();
+                session.SessionEdits = _sessionEditController.SessionEdits.ToList();
+            }
+            session.UpdatedAt = DateTime.Now;
+            UpdateOpenSessionTitle(session, session.PromptText);
+        }
+
+        private void RestoreOpenSession(AgentOpenSessionState session)
+        {
+            _restoringOpenSession = true;
+            try
+            {
+                _currentSessionId = session.Id;
+                bool restoreSharedRunState = !IsAnySessionRunning() ||
+                    string.Equals(_runningSessionId, session.Id, StringComparison.Ordinal);
+                if (restoreSharedRunState)
+                {
+                    _sessionHistory.Clear();
+                    _sessionHistory.Append(session.SessionHistoryText ?? string.Empty);
+                    _sessionHistoryTokenCount = session.SessionHistoryTokenCount;
+                    _currentRunTranscriptTokens = session.CurrentRunTranscriptTokens;
+                }
+
+                _agentPane.Prompt.Text = session.PromptText ?? string.Empty;
+                _agentPane.ResetOutput(string.IsNullOrEmpty(session.OutputText)
+                    ? _displayText.OutputPlaceholder
+                    : session.OutputText);
+                _agentPane.ClearActivity(string.IsNullOrWhiteSpace(session.ActivityText)
+                    ? _displayText.ActivityIdle
+                    : session.ActivityText);
+                if (restoreSharedRunState)
+                {
+                    _attachmentController.Replace(session.Attachments);
+                    _sessionEditController.Replace(session.SessionEdits);
+                }
+                else
+                {
+                    _agentPane.UpdateAttachments(ToAttachmentItems(session.Attachments));
+                    _agentPane.UpdateModifiedFiles(GetLatestEditsForDisplay(session.SessionEdits));
+                }
+                _historyController.UpdateUI(_currentSessionId);
+                UpdateOpenSessionsUI();
+                UpdateActiveSessionBusyState();
+                UpdateContextStatsImmediate();
+            }
+            finally
+            {
+                _restoringOpenSession = false;
+            }
+        }
+
+        private void CreateNewOpenSession()
+        {
+            SaveActiveOpenSessionFromUI();
+            var session = CreateBlankOpenSession();
+            _openSessions.Insert(0, session);
+            RestoreOpenSession(session);
+        }
+
+        private void SwitchOpenSession(string sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId) ||
+                string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var session = _openSessions.FirstOrDefault(item =>
+                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+            if (session == null)
+            {
+                return;
+            }
+
+            SaveActiveOpenSessionFromUI();
+            RestoreOpenSession(session);
+        }
+
+        private void CloseOpenSession(string sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                return;
+            }
+
+            bool isRunningSession = _runningSessions.TryGetValue(sessionId, out AgentRunContext? runContext);
+            if (isRunningSession)
+            {
+                _pendingCloseSessionId = sessionId;
+                StopAgent(sessionId);
+                UpdateOpenSessionsUI();
+                if (string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+
+            if (!isRunningSession && string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
+            {
+                var current = _openSessions.FirstOrDefault(item =>
+                    string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+                if (current != null)
+                {
+                    _openSessions.Remove(current);
+                }
+
+                var next = _openSessions.FirstOrDefault();
+                if (next == null)
+                {
+                    next = CreateBlankOpenSession();
+                    _openSessions.Add(next);
+                }
+
+                RestoreOpenSession(next);
+                return;
+            }
+
+            var session = _openSessions.FirstOrDefault(item =>
+                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+            if (session != null)
+            {
+                _openSessions.Remove(session);
+                UpdateOpenSessionsUI();
+            }
+        }
+
+        private void UpdateOpenSessionsUI()
+        {
+            var items = _openSessions
+                .Select(session =>
+                {
+                    bool isSelected = string.Equals(session.Id, _currentSessionId, StringComparison.Ordinal);
+                    bool isRunning = session.IsRunning || _runningSessions.ContainsKey(session.Id);
+                    return new AgentOpenSessionItemViewModel
+                    {
+                        Id = session.Id,
+                        Title = string.IsNullOrWhiteSpace(session.Title)
+                            ? GetUntitledOpenSessionTitle()
+                            : session.Title,
+                        IsSelected = isSelected,
+                        IsRunning = isRunning,
+                        CanSelect = true,
+                        CanClose = true
+                    };
+                })
+                .ToList();
+
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
-                _agentPane.Prompt.Text = string.Empty;
-                _agentPane.ResetOutput(_displayText.OutputPlaceholder);
-                _agentPane.ClearActivity(_displayText.ActivityIdle);
-                _attachmentController.Clear();
-                UpdateContextStatsImmediate();
-                _historyController.UpdateUI(_currentSessionId);
+                _agentPane.UpdateOpenSessionItems(items, _currentSessionId);
             });
         }
 
-        private Task AppendOutputTextAndStreamToTabAsync(string text)
+        private void UpdateOpenSessionTitle(AgentOpenSessionState session, string prompt)
+        {
+            string firstLine = BuildOpenSessionTitle(prompt);
+            session.Title = string.IsNullOrWhiteSpace(firstLine)
+                ? GetUntitledOpenSessionTitle()
+                : firstLine;
+        }
+
+        private static string BuildOpenSessionTitle(string prompt)
+        {
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                return string.Empty;
+            }
+
+            return prompt
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault()
+                ?.Trim() ?? string.Empty;
+        }
+
+        private void UpdateActiveSessionBusyState()
+        {
+            _agentPane.SetBusy(IsCurrentSessionRunning());
+        }
+
+        private async Task BeginRunOutputBlockAsync(AgentRunContext context, string title)
+        {
+            await RunOnUIThreadAsync(() =>
+            {
+                if (IsSessionVisible(context.SessionId))
+                {
+                    _agentPane.BeginOutputBlock(title);
+                }
+                else
+                {
+                    var session = EnsureOpenSession(context.SessionId);
+                    AppendOutputLineToSession(session, title);
+                }
+            });
+        }
+
+        private async Task ClearRunActivityAsync(AgentRunContext context, string text)
+        {
+            await RunOnUIThreadAsync(() =>
+            {
+                var session = EnsureOpenSession(context.SessionId);
+                session.ActivityText = text;
+                if (IsSessionVisible(context.SessionId))
+                {
+                    _agentPane.ClearActivity(text);
+                }
+            });
+        }
+
+        private async Task AppendRunActivityAsync(AgentRunContext context, string message)
+        {
+            await RunOnUIThreadAsync(() =>
+            {
+                var session = EnsureOpenSession(context.SessionId);
+                string timestamp = DateTime.Now.ToString("HH:mm:ss");
+                string line = $"{timestamp}  {message}";
+                AppendOutputLineToSession(session, line);
+                session.ActivityText = string.IsNullOrWhiteSpace(session.ActivityText) ||
+                    _displayText.IsActivityIdle(session.ActivityText)
+                    ? line
+                    : session.ActivityText + Environment.NewLine + line;
+
+                if (IsSessionVisible(context.SessionId))
+                {
+                    _agentPane.AppendActivity(message);
+                }
+            });
+        }
+
+        private async Task AppendRunOutputTextAsync(AgentRunContext context, string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            await RunOnUIThreadAsync(() =>
+            {
+                var session = EnsureOpenSession(context.SessionId);
+                if (IsSessionVisible(context.SessionId))
+                {
+                    _agentPane.AppendOutputText(text);
+                    session.OutputText = _agentPane.GetRawOutputText();
+                }
+                else
+                {
+                    session.OutputText = NormalizePlaceholderOutput(session.OutputText) + text;
+                }
+            });
+        }
+
+        private async Task AppendRunOutputLineAsync(AgentRunContext context, string line)
+        {
+            await RunOnUIThreadAsync(() =>
+            {
+                var session = EnsureOpenSession(context.SessionId);
+                if (IsSessionVisible(context.SessionId))
+                {
+                    _agentPane.AppendOutputLine(line);
+                    session.OutputText = _agentPane.GetRawOutputText();
+                }
+                else
+                {
+                    AppendOutputLineToSession(session, line);
+                }
+            });
+        }
+
+        private void EnqueueRunUi(
+            AgentRunContext context,
+            Action activeAction,
+            Action<AgentOpenSessionState>? backgroundAction = null)
+        {
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                var session = EnsureOpenSession(context.SessionId);
+                if (IsSessionVisible(context.SessionId))
+                {
+                    activeAction();
+                    session.OutputText = _agentPane.GetRawOutputText();
+                }
+                else
+                {
+                    backgroundAction?.Invoke(session);
+                }
+            });
+        }
+
+        private Task BeginRunThinkingActivityAsync(AgentRunContext context, string label)
+        {
+            return RunOnUIThreadAsync(() =>
+            {
+                if (IsSessionVisible(context.SessionId))
+                {
+                    _agentPane.BeginThinkingActivity(label);
+                }
+            });
+        }
+
+        private Task StopRunThinkingActivityAsync(AgentRunContext context)
+        {
+            return RunOnUIThreadAsync(() =>
+            {
+                if (IsSessionVisible(context.SessionId))
+                {
+                    _agentPane.StopThinkingActivity();
+                }
+            });
+        }
+
+        private bool IsSessionVisible(string sessionId)
+        {
+            return string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal);
+        }
+
+        private string NormalizePlaceholderOutput(string text)
+        {
+            if (_displayText.IsOutputPlaceholder((text ?? string.Empty).TrimStart()))
+            {
+                return string.Empty;
+            }
+
+            return text ?? string.Empty;
+        }
+
+        private void AppendOutputLineToSession(AgentOpenSessionState session, string line)
+        {
+            string text = NormalizePlaceholderOutput(session.OutputText);
+            if (!string.IsNullOrEmpty(text) && !text.EndsWith(Environment.NewLine, StringComparison.Ordinal))
+            {
+                text += Environment.NewLine;
+            }
+
+            session.OutputText = text + line + Environment.NewLine;
+            session.UpdatedAt = DateTime.Now;
+        }
+
+        private List<AgentAttachmentItem> ToAttachmentItems(IEnumerable<AgentAttachmentState> attachments)
+        {
+            return attachments.Select(attachment => new AgentAttachmentItem
+            {
+                Id = attachment.Id,
+                DisplayName = attachment.DisplayName,
+                Detail = attachment.Detail,
+                TokenText = _displayText.FormatInlineTokenCount(attachment.EstimatedTokens),
+                RemoveTooltip = _getString("AgentRemoveAttachmentTooltip", "Remove attachment"),
+                IconGlyph = attachment.IsImage ? "\uEB9F" : "\uE8A5"
+            }).ToList();
+        }
+
+        private static List<AgentFileEditPreview> GetLatestEditsForDisplay(IEnumerable<AgentFileEditPreview> edits)
+        {
+            var latestByPath = new Dictionary<string, AgentFileEditPreview>(StringComparer.OrdinalIgnoreCase);
+            foreach (AgentFileEditPreview edit in edits)
+            {
+                string key = !string.IsNullOrWhiteSpace(edit.FullPath)
+                    ? edit.FullPath
+                    : edit.RelativePath ?? string.Empty;
+                latestByPath[key] = edit;
+            }
+
+            return latestByPath.Values.ToList();
+        }
+
+        private Task AppendOutputTextAndStreamToTabAsync(AgentRunContext context, string text)
         {
             if (string.IsNullOrEmpty(text))
             {
@@ -1096,22 +1678,32 @@ namespace TxtAIEditor.Controls
 
             return RunOnUIThreadAsync(async () =>
             {
-                _agentPane.AppendOutputText(text);
-                if (_agentPane.StreamToTab)
+                var session = EnsureOpenSession(context.SessionId);
+                if (IsSessionVisible(context.SessionId))
                 {
-                    await StreamTextToTabAsync(text);
+                    _agentPane.AppendOutputText(text);
+                    session.OutputText = _agentPane.GetRawOutputText();
+                }
+                else
+                {
+                    session.OutputText = NormalizePlaceholderOutput(session.OutputText) + text;
+                }
+
+                if (context.StreamToTab)
+                {
+                    await StreamTextToTabAsync(context, text);
                 }
             });
         }
 
-        private async Task StreamTextToTabAsync(string text)
+        private async Task StreamTextToTabAsync(AgentRunContext context, string text)
         {
             if (string.IsNullOrEmpty(text))
             {
                 return;
             }
 
-            if (!_streamToTabActive)
+            if (!context.StreamToTabActive)
             {
                 bool started = _beginStreamIntoActiveEditorAsync == null
                     ? true
@@ -1120,7 +1712,7 @@ namespace TxtAIEditor.Controls
                 {
                     return;
                 }
-                _streamToTabActive = true;
+                context.StreamToTabActive = true;
             }
 
             if (_streamTextIntoActiveEditorAsync != null)
@@ -1132,14 +1724,14 @@ namespace TxtAIEditor.Controls
             await _insertIntoActiveEditorAsync(text);
         }
 
-        private async Task FinishStreamToTabAsync()
+        private async Task FinishStreamToTabAsync(AgentRunContext context)
         {
-            if (!_streamToTabActive)
+            if (!context.StreamToTabActive)
             {
                 return;
             }
 
-            _streamToTabActive = false;
+            context.StreamToTabActive = false;
             if (_endStreamIntoActiveEditorAsync != null)
             {
                 await _endStreamIntoActiveEditorAsync();
@@ -1220,23 +1812,24 @@ namespace TxtAIEditor.Controls
 
         private void StopAgent()
         {
-            if (!_isRunning)
+            StopAgent(_currentSessionId);
+        }
+
+        private void StopAgent(string sessionId)
+        {
+            if (!_runningSessions.TryGetValue(sessionId, out AgentRunContext? context))
             {
                 return;
             }
 
-            if (_runCancellation?.IsCancellationRequested == true)
+            if (context.Cancellation?.IsCancellationRequested == true)
             {
                 return;
             }
 
-            AppendActivity(_getString("AgentActivityStopRequested", "중단 요청됨"));
-            if (string.IsNullOrWhiteSpace(_agentPane.Output.Text))
-            {
-                _agentPane.AppendOutputLine(_getString("AgentOutputStopping", "Agent 실행을 중단하는 중..."));
-            }
+            _ = AppendRunActivityAsync(context, _getString("AgentActivityStopRequested", "중단 요청됨"));
 
-            _runCancellation?.Cancel();
+            context.Cancellation?.Cancel();
             _confirmationController.CancelPending();
         }
 
@@ -1495,13 +2088,13 @@ namespace TxtAIEditor.Controls
         private int GetModelContextLimitForPromptBudget()
         {
             return _modelContextLimits.GetContextLimit(
-                _settingsService.CurrentSettings,
+                GetCurrentSessionSettings(),
                 () => _agentPane.DispatcherQueue.TryEnqueue(() => UpdateContextStatsImmediate(force: true)));
         }
 
         private bool IsLmStudioProvider()
         {
-            string provider = _settingsService.CurrentSettings?.LlmProvider ?? string.Empty;
+            string provider = GetCurrentSessionSettings().LlmProvider ?? string.Empty;
             return provider.Contains("lm studio", StringComparison.OrdinalIgnoreCase) ||
                 provider.Contains("lmstudio", StringComparison.OrdinalIgnoreCase);
         }
@@ -1515,19 +2108,31 @@ namespace TxtAIEditor.Controls
                 CaptureActiveSelectionSnapshot().HasLineRange);
         }
 
-        private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForCurrentRun()
+        private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForRun(AgentRunContext context)
         {
             var attachments = new List<LlmMessageAttachment>();
-            attachments.AddRange(_attachmentController.GetImageAttachments());
-            attachments.AddRange(_currentRunImageToolAttachments);
+            attachments.AddRange(context.Attachments
+                .Select(attachment => attachment.ImageContent)
+                .Where(attachment => attachment != null)
+                .Cast<LlmMessageAttachment>());
+            attachments.AddRange(context.ImageToolAttachments);
             return attachments;
         }
 
         private void AddCurrentRunImageToolAttachment(LlmMessageAttachment attachment)
         {
-            _currentRunImageToolAttachments.RemoveAll(existing =>
+            AgentRunContext? context = _activeToolRunContext.Value;
+            if (context == null)
+            {
+                _currentRunImageToolAttachments.RemoveAll(existing =>
+                    string.Equals(existing.DisplayName, attachment.DisplayName, StringComparison.OrdinalIgnoreCase));
+                _currentRunImageToolAttachments.Add(attachment);
+                return;
+            }
+
+            context.ImageToolAttachments.RemoveAll(existing =>
                 string.Equals(existing.DisplayName, attachment.DisplayName, StringComparison.OrdinalIgnoreCase));
-            _currentRunImageToolAttachments.Add(attachment);
+            context.ImageToolAttachments.Add(attachment);
         }
 
         private void AppendActivity(string message)
@@ -1567,6 +2172,11 @@ namespace TxtAIEditor.Controls
 
         public void UpdateModelDisplay(bool forceClearCache = false)
         {
+            if (forceClearCache)
+            {
+                EnsureOpenSession(_currentSessionId).LlmSettings = CreateSessionSettingsSnapshot();
+            }
+
             _contextStatsController.UpdateModelDisplay(forceClearCache);
         }
 
@@ -1590,14 +2200,55 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            var openSession = EnsureOpenSession(_currentSessionId);
+            UpdateOpenSessionTitle(openSession, userInstruction);
+            openSession.SessionHistoryText = _sessionHistory.ToString();
+            openSession.SessionHistoryTokenCount = _sessionHistoryTokenCount;
+            openSession.CurrentRunTranscriptTokens = _currentRunTranscriptTokens;
+            openSession.SessionEdits = _sessionEditController.SessionEdits.ToList();
+            openSession.Attachments = _attachmentController.GetState();
+            openSession.UpdatedAt = DateTime.Now;
+            UpdateOpenSessionsUI();
+
             var item = new AgentHistoryItem
             {
                 Id = _currentSessionId,
                 Timestamp = DateTime.Now,
-                Title = GetSessionTitle(userInstruction),
+                Title = openSession.Title,
                 SessionHistoryText = _sessionHistory.ToString(),
                 SessionHistoryTokenCount = _sessionHistoryTokenCount,
                 SessionEdits = _sessionEditController.SessionEdits.ToList(),
+                WorkspaceRoot = _fileTools.WorkspaceRoot
+            };
+
+            await _historyController.SaveSessionAsync(item, _currentSessionId);
+        }
+
+        private async Task SaveRunSessionToHistoryAsync(AgentRunContext context, string userInstruction)
+        {
+            if (context.SessionHistory.Length == 0)
+            {
+                return;
+            }
+
+            var openSession = EnsureOpenSession(context.SessionId);
+            UpdateOpenSessionTitle(openSession, userInstruction);
+            openSession.SessionHistoryText = context.SessionHistory.ToString();
+            openSession.SessionHistoryTokenCount = context.SessionHistoryTokenCount;
+            openSession.CurrentRunTranscriptTokens = context.CurrentRunTranscriptTokens;
+            openSession.SessionEdits = context.SessionEdits.ToList();
+            openSession.Attachments = context.Attachments.ToList();
+            openSession.UpdatedAt = DateTime.Now;
+            UpdateOpenSessionsUI();
+
+            var item = new AgentHistoryItem
+            {
+                Id = context.SessionId,
+                Timestamp = DateTime.Now,
+                Title = openSession.Title,
+                SessionHistoryText = context.SessionHistory.ToString(),
+                SessionHistoryTokenCount = context.SessionHistoryTokenCount,
+                SessionEdits = context.SessionEdits.ToList(),
                 WorkspaceRoot = _fileTools.WorkspaceRoot
             };
 
@@ -1611,13 +2262,21 @@ namespace TxtAIEditor.Controls
             var item = _historyController.GetSession(historyId);
             if (item == null) return;
 
-            _currentSessionId = item.Id;
-            _sessionHistory.Clear();
-            _sessionHistory.Append(item.SessionHistoryText);
-            _sessionHistoryTokenCount = item.SessionHistoryTokenCount;
-            _currentRunTranscriptTokens = 0;
+            SaveActiveOpenSessionFromUI();
 
-            _sessionEditController.Replace(item.SessionEdits);
+            var session = EnsureOpenSession(item.Id);
+            session.Title = item.Title;
+            session.PromptText = string.Empty;
+            session.OutputText = AgentHistoryFormatter.Format(
+                item.SessionHistoryText,
+                _settingsService.CurrentSettings.LlmAgentVerbose);
+            session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
+            session.SessionHistoryText = item.SessionHistoryText;
+            session.SessionHistoryTokenCount = item.SessionHistoryTokenCount;
+            session.CurrentRunTranscriptTokens = 0;
+            session.SessionEdits = item.SessionEdits.ToList();
+            session.Attachments.Clear();
+            session.UpdatedAt = DateTime.Now;
 
             // Restore workspace folder if it was saved and still exists
             string savedWorkspaceRoot = item.WorkspaceRoot ?? string.Empty;
@@ -1631,12 +2290,7 @@ namespace TxtAIEditor.Controls
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
-                string formatted = AgentHistoryFormatter.Format(item.SessionHistoryText, _settingsService.CurrentSettings.LlmAgentVerbose);
-                _agentPane.ResetOutput(formatted);
-                _agentPane.ClearActivity(_getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨"));
-                _attachmentController.Clear();
-                UpdateContextStatsImmediate();
-                _historyController.UpdateUI(_currentSessionId);
+                RestoreOpenSession(session);
             });
         }
 
@@ -1648,7 +2302,7 @@ namespace TxtAIEditor.Controls
 
             if (string.Equals(_currentSessionId, historyId, StringComparison.Ordinal))
             {
-                ClearSession();
+                CloseOpenSession(historyId);
             }
             else
             {
@@ -1659,7 +2313,7 @@ namespace TxtAIEditor.Controls
         private async Task ClearAllHistoryAsync()
         {
             await _historyController.ClearAsync(_currentSessionId);
-            ClearSession();
+            CloseOpenSession(_currentSessionId);
         }
 
         private void RefreshOutputDisplay()
@@ -1675,34 +2329,6 @@ namespace TxtAIEditor.Controls
             _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
             string formatted = AgentHistoryFormatter.Format(text, _settingsService.CurrentSettings.LlmAgentVerbose);
             _agentPane.ResetOutput(formatted);
-        }
-
-        private string GetSessionTitle(string instruction)
-        {
-            string firstLine;
-            if (string.IsNullOrWhiteSpace(instruction))
-            {
-                string selectedPresetLabel = _presetController.GetSelectedPresetLabel();
-                if (!string.IsNullOrEmpty(selectedPresetLabel))
-                {
-                    firstLine = selectedPresetLabel;
-                }
-                else
-                {
-                    return "Untitled Session";
-                }
-            }
-            else
-            {
-                firstLine = instruction.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? instruction;
-                firstLine = firstLine.Trim();
-            }
-
-            if (firstLine.Length > 20)
-            {
-                return firstLine.Substring(0, 17) + "...";
-            }
-            return firstLine;
         }
 
     }

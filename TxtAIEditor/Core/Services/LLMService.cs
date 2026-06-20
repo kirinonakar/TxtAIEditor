@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
+using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Core.Services
@@ -27,7 +28,12 @@ namespace TxtAIEditor.Core.Services
 
         private string GetActiveLanguage()
         {
-            var lang = _settingsService?.CurrentSettings?.Language;
+            return GetActiveLanguage(_settingsService?.CurrentSettings);
+        }
+
+        private static string GetActiveLanguage(EditorSettings? settings)
+        {
+            var lang = settings?.Language;
             if (string.IsNullOrEmpty(lang) || lang.Equals("Default", StringComparison.OrdinalIgnoreCase))
             {
                 try
@@ -191,6 +197,14 @@ namespace TxtAIEditor.Core.Services
             return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments);
         }
 
+        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false)
+        {
+            string langCode = GetActiveLanguage(settings);
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode);
+            string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
+            return await ExecuteLlmAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments);
+        }
+
         public Task SaveApiKeyAsync(string provider, string apiKey)
         {
             try
@@ -233,8 +247,12 @@ namespace TxtAIEditor.Core.Services
 
         private async Task<string> ExecuteLlmAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
         {
+            return await ExecuteLlmAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments);
+        }
+
+        private async Task<string> ExecuteLlmAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
+        {
             cancellationToken.ThrowIfCancellationRequested();
-            var settings = _settingsService.CurrentSettings;
             string providerName = settings.LlmProvider;
             string apiKey = await GetApiKeyAsync(providerName);
             bool requiresApiKey = !providerName.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) &&

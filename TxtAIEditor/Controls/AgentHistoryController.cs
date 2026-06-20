@@ -70,6 +70,7 @@ namespace TxtAIEditor.Controls
             if (existing != null)
             {
                 existing.Timestamp = session.Timestamp;
+                existing.Title = session.Title;
                 existing.SessionHistoryText = session.SessionHistoryText;
                 existing.SessionHistoryTokenCount = session.SessionHistoryTokenCount;
                 existing.SessionEdits = session.SessionEdits.ToList();

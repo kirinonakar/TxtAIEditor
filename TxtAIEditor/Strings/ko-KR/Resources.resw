@@ -2602,4 +2602,22 @@
   <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
     <value>선택 칩 오른쪽으로 스크롤</value>
   </data>
+  <data name="AgentOpenSessionsTooltip" xml:space="preserve">
+    <value>열린 세션</value>
+  </data>
+  <data name="AgentOpenSessionsTitle" xml:space="preserve">
+    <value>열린 세션</value>
+  </data>
+  <data name="AgentOpenSessionsEmptyText" xml:space="preserve">
+    <value>열린 세션 없음</value>
+  </data>
+  <data name="AgentOpenSessionCloseText" xml:space="preserve">
+    <value>세션 닫기</value>
+  </data>
+  <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
+    <value>실행 중</value>
+  </data>
+  <data name="AgentOpenSessionUntitled" xml:space="preserve">
+    <value>새 세션</value>
+  </data>
 </root>

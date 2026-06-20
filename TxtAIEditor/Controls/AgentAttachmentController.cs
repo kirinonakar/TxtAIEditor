@@ -87,6 +87,23 @@ namespace TxtAIEditor.Controls
                 .ToList();
         }
 
+        public List<AgentAttachmentState> GetState()
+        {
+            return _attachments.Select(CloneAttachment).ToList();
+        }
+
+        public void Replace(IEnumerable<AgentAttachmentState>? attachments)
+        {
+            _attachments.Clear();
+            if (attachments != null)
+            {
+                _attachments.AddRange(attachments.Select(CloneAttachment));
+            }
+
+            RefreshAttachments();
+            _contextChanged();
+        }
+
         public async Task AddAttachmentsAsync()
         {
             if (_isRunningProvider())
@@ -162,6 +179,39 @@ namespace TxtAIEditor.Controls
         {
             _attachments.Clear();
             RefreshAttachments();
+        }
+
+        private static AgentAttachmentState CloneAttachment(AgentAttachmentState attachment)
+        {
+            return new AgentAttachmentState
+            {
+                Id = attachment.Id,
+                Path = attachment.Path,
+                DisplayName = attachment.DisplayName,
+                Detail = attachment.Detail,
+                TextContent = attachment.TextContent,
+                ImageContent = CloneImageAttachment(attachment.ImageContent),
+                EstimatedTokens = attachment.EstimatedTokens,
+                IsPathOnlyDocument = attachment.IsPathOnlyDocument
+            };
+        }
+
+        private static LlmMessageAttachment? CloneImageAttachment(LlmMessageAttachment? attachment)
+        {
+            if (attachment == null)
+            {
+                return null;
+            }
+
+            return new LlmMessageAttachment
+            {
+                DisplayName = attachment.DisplayName,
+                MimeType = attachment.MimeType,
+                Base64Data = attachment.Base64Data,
+                Width = attachment.Width,
+                Height = attachment.Height,
+                EstimatedTokens = attachment.EstimatedTokens
+            };
         }
 
         private static IReadOnlyList<string> GetAttachmentPickerExtensions()

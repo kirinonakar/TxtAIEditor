@@ -23,6 +23,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _refreshOutputDisplay;
         private readonly Func<string, string, string> _getString;
         private readonly AgentModelContextLimitProvider _modelContextLimits;
+        private readonly Func<EditorSettings> _settingsProvider;
 
         public AgentContextStatsController(
             ISettingsService settingsService,
@@ -39,7 +40,8 @@ namespace TxtAIEditor.Controls
             Func<double> currentRunTranscriptTokensProvider,
             Action refreshOutputDisplay,
             Func<string, string, string> getString,
-            AgentModelContextLimitProvider modelContextLimits)
+            AgentModelContextLimitProvider modelContextLimits,
+            Func<EditorSettings>? settingsProvider = null)
         {
             _settingsService = settingsService;
             _agentPane = agentPane;
@@ -56,6 +58,7 @@ namespace TxtAIEditor.Controls
             _refreshOutputDisplay = refreshOutputDisplay;
             _getString = getString;
             _modelContextLimits = modelContextLimits;
+            _settingsProvider = settingsProvider ?? (() => _settingsService.CurrentSettings);
         }
 
         public void Update(bool force = false)
@@ -120,7 +123,7 @@ namespace TxtAIEditor.Controls
 
         public void UpdateModelDisplay(bool forceClearCache = false)
         {
-            var settings = _settingsService.CurrentSettings;
+            var settings = _settingsProvider();
             if (settings == null)
             {
                 return;

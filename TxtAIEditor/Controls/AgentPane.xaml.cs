@@ -39,6 +39,16 @@ namespace TxtAIEditor.Controls
         public string TimeText { get; set; } = string.Empty;
     }
 
+    public sealed class AgentOpenSessionItemViewModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public bool IsSelected { get; set; }
+        public bool IsRunning { get; set; }
+        public bool CanSelect { get; set; } = true;
+        public bool CanClose { get; set; } = true;
+    }
+
     public sealed class AgentSkillItem
     {
         public string Name { get; set; } = string.Empty;
@@ -137,10 +147,15 @@ namespace TxtAIEditor.Controls
         public event EventHandler<string>? HistorySelected;
         public event EventHandler<string>? HistoryDeleted;
         public event RoutedEventHandler? HistoryToolbarDeleteClicked;
+        public event EventHandler? OpenSessionsFlyoutOpened;
+        public event EventHandler<string>? OpenSessionSelected;
+        public event EventHandler<string>? OpenSessionClosed;
         public event RoutedEventHandler? ModelNameClick;
 
         private List<AgentHistoryItemViewModel> _historyItems = new List<AgentHistoryItemViewModel>();
         private string? _selectedHistoryId;
+        private List<AgentOpenSessionItemViewModel> _openSessionItems = new List<AgentOpenSessionItemViewModel>();
+        private string? _selectedOpenSessionId;
 
         public AgentOutputWrapper Output => new AgentOutputWrapper(this);
         public TextBox Prompt => AgentPromptInput;
@@ -237,6 +252,8 @@ namespace TxtAIEditor.Controls
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
             AgentNewSessionButton.Content = getString("AgentNewSessionButton", "새 세션");
+            ToolTipService.SetToolTip(AgentOpenSessionsButton, getString("AgentOpenSessionsTooltip", "열린 세션"));
+            AgentOpenSessionsTitleText.Text = getString("AgentOpenSessionsTitle", "열린 세션");
             ToolTipService.SetToolTip(AgentHistoryButton, getString("AgentHistoryTooltip", "세션 히스토리"));
             AgentHistoryTitleText.Text = getString("AgentHistoryTitle", "세션 히스토리 (최근 20개)");
             ToolTipService.SetToolTip(AgentDeleteHistoryButton, getString("AgentDeleteHistoryTooltip", "히스토리 삭제"));
@@ -263,6 +280,7 @@ namespace TxtAIEditor.Controls
             RebuildAgentSkillMenu();
             RebuildAgentPresetMenu();
             RebuildSelectedAgentPresetChips();
+            RebuildOpenSessionMenu();
         }
 
         public void SetBusy(bool isBusy)
@@ -276,6 +294,7 @@ namespace TxtAIEditor.Controls
             AgentRunButton.IsEnabled = true;
             AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
             AgentNewSessionButton.IsEnabled = !isBusy;
+            AgentOpenSessionsButton.IsEnabled = true;
             AgentHistoryButton.IsEnabled = !isBusy;
             AgentDeleteHistoryButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
@@ -768,6 +787,12 @@ namespace TxtAIEditor.Controls
         private void OnAgentHistoryFlyoutOpened(object sender, object e)
         {
             RebuildHistoryMenu();
+        }
+
+        private void OnAgentOpenSessionsFlyoutOpened(object sender, object e)
+        {
+            OpenSessionsFlyoutOpened?.Invoke(this, EventArgs.Empty);
+            RebuildOpenSessionMenu();
         }
 
         private void OnDeleteHistoryClick(object sender, RoutedEventArgs e)
@@ -1910,6 +1935,124 @@ namespace TxtAIEditor.Controls
             _historyItems = items;
             _selectedHistoryId = selectedId;
             RebuildHistoryMenu();
+        }
+
+        public void UpdateOpenSessionItems(List<AgentOpenSessionItemViewModel> items, string? selectedId)
+        {
+            _openSessionItems = items;
+            _selectedOpenSessionId = selectedId;
+            RebuildOpenSessionMenu();
+        }
+
+        private void RebuildOpenSessionMenu()
+        {
+            if (AgentOpenSessionsListPanel == null)
+            {
+                return;
+            }
+
+            AgentOpenSessionsListPanel.Children.Clear();
+            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
+            Func<string, string, string> getString = _getString ?? _displayText.GetString;
+
+            if (_openSessionItems.Count == 0)
+            {
+                AgentOpenSessionsListPanel.Children.Add(new TextBlock
+                {
+                    Text = getString("AgentOpenSessionsEmptyText", "열린 세션 없음"),
+                    FontSize = 11,
+                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
+                    Margin = new Thickness(4, 2, 4, 2)
+                });
+                return;
+            }
+
+            foreach (var item in _openSessionItems)
+            {
+                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var titlePanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 6,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                if (item.IsSelected)
+                {
+                    titlePanel.Children.Add(new FontIcon
+                    {
+                        Glyph = "\uE73E",
+                        FontSize = 10,
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                }
+
+                titlePanel.Children.Add(new TextBlock
+                {
+                    Text = item.Title,
+                    FontSize = 11,
+                    MaxWidth = 190,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextWrapping = TextWrapping.NoWrap,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+                if (item.IsRunning)
+                {
+                    titlePanel.Children.Add(new TextBlock
+                    {
+                        Text = getString("AgentOpenSessionRunningSuffix", "실행 중"),
+                        FontSize = 10,
+                        Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                }
+
+                var selectBtn = new Button
+                {
+                    Content = titlePanel,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    Height = 28,
+                    Padding = new Thickness(8, 0, 8, 0),
+                    Style = buttonStyle,
+                    IsEnabled = item.CanSelect
+                };
+                if (item.IsSelected)
+                {
+                    selectBtn.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+                }
+
+                string currentId = item.Id;
+                selectBtn.Click += (_, _) =>
+                {
+                    OpenSessionSelected?.Invoke(this, currentId);
+                    AgentOpenSessionsFlyout.Hide();
+                };
+                Grid.SetColumn(selectBtn, 0);
+                rowGrid.Children.Add(selectBtn);
+
+                var closeBtn = new Button
+                {
+                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
+                    Width = 28,
+                    Height = 28,
+                    Padding = new Thickness(0),
+                    Style = buttonStyle,
+                    IsEnabled = item.CanClose
+                };
+                ToolTipService.SetToolTip(closeBtn, getString("AgentOpenSessionCloseText", "세션 닫기"));
+                closeBtn.Click += (_, _) =>
+                {
+                    OpenSessionClosed?.Invoke(this, currentId);
+                };
+                Grid.SetColumn(closeBtn, 1);
+                rowGrid.Children.Add(closeBtn);
+
+                AgentOpenSessionsListPanel.Children.Add(rowGrid);
+            }
         }
 
         private void RebuildHistoryMenu()

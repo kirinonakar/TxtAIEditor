@@ -2603,4 +2603,22 @@
   <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
     <value>選択チップを右へスクロール</value>
   </data>
+  <data name="AgentOpenSessionsTooltip" xml:space="preserve">
+    <value>開いているセッション</value>
+  </data>
+  <data name="AgentOpenSessionsTitle" xml:space="preserve">
+    <value>開いているセッション</value>
+  </data>
+  <data name="AgentOpenSessionsEmptyText" xml:space="preserve">
+    <value>開いているセッションはありません</value>
+  </data>
+  <data name="AgentOpenSessionCloseText" xml:space="preserve">
+    <value>セッションを閉じる</value>
+  </data>
+  <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
+    <value>実行中</value>
+  </data>
+  <data name="AgentOpenSessionUntitled" xml:space="preserve">
+    <value>新規セッション</value>
+  </data>
 </root>

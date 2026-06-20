@@ -2602,4 +2602,22 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
     <value>Scroll selected chips right</value>
   </data>
+  <data name="AgentOpenSessionsTooltip" xml:space="preserve">
+    <value>Open sessions</value>
+  </data>
+  <data name="AgentOpenSessionsTitle" xml:space="preserve">
+    <value>Open sessions</value>
+  </data>
+  <data name="AgentOpenSessionsEmptyText" xml:space="preserve">
+    <value>No open sessions</value>
+  </data>
+  <data name="AgentOpenSessionCloseText" xml:space="preserve">
+    <value>Close session</value>
+  </data>
+  <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="AgentOpenSessionUntitled" xml:space="preserve">
+    <value>New session</value>
+  </data>
 </root>
