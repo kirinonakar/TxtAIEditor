@@ -2590,4 +2590,10 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
     <value>Ran MCP tool: {0} ({1})</value>
   </data>
+  <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
+    <value>Scroll selected chips left</value>
+  </data>
+  <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
+    <value>Scroll selected chips right</value>
+  </data>
 </root>

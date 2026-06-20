@@ -2590,4 +2590,10 @@
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
     <value>MCP 도구를 실행했습니다: {0} ({1})</value>
   </data>
+  <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
+    <value>선택 칩 왼쪽으로 스크롤</value>
+  </data>
+  <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
+    <value>선택 칩 오른쪽으로 스크롤</value>
+  </data>
 </root>

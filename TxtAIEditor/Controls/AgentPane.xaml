@@ -484,13 +484,40 @@
                           Margin="0,0,0,4"
                           HorizontalScrollMode="Auto"
                           VerticalScrollMode="Disabled"
-                          HorizontalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Hidden"
                           VerticalScrollBarVisibility="Disabled"
+                          ViewChanged="OnSelectedPresetScrollViewerViewChanged"
+                          SizeChanged="OnSelectedPresetScrollViewerSizeChanged"
                           Visibility="Collapsed">
                 <StackPanel x:Name="AgentSelectedPresetPanel"
                             Orientation="Horizontal"
-                            Spacing="4"/>
+                            Spacing="4"
+                            SizeChanged="OnSelectedPresetPanelSizeChanged"/>
             </ScrollViewer>
+            <StackPanel x:Name="AgentSelectedPresetScrollButtons"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="2"
+                        Margin="0,0,0,4"
+                        Visibility="Collapsed">
+                <Button x:Name="AgentSelectedPresetScrollLeftButton"
+                        Content="&lt;"
+                        Width="24"
+                        Height="24"
+                        Padding="0"
+                        FontSize="12"
+                        Click="OnSelectedPresetScrollLeftClick"
+                        Style="{StaticResource AgentButtonStyle}"/>
+                <Button x:Name="AgentSelectedPresetScrollRightButton"
+                        Content="&gt;"
+                        Width="24"
+                        Height="24"
+                        Padding="0"
+                        FontSize="12"
+                        Click="OnSelectedPresetScrollRightClick"
+                        Style="{StaticResource AgentButtonStyle}"/>
+            </StackPanel>
             <Grid Grid.Row="1" Grid.Column="0">
                 <TextBox x:Name="AgentPromptInput"
                          PlaceholderText="Agent에게 맡길 작업 입력..."

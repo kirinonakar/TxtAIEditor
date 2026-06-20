@@ -164,6 +164,7 @@ namespace TxtAIEditor.Controls
         private string _thinkingLinePrefix = string.Empty;
         private string _thinkingLineTimestamp = string.Empty;
         private const int MaxOutputFlushChars = 20_000;
+        private const double SelectedChipScrollStep = 160;
 
         private void AppendText(string text)
         {
@@ -247,6 +248,8 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentInsertOutputButton, getString("AgentInsertOutputTooltip", "Agent 응답을 현재 커서에 입력"));
             AgentInsertNewTabOutputButton.Content = getString("AgentInsertNewTabOutputButtonText", "새 탭에 입력");
             ToolTipService.SetToolTip(AgentInsertNewTabOutputButton, getString("AgentInsertNewTabOutputTooltip", "Agent 응답을 새 탭에 입력 (선택한 경우 선택부위만)"));
+            ToolTipService.SetToolTip(AgentSelectedPresetScrollLeftButton, getString("AgentSelectedChipsScrollLeftTooltip", "선택 칩 왼쪽으로 스크롤"));
+            ToolTipService.SetToolTip(AgentSelectedPresetScrollRightButton, getString("AgentSelectedChipsScrollRightTooltip", "선택 칩 오른쪽으로 스크롤"));
 
             AgentDiffApproveButton.Content = getString("AgentDiffApplyButton", "승인");
             AgentDiffCancelButton.Content = getString("AgentDiffCancelButton", "취소");
@@ -1674,6 +1677,75 @@ namespace TxtAIEditor.Controls
 
             AgentSelectedPresetScrollViewer.Visibility =
                 AgentSelectedPresetPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            QueueSelectedChipScrollButtonsUpdate();
+        }
+
+        private void OnSelectedPresetScrollViewerViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+        {
+            UpdateSelectedChipScrollButtons();
+        }
+
+        private void OnSelectedPresetScrollViewerSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            QueueSelectedChipScrollButtonsUpdate();
+        }
+
+        private void OnSelectedPresetPanelSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            QueueSelectedChipScrollButtonsUpdate();
+        }
+
+        private void OnSelectedPresetScrollLeftClick(object sender, RoutedEventArgs e)
+        {
+            ScrollSelectedChips(-SelectedChipScrollStep);
+        }
+
+        private void OnSelectedPresetScrollRightClick(object sender, RoutedEventArgs e)
+        {
+            ScrollSelectedChips(SelectedChipScrollStep);
+        }
+
+        private void ScrollSelectedChips(double delta)
+        {
+            if (AgentSelectedPresetScrollViewer.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            double targetOffset = Math.Clamp(
+                AgentSelectedPresetScrollViewer.HorizontalOffset + delta,
+                0,
+                AgentSelectedPresetScrollViewer.ScrollableWidth);
+            AgentSelectedPresetScrollViewer.ChangeView(targetOffset, null, null, false);
+            UpdateSelectedChipScrollButtons();
+        }
+
+        private void QueueSelectedChipScrollButtonsUpdate()
+        {
+            if (DispatcherQueue?.TryEnqueue(UpdateSelectedChipScrollButtons) == true)
+            {
+                return;
+            }
+
+            UpdateSelectedChipScrollButtons();
+        }
+
+        private void UpdateSelectedChipScrollButtons()
+        {
+            bool hasOverflow =
+                AgentSelectedPresetScrollViewer.Visibility == Visibility.Visible &&
+                AgentSelectedPresetPanel.Children.Count > 0 &&
+                AgentSelectedPresetScrollViewer.ScrollableWidth > 0.5;
+
+            AgentSelectedPresetScrollButtons.Visibility = hasOverflow ? Visibility.Visible : Visibility.Collapsed;
+            if (!hasOverflow)
+            {
+                return;
+            }
+
+            AgentSelectedPresetScrollLeftButton.IsEnabled = AgentSelectedPresetScrollViewer.HorizontalOffset > 0.5;
+            AgentSelectedPresetScrollRightButton.IsEnabled =
+                AgentSelectedPresetScrollViewer.HorizontalOffset < AgentSelectedPresetScrollViewer.ScrollableWidth - 0.5;
         }
 
         private Border CreateSelectedChip(string text, string tooltip, Action removeAction)
