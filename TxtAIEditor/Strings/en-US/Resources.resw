@@ -2464,6 +2464,60 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentMcpApiKeyInfo" xml:space="preserve">
     <value>API keys are stored in Windows Credential Manager, not in the MCP settings file.</value>
   </data>
+  <data name="AgentMcpCredentialInfo" xml:space="preserve">
+    <value>API keys, OAuth client secrets, and OAuth tokens are stored in Windows Credential Manager, not in the MCP settings file.</value>
+  </data>
+  <data name="AgentMcpAuthTypeLabel" xml:space="preserve">
+    <value>Authentication</value>
+  </data>
+  <data name="AgentMcpAuthTypeNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="AgentMcpAuthTypeApiKey" xml:space="preserve">
+    <value>API Key Header</value>
+  </data>
+  <data name="AgentMcpAuthTypeOAuthBearer" xml:space="preserve">
+    <value>OAuth Access Token</value>
+  </data>
+  <data name="AgentMcpAuthTypeOAuthBrowser" xml:space="preserve">
+    <value>OAuth browser login</value>
+  </data>
+  <data name="AgentMcpOAuthTokenLabel" xml:space="preserve">
+    <value>OAuth Access Token</value>
+  </data>
+  <data name="AgentMcpOAuthTokenPlaceholder" xml:space="preserve">
+    <value>Enter OAuth Access Token...</value>
+  </data>
+  <data name="AgentMcpOAuthClientIdLabel" xml:space="preserve">
+    <value>OAuth Client ID</value>
+  </data>
+  <data name="AgentMcpOAuthClientIdPlaceholder" xml:space="preserve">
+    <value>Enter OAuth Client ID...</value>
+  </data>
+  <data name="AgentMcpOAuthClientSecretLabel" xml:space="preserve">
+    <value>OAuth Client Secret</value>
+  </data>
+  <data name="AgentMcpOAuthClientSecretPlaceholder" xml:space="preserve">
+    <value>Enter OAuth Client Secret...</value>
+  </data>
+  <data name="AgentMcpOAuthAuthorizationEndpointLabel" xml:space="preserve">
+    <value>Authorization URL</value>
+  </data>
+  <data name="AgentMcpOAuthAuthorizationEndpointPlaceholder" xml:space="preserve">
+    <value>https://auth.example.com/oauth/authorize</value>
+  </data>
+  <data name="AgentMcpOAuthTokenEndpointLabel" xml:space="preserve">
+    <value>Token URL</value>
+  </data>
+  <data name="AgentMcpOAuthTokenEndpointPlaceholder" xml:space="preserve">
+    <value>https://auth.example.com/oauth/token</value>
+  </data>
+  <data name="AgentMcpOAuthScopesLabel" xml:space="preserve">
+    <value>OAuth Scope</value>
+  </data>
+  <data name="AgentMcpOAuthScopesPlaceholder" xml:space="preserve">
+    <value>scope1 scope2</value>
+  </data>
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>Add</value>
   </data>
@@ -2487,6 +2541,24 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="AgentMcpHeaderPairRequired" xml:space="preserve">
     <value>Enter a header name when entering an API Key.</value>
+  </data>
+  <data name="AgentMcpOAuthTokenRequired" xml:space="preserve">
+    <value>Enter the OAuth Access Token.</value>
+  </data>
+  <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
+    <value>Enter the OAuth Client ID, Client Secret, Authorization URL, and Token URL.</value>
+  </data>
+  <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
+    <value>The OAuth Authorization URL and Token URL must be http or https URLs.</value>
+  </data>
+  <data name="AgentMcpAuthTypeInvalid" xml:space="preserve">
+    <value>This authentication type is not supported.</value>
+  </data>
+  <data name="AgentMcpOAuthLoginTimeout" xml:space="preserve">
+    <value>OAuth browser login timed out.</value>
+  </data>
+  <data name="AgentMcpOAuthLoginInvalidResponse" xml:space="preserve">
+    <value>The OAuth login response is invalid.</value>
   </data>
   <data name="AgentMcpExportErrorTitle" xml:space="preserve">
     <value>Export MCP Error</value>

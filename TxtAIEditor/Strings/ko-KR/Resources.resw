@@ -2464,6 +2464,60 @@
   <data name="AgentMcpApiKeyInfo" xml:space="preserve">
     <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
+  <data name="AgentMcpCredentialInfo" xml:space="preserve">
+    <value>API Key, OAuth Client Secret, OAuth 토큰은 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
+  </data>
+  <data name="AgentMcpAuthTypeLabel" xml:space="preserve">
+    <value>인증 방식</value>
+  </data>
+  <data name="AgentMcpAuthTypeNone" xml:space="preserve">
+    <value>없음</value>
+  </data>
+  <data name="AgentMcpAuthTypeApiKey" xml:space="preserve">
+    <value>API Key Header</value>
+  </data>
+  <data name="AgentMcpAuthTypeOAuthBearer" xml:space="preserve">
+    <value>OAuth Access Token</value>
+  </data>
+  <data name="AgentMcpAuthTypeOAuthBrowser" xml:space="preserve">
+    <value>OAuth 브라우저 로그인</value>
+  </data>
+  <data name="AgentMcpOAuthTokenLabel" xml:space="preserve">
+    <value>OAuth Access Token</value>
+  </data>
+  <data name="AgentMcpOAuthTokenPlaceholder" xml:space="preserve">
+    <value>OAuth Access Token 입력...</value>
+  </data>
+  <data name="AgentMcpOAuthClientIdLabel" xml:space="preserve">
+    <value>OAuth Client ID</value>
+  </data>
+  <data name="AgentMcpOAuthClientIdPlaceholder" xml:space="preserve">
+    <value>OAuth Client ID 입력...</value>
+  </data>
+  <data name="AgentMcpOAuthClientSecretLabel" xml:space="preserve">
+    <value>OAuth Client Secret</value>
+  </data>
+  <data name="AgentMcpOAuthClientSecretPlaceholder" xml:space="preserve">
+    <value>OAuth Client Secret 입력...</value>
+  </data>
+  <data name="AgentMcpOAuthAuthorizationEndpointLabel" xml:space="preserve">
+    <value>Authorization URL</value>
+  </data>
+  <data name="AgentMcpOAuthAuthorizationEndpointPlaceholder" xml:space="preserve">
+    <value>https://auth.example.com/oauth/authorize</value>
+  </data>
+  <data name="AgentMcpOAuthTokenEndpointLabel" xml:space="preserve">
+    <value>Token URL</value>
+  </data>
+  <data name="AgentMcpOAuthTokenEndpointPlaceholder" xml:space="preserve">
+    <value>https://auth.example.com/oauth/token</value>
+  </data>
+  <data name="AgentMcpOAuthScopesLabel" xml:space="preserve">
+    <value>OAuth Scope</value>
+  </data>
+  <data name="AgentMcpOAuthScopesPlaceholder" xml:space="preserve">
+    <value>scope1 scope2</value>
+  </data>
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>추가</value>
   </data>
@@ -2487,6 +2541,24 @@
   </data>
   <data name="AgentMcpHeaderPairRequired" xml:space="preserve">
     <value>API Key를 입력하려면 Header 이름도 함께 입력해주세요.</value>
+  </data>
+  <data name="AgentMcpOAuthTokenRequired" xml:space="preserve">
+    <value>OAuth Access Token을 입력해주세요.</value>
+  </data>
+  <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
+    <value>OAuth Client ID, Client Secret, Authorization URL, Token URL을 입력해주세요.</value>
+  </data>
+  <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
+    <value>OAuth Authorization URL과 Token URL은 http 또는 https URL이어야 합니다.</value>
+  </data>
+  <data name="AgentMcpAuthTypeInvalid" xml:space="preserve">
+    <value>지원하지 않는 인증 방식입니다.</value>
+  </data>
+  <data name="AgentMcpOAuthLoginTimeout" xml:space="preserve">
+    <value>OAuth 브라우저 로그인이 시간 초과되었습니다.</value>
+  </data>
+  <data name="AgentMcpOAuthLoginInvalidResponse" xml:space="preserve">
+    <value>OAuth 로그인 응답이 올바르지 않습니다.</value>
   </data>
   <data name="AgentMcpExportErrorTitle" xml:space="preserve">
     <value>MCP 내보내기 오류</value>

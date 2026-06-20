@@ -2465,6 +2465,60 @@
   <data name="AgentMcpApiKeyInfo" xml:space="preserve">
     <value>API Key は MCP 設定ファイルには保存せず、Windows 資格情報マネージャーに保存します。</value>
   </data>
+  <data name="AgentMcpCredentialInfo" xml:space="preserve">
+    <value>API Key、OAuth Client Secret、OAuth トークンは MCP 設定ファイルには保存せず、Windows 資格情報マネージャーに保存します。</value>
+  </data>
+  <data name="AgentMcpAuthTypeLabel" xml:space="preserve">
+    <value>認証方式</value>
+  </data>
+  <data name="AgentMcpAuthTypeNone" xml:space="preserve">
+    <value>なし</value>
+  </data>
+  <data name="AgentMcpAuthTypeApiKey" xml:space="preserve">
+    <value>API Key Header</value>
+  </data>
+  <data name="AgentMcpAuthTypeOAuthBearer" xml:space="preserve">
+    <value>OAuth Access Token</value>
+  </data>
+  <data name="AgentMcpAuthTypeOAuthBrowser" xml:space="preserve">
+    <value>OAuth ブラウザーログイン</value>
+  </data>
+  <data name="AgentMcpOAuthTokenLabel" xml:space="preserve">
+    <value>OAuth Access Token</value>
+  </data>
+  <data name="AgentMcpOAuthTokenPlaceholder" xml:space="preserve">
+    <value>OAuth Access Token を入力...</value>
+  </data>
+  <data name="AgentMcpOAuthClientIdLabel" xml:space="preserve">
+    <value>OAuth Client ID</value>
+  </data>
+  <data name="AgentMcpOAuthClientIdPlaceholder" xml:space="preserve">
+    <value>OAuth Client ID を入力...</value>
+  </data>
+  <data name="AgentMcpOAuthClientSecretLabel" xml:space="preserve">
+    <value>OAuth Client Secret</value>
+  </data>
+  <data name="AgentMcpOAuthClientSecretPlaceholder" xml:space="preserve">
+    <value>OAuth Client Secret を入力...</value>
+  </data>
+  <data name="AgentMcpOAuthAuthorizationEndpointLabel" xml:space="preserve">
+    <value>Authorization URL</value>
+  </data>
+  <data name="AgentMcpOAuthAuthorizationEndpointPlaceholder" xml:space="preserve">
+    <value>https://auth.example.com/oauth/authorize</value>
+  </data>
+  <data name="AgentMcpOAuthTokenEndpointLabel" xml:space="preserve">
+    <value>Token URL</value>
+  </data>
+  <data name="AgentMcpOAuthTokenEndpointPlaceholder" xml:space="preserve">
+    <value>https://auth.example.com/oauth/token</value>
+  </data>
+  <data name="AgentMcpOAuthScopesLabel" xml:space="preserve">
+    <value>OAuth Scope</value>
+  </data>
+  <data name="AgentMcpOAuthScopesPlaceholder" xml:space="preserve">
+    <value>scope1 scope2</value>
+  </data>
   <data name="AgentMcpSaveAddButton" xml:space="preserve">
     <value>追加</value>
   </data>
@@ -2488,6 +2542,24 @@
   </data>
   <data name="AgentMcpHeaderPairRequired" xml:space="preserve">
     <value>API Key を入力する場合はヘッダー名も入力してください。</value>
+  </data>
+  <data name="AgentMcpOAuthTokenRequired" xml:space="preserve">
+    <value>OAuth Access Token を入力してください。</value>
+  </data>
+  <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
+    <value>OAuth Client ID、Client Secret、Authorization URL、Token URL を入力してください。</value>
+  </data>
+  <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
+    <value>OAuth Authorization URL と Token URL は http または https URL である必要があります。</value>
+  </data>
+  <data name="AgentMcpAuthTypeInvalid" xml:space="preserve">
+    <value>この認証方式はサポートされていません。</value>
+  </data>
+  <data name="AgentMcpOAuthLoginTimeout" xml:space="preserve">
+    <value>OAuth ブラウザーログインがタイムアウトしました。</value>
+  </data>
+  <data name="AgentMcpOAuthLoginInvalidResponse" xml:space="preserve">
+    <value>OAuth ログイン応答が正しくありません。</value>
   </data>
   <data name="AgentMcpExportErrorTitle" xml:space="preserve">
     <value>MCP エクスポート エラー</value>
