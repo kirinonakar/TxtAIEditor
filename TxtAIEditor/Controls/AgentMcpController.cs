@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.Storage.Pickers;
 
 namespace TxtAIEditor.Controls
 {
@@ -49,6 +50,7 @@ namespace TxtAIEditor.Controls
         };
 
         private readonly AgentPane _agentPane;
+        private readonly Action<object> _initializePickerWindow;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly Action _contextChanged;
@@ -63,6 +65,7 @@ namespace TxtAIEditor.Controls
 
         public AgentMcpController(
             AgentPane agentPane,
+            Action<object> initializePickerWindow,
             Action<string, string> showError,
             Func<string, string, string> getString,
             Action contextChanged,
@@ -70,6 +73,7 @@ namespace TxtAIEditor.Controls
             Action? afterDialog)
         {
             _agentPane = agentPane;
+            _initializePickerWindow = initializePickerWindow;
             _showError = showError;
             _getString = getString;
             _contextChanged = contextChanged;
@@ -155,8 +159,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
-                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            if (!IsValidHttpEndpoint(endpoint))
             {
                 _showError(
                     _getString("AgentMcpAddErrorTitle", "MCP 추가 오류"),
@@ -181,6 +184,98 @@ namespace TxtAIEditor.Controls
             }
 
             await SaveAsync();
+        }
+
+        public async Task ExportMcpAsync()
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                SuggestedFileName = "agent-mcp-servers.json"
+            };
+            _initializePickerWindow(picker);
+            picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
+
+            var file = await picker.PickSaveFileAsync();
+            if (file == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string json = JsonSerializer.Serialize(_servers, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(file.Path, json);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("AgentMcpExportErrorTitle", "MCP 내보내기 오류"),
+                    string.Format(_getString("AgentMcpExportErrorMessage", "MCP 목록을 내보내는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
+        }
+
+        public async Task ImportMcpAsync()
+        {
+            var picker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.List,
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+            };
+            _initializePickerWindow(picker);
+            picker.FileTypeFilter.Add(".json");
+
+            var file = await picker.PickSingleFileAsync();
+            if (file == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string json = await File.ReadAllTextAsync(file.Path);
+                var imported = JsonSerializer.Deserialize<List<AgentMcpServer>>(json);
+                if (imported == null)
+                {
+                    throw new InvalidDataException(_getString("AgentMcpImportInvalidFile", "가져올 수 있는 MCP JSON이 아닙니다."));
+                }
+
+                foreach (var item in imported)
+                {
+                    string name = item.Name?.Trim() ?? string.Empty;
+                    string endpoint = item.Endpoint?.Trim() ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(name) ||
+                        string.IsNullOrWhiteSpace(endpoint) ||
+                        !IsValidHttpEndpoint(endpoint))
+                    {
+                        continue;
+                    }
+
+                    var existing = FindServer(name);
+                    if (existing != null)
+                    {
+                        existing.Endpoint = endpoint;
+                        _sessions.Remove(existing.Id);
+                        _serverStatus.Remove(existing.Id);
+                    }
+                    else
+                    {
+                        _servers.Add(new AgentMcpServer
+                        {
+                            Name = name,
+                            Endpoint = endpoint
+                        });
+                    }
+                }
+
+                await SaveAsync();
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("AgentMcpImportErrorTitle", "MCP 가져오기 오류"),
+                    string.Format(_getString("AgentMcpImportErrorMessage", "MCP 목록을 가져오는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
         }
 
         public async Task ToggleMcpAsync(string serverName)
@@ -651,6 +746,12 @@ namespace TxtAIEditor.Controls
         private AgentMcpServer? FindServer(string name)
         {
             return _servers.FirstOrDefault(server => server.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsValidHttpEndpoint(string endpoint)
+        {
+            return Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
 
         private List<AgentMcpServer> GetSelectedServers()

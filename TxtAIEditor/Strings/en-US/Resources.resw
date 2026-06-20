@@ -2458,6 +2458,21 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>The MCP address must be an http or https URL.</value>
   </data>
+  <data name="AgentMcpExportErrorTitle" xml:space="preserve">
+    <value>Export MCP Error</value>
+  </data>
+  <data name="AgentMcpExportErrorMessage" xml:space="preserve">
+    <value>An error occurred while exporting MCP servers: {0}</value>
+  </data>
+  <data name="AgentMcpImportInvalidFile" xml:space="preserve">
+    <value>This is not an importable MCP JSON file.</value>
+  </data>
+  <data name="AgentMcpImportErrorTitle" xml:space="preserve">
+    <value>Import MCP Error</value>
+  </data>
+  <data name="AgentMcpImportErrorMessage" xml:space="preserve">
+    <value>An error occurred while importing MCP servers: {0}</value>
+  </data>
   <data name="AgentMcpStatusConnecting" xml:space="preserve">
     <value>Connecting</value>
   </data>

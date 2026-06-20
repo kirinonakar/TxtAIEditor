@@ -2458,6 +2458,21 @@
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>MCP 주소는 http 또는 https URL이어야 합니다.</value>
   </data>
+  <data name="AgentMcpExportErrorTitle" xml:space="preserve">
+    <value>MCP 내보내기 오류</value>
+  </data>
+  <data name="AgentMcpExportErrorMessage" xml:space="preserve">
+    <value>MCP 목록을 내보내는 중 오류가 발생했습니다: {0}</value>
+  </data>
+  <data name="AgentMcpImportInvalidFile" xml:space="preserve">
+    <value>가져올 수 있는 MCP JSON이 아닙니다.</value>
+  </data>
+  <data name="AgentMcpImportErrorTitle" xml:space="preserve">
+    <value>MCP 가져오기 오류</value>
+  </data>
+  <data name="AgentMcpImportErrorMessage" xml:space="preserve">
+    <value>MCP 목록을 가져오는 중 오류가 발생했습니다: {0}</value>
+  </data>
   <data name="AgentMcpStatusConnecting" xml:space="preserve">
     <value>연결 중</value>
   </data>

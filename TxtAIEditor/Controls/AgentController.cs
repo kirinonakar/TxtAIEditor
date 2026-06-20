@@ -156,6 +156,7 @@ namespace TxtAIEditor.Controls
                 () => UpdateContextStatsImmediate());
             _mcpController = new AgentMcpController(
                 _agentPane,
+                _initializePickerWindow,
                 _showError,
                 _getString,
                 () => UpdateContextStatsImmediate(),
@@ -345,6 +346,8 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentPresetImportRequested += async (_, _) => await _presetController.ImportPresetsAsync();
             _agentPane.AgentMcpFlyoutOpened += async (_, _) => await _mcpController.LoadAsync();
             _agentPane.AgentMcpAddRequested += async (_, _) => await _mcpController.AddMcpAsync();
+            _agentPane.AgentMcpExportRequested += async (_, _) => await _mcpController.ExportMcpAsync();
+            _agentPane.AgentMcpImportRequested += async (_, _) => await _mcpController.ImportMcpAsync();
             _agentPane.AgentMcpToggled += async (_, serverName) => await _mcpController.ToggleMcpAsync(serverName);
             _agentPane.AgentMcpDeleted += async (_, serverName) => await _mcpController.DeleteMcpAsync(serverName);
             _agentPane.AgentMcpRemoved += (_, serverName) => _mcpController.RemoveSelectedMcp(serverName);

@@ -2459,6 +2459,21 @@
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>MCP アドレスは http または https URL である必要があります。</value>
   </data>
+  <data name="AgentMcpExportErrorTitle" xml:space="preserve">
+    <value>MCP エクスポート エラー</value>
+  </data>
+  <data name="AgentMcpExportErrorMessage" xml:space="preserve">
+    <value>MCP 一覧のエクスポート中にエラーが発生しました: {0}</value>
+  </data>
+  <data name="AgentMcpImportInvalidFile" xml:space="preserve">
+    <value>インポート可能な MCP JSON ではありません。</value>
+  </data>
+  <data name="AgentMcpImportErrorTitle" xml:space="preserve">
+    <value>MCP インポート エラー</value>
+  </data>
+  <data name="AgentMcpImportErrorMessage" xml:space="preserve">
+    <value>MCP 一覧のインポート中にエラーが発生しました: {0}</value>
+  </data>
   <data name="AgentMcpStatusConnecting" xml:space="preserve">
     <value>接続中</value>
   </data>

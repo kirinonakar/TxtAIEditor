@@ -122,6 +122,8 @@ namespace TxtAIEditor.Controls
         public event EventHandler<string>? AgentSkillRemoved;
         public event EventHandler? AgentMcpFlyoutOpened;
         public event RoutedEventHandler? AgentMcpAddRequested;
+        public event RoutedEventHandler? AgentMcpExportRequested;
+        public event RoutedEventHandler? AgentMcpImportRequested;
         public event EventHandler<string>? AgentMcpToggled;
         public event EventHandler<string>? AgentMcpDeleted;
         public event EventHandler<string>? AgentMcpRemoved;
@@ -219,6 +221,8 @@ namespace TxtAIEditor.Controls
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentMcpButton, getString("AgentMcpButtonTooltip", "MCP 서버"));
             AgentAddMcpText.Text = getString("AgentMcpAddText", "MCP 추가");
+            AgentExportMcpText.Text = getString("PresetExportText", "내보내기");
+            AgentImportMcpText.Text = getString("PresetImportText", "가져오기");
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
             ToolTipService.SetToolTip(AgentSkillButton, getString("AgentSkillButtonTooltip", "스킬"));
             AgentSkillTitleText.Text = getString("AgentSkillTitle", "스킬");
@@ -906,6 +910,18 @@ namespace TxtAIEditor.Controls
         private void OnAgentAddMcpClickInPanel(object sender, RoutedEventArgs e)
         {
             AgentMcpAddRequested?.Invoke(sender, e);
+            AgentMcpFlyout.Hide();
+        }
+
+        private void OnAgentExportMcpClickInPanel(object sender, RoutedEventArgs e)
+        {
+            AgentMcpExportRequested?.Invoke(sender, e);
+            AgentMcpFlyout.Hide();
+        }
+
+        private void OnAgentImportMcpClickInPanel(object sender, RoutedEventArgs e)
+        {
+            AgentMcpImportRequested?.Invoke(sender, e);
             AgentMcpFlyout.Hide();
         }
 
