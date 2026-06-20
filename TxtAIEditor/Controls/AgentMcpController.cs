@@ -700,15 +700,13 @@ namespace TxtAIEditor.Controls
             foreach (var server in selectedServers)
             {
                 builder.AppendLine($"## {server.Name}");
-                builder.AppendLine($"Endpoint: {server.Endpoint}");
                 var aliases = _toolAliases.Values
                     .Where(alias => alias.ServerId.Equals(server.Id, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(alias => alias.Alias, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 if (aliases.Count == 0)
                 {
-                    string status = _serverStatus.TryGetValue(server.Id, out string? value) ? value : "tools not loaded yet";
-                    builder.AppendLine($"Status: {status}");
+                    builder.AppendLine("Status: tools not available");
                     builder.AppendLine();
                     continue;
                 }
@@ -762,7 +760,7 @@ namespace TxtAIEditor.Controls
 
             if (TryGetRpcError(response.RootElement, out string error))
             {
-                return $"MCP tool failed: {error}";
+                return $"MCP tool failed: {RedactServerSecrets(server, error)}";
             }
 
             if (!TryGetResult(response.RootElement, out var result))
@@ -770,7 +768,7 @@ namespace TxtAIEditor.Controls
                 return "MCP tool returned no result.";
             }
 
-            return FormatToolCallResult(alias, result);
+            return RedactServerSecrets(server, FormatToolCallResult(alias, result));
         }
 
         private async Task RefreshServerToolsAsync(AgentMcpServer server, CancellationToken cancellationToken)
@@ -968,7 +966,7 @@ namespace TxtAIEditor.Controls
             string body = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException($"{(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+                throw new InvalidOperationException(RedactServerSecrets(server, $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}"));
             }
 
             return body;
@@ -1733,6 +1731,49 @@ namespace TxtAIEditor.Controls
             }
 
             return fallbackValue ?? string.Empty;
+        }
+
+        private string RedactServerSecrets(AgentMcpServer server, string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            var secrets = new List<string>();
+            foreach (var header in server.Headers)
+            {
+                string secret = GetHeaderSecret(server, header.Key, header.Value);
+                if (!string.IsNullOrWhiteSpace(secret))
+                {
+                    secrets.Add(secret);
+                }
+            }
+
+            AddSecretIfPresent(secrets, GetOAuthSecret(server, "access_token", server.OAuthAccessToken));
+            AddSecretIfPresent(secrets, GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken));
+            AddSecretIfPresent(secrets, GetOAuthSecret(server, "client_secret", server.OAuthClientSecret));
+
+            string redacted = text;
+            foreach (string secret in secrets.Distinct(StringComparer.Ordinal))
+            {
+                if (secret.Length < 4)
+                {
+                    continue;
+                }
+
+                redacted = redacted.Replace(secret, "[redacted]", StringComparison.Ordinal);
+            }
+
+            return redacted;
+        }
+
+        private static void AddSecretIfPresent(List<string> secrets, string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                secrets.Add(value);
+            }
         }
 
         private static string GetHeaderCredentialTarget(AgentMcpServer server, string headerName)
