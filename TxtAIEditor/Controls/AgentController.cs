@@ -469,6 +469,7 @@ namespace TxtAIEditor.Controls
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             activeOpenSession.UpdatedAt = DateTime.Now;
             activeOpenSession.IsRunning = true;
+            EditorSettings runSettings = await ResolveRunSessionSettingsAsync(activeOpenSession);
 
             var runContext = new AgentRunContext
             {
@@ -478,7 +479,7 @@ namespace TxtAIEditor.Controls
                 Attachments = activeOpenSession.Attachments.ToList(),
                 SessionEdits = activeOpenSession.SessionEdits.ToList(),
                 StreamToTab = _agentPane.StreamToTab,
-                LlmSettings = CloneSessionSettings(activeOpenSession.LlmSettings ?? _settingsService.CurrentSettings)
+                LlmSettings = runSettings
             };
             runContext.SessionHistory.Append(activeOpenSession.SessionHistoryText ?? string.Empty);
   
@@ -1267,6 +1268,50 @@ namespace TxtAIEditor.Controls
                 LlmSourceLanguage = settings.LlmSourceLanguage,
                 LlmTargetLanguage = settings.LlmTargetLanguage
             };
+        }
+
+        private async Task<EditorSettings> ResolveRunSessionSettingsAsync(AgentOpenSessionState session)
+        {
+            EditorSettings sessionSettings = CloneSessionSettings(session.LlmSettings ?? _settingsService.CurrentSettings);
+            if (!RequiresApiKey(sessionSettings.LlmProvider))
+            {
+                return sessionSettings;
+            }
+
+            string sessionApiKey = await _llmService.GetApiKeyAsync(sessionSettings.LlmProvider);
+            if (!string.IsNullOrEmpty(sessionApiKey))
+            {
+                return sessionSettings;
+            }
+
+            EditorSettings currentSettings = CreateSessionSettingsSnapshot();
+            bool sameProvider = string.Equals(
+                sessionSettings.LlmProvider,
+                currentSettings.LlmProvider,
+                StringComparison.OrdinalIgnoreCase);
+            if (sameProvider)
+            {
+                return sessionSettings;
+            }
+
+            if (!RequiresApiKey(currentSettings.LlmProvider) ||
+                !string.IsNullOrEmpty(await _llmService.GetApiKeyAsync(currentSettings.LlmProvider)))
+            {
+                session.LlmSettings = currentSettings;
+                return currentSettings;
+            }
+
+            return sessionSettings;
+        }
+
+        private static bool RequiresApiKey(string? providerName)
+        {
+            string provider = providerName ?? string.Empty;
+            return !provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) &&
+                !provider.Equals("LMStudio", StringComparison.OrdinalIgnoreCase) &&
+                !provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) &&
+                !provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) &&
+                !provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
         }
 
         private string GetUntitledOpenSessionTitle()
