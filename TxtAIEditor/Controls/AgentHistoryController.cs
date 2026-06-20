@@ -173,7 +173,7 @@ namespace TxtAIEditor.Controls
             var result = new StringBuilder();
             bool inToolCall = false;
             bool inToolResult = false;
-            bool inUserPromptPresets = false;
+            bool inUserPromptInstructionMetadata = false;
             bool afterUserRequest = false;
 
             foreach (var line in lines)
@@ -182,15 +182,17 @@ namespace TxtAIEditor.Controls
                 {
                     inToolCall = false;
                     inToolResult = false;
-                    inUserPromptPresets = line.Contains("[Agent persona/instruction presets]");
+                    inUserPromptInstructionMetadata =
+                        line.Contains("[Agent persona/instruction presets]", StringComparison.OrdinalIgnoreCase) ||
+                        line.Contains("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase);
                     afterUserRequest = false;
-                    result.AppendLine(line);
+                    result.AppendLine(inUserPromptInstructionMetadata ? "[User Prompt]:" : line);
                 }
                 else if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = true;
                     inToolResult = false;
-                    inUserPromptPresets = false;
+                    inUserPromptInstructionMetadata = false;
                     afterUserRequest = false;
                     continue;
                 }
@@ -198,7 +200,7 @@ namespace TxtAIEditor.Controls
                 {
                     inToolCall = false;
                     inToolResult = true;
-                    inUserPromptPresets = false;
+                    inUserPromptInstructionMetadata = false;
                     afterUserRequest = false;
 
                     string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
@@ -209,11 +211,11 @@ namespace TxtAIEditor.Controls
                 {
                     inToolCall = false;
                     inToolResult = false;
-                    inUserPromptPresets = false;
+                    inUserPromptInstructionMetadata = false;
                     afterUserRequest = false;
                     result.AppendLine(line);
                 }
-                else if (inUserPromptPresets)
+                else if (inUserPromptInstructionMetadata)
                 {
                     if (line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
                     {
