@@ -23,6 +23,8 @@ namespace TxtAIEditor.Controls
         private readonly IReadOnlyList<string> _skillDirectories;
         private readonly List<AgentSkill> _skills = new();
         private readonly HashSet<string> _selectedSkillNames = new(StringComparer.OrdinalIgnoreCase);
+        private Task? _loadTask;
+        private bool _hasLoaded;
 
         public AgentSkillController(
             AgentPane agentPane,
@@ -35,7 +37,24 @@ namespace TxtAIEditor.Controls
             _skillDirectories = AgentSkillDirectories.GetSkillSearchDirectories();
         }
 
-        public async Task LoadAsync()
+        public Task LoadAsync()
+        {
+            _loadTask = LoadCoreAsync();
+            return _loadTask;
+        }
+
+        public Task LoadIfNeededAsync()
+        {
+            if (_hasLoaded)
+            {
+                return Task.CompletedTask;
+            }
+
+            _loadTask ??= LoadCoreAsync();
+            return _loadTask;
+        }
+
+        private async Task LoadCoreAsync()
         {
             var loadedByName = new Dictionary<string, AgentSkill>(StringComparer.OrdinalIgnoreCase);
             foreach (string skillsDirectory in _skillDirectories)
@@ -83,6 +102,7 @@ namespace TxtAIEditor.Controls
                 .OrderBy(skill => skill.Name, StringComparer.CurrentCultureIgnoreCase));
 
             _selectedSkillNames.RemoveWhere(name => _skills.All(skill => !skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase)));
+            _hasLoaded = true;
             UpdateUI();
         }
 
@@ -217,11 +237,37 @@ namespace TxtAIEditor.Controls
                 })
                 .ToList();
             var selectedNames = _selectedSkillNames.ToList();
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
+
+            void ApplyUI()
             {
                 _agentPane.UpdateAgentSkillsMenu(skillItems, selectedNames, _getString);
-                _contextChanged();
-            });
+                QueueContextChanged();
+            }
+
+            var dispatcher = _agentPane.DispatcherQueue;
+            if (dispatcher?.HasThreadAccess == true)
+            {
+                ApplyUI();
+                return;
+            }
+
+            if (dispatcher?.TryEnqueue(ApplyUI) == true)
+            {
+                return;
+            }
+
+            ApplyUI();
+        }
+
+        private void QueueContextChanged()
+        {
+            var dispatcher = _agentPane.DispatcherQueue;
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => _contextChanged()) == true)
+            {
+                return;
+            }
+
+            _contextChanged();
         }
 
         private static IEnumerable<string> EnumerateSkillFiles(string skillsDirectory)

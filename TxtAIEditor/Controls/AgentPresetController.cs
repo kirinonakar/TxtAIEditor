@@ -410,11 +410,37 @@ namespace TxtAIEditor.Controls
         {
             var presetNames = _presets.Select(p => p.Name).ToList();
             var selectedNames = _selectedPresetNames.ToList();
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
+
+            void ApplyUI()
             {
                 _agentPane.UpdateAgentPresetsMenu(presetNames, selectedNames, _getString);
-                _contextChanged();
-            });
+                QueueContextChanged();
+            }
+
+            var dispatcher = _agentPane.DispatcherQueue;
+            if (dispatcher?.HasThreadAccess == true)
+            {
+                ApplyUI();
+                return;
+            }
+
+            if (dispatcher?.TryEnqueue(ApplyUI) == true)
+            {
+                return;
+            }
+
+            ApplyUI();
+        }
+
+        private void QueueContextChanged()
+        {
+            var dispatcher = _agentPane.DispatcherQueue;
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => _contextChanged()) == true)
+            {
+                return;
+            }
+
+            _contextChanged();
         }
 
         private TextBox CreateNameBox(string text = "")

@@ -1074,11 +1074,37 @@ namespace TxtAIEditor.Controls
                 })
                 .ToList();
             var selectedNames = GetSelectedServers().Select(server => server.Name).ToList();
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
+
+            void ApplyUI()
             {
                 _agentPane.UpdateAgentMcpMenu(items, selectedNames, _getString);
-                _contextChanged();
-            });
+                QueueContextChanged();
+            }
+
+            var dispatcher = _agentPane.DispatcherQueue;
+            if (dispatcher?.HasThreadAccess == true)
+            {
+                ApplyUI();
+                return;
+            }
+
+            if (dispatcher?.TryEnqueue(ApplyUI) == true)
+            {
+                return;
+            }
+
+            ApplyUI();
+        }
+
+        private void QueueContextChanged()
+        {
+            var dispatcher = _agentPane.DispatcherQueue;
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => _contextChanged()) == true)
+            {
+                return;
+            }
+
+            _contextChanged();
         }
 
         private async Task SaveAsync()

@@ -150,20 +150,20 @@ namespace TxtAIEditor.Controls
                 _initializePickerWindow,
                 _showError,
                 _getString,
-                () => UpdateContextStatsImmediate(),
+                () => UpdateContextStats(),
                 _beforeDialog,
                 _afterDialog);
             _skillController = new AgentSkillController(
                 _agentPane,
                 _getString,
-                () => UpdateContextStatsImmediate());
+                () => UpdateContextStats());
             _mcpController = new AgentMcpController(
                 _agentPane,
                 _initializePickerWindow,
                 _credentialService,
                 _showError,
                 _getString,
-                () => UpdateContextStatsImmediate(),
+                () => UpdateContextStats(),
                 _beforeDialog,
                 _afterDialog);
             _historyController = new AgentHistoryController(_agentPane);
@@ -356,7 +356,7 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentMcpEdited += async (_, serverName) => await _mcpController.EditMcpAsync(serverName);
             _agentPane.AgentMcpDeleted += async (_, serverName) => await _mcpController.DeleteMcpAsync(serverName);
             _agentPane.AgentMcpRemoved += (_, serverName) => _mcpController.RemoveSelectedMcp(serverName);
-            _agentPane.AgentSkillFlyoutOpened += async (_, _) => await _skillController.LoadAsync();
+            _agentPane.AgentSkillFlyoutOpened += async (_, _) => await _skillController.LoadIfNeededAsync();
             _agentPane.AgentSkillToggled += (_, skillName) => _skillController.ToggleSkill(skillName);
             _agentPane.AgentSkillRemoved += (_, skillName) => _skillController.RemoveSelectedSkill(skillName);
             
