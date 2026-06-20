@@ -417,6 +417,9 @@
         }
 
         const EDITOR_SYNC_SCROLL_SETTLE_MS = 900;
+        const FULL_DOCUMENT_RENDER_LINE_LIMIT = 1000;
+        const PREVIEW_SCROLL_OWNERSHIP_MS = 700;
+        const PROGRAMMATIC_SCROLL_IGNORE_MS = 140;
 
         let isSyncingScroll = false;
         let suppressPreviewScrollEvents = false;
@@ -492,14 +495,23 @@
             });
         }
 
+        function markPreviewScrollProgrammatic() {
+            suppressPreviewScrollUntilNextFrame();
+            lastProgrammaticScrollTime = Date.now();
+        }
+
+        function setupVirtualHeightSilently() {
+            markPreviewScrollProgrammatic();
+            setupVirtualHeight();
+        }
+
         function setPreviewScrollTopSilently(value) {
             const target = clampPreviewScrollTop(value);
             if (Math.abs(scroll.scrollTop - target) <= 0.5) {
                 lastSetScrollTop = -1;
                 return;
             }
-            suppressPreviewScrollUntilNextFrame();
-            lastProgrammaticScrollTime = Date.now();
+            markPreviewScrollProgrammatic();
             scroll.scrollTop = target;
             lastSetScrollTop = scroll.scrollTop;
         }
@@ -858,11 +870,23 @@
         function render() {
             if (state.mode === 'csv') return;
             const visible = visibleRange();
-            const contextStart = state.mode === 'markdown'
-                ? Math.max(1, visible.start - state.blockContextLines)
-                : visible.start;
+            const renderFullDocument = state.lineCount <= FULL_DOCUMENT_RENDER_LINE_LIMIT;
+            const contextStart = renderFullDocument
+                ? 1
+                : (state.mode === 'markdown'
+                    ? Math.max(1, visible.start - state.blockContextLines)
+                    : visible.start);
+            const rangeEnd = renderFullDocument ? state.lineCount : visible.end;
 
-            if (!state.renderedRange || 
+            if (renderFullDocument) {
+                state.renderedRange = {
+                    start: 1,
+                    end: state.lineCount,
+                    visibleStart: visible.start,
+                    mode: state.mode,
+                    lineCount: state.lineCount
+                };
+            } else if (!state.renderedRange || 
                 state.renderedRange.mode !== state.mode ||
                 state.renderedRange.lineCount !== state.lineCount ||
                 visible.start < state.renderedRange.visibleStart - 10 ||
@@ -872,7 +896,7 @@
                 
                 state.renderedRange = {
                     start: contextStart,
-                    end: visible.end,
+                    end: rangeEnd,
                     visibleStart: visible.start,
                     mode: state.mode,
                     lineCount: state.lineCount
@@ -1031,7 +1055,7 @@
             if (changed) {
                 const editorSyncTarget = currentEditorSyncTarget();
                 if (editorSyncTarget) {
-                    setupVirtualHeight();
+                    setupVirtualHeightSilently();
                     applyEditorSyncTarget(editorSyncTarget, true);
                 } else {
                     // Anchor scroll to the first visible line to prevent jump
@@ -1039,7 +1063,7 @@
                     const anchorTop = rowTop(anchorLine);
                     const anchorOffset = scroll.scrollTop - anchorTop;
 
-                    setupVirtualHeight();
+                    setupVirtualHeightSilently();
 
                     // Restore scroll position relative to anchor line when the preview is not being scrolled by the user.
                     // Keeping this running during editor updates prevents scroll jitter from layout changes.
@@ -1051,10 +1075,7 @@
                         const newAnchorTop = rowTop(anchorLine);
                         const corrected = newAnchorTop + anchorOffset;
                         if (Math.abs(scroll.scrollTop - corrected) > 1) {
-                            suppressPreviewScrollUntilNextFrame();
-                            lastProgrammaticScrollTime = Date.now();
-                            scroll.scrollTop = clampPreviewScrollTop(corrected);
-                            lastSetScrollTop = scroll.scrollTop;
+                            setPreviewScrollTopSilently(corrected);
                         }
                     }
                 }
@@ -1136,10 +1157,6 @@
 
         scroll.addEventListener('scroll', () => {
             const now = Date.now();
-            if (!suppressPreviewScrollEvents && !isSyncingScroll) {
-                lastPreviewUserScrollAt = now;
-                clearEditorSyncTarget();
-            }
             queueRender();
 
             if (lastSetScrollTop !== -1 && Math.abs(scroll.scrollTop - lastSetScrollTop) <= 1) {
@@ -1147,11 +1164,14 @@
             }
             lastSetScrollTop = -1;
 
-            if (now - lastProgrammaticScrollTime < 100) {
+            if (isSyncingScroll || suppressPreviewScrollEvents || now - lastProgrammaticScrollTime < PROGRAMMATIC_SCROLL_IGNORE_MS) {
                 return;
             }
 
-            if (state.scrollSyncEnabled && !isSyncingScroll && !suppressPreviewScrollEvents) {
+            lastPreviewUserScrollAt = now;
+            clearEditorSyncTarget();
+
+            if (state.scrollSyncEnabled) {
                 const firstVisible = lineAt(scroll.scrollTop);
                 const offset = scroll.scrollTop - rowTop(firstVisible);
                 lastPreviewScrollPostedAt = Date.now();
@@ -1179,7 +1199,7 @@
                 }
                 else if (message.action === 'syncScroll') {
                     if (state.scrollSyncEnabled && message.firstLine) {
-                        if (Date.now() - lastPreviewScrollPostedAt < 120) {
+                        if (Date.now() - lastPreviewScrollPostedAt < PREVIEW_SCROLL_OWNERSHIP_MS) {
                             return;
                         }
                         applyEditorSyncTarget(rememberEditorSyncTarget(message.firstLine, message.offset));

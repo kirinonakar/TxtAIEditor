@@ -20,6 +20,7 @@ namespace TxtAIEditor.Controls
         private const int InitialPreviewLineWarmupCount = 120;
         private const int PreviewLayoutRenderRetryLimit = 12;
         private const int PreviewLayoutRenderRetryMilliseconds = 50;
+        private static readonly TimeSpan PreviewScrollEchoSuppressionDuration = TimeSpan.FromMilliseconds(900);
 
         private readonly RightSidebarPane _previewPane;
         private readonly ISettingsService _settingsService;
@@ -50,6 +51,7 @@ namespace TxtAIEditor.Controls
         private int _renderAfterLayoutAttempts;
         private bool _updatingPreviewModeSelection;
         private bool _isPreviewReady;
+        private DateTimeOffset _suppressEditorScrollToPreviewUntil = DateTimeOffset.MinValue;
 
         public LivePreviewController(
             RightSidebarPane previewPane,
@@ -499,6 +501,11 @@ namespace TxtAIEditor.Controls
         public void PostScrollSync(int firstLine, double offset)
         {
             if (!_isScrollSyncEnabled())
+            {
+                return;
+            }
+
+            if (DateTimeOffset.UtcNow < _suppressEditorScrollToPreviewUntil)
             {
                 return;
             }
@@ -965,6 +972,7 @@ namespace TxtAIEditor.Controls
 
                     int firstLine = root.TryGetProperty("firstLine", out var firstLineProp) ? firstLineProp.GetInt32() : 1;
                     double offset = root.TryGetProperty("offset", out var offsetProp) ? offsetProp.GetDouble() : 0;
+                    _suppressEditorScrollToPreviewUntil = DateTimeOffset.UtcNow + PreviewScrollEchoSuppressionDuration;
                     sender.DispatcherQueue.TryEnqueue(() => _previewScrollRequested(firstLine, offset));
                     return;
                 }
