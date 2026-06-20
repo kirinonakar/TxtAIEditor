@@ -1545,6 +1545,18 @@ namespace TxtAIEditor.Controls
         {
             AgentDiffConfirmHeader.Text = header;
             AgentDiffConfirmDescription.Text = description;
+            AgentPowerShellConfirmCommand.Text = string.Empty;
+            AgentPowerShellCommandPanel.Visibility = Visibility.Collapsed;
+            AgentDiffConfirmPanel.Visibility = Visibility.Visible;
+            UpdateReviewPanelsHostVisibility();
+        }
+
+        public void ShowPowerShellConfirm(string header, string description, string command)
+        {
+            AgentDiffConfirmHeader.Text = header;
+            AgentDiffConfirmDescription.Text = description;
+            AgentPowerShellConfirmCommand.Text = command;
+            AgentPowerShellCommandPanel.Visibility = Visibility.Visible;
             AgentDiffConfirmPanel.Visibility = Visibility.Visible;
             UpdateReviewPanelsHostVisibility();
         }

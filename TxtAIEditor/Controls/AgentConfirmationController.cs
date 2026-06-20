@@ -117,9 +117,11 @@ namespace TxtAIEditor.Controls
             {
                 string headerText = _getString("AgentPowerShellConfirmHeader", "PowerShell 실행 확인");
                 string wrappedCommand = AgentToolHelpers.WrapForConfirmation(command);
-                string summaryText = string.Format(_getString("AgentPowerShellConfirmSummaryFormat", "아래 명령을 실행하시겠습니까?\n\n{0}"), wrappedCommand);
+                string summaryText = string.Format(
+                    _getString("AgentPowerShellConfirmSummaryFormat", "아래 명령을 실행하시겠습니까?\n\n{0}"),
+                    string.Empty).TrimEnd();
 
-                _agentPane.ShowDiffConfirm(headerText, summaryText);
+                _agentPane.ShowPowerShellConfirm(headerText, summaryText, wrappedCommand);
 
                 _diffApprovalTcs = new TaskCompletionSource<bool>();
                 bool approved = await _diffApprovalTcs.Task;

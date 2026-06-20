@@ -270,6 +270,25 @@
                                FontSize="11"
                                TextWrapping="Wrap"
                                Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                    <Border x:Name="AgentPowerShellCommandPanel"
+                            Background="{ThemeResource AgentOutputBackground}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            Padding="8,4"
+                            CornerRadius="4"
+                            Visibility="Collapsed">
+                        <ScrollViewer MaxHeight="72"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <TextBlock x:Name="AgentPowerShellConfirmCommand"
+                                       FontSize="11"
+                                       FontFamily="Consolas, Cascadia Mono, Segoe UI, Malgun Gothic"
+                                       LineHeight="16"
+                                       TextWrapping="Wrap"
+                                       IsTextSelectionEnabled="True"
+                                       Foreground="{ThemeResource AgentOutputForeground}"/>
+                        </ScrollViewer>
+                    </Border>
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
