@@ -1135,8 +1135,19 @@ namespace TxtAIEditor.Controls
                 Text = text,
                 FontSize = 11,
                 TextWrapping = TextWrapping.Wrap,
-                Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"]
+                Foreground = CreateSecondaryTextBrush()
             };
+        }
+
+        private Brush CreateSecondaryTextBrush()
+        {
+            bool isLightTheme = _agentPane.ActualTheme == ElementTheme.Light ||
+                (_agentPane.ActualTheme == ElementTheme.Default &&
+                    Application.Current.RequestedTheme == ApplicationTheme.Light);
+
+            return new SolidColorBrush(isLightTheme
+                ? Windows.UI.Color.FromArgb(255, 75, 85, 99)
+                : Windows.UI.Color.FromArgb(255, 229, 231, 235));
         }
 
         private async Task<ContentDialogResult> ShowDialogAsync(ContentDialog dialog)

@@ -1437,7 +1437,7 @@ namespace TxtAIEditor.Controls
                 {
                     Text = item.Detail,
                     FontSize = 10,
-                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
+                    Foreground = CreateMcpSecondaryTextBrush(),
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     TextWrapping = TextWrapping.NoWrap
                 });
@@ -1484,12 +1484,17 @@ namespace TxtAIEditor.Controls
 
         private Brush CreateMcpEmptyTextBrush()
         {
+            return CreateMcpSecondaryTextBrush();
+        }
+
+        private Brush CreateMcpSecondaryTextBrush()
+        {
             bool isLightTheme = ActualTheme == ElementTheme.Light ||
                 (ActualTheme == ElementTheme.Default && Application.Current.RequestedTheme == ApplicationTheme.Light);
 
             return new SolidColorBrush(isLightTheme
-                ? Windows.UI.Color.FromArgb(255, 31, 41, 55)
-                : Windows.UI.Color.FromArgb(255, 255, 255, 255));
+                ? Windows.UI.Color.FromArgb(255, 75, 85, 99)
+                : Windows.UI.Color.FromArgb(255, 229, 231, 235));
         }
 
         private void RebuildAgentSkillMenu()
