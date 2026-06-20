@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -14,15 +13,13 @@ namespace TxtAIEditor.Controls
 {
     public sealed class TocController
     {
-        private const long MaxAutoTocFileBytes = 8L * 1024L * 1024L;
-        private const int MaxAutoTocLines = 50000;
-
         private readonly MainWindowViewModel _viewModel;
         private readonly LeftSidebarPane _leftSidebar;
         private readonly Func<OpenedTab?> _getActiveTab;
         private readonly Func<OpenedTab, EditorDocumentSession?> _getSession;
         private readonly Func<bool> _isAozoraMode;
         private readonly Func<int, Task> _revealLineAsync;
+        private int _refreshVersion;
 
         public TocController(
             MainWindowViewModel viewModel,
@@ -45,6 +42,8 @@ namespace TxtAIEditor.Controls
 
         public void RefreshToc(OpenedTab? tab)
         {
+            int refreshVersion = ++_refreshVersion;
+
             if (tab == null)
             {
                 _viewModel.TocItems.Clear();
@@ -59,12 +58,6 @@ namespace TxtAIEditor.Controls
             }
 
             int lineCount = session.Model.LineCount;
-            if (ShouldSkipAutomaticTocRefresh(tab, lineCount))
-            {
-                _viewModel.TocItems.Clear();
-                return;
-            }
-
             var lines = session.GetLines(1, lineCount);
             if (lines == null || lines.Count == 0)
             {
@@ -74,14 +67,19 @@ namespace TxtAIEditor.Controls
 
             bool aozoraMode = _isAozoraMode();
             string lang = tab.Language?.ToLowerInvariant() ?? string.Empty;
+            bool isTextFile = tab.FilePath != null && tab.FilePath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
 
+            _ = BuildTocInBackgroundAsync(refreshVersion, tab.Id, lines, aozoraMode, lang, isTextFile);
+        }
+
+        private List<TocItem> BuildTocItems(IReadOnlyList<string> lines, bool aozoraMode, string lang, bool isTextFile)
+        {
             var newItems = new List<TocItem>();
-
             if (lang == "markdown")
             {
                 ParseMarkdown(lines, newItems);
             }
-            else if (aozoraMode || lang == "aozora" || (tab.FilePath != null && tab.FilePath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && HasAozoraTags(lines)))
+            else if (aozoraMode || lang == "aozora" || (isTextFile && HasAozoraTags(lines)))
             {
                 ParseAozora(lines, newItems);
             }
@@ -90,6 +88,48 @@ namespace TxtAIEditor.Controls
                 ParseCodeOutline(lines, lang, newItems);
             }
 
+            return newItems;
+        }
+
+        private async Task BuildTocInBackgroundAsync(
+            int refreshVersion,
+            string tabId,
+            IReadOnlyList<string> lines,
+            bool aozoraMode,
+            string lang,
+            bool isTextFile)
+        {
+            List<TocItem> newItems;
+            try
+            {
+                newItems = await Task.Run(() => BuildTocItems(lines, aozoraMode, lang, isTextFile));
+            }
+            catch
+            {
+                return;
+            }
+
+            bool ApplyIfCurrent()
+            {
+                var activeTab = _getActiveTab();
+                if (refreshVersion != _refreshVersion || activeTab?.Id != tabId)
+                {
+                    return false;
+                }
+
+                ApplyTocItems(newItems);
+                return true;
+            }
+
+            var dispatcher = _leftSidebar.DispatcherQueue;
+            if (dispatcher == null || !dispatcher.TryEnqueue(() => ApplyIfCurrent()))
+            {
+                ApplyIfCurrent();
+            }
+        }
+
+        private void ApplyTocItems(IReadOnlyList<TocItem> newItems)
+        {
             // Check if outline structure changed (additions, deletions, text/margin/icon changes)
             bool structureChanged = false;
             if (newItems.Count != _viewModel.TocItems.Count)
@@ -134,31 +174,6 @@ namespace TxtAIEditor.Controls
                     }
                 }
             }
-        }
-
-        private static bool ShouldSkipAutomaticTocRefresh(OpenedTab tab, int lineCount)
-        {
-            if (lineCount > MaxAutoTocLines)
-            {
-                return true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(tab.FilePath))
-            {
-                try
-                {
-                    var info = new FileInfo(tab.FilePath);
-                    if (info.Exists && info.Length > MaxAutoTocFileBytes)
-                    {
-                        return true;
-                    }
-                }
-                catch
-                {
-                }
-            }
-
-            return false;
         }
 
         private bool HasAozoraTags(IReadOnlyList<string> lines)
