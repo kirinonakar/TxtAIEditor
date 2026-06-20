@@ -502,6 +502,11 @@ namespace TxtAIEditor.Core.Services
                     break;
                 }
 
+                if (IsInsideNestedElement(paragraph, node, "tbl"))
+                {
+                    continue;
+                }
+
                 if (node is XText textNode && textNode.Parent?.Name.LocalName == "t")
                 {
                     AppendLimited(builder, textNode.Value, maxChars);
@@ -531,6 +536,22 @@ namespace TxtAIEditor.Core.Services
                         break;
                 }
             }
+        }
+
+        private static bool IsInsideNestedElement(XElement root, XNode node, string localName)
+        {
+            XElement? parent = node.Parent;
+            while (parent != null && !ReferenceEquals(parent, root))
+            {
+                if (parent.Name.LocalName == localName)
+                {
+                    return true;
+                }
+
+                parent = parent.Parent;
+            }
+
+            return false;
         }
 
         private static async Task<IReadOnlyList<string>> LoadSharedStringsAsync(ZipArchive archive)

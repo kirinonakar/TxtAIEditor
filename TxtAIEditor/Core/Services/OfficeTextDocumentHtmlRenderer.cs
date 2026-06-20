@@ -615,6 +615,12 @@ namespace TxtAIEditor.Core.Services
         private static string ReadPositiveIntegerAttribute(XElement element, string attributeName)
         {
             string value = GetAttributeValue(element, attributeName);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                XElement? cellSpan = element.Elements().FirstOrDefault(e => e.Name.LocalName == "cellSpan");
+                value = GetAttributeValue(cellSpan, attributeName);
+            }
+
             return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) && parsed > 1
                 ? parsed.ToString(CultureInfo.InvariantCulture)
                 : string.Empty;
