@@ -230,6 +230,53 @@ function applyCellStyle(td, cell) {
     if (cell.italic) td.style.fontStyle = 'italic';
 }
 
+function escapeCsvValue(value) {
+    const text = String(value ?? '');
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function selectedCellsAsCsv() {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return '';
+
+    const selectedCells = [];
+    const cells = wrap.querySelectorAll('tbody td[data-csv-row][data-csv-column]');
+    cells.forEach(td => {
+        for (let i = 0; i < selection.rangeCount; i++) {
+            const range = selection.getRangeAt(i);
+            if (range.intersectsNode(td)) {
+                selectedCells.push(td);
+                break;
+            }
+        }
+    });
+
+    if (!selectedCells.length) return '';
+
+    const rowIndexes = selectedCells.map(td => Number(td.dataset.csvRow));
+    const columnIndexes = selectedCells.map(td => Number(td.dataset.csvColumn));
+    const minRow = Math.min(...rowIndexes);
+    const maxRow = Math.max(...rowIndexes);
+    const minColumn = Math.min(...columnIndexes);
+    const maxColumn = Math.max(...columnIndexes);
+
+    const values = new Map();
+    selectedCells.forEach(td => {
+        values.set(`${td.dataset.csvRow}:${td.dataset.csvColumn}`, td.textContent ?? '');
+    });
+
+    const lines = [];
+    for (let r = minRow; r <= maxRow; r++) {
+        const line = [];
+        for (let c = minColumn; c <= maxColumn; c++) {
+            line.push(escapeCsvValue(values.get(`${r}:${c}`) ?? ''));
+        }
+        lines.push(line.join(','));
+    }
+
+    return lines.join('\r\n');
+}
+
 function renderSheet(index) {
     const sheet = sheets[index];
     const rows = sheet.rows || [];
@@ -260,6 +307,8 @@ function renderSheet(index) {
         for (let c = 0; c < columnCount; c++) {
             const sourceCell = row[c] || null;
             const td = cell('td', valueOf(sourceCell));
+            td.dataset.csvRow = String(r);
+            td.dataset.csvColumn = String(c);
             applyCellStyle(td, sourceCell);
             tr.appendChild(td);
         }
@@ -280,6 +329,13 @@ sheets.forEach((sheet, index) => {
     select.appendChild(option);
 });
 select.addEventListener('change', () => renderSheet(Number(select.value || 0)));
+document.addEventListener('copy', event => {
+    const csv = selectedCellsAsCsv();
+    if (!csv) return;
+
+    event.clipboardData?.setData('text/plain', csv);
+    event.preventDefault();
+});
 renderSheet(0);
 </script>
 </body>
