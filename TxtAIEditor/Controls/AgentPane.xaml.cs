@@ -64,6 +64,8 @@ namespace TxtAIEditor.Controls
         private HashSet<string> _selectedAgentPresetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private List<AgentSkillItem> _agentSkillItems = new List<AgentSkillItem>();
         private HashSet<string> _selectedAgentSkillNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private List<AgentMcpItem> _agentMcpItems = new List<AgentMcpItem>();
+        private HashSet<string> _selectedAgentMcpNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Func<string, string, string>? _getString;
 
         public string RawOutputText => GetRawOutputText();
@@ -118,6 +120,11 @@ namespace TxtAIEditor.Controls
         public event EventHandler? AgentSkillFlyoutOpened;
         public event EventHandler<string>? AgentSkillToggled;
         public event EventHandler<string>? AgentSkillRemoved;
+        public event EventHandler? AgentMcpFlyoutOpened;
+        public event RoutedEventHandler? AgentMcpAddRequested;
+        public event EventHandler<string>? AgentMcpToggled;
+        public event EventHandler<string>? AgentMcpDeleted;
+        public event EventHandler<string>? AgentMcpRemoved;
         public event RoutedEventHandler? DiffApproved;
         public event RoutedEventHandler? DiffCancelled;
         public event EventHandler<AgentFileEditPreview>? FileRevertRequested;
@@ -210,6 +217,8 @@ namespace TxtAIEditor.Controls
             AgentPlanningModeCheckBox.Content = getString("AgentIncludeActiveFile", "계획 모드 (Planning mode)");
             AgentStreamToTabCheckBox.Content = getString("AgentStreamToTab", "탭에 스트리밍");
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
+            ToolTipService.SetToolTip(AgentMcpButton, getString("AgentMcpButtonTooltip", "MCP 서버"));
+            AgentAddMcpText.Text = getString("AgentMcpAddText", "MCP 추가");
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
             ToolTipService.SetToolTip(AgentSkillButton, getString("AgentSkillButtonTooltip", "스킬"));
             AgentSkillTitleText.Text = getString("AgentSkillTitle", "스킬");
@@ -241,6 +250,7 @@ namespace TxtAIEditor.Controls
             AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (클릭 시 비교)");
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
             ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
+            RebuildAgentMcpMenu();
             RebuildAgentSkillMenu();
             RebuildAgentPresetMenu();
             RebuildSelectedAgentPresetChips();
@@ -262,6 +272,7 @@ namespace TxtAIEditor.Controls
             AgentPromptInput.IsEnabled = !isBusy;
             AgentPlanningModeCheckBox.IsEnabled = !isBusy;
             AgentStreamToTabCheckBox.IsEnabled = !isBusy;
+            AgentMcpButton.IsEnabled = !isBusy;
             AgentAddAttachmentButton.IsEnabled = !isBusy;
             AgentSkillButton.IsEnabled = !isBusy;
             AgentAttachmentsList.IsEnabled = !isBusy;
@@ -892,6 +903,18 @@ namespace TxtAIEditor.Controls
             AgentPresetFlyout.Hide();
         }
 
+        private void OnAgentAddMcpClickInPanel(object sender, RoutedEventArgs e)
+        {
+            AgentMcpAddRequested?.Invoke(sender, e);
+            AgentMcpFlyout.Hide();
+        }
+
+        private void OnAgentMcpFlyoutOpened(object sender, object e)
+        {
+            AgentMcpFlyoutOpened?.Invoke(this, EventArgs.Empty);
+            RebuildAgentMcpMenu();
+        }
+
         private void OnAgentPresetFlyoutOpened(object sender, object e)
         {
             RebuildAgentPresetMenu();
@@ -1333,6 +1356,97 @@ namespace TxtAIEditor.Controls
             RebuildSelectedAgentPresetChips();
         }
 
+        public void UpdateAgentMcpMenu(
+            IReadOnlyList<AgentMcpItem> mcpItems,
+            IReadOnlyCollection<string> selectedMcpNames,
+            Func<string, string, string> getString)
+        {
+            _getString = getString;
+            _agentMcpItems = new List<AgentMcpItem>(mcpItems);
+            _selectedAgentMcpNames = new HashSet<string>(selectedMcpNames, StringComparer.OrdinalIgnoreCase);
+            RebuildAgentMcpMenu();
+            RebuildSelectedAgentPresetChips();
+        }
+
+        private void RebuildAgentMcpMenu()
+        {
+            if (AgentMcpListPanel == null)
+            {
+                return;
+            }
+
+            AgentMcpListPanel.Children.Clear();
+            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
+            Func<string, string, string> getString = _getString ?? _displayText.GetString;
+
+            if (_agentMcpItems.Count == 0)
+            {
+                AgentMcpListPanel.Children.Add(new TextBlock
+                {
+                    Text = getString("AgentMcpEmptyText", "등록된 MCP 없음"),
+                    FontSize = 11,
+                    Foreground = GetBrushResource("AgentOutputForeground", Windows.UI.Color.FromArgb(255, 212, 212, 212)),
+                    Margin = new Thickness(4, 2, 4, 2)
+                });
+                return;
+            }
+
+            foreach (var item in _agentMcpItems)
+            {
+                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                bool isSelected = _selectedAgentMcpNames.Contains(item.Name);
+                var selectBtn = new Button
+                {
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    MinHeight = 34,
+                    Padding = new Thickness(8, 3, 8, 3),
+                    Style = buttonStyle
+                };
+
+                var textStack = new StackPanel { Spacing = 1 };
+                textStack.Children.Add(new TextBlock
+                {
+                    Text = isSelected ? $"✓ {item.Name}" : item.Name,
+                    FontSize = 11,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextWrapping = TextWrapping.NoWrap
+                });
+                textStack.Children.Add(new TextBlock
+                {
+                    Text = item.Detail,
+                    FontSize = 10,
+                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextWrapping = TextWrapping.NoWrap
+                });
+                selectBtn.Content = textStack;
+
+                string currentName = item.Name;
+                selectBtn.Click += (_, _) => AgentMcpToggled?.Invoke(this, currentName);
+                Grid.SetColumn(selectBtn, 0);
+                rowGrid.Children.Add(selectBtn);
+
+                var deleteBtn = new Button
+                {
+                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
+                    Width = 28,
+                    Height = 34,
+                    Padding = new Thickness(0),
+                    Style = buttonStyle
+                };
+                ToolTipService.SetToolTip(deleteBtn, getString("AgentMcpDeleteText", "삭제"));
+                deleteBtn.Click += (_, _) => AgentMcpDeleted?.Invoke(this, currentName);
+                Grid.SetColumn(deleteBtn, 1);
+                rowGrid.Children.Add(deleteBtn);
+
+                AgentMcpListPanel.Children.Add(rowGrid);
+            }
+        }
+
         private void RebuildAgentSkillMenu()
         {
             if (AgentSkillListPanel == null)
@@ -1476,6 +1590,21 @@ namespace TxtAIEditor.Controls
                     presetName,
                     getString("AgentPresetRemoveTooltip", "선택 해제"),
                     () => AgentPresetRemoved?.Invoke(this, presetName)));
+            }
+
+            string mcpPrefix = getString("AgentMcpChipPrefix", "MCP: ");
+            foreach (var mcp in _agentMcpItems)
+            {
+                if (!_selectedAgentMcpNames.Contains(mcp.Name))
+                {
+                    continue;
+                }
+
+                string currentName = mcp.Name;
+                AgentSelectedPresetPanel.Children.Add(CreateSelectedChip(
+                    mcpPrefix + mcp.Name,
+                    getString("AgentMcpRemoveTooltip", "MCP 선택 해제"),
+                    () => AgentMcpRemoved?.Invoke(this, currentName)));
             }
 
             string skillPrefix = getString("AgentSkillChipPrefix", "Skill: ");

@@ -154,6 +154,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
@@ -172,9 +173,46 @@
                               FontSize="12"/>
                 </StackPanel>
 
-                <Button x:Name="AgentAddAttachmentButton"
+                <Button x:Name="AgentMcpButton"
                         Grid.Row="0"
                         Grid.Column="1"
+                        Width="30"
+                        Height="30"
+                        Padding="0"
+                        VerticalAlignment="Top"
+                        ToolTipService.ToolTip="MCP"
+                        Style="{StaticResource AgentButtonStyle}">
+                    <FontIcon Glyph="&#xE968;" FontSize="14"/>
+                    <Button.Flyout>
+                        <Flyout x:Name="AgentMcpFlyout" Opened="OnAgentMcpFlyoutOpened">
+                            <Grid Width="260" RowSpacing="8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Button x:Name="AgentAddMcpButton"
+                                        Grid.Row="0"
+                                        HorizontalAlignment="Stretch"
+                                        Click="OnAgentAddMcpClickInPanel"
+                                        Style="{StaticResource AgentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE710;" FontSize="12"/>
+                                        <TextBlock x:Name="AgentAddMcpText" Text="MCP 추가" FontSize="11" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <MenuFlyoutSeparator Grid.Row="1"/>
+                                <ScrollViewer Grid.Row="2" MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="AgentMcpListPanel" Spacing="4"/>
+                                </ScrollViewer>
+                            </Grid>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+
+                <Button x:Name="AgentAddAttachmentButton"
+                        Grid.Row="0"
+                        Grid.Column="2"
                         Width="30"
                         Height="30"
                         Padding="0"
@@ -189,7 +227,7 @@
                 <ListView x:Name="AgentAttachmentsList"
                           Grid.Row="1"
                           Grid.Column="0"
-                          Grid.ColumnSpan="2"
+                          Grid.ColumnSpan="3"
                           MaxHeight="96"
                           SelectionMode="None"
                           Visibility="Collapsed"

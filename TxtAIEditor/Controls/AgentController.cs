@@ -46,6 +46,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentPresetController _presetController;
         private readonly AgentSkillController _skillController;
+        private readonly AgentMcpController _mcpController;
         private readonly AgentHistoryController _historyController;
         private readonly AgentSessionEditController _sessionEditController;
         private readonly AgentWorkspaceContextBuilder _workspaceContextBuilder;
@@ -153,6 +154,13 @@ namespace TxtAIEditor.Controls
                 _agentPane,
                 _getString,
                 () => UpdateContextStatsImmediate());
+            _mcpController = new AgentMcpController(
+                _agentPane,
+                _showError,
+                _getString,
+                () => UpdateContextStatsImmediate(),
+                _beforeDialog,
+                _afterDialog);
             _historyController = new AgentHistoryController(_agentPane);
             _sessionEditController = new AgentSessionEditController(
                 _agentPane,
@@ -215,6 +223,7 @@ namespace TxtAIEditor.Controls
                 _fileToolController,
                 _tabToolController,
                 _skillController,
+                _mcpController,
                 AddCurrentRunImageToolAttachment,
                 AppendActivity,
                 _getString);
@@ -267,6 +276,7 @@ namespace TxtAIEditor.Controls
         private async Task LoadStartupDataAsync()
         {
             await _presetController.LoadAsync();
+            await _mcpController.LoadAsync();
             await _skillController.LoadAsync();
             await _historyController.LoadAsync(_currentSessionId);
         }
@@ -333,6 +343,11 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentPresetRemoved += (_, presetName) => _presetController.RemoveSelectedPreset(presetName);
             _agentPane.AgentPresetExportRequested += async (_, _) => await _presetController.ExportPresetsAsync();
             _agentPane.AgentPresetImportRequested += async (_, _) => await _presetController.ImportPresetsAsync();
+            _agentPane.AgentMcpFlyoutOpened += async (_, _) => await _mcpController.LoadAsync();
+            _agentPane.AgentMcpAddRequested += async (_, _) => await _mcpController.AddMcpAsync();
+            _agentPane.AgentMcpToggled += async (_, serverName) => await _mcpController.ToggleMcpAsync(serverName);
+            _agentPane.AgentMcpDeleted += async (_, serverName) => await _mcpController.DeleteMcpAsync(serverName);
+            _agentPane.AgentMcpRemoved += (_, serverName) => _mcpController.RemoveSelectedMcp(serverName);
             _agentPane.AgentSkillFlyoutOpened += async (_, _) => await _skillController.LoadAsync();
             _agentPane.AgentSkillToggled += (_, skillName) => _skillController.ToggleSkill(skillName);
             _agentPane.AgentSkillRemoved += (_, skillName) => _skillController.RemoveSelectedSkill(skillName);
@@ -357,6 +372,7 @@ namespace TxtAIEditor.Controls
             var settings = _settingsService.CurrentSettings;
 
             string userInstruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
+            await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
             string instruction = BuildAgentInstruction(userInstruction);
             if (string.IsNullOrWhiteSpace(instruction))
             {
@@ -1278,6 +1294,12 @@ namespace TxtAIEditor.Controls
                 labels.Add(presetLabel);
             }
 
+            string mcpLabel = _mcpController.GetSelectedMcpLabel();
+            if (!string.IsNullOrEmpty(mcpLabel))
+            {
+                labels.Add(string.Format(_getString("AgentMcpDisplayLabelFormat", "MCP: {0}"), mcpLabel));
+            }
+
             string skillLabel = _skillController.GetSelectedSkillLabel();
             if (!string.IsNullOrEmpty(skillLabel))
             {
@@ -1301,8 +1323,10 @@ namespace TxtAIEditor.Controls
         private string BuildAgentInstruction(string userInstruction)
         {
             string presetSection = _presetController.BuildSelectedPresetSection();
+            string mcpSection = _mcpController.BuildSelectedMcpSection();
             string skillSection = _skillController.BuildSelectedSkillSection();
             if (string.IsNullOrWhiteSpace(presetSection) &&
+                string.IsNullOrWhiteSpace(mcpSection) &&
                 string.IsNullOrWhiteSpace(skillSection))
             {
                 return userInstruction;
@@ -1312,6 +1336,12 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrWhiteSpace(presetSection))
             {
                 builder.AppendLine(presetSection);
+                builder.AppendLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(mcpSection))
+            {
+                builder.AppendLine(mcpSection);
                 builder.AppendLine();
             }
 

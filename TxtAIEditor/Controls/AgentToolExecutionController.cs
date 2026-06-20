@@ -20,6 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentFileToolController _fileToolController;
         private readonly AgentTabToolController _tabToolController;
         private readonly AgentSkillController _skillController;
+        private readonly AgentMcpController _mcpController;
         private readonly Action<LlmMessageAttachment> _addImageAttachment;
         private readonly Action<string> _appendActivity;
         private readonly Func<string, string, string> _getString;
@@ -30,6 +31,7 @@ namespace TxtAIEditor.Controls
             AgentFileToolController fileToolController,
             AgentTabToolController tabToolController,
             AgentSkillController skillController,
+            AgentMcpController mcpController,
             Action<LlmMessageAttachment> addImageAttachment,
             Action<string> appendActivity,
             Func<string, string, string> getString)
@@ -39,6 +41,7 @@ namespace TxtAIEditor.Controls
             _fileToolController = fileToolController;
             _tabToolController = tabToolController;
             _skillController = skillController;
+            _mcpController = mcpController;
             _addImageAttachment = addImageAttachment;
             _appendActivity = appendActivity;
             _getString = getString;
@@ -50,8 +53,9 @@ namespace TxtAIEditor.Controls
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string normalizedToolName = NormalizeToolName(toolName);
+                bool isMcpTool = _mcpController.TryGetToolAlias(normalizedToolName, out _);
                 string? selectionScopeError = _fileToolController.ValidateSelectionEditScope(normalizedToolName, arguments);
-                if (!string.IsNullOrEmpty(selectionScopeError))
+                if (!isMcpTool && !string.IsNullOrEmpty(selectionScopeError))
                 {
                     _appendActivity(string.Format(
                         _getString("AgentActivityToolBlockedFormat", "도구 차단: {0}"),
@@ -69,6 +73,10 @@ namespace TxtAIEditor.Controls
                 else if (normalizedToolName == "search_replace")
                 {
                     result = await _fileToolController.SearchReplaceAsync(arguments);
+                }
+                else if (isMcpTool)
+                {
+                    result = await _mcpController.ExecuteToolAsync(normalizedToolName, arguments, cancellationToken);
                 }
                 else
                 {
@@ -195,6 +203,19 @@ namespace TxtAIEditor.Controls
                         return string.Format(_getString("AgentVerboseReadSkillOnly", "{0} 스킬을 참고합니다."), skillName);
                     }
                 }
+            }
+
+            if (_mcpController.TryGetToolAlias(normalizedToolName, out var mcpAlias))
+            {
+                if (verbose || toolResult.StartsWith("MCP tool failed:", StringComparison.OrdinalIgnoreCase))
+                {
+                    return toolResult;
+                }
+
+                return string.Format(
+                    _getString("AgentVerboseMcpToolOnly", "MCP 도구를 실행했습니다: {0} ({1})"),
+                    mcpAlias.ToolName,
+                    mcpAlias.ServerName);
             }
 
             if (verbose || toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
@@ -330,6 +351,14 @@ namespace TxtAIEditor.Controls
 
         private string GetToolStartMessage(string toolName, JsonElement arguments)
         {
+            if (_mcpController.TryGetToolAlias(toolName, out var mcpAlias))
+            {
+                return string.Format(
+                    _getString("AgentActivityMcpToolFormat", "MCP 도구 실행 중: {0} ({1})"),
+                    mcpAlias.ToolName,
+                    mcpAlias.ServerName);
+            }
+
             return toolName switch
             {
                 "list_files" => string.Format(

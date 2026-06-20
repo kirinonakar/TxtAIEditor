@@ -2413,4 +2413,64 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
     <value>Sheet</value>
   </data>
+  <data name="AgentMcpButtonTooltip" xml:space="preserve">
+    <value>MCP Servers</value>
+  </data>
+  <data name="AgentMcpAddText" xml:space="preserve">
+    <value>Add MCP</value>
+  </data>
+  <data name="AgentMcpEmptyText" xml:space="preserve">
+    <value>No MCP servers</value>
+  </data>
+  <data name="AgentMcpDeleteText" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="AgentMcpRemoveTooltip" xml:space="preserve">
+    <value>Disable MCP</value>
+  </data>
+  <data name="AgentMcpChipPrefix" xml:space="preserve">
+    <value>MCP: </value>
+  </data>
+  <data name="AgentMcpDisplayLabelFormat" xml:space="preserve">
+    <value>MCP: {0}</value>
+  </data>
+  <data name="AgentMcpNamePlaceholder" xml:space="preserve">
+    <value>Enter MCP name...</value>
+  </data>
+  <data name="AgentMcpEndpointPlaceholder" xml:space="preserve">
+    <value>https://server.example/mcp</value>
+  </data>
+  <data name="AgentMcpNameLabel" xml:space="preserve">
+    <value>MCP Name</value>
+  </data>
+  <data name="AgentMcpEndpointLabel" xml:space="preserve">
+    <value>MCP Address</value>
+  </data>
+  <data name="AgentMcpSaveAddButton" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="AgentMcpAddErrorTitle" xml:space="preserve">
+    <value>Add MCP Error</value>
+  </data>
+  <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
+    <value>Enter both the MCP name and address.</value>
+  </data>
+  <data name="AgentMcpEndpointInvalid" xml:space="preserve">
+    <value>The MCP address must be an http or https URL.</value>
+  </data>
+  <data name="AgentMcpStatusConnecting" xml:space="preserve">
+    <value>Connecting</value>
+  </data>
+  <data name="AgentMcpStatusToolCount" xml:space="preserve">
+    <value>{0:N0} tools</value>
+  </data>
+  <data name="AgentMcpStatusFailedFormat" xml:space="preserve">
+    <value>Connection failed: {0}</value>
+  </data>
+  <data name="AgentActivityMcpToolFormat" xml:space="preserve">
+    <value>Running MCP tool: {0} ({1})</value>
+  </data>
+  <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
+    <value>Ran MCP tool: {0} ({1})</value>
+  </data>
 </root>

@@ -2414,4 +2414,64 @@
   <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
     <value>シート</value>
   </data>
- </root>
+  <data name="AgentMcpButtonTooltip" xml:space="preserve">
+    <value>MCP サーバー</value>
+  </data>
+  <data name="AgentMcpAddText" xml:space="preserve">
+    <value>MCP 追加</value>
+  </data>
+  <data name="AgentMcpEmptyText" xml:space="preserve">
+    <value>登録済み MCP なし</value>
+  </data>
+  <data name="AgentMcpDeleteText" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="AgentMcpRemoveTooltip" xml:space="preserve">
+    <value>MCP 選択解除</value>
+  </data>
+  <data name="AgentMcpChipPrefix" xml:space="preserve">
+    <value>MCP: </value>
+  </data>
+  <data name="AgentMcpDisplayLabelFormat" xml:space="preserve">
+    <value>MCP: {0}</value>
+  </data>
+  <data name="AgentMcpNamePlaceholder" xml:space="preserve">
+    <value>MCP 名を入力...</value>
+  </data>
+  <data name="AgentMcpEndpointPlaceholder" xml:space="preserve">
+    <value>https://server.example/mcp</value>
+  </data>
+  <data name="AgentMcpNameLabel" xml:space="preserve">
+    <value>MCP 名</value>
+  </data>
+  <data name="AgentMcpEndpointLabel" xml:space="preserve">
+    <value>MCP アドレス</value>
+  </data>
+  <data name="AgentMcpSaveAddButton" xml:space="preserve">
+    <value>追加</value>
+  </data>
+  <data name="AgentMcpAddErrorTitle" xml:space="preserve">
+    <value>MCP 追加エラー</value>
+  </data>
+  <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
+    <value>MCP 名とアドレスを入力してください。</value>
+  </data>
+  <data name="AgentMcpEndpointInvalid" xml:space="preserve">
+    <value>MCP アドレスは http または https URL である必要があります。</value>
+  </data>
+  <data name="AgentMcpStatusConnecting" xml:space="preserve">
+    <value>接続中</value>
+  </data>
+  <data name="AgentMcpStatusToolCount" xml:space="preserve">
+    <value>{0:N0} 個のツール</value>
+  </data>
+  <data name="AgentMcpStatusFailedFormat" xml:space="preserve">
+    <value>接続失敗: {0}</value>
+  </data>
+  <data name="AgentActivityMcpToolFormat" xml:space="preserve">
+    <value>MCP ツール実行中: {0} ({1})</value>
+  </data>
+  <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
+    <value>MCP ツールを実行しました: {0} ({1})</value>
+  </data>
+</root>
