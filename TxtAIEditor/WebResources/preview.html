@@ -417,7 +417,6 @@
         }
 
         const EDITOR_SYNC_SCROLL_SETTLE_MS = 900;
-        const FULL_DOCUMENT_RENDER_LINE_LIMIT = 1000;
         const PREVIEW_SCROLL_OWNERSHIP_MS = 700;
         const PROGRAMMATIC_SCROLL_IGNORE_MS = 140;
 
@@ -870,23 +869,11 @@
         function render() {
             if (state.mode === 'csv') return;
             const visible = visibleRange();
-            const renderFullDocument = state.lineCount <= FULL_DOCUMENT_RENDER_LINE_LIMIT;
-            const contextStart = renderFullDocument
-                ? 1
-                : (state.mode === 'markdown'
-                    ? Math.max(1, visible.start - state.blockContextLines)
-                    : visible.start);
-            const rangeEnd = renderFullDocument ? state.lineCount : visible.end;
+            const contextStart = state.mode === 'markdown'
+                ? Math.max(1, visible.start - state.blockContextLines)
+                : visible.start;
 
-            if (renderFullDocument) {
-                state.renderedRange = {
-                    start: 1,
-                    end: state.lineCount,
-                    visibleStart: visible.start,
-                    mode: state.mode,
-                    lineCount: state.lineCount
-                };
-            } else if (!state.renderedRange || 
+            if (!state.renderedRange ||
                 state.renderedRange.mode !== state.mode ||
                 state.renderedRange.lineCount !== state.lineCount ||
                 visible.start < state.renderedRange.visibleStart - 10 ||
@@ -896,7 +883,7 @@
                 
                 state.renderedRange = {
                     start: contextStart,
-                    end: rangeEnd,
+                    end: visible.end,
                     visibleStart: visible.start,
                     mode: state.mode,
                     lineCount: state.lineCount
@@ -1036,7 +1023,11 @@
         }
 
         function measureRenderedRows() {
-            let changed = false;
+            // Capture the scroll anchor before mutating measured heights; this keeps variable-height virtualization stable.
+            const anchorLine = lineAt(scroll.scrollTop);
+            const anchorTop = rowTop(anchorLine);
+            const anchorOffset = scroll.scrollTop - anchorTop;
+            const heightUpdates = [];
             const rows = viewport.querySelectorAll('.preview-row');
             rows.forEach(row => {
                 const lineNumber = Number(row.dataset.line || 0);
@@ -1047,36 +1038,23 @@
                     : Math.max(0, Math.ceil(row.getBoundingClientRect().height || row.scrollHeight || 0));
                 const previous = rowHeightFor(lineNumber);
                 if (Math.abs(previous - measured) > 1) {
-                    state.rowHeights.set(lineNumber, measured);
-                    changed = true;
+                    heightUpdates.push({ lineNumber, measured });
                 }
             });
 
-            if (changed) {
+            if (heightUpdates.length > 0) {
+                heightUpdates.forEach(update => state.rowHeights.set(update.lineNumber, update.measured));
+
                 const editorSyncTarget = currentEditorSyncTarget();
                 if (editorSyncTarget) {
                     setupVirtualHeightSilently();
                     applyEditorSyncTarget(editorSyncTarget, true);
                 } else {
-                    // Anchor scroll to the first visible line to prevent jump
-                    const anchorLine = lineAt(scroll.scrollTop);
-                    const anchorTop = rowTop(anchorLine);
-                    const anchorOffset = scroll.scrollTop - anchorTop;
-
                     setupVirtualHeightSilently();
 
-                    // Restore scroll position relative to anchor line when the preview is not being scrolled by the user.
-                    // Keeping this running during editor updates prevents scroll jitter from layout changes.
-                    const now = Date.now();
-                    const isActivePreviewScroll = (now - lastPreviewUserScrollAt) < 160;
-
-                    if (!isActivePreviewScroll) {
-                        // Restore scroll position relative to anchor line
-                        const newAnchorTop = rowTop(anchorLine);
-                        const corrected = newAnchorTop + anchorOffset;
-                        if (Math.abs(scroll.scrollTop - corrected) > 1) {
-                            setPreviewScrollTopSilently(corrected);
-                        }
+                    const corrected = rowTop(anchorLine) + anchorOffset;
+                    if (Math.abs(scroll.scrollTop - corrected) > 1) {
+                        setPreviewScrollTopSilently(corrected);
                     }
                 }
 
