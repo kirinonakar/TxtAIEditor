@@ -61,6 +61,10 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Live Renderer:** View Markdown, HTML, Aozora or LaTeX (powered by KaTeX) in a split view or an external browser.
 *   **Inline Live Preview:** Renders Markdown elements (headers, lists, tables, code blocks, images) directly within the editor area. Non-active lines transition into their styled preview form, and automatically revert to raw source text when focused or edited for a seamless WYSIWYG-like experience.
 
+### 📄 Office Document Viewer
+*   **Document Preview:** Preview PDF, DOCX, PPTX, HWPX, and XLSX files directly inside TxtAIEditor without leaving the workspace.
+*   **Unified Viewer Workflow:** Open supported office documents from the Explorer or editor tabs and inspect their contents alongside the rest of your project files.
+
 ### 📊 Interactive CSV Table Mode
 *   **Grid Editor Shell:** Automatically renders `.csv` files into a premium, highly responsive interactive spreadsheet-like grid instead of raw comma-separated text.
 *   **Column & Row Multi-Select:** Click row numbers or column headers to select entire rows/columns, with support for range dragging and multi-selection using `Ctrl` and `Shift` keys.
@@ -86,6 +90,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   **Document Extraction:** The agent can convert PDF, DOCX, PPTX, XLSX, and HWPX files into readable workspace files via `extract_document`. PDF/DOCX/PPTX/HWPX are saved as `.txt`, XLSX is exported as CSV, and multi-sheet XLSX files are split into `_sheet1.csv`, `_sheet2.csv`, etc. The agent records only the source and generated file paths, then reads targeted ranges from the converted files to avoid overflowing model context.
 *   **Persona & System Instructions:** You can specify custom personas and system instructions for the AI agent.
 *   **Custom Agent Skills:** Extend the agent's capabilities by installing custom skills into the skills directory.
+    *   **Skill Creator:** To create a new skill, open the skill list, check and enable `skill-creator`, then ask the agent to create a skill for a specific task. The agent will generate the skill and it will be registered automatically in the skill list.
     *   **Skill Directories:** The agent loads built-in skills from the app's `md\skills\` directory, user skills from `%USERPROFILE%\.TxtAIEditor\skills\`, and legacy user skills from `%USERPROFILE%\.agents\skills\`.
     *   **Default User Skill Directory:** New TxtAIEditor skills should be saved under `%USERPROFILE%\.TxtAIEditor\skills\`.
     *   **Skill Structure:** Skills can be structured in two ways:
