@@ -17,12 +17,15 @@ namespace TxtAIEditor.Core.Services
         {
             // Compiled / native binaries
             ".exe", ".dll", ".so", ".dylib", ".pdb", ".lib", ".obj", ".o", ".a", ".msixupload", ".msix", ".appx",
+            // Documents
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".pages", ".key", ".numbers", ".epub", ".mobi",
             // Images
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp",
             ".tiff", ".tif", ".heic", ".heif", ".raw", ".psd", ".ai", ".eps",
-            // Videos
+            // Videos & Audio
             ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v",
             ".mpg", ".mpeg", ".3gp", ".ts", ".m2ts", ".vob",
+            ".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a", ".wma",
             // Compressed / archive containers
             ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso",
             ".jar", ".war", ".ear", ".cab", ".lzma", ".tgz", ".tbz2", ".txz",
