@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using TxtAIEditor.Core.Interfaces;
@@ -66,7 +67,8 @@ namespace TxtAIEditor.Core.Services
             string query,
             long largeFileThresholdBytes,
             FileSearchOptions options,
-            Action<IReadOnlyList<SearchResultItem>> publishResults)
+            Action<IReadOnlyList<SearchResultItem>> publishResults,
+            CancellationToken cancellationToken = default)
         {
             var searchRegex = BuildSearchRegex(query, options);
             int foundCount = 0;
@@ -78,6 +80,8 @@ namespace TxtAIEditor.Core.Services
 
                 foreach (var file in EnumerateSearchFiles(searchRoot))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     try
                     {
                         if (DocumentTextExtractionService.IsSupportedExtension(file))
@@ -86,7 +90,8 @@ namespace TxtAIEditor.Core.Services
                                 file,
                                 searchRegex,
                                 tempResults,
-                                publishResults);
+                                publishResults,
+                                cancellationToken);
                             continue;
                         }
 
@@ -102,6 +107,8 @@ namespace TxtAIEditor.Core.Services
 
                             foreach (var lr in largeResults)
                             {
+                                cancellationToken.ThrowIfCancellationRequested();
+
                                 tempResults.Add(new SearchResultItem
                                 {
                                     Path = file,
@@ -111,7 +118,7 @@ namespace TxtAIEditor.Core.Services
                                     MatchLength = lr.MatchLength
                                 });
                                 foundCount++;
-                                FlushSearchResultsIfNeeded(tempResults, publishResults);
+                                FlushSearchResultsIfNeeded(tempResults, publishResults, cancellationToken);
                             }
 
                             continue;
@@ -120,6 +127,8 @@ namespace TxtAIEditor.Core.Services
                         int lineNum = 1;
                         foreach (var line in File.ReadLines(file))
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
+
                             var match = searchRegex.Match(line);
                             if (match.Success)
                             {
@@ -132,7 +141,7 @@ namespace TxtAIEditor.Core.Services
                                     MatchLength = match.Length
                                 });
                                 foundCount++;
-                                FlushSearchResultsIfNeeded(tempResults, publishResults);
+                                FlushSearchResultsIfNeeded(tempResults, publishResults, cancellationToken);
                             }
 
                             lineNum++;
@@ -145,8 +154,9 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
 
-                FlushSearchResults(tempResults, publishResults);
-            });
+                cancellationToken.ThrowIfCancellationRequested();
+                FlushSearchResults(tempResults, publishResults, cancellationToken);
+            }, cancellationToken);
 
             return new FileSearchSummary
             {
@@ -159,11 +169,12 @@ namespace TxtAIEditor.Core.Services
             string file,
             Regex searchRegex,
             List<SearchResultItem> tempResults,
-            Action<IReadOnlyList<SearchResultItem>> publishResults)
+            Action<IReadOnlyList<SearchResultItem>> publishResults,
+            CancellationToken cancellationToken)
         {
             int foundCount = 0;
             string extracted = _documentTextExtractionService
-                .ExtractTextAsync(file, DocumentSearchMaxChars)
+                .ExtractTextAsync(file, DocumentSearchMaxChars, cancellationToken: cancellationToken)
                 .ConfigureAwait(false)
                 .GetAwaiter()
                 .GetResult();
@@ -176,6 +187,8 @@ namespace TxtAIEditor.Core.Services
             int lineNum = 1;
             foreach (string line in EnumerateNormalizedLines(extracted))
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 Match match = searchRegex.Match(line);
                 if (match.Success)
                 {
@@ -189,7 +202,7 @@ namespace TxtAIEditor.Core.Services
                         CanReplace = false
                     });
                     foundCount++;
-                    FlushSearchResultsIfNeeded(tempResults, publishResults);
+                    FlushSearchResultsIfNeeded(tempResults, publishResults, cancellationToken);
                 }
 
                 lineNum++;
@@ -446,21 +459,22 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static void FlushSearchResultsIfNeeded(List<SearchResultItem> results, Action<IReadOnlyList<SearchResultItem>> publishResults)
+        private static void FlushSearchResultsIfNeeded(List<SearchResultItem> results, Action<IReadOnlyList<SearchResultItem>> publishResults, CancellationToken cancellationToken)
         {
             if (results.Count >= 30)
             {
-                FlushSearchResults(results, publishResults);
+                FlushSearchResults(results, publishResults, cancellationToken);
             }
         }
 
-        private static void FlushSearchResults(List<SearchResultItem> results, Action<IReadOnlyList<SearchResultItem>> publishResults)
+        private static void FlushSearchResults(List<SearchResultItem> results, Action<IReadOnlyList<SearchResultItem>> publishResults, CancellationToken cancellationToken)
         {
             if (results.Count == 0)
             {
                 return;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             var batch = results.ToList();
             results.Clear();
             publishResults(batch);

@@ -13,7 +13,8 @@ namespace TxtAIEditor
     public partial class App : Application
     {
         private const string SingleInstanceMutexName = "TxtAIEditorSingleInstanceMutex";
-        private static readonly string IpcDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "IPC");
+        private static readonly string AppTempDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor");
+        private static readonly string IpcDir = Path.Combine(AppTempDir, "IPC");
         private Window? _window;
         private static Mutex? _singleInstanceMutex;
         private FileSystemWatcher? _ipcWatcher;
@@ -415,8 +416,72 @@ namespace TxtAIEditor
                 _singleInstanceMutex = null;
             }
 
+            DocumentTextExtractionService.KillRunningPdftotextProcesses();
+            CleanupTemporaryFiles();
+
             // Force terminate the process to ensure no background processes are left running
             Environment.Exit(0);
+        }
+
+        private static void CleanupTemporaryFiles()
+        {
+            try
+            {
+                string tempRoot = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string appTempRoot = Path.GetFullPath(AppTempDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (!appTempRoot.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(Path.GetFileName(appTempRoot), "TxtAIEditor", StringComparison.OrdinalIgnoreCase) ||
+                    !Directory.Exists(appTempRoot))
+                {
+                    return;
+                }
+
+                foreach (string file in Directory.EnumerateFiles(appTempRoot, "*", SearchOption.AllDirectories))
+                {
+                    TryDeleteFile(file);
+                }
+
+                foreach (string directory in Directory.EnumerateDirectories(appTempRoot, "*", SearchOption.AllDirectories)
+                    .OrderByDescending(path => path.Length))
+                {
+                    TryDeleteDirectory(directory);
+                }
+
+                TryDeleteDirectory(appTempRoot);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to clean temporary files: {ex.Message}");
+            }
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.SetAttributes(path, FileAttributes.Normal);
+                    File.Delete(path);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static void TryDeleteDirectory(string path)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, recursive: false);
+                }
+            }
+            catch
+            {
+            }
         }
 
         private void StartIpcWatcher()

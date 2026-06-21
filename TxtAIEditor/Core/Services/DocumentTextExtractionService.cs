@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -6,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -20,25 +22,37 @@ namespace TxtAIEditor.Core.Services
 
     public sealed class DocumentTextExtractionService
     {
-        public async Task<string> ExtractTextAsync(string filePath, int maxChars, IProgress<int>? progress = null)
+        private static readonly ConcurrentDictionary<int, Process> RunningPdftotextProcesses = new();
+
+        public static void KillRunningPdftotextProcesses()
+        {
+            foreach (Process process in RunningPdftotextProcesses.Values.ToList())
+            {
+                TryKillProcess(process);
+            }
+        }
+
+        public async Task<string> ExtractTextAsync(string filePath, int maxChars, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || maxChars <= 0)
             {
                 return string.Empty;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(1);
             string extension = Path.GetExtension(filePath).ToLowerInvariant();
             string text = extension switch
             {
-                ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
-                ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
-                ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
-                ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
-                ".hwpx" => await ExtractHwpxTextAsync(filePath, maxChars, progress).ConfigureAwait(false),
+                ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                ".hwpx" => await ExtractHwpxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
                 _ => string.Empty
             };
 
+            cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(98);
             return Truncate(NormalizeExtractedText(text), maxChars);
         }
@@ -53,21 +67,23 @@ namespace TxtAIEditor.Core.Services
                 extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
         }
 
-        private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress)
+        private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
-            string text = await TryExtractPdfWithPdftotextAsync(filePath, maxChars, progress).ConfigureAwait(false);
+            string text = await TryExtractPdfWithPdftotextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(text))
             {
                 return text;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             return await new PdfTextExtractionService()
                 .ExtractTextAsync(filePath, maxChars, progress)
                 .ConfigureAwait(false);
         }
 
-        private static async Task<string> TryExtractPdfWithPdftotextAsync(string filePath, int maxChars, IProgress<int>? progress)
+        private static async Task<string> TryExtractPdfWithPdftotextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string executable = ResolveExecutablePath("pdftotext");
             if (string.Equals(executable, "pdftotext", StringComparison.OrdinalIgnoreCase))
             {
@@ -95,43 +111,57 @@ namespace TxtAIEditor.Core.Services
             {
                 progress?.Report(5);
                 process.Start();
+                RegisterPdftotextProcess(process);
             }
             catch
             {
                 return string.Empty;
             }
 
-            Task<string> stdoutTask = ReadTextPrefixAsync(process.StandardOutput, maxChars);
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync();
-            Task waitTask = process.WaitForExitAsync();
-
-            int reported = 5;
-            while (!waitTask.IsCompleted)
+            try
             {
-                await Task.Delay(500).ConfigureAwait(false);
-                reported = Math.Min(90, reported + 5);
-                progress?.Report(reported);
+                Task<string> stdoutTask = ReadTextPrefixAsync(process.StandardOutput, maxChars, cancellationToken);
+                Task<string> stderrTask = process.StandardError.ReadToEndAsync();
+                Task waitTask = process.WaitForExitAsync();
+
+                int reported = 5;
+                while (!waitTask.IsCompleted)
+                {
+                    await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+                    reported = Math.Min(90, reported + 5);
+                    progress?.Report(reported);
+                }
+
+                await waitTask.ConfigureAwait(false);
+                string stdout = await stdoutTask.ConfigureAwait(false);
+                _ = await stderrTask.ConfigureAwait(false);
+
+                if (process.ExitCode != 0)
+                {
+                    return string.Empty;
+                }
+
+                progress?.Report(95);
+                return stdout;
             }
-
-            await waitTask.ConfigureAwait(false);
-            string stdout = await stdoutTask.ConfigureAwait(false);
-            _ = await stderrTask.ConfigureAwait(false);
-
-            if (process.ExitCode != 0)
+            catch (OperationCanceledException)
             {
-                return string.Empty;
+                TryKillProcess(process);
+                throw;
             }
-
-            progress?.Report(95);
-            return stdout;
+            finally
+            {
+                UnregisterPdftotextProcess(process);
+            }
         }
 
-        private static async Task<string> ReadTextPrefixAsync(TextReader reader, int maxChars)
+        private static async Task<string> ReadTextPrefixAsync(TextReader reader, int maxChars, CancellationToken cancellationToken)
         {
             char[] buffer = new char[Math.Min(Math.Max(maxChars, 1), 81920)];
             var builder = new StringBuilder(Math.Min(maxChars, 81920));
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 int read = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
                 if (read <= 0)
                 {
@@ -146,6 +176,45 @@ namespace TxtAIEditor.Core.Services
             }
 
             return builder.ToString();
+        }
+
+        private static void TryKillProcess(Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static void RegisterPdftotextProcess(Process process)
+        {
+            try
+            {
+                RunningPdftotextProcesses[process.Id] = process;
+            }
+            catch
+            {
+            }
+        }
+
+        private static void UnregisterPdftotextProcess(Process process)
+        {
+            try
+            {
+                if (process.Id > 0)
+                {
+                    RunningPdftotextProcesses.TryRemove(process.Id, out _);
+                }
+            }
+            catch
+            {
+            }
         }
 
         private static string ResolveExecutablePath(string fileName)
@@ -183,7 +252,7 @@ namespace TxtAIEditor.Core.Services
             return fileName;
         }
 
-        private static async Task<string> ExtractDocxTextAsync(string filePath, int maxChars, IProgress<int>? progress)
+        private static async Task<string> ExtractDocxTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
             ZipArchiveEntry? entry = archive.GetEntry("word/document.xml");
@@ -198,6 +267,7 @@ namespace TxtAIEditor.Core.Services
 
             foreach (XElement paragraph in doc.Descendants().Where(e => e.Name.LocalName == "p"))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 AppendParagraphText(builder, paragraph);
                 AppendLimited(builder, "\n", maxChars);
                 if (builder.Length >= maxChars)
@@ -210,7 +280,7 @@ namespace TxtAIEditor.Core.Services
             return builder.ToString();
         }
 
-        private static async Task<string> ExtractPptxTextAsync(string filePath, int maxChars, IProgress<int>? progress)
+        private static async Task<string> ExtractPptxTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
             var slideEntries = archive.Entries
@@ -222,6 +292,7 @@ namespace TxtAIEditor.Core.Services
             int slideNumber = 1;
             for (int slideIndex = 0; slideIndex < slideEntries.Count; slideIndex++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 ZipArchiveEntry slideEntry = slideEntries[slideIndex];
                 progress?.Report(5 + (int)((slideIndex / (double)Math.Max(1, slideEntries.Count)) * 90));
                 XDocument slide = await LoadXmlEntryAsync(slideEntry).ConfigureAwait(false);
@@ -229,6 +300,7 @@ namespace TxtAIEditor.Core.Services
 
                 foreach (XElement paragraph in slide.Descendants().Where(e => e.Name.LocalName == "p"))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     int before = builder.Length;
                     AppendParagraphText(builder, paragraph);
                     if (builder.Length > before)
@@ -255,9 +327,9 @@ namespace TxtAIEditor.Core.Services
             return builder.ToString();
         }
 
-        private static async Task<string> ExtractXlsxTextAsync(string filePath, int maxChars, IProgress<int>? progress)
+        private static async Task<string> ExtractXlsxTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
-            IReadOnlyList<ExtractedSpreadsheetSheet> sheets = await ExtractXlsxSheetsAsync(filePath, maxChars, progress).ConfigureAwait(false);
+            IReadOnlyList<ExtractedSpreadsheetSheet> sheets = await ExtractXlsxSheetsAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false);
             if (sheets.Count == 0)
             {
                 return string.Empty;
@@ -271,6 +343,7 @@ namespace TxtAIEditor.Core.Services
             var builder = new StringBuilder();
             foreach (ExtractedSpreadsheetSheet sheet in sheets)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 AppendLimitedLine(builder, $"# Sheet: {EscapeCsvComment(sheet.Name)}", maxChars);
                 AppendLimited(builder, sheet.CsvContent, maxChars);
                 AppendLimited(builder, "\n", maxChars);
@@ -283,7 +356,7 @@ namespace TxtAIEditor.Core.Services
             return builder.ToString();
         }
 
-        private static async Task<string> ExtractHwpxTextAsync(string filePath, int maxChars, IProgress<int>? progress)
+        private static async Task<string> ExtractHwpxTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
             var sectionEntries = archive.Entries
@@ -305,12 +378,14 @@ namespace TxtAIEditor.Core.Services
             var builder = new StringBuilder();
             for (int sectionIndex = 0; sectionIndex < sectionEntries.Count; sectionIndex++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 ZipArchiveEntry sectionEntry = sectionEntries[sectionIndex];
                 progress?.Report(5 + (int)((sectionIndex / (double)Math.Max(1, sectionEntries.Count)) * 90));
 
                 XDocument section = await LoadXmlEntryAsync(sectionEntry).ConfigureAwait(false);
                 foreach (XElement paragraph in section.Descendants().Where(e => e.Name.LocalName == "p"))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     int before = builder.Length;
                     AppendHwpxParagraphText(builder, paragraph, maxChars);
                     if (builder.Length > before)
@@ -336,7 +411,7 @@ namespace TxtAIEditor.Core.Services
             return builder.ToString();
         }
 
-        public static async Task<IReadOnlyList<ExtractedSpreadsheetSheet>> ExtractXlsxSheetsAsync(string filePath, int maxChars, IProgress<int>? progress = null)
+        public static async Task<IReadOnlyList<ExtractedSpreadsheetSheet>> ExtractXlsxSheetsAsync(string filePath, int maxChars, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
         {
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
             IReadOnlyList<string> sharedStrings = await LoadSharedStringsAsync(archive).ConfigureAwait(false);
@@ -351,6 +426,7 @@ namespace TxtAIEditor.Core.Services
             int fallbackSheetNumber = 1;
             for (int sheetIndex = 0; sheetIndex < sheetEntries.Count; sheetIndex++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 ZipArchiveEntry sheetEntry = sheetEntries[sheetIndex];
                 progress?.Report(5 + (int)((sheetIndex / (double)Math.Max(1, sheetEntries.Count)) * 90));
                 string sheetName = sheetNamesByPath.TryGetValue(sheetEntry.FullName, out string? mappedName)
@@ -361,9 +437,11 @@ namespace TxtAIEditor.Core.Services
                 XDocument sheet = await LoadXmlEntryAsync(sheetEntry).ConfigureAwait(false);
                 foreach (XElement row in sheet.Descendants().Where(e => e.Name.LocalName == "row"))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var values = new List<string>();
                     foreach (XElement cell in row.Elements().Where(e => e.Name.LocalName == "c"))
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         int columnIndex = GetCellColumnIndex(cell);
                         if (columnIndex > 0)
                         {

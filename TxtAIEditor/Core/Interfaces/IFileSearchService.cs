@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Models;
 
@@ -27,7 +28,8 @@ namespace TxtAIEditor.Core.Interfaces
             string query,
             long largeFileThresholdBytes,
             FileSearchOptions options,
-            Action<IReadOnlyList<SearchResultItem>> publishResults);
+            Action<IReadOnlyList<SearchResultItem>> publishResults,
+            CancellationToken cancellationToken = default);
         string ReplaceSearchMatches(string original, string query, string replace, FileSearchOptions options);
         Task ReplaceInLargeFileAsync(string filePath, IEnumerable<SearchResultItem> results, string query, string replace, FileSearchOptions options);
     }

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -31,6 +32,8 @@ namespace TxtAIEditor.Controls
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
         private string _lastSearchQuery = string.Empty;
+        private CancellationTokenSource? _searchCancellationTokenSource;
+        private int _searchVersion;
         public event Func<string, Task>? FileModified;
 
         public SearchReplaceController(
@@ -90,6 +93,12 @@ namespace TxtAIEditor.Controls
             _viewModel.SearchResults.Clear();
             _viewModel.SearchResultsGrouped.Clear();
 
+            _searchCancellationTokenSource?.Cancel();
+            var searchCancellationTokenSource = new CancellationTokenSource();
+            _searchCancellationTokenSource = searchCancellationTokenSource;
+            int searchVersion = unchecked(++_searchVersion);
+            CancellationToken cancellationToken = searchCancellationTokenSource.Token;
+
             FileSearchSummary summary;
             try
             {
@@ -98,11 +107,35 @@ namespace TxtAIEditor.Controls
                     query,
                     _largeFileThresholdBytesProvider(),
                     GetSearchOptions(),
-                    PublishSearchResults);
+                    results => PublishSearchResults(results, searchVersion, cancellationToken),
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
             }
             catch (ArgumentException ex)
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 _showError("검색 실패", $"정규식이 올바르지 않습니다.\n{ex.Message}");
+                return;
+            }
+            finally
+            {
+                if (ReferenceEquals(_searchCancellationTokenSource, searchCancellationTokenSource))
+                {
+                    _searchCancellationTokenSource = null;
+                }
+
+                searchCancellationTokenSource.Dispose();
+            }
+
+            if (cancellationToken.IsCancellationRequested || searchVersion != _searchVersion)
+            {
                 return;
             }
 
@@ -298,10 +331,20 @@ namespace TxtAIEditor.Controls
             };
         }
 
-        private void PublishSearchResults(System.Collections.Generic.IReadOnlyList<SearchResultItem> results)
+        private void PublishSearchResults(System.Collections.Generic.IReadOnlyList<SearchResultItem> results, int searchVersion, CancellationToken cancellationToken)
         {
+            if (cancellationToken.IsCancellationRequested || searchVersion != _searchVersion)
+            {
+                return;
+            }
+
             _searchResultsList.DispatcherQueue.TryEnqueue(() =>
             {
+                if (cancellationToken.IsCancellationRequested || searchVersion != _searchVersion)
+                {
+                    return;
+                }
+
                 if (_viewModel.SearchResults is BulkObservableCollection<SearchResultItem> bulk)
                 {
                     bulk.AddRange(results);
