@@ -16,6 +16,7 @@ namespace TxtAIEditor.Core.Services
     public sealed class FileSearchService : IFileSearchService
     {
         private const int DocumentSearchMaxChars = 50_000_000;
+        private const int SearchResultBatchSize = 100;
 
         private static readonly HashSet<string> SkippedFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -58,7 +59,12 @@ namespace TxtAIEditor.Core.Services
                 pattern = $"\\b{pattern}\\b";
             }
 
-            var regexOptions = options.MatchCase ? RegexOptions.None : RegexOptions.IgnoreCase;
+            var regexOptions = RegexOptions.Compiled | RegexOptions.CultureInvariant;
+            if (!options.MatchCase)
+            {
+                regexOptions |= RegexOptions.IgnoreCase;
+            }
+
             return new Regex(pattern, regexOptions);
         }
 
@@ -70,93 +76,44 @@ namespace TxtAIEditor.Core.Services
             Action<IReadOnlyList<SearchResultItem>> publishResults,
             CancellationToken cancellationToken = default)
         {
-            var searchRegex = BuildSearchRegex(query, options);
+            Regex? regex = options.IsRegex || options.WholeWord
+                ? BuildSearchRegex(query, options)
+                : null;
+            var matcher = SearchMatcher.Create(query, options, regex);
             int foundCount = 0;
             int skippedFiles = 0;
 
-            await Task.Run(() =>
+            var parallelOptions = new ParallelOptions
             {
-                var tempResults = new List<SearchResultItem>();
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = GetSearchDegreeOfParallelism()
+            };
 
-                foreach (var file in EnumerateSearchFiles(searchRoot))
+            await Parallel.ForEachAsync(EnumerateSearchFiles(searchRoot), parallelOptions, async (file, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+
+                try
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    int fileFoundCount = DocumentTextExtractionService.IsSupportedExtension(file)
+                        ? await SearchExtractedDocumentAsync(file, matcher, publishResults, token).ConfigureAwait(false)
+                        : SearchTextFile(file, matcher, publishResults, token);
 
-                    try
+                    if (fileFoundCount > 0)
                     {
-                        if (DocumentTextExtractionService.IsSupportedExtension(file))
-                        {
-                            foundCount += SearchExtractedDocument(
-                                file,
-                                searchRegex,
-                                tempResults,
-                                publishResults,
-                                cancellationToken);
-                            continue;
-                        }
-
-                        var info = new FileInfo(file);
-                        if (info.Length > largeFileThresholdBytes)
-                        {
-                            var largeResults = _fileService.SearchLargeFileAsync(
-                                file,
-                                query,
-                                options.IsRegex,
-                                options.MatchCase,
-                                options.WholeWord).GetAwaiter().GetResult();
-
-                            foreach (var lr in largeResults)
-                            {
-                                cancellationToken.ThrowIfCancellationRequested();
-
-                                tempResults.Add(new SearchResultItem
-                                {
-                                    Path = file,
-                                    LineNumber = lr.LineNumber,
-                                    LineContent = lr.LineContent,
-                                    IndexOfMatch = lr.IndexOfMatch,
-                                    MatchLength = lr.MatchLength
-                                });
-                                foundCount++;
-                                FlushSearchResultsIfNeeded(tempResults, publishResults, cancellationToken);
-                            }
-
-                            continue;
-                        }
-
-                        int lineNum = 1;
-                        foreach (var line in File.ReadLines(file))
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-
-                            var match = searchRegex.Match(line);
-                            if (match.Success)
-                            {
-                                tempResults.Add(new SearchResultItem
-                                {
-                                    Path = file,
-                                    LineNumber = lineNum,
-                                    LineContent = line,
-                                    IndexOfMatch = match.Index,
-                                    MatchLength = match.Length
-                                });
-                                foundCount++;
-                                FlushSearchResultsIfNeeded(tempResults, publishResults, cancellationToken);
-                            }
-
-                            lineNum++;
-                        }
-                    }
-                    catch (Exception ex) when (IsSearchReadException(ex))
-                    {
-                        skippedFiles++;
-                        Debug.WriteLine($"Skipped search file {file}: {ex.Message}");
+                        Interlocked.Add(ref foundCount, fileFoundCount);
                     }
                 }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                FlushSearchResults(tempResults, publishResults, cancellationToken);
-            }, cancellationToken);
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (IsSearchReadException(ex))
+                {
+                    Interlocked.Increment(ref skippedFiles);
+                    Debug.WriteLine($"Skipped search file {file}: {ex.Message}");
+                }
+            }).ConfigureAwait(false);
 
             return new FileSearchSummary
             {
@@ -165,40 +122,37 @@ namespace TxtAIEditor.Core.Services
             };
         }
 
-        private int SearchExtractedDocument(
+        private async Task<int> SearchExtractedDocumentAsync(
             string file,
-            Regex searchRegex,
-            List<SearchResultItem> tempResults,
+            SearchMatcher matcher,
             Action<IReadOnlyList<SearchResultItem>> publishResults,
             CancellationToken cancellationToken)
         {
             int foundCount = 0;
-            string extracted = _documentTextExtractionService
-                .ExtractTextAsync(file, DocumentSearchMaxChars, cancellationToken: cancellationToken)
-                .ConfigureAwait(false)
-                .GetAwaiter()
-                .GetResult();
+            string extracted = await _documentTextExtractionService
+                .ExtractTextAsync(file, DocumentSearchMaxChars, normalize: false, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(extracted))
             {
                 return 0;
             }
 
+            var tempResults = new List<SearchResultItem>(SearchResultBatchSize);
             int lineNum = 1;
             foreach (string line in EnumerateNormalizedLines(extracted))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                Match match = searchRegex.Match(line);
-                if (match.Success)
+                if (matcher.TryFind(line, out int indexOfMatch, out int matchLength))
                 {
                     tempResults.Add(new SearchResultItem
                     {
                         Path = file,
                         LineNumber = lineNum,
                         LineContent = line,
-                        IndexOfMatch = match.Index,
-                        MatchLength = match.Length,
+                        IndexOfMatch = indexOfMatch,
+                        MatchLength = matchLength,
                         CanReplace = false
                     });
                     foundCount++;
@@ -208,6 +162,56 @@ namespace TxtAIEditor.Core.Services
                 lineNum++;
             }
 
+            FlushSearchResults(tempResults, publishResults, cancellationToken);
+            return foundCount;
+        }
+
+        private static int SearchTextFile(
+            string file,
+            SearchMatcher matcher,
+            Action<IReadOnlyList<SearchResultItem>> publishResults,
+            CancellationToken cancellationToken)
+        {
+            int foundCount = 0;
+            var tempResults = new List<SearchResultItem>(SearchResultBatchSize);
+
+            using var stream = new FileStream(
+                file,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                bufferSize: 64 * 1024,
+                options: FileOptions.SequentialScan);
+            using var reader = new StreamReader(
+                stream,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: true,
+                bufferSize: 64 * 1024);
+
+            string? line;
+            int lineNum = 1;
+            while ((line = reader.ReadLine()) != null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (matcher.TryFind(line, out int indexOfMatch, out int matchLength))
+                {
+                    tempResults.Add(new SearchResultItem
+                    {
+                        Path = file,
+                        LineNumber = lineNum,
+                        LineContent = line,
+                        IndexOfMatch = indexOfMatch,
+                        MatchLength = matchLength
+                    });
+                    foundCount++;
+                    FlushSearchResultsIfNeeded(tempResults, publishResults, cancellationToken);
+                }
+
+                lineNum++;
+            }
+
+            FlushSearchResults(tempResults, publishResults, cancellationToken);
             return foundCount;
         }
 
@@ -459,9 +463,14 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        private static int GetSearchDegreeOfParallelism()
+        {
+            return Math.Clamp(Environment.ProcessorCount, 2, 8);
+        }
+
         private static void FlushSearchResultsIfNeeded(List<SearchResultItem> results, Action<IReadOnlyList<SearchResultItem>> publishResults, CancellationToken cancellationToken)
         {
-            if (results.Count >= 30)
+            if (results.Count >= SearchResultBatchSize)
             {
                 FlushSearchResults(results, publishResults, cancellationToken);
             }
@@ -478,6 +487,53 @@ namespace TxtAIEditor.Core.Services
             var batch = results.ToList();
             results.Clear();
             publishResults(batch);
+        }
+
+        private readonly struct SearchMatcher
+        {
+            private readonly string _query;
+            private readonly StringComparison _comparison;
+            private readonly Regex? _regex;
+
+            private SearchMatcher(string query, StringComparison comparison, Regex? regex)
+            {
+                _query = query;
+                _comparison = comparison;
+                _regex = regex;
+            }
+
+            public static SearchMatcher Create(string query, FileSearchOptions options, Regex? regex)
+            {
+                if (options.IsRegex || options.WholeWord)
+                {
+                    return new SearchMatcher(query, StringComparison.Ordinal, regex ?? throw new ArgumentNullException(nameof(regex)));
+                }
+
+                var comparison = options.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+                return new SearchMatcher(query, comparison, null);
+            }
+
+            public bool TryFind(string line, out int indexOfMatch, out int matchLength)
+            {
+                if (_regex != null)
+                {
+                    Match match = _regex.Match(line);
+                    if (match.Success)
+                    {
+                        indexOfMatch = match.Index;
+                        matchLength = match.Length;
+                        return true;
+                    }
+
+                    indexOfMatch = -1;
+                    matchLength = 0;
+                    return false;
+                }
+
+                indexOfMatch = line.IndexOf(_query, _comparison);
+                matchLength = indexOfMatch >= 0 ? _query.Length : 0;
+                return indexOfMatch >= 0;
+            }
         }
     }
 

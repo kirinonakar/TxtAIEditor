@@ -32,7 +32,12 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        public async Task<string> ExtractTextAsync(string filePath, int maxChars, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+        public async Task<string> ExtractTextAsync(
+            string filePath,
+            int maxChars,
+            IProgress<int>? progress = null,
+            bool normalize = true,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || maxChars <= 0)
             {
@@ -54,7 +59,7 @@ namespace TxtAIEditor.Core.Services
 
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(98);
-            return Truncate(NormalizeExtractedText(text), maxChars);
+            return Truncate(normalize ? NormalizeExtractedText(text) : text, maxChars);
         }
 
         public static bool IsSupportedExtension(string filePath)

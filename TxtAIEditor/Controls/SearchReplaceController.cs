@@ -35,6 +35,7 @@ namespace TxtAIEditor.Controls
         private string _lastSearchQuery = string.Empty;
         private CancellationTokenSource? _searchCancellationTokenSource;
         private int _searchVersion;
+        private int _groupedResultsUpdateQueued;
         public event Func<string, Task>? FileModified;
 
         public SearchReplaceController(
@@ -391,49 +392,70 @@ namespace TxtAIEditor.Controls
                         _viewModel.SearchResults.Add(item);
                     }
                 }
-                UpdateGroupedResults();
+                QueueGroupedResultsUpdate();
             });
         }
 
         private void UpdateGroupedResults()
         {
-            _searchResultsList.DispatcherQueue.TryEnqueue(() =>
+            QueueGroupedResultsUpdate();
+        }
+
+        private void QueueGroupedResultsUpdate()
+        {
+            if (Interlocked.Exchange(ref _groupedResultsUpdateQueued, 1) == 1)
             {
-                string searchRoot = _searchRootProvider();
-                var groups = _viewModel.SearchResults
-                    .GroupBy(item => item.Path)
-                    .Select(g =>
-                    {
-                        string relDir = "";
-                        try
-                        {
-                            if (!string.IsNullOrEmpty(searchRoot) && g.Key.StartsWith(searchRoot, StringComparison.OrdinalIgnoreCase))
-                            {
-                                string relPath = Path.GetRelativePath(searchRoot, g.Key);
-                                string? dir = Path.GetDirectoryName(relPath);
-                                relDir = string.IsNullOrEmpty(dir) || dir == "." ? "" : dir.Replace('\\', '/');
-                            }
-                            else
-                            {
-                                string? dir = Path.GetDirectoryName(g.Key);
-                                relDir = string.IsNullOrEmpty(dir) ? "" : dir.Replace('\\', '/');
-                            }
-                        }
-                        catch
-                        {
-                            relDir = Path.GetDirectoryName(g.Key) ?? "";
-                        }
+                return;
+            }
 
-                        return new SearchResultGroup(g.Key, g.ToList(), relDir);
-                    })
-                    .ToList();
-
-                _viewModel.SearchResultsGrouped.Clear();
-                foreach (var grp in groups)
-                {
-                    _viewModel.SearchResultsGrouped.Add(grp);
-                }
+            bool queued = _searchResultsList.DispatcherQueue.TryEnqueue(() =>
+            {
+                Interlocked.Exchange(ref _groupedResultsUpdateQueued, 0);
+                RebuildGroupedResults();
             });
+
+            if (!queued)
+            {
+                Interlocked.Exchange(ref _groupedResultsUpdateQueued, 0);
+            }
+        }
+
+        private void RebuildGroupedResults()
+        {
+            string searchRoot = _searchRootProvider();
+            var groups = _viewModel.SearchResults
+                .GroupBy(item => item.Path)
+                .Select(g =>
+                {
+                    string relDir = "";
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(searchRoot) && g.Key.StartsWith(searchRoot, StringComparison.OrdinalIgnoreCase))
+                        {
+                            string relPath = Path.GetRelativePath(searchRoot, g.Key);
+                            string? dir = Path.GetDirectoryName(relPath);
+                            relDir = string.IsNullOrEmpty(dir) || dir == "." ? "" : dir.Replace('\\', '/');
+                        }
+                        else
+                        {
+                            string? dir = Path.GetDirectoryName(g.Key);
+                            relDir = string.IsNullOrEmpty(dir) ? "" : dir.Replace('\\', '/');
+                        }
+                    }
+                    catch
+                    {
+                        relDir = Path.GetDirectoryName(g.Key) ?? "";
+                    }
+
+                    return new SearchResultGroup(g.Key, g.ToList(), relDir);
+                })
+                .ToList();
+
+            _viewModel.SearchResultsGrouped.Clear();
+            foreach (var grp in groups)
+            {
+                _viewModel.SearchResultsGrouped.Add(grp);
+            }
         }
     }
 }
