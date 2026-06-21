@@ -110,18 +110,6 @@ namespace TxtAIEditor.Controls
             {
                 _showError("검색 완료", $"검색 결과가 없습니다.\n읽을 수 없어 건너뛴 파일: {summary.SkippedFiles:N0}개");
             }
-            else if (summary.FoundCount > 0)
-            {
-                _searchResultsList.DispatcherQueue.TryEnqueue(async () =>
-                {
-                    _searchResultsList.SelectedIndex = 0;
-                    _searchResultsList.ScrollIntoView(_searchResultsList.SelectedItem);
-                    if (_searchResultsList.SelectedItem is SearchResultItem selectedItem)
-                    {
-                        await _loadAndHighlightResultAsync(selectedItem, _lastSearchQuery);
-                    }
-                });
-            }
         }
 
         public async Task ReplaceAllAsync()
