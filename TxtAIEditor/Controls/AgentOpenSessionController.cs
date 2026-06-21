@@ -369,9 +369,14 @@ namespace TxtAIEditor.Controls
         public void UpdateSessionTitle(AgentOpenSessionState session, string prompt)
         {
             string firstLine = BuildOpenSessionTitle(prompt);
-            session.Title = string.IsNullOrWhiteSpace(firstLine)
-                ? GetUntitledOpenSessionTitle()
-                : firstLine;
+            if (!string.IsNullOrWhiteSpace(firstLine))
+            {
+                session.Title = firstLine;
+            }
+            else if (string.IsNullOrWhiteSpace(session.Title))
+            {
+                session.Title = GetUntitledOpenSessionTitle();
+            }
         }
 
         public void UpdateActiveSessionBusyState()
