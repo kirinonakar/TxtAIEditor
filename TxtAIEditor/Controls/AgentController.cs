@@ -1155,6 +1155,13 @@ namespace TxtAIEditor.Controls
                 activeOpenSession.Attachments = runContext.Attachments.ToList();
                 activeOpenSession.WorkspaceRoot = runContext.WorkspaceRoot;
                 _openSessionController.ClearThinkingState(activeOpenSession);
+                if (IsSessionVisible(runContext.SessionId))
+                {
+                    RestoreSessionHistoryState(
+                        activeOpenSession.SessionHistoryText,
+                        activeOpenSession.SessionHistoryTokenCount,
+                        activeOpenSession.CurrentRunTranscriptTokens);
+                }
                 UpdateActiveSessionBusyState();
 
                 if (_openSessionController.IsPendingClose(runContext.SessionId))

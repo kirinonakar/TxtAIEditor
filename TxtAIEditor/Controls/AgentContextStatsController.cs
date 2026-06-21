@@ -143,7 +143,10 @@ namespace TxtAIEditor.Controls
                     result += " -v";
                 }
                 _agentPane.UpdateModelName(result);
-            _refreshOutputDisplay();
+            if (forceClearCache)
+            {
+                _refreshOutputDisplay();
+            }
         }
 
         private double EstimateContextTokens()
