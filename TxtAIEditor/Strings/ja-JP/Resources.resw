@@ -494,6 +494,9 @@
   <data name="SearchHeader" xml:space="preserve">
     <value>フォルダ内検索と置換</value>
   </data>
+  <data name="SearchInProgressSuffix" xml:space="preserve">
+    <value>(検索中)</value>
+  </data>
   <data name="SearchPlaceholder" xml:space="preserve">
     <value>検索語を入力...</value>
   </data>

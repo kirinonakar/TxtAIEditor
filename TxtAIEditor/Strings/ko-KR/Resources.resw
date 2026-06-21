@@ -494,6 +494,9 @@
   <data name="SearchHeader" xml:space="preserve">
     <value>폴더 전체 검색 및 바꾸기</value>
   </data>
+  <data name="SearchInProgressSuffix" xml:space="preserve">
+    <value>(검색중)</value>
+  </data>
   <data name="SearchPlaceholder" xml:space="preserve">
     <value>검색어 입력...</value>
   </data>

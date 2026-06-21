@@ -22,6 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly ToggleButton _wholeWordToggle;
         private readonly ToggleButton _regexToggle;
         private readonly ListView _searchResultsList;
+        private readonly TextBlock _searchHeaderLabel;
         private readonly Func<string> _searchRootProvider;
         private readonly Func<long> _largeFileThresholdBytesProvider;
         private readonly Func<XamlRoot> _xamlRootProvider;
@@ -45,6 +46,7 @@ namespace TxtAIEditor.Controls
             ToggleButton wholeWordToggle,
             ToggleButton regexToggle,
             ListView searchResultsList,
+            TextBlock searchHeaderLabel,
             Func<string> searchRootProvider,
             Func<long> largeFileThresholdBytesProvider,
             Func<XamlRoot> xamlRootProvider,
@@ -63,6 +65,7 @@ namespace TxtAIEditor.Controls
             _wholeWordToggle = wholeWordToggle;
             _regexToggle = regexToggle;
             _searchResultsList = searchResultsList;
+            _searchHeaderLabel = searchHeaderLabel;
             _searchRootProvider = searchRootProvider;
             _largeFileThresholdBytesProvider = largeFileThresholdBytesProvider;
             _xamlRootProvider = xamlRootProvider;
@@ -79,6 +82,7 @@ namespace TxtAIEditor.Controls
             string query = _searchQueryInput.Text;
             if (string.IsNullOrWhiteSpace(query))
             {
+                CancelActiveSearch();
                 return;
             }
 
@@ -98,6 +102,7 @@ namespace TxtAIEditor.Controls
             _searchCancellationTokenSource = searchCancellationTokenSource;
             int searchVersion = unchecked(++_searchVersion);
             CancellationToken cancellationToken = searchCancellationTokenSource.Token;
+            SetSearchHeaderIsSearching(searchVersion, true);
 
             FileSearchSummary summary;
             try
@@ -129,6 +134,7 @@ namespace TxtAIEditor.Controls
                 if (ReferenceEquals(_searchCancellationTokenSource, searchCancellationTokenSource))
                 {
                     _searchCancellationTokenSource = null;
+                    SetSearchHeaderIsSearching(searchVersion, false);
                 }
 
                 searchCancellationTokenSource.Dispose();
@@ -329,6 +335,35 @@ namespace TxtAIEditor.Controls
                 MatchCase = _matchCaseToggle.IsChecked == true,
                 WholeWord = _wholeWordToggle.IsChecked == true
             };
+        }
+
+        private void CancelActiveSearch()
+        {
+            _searchCancellationTokenSource?.Cancel();
+            unchecked
+            {
+                _searchVersion++;
+            }
+
+            SetSearchHeaderText(isSearching: false);
+        }
+
+        private void SetSearchHeaderIsSearching(int searchVersion, bool isSearching)
+        {
+            if (searchVersion != _searchVersion)
+            {
+                return;
+            }
+
+            SetSearchHeaderText(isSearching);
+        }
+
+        private void SetSearchHeaderText(bool isSearching)
+        {
+            string header = _getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
+            _searchHeaderLabel.Text = isSearching
+                ? header + " " + _getString("SearchInProgressSuffix", "(검색중)")
+                : header;
         }
 
         private void PublishSearchResults(System.Collections.Generic.IReadOnlyList<SearchResultItem> results, int searchVersion, CancellationToken cancellationToken)
