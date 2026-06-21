@@ -2621,4 +2621,10 @@
   <data name="AgentOpenSessionUntitled" xml:space="preserve">
     <value>新規セッション</value>
   </data>
+  <data name="SearchReplaceReadOnlyTitle" xml:space="preserve">
+    <value>置換できません</value>
+  </data>
+  <data name="SearchReplaceReadOnlyContent" xml:space="preserve">
+    <value>ドキュメントファイルの検索結果は内容検索専用のため、置換できません。</value>
+  </data>
 </root>

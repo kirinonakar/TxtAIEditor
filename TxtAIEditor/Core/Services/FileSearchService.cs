@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Xml;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 
@@ -13,6 +14,8 @@ namespace TxtAIEditor.Core.Services
 {
     public sealed class FileSearchService : IFileSearchService
     {
+        private const int DocumentSearchMaxChars = 50_000_000;
+
         private static readonly HashSet<string> SkippedFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             // Compiled / native binaries
@@ -33,10 +36,17 @@ namespace TxtAIEditor.Core.Services
         };
 
         private readonly IFileService _fileService;
+        private readonly DocumentTextExtractionService _documentTextExtractionService;
 
         public FileSearchService(IFileService fileService)
+            : this(fileService, new DocumentTextExtractionService())
+        {
+        }
+
+        public FileSearchService(IFileService fileService, DocumentTextExtractionService documentTextExtractionService)
         {
             _fileService = fileService;
+            _documentTextExtractionService = documentTextExtractionService;
         }
 
         public Regex BuildSearchRegex(string query, FileSearchOptions options)
@@ -70,6 +80,16 @@ namespace TxtAIEditor.Core.Services
                 {
                     try
                     {
+                        if (DocumentTextExtractionService.IsSupportedExtension(file))
+                        {
+                            foundCount += SearchExtractedDocument(
+                                file,
+                                searchRegex,
+                                tempResults,
+                                publishResults);
+                            continue;
+                        }
+
                         var info = new FileInfo(file);
                         if (info.Length > largeFileThresholdBytes)
                         {
@@ -118,7 +138,7 @@ namespace TxtAIEditor.Core.Services
                             lineNum++;
                         }
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException || ex is NotSupportedException)
+                    catch (Exception ex) when (IsSearchReadException(ex))
                     {
                         skippedFiles++;
                         Debug.WriteLine($"Skipped search file {file}: {ex.Message}");
@@ -133,6 +153,49 @@ namespace TxtAIEditor.Core.Services
                 FoundCount = foundCount,
                 SkippedFiles = skippedFiles
             };
+        }
+
+        private int SearchExtractedDocument(
+            string file,
+            Regex searchRegex,
+            List<SearchResultItem> tempResults,
+            Action<IReadOnlyList<SearchResultItem>> publishResults)
+        {
+            int foundCount = 0;
+            string extracted = _documentTextExtractionService
+                .ExtractTextAsync(file, DocumentSearchMaxChars)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
+
+            if (string.IsNullOrWhiteSpace(extracted))
+            {
+                return 0;
+            }
+
+            int lineNum = 1;
+            foreach (string line in EnumerateNormalizedLines(extracted))
+            {
+                Match match = searchRegex.Match(line);
+                if (match.Success)
+                {
+                    tempResults.Add(new SearchResultItem
+                    {
+                        Path = file,
+                        LineNumber = lineNum,
+                        LineContent = line,
+                        IndexOfMatch = match.Index,
+                        MatchLength = match.Length,
+                        CanReplace = false
+                    });
+                    foundCount++;
+                    FlushSearchResultsIfNeeded(tempResults, publishResults);
+                }
+
+                lineNum++;
+            }
+
+            return foundCount;
         }
 
         public string ReplaceSearchMatches(string original, string query, string replace, FileSearchOptions options)
@@ -234,12 +297,38 @@ namespace TxtAIEditor.Core.Services
 
         private static bool ShouldSkipFileExtension(string filePath)
         {
+            if (DocumentTextExtractionService.IsSupportedExtension(filePath))
+            {
+                return false;
+            }
+
             string ext = Path.GetExtension(filePath);
             if (string.IsNullOrEmpty(ext))
             {
                 return false;
             }
             return SkippedFileExtensions.Contains(ext);
+        }
+
+        private static IEnumerable<string> EnumerateNormalizedLines(string text)
+        {
+            using var reader = new StringReader(text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n'));
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                yield return line;
+            }
+        }
+
+        private static bool IsSearchReadException(Exception ex)
+        {
+            return ex is IOException ||
+                ex is UnauthorizedAccessException ||
+                ex is System.Security.SecurityException ||
+                ex is NotSupportedException ||
+                ex is InvalidDataException ||
+                ex is XmlException ||
+                ex is ArgumentException;
         }
 
         private static bool IsPathIgnored(string absolutePath, List<GitIgnoreFile> gitIgnoreStack, bool isDir)

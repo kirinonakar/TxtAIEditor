@@ -2620,4 +2620,10 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentOpenSessionUntitled" xml:space="preserve">
     <value>New session</value>
   </data>
+  <data name="SearchReplaceReadOnlyTitle" xml:space="preserve">
+    <value>Cannot replace</value>
+  </data>
+  <data name="SearchReplaceReadOnlyContent" xml:space="preserve">
+    <value>Document search results are read-only and cannot be replaced.</value>
+  </data>
 </root>

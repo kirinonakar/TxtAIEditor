@@ -27,6 +27,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<SearchResultItem, string, Task> _loadAndHighlightResultAsync;
         private readonly Func<Task> _refreshGitStatusAsync;
+        private readonly Func<string, string, string> _getString;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
         private string _lastSearchQuery = string.Empty;
@@ -47,6 +48,7 @@ namespace TxtAIEditor.Controls
             Action<string, string> showError,
             Func<SearchResultItem, string, Task> loadAndHighlightResultAsync,
             Func<Task> refreshGitStatusAsync,
+            Func<string, string, string>? getString = null,
             Action? beforeDialog = null,
             Action? afterDialog = null)
         {
@@ -64,6 +66,7 @@ namespace TxtAIEditor.Controls
             _showError = showError;
             _loadAndHighlightResultAsync = loadAndHighlightResultAsync;
             _refreshGitStatusAsync = refreshGitStatusAsync;
+            _getString = getString ?? ((_, fallback) => fallback);
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
         }
@@ -130,6 +133,15 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            var editableResults = _viewModel.SearchResults.Where(r => r.CanReplace).ToList();
+            if (editableResults.Count == 0)
+            {
+                _showError(
+                    _getString("SearchReplaceReadOnlyTitle", "바꾸기 불가"),
+                    _getString("SearchReplaceReadOnlyContent", "문서 파일의 검색 결과는 내용 검색 전용이라 바꾸기할 수 없습니다."));
+                return;
+            }
+
             var options = GetSearchOptions();
             try
             {
@@ -145,7 +157,7 @@ namespace TxtAIEditor.Controls
             var dialog = new ContentDialog
             {
                 Title = "전체 바꾸기 경고",
-                Content = $"{_viewModel.SearchResults.Count}개의 일치 항목을 '{replace}'(으)로 일괄 바꾸기하시겠습니까?",
+                Content = $"{editableResults.Count}개의 일치 항목을 '{replace}'(으)로 일괄 바꾸기하시겠습니까?",
                 PrimaryButtonText = "바꾸기 실행",
                 CloseButtonText = "취소",
                 XamlRoot = _xamlRootProvider()
@@ -159,7 +171,7 @@ namespace TxtAIEditor.Controls
             }
 
             long thresholdBytes = _largeFileThresholdBytesProvider();
-            var grouped = _viewModel.SearchResults.GroupBy(r => r.Path).ToList();
+            var grouped = editableResults.GroupBy(r => r.Path).ToList();
             foreach (var group in grouped)
             {
                 string filePath = group.Key;
@@ -196,8 +208,12 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            _viewModel.SearchResults.Clear();
-            _viewModel.SearchResultsGrouped.Clear();
+            foreach (SearchResultItem replacedItem in editableResults)
+            {
+                _viewModel.SearchResults.Remove(replacedItem);
+            }
+
+            UpdateGroupedResults();
             _showError("바꾸기 완료", "모든 매칭 항목의 바꾸기 처리가 완료되었습니다.");
             await _refreshGitStatusAsync();
         }
@@ -213,6 +229,14 @@ namespace TxtAIEditor.Controls
             string replace = _replaceQueryInput.Text;
             if (string.IsNullOrEmpty(query))
             {
+                return;
+            }
+
+            if (!item.CanReplace)
+            {
+                _showError(
+                    _getString("SearchReplaceReadOnlyTitle", "바꾸기 불가"),
+                    _getString("SearchReplaceReadOnlyContent", "문서 파일의 검색 결과는 내용 검색 전용이라 바꾸기할 수 없습니다."));
                 return;
             }
 

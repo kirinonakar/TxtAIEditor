@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Microsoft.UI.Xaml;
 
 namespace TxtAIEditor.Core.Models
 {
@@ -41,7 +42,9 @@ namespace TxtAIEditor.Core.Models
         public string LineContent { get; set; } = string.Empty;
         public int IndexOfMatch { get; set; }
         public int MatchLength { get; set; }
+        public bool CanReplace { get; set; } = true;
         public string LineHeader => $"Line {LineNumber}";
+        public Visibility ReplaceButtonVisibility => CanReplace ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public class SearchResultGroup : System.Collections.Generic.List<SearchResultItem>

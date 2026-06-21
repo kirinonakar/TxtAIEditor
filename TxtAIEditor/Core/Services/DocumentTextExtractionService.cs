@@ -55,7 +55,15 @@ namespace TxtAIEditor.Core.Services
 
         private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress)
         {
-            return await TryExtractPdfWithPdftotextAsync(filePath, maxChars, progress).ConfigureAwait(false);
+            string text = await TryExtractPdfWithPdftotextAsync(filePath, maxChars, progress).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return text;
+            }
+
+            return await new PdfTextExtractionService()
+                .ExtractTextAsync(filePath, maxChars, progress)
+                .ConfigureAwait(false);
         }
 
         private static async Task<string> TryExtractPdfWithPdftotextAsync(string filePath, int maxChars, IProgress<int>? progress)
@@ -66,7 +74,6 @@ namespace TxtAIEditor.Core.Services
                 return string.Empty;
             }
 
-            string tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
             using var process = new Process();
             process.StartInfo = new ProcessStartInfo
             {
@@ -82,7 +89,7 @@ namespace TxtAIEditor.Core.Services
             process.StartInfo.ArgumentList.Add("-enc");
             process.StartInfo.ArgumentList.Add("UTF-8");
             process.StartInfo.ArgumentList.Add(filePath);
-            process.StartInfo.ArgumentList.Add(tempPath);
+            process.StartInfo.ArgumentList.Add("-");
 
             try
             {
@@ -91,11 +98,10 @@ namespace TxtAIEditor.Core.Services
             }
             catch
             {
-                TryDelete(tempPath);
                 return string.Empty;
             }
 
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> stdoutTask = ReadTextPrefixAsync(process.StandardOutput, maxChars);
             Task<string> stderrTask = process.StandardError.ReadToEndAsync();
             Task waitTask = process.WaitForExitAsync();
 
@@ -108,53 +114,38 @@ namespace TxtAIEditor.Core.Services
             }
 
             await waitTask.ConfigureAwait(false);
-            _ = await stdoutTask.ConfigureAwait(false);
+            string stdout = await stdoutTask.ConfigureAwait(false);
             _ = await stderrTask.ConfigureAwait(false);
 
-            if (process.ExitCode != 0 || !File.Exists(tempPath))
+            if (process.ExitCode != 0)
             {
-                TryDelete(tempPath);
                 return string.Empty;
             }
 
             progress?.Report(95);
-            string text = await ReadTextFilePrefixAsync(tempPath, maxChars).ConfigureAwait(false);
-            TryDelete(tempPath);
-            return text;
+            return stdout;
         }
 
-        private static async Task<string> ReadTextFilePrefixAsync(string filePath, int maxChars)
+        private static async Task<string> ReadTextPrefixAsync(TextReader reader, int maxChars)
         {
-            using var reader = new StreamReader(filePath, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            char[] buffer = new char[Math.Min(maxChars, 81920)];
+            char[] buffer = new char[Math.Min(Math.Max(maxChars, 1), 81920)];
             var builder = new StringBuilder(Math.Min(maxChars, 81920));
-            while (builder.Length < maxChars)
+            while (true)
             {
-                int remaining = maxChars - builder.Length;
-                int read = await reader.ReadAsync(buffer, 0, Math.Min(buffer.Length, remaining)).ConfigureAwait(false);
+                int read = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
                 if (read <= 0)
                 {
                     break;
                 }
 
-                builder.Append(buffer, 0, read);
+                if (builder.Length < maxChars)
+                {
+                    int remaining = maxChars - builder.Length;
+                    builder.Append(buffer, 0, Math.Min(read, remaining));
+                }
             }
 
             return builder.ToString();
-        }
-
-        private static void TryDelete(string path)
-        {
-            try
-            {
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                }
-            }
-            catch
-            {
-            }
         }
 
         private static string ResolveExecutablePath(string fileName)

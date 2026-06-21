@@ -2620,4 +2620,10 @@
   <data name="AgentOpenSessionUntitled" xml:space="preserve">
     <value>새 세션</value>
   </data>
+  <data name="SearchReplaceReadOnlyTitle" xml:space="preserve">
+    <value>바꾸기 불가</value>
+  </data>
+  <data name="SearchReplaceReadOnlyContent" xml:space="preserve">
+    <value>문서 파일의 검색 결과는 내용 검색 전용이라 바꾸기할 수 없습니다.</value>
+  </data>
 </root>

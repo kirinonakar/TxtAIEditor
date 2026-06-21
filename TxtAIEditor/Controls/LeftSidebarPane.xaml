@@ -382,7 +382,7 @@
                                                     <TextBlock Text="{x:Bind LineHeader}" FontWeight="SemiBold" FontSize="10" Foreground="{ThemeResource SystemControlForegroundAccentBrush}"/>
                                                     <TextBlock Text="{x:Bind LineContent}" FontSize="12" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
-                                                <Button Grid.Column="1" Content="&#xE194;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnReplaceOneClick" Tag="{x:Bind}" Padding="4" Margin="5,0,0,0" VerticalAlignment="Center" ToolTipService.ToolTip="{Binding Path=ReplaceOneTooltip, Source={StaticResource LocBridge}}" FontSize="11"/>
+                                                <Button Grid.Column="1" Content="&#xE194;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnReplaceOneClick" Tag="{x:Bind}" Padding="4" Margin="5,0,0,0" VerticalAlignment="Center" Visibility="{x:Bind ReplaceButtonVisibility}" ToolTipService.ToolTip="{Binding Path=ReplaceOneTooltip, Source={StaticResource LocBridge}}" FontSize="11"/>
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>

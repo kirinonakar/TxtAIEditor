@@ -380,6 +380,7 @@ namespace TxtAIEditor
                 _dialogController.ShowErrorMessage,
                 _searchReplaceTabSyncController.LoadAndHighlightAsync,
                 RefreshGitStatusUIAsync,
+                getString: GetLocalizedString,
                 beforeDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (EditorWorkspace.IsTerminalVisible) TerminalPane.ResumeNativeWindows(); });
             _searchReplaceController.FileModified += _searchReplaceTabSyncController.HandleFileModifiedAsync;
