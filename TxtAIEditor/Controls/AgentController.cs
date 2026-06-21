@@ -1672,9 +1672,6 @@ namespace TxtAIEditor.Controls
                             : session.Title,
                         IsSelected = isSelected,
                         IsRunning = isRunning,
-                        StatusText = isRunning
-                            ? _getString("AgentOpenSessionActiveStatus", "active")
-                            : _getString("AgentOpenSessionIdleStatus", "idle"),
                         CanSelect = true,
                         CanClose = true
                     };

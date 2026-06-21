@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using Windows.System;
 
 namespace TxtAIEditor.Controls
@@ -45,7 +46,6 @@ namespace TxtAIEditor.Controls
         public string Title { get; set; } = string.Empty;
         public bool IsSelected { get; set; }
         public bool IsRunning { get; set; }
-        public string StatusText { get; set; } = string.Empty;
         public bool CanSelect { get; set; } = true;
         public bool CanClose { get; set; } = true;
     }
@@ -2055,6 +2055,17 @@ namespace TxtAIEditor.Controls
                     Spacing = 6,
                     VerticalAlignment = VerticalAlignment.Center
                 };
+
+                titlePanel.Children.Add(new Ellipse
+                {
+                    Width = 7,
+                    Height = 7,
+                    Fill = new SolidColorBrush(item.IsRunning
+                        ? Windows.UI.Color.FromArgb(255, 34, 197, 94)
+                        : Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
                 if (item.IsSelected)
                 {
                     titlePanel.Children.Add(new FontIcon
@@ -2074,17 +2085,6 @@ namespace TxtAIEditor.Controls
                     TextWrapping = TextWrapping.NoWrap,
                     VerticalAlignment = VerticalAlignment.Center
                 });
-
-                if (!string.IsNullOrWhiteSpace(item.StatusText))
-                {
-                    titlePanel.Children.Add(new TextBlock
-                    {
-                        Text = item.StatusText,
-                        FontSize = 10,
-                        Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                }
 
                 var selectBtn = new Button
                 {
