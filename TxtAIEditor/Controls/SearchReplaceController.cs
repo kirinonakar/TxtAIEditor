@@ -135,7 +135,7 @@ namespace TxtAIEditor.Controls
                 if (ReferenceEquals(_searchCancellationTokenSource, searchCancellationTokenSource))
                 {
                     _searchCancellationTokenSource = null;
-                    SetSearchHeaderIsSearching(searchVersion, false);
+                    SetSearchHeaderText(isSearching: false);
                 }
 
                 searchCancellationTokenSource.Dispose();
@@ -340,7 +340,13 @@ namespace TxtAIEditor.Controls
 
         private void CancelActiveSearch()
         {
-            _searchCancellationTokenSource?.Cancel();
+            CancellationTokenSource? cancellationTokenSource = _searchCancellationTokenSource;
+            cancellationTokenSource?.Cancel();
+            if (cancellationTokenSource != null)
+            {
+                _searchCancellationTokenSource = null;
+            }
+
             unchecked
             {
                 _searchVersion++;
@@ -361,7 +367,7 @@ namespace TxtAIEditor.Controls
 
         private void QueueSearchHeaderText(bool isSearching, int? expectedSearchVersion)
         {
-            _searchHeaderLabel.DispatcherQueue.TryEnqueue(() =>
+            void ApplyIfCurrent()
             {
                 if (expectedSearchVersion.HasValue && expectedSearchVersion.Value != _searchVersion)
                 {
@@ -369,7 +375,15 @@ namespace TxtAIEditor.Controls
                 }
 
                 ApplySearchHeaderText(isSearching);
-            });
+            }
+
+            if (_searchHeaderLabel.DispatcherQueue.HasThreadAccess)
+            {
+                ApplyIfCurrent();
+                return;
+            }
+
+            _searchHeaderLabel.DispatcherQueue.TryEnqueue(ApplyIfCurrent);
         }
 
         private void ApplySearchHeaderText(bool isSearching)
