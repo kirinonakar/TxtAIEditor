@@ -351,15 +351,28 @@ namespace TxtAIEditor.Controls
 
         private void SetSearchHeaderIsSearching(int searchVersion, bool isSearching)
         {
-            if (searchVersion != _searchVersion)
-            {
-                return;
-            }
-
-            SetSearchHeaderText(isSearching);
+            QueueSearchHeaderText(isSearching, searchVersion);
         }
 
         private void SetSearchHeaderText(bool isSearching)
+        {
+            QueueSearchHeaderText(isSearching, expectedSearchVersion: null);
+        }
+
+        private void QueueSearchHeaderText(bool isSearching, int? expectedSearchVersion)
+        {
+            _searchHeaderLabel.DispatcherQueue.TryEnqueue(() =>
+            {
+                if (expectedSearchVersion.HasValue && expectedSearchVersion.Value != _searchVersion)
+                {
+                    return;
+                }
+
+                ApplySearchHeaderText(isSearching);
+            });
+        }
+
+        private void ApplySearchHeaderText(bool isSearching)
         {
             string header = _getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
             _searchHeaderLabel.Text = isSearching
