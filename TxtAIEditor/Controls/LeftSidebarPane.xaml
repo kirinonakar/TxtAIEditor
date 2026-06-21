@@ -322,7 +322,10 @@
                                 </Grid.RowDefinitions>
                                 
                                 <StackPanel Grid.Row="0" Spacing="8" Margin="10,0,10,10">
-                                    <TextBlock x:Name="SearchHeaderText" Text="폴더 전체 검색 및 바꾸기" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <TextBlock x:Name="SearchHeaderText" Text="폴더 전체 검색 및 바꾸기" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                                        <Ellipse x:Name="SearchProgressDot" Width="7" Height="7" Fill="#2FB344" Visibility="Collapsed" VerticalAlignment="Center"/>
+                                    </StackPanel>
                                     <TextBox x:Name="SearchQueryInput" PlaceholderText="검색어 입력..." KeyDown="OnSearchQueryInputKeyDown" Height="32" FontSize="12" FontFamily="Segoe UI, Malgun Gothic" VerticalContentAlignment="Center" Padding="10,8,10,0" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
                                     <TextBox x:Name="ReplaceQueryInput" PlaceholderText="바꿀 단어 입력..." Height="32" FontSize="12" FontFamily="Segoe UI, Malgun Gothic" VerticalContentAlignment="Center" Padding="10,8,10,0" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
                                     

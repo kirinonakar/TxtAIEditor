@@ -129,6 +129,7 @@ namespace TxtAIEditor.Controls
         public Button ResetSnippets => ResetSnippetsButton;
 
         public TextBlock SearchHeaderLabel => SearchHeaderText;
+        public FrameworkElement SearchProgressIndicator => SearchProgressDot;
         public Button SearchAllFilesBtn => SearchAllButton;
         public Button ReplaceAllFilesBtn => ReplaceAllButton;
         public TextBlock RecentFilesHeaderLabel => RecentFilesHeaderText;

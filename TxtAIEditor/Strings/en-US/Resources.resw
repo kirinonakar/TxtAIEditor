@@ -494,9 +494,6 @@
   <data name="SearchHeader" xml:space="preserve">
     <value>Search &amp; Replace in Folder</value>
   </data>
-  <data name="SearchInProgressSuffix" xml:space="preserve">
-    <value>(searching)</value>
-  </data>
   <data name="SearchPlaceholder" xml:space="preserve">
     <value>Enter search term...</value>
   </data>

@@ -23,6 +23,7 @@ namespace TxtAIEditor.Controls
         private readonly ToggleButton _regexToggle;
         private readonly ListView _searchResultsList;
         private readonly TextBlock _searchHeaderLabel;
+        private readonly FrameworkElement _searchProgressIndicator;
         private readonly Func<string> _searchRootProvider;
         private readonly Func<long> _largeFileThresholdBytesProvider;
         private readonly Func<XamlRoot> _xamlRootProvider;
@@ -48,6 +49,7 @@ namespace TxtAIEditor.Controls
             ToggleButton regexToggle,
             ListView searchResultsList,
             TextBlock searchHeaderLabel,
+            FrameworkElement searchProgressIndicator,
             Func<string> searchRootProvider,
             Func<long> largeFileThresholdBytesProvider,
             Func<XamlRoot> xamlRootProvider,
@@ -67,6 +69,7 @@ namespace TxtAIEditor.Controls
             _regexToggle = regexToggle;
             _searchResultsList = searchResultsList;
             _searchHeaderLabel = searchHeaderLabel;
+            _searchProgressIndicator = searchProgressIndicator;
             _searchRootProvider = searchRootProvider;
             _largeFileThresholdBytesProvider = largeFileThresholdBytesProvider;
             _xamlRootProvider = xamlRootProvider;
@@ -392,10 +395,8 @@ namespace TxtAIEditor.Controls
 
         private void ApplySearchHeaderText(bool isSearching)
         {
-            string header = _getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
-            _searchHeaderLabel.Text = isSearching
-                ? header + " " + _getString("SearchInProgressSuffix", "(검색중)")
-                : header;
+            _searchHeaderLabel.Text = _getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
+            _searchProgressIndicator.Visibility = isSearching ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void PublishSearchResults(System.Collections.Generic.IReadOnlyList<SearchResultItem> results, int searchVersion, CancellationToken cancellationToken)

@@ -375,6 +375,7 @@ namespace TxtAIEditor
                 SearchRegexToggle,
                 SearchResultsList,
                 LeftSidebarTabView.SearchHeaderLabel,
+                LeftSidebarTabView.SearchProgressIndicator,
                 GetSearchRoot,
                 GetLargeFileThresholdBytes,
                 () => this.Content.XamlRoot,
