@@ -2618,6 +2618,12 @@
   <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
     <value>実行中</value>
   </data>
+  <data name="AgentOpenSessionActiveStatus" xml:space="preserve">
+    <value>active</value>
+  </data>
+  <data name="AgentOpenSessionIdleStatus" xml:space="preserve">
+    <value>idle</value>
+  </data>
   <data name="AgentOpenSessionUntitled" xml:space="preserve">
     <value>新規セッション</value>
   </data>

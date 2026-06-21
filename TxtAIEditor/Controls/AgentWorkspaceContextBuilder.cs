@@ -26,7 +26,8 @@ namespace TxtAIEditor.Controls
             string instruction,
             OpenedTab? activeTab,
             bool includeActiveFile,
-            bool hasSelectionRangeContext)
+            bool hasSelectionRangeContext,
+            IEnumerable<AgentAttachmentState>? attachments = null)
         {
             var context = new List<string>();
             context.Add("[Workspace root]");
@@ -36,7 +37,7 @@ namespace TxtAIEditor.Controls
             AddReferencedPathContext(context, instruction);
             AddOpenTabsContext(context, activeTab);
             AddActiveTabContext(context, activeTab, includeActiveFile, hasSelectionRangeContext);
-            AddAttachmentsContext(context);
+            AddAttachmentsContext(context, attachments);
 
             return string.Join(Environment.NewLine, context);
         }
@@ -90,16 +91,17 @@ namespace TxtAIEditor.Controls
             context.Add($"Dirty: {activeTab.IsDirty}");
         }
 
-        private void AddAttachmentsContext(List<string> context)
+        private void AddAttachmentsContext(List<string> context, IEnumerable<AgentAttachmentState>? attachments)
         {
-            if (_attachmentController.Count == 0)
+            var items = attachments?.ToList() ?? _attachmentController.Attachments.ToList();
+            if (items.Count == 0)
             {
                 return;
             }
 
             context.Add("");
             context.Add("[Agent attachments]");
-            foreach (var attachment in _attachmentController.Attachments)
+            foreach (var attachment in items)
             {
                 context.Add($"- {attachment.DisplayName} ({attachment.Detail}, approx {attachment.EstimatedTokens:N0} tokens)");
                 if (attachment.IsImage)

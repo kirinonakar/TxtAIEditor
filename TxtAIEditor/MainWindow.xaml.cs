@@ -1711,37 +1711,43 @@ namespace TxtAIEditor
             return true;
         }
 
-        private async Task<bool> BeginStreamIntoActiveEditorAsync()
+        private async Task<bool> BeginStreamIntoActiveEditorAsync(string? targetTabId)
         {
-            await EndStreamIntoActiveEditorAsync();
+            if (string.IsNullOrEmpty(targetTabId))
+            {
+                await EndStreamIntoActiveEditorAsync(null);
+            }
 
-            if (!TryGetCurrentActiveEditorBridge(out string tabId, out _, out var bridgeGroup))
+            if (!TryGetStreamEditorBridge(targetTabId, out string tabId, out var bridgeGroup))
             {
                 return false;
             }
 
-            _activeEditorStreamTabId = tabId;
-            try
+            if (string.IsNullOrEmpty(targetTabId))
             {
-                bridgeGroup.WebView.Focus(FocusState.Programmatic);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to focus editor for stream insert: {ex.Message}");
+                _activeEditorStreamTabId = tabId;
+                try
+                {
+                    bridgeGroup.WebView.Focus(FocusState.Programmatic);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to focus editor for stream insert: {ex.Message}");
+                }
             }
 
             await bridgeGroup.Bridge.BeginStreamInsertAsync();
             return true;
         }
 
-        private async Task<bool> InsertStreamTextIntoActiveEditorAsync(string text)
+        private async Task<bool> InsertStreamTextIntoActiveEditorAsync(string? targetTabId, string text)
         {
             if (string.IsNullOrEmpty(text))
             {
                 return true;
             }
 
-            string? tabId = _activeEditorStreamTabId;
+            string? tabId = string.IsNullOrEmpty(targetTabId) ? _activeEditorStreamTabId : targetTabId;
             if (string.IsNullOrEmpty(tabId) ||
                 !_tabBridges.TryGetValue(tabId, out var bridgeGroup) ||
                 bridgeGroup.Bridge == null)
@@ -1761,10 +1767,13 @@ namespace TxtAIEditor
             return true;
         }
 
-        private async Task EndStreamIntoActiveEditorAsync()
+        private async Task EndStreamIntoActiveEditorAsync(string? targetTabId)
         {
-            string? tabId = _activeEditorStreamTabId;
-            _activeEditorStreamTabId = null;
+            string? tabId = string.IsNullOrEmpty(targetTabId) ? _activeEditorStreamTabId : targetTabId;
+            if (string.IsNullOrEmpty(targetTabId))
+            {
+                _activeEditorStreamTabId = null;
+            }
 
             if (!string.IsNullOrEmpty(tabId) &&
                 _tabBridges.TryGetValue(tabId, out var bridgeGroup) &&
@@ -1772,6 +1781,26 @@ namespace TxtAIEditor
             {
                 await bridgeGroup.Bridge.EndStreamInsertAsync();
             }
+        }
+
+        private bool TryGetStreamEditorBridge(
+            string? targetTabId,
+            out string tabId,
+            out (WebView2 WebView, MonacoBridge Bridge) bridgeGroup)
+        {
+            tabId = string.Empty;
+            bridgeGroup = default;
+
+            if (!string.IsNullOrEmpty(targetTabId) &&
+                _tabBridges.TryGetValue(targetTabId, out var targetBridgeGroup) &&
+                targetBridgeGroup.Bridge != null)
+            {
+                tabId = targetTabId;
+                bridgeGroup = targetBridgeGroup;
+                return true;
+            }
+
+            return TryGetCurrentActiveEditorBridge(out tabId, out _, out bridgeGroup);
         }
 
         private string GetTabTextForLlmContext(OpenedTab tab, int maxChars)

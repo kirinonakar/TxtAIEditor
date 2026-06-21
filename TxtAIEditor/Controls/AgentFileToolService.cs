@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Services.LLM;
@@ -67,13 +68,15 @@ namespace TxtAIEditor.Controls
         private readonly AgentProcessToolService _processes;
         private readonly AgentFileEditToolService _edits;
         private readonly Func<string, string, string> _getString;
+        private readonly Func<string> _workspaceRootProvider;
 
         public AgentFileToolService(
             Func<string> workspaceRootProvider,
             Func<string, string, string>? getString = null)
         {
             _getString = getString ?? ((_, fallback) => fallback);
-            _workspace = new AgentWorkspaceFileResolver(workspaceRootProvider);
+            _workspaceRootProvider = workspaceRootProvider;
+            _workspace = new AgentWorkspaceFileResolver(ResolveWorkspaceRoot);
             _workspaceFiles = new AgentWorkspaceFileToolService(_workspace);
             _images = new AgentImageToolService(_workspace);
             _documents = new AgentDocumentExtractionToolService(
@@ -95,8 +98,20 @@ namespace TxtAIEditor.Controls
         public Func<string, Task<bool>>? ConfirmPowerShellAsync { get; set; }
         public Func<string, Task>? FileModifiedAsync { get; set; }
         public Action<string>? ActivityReporter { get; set; }
+        public Func<string?>? WorkspaceRootOverrideProvider { get; set; }
 
         public string WorkspaceRoot => _workspace.WorkspaceRoot;
+
+        private string ResolveWorkspaceRoot()
+        {
+            string? overrideRoot = WorkspaceRootOverrideProvider?.Invoke();
+            if (!string.IsNullOrWhiteSpace(overrideRoot) && Directory.Exists(overrideRoot))
+            {
+                return overrideRoot;
+            }
+
+            return _workspaceRootProvider();
+        }
 
         public Task<string> ListFilesAsync(string? glob, int maxResults)
         {

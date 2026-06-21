@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
@@ -18,8 +19,15 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Func<string, Task<AgentOpenFileResult>>? _openFileInEditorAsync;
 
-        private string? _currentRunLastFilePath;
-        private bool _currentRunRestrictEditsToSelection;
+        private readonly AsyncLocal<RunFileToolState?> _currentRunState = new();
+
+        private sealed class RunFileToolState
+        {
+            public string? LastFilePath { get; set; }
+            public bool RestrictEditsToSelection { get; set; }
+            public AgentSelectionSnapshot? SelectionSnapshot { get; set; }
+            public string? ActiveTabPath { get; set; }
+        }
 
         public AgentFileToolController(
             AgentFileToolService fileTools,
@@ -39,18 +47,25 @@ namespace TxtAIEditor.Controls
 
         public void StartRun()
         {
-            _currentRunLastFilePath = null;
-            _currentRunRestrictEditsToSelection = false;
+            _currentRunState.Value = new RunFileToolState();
         }
 
         public void SetRestrictEditsToSelection(bool restrictEditsToSelection)
         {
-            _currentRunRestrictEditsToSelection = restrictEditsToSelection;
+            RunFileToolState state = _currentRunState.Value ??= new RunFileToolState();
+            state.RestrictEditsToSelection = restrictEditsToSelection;
+        }
+
+        public void SetRunContext(AgentSelectionSnapshot selectionSnapshot, OpenedTab? activeTab)
+        {
+            RunFileToolState state = _currentRunState.Value ??= new RunFileToolState();
+            state.SelectionSnapshot = selectionSnapshot;
+            state.ActiveTabPath = activeTab?.FilePath;
         }
 
         public void FinishRun()
         {
-            _currentRunRestrictEditsToSelection = false;
+            _currentRunState.Value = null;
         }
 
         public string? ValidateSelectionEditScope(string normalizedToolName, JsonElement arguments)
@@ -89,7 +104,8 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrWhiteSpace(path))
             {
-                _currentRunLastFilePath = path;
+                RunFileToolState state = _currentRunState.Value ??= new RunFileToolState();
+                state.LastFilePath = path;
             }
         }
 
@@ -548,6 +564,12 @@ namespace TxtAIEditor.Controls
 
         private AgentSelectionSnapshot CaptureActiveSelectionSnapshot()
         {
+            AgentSelectionSnapshot? runSelection = _currentRunState.Value?.SelectionSnapshot;
+            if (runSelection != null && !string.IsNullOrEmpty(runSelection.Text))
+            {
+                return runSelection;
+            }
+
             return _selectionContextController.CaptureActiveSelectionSnapshot(_isRunningProvider());
         }
 
@@ -560,12 +582,13 @@ namespace TxtAIEditor.Controls
                 return selection.SourcePath;
             }
 
-            if (!string.IsNullOrWhiteSpace(_currentRunLastFilePath))
+            string? currentRunLastFilePath = _currentRunState.Value?.LastFilePath;
+            if (!string.IsNullOrWhiteSpace(currentRunLastFilePath))
             {
-                return _currentRunLastFilePath;
+                return currentRunLastFilePath;
             }
 
-            string activePath = _activeTabProvider()?.FilePath ?? string.Empty;
+            string activePath = _currentRunState.Value?.ActiveTabPath ?? _activeTabProvider()?.FilePath ?? string.Empty;
             return string.IsNullOrWhiteSpace(activePath) ? string.Empty : activePath;
         }
 

@@ -151,6 +151,11 @@ namespace TxtAIEditor.Controls
         public string BuildActiveSelectionContext(bool isRunning)
         {
             AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot(isRunning);
+            return BuildSelectionContext(selection);
+        }
+
+        public string BuildSelectionContext(AgentSelectionSnapshot selection)
+        {
             if (string.IsNullOrEmpty(selection.Text))
             {
                 return string.Empty;

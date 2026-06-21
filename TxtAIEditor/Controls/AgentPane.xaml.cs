@@ -45,6 +45,7 @@ namespace TxtAIEditor.Controls
         public string Title { get; set; } = string.Empty;
         public bool IsSelected { get; set; }
         public bool IsRunning { get; set; }
+        public string StatusText { get; set; } = string.Empty;
         public bool CanSelect { get; set; } = true;
         public bool CanClose { get; set; } = true;
     }
@@ -168,6 +169,7 @@ namespace TxtAIEditor.Controls
         public bool StreamToTab => AgentStreamToTabCheckBox.IsChecked == true;
 
         public bool HideHtmlCodeBlocks { get; set; }
+        public bool IsThinkingActivityActive => _thinkingLineActive;
 
         private bool _isBusy;
         private string _runButtonText = string.Empty;
@@ -429,6 +431,35 @@ namespace TxtAIEditor.Controls
             CompleteThinkingLine();
         }
 
+        public void ResumeThinkingActivityFromOutput()
+        {
+            FlushAllPendingOutputText();
+            ResetThinkingState();
+            if (string.IsNullOrEmpty(_rawOutputText))
+            {
+                return;
+            }
+
+            int lineStart = FindLastLineStart(_rawOutputText);
+            string line = _rawOutputText.Substring(lineStart).TrimEnd('\r', '\n');
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return;
+            }
+
+            int trailingDotCount = CountTrailingThinkingDots(line);
+            _thinkingLineStart = lineStart;
+            _thinkingDotCount = trailingDotCount;
+            _thinkingLinePrefix = trailingDotCount > 0
+                ? line.Substring(0, line.Length - trailingDotCount)
+                : line;
+            _thinkingLineTimestamp = string.Empty;
+            _thinkingLineActive = true;
+
+            _thinkingTimer ??= CreateThinkingTimer();
+            _thinkingTimer.Start();
+        }
+
         private void ClearOutputPlaceholder()
         {
             string text = _rawOutputText;
@@ -452,6 +483,7 @@ namespace TxtAIEditor.Controls
 
         public void ResetOutput(string text)
         {
+            ResetThinkingState();
             ClearPendingOutputText();
             ClearExplicitOutputSelection();
             _rawOutputText = text ?? string.Empty;
@@ -625,6 +657,16 @@ namespace TxtAIEditor.Controls
             ScrollOutputToEnd();
         }
 
+        private void ResetThinkingState()
+        {
+            _thinkingTimer?.Stop();
+            _thinkingLineActive = false;
+            _thinkingLineStart = 0;
+            _thinkingDotCount = 0;
+            _thinkingLinePrefix = string.Empty;
+            _thinkingLineTimestamp = string.Empty;
+        }
+
         private void ReplaceThinkingLine(string text)
         {
             int currentLength = _rawOutputText.Length;
@@ -644,6 +686,29 @@ namespace TxtAIEditor.Controls
                 UpdateRichText(_rawOutputText);
             }
             ScrollOutputToEnd();
+        }
+
+        private static int FindLastLineStart(string text)
+        {
+            int lastLf = text.LastIndexOf('\n');
+            if (lastLf >= 0)
+            {
+                return lastLf + 1;
+            }
+
+            int lastCr = text.LastIndexOf('\r');
+            return lastCr >= 0 ? lastCr + 1 : 0;
+        }
+
+        private static int CountTrailingThinkingDots(string line)
+        {
+            int count = 0;
+            for (int i = line.Length - 1; i >= 0 && line[i] == '.' && count < 3; i--)
+            {
+                count++;
+            }
+
+            return count;
         }
 
         private static bool EndsWithLineBreak(string text)
@@ -2010,11 +2075,11 @@ namespace TxtAIEditor.Controls
                     VerticalAlignment = VerticalAlignment.Center
                 });
 
-                if (item.IsRunning)
+                if (!string.IsNullOrWhiteSpace(item.StatusText))
                 {
                     titlePanel.Children.Add(new TextBlock
                     {
-                        Text = getString("AgentOpenSessionRunningSuffix", "실행 중"),
+                        Text = item.StatusText,
                         FontSize = 10,
                         Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
                         VerticalAlignment = VerticalAlignment.Center
