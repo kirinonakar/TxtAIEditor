@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -84,7 +85,10 @@ namespace TxtAIEditor.Controls
                 }
 
                 pdfWebView.Focus(FocusState.Programmatic);
-                await TryNavigatePdfViewerPageAsync(pdfWebView, pageNumber);
+                if (!await TryNavigatePdfViewerPageAsync(pdfWebView, pageNumber))
+                {
+                    await TryNavigatePdfViewerPageWithKeyboardAsync(pdfWebView, pageNumber);
+                }
             }
             catch
             {
@@ -240,7 +244,7 @@ namespace TxtAIEditor.Controls
 
             string script = PdfPageNavigationScript.Replace(
                 "__PAGE_NUMBER__",
-                pageNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                pageNumber.ToString(CultureInfo.InvariantCulture),
                 StringComparison.Ordinal);
 
             try
@@ -252,6 +256,92 @@ namespace TxtAIEditor.Controls
             {
                 return false;
             }
+        }
+
+        private static async Task<bool> TryNavigatePdfViewerPageWithKeyboardAsync(WebView2 pdfWebView, int pageNumber)
+        {
+            if (pdfWebView.CoreWebView2 == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                await SendKeyChordAsync(pdfWebView, "KeyG", 71, "g", modifiers: 3);
+                await Task.Delay(80);
+                await InsertTextAsync(pdfWebView, pageNumber.ToString(CultureInfo.InvariantCulture));
+                await Task.Delay(30);
+                await SendKeyAsync(pdfWebView, "Enter", 13, "Enter");
+                return true;
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                await SendKeyChordAsync(pdfWebView, "KeyG", 71, "g", modifiers: 2);
+                await Task.Delay(80);
+                await InsertTextAsync(pdfWebView, pageNumber.ToString(CultureInfo.InvariantCulture));
+                await Task.Delay(30);
+                await SendKeyAsync(pdfWebView, "Enter", 13, "Enter");
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static async Task SendKeyChordAsync(
+            WebView2 pdfWebView,
+            string code,
+            int virtualKeyCode,
+            string key,
+            int modifiers)
+        {
+            await DispatchKeyEventAsync(pdfWebView, "rawKeyDown", code, virtualKeyCode, key, modifiers);
+            await DispatchKeyEventAsync(pdfWebView, "keyUp", code, virtualKeyCode, key, modifiers);
+        }
+
+        private static async Task SendKeyAsync(
+            WebView2 pdfWebView,
+            string code,
+            int virtualKeyCode,
+            string key)
+        {
+            await DispatchKeyEventAsync(pdfWebView, "rawKeyDown", code, virtualKeyCode, key, 0);
+            await DispatchKeyEventAsync(pdfWebView, "keyUp", code, virtualKeyCode, key, 0);
+        }
+
+        private static async Task DispatchKeyEventAsync(
+            WebView2 pdfWebView,
+            string type,
+            string code,
+            int virtualKeyCode,
+            string key,
+            int modifiers)
+        {
+            var payload = new
+            {
+                type,
+                modifiers,
+                windowsVirtualKeyCode = virtualKeyCode,
+                nativeVirtualKeyCode = virtualKeyCode,
+                code,
+                key
+            };
+
+            await pdfWebView.CoreWebView2.CallDevToolsProtocolMethodAsync(
+                "Input.dispatchKeyEvent",
+                JsonSerializer.Serialize(payload));
+        }
+
+        private static async Task InsertTextAsync(WebView2 pdfWebView, string text)
+        {
+            await pdfWebView.CoreWebView2.CallDevToolsProtocolMethodAsync(
+                "Input.insertText",
+                JsonSerializer.Serialize(new { text }));
         }
 
         private const string SelectionBridgeScript = @"
@@ -314,6 +404,31 @@ namespace TxtAIEditor.Controls
     const targetPage = __PAGE_NUMBER__;
     const pageIndex = Math.max(0, targetPage - 1);
 
+    function dispatchViewportEvent(root) {
+        const eventTargets = [];
+        if (root) {
+            eventTargets.push(root);
+            if (root.body) eventTargets.push(root.body);
+            if (root.host) eventTargets.push(root.host);
+        }
+        eventTargets.push(document, document.body);
+
+        let dispatched = false;
+        for (const target of eventTargets) {
+            if (!target) continue;
+            try {
+                target.dispatchEvent(new CustomEvent('change-page-and-xy', {
+                    bubbles: true,
+                    composed: true,
+                    detail: { page: pageIndex, x: 0, y: 0 }
+                }));
+                dispatched = true;
+            } catch {}
+        }
+
+        return dispatched;
+    }
+
     function callPageMethod(owner) {
         if (!owner) return false;
         const objects = [
@@ -339,6 +454,20 @@ namespace TxtAIEditor.Controls
                     }
                 } catch {}
             }
+
+            try {
+                if (typeof obj.goToPageAndXY === 'function') {
+                    obj.goToPageAndXY(pageIndex, 0, 0);
+                    return true;
+                }
+            } catch {}
+
+            try {
+                if (typeof obj.goToPageAndXy === 'function') {
+                    obj.goToPageAndXy(pageIndex, 0, 0);
+                    return true;
+                }
+            } catch {}
 
             try {
                 if (typeof obj.currentPageNumber !== 'undefined') {
@@ -445,6 +574,7 @@ namespace TxtAIEditor.Controls
         document.querySelector('embed[type=""application/pdf""]') ||
         document.querySelector('embed[type=""application/x-google-chrome-pdf""]');
 
+    dispatchViewportEvent(document);
     if (callPageMethod(viewer)) return true;
     if (viewer && viewer.shadowRoot && (callPageMethod(viewer.shadowRoot.querySelector('#viewer')) || setPageInput(viewer.shadowRoot))) {
         return true;
@@ -452,7 +582,9 @@ namespace TxtAIEditor.Controls
     if (setPageInput(document)) return true;
 
     for (const root of collectRoots(document)) {
+        dispatchViewportEvent(root);
         if (callPageMethod(root.querySelector && root.querySelector('#viewer'))) return true;
+        if (callPageMethod(root.host)) return true;
         if (setPageInput(root)) return true;
         if (scrollToPageElement(root)) return true;
     }
@@ -460,7 +592,6 @@ namespace TxtAIEditor.Controls
     try {
         window.location.hash = 'page=' + targetPage;
         window.dispatchEvent(new HashChangeEvent('hashchange'));
-        return true;
     } catch {}
 
     return false;
