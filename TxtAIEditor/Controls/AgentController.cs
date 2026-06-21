@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
@@ -16,45 +14,6 @@ using static TxtAIEditor.Controls.AgentToolHelpers;
 
 namespace TxtAIEditor.Controls
 {
-    internal sealed class AgentOpenSessionState
-    {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Title { get; set; } = string.Empty;
-        public string PromptText { get; set; } = string.Empty;
-        public string OutputText { get; set; } = string.Empty;
-        public string ActivityText { get; set; } = string.Empty;
-        public string SessionHistoryText { get; set; } = string.Empty;
-        public string WorkspaceRoot { get; set; } = string.Empty;
-        public double SessionHistoryTokenCount { get; set; }
-        public double CurrentRunTranscriptTokens { get; set; }
-        public DateTime UpdatedAt { get; set; } = DateTime.Now;
-        public List<AgentAttachmentState> Attachments { get; set; } = new();
-        public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
-        public bool IsRunning { get; set; }
-        public bool ThinkingLineActive { get; set; }
-        public int ThinkingLineStart { get; set; }
-        public string ThinkingLineTimestamp { get; set; } = string.Empty;
-        public string ThinkingLinePrefix { get; set; } = string.Empty;
-        public EditorSettings? LlmSettings { get; set; }
-    }
-
-    internal sealed class AgentRunContext
-    {
-        public string SessionId { get; set; } = string.Empty;
-        public CancellationTokenSource? Cancellation { get; set; }
-        public StringBuilder SessionHistory { get; } = new();
-        public double SessionHistoryTokenCount { get; set; }
-        public double CurrentRunTranscriptTokens { get; set; }
-        public List<AgentAttachmentState> Attachments { get; set; } = new();
-        public List<LlmMessageAttachment> ImageToolAttachments { get; } = new();
-        public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
-        public bool StreamToTabActive { get; set; }
-        public bool StreamToTab { get; set; }
-        public string? StreamToTabTargetTabId { get; set; }
-        public string WorkspaceRoot { get; set; } = string.Empty;
-        public EditorSettings LlmSettings { get; set; } = new();
-    }
-
     public sealed class AgentController
     {
         private const int FallbackSessionHistoryPromptChars = 80_000;
@@ -91,6 +50,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentMcpController _mcpController;
         private readonly AgentHistoryController _historyController;
         private readonly AgentSessionEditController _sessionEditController;
+        private readonly AgentOpenSessionController _openSessionController;
         private readonly AgentWorkspaceContextBuilder _workspaceContextBuilder;
         private readonly AgentOutputInsertController _outputInsertController;
         private readonly AgentConfirmationController _confirmationController;
@@ -100,14 +60,11 @@ namespace TxtAIEditor.Controls
         private readonly AgentToolExecutionController _toolExecutionController;
         private readonly AgentContextStatsController _contextStatsController;
         private readonly AgentModelContextLimitProvider _modelContextLimits = new();
-        private readonly List<AgentOpenSessionState> _openSessions = new();
         private readonly Dictionary<string, AgentRunContext> _runningSessions = new(StringComparer.Ordinal);
         private readonly SemaphoreSlim _toolExecutionSessionGate = new(1, 1);
         private readonly AsyncLocal<AgentRunContext?> _activeToolRunContext = new();
         private readonly AsyncLocal<AgentRunContext?> _activeWorkspaceRunContext = new();
         private string _currentSessionId = Guid.NewGuid().ToString();
-        private string? _pendingCloseSessionId;
-        private bool _restoringOpenSession;
 
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
@@ -230,6 +187,25 @@ namespace TxtAIEditor.Controls
                 AppendActivity,
                 _showError,
                 _getString);
+            _openSessionController = new AgentOpenSessionController(
+                _settingsService,
+                _agentPane,
+                _fileTools,
+                _attachmentController,
+                _sessionEditController,
+                _historyController,
+                _displayText,
+                _runningSessions,
+                () => _currentSessionId,
+                value => _currentSessionId = value,
+                () => _sessionHistory.ToString(),
+                () => _sessionHistoryTokenCount,
+                () => _currentRunTranscriptTokens,
+                RestoreSessionHistoryState,
+                StopAgent,
+                () => UpdateContextStatsImmediate(),
+                _getString,
+                _navigateToFolderAsync);
             _workspaceContextBuilder = new AgentWorkspaceContextBuilder(
                 () => _fileTools.WorkspaceRoot,
                 openTabsProvider,
@@ -320,6 +296,17 @@ namespace TxtAIEditor.Controls
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEditController.SessionEdits;
 
+        private void RestoreSessionHistoryState(
+            string sessionHistoryText,
+            double sessionHistoryTokenCount,
+            double currentRunTranscriptTokens)
+        {
+            _sessionHistory.Clear();
+            _sessionHistory.Append(sessionHistoryText ?? string.Empty);
+            _sessionHistoryTokenCount = sessionHistoryTokenCount;
+            _currentRunTranscriptTokens = currentRunTranscriptTokens;
+        }
+
         private void QueueDeferredStartupDataLoad()
         {
             var dispatcher = _agentPane.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
@@ -359,12 +346,12 @@ namespace TxtAIEditor.Controls
 
         private bool IsCurrentSessionRunning()
         {
-            return _runningSessions.ContainsKey(_currentSessionId);
+            return _openSessionController.IsCurrentSessionRunning();
         }
 
         private bool IsAnySessionRunning()
         {
-            return _runningSessions.Count > 0;
+            return _openSessionController.IsAnySessionRunning();
         }
 
         private string? GetActiveRunWorkspaceRoot()
@@ -377,9 +364,7 @@ namespace TxtAIEditor.Controls
 
         private EditorSettings GetCurrentSessionSettings()
         {
-            var session = EnsureOpenSession(_currentSessionId);
-            session.LlmSettings ??= CreateSessionSettingsSnapshot();
-            return session.LlmSettings;
+            return _openSessionController.GetCurrentSessionSettings();
         }
 
         private OpenedTab? GetActiveTabForContext()
@@ -485,7 +470,7 @@ namespace TxtAIEditor.Controls
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             activeOpenSession.UpdatedAt = DateTime.Now;
             activeOpenSession.IsRunning = true;
-            activeOpenSession.WorkspaceRoot = CaptureCurrentWorkspaceRoot();
+            activeOpenSession.WorkspaceRoot = _fileTools.WorkspaceRoot;
             EditorSettings runSettings = await ResolveRunSessionSettingsAsync(activeOpenSession);
 
             var runContext = new AgentRunContext
@@ -629,7 +614,7 @@ namespace TxtAIEditor.Controls
                                             EnqueueRunUi(
                                                 runContext,
                                                 () => _agentPane.BeginThinkingActivity(label),
-                                                session => BeginThinkingInSession(session, label));
+                                                session => _openSessionController.BeginThinkingInSession(session, label));
                                             printedLength = streamedText.Length;
                                         }
                                         else
@@ -637,7 +622,7 @@ namespace TxtAIEditor.Controls
                                             EnqueueRunUi(
                                                 runContext,
                                                 () => _agentPane.AppendOutputText(streamedText),
-                                                session => AppendOutputTextToSession(session, streamedText));
+                                                session => _openSessionController.AppendOutputTextToSession(session, streamedText));
                                             printedLength = streamedText.Length;
                                         }
                                     }
@@ -653,7 +638,7 @@ namespace TxtAIEditor.Controls
                                     EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.UpdateThinkingActivity(label),
-                                        session => UpdateThinkingInSession(session, label));
+                                        session => _openSessionController.UpdateThinkingInSession(session, label));
                                     printedLength = streamedText.Length;
                                 }
                                 else
@@ -661,7 +646,7 @@ namespace TxtAIEditor.Controls
                                     EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.AppendOutputText(chunk),
-                                        session => AppendOutputTextToSession(session, chunk));
+                                        session => _openSessionController.AppendOutputTextToSession(session, chunk));
                                     printedLength = streamedText.Length;
                                 }
                                 return;
@@ -678,14 +663,14 @@ namespace TxtAIEditor.Controls
                                     EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.UpdateThinkingActivity(label),
-                                        session => UpdateThinkingInSession(session, label));
+                                        session => _openSessionController.UpdateThinkingInSession(session, label));
                                 }
                                 else
                                 {
                                     EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.AppendOutputText(chunk),
-                                        session => AppendOutputTextToSession(session, chunk));
+                                        session => _openSessionController.AppendOutputTextToSession(session, chunk));
                                     printedLength = streamedText.Length;
                                 }
                                 return;
@@ -717,7 +702,7 @@ namespace TxtAIEditor.Controls
                                         EnqueueRunUi(
                                             runContext,
                                             () => _agentPane.BeginThinkingActivity(label),
-                                            session => BeginThinkingInSession(session, label));
+                                            session => _openSessionController.BeginThinkingInSession(session, label));
                                     }
                                 }
                                 else
@@ -726,7 +711,7 @@ namespace TxtAIEditor.Controls
                                     EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.AppendOutputText(toolCallText),
-                                        session => AppendOutputTextToSession(session, toolCallText));
+                                        session => _openSessionController.AppendOutputTextToSession(session, toolCallText));
                                     printedLength = streamedText.Length;
                                 }
                             }
@@ -1169,13 +1154,12 @@ namespace TxtAIEditor.Controls
                 activeOpenSession.SessionEdits = runContext.SessionEdits.ToList();
                 activeOpenSession.Attachments = runContext.Attachments.ToList();
                 activeOpenSession.WorkspaceRoot = runContext.WorkspaceRoot;
-                ClearThinkingState(activeOpenSession);
+                _openSessionController.ClearThinkingState(activeOpenSession);
                 UpdateActiveSessionBusyState();
 
-                if (string.Equals(_pendingCloseSessionId, runContext.SessionId, StringComparison.Ordinal))
+                if (_openSessionController.IsPendingClose(runContext.SessionId))
                 {
-                    string closingSessionId = _pendingCloseSessionId ?? string.Empty;
-                    _pendingCloseSessionId = null;
+                    string closingSessionId = _openSessionController.ConsumePendingCloseSessionId();
                     CloseOpenSession(closingSessionId);
                 }
                 else
@@ -1257,555 +1241,87 @@ namespace TxtAIEditor.Controls
 
         private AgentOpenSessionState EnsureOpenSession(string sessionId)
         {
-            var session = _openSessions.FirstOrDefault(item =>
-                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
-            if (session != null)
-            {
-                return session;
-            }
-
-            session = CreateBlankOpenSession(sessionId);
-            _openSessions.Insert(0, session);
-            return session;
-        }
-
-        private AgentOpenSessionState CreateBlankOpenSession(string? sessionId = null)
-        {
-            return new AgentOpenSessionState
-            {
-                Id = string.IsNullOrWhiteSpace(sessionId) ? Guid.NewGuid().ToString() : sessionId,
-                Title = GetUntitledOpenSessionTitle(),
-                OutputText = _displayText.OutputPlaceholder,
-                ActivityText = _displayText.ActivityIdle,
-                WorkspaceRoot = CaptureCurrentWorkspaceRoot(),
-                LlmSettings = CreateSessionSettingsSnapshot()
-            };
+            return _openSessionController.EnsureSession(sessionId);
         }
 
         private EditorSettings CreateSessionSettingsSnapshot()
         {
-            return CloneSessionSettings(_settingsService.CurrentSettings);
-        }
-
-        private static EditorSettings CloneSessionSettings(EditorSettings settings)
-        {
-            return new EditorSettings
-            {
-                Language = settings.Language,
-                LlmProvider = settings.LlmProvider,
-                LlmEndpoint = settings.LlmEndpoint,
-                LlmModel = settings.LlmModel,
-                LlmModelGemini = settings.LlmModelGemini,
-                LlmModelOpenAI = settings.LlmModelOpenAI,
-                LlmModelOpenRouter = settings.LlmModelOpenRouter,
-                LlmModelLmStudio = settings.LlmModelLmStudio,
-                LlmModelOpenCodeGo = settings.LlmModelOpenCodeGo,
-                LlmModelOpenCodeZen = settings.LlmModelOpenCodeZen,
-                LlmModelOllama = settings.LlmModelOllama,
-                LlmModelOllamaCloud = settings.LlmModelOllamaCloud,
-                LlmThinkingLevel = settings.LlmThinkingLevel,
-                LlmConfirmBeforeSending = settings.LlmConfirmBeforeSending,
-                LlmAgentVerbose = settings.LlmAgentVerbose,
-                LlmAgentAutoApproveGitEdits = settings.LlmAgentAutoApproveGitEdits,
-                LlmMaxToolCalls = settings.LlmMaxToolCalls,
-                LlmSourceLanguage = settings.LlmSourceLanguage,
-                LlmTargetLanguage = settings.LlmTargetLanguage
-            };
+            return _openSessionController.CreateSessionSettingsSnapshot();
         }
 
         private Task<EditorSettings> ResolveRunSessionSettingsAsync(AgentOpenSessionState session)
         {
-            session.LlmSettings ??= CreateSessionSettingsSnapshot();
-            return Task.FromResult(CloneSessionSettings(session.LlmSettings));
-        }
-
-        private string CaptureCurrentWorkspaceRoot()
-        {
-            return _fileTools.WorkspaceRoot;
-        }
-
-        private void RestoreWorkspaceRoot(AgentOpenSessionState session)
-        {
-            if (_navigateToFolderAsync == null ||
-                string.IsNullOrWhiteSpace(session.WorkspaceRoot) ||
-                !Directory.Exists(session.WorkspaceRoot))
-            {
-                return;
-            }
-
-            _ = _navigateToFolderAsync(session.WorkspaceRoot);
-        }
-
-        private void SyncVisibleThinkingStateToSession(AgentOpenSessionState session)
-        {
-            if (_agentPane.IsThinkingActivityActive)
-            {
-                CaptureThinkingStateFromOutput(session);
-            }
-            else
-            {
-                ClearThinkingState(session);
-            }
-        }
-
-        private void BeginThinkingInSession(AgentOpenSessionState session, string label)
-        {
-            string text = NormalizePlaceholderOutput(session.OutputText);
-            if (!string.IsNullOrEmpty(text) && !EndsWithLineBreak(text))
-            {
-                text += Environment.NewLine;
-            }
-
-            string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            string prefix = $"{timestamp}  {label}";
-            session.OutputText = text + prefix;
-            session.ThinkingLineActive = true;
-            session.ThinkingLineStart = text.Length;
-            session.ThinkingLineTimestamp = timestamp;
-            session.ThinkingLinePrefix = prefix;
-            session.UpdatedAt = DateTime.Now;
-        }
-
-        private void UpdateThinkingInSession(AgentOpenSessionState session, string label)
-        {
-            if (!session.ThinkingLineActive)
-            {
-                BeginThinkingInSession(session, label);
-                return;
-            }
-
-            string text = session.OutputText ?? string.Empty;
-            if (session.ThinkingLineStart < 0 || session.ThinkingLineStart > text.Length)
-            {
-                BeginThinkingInSession(session, label);
-                return;
-            }
-
-            string timestamp = string.IsNullOrWhiteSpace(session.ThinkingLineTimestamp)
-                ? DateTime.Now.ToString("HH:mm:ss")
-                : session.ThinkingLineTimestamp;
-            string prefix = $"{timestamp}  {label}";
-            session.OutputText = text.Substring(0, session.ThinkingLineStart) + prefix;
-            session.ThinkingLinePrefix = prefix;
-            session.ThinkingLineTimestamp = timestamp;
-            session.UpdatedAt = DateTime.Now;
-        }
-
-        private void CompleteThinkingInSession(AgentOpenSessionState session)
-        {
-            if (!session.ThinkingLineActive)
-            {
-                return;
-            }
-
-            if (!EndsWithLineBreak(session.OutputText ?? string.Empty))
-            {
-                session.OutputText = (session.OutputText ?? string.Empty) + Environment.NewLine;
-            }
-
-            ClearThinkingState(session);
-            session.UpdatedAt = DateTime.Now;
-        }
-
-        private void CaptureThinkingStateFromOutput(AgentOpenSessionState session)
-        {
-            string text = session.OutputText ?? string.Empty;
-            int lineStart = FindLastLineStart(text);
-            string line = lineStart < text.Length
-                ? text.Substring(lineStart).TrimEnd('\r', '\n')
-                : string.Empty;
-            session.ThinkingLineActive = !string.IsNullOrWhiteSpace(line);
-            session.ThinkingLineStart = lineStart;
-            session.ThinkingLineTimestamp = ExtractThinkingTimestamp(line);
-            session.ThinkingLinePrefix = StripTrailingThinkingDots(line);
-        }
-
-        private static void ClearThinkingState(AgentOpenSessionState session)
-        {
-            session.ThinkingLineActive = false;
-            session.ThinkingLineStart = 0;
-            session.ThinkingLineTimestamp = string.Empty;
-            session.ThinkingLinePrefix = string.Empty;
-        }
-
-        private static int FindLastLineStart(string text)
-        {
-            int lastLf = (text ?? string.Empty).LastIndexOf('\n');
-            if (lastLf >= 0)
-            {
-                return lastLf + 1;
-            }
-
-            int lastCr = (text ?? string.Empty).LastIndexOf('\r');
-            return lastCr >= 0 ? lastCr + 1 : 0;
-        }
-
-        private static string ExtractThinkingTimestamp(string line)
-        {
-            return line.Length >= 8 &&
-                line[2] == ':' &&
-                line[5] == ':'
-                ? line.Substring(0, 8)
-                : string.Empty;
-        }
-
-        private static string StripTrailingThinkingDots(string line)
-        {
-            int end = line.Length;
-            int count = 0;
-            while (end > 0 && line[end - 1] == '.' && count < 3)
-            {
-                end--;
-                count++;
-            }
-
-            return line.Substring(0, end);
-        }
-
-        private static bool EndsWithLineBreak(string text)
-        {
-            return (text ?? string.Empty).EndsWith("\r\n", StringComparison.Ordinal) ||
-                (text ?? string.Empty).EndsWith("\n", StringComparison.Ordinal) ||
-                (text ?? string.Empty).EndsWith("\r", StringComparison.Ordinal);
-        }
-
-        private string GetUntitledOpenSessionTitle()
-        {
-            return _getString("AgentOpenSessionUntitled", "새 세션");
+            return _openSessionController.ResolveRunSessionSettingsAsync(session);
         }
 
         private void SaveOpenSessionPromptTitleFromUI()
         {
-            if (_restoringOpenSession)
-            {
-                return;
-            }
-
-            var session = EnsureOpenSession(_currentSessionId);
-            session.PromptText = _agentPane.Prompt.Text ?? string.Empty;
-            UpdateOpenSessionTitle(session, session.PromptText);
-            session.UpdatedAt = DateTime.Now;
-            UpdateOpenSessionsUI();
+            _openSessionController.SavePromptTitleFromUI();
         }
 
         private void SaveActiveOpenSessionFromUI()
         {
-            if (_restoringOpenSession)
-            {
-                return;
-            }
-
-            var session = EnsureOpenSession(_currentSessionId);
-            session.PromptText = _agentPane.Prompt.Text ?? string.Empty;
-            session.OutputText = _agentPane.GetRawOutputText();
-            session.ActivityText = _agentPane.Activity.Text ?? string.Empty;
-            session.WorkspaceRoot = CaptureCurrentWorkspaceRoot();
-            SyncVisibleThinkingStateToSession(session);
-            if (_runningSessions.TryGetValue(session.Id, out AgentRunContext? runContext))
-            {
-                session.SessionHistoryText = runContext.SessionHistory.ToString();
-                session.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
-                session.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
-                session.Attachments = runContext.Attachments.ToList();
-                session.SessionEdits = runContext.SessionEdits.ToList();
-            }
-            else
-            {
-                session.SessionHistoryText = _sessionHistory.ToString();
-                session.SessionHistoryTokenCount = _sessionHistoryTokenCount;
-                session.CurrentRunTranscriptTokens = _currentRunTranscriptTokens;
-                session.Attachments = _attachmentController.GetState();
-                session.SessionEdits = _sessionEditController.SessionEdits.ToList();
-            }
-            session.UpdatedAt = DateTime.Now;
-            UpdateOpenSessionTitle(session, session.PromptText);
+            _openSessionController.SaveActiveFromUI();
         }
 
         private void RestoreOpenSession(AgentOpenSessionState session)
         {
-            _restoringOpenSession = true;
-            try
-            {
-                _currentSessionId = session.Id;
-                bool isRunningSession = _runningSessions.TryGetValue(session.Id, out AgentRunContext? runContext);
-                _sessionHistory.Clear();
-                _sessionHistory.Append(isRunningSession
-                    ? runContext?.SessionHistory.ToString() ?? string.Empty
-                    : session.SessionHistoryText ?? string.Empty);
-                _sessionHistoryTokenCount = isRunningSession
-                    ? runContext?.SessionHistoryTokenCount ?? 0
-                    : session.SessionHistoryTokenCount;
-                _currentRunTranscriptTokens = isRunningSession
-                    ? runContext?.CurrentRunTranscriptTokens ?? 0
-                    : session.CurrentRunTranscriptTokens;
-
-                if (isRunningSession && runContext != null)
-                {
-                    session.SessionHistoryText = runContext.SessionHistory.ToString();
-                    session.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
-                    session.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
-                    session.Attachments = runContext.Attachments.ToList();
-                    session.SessionEdits = runContext.SessionEdits.ToList();
-                }
-
-                _agentPane.Prompt.Text = session.PromptText ?? string.Empty;
-                _agentPane.ResetOutput(string.IsNullOrEmpty(session.OutputText)
-                    ? _displayText.OutputPlaceholder
-                    : session.OutputText);
-                if (session.ThinkingLineActive && session.IsRunning)
-                {
-                    _agentPane.ResumeThinkingActivityFromOutput();
-                }
-
-                _agentPane.ClearActivity(string.IsNullOrWhiteSpace(session.ActivityText)
-                    ? _displayText.ActivityIdle
-                    : session.ActivityText);
-                if (isRunningSession && runContext != null)
-                {
-                    _attachmentController.Replace(runContext.Attachments);
-                    _sessionEditController.Replace(runContext.SessionEdits);
-                }
-                else
-                {
-                    _attachmentController.Replace(session.Attachments);
-                    _sessionEditController.Replace(session.SessionEdits);
-                }
-                _historyController.UpdateUI(_currentSessionId);
-                RestoreWorkspaceRoot(session);
-                UpdateOpenSessionsUI();
-                UpdateActiveSessionBusyState();
-                UpdateContextStatsImmediate();
-            }
-            finally
-            {
-                _restoringOpenSession = false;
-            }
+            _openSessionController.RestoreSession(session);
         }
 
         private void CreateNewOpenSession()
         {
-            SaveActiveOpenSessionFromUI();
-            var session = CreateBlankOpenSession();
-            _openSessions.Insert(0, session);
-            RestoreOpenSession(session);
+            _openSessionController.CreateNewSession();
         }
 
         private void SwitchOpenSession(string sessionId)
         {
-            if (string.IsNullOrWhiteSpace(sessionId) ||
-                string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            var session = _openSessions.FirstOrDefault(item =>
-                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
-            if (session == null)
-            {
-                return;
-            }
-
-            SaveActiveOpenSessionFromUI();
-            RestoreOpenSession(session);
+            _openSessionController.SwitchSession(sessionId);
         }
 
         private void CloseOpenSession(string sessionId)
         {
-            if (string.IsNullOrWhiteSpace(sessionId))
-            {
-                return;
-            }
-
-            bool isRunningSession = _runningSessions.TryGetValue(sessionId, out AgentRunContext? runContext);
-            if (isRunningSession)
-            {
-                _pendingCloseSessionId = sessionId;
-                StopAgent(sessionId);
-                UpdateOpenSessionsUI();
-                if (string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
-                {
-                    return;
-                }
-            }
-
-            if (!isRunningSession && string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
-            {
-                var current = _openSessions.FirstOrDefault(item =>
-                    string.Equals(item.Id, sessionId, StringComparison.Ordinal));
-                if (current != null)
-                {
-                    _openSessions.Remove(current);
-                }
-
-                var next = _openSessions.FirstOrDefault();
-                if (next == null)
-                {
-                    next = CreateBlankOpenSession();
-                    _openSessions.Add(next);
-                }
-
-                RestoreOpenSession(next);
-                return;
-            }
-
-            var session = _openSessions.FirstOrDefault(item =>
-                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
-            if (session != null)
-            {
-                _openSessions.Remove(session);
-                UpdateOpenSessionsUI();
-            }
+            _openSessionController.CloseSession(sessionId);
         }
 
         private void UpdateOpenSessionsUI()
         {
-            var items = _openSessions
-                .Select(session =>
-                {
-                    bool isSelected = string.Equals(session.Id, _currentSessionId, StringComparison.Ordinal);
-                    bool isRunning = session.IsRunning || _runningSessions.ContainsKey(session.Id);
-                    return new AgentOpenSessionItemViewModel
-                    {
-                        Id = session.Id,
-                        Title = string.IsNullOrWhiteSpace(session.Title)
-                            ? GetUntitledOpenSessionTitle()
-                            : session.Title,
-                        IsSelected = isSelected,
-                        IsRunning = isRunning,
-                        CanSelect = true,
-                        CanClose = true
-                    };
-                })
-                .ToList();
-
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                _agentPane.UpdateOpenSessionItems(items, _currentSessionId);
-            });
+            _openSessionController.UpdateUI();
         }
 
         private void UpdateOpenSessionTitle(AgentOpenSessionState session, string prompt)
         {
-            string firstLine = BuildOpenSessionTitle(prompt);
-            session.Title = string.IsNullOrWhiteSpace(firstLine)
-                ? GetUntitledOpenSessionTitle()
-                : firstLine;
-        }
-
-        private static string BuildOpenSessionTitle(string prompt)
-        {
-            if (string.IsNullOrWhiteSpace(prompt))
-            {
-                return string.Empty;
-            }
-
-            return prompt
-                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .FirstOrDefault()
-                ?.Trim() ?? string.Empty;
+            _openSessionController.UpdateSessionTitle(session, prompt);
         }
 
         private void UpdateActiveSessionBusyState()
         {
-            _agentPane.SetBusy(IsCurrentSessionRunning());
+            _openSessionController.UpdateActiveSessionBusyState();
         }
 
-        private async Task BeginRunOutputBlockAsync(AgentRunContext context, string title)
+        private Task BeginRunOutputBlockAsync(AgentRunContext context, string title)
         {
-            await RunOnUIThreadAsync(() =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                if (IsSessionVisible(context.SessionId))
-                {
-                    _agentPane.BeginOutputBlock(title);
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    SyncVisibleThinkingStateToSession(session);
-                }
-                else
-                {
-                    CompleteThinkingInSession(session);
-                    AppendOutputLineToSession(session, title);
-                }
-            });
+            return _openSessionController.BeginRunOutputBlockAsync(context, title);
         }
 
-        private async Task ClearRunActivityAsync(AgentRunContext context, string text)
+        private Task ClearRunActivityAsync(AgentRunContext context, string text)
         {
-            await RunOnUIThreadAsync(() =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                session.ActivityText = text;
-                if (IsSessionVisible(context.SessionId))
-                {
-                    _agentPane.ClearActivity(text);
-                }
-            });
+            return _openSessionController.ClearRunActivityAsync(context, text);
         }
 
-        private async Task AppendRunActivityAsync(AgentRunContext context, string message)
+        private Task AppendRunActivityAsync(AgentRunContext context, string message)
         {
-            await RunOnUIThreadAsync(() =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                string timestamp = DateTime.Now.ToString("HH:mm:ss");
-                string line = $"{timestamp}  {message}";
-                CompleteThinkingInSession(session);
-                AppendOutputLineToSession(session, line);
-                session.ActivityText = string.IsNullOrWhiteSpace(session.ActivityText) ||
-                    _displayText.IsActivityIdle(session.ActivityText)
-                    ? line
-                    : session.ActivityText + Environment.NewLine + line;
-
-                if (IsSessionVisible(context.SessionId))
-                {
-                    _agentPane.AppendActivity(message);
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    session.ActivityText = _agentPane.Activity.Text ?? string.Empty;
-                    SyncVisibleThinkingStateToSession(session);
-                }
-            });
+            return _openSessionController.AppendRunActivityAsync(context, message);
         }
 
-        private async Task AppendRunOutputTextAsync(AgentRunContext context, string text)
+        private Task AppendRunOutputTextAsync(AgentRunContext context, string text)
         {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            await RunOnUIThreadAsync(() =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                if (IsSessionVisible(context.SessionId))
-                {
-                    _agentPane.AppendOutputText(text);
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    SyncVisibleThinkingStateToSession(session);
-                }
-                else
-                {
-                    AppendOutputTextToSession(session, text);
-                }
-            });
+            return _openSessionController.AppendRunOutputTextAsync(context, text);
         }
 
-        private async Task AppendRunOutputLineAsync(AgentRunContext context, string line)
+        private Task AppendRunOutputLineAsync(AgentRunContext context, string line)
         {
-            await RunOnUIThreadAsync(() =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                if (IsSessionVisible(context.SessionId))
-                {
-                    _agentPane.AppendOutputLine(line);
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    SyncVisibleThinkingStateToSession(session);
-                }
-                else
-                {
-                    CompleteThinkingInSession(session);
-                    AppendOutputLineToSession(session, line);
-                }
-            });
+            return _openSessionController.AppendRunOutputLineAsync(context, line);
         }
 
         private void EnqueueRunUi(
@@ -1813,150 +1329,30 @@ namespace TxtAIEditor.Controls
             Action activeAction,
             Action<AgentOpenSessionState>? backgroundAction = null)
         {
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                if (IsSessionVisible(context.SessionId))
-                {
-                    activeAction();
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    SyncVisibleThinkingStateToSession(session);
-                }
-                else
-                {
-                    backgroundAction?.Invoke(session);
-                }
-            });
+            _openSessionController.EnqueueRunUi(context, activeAction, backgroundAction);
         }
 
         private Task BeginRunThinkingActivityAsync(AgentRunContext context, string label)
         {
-            return RunOnUIThreadAsync(() =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                if (IsSessionVisible(context.SessionId))
-                {
-                    _agentPane.BeginThinkingActivity(label);
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    SyncVisibleThinkingStateToSession(session);
-                }
-                else
-                {
-                    BeginThinkingInSession(session, label);
-                }
-            });
+            return _openSessionController.BeginRunThinkingActivityAsync(context, label);
         }
 
         private Task StopRunThinkingActivityAsync(AgentRunContext context)
         {
-            return RunOnUIThreadAsync(() =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                if (IsSessionVisible(context.SessionId))
-                {
-                    _agentPane.StopThinkingActivity();
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    SyncVisibleThinkingStateToSession(session);
-                }
-                else
-                {
-                    CompleteThinkingInSession(session);
-                }
-            });
+            return _openSessionController.StopRunThinkingActivityAsync(context);
         }
 
         private bool IsSessionVisible(string sessionId)
         {
-            return string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal);
-        }
-
-        private string NormalizePlaceholderOutput(string text)
-        {
-            if (_displayText.IsOutputPlaceholder((text ?? string.Empty).TrimStart()))
-            {
-                return string.Empty;
-            }
-
-            return text ?? string.Empty;
-        }
-
-        private void AppendOutputLineToSession(AgentOpenSessionState session, string line)
-        {
-            string text = NormalizePlaceholderOutput(session.OutputText);
-            if (!string.IsNullOrEmpty(text) && !text.EndsWith(Environment.NewLine, StringComparison.Ordinal))
-            {
-                text += Environment.NewLine;
-            }
-
-            session.OutputText = text + line + Environment.NewLine;
-            session.UpdatedAt = DateTime.Now;
-        }
-
-        private void AppendOutputTextToSession(AgentOpenSessionState session, string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            CompleteThinkingInSession(session);
-            session.OutputText = NormalizePlaceholderOutput(session.OutputText) + text;
-            session.UpdatedAt = DateTime.Now;
-        }
-
-        private List<AgentAttachmentItem> ToAttachmentItems(IEnumerable<AgentAttachmentState> attachments)
-        {
-            return attachments.Select(attachment => new AgentAttachmentItem
-            {
-                Id = attachment.Id,
-                DisplayName = attachment.DisplayName,
-                Detail = attachment.Detail,
-                TokenText = _displayText.FormatInlineTokenCount(attachment.EstimatedTokens),
-                RemoveTooltip = _getString("AgentRemoveAttachmentTooltip", "Remove attachment"),
-                IconGlyph = attachment.IsImage ? "\uEB9F" : "\uE8A5"
-            }).ToList();
-        }
-
-        private static List<AgentFileEditPreview> GetLatestEditsForDisplay(IEnumerable<AgentFileEditPreview> edits)
-        {
-            var latestByPath = new Dictionary<string, AgentFileEditPreview>(StringComparer.OrdinalIgnoreCase);
-            foreach (AgentFileEditPreview edit in edits)
-            {
-                string key = !string.IsNullOrWhiteSpace(edit.FullPath)
-                    ? edit.FullPath
-                    : edit.RelativePath ?? string.Empty;
-                latestByPath[key] = edit;
-            }
-
-            return latestByPath.Values.ToList();
+            return _openSessionController.IsSessionVisible(sessionId);
         }
 
         private Task AppendOutputTextAndStreamToTabAsync(AgentRunContext context, string text)
         {
-            if (string.IsNullOrEmpty(text))
-            {
-                return Task.CompletedTask;
-            }
-
-            return RunOnUIThreadAsync(async () =>
-            {
-                var session = EnsureOpenSession(context.SessionId);
-                if (IsSessionVisible(context.SessionId))
-                {
-                    _agentPane.AppendOutputText(text);
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    SyncVisibleThinkingStateToSession(session);
-                }
-                else
-                {
-                    AppendOutputTextToSession(session, text);
-                }
-
-                if (context.StreamToTab)
-                {
-                    await StreamTextToTabAsync(context, text);
-                }
-            });
+            return _openSessionController.AppendRunOutputTextAndExecuteAsync(
+                context,
+                text,
+                () => context.StreamToTab ? StreamTextToTabAsync(context, text) : Task.CompletedTask);
         }
 
         private async Task StreamTextToTabAsync(AgentRunContext context, string text)
@@ -2421,14 +1817,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                var session = EnsureOpenSession(_currentSessionId);
-                _agentPane.AppendActivity(message);
-                session.OutputText = _agentPane.GetRawOutputText();
-                session.ActivityText = _agentPane.Activity.Text ?? string.Empty;
-                SyncVisibleThinkingStateToSession(session);
-            });
+            _openSessionController.AppendActivityToCurrentSession(message);
         }
 
         public void UpdateContextStats()
@@ -2566,7 +1955,7 @@ namespace TxtAIEditor.Controls
             session.SessionEdits = item.SessionEdits.ToList();
             session.Attachments.Clear();
             session.WorkspaceRoot = item.WorkspaceRoot ?? string.Empty;
-            ClearThinkingState(session);
+            _openSessionController.ClearThinkingState(session);
             session.UpdatedAt = DateTime.Now;
 
             _agentPane.DispatcherQueue.TryEnqueue(() =>
