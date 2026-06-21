@@ -18,7 +18,7 @@ namespace TxtAIEditor.Core.Services
             // Compiled / native binaries
             ".exe", ".dll", ".so", ".dylib", ".pdb", ".lib", ".obj", ".o", ".a", ".msixupload", ".msix", ".appx",
             // Documents
-            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".pages", ".key", ".numbers", ".epub", ".mobi",
+            ".pdf", ".doc", ".docx", ".hwp", ".hwpx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".pages", ".key", ".numbers", ".epub", ".mobi",
             // Images
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp",
             ".tiff", ".tif", ".heic", ".heif", ".raw", ".psd", ".ai", ".eps",
