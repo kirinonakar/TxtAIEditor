@@ -772,6 +772,14 @@ namespace TxtAIEditor
                     {
                         await _editorLineNavigationController.RevealTabLineAsync(activeTab.Id, targetLine);
                     }
+                },
+                async targetPage =>
+                {
+                    var activeTab = _tabNavigationController.GetActiveTab();
+                    if (activeTab != null)
+                    {
+                        await _pdfViewerController.NavigateToPageAsync(activeTab, targetPage);
+                    }
                 });
             _editorBridgeDocumentController = new EditorBridgeDocumentController(
                 _tabDirtyStateController,

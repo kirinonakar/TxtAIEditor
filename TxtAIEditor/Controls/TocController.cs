@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
 
@@ -19,6 +21,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab, EditorDocumentSession?> _getSession;
         private readonly Func<bool> _isAozoraMode;
         private readonly Func<int, Task> _revealLineAsync;
+        private readonly Func<int, Task> _revealPdfPageAsync;
+        private readonly PdfOutlineExtractionService _pdfOutlineExtractionService = new PdfOutlineExtractionService();
         private int _refreshVersion;
 
         public TocController(
@@ -27,7 +31,8 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> getActiveTab,
             Func<OpenedTab, EditorDocumentSession?> getSession,
             Func<bool> isAozoraMode,
-            Func<int, Task> revealLineAsync)
+            Func<int, Task> revealLineAsync,
+            Func<int, Task> revealPdfPageAsync)
         {
             _viewModel = viewModel;
             _leftSidebar = leftSidebar;
@@ -35,6 +40,7 @@ namespace TxtAIEditor.Controls
             _getSession = getSession;
             _isAozoraMode = isAozoraMode;
             _revealLineAsync = revealLineAsync;
+            _revealPdfPageAsync = revealPdfPageAsync;
 
             _leftSidebar.TocList.ItemsSource = _viewModel.TocItems;
             _leftSidebar.TocItemClick += OnTocItemClick;
@@ -47,6 +53,18 @@ namespace TxtAIEditor.Controls
             if (tab == null)
             {
                 _viewModel.TocItems.Clear();
+                return;
+            }
+
+            if (tab.IsPdfViewer)
+            {
+                if (string.IsNullOrWhiteSpace(tab.FilePath) || !File.Exists(tab.FilePath))
+                {
+                    _viewModel.TocItems.Clear();
+                    return;
+                }
+
+                _ = BuildPdfTocInBackgroundAsync(refreshVersion, tab.Id, tab.FilePath);
                 return;
             }
 
@@ -128,6 +146,50 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private async Task BuildPdfTocInBackgroundAsync(int refreshVersion, string tabId, string filePath)
+        {
+            IReadOnlyList<PdfOutlineItem> outlineItems;
+            try
+            {
+                outlineItems = await _pdfOutlineExtractionService.ExtractOutlineAsync(filePath).ConfigureAwait(false);
+            }
+            catch
+            {
+                return;
+            }
+
+            var newItems = new List<TocItem>(outlineItems.Count);
+            foreach (var outlineItem in outlineItems)
+            {
+                newItems.Add(new TocItem
+                {
+                    DisplayText = outlineItem.Title,
+                    LineNumber = outlineItem.PageNumber,
+                    PageNumber = outlineItem.PageNumber,
+                    IconGlyph = "\uE8A5",
+                    Margin = new Thickness(Math.Min(outlineItem.Level, 6) * 12, 2, 0, 2)
+                });
+            }
+
+            bool ApplyIfCurrent()
+            {
+                var activeTab = _getActiveTab();
+                if (refreshVersion != _refreshVersion || activeTab?.Id != tabId)
+                {
+                    return false;
+                }
+
+                ApplyTocItems(newItems);
+                return true;
+            }
+
+            var dispatcher = _leftSidebar.DispatcherQueue;
+            if (dispatcher == null || !dispatcher.TryEnqueue(() => ApplyIfCurrent()))
+            {
+                ApplyIfCurrent();
+            }
+        }
+
         private void ApplyTocItems(IReadOnlyList<TocItem> newItems)
         {
             // Check if outline structure changed (additions, deletions, text/margin/icon changes)
@@ -143,6 +205,7 @@ namespace TxtAIEditor.Controls
                     var newItem = newItems[i];
                     var oldItem = _viewModel.TocItems[i];
                     if (newItem.DisplayText != oldItem.DisplayText ||
+                        newItem.PageNumber != oldItem.PageNumber ||
                         newItem.IconGlyph != oldItem.IconGlyph ||
                         newItem.Margin.Left != oldItem.Margin.Left ||
                         newItem.Margin.Top != oldItem.Margin.Top ||
@@ -171,6 +234,10 @@ namespace TxtAIEditor.Controls
                     if (_viewModel.TocItems[i].LineNumber != newItems[i].LineNumber)
                     {
                         _viewModel.TocItems[i].LineNumber = newItems[i].LineNumber;
+                    }
+                    if (_viewModel.TocItems[i].PageNumber != newItems[i].PageNumber)
+                    {
+                        _viewModel.TocItems[i].PageNumber = newItems[i].PageNumber;
                     }
                 }
             }
@@ -608,6 +675,12 @@ namespace TxtAIEditor.Controls
 
             var tab = _getActiveTab();
             if (tab == null) return;
+
+            if (tab.IsPdfViewer && item.PageNumber.HasValue)
+            {
+                await _revealPdfPageAsync(item.PageNumber.Value);
+                return;
+            }
 
             await _revealLineAsync(item.LineNumber);
         }

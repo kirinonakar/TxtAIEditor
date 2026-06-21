@@ -65,6 +65,32 @@ namespace TxtAIEditor.Controls
             return true;
         }
 
+        public async Task NavigateToPageAsync(OpenedTab tab, int pageNumber)
+        {
+            if (!tab.IsPdfViewer ||
+                string.IsNullOrWhiteSpace(tab.FilePath) ||
+                !_viewerWebViews.TryGetValue(tab.Id, out var pdfWebView))
+            {
+                return;
+            }
+
+            pageNumber = Math.Max(1, pageNumber);
+            try
+            {
+                if (pdfWebView.CoreWebView2 == null)
+                {
+                    var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                    await pdfWebView.EnsureCoreWebView2Async(env);
+                }
+
+                pdfWebView.Focus(FocusState.Programmatic);
+                await TryNavigatePdfViewerPageAsync(pdfWebView, pageNumber);
+            }
+            catch
+            {
+            }
+        }
+
         public void Close(string tabId)
         {
             if (_viewerWebViews.TryGetValue(tabId, out var pdfWebView))
@@ -205,6 +231,29 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private static async Task<bool> TryNavigatePdfViewerPageAsync(WebView2 pdfWebView, int pageNumber)
+        {
+            if (pdfWebView.CoreWebView2 == null)
+            {
+                return false;
+            }
+
+            string script = PdfPageNavigationScript.Replace(
+                "__PAGE_NUMBER__",
+                pageNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                StringComparison.Ordinal);
+
+            try
+            {
+                string result = await pdfWebView.CoreWebView2.ExecuteScriptAsync(script);
+                return string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private const string SelectionBridgeScript = @"
 (() => {
     if (window.__txtAiEditorPdfSelectionBridge) return;
@@ -257,6 +306,164 @@ namespace TxtAIEditor.Controls
     document.addEventListener('keyup', scheduleRead, true);
     window.addEventListener('focus', scheduleRead, true);
     scheduleRead();
+})();
+";
+
+        private const string PdfPageNavigationScript = @"
+(() => {
+    const targetPage = __PAGE_NUMBER__;
+    const pageIndex = Math.max(0, targetPage - 1);
+
+    function callPageMethod(owner) {
+        if (!owner) return false;
+        const objects = [
+            owner,
+            owner.viewport,
+            owner.viewport_,
+            owner.viewer,
+            owner.viewer_,
+            owner.pdfViewer,
+            owner.pdfViewer_
+        ];
+
+        for (const obj of objects) {
+            if (!obj) continue;
+            for (const method of ['goToPage', 'goToPageIndex', 'scrollToPage', 'setPage', 'setPageNumber']) {
+                try {
+                    if (typeof obj[method] === 'function') {
+                        const argument = method === 'setPage' || method === 'setPageNumber'
+                            ? targetPage
+                            : pageIndex;
+                        obj[method](argument);
+                        return true;
+                    }
+                } catch {}
+            }
+
+            try {
+                if (typeof obj.currentPageNumber !== 'undefined') {
+                    obj.currentPageNumber = targetPage;
+                    return true;
+                }
+            } catch {}
+
+            try {
+                if (typeof obj.pageNo !== 'undefined') {
+                    obj.pageNo = targetPage;
+                    return true;
+                }
+            } catch {}
+        }
+
+        return false;
+    }
+
+    function setPageInput(root) {
+        if (!root) return false;
+        const selectors = [
+            'viewer-page-selector input',
+            'viewer-page-indicator input',
+            '#pageSelector input',
+            '#page-selector input',
+            'input[type=""number""]',
+            'input'
+        ];
+
+        for (const selector of selectors) {
+            const input = root.querySelector(selector);
+            if (!input) continue;
+            try {
+                input.focus();
+                input.value = String(targetPage);
+                input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: String(targetPage) }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
+                input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
+                return true;
+            } catch {}
+        }
+
+        return false;
+    }
+
+    function collectRoots(root, roots = []) {
+        if (!root || roots.includes(root)) return roots;
+        roots.push(root);
+        try {
+            root.querySelectorAll('*').forEach(element => {
+                if (element.shadowRoot) collectRoots(element.shadowRoot, roots);
+            });
+        } catch {}
+        return roots;
+    }
+
+    function findScrollContainer(element) {
+        let current = element;
+        while (current) {
+            try {
+                if (current.scrollHeight > current.clientHeight + 8) return current;
+            } catch {}
+
+            current = current.parentElement || current.getRootNode().host || null;
+        }
+
+        return document.scrollingElement || document.documentElement || document.body;
+    }
+
+    function scrollToPageElement(root) {
+        if (!root) return false;
+        const selectors = [
+            `[data-page-number=""${targetPage}""]`,
+            `[page-number=""${targetPage}""]`,
+            `[data-page-index=""${pageIndex}""]`,
+            `[aria-label*=""Page ${targetPage}""]`,
+            `#pageContainer${targetPage}`,
+            `.page:nth-of-type(${targetPage})`
+        ];
+
+        for (const selector of selectors) {
+            let page = null;
+            try {
+                page = root.querySelector(selector);
+            } catch {}
+
+            if (!page) continue;
+            try {
+                const scroller = findScrollContainer(page);
+                if (scroller && page.offsetTop >= 0) {
+                    scroller.scrollTo({ top: page.offsetTop, behavior: 'auto' });
+                }
+                page.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+                return true;
+            } catch {}
+        }
+
+        return false;
+    }
+
+    const viewer = document.querySelector('pdf-viewer') ||
+        document.querySelector('embed[type=""application/pdf""]') ||
+        document.querySelector('embed[type=""application/x-google-chrome-pdf""]');
+
+    if (callPageMethod(viewer)) return true;
+    if (viewer && viewer.shadowRoot && (callPageMethod(viewer.shadowRoot.querySelector('#viewer')) || setPageInput(viewer.shadowRoot))) {
+        return true;
+    }
+    if (setPageInput(document)) return true;
+
+    for (const root of collectRoots(document)) {
+        if (callPageMethod(root.querySelector && root.querySelector('#viewer'))) return true;
+        if (setPageInput(root)) return true;
+        if (scrollToPageElement(root)) return true;
+    }
+
+    try {
+        window.location.hash = 'page=' + targetPage;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+        return true;
+    } catch {}
+
+    return false;
 })();
 ";
     }

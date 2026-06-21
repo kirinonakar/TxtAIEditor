@@ -8,6 +8,7 @@ namespace TxtAIEditor.Core.Models
     {
         private string _displayText = string.Empty;
         private int _lineNumber;
+        private int? _pageNumber;
         private string _iconGlyph = "\uE9D2";
         private Thickness _margin = new Thickness(0, 2, 0, 2);
 
@@ -38,7 +39,21 @@ namespace TxtAIEditor.Core.Models
             }
         }
 
-        public string LineDisplay => $"L{LineNumber}";
+        public int? PageNumber
+        {
+            get => _pageNumber;
+            set
+            {
+                if (_pageNumber != value)
+                {
+                    _pageNumber = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(LineDisplay));
+                }
+            }
+        }
+
+        public string LineDisplay => PageNumber.HasValue ? $"P{PageNumber.Value}" : $"L{LineNumber}";
 
         public string IconGlyph
         {
