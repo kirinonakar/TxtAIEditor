@@ -132,9 +132,13 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
-                if (ReferenceEquals(_searchCancellationTokenSource, searchCancellationTokenSource))
+                if (searchVersion == _searchVersion)
                 {
-                    _searchCancellationTokenSource = null;
+                    if (ReferenceEquals(_searchCancellationTokenSource, searchCancellationTokenSource))
+                    {
+                        _searchCancellationTokenSource = null;
+                    }
+
                     SetSearchHeaderText(isSearching: false);
                 }
 
