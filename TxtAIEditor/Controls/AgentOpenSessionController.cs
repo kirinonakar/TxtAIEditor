@@ -258,6 +258,14 @@ namespace TxtAIEditor.Controls
         public void CreateNewSession()
         {
             SaveActiveFromUI();
+            var currentSession = EnsureSession(_currentSessionIdProvider());
+            if (IsReusableBlankSession(currentSession))
+            {
+                currentSession.UpdatedAt = DateTime.Now;
+                RestoreSession(currentSession);
+                return;
+            }
+
             var session = CreateBlankSession();
             _openSessions.Insert(0, session);
             RestoreSession(session);
@@ -679,6 +687,25 @@ namespace TxtAIEditor.Controls
             }
 
             return text ?? string.Empty;
+        }
+
+        private bool IsReusableBlankSession(AgentOpenSessionState session)
+        {
+            if (session.IsRunning || _runningSessions.ContainsKey(session.Id))
+            {
+                return false;
+            }
+
+            bool hasOutput = !string.IsNullOrWhiteSpace(NormalizePlaceholderOutput(session.OutputText));
+            bool hasActivity = !string.IsNullOrWhiteSpace(session.ActivityText) &&
+                !_displayText.IsActivityIdle(session.ActivityText);
+
+            return string.IsNullOrWhiteSpace(session.PromptText) &&
+                string.IsNullOrWhiteSpace(session.SessionHistoryText) &&
+                !hasOutput &&
+                !hasActivity &&
+                session.Attachments.Count == 0 &&
+                session.SessionEdits.Count == 0;
         }
 
         private void AppendOutputLineToSession(AgentOpenSessionState session, string line)
