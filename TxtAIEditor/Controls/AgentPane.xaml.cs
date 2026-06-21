@@ -297,7 +297,7 @@ namespace TxtAIEditor.Controls
             AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
             AgentNewSessionButton.IsEnabled = true;
             AgentOpenSessionsButton.IsEnabled = true;
-            AgentHistoryButton.IsEnabled = !isBusy;
+            AgentHistoryButton.IsEnabled = true;
             AgentDeleteHistoryButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
             AgentPlanningModeCheckBox.IsEnabled = !isBusy;
@@ -309,6 +309,7 @@ namespace TxtAIEditor.Controls
             AgentPresetButton.IsEnabled = !isBusy;
             AgentSelectedPresetScrollViewer.IsHitTestVisible = !isBusy;
             AgentSelectedPresetScrollViewer.Opacity = isBusy ? 0.65 : 1.0;
+            RebuildHistoryMenu();
 
             if (!isBusy)
             {
@@ -2191,7 +2192,8 @@ namespace TxtAIEditor.Controls
                     Width = 28,
                     Height = 28,
                     Padding = new Thickness(0),
-                    Style = buttonStyle
+                    Style = buttonStyle,
+                    IsEnabled = !_isBusy
                 };
                 ToolTipService.SetToolTip(deleteBtn, getString("AgentHistoryDeleteText", "삭제"));
                 deleteBtn.Click += (_, _) =>
