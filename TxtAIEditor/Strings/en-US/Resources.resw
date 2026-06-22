@@ -2279,8 +2279,17 @@ Plan: {0}</value>
    </data>
    <data name="OpenExternalViewerTooltip" xml:space="preserve">
      <value>Open in External Viewer</value>
-   </data>
-   <data name="ExternalViewerOpenTitle" xml:space="preserve">
+    </data>
+    <data name="OpenWithDefaultProgramTooltip" xml:space="preserve">
+      <value>Open in Default Program</value>
+    </data>
+    <data name="OpenWithDefaultProgramFailedTitle" xml:space="preserve">
+      <value>Failed to Open with Default Program</value>
+    </data>
+    <data name="OpenWithDefaultProgramNoActiveTab" xml:space="preserve">
+      <value>There is no active tab to open with the default program.</value>
+    </data>
+    <data name="ExternalViewerOpenTitle" xml:space="preserve">
      <value>Open External Viewer</value>
    </data>
    <data name="ExternalViewerOpenFailedTitle" xml:space="preserve">

@@ -84,6 +84,7 @@ namespace TxtAIEditor.Controls
 
             _previewPane.PreviewModeSelectionChanged += OnPreviewModeSelectionChanged;
             _previewPane.OpenPreviewInBrowserClick += OnOpenPreviewInBrowserClick;
+            _previewPane.OpenWithDefaultProgramClick += OnOpenWithDefaultProgramClick;
             _previewPane.OpenExternalViewerClick += OnOpenExternalViewerClick;
 
             _previewDebounceTimer = new DispatcherTimer
@@ -756,6 +757,11 @@ namespace TxtAIEditor.Controls
             await OpenExternalViewerAsync();
         }
 
+        private async void OnOpenWithDefaultProgramClick(object sender, RoutedEventArgs e)
+        {
+            await OpenWithDefaultProgramAsync();
+        }
+
         private async Task OpenInBrowserAsync()
         {
             var tab = _activeTabProvider();
@@ -791,6 +797,54 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 _showErrorMessage("브라우저 열기 실패", ex.Message);
+            }
+        }
+
+        private async Task OpenWithDefaultProgramAsync()
+        {
+            var tab = _activeTabProvider();
+            if (tab == null)
+            {
+                _showErrorMessage(
+                    _getString("OpenWithDefaultProgramFailedTitle", "기본 프로그램으로 열기 실패"),
+                    _getString("OpenWithDefaultProgramNoActiveTab", "기본 프로그램으로 열 활성 탭이 없습니다."));
+                return;
+            }
+
+            try
+            {
+                string targetPath = tab.FilePath ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(targetPath) || !File.Exists(targetPath))
+                {
+                    string previewDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "OpenWithDefault");
+                    Directory.CreateDirectory(previewDir);
+                    string extension = Path.GetExtension(tab.FilePath) ?? ".md";
+                    if (string.IsNullOrWhiteSpace(extension))
+                    {
+                        extension = tab.Language?.ToLowerInvariant() switch
+                        {
+                            "html" => ".html",
+                            "csv" => ".csv",
+                            "latex" => ".tex",
+                            _ => ".md"
+                        };
+                    }
+                    targetPath = Path.Combine(previewDir, $"open-{tab.Id}{extension}");
+                    string content = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
+                    await File.WriteAllTextAsync(targetPath, content, Encoding.UTF8);
+                }
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = targetPath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _showErrorMessage(
+                    _getString("OpenWithDefaultProgramFailedTitle", "기본 프로그램으로 열기 실패"),
+                    ex.Message);
             }
         }
 

@@ -2279,8 +2279,17 @@
    </data>
    <data name="OpenExternalViewerTooltip" xml:space="preserve">
      <value>외부 뷰어로 열기</value>
-   </data>
-   <data name="ExternalViewerOpenTitle" xml:space="preserve">
+    </data>
+    <data name="OpenWithDefaultProgramTooltip" xml:space="preserve">
+      <value>기본 프로그램으로 열기</value>
+    </data>
+    <data name="OpenWithDefaultProgramFailedTitle" xml:space="preserve">
+      <value>기본 프로그램으로 열기 실패</value>
+    </data>
+    <data name="OpenWithDefaultProgramNoActiveTab" xml:space="preserve">
+      <value>기본 프로그램으로 열 활성 탭이 없습니다.</value>
+    </data>
+    <data name="ExternalViewerOpenTitle" xml:space="preserve">
      <value>외부 뷰어 열기</value>
    </data>
    <data name="ExternalViewerOpenFailedTitle" xml:space="preserve">

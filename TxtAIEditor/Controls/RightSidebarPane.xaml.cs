@@ -16,6 +16,7 @@ namespace TxtAIEditor.Controls
         public event SelectionChangedEventHandler? PreviewModeSelectionChanged;
         public event RoutedEventHandler? OpenPreviewInBrowserClick;
         public event RoutedEventHandler? OpenExternalViewerClick;
+        public event RoutedEventHandler? OpenWithDefaultProgramClick;
         public event RoutedEventHandler? LlmAddFileContextClick;
         public event RoutedEventHandler? LlmRemoveFileContextClick;
         public event RoutedEventHandler? LlmExplainClick;
@@ -100,7 +101,7 @@ namespace TxtAIEditor.Controls
             OpenBrowserButtonText.Text = getString("OpenInBrowserButtonText", "브라우저");
             ToolTipService.SetToolTip(OpenBrowserButton, getString("OpenInBrowserTooltip", "HTML 미리보기를 브라우저로 열기"));
             ToolTipService.SetToolTip(OpenExternalViewerButton, getString("OpenExternalViewerTooltip", "외부 뷰어로 열기"));
-
+            ToolTipService.SetToolTip(OpenWithDefaultProgramButton, getString("OpenWithDefaultProgramTooltip", "기본 프로그램으로 열기"));
             AiAssistantTab.Header = getString("AiAssistantTabHeader", "AI Assistant");
             AgentTab.Header = getString("AgentTabHeader", "Agent");
             AgentPaneControl.Localize(getString);
@@ -171,6 +172,11 @@ namespace TxtAIEditor.Controls
         private void OnOpenExternalViewerClick(object sender, RoutedEventArgs e)
         {
             OpenExternalViewerClick?.Invoke(sender, e);
+        }
+
+        private void OnOpenWithDefaultProgramClick(object sender, RoutedEventArgs e)
+        {
+            OpenWithDefaultProgramClick?.Invoke(sender, e);
         }
 
         private void OnLlmAddFileContextClick(object sender, RoutedEventArgs e)

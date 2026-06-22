@@ -78,6 +78,11 @@
                                         <Button x:Name="OpenExternalViewerButton" Click="OnOpenExternalViewerClick" Height="24" Width="28" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="외부 뷰어로 열기">
                                             <FontIcon Glyph="&#xE8A7;" FontSize="13"/>
                                         </Button>
+                                        <Button x:Name="OpenWithDefaultProgramButton" Click="OnOpenWithDefaultProgramClick" Height="24" Padding="8,0,8,0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="기본 프로그램으로 열기">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <FontIcon Glyph="&#xE163;" FontSize="12"/>
+                                            </StackPanel>
+                                        </Button>
                                     </StackPanel>
                                 </Border>
     

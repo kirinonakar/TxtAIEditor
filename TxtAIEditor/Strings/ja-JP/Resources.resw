@@ -2280,8 +2280,17 @@
    </data>
    <data name="OpenExternalViewerTooltip" xml:space="preserve">
      <value>外部ビューアーで開く</value>
-   </data>
-   <data name="ExternalViewerOpenTitle" xml:space="preserve">
+    </data>
+    <data name="OpenWithDefaultProgramTooltip" xml:space="preserve">
+      <value>既定のプログラムで開く</value>
+    </data>
+    <data name="OpenWithDefaultProgramFailedTitle" xml:space="preserve">
+      <value>既定のプログラムで開けませんでした</value>
+    </data>
+    <data name="OpenWithDefaultProgramNoActiveTab" xml:space="preserve">
+      <value>既定のプログラムで開くアクティブなタブがありません。</value>
+    </data>
+    <data name="ExternalViewerOpenTitle" xml:space="preserve">
      <value>外部ビューアーを開く</value>
    </data>
    <data name="ExternalViewerOpenFailedTitle" xml:space="preserve">
