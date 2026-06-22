@@ -276,7 +276,6 @@ namespace TxtAIEditor.Controls
                 _agentPane,
                 _fileTools,
                 _isGitRepoProvider,
-                _sessionEditController,
                 async action => await _uiDispatcher.RunAsync(action),
                 AppendActivity,
                 _getString);
@@ -306,6 +305,7 @@ namespace TxtAIEditor.Controls
                 _getString);
             _fileTools.ConfirmFileEditAsync = _confirmationController.ConfirmFileEditAsync;
             _fileTools.ConfirmPowerShellAsync = _confirmationController.ConfirmPowerShellAsync;
+            _fileTools.FileEditCommittedAsync = preview => _uiDispatcher.RunAsync(() => _sessionEditController.Track(preview));
             _fileTools.ActivityReporter = AppendActivity;
             if (_fileModifiedAsync != null)
             {

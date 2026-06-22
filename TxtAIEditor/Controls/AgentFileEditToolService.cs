@@ -13,15 +13,18 @@ namespace TxtAIEditor.Controls
         private readonly AgentWorkspaceFileResolver _workspace;
         private readonly Func<AgentFileEditPreview, Task<bool>> _confirmEditAsync;
         private readonly Func<string, Task> _notifyFileModifiedAsync;
+        private readonly Func<AgentFileEditPreview, Task> _notifyFileEditCommittedAsync;
 
         public AgentFileEditToolService(
             AgentWorkspaceFileResolver workspace,
             Func<AgentFileEditPreview, Task<bool>> confirmEditAsync,
-            Func<string, Task> notifyFileModifiedAsync)
+            Func<string, Task> notifyFileModifiedAsync,
+            Func<AgentFileEditPreview, Task> notifyFileEditCommittedAsync)
         {
             _workspace = workspace;
             _confirmEditAsync = confirmEditAsync;
             _notifyFileModifiedAsync = notifyFileModifiedAsync;
+            _notifyFileEditCommittedAsync = notifyFileEditCommittedAsync;
         }
 
         public async Task<string> CreateFileAsync(string path, string content)
@@ -73,13 +76,20 @@ namespace TxtAIEditor.Controls
                     : $"create_file cancelled: {path}";
             }
 
+            string finalRelativePath = _workspace.RelativePath(fullPath);
             await File.WriteAllTextAsync(fullPath, newContent);
+            if (!File.Exists(fullPath))
+            {
+                return $"create_file failed: file was not found after write: {finalRelativePath}";
+            }
+
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
 
-            string finalRelativePath = _workspace.RelativePath(fullPath);
-            return wasRenamed
+            string result = wasRenamed
                 ? $"created: {finalRelativePath} (Note: '{originalPath}' already existed, so the file was renamed to '{finalRelativePath}')"
                 : $"created: {finalRelativePath}";
+            return $"{result}\nfull_path: {fullPath}";
         }
 
         public async Task<string> ReplaceInFileAsync(string path, string oldText, string newText)
@@ -199,6 +209,7 @@ namespace TxtAIEditor.Controls
             }
 
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"modified: {_workspace.RelativePath(fullPath)}";
         }
@@ -346,6 +357,7 @@ namespace TxtAIEditor.Controls
             }
 
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
 
             string replacementLabel = replacementCount == 1 ? "replacement" : "replacements";
@@ -489,6 +501,7 @@ namespace TxtAIEditor.Controls
             }
 
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"modified: {_workspace.RelativePath(fullPath)}{rangeAdjustmentNote}";
         }
@@ -602,6 +615,7 @@ namespace TxtAIEditor.Controls
             }
 
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"modified: {_workspace.RelativePath(fullPath)}";
         }
@@ -644,6 +658,7 @@ namespace TxtAIEditor.Controls
             }
 
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(newContent, lineEnding));
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"overwritten: {_workspace.RelativePath(fullPath)}";
         }
@@ -692,6 +707,7 @@ namespace TxtAIEditor.Controls
             }
 
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(newContent, lineEnding));
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"appended: {_workspace.RelativePath(fullPath)}";
         }
@@ -768,6 +784,7 @@ namespace TxtAIEditor.Controls
             }
 
             await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(targetFullPath);
             return $"merged: {_workspace.RelativePath(targetFullPath)}";
         }
@@ -835,6 +852,7 @@ namespace TxtAIEditor.Controls
             }
 
             await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"inserted: {_workspace.RelativePath(fullPath)}";
         }
@@ -1012,6 +1030,7 @@ namespace TxtAIEditor.Controls
                         }
 
                         await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+                        await _notifyFileEditCommittedAsync(preview);
                         await _notifyFileModifiedAsync(targetFullPath);
                         outputResults.Add($"created: {_workspace.RelativePath(targetFullPath)} (lines {start}-{endIdx})");
                     }
@@ -1069,6 +1088,7 @@ namespace TxtAIEditor.Controls
                         }
 
                         await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+                        await _notifyFileEditCommittedAsync(preview);
                         await _notifyFileModifiedAsync(targetFullPath);
                         outputResults.Add($"created: {partRelativePath} (lines {i + 1}-{i + chunkCount})");
                     }

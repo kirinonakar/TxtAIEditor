@@ -91,12 +91,14 @@ namespace TxtAIEditor.Controls
             _edits = new AgentFileEditToolService(
                 _workspace,
                 ConfirmEditAsync,
-                NotifyFileModifiedAsync);
+                NotifyFileModifiedAsync,
+                NotifyFileEditCommittedAsync);
         }
 
         public Func<AgentFileEditPreview, Task<bool>>? ConfirmFileEditAsync { get; set; }
         public Func<string, Task<bool>>? ConfirmPowerShellAsync { get; set; }
         public Func<string, Task>? FileModifiedAsync { get; set; }
+        public Func<AgentFileEditPreview, Task>? FileEditCommittedAsync { get; set; }
         public Action<string>? ActivityReporter { get; set; }
         public Func<string?>? WorkspaceRootOverrideProvider { get; set; }
 
@@ -259,6 +261,14 @@ namespace TxtAIEditor.Controls
             if (FileModifiedAsync != null)
             {
                 await FileModifiedAsync(fullPath);
+            }
+        }
+
+        private async Task NotifyFileEditCommittedAsync(AgentFileEditPreview preview)
+        {
+            if (FileEditCommittedAsync != null)
+            {
+                await FileEditCommittedAsync(preview);
             }
         }
 

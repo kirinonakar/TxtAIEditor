@@ -12,7 +12,6 @@ namespace TxtAIEditor.Controls
         private readonly AgentPane _agentPane;
         private readonly AgentFileToolService _fileTools;
         private readonly Func<string, bool> _isGitRepoProvider;
-        private readonly AgentSessionEditController _sessionEditController;
         private readonly Func<Func<Task<bool>>, Task<bool>> _runOnUIThreadAsync;
         private readonly Action<string> _appendActivity;
         private readonly Func<string, string, string> _getString;
@@ -23,7 +22,6 @@ namespace TxtAIEditor.Controls
             AgentPane agentPane,
             AgentFileToolService fileTools,
             Func<string, bool> isGitRepoProvider,
-            AgentSessionEditController sessionEditController,
             Func<Func<Task<bool>>, Task<bool>> runOnUIThreadAsync,
             Action<string> appendActivity,
             Func<string, string, string> getString)
@@ -32,7 +30,6 @@ namespace TxtAIEditor.Controls
             _agentPane = agentPane;
             _fileTools = fileTools;
             _isGitRepoProvider = isGitRepoProvider;
-            _sessionEditController = sessionEditController;
             _runOnUIThreadAsync = runOnUIThreadAsync;
             _appendActivity = appendActivity;
             _getString = getString;
@@ -57,11 +54,6 @@ namespace TxtAIEditor.Controls
                 _appendActivity(string.Format(
                     _getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"),
                     preview.RelativePath));
-                await _runOnUIThreadAsync(() =>
-                {
-                    _sessionEditController.Track(preview);
-                    return Task.FromResult(true);
-                });
                 return true;
             }
 
@@ -100,11 +92,6 @@ namespace TxtAIEditor.Controls
                 _appendActivity(approved
                     ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
                     : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
-
-                if (approved)
-                {
-                    _sessionEditController.Track(preview);
-                }
 
                 return approved;
             });

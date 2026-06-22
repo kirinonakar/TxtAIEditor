@@ -142,6 +142,18 @@ namespace TxtAIEditor.Controls
 
         public string GetWorkspaceRoot()
         {
+            string currentFolder = _currentFolderProvider();
+            if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
+            {
+                return currentFolder;
+            }
+
+            string currentRepo = _currentRepoProvider();
+            if (!string.IsNullOrWhiteSpace(currentRepo) && Directory.Exists(currentRepo))
+            {
+                return currentRepo;
+            }
+
             if (_selectedExplorerItemProvider() is ExplorerItem selectedItem)
             {
                 if (selectedItem.IsFolder && Directory.Exists(selectedItem.Path))
@@ -154,18 +166,6 @@ namespace TxtAIEditor.Controls
                 {
                     return selectedFileDirectory;
                 }
-            }
-
-            string currentFolder = _currentFolderProvider();
-            if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
-            {
-                return currentFolder;
-            }
-
-            string currentRepo = _currentRepoProvider();
-            if (!string.IsNullOrWhiteSpace(currentRepo) && Directory.Exists(currentRepo))
-            {
-                return currentRepo;
             }
 
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
