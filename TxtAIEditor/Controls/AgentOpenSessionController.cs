@@ -384,7 +384,7 @@ namespace TxtAIEditor.Controls
             bool isCurrentSessionRunning = IsCurrentSessionRunning();
             var currentSession = EnsureSession(_currentSessionIdProvider());
             _agentPane.SetBusy(isCurrentSessionRunning);
-            _agentPane.SetCanRewindSession(!isCurrentSessionRunning && currentSession.LastRewindSnapshot != null);
+            _agentPane.SetCanRewindSession(!isCurrentSessionRunning && currentSession.RewindSnapshots.Count > 0);
         }
 
         public async Task BeginRunOutputBlockAsync(AgentRunContext context, string title)

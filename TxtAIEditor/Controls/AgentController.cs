@@ -485,7 +485,7 @@ namespace TxtAIEditor.Controls
 
             var activeOpenSession = EnsureOpenSession(_currentSessionId);
             SaveActiveOpenSessionFromUI();
-            activeOpenSession.LastRewindSnapshot = AgentSessionRewindSnapshot.Capture(activeOpenSession);
+            activeOpenSession.RewindSnapshots.Add(AgentSessionRewindSnapshot.Capture(activeOpenSession));
             UpdateOpenSessionTitle(activeOpenSession, userInstruction);
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             activeOpenSession.UpdatedAt = DateTime.Now;
@@ -1493,6 +1493,7 @@ namespace TxtAIEditor.Controls
                 session.CurrentRunTranscriptTokens = 0;
                 session.Attachments.Clear();
                 session.SessionEdits.Clear();
+                session.RewindSnapshots.Clear();
                 session.WorkspaceRoot = string.IsNullOrWhiteSpace(workspaceRoot) ? _fileTools.WorkspaceRoot : workspaceRoot;
                 session.LlmSettings = CreateSessionSettingsSnapshot();
                 session.UpdatedAt = DateTime.Now;
@@ -1737,13 +1738,14 @@ namespace TxtAIEditor.Controls
                 SaveActiveOpenSessionFromUI();
 
                 var session = EnsureOpenSession(_currentSessionId);
-                AgentSessionRewindSnapshot? snapshot = session.LastRewindSnapshot;
-                if (snapshot == null)
+                if (session.RewindSnapshots.Count == 0)
                 {
                     return;
                 }
 
+                AgentSessionRewindSnapshot snapshot = session.RewindSnapshots[^1];
                 await RevertSessionEditsToSnapshotAsync(snapshot);
+                session.RewindSnapshots.RemoveAt(session.RewindSnapshots.Count - 1);
                 RestoreOpenSessionFromSnapshot(session, snapshot);
                 await PersistRewoundSessionHistoryAsync(session);
             }
@@ -1794,7 +1796,6 @@ namespace TxtAIEditor.Controls
             session.SessionEdits = snapshot.CloneSessionEdits();
             session.WorkspaceRoot = snapshot.WorkspaceRoot;
             session.IsRunning = false;
-            session.LastRewindSnapshot = null;
             session.UpdatedAt = DateTime.Now;
             _openSessionController.ClearThinkingState(session);
             RestoreOpenSession(session);
@@ -2518,6 +2519,7 @@ namespace TxtAIEditor.Controls
             session.CurrentRunTranscriptTokens = 0;
             session.SessionEdits = item.SessionEdits.ToList();
             session.Attachments.Clear();
+            session.RewindSnapshots.Clear();
             session.WorkspaceRoot = item.WorkspaceRoot ?? string.Empty;
             _openSessionController.ClearThinkingState(session);
             session.UpdatedAt = DateTime.Now;

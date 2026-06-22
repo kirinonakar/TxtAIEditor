@@ -22,7 +22,7 @@ namespace TxtAIEditor.Controls
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
         public List<AgentAttachmentState> Attachments { get; set; } = new();
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
-        public AgentSessionRewindSnapshot? LastRewindSnapshot { get; set; }
+        public List<AgentSessionRewindSnapshot> RewindSnapshots { get; set; } = new();
         public bool IsRunning { get; set; }
         public bool ThinkingLineActive { get; set; }
         public int ThinkingLineStart { get; set; }
