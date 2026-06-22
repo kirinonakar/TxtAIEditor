@@ -30,6 +30,10 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- Search/process: run_rg {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}; run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}; run_powershell {\"command\":\"git status --short\",\"timeoutMs\":10000}.");
             builder.AppendLine("- Documents: extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}; then read the generated .txt/.csv in targeted ranges. Use for PDF/DOCX/PPTX/XLSX/HWPX; scanned PDFs may need OCR.");
             builder.AppendLine("- File edits: create_file {\"path\":\"relative/path.txt\",\"content\":\"...\",\"openAfterCreate\":false}; replace_in_file {\"path\":\"relative/path.cs\",\"oldText\":\"...\",\"newText\":\"...\"}; search_replace {\"path\":\"relative/path.cs\",\"search\":\"old\",\"replacement\":\"new\",\"useRegex\":false,\"matchCase\":true,\"wholeWord\":false,\"maxReplacements\":0}; replace_range {\"path\":\"relative/path.cs\",\"startLine\":120,\"endLine\":145,\"newText\":\"...\",\"expectedSnippet\":\"optional\"}; apply_patch {\"path\":\"relative/path.cs\",\"patch\":\"unified diff...\"}; overwrite_file {\"path\":\"relative/path.cs\",\"content\":\"...\"}; insert_to_file {\"path\":\"relative/path.cs\",\"content\":\"...\",\"before\":\"unique context\",\"after\":\"unique context\"}; append_to_file, merge_files, split_file.");
+            if (isPlanningMode)
+            {
+                builder.AppendLine("- Planning: make_plan {\"markdown\":\"# Plan\\n...\"}; use only in planning mode. Provide only the Markdown plan content; the host chooses the filename, saves it under the TxtAIEditor plan folder, and opens it for user review.");
+            }
             builder.AppendLine("- Editor tabs: insert_text {\"content\":\"...\"}; create_tab {\"title\":\"draft.md\",\"content\":\"...\"}; edit_tab {\"title\":\"tab title or ID\",\"content\":\"...\"}; save_tab {\"title\":\"optional\",\"path\":\"optional workspace path\"}; open_file {\"path\":\"relative/path.txt\"}.");
             builder.AppendLine("- Web: web_search_exa {\"query\":\"search query\",\"numResults\":5}; web_fetch {\"urls\":[\"https://example.com/page\"]}.");
             builder.AppendLine("- MCP: if [Enabled MCP servers] lists mcp_* tools, call the exact listed alias with arguments matching its JSON schema. MCP tools are external Model Context Protocol tools.");
@@ -75,12 +79,16 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 builder.AppendLine();
                 builder.AppendLine("Planning mode:");
-                builder.AppendLine("- Keep a concise internal plan for non-trivial work: investigate, implement, verify.");
-                builder.AppendLine("- Do not edit before identifying the relevant files and reading enough surrounding structure.");
+                builder.AppendLine("- This is a plan-only run. Investigate the task, then call make_plan with the detailed Markdown implementation plan.");
+                builder.AppendLine("- Do not create, modify, delete, move, format, stage, commit, build, restore, install, or otherwise change files or external state in planning mode, except for the make_plan tool.");
+                builder.AppendLine("- Do not use create_file, overwrite_file, append_to_file, edit_tab, save_tab, or other ordinary write tools to create the plan file.");
+                builder.AppendLine("- The make_plan tool is visible only in planning mode. Its input must be only Markdown plan content; do not provide a path or filename.");
+                builder.AppendLine("- Use only safe inspection tools such as list_files, search_text, read_file, skill_use, read_image, web tools, run_rg, run_rga, or clearly read-only run_powershell commands.");
+                builder.AppendLine("- The make_plan Markdown must include: goal, target files, edit scope, areas not to touch, current cause/context summary, concrete implementation steps, verification, and rollback/failure criteria.");
                 builder.AppendLine("- Keep scope minimal. Avoid unrelated refactoring, formatting, renaming, dependency changes, or architecture changes.");
                 builder.AppendLine("- If more tool work is needed, emit only the next tool_call; do not output progress or the plan first.");
                 builder.AppendLine("- Ask the user only when requirements conflict, scope must expand, or a risky/destructive action is necessary.");
-                builder.AppendLine("- Final answer: summarize changed files, verification, and any remaining risk.");
+                builder.AppendLine("- When ready, reply with exactly one make_plan tool_call and no plain text. Plain text does not save a plan.");
             }
             return builder.ToString();
         }

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -26,6 +28,7 @@ namespace TxtAIEditor.Controls
         private readonly ICredentialService _credentialService;
         private readonly AgentPane _agentPane;
         private readonly Func<OpenedTab?> _activeTabProvider;
+        private readonly Func<IReadOnlyList<OpenedTab>> _openTabsProvider;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
@@ -40,6 +43,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string>? _closeTabById;
         private readonly Func<string, Task>? _navigateToFolderAsync;
         private readonly Func<string, Task<bool>> _insertIntoActiveEditorAsync;
+        private readonly Func<OpenedTab, string?, Task<bool>>? _saveTabAsync;
         private readonly Func<string?, Task<bool>>? _beginStreamIntoActiveEditorAsync;
         private readonly Func<string?, string, Task<bool>>? _streamTextIntoActiveEditorAsync;
         private readonly Func<string?, Task>? _endStreamIntoActiveEditorAsync;
@@ -109,6 +113,7 @@ namespace TxtAIEditor.Controls
             _credentialService = credentialService;
             _agentPane = agentPane;
             _activeTabProvider = activeTabProvider;
+            _openTabsProvider = openTabsProvider;
             _showError = showError;
             _getString = getString;
             _fileTools = fileTools;
@@ -124,6 +129,7 @@ namespace TxtAIEditor.Controls
             _closeTabById = closeTabById;
             _navigateToFolderAsync = navigateToFolderAsync;
             _insertIntoActiveEditorAsync = insertIntoActiveEditorAsync;
+            _saveTabAsync = saveTabAsync;
             _beginStreamIntoActiveEditorAsync = beginStreamIntoActiveEditorAsync;
             _streamTextIntoActiveEditorAsync = streamTextIntoActiveEditorAsync;
             _endStreamIntoActiveEditorAsync = endStreamIntoActiveEditorAsync;
@@ -257,6 +263,7 @@ namespace TxtAIEditor.Controls
                 _skillController,
                 _mcpController,
                 AddCurrentRunImageToolAttachment,
+                MakePlanAsync,
                 AppendActivity,
                 _getString);
             _confirmationController = new AgentConfirmationController(
@@ -454,8 +461,19 @@ namespace TxtAIEditor.Controls
             var settings = _settingsService.CurrentSettings;
 
             string userInstruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
+            bool requestedPlanningMode = _agentPane.PlanningMode;
+            if (requestedPlanningMode && string.IsNullOrWhiteSpace(userInstruction))
+            {
+                _showError(
+                    _getString("AgentErrorTitle", "Agent 오류"),
+                    _getString("AgentEmptyPrompt", "Agent에게 맡길 작업을 입력해 주세요."));
+                return;
+            }
+
             await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
-            string instruction = BuildAgentInstruction(userInstruction);
+            string instruction = BuildAgentInstruction(requestedPlanningMode
+                ? BuildPlanningModeRequest(userInstruction)
+                : userInstruction);
             if (string.IsNullOrWhiteSpace(instruction))
             {
                 _showError(
@@ -482,7 +500,9 @@ namespace TxtAIEditor.Controls
                 SessionEdits = activeOpenSession.SessionEdits.ToList(),
                 StreamToTab = _agentPane.StreamToTab,
                 WorkspaceRoot = activeOpenSession.WorkspaceRoot,
-                LlmSettings = runSettings
+                LlmSettings = runSettings,
+                IsPlanningMode = requestedPlanningMode,
+                OriginalUserInstruction = userInstruction
             };
             runContext.SessionHistory.Append(activeOpenSession.SessionHistoryText ?? string.Empty);
   
@@ -505,6 +525,8 @@ namespace TxtAIEditor.Controls
 
             string initialTranscript = string.Empty;
             string transcript = string.Empty;
+            string approvedPlanExecutionPrompt = string.Empty;
+            string approvedPlanWorkspaceRoot = activeOpenSession.WorkspaceRoot;
             void AppendRunSessionHistoryLine(string line = "")
             {
                 runContext.SessionHistory.AppendLine(line);
@@ -533,6 +555,8 @@ namespace TxtAIEditor.Controls
                     runContext.Attachments);
                 string lastWorkspaceContext = workspaceContext;
                 string runSelectionContext = _selectionContextController.BuildSelectionContext(currentRunSelectionSnapshot);
+                runContext.PlanWorkspaceContext = workspaceContext;
+                runContext.PlanSelectionContext = runSelectionContext;
                 var initialTranscriptBuilder = new StringBuilder();
                 string sessionHistoryForPrompt = BuildSessionHistoryForPrompt(
                     instruction,
@@ -557,10 +581,12 @@ namespace TxtAIEditor.Controls
                 const int maxEmptyResponseRetries = 1;
                 int toolCallFormatRetryCount = 0;
                 const int maxToolCallFormatRetries = 2;
+                int makePlanRetryCount = 0;
+                const int maxMakePlanRetries = 2;
                 int repeatedDuplicateToolSkipCount = 0;
                 string? lastDuplicateToolInvocationKey = null;
                 const int maxRepeatedDuplicateToolSkips = 3;
-                bool planningMode = _agentPane.PlanningMode;
+                bool planningMode = requestedPlanningMode;
                 int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls > 0 ? runContext.LlmSettings.LlmMaxToolCalls : 50;
                 var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
                 int currentTaskStartEditIndex = runContext.SessionEdits.Count;
@@ -809,17 +835,17 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    if (!responseHasToolSyntax && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(response))
+                    if (!planningMode && !responseHasToolSyntax && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(response))
                     {
                         visibleTextFlushed = true;
                         await AppendOutputTextAndStreamToTabAsync(runContext, response);
                     }
-                    else if (!responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(response))
+                    else if (!planningMode && !responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(response))
                     {
                         visibleTextFlushed = true;
                         await AppendOutputTextAndStreamToTabAsync(runContext, response);
                     }
-                    else if (!responseHasToolSyntax && printedLength < endLength)
+                    else if (!planningMode && !responseHasToolSyntax && printedLength < endLength)
                     {
                         string remainingText = response.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;
@@ -872,6 +898,51 @@ namespace TxtAIEditor.Controls
                             continue;
                         }
 
+                        if (planningMode)
+                        {
+                            makePlanRetryCount++;
+                            string retryNote =
+                                "\n\n[Planning mode make_plan required]\n" +
+                                "Do not answer with the plan as plain text. Save it by replying with exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
+
+                            transcript += retryNote;
+                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+
+                            string retryMessage = _getString(
+                                "AgentMakePlanRequired",
+                                "계획 모드에서는 make_plan 도구로 계획서를 저장해야 합니다.");
+                            await AppendRunActivityAsync(runContext, retryMessage);
+                            await AppendRunOutputLineAsync(runContext, retryMessage);
+                            if (IsSessionVisible(runContext.SessionId))
+                            {
+                                UpdateContextStatsImmediate(force: true);
+                            }
+
+                            if (makePlanRetryCount > maxMakePlanRetries)
+                            {
+                                string limitMessage = _getString(
+                                    "AgentMakePlanRetryLimit",
+                                    "make_plan 도구 호출이 생성되지 않아 계획 모드를 중단했습니다. 다시 실행해 주세요.");
+                                await AppendRunActivityAsync(runContext, limitMessage);
+                                await AppendRunOutputLineAsync(runContext, limitMessage);
+
+                                AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
+                                string failedPlanTranscript = transcript.Substring(initialTranscript.Length);
+                                if (!string.IsNullOrWhiteSpace(failedPlanTranscript))
+                                {
+                                    AppendRunSessionHistoryLine(failedPlanTranscript.Trim());
+                                }
+                                AppendRunSessionHistoryLine($"[Agent Response]: {limitMessage}");
+                                AppendRunSessionHistoryLine();
+                                _ = PersistRunSessionToHistoryAsync();
+
+                                completed = true;
+                                break;
+                            }
+
+                            continue;
+                        }
+
                         if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
                             await AppendOutputTextAndStreamToTabAsync(runContext, response);
@@ -906,7 +977,19 @@ namespace TxtAIEditor.Controls
                     string toolResultForTranscript;
                     toolCallFormatRetryCount = 0;
 
-                    if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
+                    if (!planningMode && normalizedToolName == "make_plan")
+                    {
+                        toolResult = "make_plan failed: this tool is only available when planning mode is enabled.";
+                        toolResultForTranscript = toolResult;
+                    }
+                    else if (planningMode && IsMutatingTool(normalizedToolName) && normalizedToolName != "make_plan")
+                    {
+                        toolResult =
+                            "blocked: planning mode is plan-only and cannot run file/editor mutation tools. " +
+                            "Continue with safe inspection if needed, or write the detailed Markdown plan as the final answer.";
+                        toolResultForTranscript = toolResult;
+                    }
+                    else if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
                         successfulToolResults.TryGetValue(toolInvocationKey, out string? cachedToolResult))
                     {
                         skippedDuplicateTool = true;
@@ -1035,6 +1118,31 @@ namespace TxtAIEditor.Controls
                         : _getString("AgentToolRunning", "도구 실행 중");
                     await AppendRunOutputLineAsync(runContext, $"{outputHeader}: {toolName}");
                     await AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
+
+                    if (planningMode && normalizedToolName == "make_plan" && IsSuccessfulToolResult(toolResult))
+                    {
+                        approvedPlanExecutionPrompt = await WaitForSavedPlanApprovalAsync(
+                            runContext,
+                            userInstruction,
+                            cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(approvedPlanExecutionPrompt))
+                        {
+                            approvedPlanWorkspaceRoot = runContext.WorkspaceRoot;
+                        }
+
+                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
+                        string makePlanRunTranscript = transcript.Substring(initialTranscript.Length);
+                        if (!string.IsNullOrWhiteSpace(makePlanRunTranscript))
+                        {
+                            AppendRunSessionHistoryLine(makePlanRunTranscript.Trim());
+                        }
+                        AppendRunSessionHistoryLine("[Agent Response]: Plan saved for user review.");
+                        AppendRunSessionHistoryLine();
+                        _ = PersistRunSessionToHistoryAsync();
+
+                        completed = true;
+                        break;
+                    }
 
                     if (stopAfterDuplicateLoopGuard)
                     {
@@ -1175,6 +1283,323 @@ namespace TxtAIEditor.Controls
                     UpdateOpenSessionsUI();
                 }
             }
+
+            if (!string.IsNullOrWhiteSpace(approvedPlanExecutionPrompt))
+            {
+                await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot);
+            }
+        }
+
+        private static string BuildPlanningModeRequest(string userInstruction)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("[Planning-mode task]");
+            builder.AppendLine("Investigate first, then call make_plan with the detailed Markdown plan.");
+            builder.AppendLine("Do not edit, create, delete, move, format, build, restore, install, stage, commit, or save files in this run, except by calling make_plan once for the plan document.");
+            builder.AppendLine("Do not use ordinary file creation or tab saving tools for the plan. The make_plan tool chooses the filename and opens the saved plan.");
+            builder.AppendLine("The make_plan Markdown must include target files, edit scope, areas not to touch, evidence/context summary, step-by-step implementation, verification, and rollback/failure criteria.");
+            builder.AppendLine();
+            builder.AppendLine("[Original user request]");
+            builder.Append(userInstruction);
+            return builder.ToString().Trim();
+        }
+
+        private async Task<string> MakePlanAsync(JsonElement arguments, CancellationToken cancellationToken)
+        {
+            AgentRunContext? runContext = _activeToolRunContext.Value ?? _activeWorkspaceRunContext.Value;
+            if (runContext == null)
+            {
+                return "make_plan failed: no active planning run context.";
+            }
+
+            if (!runContext.IsPlanningMode)
+            {
+                return "make_plan failed: this tool is only available when planning mode is enabled.";
+            }
+
+            string planMarkdown = GetFirstStringArgument(arguments, "markdown", "content", "plan", "md", "text");
+            if (string.IsNullOrWhiteSpace(planMarkdown))
+            {
+                return "make_plan failed: markdown content is empty.";
+            }
+
+            string workspaceRoot = runContext.WorkspaceRoot;
+            try
+            {
+                string planPath = await SavePlanFileAsync(
+                    runContext.OriginalUserInstruction,
+                    planMarkdown,
+                    workspaceRoot,
+                    runContext.PlanWorkspaceContext,
+                    runContext.PlanSelectionContext,
+                    cancellationToken);
+                runContext.GeneratedPlanPath = planPath;
+                await OpenPlanFileForReviewAsync(runContext, planPath);
+                return $"make_plan saved: {planPath}\nworkspace_root: {workspaceRoot}";
+            }
+            catch (Exception ex)
+            {
+                string title = _getString("AgentPlanSaveErrorTitle", "계획 저장 오류");
+                string message = string.Format(
+                    _getString("AgentPlanSaveErrorMessage", "계획서를 저장하는 중 오류가 발생했습니다: {0}"),
+                    ex.Message);
+                await RunOnUIThreadAsync(() => _showError(title, message));
+                await AppendRunActivityAsync(runContext, message);
+                return $"make_plan failed: {ex.Message}";
+            }
+        }
+
+        private async Task<string> WaitForSavedPlanApprovalAsync(
+            AgentRunContext runContext,
+            string originalUserInstruction,
+            CancellationToken cancellationToken)
+        {
+            string planPath = runContext.GeneratedPlanPath;
+            if (string.IsNullOrWhiteSpace(planPath))
+            {
+                string message = _getString(
+                    "AgentPlanPathMissing",
+                    "저장된 계획서 경로를 찾지 못해 실행을 시작하지 않았습니다.");
+                await AppendRunActivityAsync(runContext, message);
+                await AppendRunOutputLineAsync(runContext, message);
+                return string.Empty;
+            }
+
+            await AppendRunActivityAsync(runContext, string.Format(
+                _getString("AgentActivityPlanSavedFormat", "계획서 저장됨: {0}"),
+                planPath));
+            await AppendRunOutputLineAsync(runContext, string.Format(
+                _getString("AgentPlanSavedOutputFormat", "계획서를 저장하고 열었습니다: {0}"),
+                planPath));
+
+            bool approved = await _confirmationController.ConfirmPlanExecutionAsync(planPath, cancellationToken);
+            if (!approved)
+            {
+                await AppendRunOutputLineAsync(
+                    runContext,
+                    _getString("AgentPlanExecutionCancelledOutput", "계획 실행이 취소되었습니다."));
+                return string.Empty;
+            }
+
+            bool saved = await SaveOpenPlanTabIfDirtyAsync(planPath);
+            if (!saved)
+            {
+                string message = _getString(
+                    "AgentPlanSaveDirtyTabFailed",
+                    "수정된 계획 탭을 저장하지 못해 실행을 시작하지 않았습니다.");
+                await AppendRunActivityAsync(runContext, message);
+                await AppendRunOutputLineAsync(runContext, message);
+                return string.Empty;
+            }
+
+            string approvedPlan = await File.ReadAllTextAsync(planPath, cancellationToken);
+            string workspaceRoot = runContext.WorkspaceRoot;
+            return BuildApprovedPlanExecutionPrompt(
+                originalUserInstruction,
+                approvedPlan,
+                planPath,
+                workspaceRoot);
+        }
+
+        private async Task<string> SavePlanFileAsync(
+            string originalUserInstruction,
+            string planMarkdown,
+            string workspaceRoot,
+            string workspaceContext,
+            string selectionContext,
+            CancellationToken cancellationToken)
+        {
+            string planDirectory = Path.Combine(AgentSkillDirectories.UserSettingsDirectory, "plan");
+            Directory.CreateDirectory(planDirectory);
+
+            DateTime createdAt = DateTime.Now;
+            string planPath = GetNextPlanFilePath(planDirectory, createdAt);
+            string content = BuildPlanFileContent(
+                originalUserInstruction,
+                planMarkdown,
+                workspaceRoot,
+                workspaceContext,
+                selectionContext,
+                createdAt);
+
+            await File.WriteAllTextAsync(planPath, content, Encoding.UTF8, cancellationToken);
+            return planPath;
+        }
+
+        private async Task OpenPlanFileForReviewAsync(AgentRunContext runContext, string planPath)
+        {
+            if (_openFileInEditorAsync == null)
+            {
+                return;
+            }
+
+            AgentOpenFileResult openResult = await RunOnUIThreadAsync(async () => await _openFileInEditorAsync(planPath));
+            if (openResult.Success)
+            {
+                return;
+            }
+
+            string message = string.Format(
+                _getString("AgentPlanOpenFailedFormat", "계획서를 열지 못했습니다: {0}"),
+                string.IsNullOrWhiteSpace(openResult.ErrorMessage) ? planPath : openResult.ErrorMessage);
+            await AppendRunActivityAsync(runContext, message);
+            await AppendRunOutputLineAsync(runContext, message);
+        }
+
+        private async Task<bool> SaveOpenPlanTabIfDirtyAsync(string planPath)
+        {
+            if (_saveTabAsync == null)
+            {
+                return true;
+            }
+
+            return await RunOnUIThreadAsync(async () =>
+            {
+                string normalizedPlanPath = NormalizeFullPath(planPath);
+                OpenedTab? planTab = _openTabsProvider()
+                    .FirstOrDefault(tab =>
+                        !string.IsNullOrWhiteSpace(tab.FilePath) &&
+                        string.Equals(NormalizeFullPath(tab.FilePath), normalizedPlanPath, StringComparison.OrdinalIgnoreCase));
+
+                if (planTab == null || !planTab.IsDirty)
+                {
+                    return true;
+                }
+
+                if (planTab.IsReadOnlyViewer)
+                {
+                    return false;
+                }
+
+                return await _saveTabAsync(planTab, null);
+            });
+        }
+
+        private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot)
+        {
+            await RunOnUIThreadAsync(() =>
+            {
+                SaveActiveOpenSessionFromUI();
+
+                var session = EnsureOpenSession(Guid.NewGuid().ToString());
+                session.Title = _getString("AgentPlanExecutionSessionTitle", "계획 실행");
+                session.PromptText = executionPrompt;
+                session.OutputText = _displayText.OutputPlaceholder;
+                session.ActivityText = _displayText.ActivityIdle;
+                session.SessionHistoryText = string.Empty;
+                session.SessionHistoryTokenCount = 0;
+                session.CurrentRunTranscriptTokens = 0;
+                session.Attachments.Clear();
+                session.SessionEdits.Clear();
+                session.WorkspaceRoot = string.IsNullOrWhiteSpace(workspaceRoot) ? _fileTools.WorkspaceRoot : workspaceRoot;
+                session.LlmSettings = CreateSessionSettingsSnapshot();
+                session.UpdatedAt = DateTime.Now;
+
+                _agentPane.PlanningModeCheckBox.IsChecked = false;
+                RestoreOpenSession(session);
+            });
+
+            await RunOnUIThreadAsync(async () => await RunAgentAsync());
+        }
+
+        private string BuildApprovedPlanExecutionPrompt(
+            string originalUserInstruction,
+            string approvedPlan,
+            string planPath,
+            string workspaceRoot)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("[Approved plan execution]");
+            builder.AppendLine("Execute the approved plan below in this fresh session.");
+            builder.AppendLine("The previous planning transcript is intentionally omitted; use only this compact context and the approved plan as starting context.");
+            builder.AppendLine("Re-read the relevant files before editing, keep the scope limited to the plan, and do not perform unrelated refactors, formatting, renames, moves, commits, or dependency changes.");
+            builder.AppendLine($"Use this workspace root for all relative paths: {workspaceRoot}");
+            builder.AppendLine($"The plan file may be open in the editor, but its folder is not the working directory: {planPath}");
+            builder.AppendLine("Do not edit the plan file unless the approved plan explicitly asks for it.");
+            builder.AppendLine();
+            builder.AppendLine("[Original user request]");
+            builder.AppendLine(originalUserInstruction);
+            builder.AppendLine();
+            builder.AppendLine("[Approved plan]");
+            builder.AppendLine(approvedPlan);
+            return builder.ToString().Trim();
+        }
+
+        private static string BuildPlanFileContent(
+            string originalUserInstruction,
+            string planMarkdown,
+            string workspaceRoot,
+            string workspaceContext,
+            string selectionContext,
+            DateTime createdAt)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("# TxtAIEditor Agent Plan");
+            builder.AppendLine();
+            builder.AppendLine($"- Created: {createdAt:yyyy-MM-dd HH:mm:ss}");
+            builder.AppendLine($"- Workspace root: {workspaceRoot}");
+            builder.AppendLine();
+            builder.AppendLine("## Original Request");
+            builder.AppendLine();
+            AppendFencedBlock(builder, originalUserInstruction);
+            builder.AppendLine();
+            builder.AppendLine("## Compact Context");
+            builder.AppendLine();
+            AppendFencedBlock(builder, workspaceContext);
+            if (!string.IsNullOrWhiteSpace(selectionContext))
+            {
+                builder.AppendLine();
+                builder.AppendLine("## Selection Context");
+                builder.AppendLine();
+                AppendFencedBlock(builder, selectionContext);
+            }
+            builder.AppendLine();
+            builder.AppendLine("## Plan");
+            builder.AppendLine();
+            builder.AppendLine(planMarkdown.Trim());
+            builder.AppendLine();
+            return builder.ToString();
+        }
+
+        private static void AppendFencedBlock(StringBuilder builder, string value)
+        {
+            string text = value ?? string.Empty;
+            string fence = text.Contains("```", StringComparison.Ordinal) ? "~~~~" : "```";
+            builder.AppendLine(fence + "text");
+            builder.AppendLine(text);
+            builder.AppendLine(fence);
+        }
+
+        private static string GetNextPlanFilePath(string planDirectory, DateTime createdAt)
+        {
+            string dateText = createdAt.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+            for (int i = 1; i <= 9999; i++)
+            {
+                string candidate = Path.Combine(planDirectory, $"plan_{dateText}_{i:000}.md");
+                if (!File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            return Path.Combine(planDirectory, $"plan_{dateText}_{createdAt:HHmmssfff}.md");
+        }
+
+        private static string NormalizeFullPath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch
+            {
+                return path;
+            }
         }
 
         private string BuildTranscriptWithEditLedger(
@@ -1278,6 +1703,7 @@ namespace TxtAIEditor.Controls
 
         private void CreateNewOpenSession()
         {
+            _agentPane.PlanningModeCheckBox.IsChecked = false;
             _openSessionController.CreateNewSession();
         }
 

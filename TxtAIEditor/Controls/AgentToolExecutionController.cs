@@ -22,6 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentSkillController _skillController;
         private readonly AgentMcpController _mcpController;
         private readonly Action<LlmMessageAttachment> _addImageAttachment;
+        private readonly Func<JsonElement, CancellationToken, Task<string>>? _makePlanAsync;
         private readonly Action<string> _appendActivity;
         private readonly Func<string, string, string> _getString;
 
@@ -33,6 +34,7 @@ namespace TxtAIEditor.Controls
             AgentSkillController skillController,
             AgentMcpController mcpController,
             Action<LlmMessageAttachment> addImageAttachment,
+            Func<JsonElement, CancellationToken, Task<string>>? makePlanAsync,
             Action<string> appendActivity,
             Func<string, string, string> getString)
         {
@@ -43,6 +45,7 @@ namespace TxtAIEditor.Controls
             _skillController = skillController;
             _mcpController = mcpController;
             _addImageAttachment = addImageAttachment;
+            _makePlanAsync = makePlanAsync;
             _appendActivity = appendActivity;
             _getString = getString;
         }
@@ -126,6 +129,9 @@ namespace TxtAIEditor.Controls
                         "edit_tab" => await _tabToolController.EditTabAsync(arguments),
                         "save_tab" => await _tabToolController.SaveTabAsync(arguments),
                         "open_file" => await _fileToolController.OpenFileAsync(arguments),
+                        "make_plan" => _makePlanAsync != null
+                            ? await _makePlanAsync(arguments, cancellationToken)
+                            : "make_plan failed: planning tool is not available.",
                         "web_search_exa" => await _llmService.SearchExaAsync(
                             GetStringArgument(arguments, "query"),
                             GetIntArgument(arguments, "numResults", 5),
@@ -317,6 +323,13 @@ namespace TxtAIEditor.Controls
                 return string.Format(_getString(resourceKey, fallback), path);
             }
 
+            if (normalizedToolName == "make_plan")
+            {
+                return toolResult.StartsWith("make_plan saved:", StringComparison.OrdinalIgnoreCase)
+                    ? _getString("AgentVerboseMakePlanOnly", "계획서를 저장하고 열었습니다.")
+                    : toolResult;
+            }
+
             if (normalizedToolName == "save_tab")
             {
                 string path = GetFirstStringArgument(arguments, "path", "filePath", "file_path");
@@ -435,6 +448,7 @@ namespace TxtAIEditor.Controls
                 "open_file" => string.Format(
                     _getString("AgentActivityOpenFileFormat", "파일 여는 중: {0}"),
                     GetStringArgument(arguments, "path")),
+                "make_plan" => _getString("AgentActivityMakePlan", "계획서 저장 중"),
                 "web_search_exa" => string.Format(
                     _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
                     GetStringArgument(arguments, "query")),

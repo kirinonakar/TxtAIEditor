@@ -1829,6 +1829,62 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityDiffCancelledFormat" xml:space="preserve">
     <value>File change cancelled: {0}</value>
   </data>
+  <data name="AgentActivityPlanApprovalPending" xml:space="preserve">
+    <value>Waiting for plan execution approval</value>
+  </data>
+  <data name="AgentPlanApprovalHeader" xml:space="preserve">
+    <value>Approve Plan Execution</value>
+  </data>
+  <data name="AgentPlanApprovalDescriptionFormat" xml:space="preserve">
+    <value>Review, edit, and save the opened plan, then approve to execute it in a new session.
+
+Plan: {0}</value>
+  </data>
+  <data name="AgentActivityPlanApproved" xml:space="preserve">
+    <value>Plan execution approved</value>
+  </data>
+  <data name="AgentActivityPlanCancelled" xml:space="preserve">
+    <value>Plan execution cancelled</value>
+  </data>
+  <data name="AgentActivityPlanSavedFormat" xml:space="preserve">
+    <value>Plan saved: {0}</value>
+  </data>
+  <data name="AgentActivityMakePlan" xml:space="preserve">
+    <value>Saving plan</value>
+  </data>
+  <data name="AgentVerboseMakePlanOnly" xml:space="preserve">
+    <value>Saved and opened the plan.</value>
+  </data>
+  <data name="AgentMakePlanRequired" xml:space="preserve">
+    <value>Planning mode must save the plan with the make_plan tool.</value>
+  </data>
+  <data name="AgentMakePlanRetryLimit" xml:space="preserve">
+    <value>No make_plan tool call was produced, so planning mode stopped. Please run it again.</value>
+  </data>
+  <data name="AgentPlanPathMissing" xml:space="preserve">
+    <value>Could not find the saved plan path, so execution was not started.</value>
+  </data>
+  <data name="AgentPlanSavedOutputFormat" xml:space="preserve">
+    <value>Saved and opened the plan: {0}</value>
+  </data>
+  <data name="AgentPlanOpenFailedFormat" xml:space="preserve">
+    <value>Could not open the plan: {0}</value>
+  </data>
+  <data name="AgentPlanExecutionCancelledOutput" xml:space="preserve">
+    <value>Plan execution was cancelled.</value>
+  </data>
+  <data name="AgentPlanSaveDirtyTabFailed" xml:space="preserve">
+    <value>The edited plan tab could not be saved, so execution was not started.</value>
+  </data>
+  <data name="AgentPlanSaveErrorTitle" xml:space="preserve">
+    <value>Plan Save Error</value>
+  </data>
+  <data name="AgentPlanSaveErrorMessage" xml:space="preserve">
+    <value>An error occurred while saving the plan: {0}</value>
+  </data>
+  <data name="AgentPlanExecutionSessionTitle" xml:space="preserve">
+    <value>Execute Plan</value>
+  </data>
   <data name="AgentInsertTitle" xml:space="preserve">
     <value>Insert Agent Response</value>
   </data>

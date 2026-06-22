@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 
@@ -130,6 +131,44 @@ namespace TxtAIEditor.Controls
                 _appendActivity(approved
                     ? _getString("AgentActivityPowerShellApproved", "PowerShell 실행 승인됨")
                     : _getString("AgentActivityPowerShellCancelled", "PowerShell 실행 취소됨"));
+
+                return approved;
+            });
+        }
+
+        public async Task<bool> ConfirmPlanExecutionAsync(string planPath, CancellationToken cancellationToken = default)
+        {
+            _appendActivity(_getString("AgentActivityPlanApprovalPending", "계획 실행 승인 대기 중"));
+
+            return await _runOnUIThreadAsync(async () =>
+            {
+                string headerText = _getString("AgentPlanApprovalHeader", "계획 실행 승인");
+                string summaryText = string.Format(
+                    _getString(
+                        "AgentPlanApprovalDescriptionFormat",
+                        "열린 계획서를 검토, 수정, 저장한 뒤 승인하면 새 세션에서 계획을 실행합니다.\n\n계획서: {0}"),
+                    planPath);
+
+                _agentPane.ShowDiffConfirm(headerText, summaryText);
+
+                var approvalTcs = new TaskCompletionSource<bool>();
+                _diffApprovalTcs = approvalTcs;
+                using CancellationTokenRegistration registration =
+                    cancellationToken.Register(() => approvalTcs.TrySetCanceled(cancellationToken));
+
+                bool approved;
+                try
+                {
+                    approved = await approvalTcs.Task;
+                }
+                finally
+                {
+                    _agentPane.HideDiffConfirm();
+                }
+
+                _appendActivity(approved
+                    ? _getString("AgentActivityPlanApproved", "계획 실행 승인됨")
+                    : _getString("AgentActivityPlanCancelled", "계획 실행 취소됨"));
 
                 return approved;
             });

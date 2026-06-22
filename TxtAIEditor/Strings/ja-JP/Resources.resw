@@ -1830,6 +1830,62 @@
   <data name="AgentActivityDiffCancelledFormat" xml:space="preserve">
     <value>変更適用のキャンセル: {0}</value>
   </data>
+  <data name="AgentActivityPlanApprovalPending" xml:space="preserve">
+    <value>計画実行の承認待ち</value>
+  </data>
+  <data name="AgentPlanApprovalHeader" xml:space="preserve">
+    <value>計画実行の承認</value>
+  </data>
+  <data name="AgentPlanApprovalDescriptionFormat" xml:space="preserve">
+    <value>開いた計画書を確認、編集、保存してから承認すると、新しいセッションで計画を実行します。
+
+計画書: {0}</value>
+  </data>
+  <data name="AgentActivityPlanApproved" xml:space="preserve">
+    <value>計画実行が承認されました</value>
+  </data>
+  <data name="AgentActivityPlanCancelled" xml:space="preserve">
+    <value>計画実行がキャンセルされました</value>
+  </data>
+  <data name="AgentActivityPlanSavedFormat" xml:space="preserve">
+    <value>計画書を保存しました: {0}</value>
+  </data>
+  <data name="AgentActivityMakePlan" xml:space="preserve">
+    <value>計画書を保存中</value>
+  </data>
+  <data name="AgentVerboseMakePlanOnly" xml:space="preserve">
+    <value>計画書を保存して開きました。</value>
+  </data>
+  <data name="AgentMakePlanRequired" xml:space="preserve">
+    <value>計画モードでは make_plan ツールで計画書を保存する必要があります。</value>
+  </data>
+  <data name="AgentMakePlanRetryLimit" xml:space="preserve">
+    <value>make_plan ツール呼び出しが生成されなかったため、計画モードを停止しました。もう一度実行してください。</value>
+  </data>
+  <data name="AgentPlanPathMissing" xml:space="preserve">
+    <value>保存された計画書のパスが見つからなかったため、実行を開始しませんでした。</value>
+  </data>
+  <data name="AgentPlanSavedOutputFormat" xml:space="preserve">
+    <value>計画書を保存して開きました: {0}</value>
+  </data>
+  <data name="AgentPlanOpenFailedFormat" xml:space="preserve">
+    <value>計画書を開けませんでした: {0}</value>
+  </data>
+  <data name="AgentPlanExecutionCancelledOutput" xml:space="preserve">
+    <value>計画実行はキャンセルされました。</value>
+  </data>
+  <data name="AgentPlanSaveDirtyTabFailed" xml:space="preserve">
+    <value>編集された計画タブを保存できなかったため、実行を開始しませんでした。</value>
+  </data>
+  <data name="AgentPlanSaveErrorTitle" xml:space="preserve">
+    <value>計画保存エラー</value>
+  </data>
+  <data name="AgentPlanSaveErrorMessage" xml:space="preserve">
+    <value>計画書の保存中にエラーが発生しました: {0}</value>
+  </data>
+  <data name="AgentPlanExecutionSessionTitle" xml:space="preserve">
+    <value>計画実行</value>
+  </data>
   <data name="AgentInsertTitle" xml:space="preserve">
     <value>Agentの応答を入力</value>
   </data>

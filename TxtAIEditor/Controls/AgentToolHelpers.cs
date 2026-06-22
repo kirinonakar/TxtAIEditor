@@ -212,7 +212,8 @@ namespace TxtAIEditor.Controls
                 or "append_to_file"
                 or "merge_files"
                 or "split_file"
-                or "insert_to_file";
+                or "insert_to_file"
+                or "make_plan";
         }
 
         public static void ClearCachedToolResults(Dictionary<string, string> toolResults, string normalizedToolName)
@@ -395,6 +396,10 @@ namespace TxtAIEditor.Controls
                 "open" => "open_file",
                 "open_in_editor" => "open_file",
                 "open_tab" => "open_file",
+                "make_plan" => "make_plan",
+                "create_plan" => "make_plan",
+                "save_plan" => "make_plan",
+                "plan" => "make_plan",
                 _ => normalized
             };
         }
@@ -485,6 +490,9 @@ namespace TxtAIEditor.Controls
                 or "name"
                 or "skill"
                 or "path"
+                or "markdown"
+                or "md"
+                or "plan"
                 or "content"
                 or "text";
         }
