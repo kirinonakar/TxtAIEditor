@@ -232,6 +232,12 @@ function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
         workingText = workingText.replace(/\b(True|False|None|self|print|len|range|str|int|float|list|dict|set|tuple|object|open|enumerate|zip)\b/g, m => stash(`<span class="token-type">${escapeHtml(m)}</span>`));
         // 8. Functions
         workingText = workingText.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, m => stash(`<span class="token-function">${escapeHtml(m)}</span>`));
+        // 9. Decorators
+        workingText = workingText.replace(/@[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*/g, m => stash(`<span class="token-keyword">${escapeHtml(m)}</span>`));
+        // 10. Operators
+        workingText = workingText.replace(/\*\*|\/\/|<<|>>|<=|>=|==|!=|<>|:=|->|&&|\|\||[+\-*\/%=<>&|^~]/g, m => stash(`<span class="token-operator">${escapeHtml(m)}</span>`));
+        // 11. Punctuation (includes brackets for bracket-pair colorization)
+        workingText = workingText.replace(/[{}()\[\].;,:]/g, m => stash(`<span class="token-punctuation">${escapeHtml(m)}</span>`));
     }
     else if (isR) {
         // 1. Comments
