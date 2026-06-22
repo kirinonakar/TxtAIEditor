@@ -483,8 +483,6 @@ namespace TxtAIEditor.Controls
                 if (IsSessionVisible(context.SessionId))
                 {
                     activeAction();
-                    session.OutputText = _agentPane.GetRawOutputText();
-                    SyncVisibleThinkingStateToSession(session);
                 }
                 else
                 {
@@ -529,21 +527,18 @@ namespace TxtAIEditor.Controls
             });
         }
 
-        public Task AppendRunOutputTextAndExecuteAsync(
+        public async Task AppendRunOutputTextAndExecuteAsync(
             AgentRunContext context,
             string text,
             Func<Task> afterAppendAsync)
         {
             if (string.IsNullOrEmpty(text))
             {
-                return Task.CompletedTask;
+                return;
             }
 
-            return RunOnUIThreadAsync(async () =>
-            {
-                AppendRunOutputTextOnCurrentThread(context, text);
-                await afterAppendAsync();
-            });
+            await RunOnUIThreadAsync(() => AppendRunOutputTextOnCurrentThread(context, text));
+            await afterAppendAsync();
         }
 
         public void AppendActivityToCurrentSession(string message)
@@ -643,8 +638,6 @@ namespace TxtAIEditor.Controls
             if (IsSessionVisible(context.SessionId))
             {
                 _agentPane.AppendOutputText(text);
-                session.OutputText = _agentPane.GetRawOutputText();
-                SyncVisibleThinkingStateToSession(session);
             }
             else
             {
@@ -740,7 +733,7 @@ namespace TxtAIEditor.Controls
             session.UpdatedAt = DateTime.Now;
         }
 
-        private Task RunOnUIThreadAsync(Action action)
+        public Task RunOnUIThreadAsync(Action action)
         {
             var tcs = new TaskCompletionSource();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
@@ -758,7 +751,7 @@ namespace TxtAIEditor.Controls
             return tcs.Task;
         }
 
-        private Task RunOnUIThreadAsync(Func<Task> func)
+        public Task RunOnUIThreadAsync(Func<Task> func)
         {
             var tcs = new TaskCompletionSource();
             _agentPane.DispatcherQueue.TryEnqueue(async () =>

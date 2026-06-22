@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Models;
 
@@ -11,6 +13,10 @@ namespace TxtAIEditor.Controls
         private readonly Func<string?, Task<bool>>? _beginStreamIntoActiveEditorAsync;
         private readonly Func<string?, string, Task<bool>>? _streamTextIntoActiveEditorAsync;
         private readonly Func<string?, Task>? _endStreamIntoActiveEditorAsync;
+        private readonly object _streamToTabBufferGate = new();
+        private readonly Dictionary<AgentRunContext, StreamToTabBuffer> _streamToTabBuffers = new();
+        private const int StreamToTabFlushDelayMs = 50;
+        private const int MaxStreamToTabFlushChars = 8_000;
 
         public AgentRunOutputController(
             AgentOpenSessionController openSessionController,
@@ -79,16 +85,30 @@ namespace TxtAIEditor.Controls
             return _openSessionController.AppendRunOutputTextAndExecuteAsync(
                 context,
                 text,
-                () => context.StreamToTab ? StreamTextToTabAsync(context, text) : Task.CompletedTask);
+                () =>
+                {
+                    if (context.StreamToTab)
+                    {
+                        QueueStreamTextToTab(context, text);
+                    }
+
+                    return Task.CompletedTask;
+                });
         }
 
-        public async Task StreamTextToTabAsync(AgentRunContext context, string text)
+        public Task StreamTextToTabAsync(AgentRunContext context, string text)
         {
             if (string.IsNullOrEmpty(text))
             {
-                return;
+                return Task.CompletedTask;
             }
 
+            QueueStreamTextToTab(context, text);
+            return Task.CompletedTask;
+        }
+
+        private async Task StreamTextToTabImmediateAsync(AgentRunContext context, string text)
+        {
             if (!context.StreamToTabActive)
             {
                 bool started = _beginStreamIntoActiveEditorAsync == null
@@ -113,8 +133,11 @@ namespace TxtAIEditor.Controls
 
         public async Task FinishStreamToTabAsync(AgentRunContext context)
         {
+            await FlushQueuedStreamToTabAsync(context);
+
             if (!context.StreamToTabActive)
             {
+                RemoveStreamToTabBuffer(context);
                 return;
             }
 
@@ -123,6 +146,132 @@ namespace TxtAIEditor.Controls
             {
                 await _endStreamIntoActiveEditorAsync(context.StreamToTabTargetTabId);
             }
+
+            RemoveStreamToTabBuffer(context);
+        }
+
+        private void QueueStreamTextToTab(AgentRunContext context, string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            lock (_streamToTabBufferGate)
+            {
+                StreamToTabBuffer buffer = GetOrCreateStreamToTabBuffer(context);
+                buffer.PendingText.Append(text);
+                if (buffer.FlushTask is { IsCompleted: false })
+                {
+                    return;
+                }
+
+                buffer.FlushTask = FlushStreamToTabLoopAsync(context);
+            }
+        }
+
+        private async Task FlushStreamToTabLoopAsync(AgentRunContext context)
+        {
+            await Task.Delay(StreamToTabFlushDelayMs);
+            while (true)
+            {
+                string text = DequeueStreamToTabText(context, MaxStreamToTabFlushChars);
+                if (string.IsNullOrEmpty(text))
+                {
+                    return;
+                }
+
+                await _openSessionController.RunOnUIThreadAsync(
+                    async () => await StreamTextToTabImmediateAsync(context, text));
+
+                if (!HasPendingStreamToTabText(context))
+                {
+                    return;
+                }
+
+                await Task.Delay(StreamToTabFlushDelayMs);
+            }
+        }
+
+        private async Task FlushQueuedStreamToTabAsync(AgentRunContext context)
+        {
+            while (true)
+            {
+                Task? flushTask;
+                lock (_streamToTabBufferGate)
+                {
+                    flushTask = _streamToTabBuffers.TryGetValue(context, out StreamToTabBuffer? buffer)
+                        ? buffer.FlushTask
+                        : null;
+                }
+
+                if (flushTask != null && !flushTask.IsCompleted)
+                {
+                    await flushTask;
+                    continue;
+                }
+
+                string text = DequeueStreamToTabText(context, MaxStreamToTabFlushChars);
+                if (string.IsNullOrEmpty(text))
+                {
+                    return;
+                }
+
+                await _openSessionController.RunOnUIThreadAsync(
+                    async () => await StreamTextToTabImmediateAsync(context, text));
+            }
+        }
+
+        private StreamToTabBuffer GetOrCreateStreamToTabBuffer(AgentRunContext context)
+        {
+            if (_streamToTabBuffers.TryGetValue(context, out StreamToTabBuffer? buffer))
+            {
+                return buffer;
+            }
+
+            buffer = new StreamToTabBuffer();
+            _streamToTabBuffers[context] = buffer;
+            return buffer;
+        }
+
+        private string DequeueStreamToTabText(AgentRunContext context, int maxChars)
+        {
+            lock (_streamToTabBufferGate)
+            {
+                if (!_streamToTabBuffers.TryGetValue(context, out StreamToTabBuffer? buffer) ||
+                    buffer.PendingText.Length == 0)
+                {
+                    return string.Empty;
+                }
+
+                int take = Math.Min(buffer.PendingText.Length, maxChars);
+                string text = buffer.PendingText.ToString(0, take);
+                buffer.PendingText.Remove(0, take);
+                return text;
+            }
+        }
+
+        private bool HasPendingStreamToTabText(AgentRunContext context)
+        {
+            lock (_streamToTabBufferGate)
+            {
+                return _streamToTabBuffers.TryGetValue(context, out StreamToTabBuffer? buffer) &&
+                    buffer.PendingText.Length > 0;
+            }
+        }
+
+        private void RemoveStreamToTabBuffer(AgentRunContext context)
+        {
+            lock (_streamToTabBufferGate)
+            {
+                _streamToTabBuffers.Remove(context);
+            }
+        }
+
+        private sealed class StreamToTabBuffer
+        {
+            public StringBuilder PendingText { get; } = new();
+            public Task? FlushTask { get; set; }
         }
     }
 }
