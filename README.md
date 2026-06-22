@@ -34,7 +34,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ## ✨ Key Features
 
 ### 📝 Virtualized Editor Core
-*   **Massive File Support:** Instantly open and edit extremely large files (200MB+ texts) with zero lag, keeping the editor highly responsive.
+*   **Large File Support:** Instantly open and edit large files (200MB+ texts) with zero lag, keeping the editor highly responsive.
 *   **Virtual Scrolling:** Renders only visible viewport lines plus an overscan buffer, keeping DOM elements minimal and rendering fast.
 *   **Syntax Highlighting:** Premium, high-performance syntax coloring for Markdown (headers, lists, blockquotes, bold/italic, code blocks, links), C#, JavaScript, Python, HTML, CSS, LaTeX, and many more.
 *   **Auto-Completion & Snippets:** Intelligent auto-completion suggesting variables, keywords, and customizable snippets (such as Markdown tables, LaTeX matrices, HTML5 shells, C# notifier properties) that insert seamlessly via Enter or Tab.
@@ -78,42 +78,19 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ### 🤖 AI Assistant
 *   **Multi-Provider:** Connect with Gemini, OpenAI, OpenRouter, OpenCode Go/Zen, Ollama/Ollama Cloud or local LM Studio endpoints.
 *   **Secure Storage:** API keys are securely saved via native Windows Credential Manager.
-*   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Chinese, French, Spanish, German, etc. while safely preserving code structure, markdown formatting, and commands. *(When translating with file context, it automatically performs chunk processing).*
-*   **Context Actions:** Quick AI actions (Explain, Refactor, Summarize, Fix) on selected text. *(When summarizing with file context, it automatically performs chunk processing to handle large documents).*
+*   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Chinese, French, Spanish, German, etc.  *(When translating with file context, it automatically performs chunk processing).*
+*   **Context Actions:** Quick AI actions (Explain, Summarize, Refine) on selected text. *(When summarizing with file context, it automatically performs chunk processing to handle large documents).*
 *   **AI Custom Commands:** Ask questions or give instructions to the AI.
     *   **Direct Input:** Type a short prompt in the input box and press Send.
     *   **Instruction Presets:** Save instructions as custom prompt presets for quick access.
 
 ### 🤖 AI Agent
-*   **Autonomous Problem Solving:** Solve complex, multi-step editing tasks automatically by allowing the AI agent to run workspace tools (file search, read/write, terminal command execution, and web search/retrieval).
-    *   **Web Search & Fetch:** Supports real-time web search and webpage content extraction powered by the Exa API or Exa MCP server, allowing the agent to find live documentation, code samples, and up-to-date information. (Configurable via Exa API Key and Endpoint in the settings).   
-    *   **Document Extraction:** The agent can convert PDF, DOCX, PPTX, XLSX, and HWPX files into readable workspace files via `extract_document`. PDF/DOCX/PPTX/HWPX are saved as `.txt`, XLSX is exported as CSV, and multi-sheet XLSX files are split into `_sheet1.csv`, `_sheet2.csv`, etc. The agent records only the source and generated file paths, then reads targeted ranges from the converted files to avoid overflowing model context.
-*   **Multisession Management:** Run and manage multiple AI agent tasks in parallel with fully isolated environments.
-    *   **Independent State Isolation:** Each session maintains its own prompt input, workspace directory, file edit history, attachment files, and conversation transcript.
-    *   **Background Execution:** Start a long-running agent task in one session, switch to another session to work on a different task, and let the background agent run without interruption.
-    *   **Cloned Settings:** Every session preserves its own LLM settings (Provider, Model, Endpoint), allowing different models or configurations to be tested concurrently.
-    *   **Workspace Auto-Syncing:** Switching sessions automatically redirects the active explorer and terminal path to the workspace root associated with that session.
-*   **Model Context Protocol (MCP) Tools:** Register Streamable HTTP MCP servers directly from the Agent panel, enable selected servers for the current agent run, and let the agent discover and call their tools through the standard MCP `initialize`, `tools/list`, and `tools/call` flow.
-    *   **MCP Management:** Add an MCP server by name and endpoint URL, toggle registered servers on/off from the MCP menu, remove servers, and import/export the MCP server list as JSON for easy backup or sharing.
-    *   **Agent Integration:** Enabled MCP tools are exposed to the agent as `mcp_*` tool aliases. In non-verbose mode, MCP tool schemas and server metadata are hidden from the visible session output while still being supplied to the model as agent context.
-    *   **Built-in ComfyUI Tool:** A built-in MCP-compatible plugin  that generates and modifies images using ComfyUI workflows exported in API format.
-*   **Persona & System Instructions:** You can specify custom personas and system instructions for the AI agent.
-*   **Custom Agent Skills:** Extend the agent's capabilities by installing custom skills into the skills directory.
-    *   **Skill Creator:** To create a new skill, open the skill list, check and enable `skill-creator`, then ask the agent to create a skill for a specific task. The agent will generate the skill and it will be registered automatically in the skill list.
-    *   **Skill Directories:** The agent loads built-in skills from the app's `md\skills\` directory, user skills from `%USERPROFILE%\.TxtAIEditor\skills\`, and legacy user skills from `%USERPROFILE%\.agents\skills\`.
-    *   **Default User Skill Directory:** New TxtAIEditor skills should be saved under `%USERPROFILE%\.TxtAIEditor\skills\`.
-    *   **Skill Structure:** Skills can be structured in two ways:
-        *   **Folder-based Skills:** A subfolder under a skills directory (for example, `%USERPROFILE%\.TxtAIEditor\skills\<SkillName>\`) containing a `SKILL.md` file. The folder name is used as the skill name.
-        *   **File-based Skills:** A single `.md` file directly under a skills directory (for example, `%USERPROFILE%\.TxtAIEditor\skills\MySkill.md`). The file name (without extension) is used as the skill name.
-    *   **Description Parsing:** The skill description shown in the user interface is extracted from:
-        *   YAML frontmatter (e.g., `description: ...` or `Description: ...`) at the top of the file.
-        *   A Markdown heading named `# Description`.
-        *   The first non-empty paragraph of the file.
- *   **Recommended Installation:** For the best performance and compatibility, it is highly recommended to install:
-     *   [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`)
-     *   [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) for plain text and source code search.
-     *   [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`) for searching supported document formats (PDF, DOCX, etc.). Use `extract_document` for HWPX.
-     *   [pdftotext](https://poppler.freedesktop.org/) (Xpdf/Poppler tools) for fast PDF conversion inside `extract_document`.
+*   **Autonomous Problem Solving:** Executes multi-step workspace tasks using tools (file I/O, terminal execution, web search/fetch, and document text extraction).
+*   **Multisession Management:** Runs and manages parallel, fully isolated agent environments (workspace paths, settings, history, and background execution).
+*   **Model Context Protocol (MCP) Support:** Dynamically connects HTTP MCP servers to expose custom tools (e.g., built-in ComfyUI workflow plugin) to the agent.
+*   **Custom Personas & Skills:** Supports custom personas/system instructions, and extensible local/custom skills (with auto-generation via `skill-creator`).
+*   **Recommended Extensions:** For full feature support, installing [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`), [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`), [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`), and [pdftotext](https://poppler.freedesktop.org/) is recommended.
+
 
 ### 💻 Terminal
 *   **Shell Profiles:** Launch PowerShell, Command Prompt, Git Bash, or WSL sessions directly beneath your editor canvas.
