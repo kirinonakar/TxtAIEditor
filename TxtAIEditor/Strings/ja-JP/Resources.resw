@@ -2246,6 +2246,48 @@
    <data name="SettingsExternalViewerArgumentsInfo" xml:space="preserve">
      <value>{file} の位置に現在のファイルパスを挿入します。{file} がない場合、ファイルパスを最後の引数として自動追加します。</value>
    </data>
+   <data name="SettingsBackupTitle" xml:space="preserve">
+     <value>すべての設定</value>
+   </data>
+   <data name="SettingsExportAllButton" xml:space="preserve">
+     <value>すべての設定を書き出し</value>
+   </data>
+   <data name="SettingsImportAllButton" xml:space="preserve">
+     <value>すべての設定を読み込み</value>
+   </data>
+   <data name="SettingsBackupDescription" xml:space="preserve">
+     <value>.TxtAIEditor フォルダー全体を txtaieditor-setting.zip に書き出すか、zip から読み込みます。</value>
+   </data>
+   <data name="SettingsBackupPickerUnavailable" xml:space="preserve">
+     <value>ファイル ピッカーを開けません。</value>
+   </data>
+   <data name="SettingsBackupZipFileType" xml:space="preserve">
+     <value>ZIP 圧縮ファイル</value>
+   </data>
+   <data name="SettingsBackupExporting" xml:space="preserve">
+     <value>すべての設定を書き出しています...</value>
+   </data>
+   <data name="SettingsBackupExportedFormat" xml:space="preserve">
+     <value>すべての設定を書き出しました: {0}</value>
+   </data>
+   <data name="SettingsBackupExportFailedFormat" xml:space="preserve">
+     <value>すべての設定を書き出せませんでした: {0}</value>
+   </data>
+   <data name="SettingsBackupImporting" xml:space="preserve">
+     <value>すべての設定を読み込んでいます...</value>
+   </data>
+   <data name="SettingsBackupImported" xml:space="preserve">
+     <value>すべての設定を読み込みました。</value>
+   </data>
+   <data name="SettingsBackupImportFailedFormat" xml:space="preserve">
+     <value>すべての設定を読み込めませんでした: {0}</value>
+   </data>
+   <data name="SettingsBackupImportedTitle" xml:space="preserve">
+     <value>設定の読み込み完了</value>
+   </data>
+   <data name="SettingsBackupImportedMessage" xml:space="preserve">
+     <value>すべての設定を読み込みました。現在の設定は再読み込み済みです。一部の項目は再起動後に反映される場合があります。</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key が無効です。設定を先に確認してください。</value>
    </data>

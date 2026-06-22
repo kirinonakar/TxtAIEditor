@@ -154,12 +154,29 @@ namespace TxtAIEditor.Controls
 
             var result = await _settingsDialogService.ShowAsync(settings, _xamlRootProvider(), _getLocalizedString, _initializePickerWindow, initialTab);
             ResumeTerminalIfNeeded(terminalWasSuspended);
+            if (result.SettingsImported)
+            {
+                await _settingsService.LoadSettingsAsync();
+                bool restarted = await ApplyRuntimeSettingsAsync(_settingsService.CurrentSettings, oldLanguage);
+                if (!restarted)
+                {
+                    await ShowSettingsImportedDialogAsync();
+                }
+
+                return;
+            }
+
             if (!result.Saved)
             {
                 return;
             }
 
             await _settingsService.SaveSettingsAsync(settings);
+            await ApplyRuntimeSettingsAsync(settings, oldLanguage);
+        }
+
+        private async Task<bool> ApplyRuntimeSettingsAsync(EditorSettings settings, string oldLanguage)
+        {
             _llmAssistantController.UpdateModelDisplay();
             _agentController.UpdateModelDisplay(true);
             _agentController.UpdateContextStats();
@@ -178,11 +195,28 @@ namespace TxtAIEditor.Controls
             {
                 _cleanupBeforeRestart();
                 Microsoft.Windows.AppLifecycle.AppInstance.Restart("");
-                return;
+                return true;
             }
 
             await ApplySettingsToOpenEditorsAsync(settings);
             _livePreviewController.RenderActiveTab();
+            return false;
+        }
+
+        private async Task ShowSettingsImportedDialogAsync()
+        {
+            bool terminalWasSuspended = SuspendTerminalIfVisible();
+            var dialog = new ContentDialog
+            {
+                Title = _getLocalizedString("SettingsBackupImportedTitle", "Settings Imported"),
+                Content = _getLocalizedString("SettingsBackupImportedMessage", "All settings were imported. Current settings were reloaded, and some items may require a restart."),
+                CloseButtonText = _getLocalizedString("Ok", "OK"),
+                XamlRoot = _xamlRootProvider(),
+                RequestedTheme = _getCurrentElementTheme()
+            };
+
+            await dialog.ShowAsync();
+            ResumeTerminalIfNeeded(terminalWasSuspended);
         }
 
         public async Task ApplySettingsToOpenEditorsAsync(EditorSettings settings)

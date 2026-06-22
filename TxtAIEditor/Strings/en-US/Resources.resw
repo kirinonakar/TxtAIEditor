@@ -2245,6 +2245,48 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
    <data name="SettingsExternalViewerArgumentsInfo" xml:space="preserve">
      <value>Use {file} where the current file path should be inserted. If {file} is omitted, the file path is added as the last argument.</value>
    </data>
+   <data name="SettingsBackupTitle" xml:space="preserve">
+     <value>All Settings</value>
+   </data>
+   <data name="SettingsExportAllButton" xml:space="preserve">
+     <value>Export All Settings</value>
+   </data>
+   <data name="SettingsImportAllButton" xml:space="preserve">
+     <value>Import All Settings</value>
+   </data>
+   <data name="SettingsBackupDescription" xml:space="preserve">
+     <value>Export the entire .TxtAIEditor folder to txtaieditor-setting.zip or import it from a zip file.</value>
+   </data>
+   <data name="SettingsBackupPickerUnavailable" xml:space="preserve">
+     <value>Could not open the file picker.</value>
+   </data>
+   <data name="SettingsBackupZipFileType" xml:space="preserve">
+     <value>ZIP archive</value>
+   </data>
+   <data name="SettingsBackupExporting" xml:space="preserve">
+     <value>Exporting all settings...</value>
+   </data>
+   <data name="SettingsBackupExportedFormat" xml:space="preserve">
+     <value>All settings were exported: {0}</value>
+   </data>
+   <data name="SettingsBackupExportFailedFormat" xml:space="preserve">
+     <value>Failed to export all settings: {0}</value>
+   </data>
+   <data name="SettingsBackupImporting" xml:space="preserve">
+     <value>Importing all settings...</value>
+   </data>
+   <data name="SettingsBackupImported" xml:space="preserve">
+     <value>All settings were imported.</value>
+   </data>
+   <data name="SettingsBackupImportFailedFormat" xml:space="preserve">
+     <value>Failed to import all settings: {0}</value>
+   </data>
+   <data name="SettingsBackupImportedTitle" xml:space="preserve">
+     <value>Settings Imported</value>
+   </data>
+   <data name="SettingsBackupImportedMessage" xml:space="preserve">
+     <value>All settings were imported. Current settings were reloaded, and some items may require a restart.</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key is invalid. Please check your settings first.</value>
    </data>

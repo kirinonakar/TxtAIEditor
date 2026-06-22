@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Models;
@@ -20,6 +21,8 @@ namespace TxtAIEditor.Core.Services
         private readonly TextBox _homeFolderBox;
         private readonly TextBox _externalViewerPathBox;
         private readonly TextBox _externalViewerArgumentsBox;
+
+        public event EventHandler? SettingsImported;
 
         public SettingsEditingPanel(
             EditorSettings settings,
@@ -59,6 +62,7 @@ namespace TxtAIEditor.Core.Services
 
             AddHomeFolderPicker(section, getString, initializePickerWindow);
             AddExternalViewerPicker(section, getString, initializePickerWindow);
+            AddSettingsBackupActions(section, getString, initializePickerWindow);
             Content = section;
         }
 
@@ -152,6 +156,133 @@ namespace TxtAIEditor.Core.Services
                     _externalViewerPathBox.Text = file.Path;
                 }
             };
+        }
+
+        private void AddSettingsBackupActions(
+            StackPanel section,
+            Func<string, string, string> getString,
+            Action<object>? initializePickerWindow)
+        {
+            SettingsDialogUi.AddLabel(section, getString("SettingsBackupTitle", "전체 설정"));
+
+            var actionsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6
+            };
+
+            var exportButton = new Button
+            {
+                Content = getString("SettingsExportAllButton", "전체 설정 내보내기"),
+                MinWidth = 130
+            };
+            var importButton = new Button
+            {
+                Content = getString("SettingsImportAllButton", "전체 설정 불러오기"),
+                MinWidth = 130
+            };
+            actionsPanel.Children.Add(exportButton);
+            actionsPanel.Children.Add(importButton);
+            section.Children.Add(actionsPanel);
+
+            var statusText = new TextBlock
+            {
+                Text = getString("SettingsBackupDescription", ".TxtAIEditor 폴더 전체를 txtaieditor-setting.zip으로 내보내거나 zip에서 불러옵니다."),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11
+            };
+            section.Children.Add(statusText);
+
+            exportButton.Click += async (_, _) =>
+            {
+                if (initializePickerWindow == null)
+                {
+                    statusText.Text = getString("SettingsBackupPickerUnavailable", "파일 선택기를 열 수 없습니다.");
+                    return;
+                }
+
+                var picker = new FileSavePicker
+                {
+                    SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                    SuggestedFileName = SettingsBackupService.ArchiveFileName
+                };
+                picker.FileTypeChoices.Add(
+                    getString("SettingsBackupZipFileType", "ZIP archive"),
+                    new List<string> { ".zip" });
+                initializePickerWindow(picker);
+
+                var file = await picker.PickSaveFileAsync();
+                if (file == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    exportButton.IsEnabled = false;
+                    importButton.IsEnabled = false;
+                    statusText.Text = getString("SettingsBackupExporting", "전체 설정을 내보내는 중...");
+                    await SettingsBackupService.ExportAsync(file.Path);
+                    statusText.Text = string.Format(
+                        getString("SettingsBackupExportedFormat", "전체 설정을 내보냈습니다: {0}"),
+                        file.Path);
+                }
+                catch (Exception ex)
+                {
+                    statusText.Text = string.Format(
+                        getString("SettingsBackupExportFailedFormat", "전체 설정 내보내기에 실패했습니다: {0}"),
+                        ex.Message);
+                }
+                finally
+                {
+                    exportButton.IsEnabled = true;
+                    importButton.IsEnabled = true;
+                }
+            };
+
+            importButton.Click += async (_, _) =>
+            {
+                if (initializePickerWindow == null)
+                {
+                    statusText.Text = getString("SettingsBackupPickerUnavailable", "파일 선택기를 열 수 없습니다.");
+                    return;
+                }
+
+                var picker = new FileOpenPicker
+                {
+                    SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+                };
+                picker.FileTypeFilter.Add(".zip");
+                initializePickerWindow(picker);
+
+                var file = await picker.PickSingleFileAsync();
+                if (file == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    exportButton.IsEnabled = false;
+                    importButton.IsEnabled = false;
+                    statusText.Text = getString("SettingsBackupImporting", "전체 설정을 불러오는 중...");
+                    await SettingsBackupService.ImportAsync(file.Path);
+                    statusText.Text = getString("SettingsBackupImported", "전체 설정을 불러왔습니다.");
+                    SettingsImported?.Invoke(this, EventArgs.Empty);
+                }
+                catch (Exception ex)
+                {
+                    statusText.Text = string.Format(
+                        getString("SettingsBackupImportFailedFormat", "전체 설정 불러오기에 실패했습니다: {0}"),
+                        ex.Message);
+                }
+                finally
+                {
+                    exportButton.IsEnabled = true;
+                    importButton.IsEnabled = true;
+                }
+            };
+
         }
     }
 }

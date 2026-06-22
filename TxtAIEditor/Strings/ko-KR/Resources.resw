@@ -2245,6 +2245,48 @@
    <data name="SettingsExternalViewerArgumentsInfo" xml:space="preserve">
      <value>{file} 위치에 현재 파일 경로를 넣습니다. {file}이 없으면 마지막 인자로 파일 경로를 자동 추가합니다.</value>
    </data>
+   <data name="SettingsBackupTitle" xml:space="preserve">
+     <value>전체 설정</value>
+   </data>
+   <data name="SettingsExportAllButton" xml:space="preserve">
+     <value>전체 설정 내보내기</value>
+   </data>
+   <data name="SettingsImportAllButton" xml:space="preserve">
+     <value>전체 설정 불러오기</value>
+   </data>
+   <data name="SettingsBackupDescription" xml:space="preserve">
+     <value>.TxtAIEditor 폴더 전체를 txtaieditor-setting.zip으로 내보내거나 zip에서 불러옵니다.</value>
+   </data>
+   <data name="SettingsBackupPickerUnavailable" xml:space="preserve">
+     <value>파일 선택기를 열 수 없습니다.</value>
+   </data>
+   <data name="SettingsBackupZipFileType" xml:space="preserve">
+     <value>ZIP 압축 파일</value>
+   </data>
+   <data name="SettingsBackupExporting" xml:space="preserve">
+     <value>전체 설정을 내보내는 중...</value>
+   </data>
+   <data name="SettingsBackupExportedFormat" xml:space="preserve">
+     <value>전체 설정을 내보냈습니다: {0}</value>
+   </data>
+   <data name="SettingsBackupExportFailedFormat" xml:space="preserve">
+     <value>전체 설정 내보내기에 실패했습니다: {0}</value>
+   </data>
+   <data name="SettingsBackupImporting" xml:space="preserve">
+     <value>전체 설정을 불러오는 중...</value>
+   </data>
+   <data name="SettingsBackupImported" xml:space="preserve">
+     <value>전체 설정을 불러왔습니다.</value>
+   </data>
+   <data name="SettingsBackupImportFailedFormat" xml:space="preserve">
+     <value>전체 설정 불러오기에 실패했습니다: {0}</value>
+   </data>
+   <data name="SettingsBackupImportedTitle" xml:space="preserve">
+     <value>설정 불러오기 완료</value>
+   </data>
+   <data name="SettingsBackupImportedMessage" xml:space="preserve">
+     <value>전체 설정을 불러왔습니다. 현재 설정은 다시 로드했으며, 일부 항목은 재시작 후 반영될 수 있습니다.</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.</value>
    </data>

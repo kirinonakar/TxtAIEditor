@@ -34,6 +34,7 @@ namespace TxtAIEditor.Core.Services
             dialogView.RestoreCustomFontSizes();
 
             bool isDarkTheme = xamlRoot.Content is FrameworkElement fe && fe.ActualTheme == ElementTheme.Dark;
+            bool settingsImported = false;
             var dialog = new ContentDialog
             {
                 Title = getString("SettingsTitle", "TxtAIEditor 설정"),
@@ -43,11 +44,16 @@ namespace TxtAIEditor.Core.Services
                 XamlRoot = xamlRoot,
                 RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light
             };
+            dialogView.SettingsImported += (_, _) =>
+            {
+                settingsImported = true;
+                dialog.Hide();
+            };
 
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary)
             {
-                return new SettingsDialogResult { Saved = false };
+                return new SettingsDialogResult { Saved = false, SettingsImported = settingsImported };
             }
 
             dialogView.ApplyToSettings(settings);
@@ -56,6 +62,7 @@ namespace TxtAIEditor.Core.Services
             return new SettingsDialogResult
             {
                 Saved = true,
+                SettingsImported = settingsImported,
                 ApiKeyStatusMessage = dialogView.CreateApiKeyStatusMessage(settings)
             };
         }

@@ -8,6 +8,7 @@ namespace TxtAIEditor.Core.Interfaces
     public sealed class SettingsDialogResult
     {
         public bool Saved { get; set; }
+        public bool SettingsImported { get; set; }
         public string ApiKeyStatusMessage { get; set; } = string.Empty;
     }
 

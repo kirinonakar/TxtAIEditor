@@ -53,6 +53,7 @@ namespace TxtAIEditor.Core.Services
         }
 
         public Pivot Pivot { get; }
+        public event EventHandler? SettingsImported;
 
         public static async Task<SettingsDialogView> CreateAsync(
             EditorSettings settings,
@@ -70,7 +71,7 @@ namespace TxtAIEditor.Core.Services
             var shortcutsPanel = new SettingsShortcutsPanel(getString);
             var aboutPanel = new SettingsAboutPanel(getString);
 
-            return new SettingsDialogView(
+            var view = new SettingsDialogView(
                 appearancePanel,
                 editingPanel,
                 terminalPanel,
@@ -80,6 +81,8 @@ namespace TxtAIEditor.Core.Services
                 aboutPanel,
                 getString,
                 initialTab);
+            editingPanel.SettingsImported += (_, _) => view.SettingsImported?.Invoke(view, EventArgs.Empty);
+            return view;
         }
 
         public void ApplyToSettings(EditorSettings settings)
