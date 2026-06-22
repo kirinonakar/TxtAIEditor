@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         private readonly ISettingsService _settingsService;
         private readonly ICredentialService _credentialService;
         private readonly AgentPane _agentPane;
+        private readonly AgentUiDispatcher _uiDispatcher;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<IReadOnlyList<OpenedTab>> _openTabsProvider;
         private readonly Action<string, string> _showError;
@@ -40,11 +41,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, bool, Task>? _revertTabOrFileAsync;
         private readonly Action<string>? _closeTabById;
         private readonly Func<string, Task>? _navigateToFolderAsync;
-        private readonly Func<string, Task<bool>> _insertIntoActiveEditorAsync;
         private readonly Func<OpenedTab, string?, Task<bool>>? _saveTabAsync;
-        private readonly Func<string?, Task<bool>>? _beginStreamIntoActiveEditorAsync;
-        private readonly Func<string?, string, Task<bool>>? _streamTextIntoActiveEditorAsync;
-        private readonly Func<string?, Task>? _endStreamIntoActiveEditorAsync;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentPresetController _presetController;
@@ -62,6 +59,8 @@ namespace TxtAIEditor.Controls
         private readonly AgentToolExecutionController _toolExecutionController;
         private readonly AgentContextStatsController _contextStatsController;
         private readonly AgentPlanController _planController;
+        private readonly AgentSessionRewindController _sessionRewindController;
+        private readonly AgentRunOutputController _runOutputController;
         private readonly AgentRunTranscriptService _runTranscriptService = new();
         private readonly AgentModelContextLimitProvider _modelContextLimits = new();
         private readonly Dictionary<string, AgentRunContext> _runningSessions = new(StringComparer.Ordinal);
@@ -112,6 +111,7 @@ namespace TxtAIEditor.Controls
             _settingsService = settingsService;
             _credentialService = credentialService;
             _agentPane = agentPane;
+            _uiDispatcher = new AgentUiDispatcher(_agentPane.DispatcherQueue);
             _activeTabProvider = activeTabProvider;
             _openTabsProvider = openTabsProvider;
             _showError = showError;
@@ -128,11 +128,7 @@ namespace TxtAIEditor.Controls
             _revertTabOrFileAsync = revertTabOrFileAsync;
             _closeTabById = closeTabById;
             _navigateToFolderAsync = navigateToFolderAsync;
-            _insertIntoActiveEditorAsync = insertIntoActiveEditorAsync;
             _saveTabAsync = saveTabAsync;
-            _beginStreamIntoActiveEditorAsync = beginStreamIntoActiveEditorAsync;
-            _streamTextIntoActiveEditorAsync = streamTextIntoActiveEditorAsync;
-            _endStreamIntoActiveEditorAsync = endStreamIntoActiveEditorAsync;
             _displayText = new AgentDisplayLocalizer(_getString);
             _attachmentController = new AgentAttachmentController(
                 _agentPane,
@@ -182,7 +178,7 @@ namespace TxtAIEditor.Controls
             _historyController = new AgentHistoryController(_agentPane);
             _sessionEditController = new AgentSessionEditController(
                 _agentPane,
-                async action => await RunOnUIThreadAsync<bool>(async () =>
+                async action => await _uiDispatcher.RunAsync<bool>(async () =>
                 {
                     await action();
                     return true;
@@ -212,6 +208,25 @@ namespace TxtAIEditor.Controls
                 () => UpdateContextStatsImmediate(),
                 _getString,
                 _navigateToFolderAsync);
+            _runOutputController = new AgentRunOutputController(
+                _openSessionController,
+                insertIntoActiveEditorAsync,
+                beginStreamIntoActiveEditorAsync,
+                streamTextIntoActiveEditorAsync,
+                endStreamIntoActiveEditorAsync);
+            _sessionRewindController = new AgentSessionRewindController(
+                IsCurrentSessionRunning,
+                _toolExecutionSessionGate,
+                () => _currentSessionId,
+                SaveActiveOpenSessionFromUI,
+                EnsureOpenSession,
+                RestoreOpenSession,
+                _openSessionController.ClearThinkingState,
+                _sessionEditController,
+                _historyController,
+                _displayText,
+                _showError,
+                _getString);
             _workspaceContextBuilder = new AgentWorkspaceContextBuilder(
                 () => _fileTools.WorkspaceRoot,
                 openTabsProvider,
@@ -240,7 +255,7 @@ namespace TxtAIEditor.Controls
                 _showError,
                 _getString,
                 _displayText.IsOutputPlaceholder,
-                () => RunOnUIThreadAsync(() => { }));
+                () => _uiDispatcher.RunAsync(() => { }));
             _tabToolController = new AgentTabToolController(
                 GetActiveTabForContext,
                 _activeTabProvider,
@@ -252,16 +267,16 @@ namespace TxtAIEditor.Controls
                 editTabAsync,
                 _fileTools,
                 _sessionEditController,
-                action => RunOnUIThreadAsync(action),
-                action => RunOnUIThreadAsync(action),
-                action => RunOnUIThreadAsync(action));
+                action => _uiDispatcher.RunAsync(action),
+                action => _uiDispatcher.RunAsync(action),
+                action => _uiDispatcher.RunAsync(action));
             _confirmationController = new AgentConfirmationController(
                 _settingsService,
                 _agentPane,
                 _fileTools,
                 _isGitRepoProvider,
                 _sessionEditController,
-                async action => await RunOnUIThreadAsync(action),
+                async action => await _uiDispatcher.RunAsync(action),
                 AppendActivity,
                 _getString);
             _planController = new AgentPlanController(
@@ -270,11 +285,11 @@ namespace TxtAIEditor.Controls
                 _openTabsProvider,
                 _openFileInEditorAsync,
                 _saveTabAsync,
-                action => RunOnUIThreadAsync(action),
-                async action => await RunOnUIThreadAsync(action),
-                async action => await RunOnUIThreadAsync(action),
-                AppendRunActivityAsync,
-                AppendRunOutputLineAsync,
+                action => _uiDispatcher.RunAsync(action),
+                async action => await _uiDispatcher.RunAsync(action),
+                async action => await _uiDispatcher.RunAsync(action),
+                _runOutputController.AppendRunActivityAsync,
+                _runOutputController.AppendRunOutputLineAsync,
                 _showError,
                 _getString);
             _toolExecutionController = new AgentToolExecutionController(
@@ -394,7 +409,7 @@ namespace TxtAIEditor.Controls
 
         private Task<OpenedTab?> CaptureActiveTabForRunAsync()
         {
-            return RunOnUIThreadAsync(() => _selectionContextController.CaptureActiveTabForRun(IsCurrentSessionRunning()));
+            return _uiDispatcher.RunAsync(() => _selectionContextController.CaptureActiveTabForRun(IsCurrentSessionRunning()));
         }
 
         private string GetActiveSelectionText()
@@ -417,7 +432,7 @@ namespace TxtAIEditor.Controls
             _agentPane.RunRequested += async (_, _) => await RunAgentAsync();
             _agentPane.StopRequested += (_, _) => StopAgent();
             _agentPane.NewSessionRequested += (_, _) => CreateNewOpenSession();
-            _agentPane.RewindSessionRequested += async (_, _) => await RewindCurrentSessionAsync();
+            _agentPane.RewindSessionRequested += async (_, _) => await _sessionRewindController.RewindCurrentSessionAsync();
             _agentPane.OpenSessionsFlyoutOpened += (_, _) =>
             {
                 SaveOpenSessionPromptTitleFromUI();
@@ -534,9 +549,9 @@ namespace TxtAIEditor.Controls
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
             UpdateActiveSessionBusyState();
-            await ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
-            await BeginRunOutputBlockAsync(runContext, BuildRunHeader(BuildInstructionDisplay(userInstruction)));
-            await AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
+            await _runOutputController.ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
+            await _runOutputController.BeginRunOutputBlockAsync(runContext, BuildRunHeader(BuildInstructionDisplay(userInstruction)));
+            await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
 
             string initialTranscript = string.Empty;
             string transcript = string.Empty;
@@ -610,7 +625,7 @@ namespace TxtAIEditor.Controls
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string thinkingLabel = _getString("AgentActivityThinking", "생각중");
-                    await BeginRunThinkingActivityAsync(runContext, thinkingLabel);
+                    await _runOutputController.BeginRunThinkingActivityAsync(runContext, thinkingLabel);
 
                     var responseBuilder = new StringBuilder();
                     int printedLength = 0;
@@ -652,7 +667,7 @@ namespace TxtAIEditor.Controls
                                             heldPotentialToolCallText = true;
                                             int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
                                             string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                            EnqueueRunUi(
+                                            _runOutputController.EnqueueRunUi(
                                                 runContext,
                                                 () => _agentPane.BeginThinkingActivity(label),
                                                 session => _openSessionController.BeginThinkingInSession(session, label));
@@ -660,7 +675,7 @@ namespace TxtAIEditor.Controls
                                         }
                                         else
                                         {
-                                            EnqueueRunUi(
+                                            _runOutputController.EnqueueRunUi(
                                                 runContext,
                                                 () => _agentPane.AppendOutputText(streamedText),
                                                 session => _openSessionController.AppendOutputTextToSession(session, streamedText));
@@ -676,7 +691,7 @@ namespace TxtAIEditor.Controls
                                 {
                                     int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
                                     string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                    EnqueueRunUi(
+                                    _runOutputController.EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.UpdateThinkingActivity(label),
                                         session => _openSessionController.UpdateThinkingInSession(session, label));
@@ -684,7 +699,7 @@ namespace TxtAIEditor.Controls
                                 }
                                 else
                                 {
-                                    EnqueueRunUi(
+                                    _runOutputController.EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.AppendOutputText(chunk),
                                         session => _openSessionController.AppendOutputTextToSession(session, chunk));
@@ -701,14 +716,14 @@ namespace TxtAIEditor.Controls
                                     string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
                                     int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(toolCallText));
                                     string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                    EnqueueRunUi(
+                                    _runOutputController.EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.UpdateThinkingActivity(label),
                                         session => _openSessionController.UpdateThinkingInSession(session, label));
                                 }
                                 else
                                 {
-                                    EnqueueRunUi(
+                                    _runOutputController.EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.AppendOutputText(chunk),
                                         session => _openSessionController.AppendOutputTextToSession(session, chunk));
@@ -728,7 +743,7 @@ namespace TxtAIEditor.Controls
                                     if (!suppressStreamingText)
                                     {
                                         visibleTextFlushed = true;
-                                        await AppendOutputTextAndStreamToTabAsync(runContext, textToPrint);
+                                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, textToPrint);
                                     }
                                     printedLength = toolCallIndex;
                                 }
@@ -740,7 +755,7 @@ namespace TxtAIEditor.Controls
                                         toolCallPlaceholderShown = true;
                                         int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText.Substring(toolCallIndex)));
                                         string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                        EnqueueRunUi(
+                                        _runOutputController.EnqueueRunUi(
                                             runContext,
                                             () => _agentPane.BeginThinkingActivity(label),
                                             session => _openSessionController.BeginThinkingInSession(session, label));
@@ -749,7 +764,7 @@ namespace TxtAIEditor.Controls
                                 else
                                 {
                                     string toolCallText = streamedText.Substring(toolCallIndex);
-                                    EnqueueRunUi(
+                                    _runOutputController.EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.AppendOutputText(toolCallText),
                                         session => _openSessionController.AppendOutputTextToSession(session, toolCallText));
@@ -777,7 +792,7 @@ namespace TxtAIEditor.Controls
                                     if (!suppressStreamingText)
                                     {
                                         visibleTextFlushed = true;
-                                        await AppendOutputTextAndStreamToTabAsync(runContext, textToPrint);
+                                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, textToPrint);
                                     }
                                     printedLength = safeLength;
                                 }
@@ -793,7 +808,7 @@ namespace TxtAIEditor.Controls
 
                     if (string.IsNullOrWhiteSpace(response))
                     {
-                        await StopRunThinkingActivityAsync(runContext);
+                        await _runOutputController.StopRunThinkingActivityAsync(runContext);
 
                         if (emptyResponseRetryCount < maxEmptyResponseRetries)
                         {
@@ -802,13 +817,13 @@ namespace TxtAIEditor.Controls
                                 "\n\n[Agent empty response]\n" +
                                 "The model returned no visible content. Continue by writing exactly one tool_call or a final answer.";
 
-                            await RunOnUIThreadAsync(() =>
+                            await _uiDispatcher.RunAsync(() =>
                             {
                                 transcript += retryNote;
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
                                 UpdateContextStatsImmediate(force: true);
                             });
-                            await AppendRunActivityAsync(runContext, _getString(
+                            await _runOutputController.AppendRunActivityAsync(runContext, _getString(
                                 "AgentActivityEmptyResponseRetry",
                                 "빈 응답을 수신해 다시 시도합니다."));
 
@@ -819,8 +834,8 @@ namespace TxtAIEditor.Controls
                             "LlmErrorEmptyResponse",
                             "AI로부터 빈 응답을 수신했습니다.");
 
-                            await AppendRunActivityAsync(runContext, emptyResponseMessage);
-                            await AppendRunOutputLineAsync(runContext, emptyResponseMessage);
+                            await _runOutputController.AppendRunActivityAsync(runContext, emptyResponseMessage);
+                            await _runOutputController.AppendRunOutputLineAsync(runContext, emptyResponseMessage);
 
                         AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                         string emptyRunTranscript = transcript.Substring(initialTranscript.Length);
@@ -836,7 +851,7 @@ namespace TxtAIEditor.Controls
                         break;
                     }
 
-                    await StopRunThinkingActivityAsync(runContext);
+                    await _runOutputController.StopRunThinkingActivityAsync(runContext);
 
                     bool responseHasToolSyntax = AgentToolCallParser.ContainsToolCallSyntax(response);
 
@@ -853,18 +868,18 @@ namespace TxtAIEditor.Controls
                     if (!planningMode && !responseHasToolSyntax && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(response))
                     {
                         visibleTextFlushed = true;
-                        await AppendOutputTextAndStreamToTabAsync(runContext, response);
+                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, response);
                     }
                     else if (!planningMode && !responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(response))
                     {
                         visibleTextFlushed = true;
-                        await AppendOutputTextAndStreamToTabAsync(runContext, response);
+                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, response);
                     }
                     else if (!planningMode && !responseHasToolSyntax && printedLength < endLength)
                     {
                         string remainingText = response.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;
-                        await AppendOutputTextAndStreamToTabAsync(runContext, remainingText);
+                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, remainingText);
                     }
 
                     cancellationToken.ThrowIfCancellationRequested();
@@ -881,9 +896,9 @@ namespace TxtAIEditor.Controls
                             string retryMessage = _getString(
                                 "AgentToolCallFormatRetry",
                                 "도구 호출 형식이 섞여 다시 요청합니다.");
-                            await AppendRunActivityAsync(runContext, retryMessage);
-                            await AppendRunOutputLineAsync(runContext, retryMessage);
-                            if (IsSessionVisible(runContext.SessionId))
+                            await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
+                            await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
+                            if (_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
                                 UpdateContextStatsImmediate(force: true);
                             }
@@ -893,8 +908,8 @@ namespace TxtAIEditor.Controls
                                 string limitMessage = _getString(
                                     "AgentToolCallFormatRetryLimit",
                                     "도구 호출 형식 오류가 반복되어 Agent 실행을 중단했습니다. 작업을 다시 실행해 주세요.");
-                                await AppendRunActivityAsync(runContext, limitMessage);
-                                await AppendRunOutputLineAsync(runContext, limitMessage);
+                                await _runOutputController.AppendRunActivityAsync(runContext, limitMessage);
+                                await _runOutputController.AppendRunOutputLineAsync(runContext, limitMessage);
 
                                 AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                                 string formatRunTranscript = transcript.Substring(initialTranscript.Length);
@@ -926,9 +941,9 @@ namespace TxtAIEditor.Controls
                             string retryMessage = _getString(
                                 "AgentMakePlanRequired",
                                 "계획 모드에서는 make_plan 도구로 계획서를 저장해야 합니다.");
-                            await AppendRunActivityAsync(runContext, retryMessage);
-                            await AppendRunOutputLineAsync(runContext, retryMessage);
-                            if (IsSessionVisible(runContext.SessionId))
+                            await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
+                            await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
+                            if (_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
                                 UpdateContextStatsImmediate(force: true);
                             }
@@ -938,8 +953,8 @@ namespace TxtAIEditor.Controls
                                 string limitMessage = _getString(
                                     "AgentMakePlanRetryLimit",
                                     "make_plan 도구 호출이 생성되지 않아 계획 모드를 중단했습니다. 다시 실행해 주세요.");
-                                await AppendRunActivityAsync(runContext, limitMessage);
-                                await AppendRunOutputLineAsync(runContext, limitMessage);
+                                await _runOutputController.AppendRunActivityAsync(runContext, limitMessage);
+                                await _runOutputController.AppendRunOutputLineAsync(runContext, limitMessage);
 
                                 AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                                 string failedPlanTranscript = transcript.Substring(initialTranscript.Length);
@@ -960,14 +975,14 @@ namespace TxtAIEditor.Controls
 
                         if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
-                            await AppendOutputTextAndStreamToTabAsync(runContext, response);
+                            await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, response);
                         }
 
                         toolCallFormatRetryCount = 0;
-                        await AppendRunActivityAsync(runContext, _getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
+                        await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                         if (runContext.StreamToTab)
                         {
-                            await StreamTextToTabAsync(runContext, "\n");
+                            await _runOutputController.StreamTextToTabAsync(runContext, "\n");
                         }
 
                         AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
@@ -1039,16 +1054,16 @@ namespace TxtAIEditor.Controls
                         try
                         {
                             _activeToolRunContext.Value = runContext;
-                            await RunOnUIThreadAsync(() =>
+                            await _uiDispatcher.RunAsync(() =>
                             {
                                 _sessionEditController.Replace(runContext.SessionEdits);
                             });
                             toolResult = await _toolExecutionController.ExecuteAsync(toolName, arguments, cancellationToken);
                             runContext.SessionEdits = _sessionEditController.SessionEdits.ToList();
                             EnsureOpenSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
-                            if (!IsSessionVisible(runContext.SessionId))
+                            if (!_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
-                                await RunOnUIThreadAsync(() =>
+                                await _uiDispatcher.RunAsync(() =>
                                 {
                                     var visibleSession = EnsureOpenSession(_currentSessionId);
                                     _sessionEditController.Replace(visibleSession.SessionEdits);
@@ -1088,7 +1103,7 @@ namespace TxtAIEditor.Controls
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    await RunOnUIThreadAsync(() =>
+                    await _uiDispatcher.RunAsync(() =>
                     {
                         string refreshedContext = BuildWorkspaceContext(
                             instruction,
@@ -1131,8 +1146,8 @@ namespace TxtAIEditor.Controls
                     string outputHeader = skippedDuplicateTool
                         ? _getString("AgentDuplicateToolSkipped", "도구 중복 호출 건너뜀")
                         : _getString("AgentToolRunning", "도구 실행 중");
-                    await AppendRunOutputLineAsync(runContext, $"{outputHeader}: {toolName}");
-                    await AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
+                    await _runOutputController.AppendRunOutputLineAsync(runContext, $"{outputHeader}: {toolName}");
+                    await _runOutputController.AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
 
                     if (planningMode && normalizedToolName == "make_plan" && IsSuccessfulToolResult(toolResult))
                     {
@@ -1164,8 +1179,8 @@ namespace TxtAIEditor.Controls
                         string loopMessage = _getString(
                             "AgentLoopGuardStopped",
                             "동일한 도구 호출 반복 루프가 감지되어 Agent 실행을 중단했습니다. 출력된 결과를 확인한 뒤 다시 실행해 주세요.");
-                        await AppendRunActivityAsync(runContext, loopMessage);
-                        await AppendRunOutputLineAsync(runContext, loopMessage);
+                        await _runOutputController.AppendRunActivityAsync(runContext, loopMessage);
+                        await _runOutputController.AppendRunOutputLineAsync(runContext, loopMessage);
 
                         AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                         string loopRunTranscript = transcript.Substring(initialTranscript.Length);
@@ -1194,7 +1209,7 @@ namespace TxtAIEditor.Controls
 
                         transcript += "\n\n[File edit verification: requested content already matches the current file. Task complete.]";
 
-                        await AppendRunOutputLineAsync(runContext, completeMsg);
+                        await _runOutputController.AppendRunOutputLineAsync(runContext, completeMsg);
 
                         AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                         string unchangedRunTranscript = transcript.Substring(initialTranscript.Length);
@@ -1221,8 +1236,8 @@ namespace TxtAIEditor.Controls
                         "AgentToolStepLimitReached",
                         "도구 호출 한도에 도달해 작업을 중단했습니다. 지금까지의 결과를 검토한 뒤 다시 실행해 주세요.");
 
-                    await AppendRunActivityAsync(runContext, limitMsg);
-                    await AppendRunOutputLineAsync(runContext, limitMsg);
+                    await _runOutputController.AppendRunActivityAsync(runContext, limitMsg);
+                    await _runOutputController.AppendRunOutputLineAsync(runContext, limitMsg);
 
                     AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                     string runTranscript = transcript.Substring(initialTranscript.Length);
@@ -1237,8 +1252,8 @@ namespace TxtAIEditor.Controls
             }
             catch (OperationCanceledException)
             {
-                await AppendRunActivityAsync(runContext, _getString("AgentActivityStopped", "중단됨"));
-                await AppendRunOutputLineAsync(runContext, _getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
+                await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityStopped", "중단됨"));
+                await _runOutputController.AppendRunOutputLineAsync(runContext, _getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
 
                 AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
                 string runTranscript = transcript.Substring(initialTranscript.Length);
@@ -1252,7 +1267,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                await AppendRunOutputLineAsync(runContext, string.Format(
+                await _runOutputController.AppendRunOutputLineAsync(runContext, string.Format(
                     _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
                     ex.Message));
             }
@@ -1270,7 +1285,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 cancellationSource.Dispose();
-                await RunOnUIThreadAsync(async () => await FinishStreamToTabAsync(runContext));
+                await _uiDispatcher.RunAsync(async () => await _runOutputController.FinishStreamToTabAsync(runContext));
                 activeOpenSession.SessionHistoryText = runContext.SessionHistory.ToString();
                 activeOpenSession.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
                 activeOpenSession.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
@@ -1278,7 +1293,7 @@ namespace TxtAIEditor.Controls
                 activeOpenSession.Attachments = runContext.Attachments.ToList();
                 activeOpenSession.WorkspaceRoot = runContext.WorkspaceRoot;
                 _openSessionController.ClearThinkingState(activeOpenSession);
-                if (IsSessionVisible(runContext.SessionId))
+                if (_runOutputController.IsSessionVisible(runContext.SessionId))
                 {
                     RestoreSessionHistoryState(
                         activeOpenSession.SessionHistoryText,
@@ -1307,7 +1322,7 @@ namespace TxtAIEditor.Controls
 
         private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot)
         {
-            await RunOnUIThreadAsync(() =>
+            await _uiDispatcher.RunAsync(() =>
             {
                 SaveActiveOpenSessionFromUI();
 
@@ -1330,7 +1345,7 @@ namespace TxtAIEditor.Controls
                 RestoreOpenSession(session);
             });
 
-            await RunOnUIThreadAsync(async () => await RunAgentAsync());
+            await _uiDispatcher.RunAsync(async () => await RunAgentAsync());
         }
 
         private AgentOpenSessionState EnsureOpenSession(string sessionId)
@@ -1379,135 +1394,6 @@ namespace TxtAIEditor.Controls
             _openSessionController.CloseSession(sessionId);
         }
 
-        private async Task RewindCurrentSessionAsync()
-        {
-            if (IsCurrentSessionRunning())
-            {
-                return;
-            }
-
-            await _toolExecutionSessionGate.WaitAsync();
-            try
-            {
-                if (IsCurrentSessionRunning())
-                {
-                    return;
-                }
-
-                SaveActiveOpenSessionFromUI();
-
-                var session = EnsureOpenSession(_currentSessionId);
-                if (session.RewindSnapshots.Count == 0)
-                {
-                    return;
-                }
-
-                AgentSessionRewindSnapshot snapshot = session.RewindSnapshots[^1];
-                await RevertSessionEditsToSnapshotAsync(snapshot);
-                session.RewindSnapshots.RemoveAt(session.RewindSnapshots.Count - 1);
-                RestoreOpenSessionFromSnapshot(session, snapshot);
-                await PersistRewoundSessionHistoryAsync(session);
-            }
-            catch (Exception ex)
-            {
-                _showError(
-                    _getString("AgentSessionRewindErrorTitle", "세션 되감기 오류"),
-                    string.Format(_getString("AgentSessionRewindErrorFormat", "세션을 되감는 중 오류가 발생했습니다: {0}"), ex.Message));
-            }
-            finally
-            {
-                _toolExecutionSessionGate.Release();
-            }
-        }
-
-        private async Task RevertSessionEditsToSnapshotAsync(AgentSessionRewindSnapshot snapshot)
-        {
-            var currentEdits = _sessionEditController.SessionEdits.ToList();
-            var targetEdits = snapshot.CloneSessionEdits();
-            int commonPrefixLength = CountCommonEditPrefix(currentEdits, targetEdits);
-
-            for (int i = currentEdits.Count - 1; i >= commonPrefixLength; i--)
-            {
-                await _sessionEditController.RevertAsync(currentEdits[i]);
-            }
-
-            _sessionEditController.Replace(targetEdits);
-        }
-
-        private void RestoreOpenSessionFromSnapshot(
-            AgentOpenSessionState session,
-            AgentSessionRewindSnapshot snapshot)
-        {
-            session.Title = string.IsNullOrWhiteSpace(snapshot.Title)
-                ? _getString("AgentOpenSessionUntitled", "새 세션")
-                : snapshot.Title;
-            session.PromptText = snapshot.PromptText;
-            session.OutputText = string.IsNullOrEmpty(snapshot.OutputText)
-                ? _displayText.OutputPlaceholder
-                : snapshot.OutputText;
-            session.ActivityText = string.IsNullOrWhiteSpace(snapshot.ActivityText)
-                ? _displayText.ActivityIdle
-                : snapshot.ActivityText;
-            session.SessionHistoryText = snapshot.SessionHistoryText;
-            session.SessionHistoryTokenCount = snapshot.SessionHistoryTokenCount;
-            session.CurrentRunTranscriptTokens = snapshot.CurrentRunTranscriptTokens;
-            session.Attachments = snapshot.CloneAttachments();
-            session.SessionEdits = snapshot.CloneSessionEdits();
-            session.WorkspaceRoot = snapshot.WorkspaceRoot;
-            session.IsRunning = false;
-            session.UpdatedAt = DateTime.Now;
-            _openSessionController.ClearThinkingState(session);
-            RestoreOpenSession(session);
-        }
-
-        private async Task PersistRewoundSessionHistoryAsync(AgentOpenSessionState session)
-        {
-            if (string.IsNullOrWhiteSpace(session.SessionHistoryText))
-            {
-                await _historyController.DeleteAsync(session.Id, _currentSessionId);
-                return;
-            }
-
-            var item = new AgentHistoryItem
-            {
-                Id = session.Id,
-                Timestamp = DateTime.Now,
-                Title = session.Title,
-                SessionHistoryText = session.SessionHistoryText,
-                SessionHistoryTokenCount = session.SessionHistoryTokenCount,
-                SessionEdits = AgentSessionRewindSnapshot.CloneEdits(session.SessionEdits),
-                WorkspaceRoot = session.WorkspaceRoot
-            };
-
-            await _historyController.SaveSessionAsync(item, _currentSessionId);
-        }
-
-        private static int CountCommonEditPrefix(
-            IReadOnlyList<AgentFileEditPreview> currentEdits,
-            IReadOnlyList<AgentFileEditPreview> targetEdits)
-        {
-            int count = Math.Min(currentEdits.Count, targetEdits.Count);
-            for (int i = 0; i < count; i++)
-            {
-                if (!AreSameEdit(currentEdits[i], targetEdits[i]))
-                {
-                    return i;
-                }
-            }
-
-            return count;
-        }
-
-        private static bool AreSameEdit(AgentFileEditPreview left, AgentFileEditPreview right)
-        {
-            return string.Equals(left.ActionName, right.ActionName, StringComparison.Ordinal) &&
-                string.Equals(left.RelativePath, right.RelativePath, StringComparison.Ordinal) &&
-                string.Equals(left.FullPath, right.FullPath, StringComparison.Ordinal) &&
-                string.Equals(left.OldContent, right.OldContent, StringComparison.Ordinal) &&
-                string.Equals(left.NewContent, right.NewContent, StringComparison.Ordinal) &&
-                left.IsNewFile == right.IsNewFile;
-        }
-
         private void UpdateOpenSessionsUI()
         {
             _openSessionController.UpdateUI();
@@ -1521,176 +1407,6 @@ namespace TxtAIEditor.Controls
         private void UpdateActiveSessionBusyState()
         {
             _openSessionController.UpdateActiveSessionBusyState();
-        }
-
-        private Task BeginRunOutputBlockAsync(AgentRunContext context, string title)
-        {
-            return _openSessionController.BeginRunOutputBlockAsync(context, title);
-        }
-
-        private Task ClearRunActivityAsync(AgentRunContext context, string text)
-        {
-            return _openSessionController.ClearRunActivityAsync(context, text);
-        }
-
-        private Task AppendRunActivityAsync(AgentRunContext context, string message)
-        {
-            return _openSessionController.AppendRunActivityAsync(context, message);
-        }
-
-        private Task AppendRunOutputTextAsync(AgentRunContext context, string text)
-        {
-            return _openSessionController.AppendRunOutputTextAsync(context, text);
-        }
-
-        private Task AppendRunOutputLineAsync(AgentRunContext context, string line)
-        {
-            return _openSessionController.AppendRunOutputLineAsync(context, line);
-        }
-
-        private void EnqueueRunUi(
-            AgentRunContext context,
-            Action activeAction,
-            Action<AgentOpenSessionState>? backgroundAction = null)
-        {
-            _openSessionController.EnqueueRunUi(context, activeAction, backgroundAction);
-        }
-
-        private Task BeginRunThinkingActivityAsync(AgentRunContext context, string label)
-        {
-            return _openSessionController.BeginRunThinkingActivityAsync(context, label);
-        }
-
-        private Task StopRunThinkingActivityAsync(AgentRunContext context)
-        {
-            return _openSessionController.StopRunThinkingActivityAsync(context);
-        }
-
-        private bool IsSessionVisible(string sessionId)
-        {
-            return _openSessionController.IsSessionVisible(sessionId);
-        }
-
-        private Task AppendOutputTextAndStreamToTabAsync(AgentRunContext context, string text)
-        {
-            return _openSessionController.AppendRunOutputTextAndExecuteAsync(
-                context,
-                text,
-                () => context.StreamToTab ? StreamTextToTabAsync(context, text) : Task.CompletedTask);
-        }
-
-        private async Task StreamTextToTabAsync(AgentRunContext context, string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            if (!context.StreamToTabActive)
-            {
-                bool started = _beginStreamIntoActiveEditorAsync == null
-                    ? true
-                    : await _beginStreamIntoActiveEditorAsync(context.StreamToTabTargetTabId);
-                if (!started)
-                {
-                    return;
-                }
-                context.StreamToTabActive = true;
-            }
-
-            if (_streamTextIntoActiveEditorAsync != null)
-            {
-                await _streamTextIntoActiveEditorAsync(context.StreamToTabTargetTabId, text);
-                return;
-            }
-
-            await _insertIntoActiveEditorAsync(text);
-        }
-
-        private async Task FinishStreamToTabAsync(AgentRunContext context)
-        {
-            if (!context.StreamToTabActive)
-            {
-                return;
-            }
-
-            context.StreamToTabActive = false;
-            if (_endStreamIntoActiveEditorAsync != null)
-            {
-                await _endStreamIntoActiveEditorAsync(context.StreamToTabTargetTabId);
-            }
-        }
-
-        private Task RunOnUIThreadAsync(Action action)
-        {
-            var tcs = new TaskCompletionSource();
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                try
-                {
-                    action();
-                    tcs.SetResult();
-                }
-                catch (Exception ex)
-                {
-                    tcs.SetException(ex);
-                }
-            });
-            return tcs.Task;
-        }
-
-        private Task RunOnUIThreadAsync(Func<Task> func)
-        {
-            var tcs = new TaskCompletionSource();
-            _agentPane.DispatcherQueue.TryEnqueue(async () =>
-            {
-                try
-                {
-                    await func();
-                    tcs.SetResult();
-                }
-                catch (Exception ex)
-                {
-                    tcs.SetException(ex);
-                }
-            });
-            return tcs.Task;
-        }
-
-        private Task<T> RunOnUIThreadAsync<T>(Func<T> func)
-        {
-            var tcs = new TaskCompletionSource<T>();
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                try
-                {
-                    T result = func();
-                    tcs.SetResult(result);
-                }
-                catch (Exception ex)
-                {
-                    tcs.SetException(ex);
-                }
-            });
-            return tcs.Task;
-        }
-
-        private Task<T> RunOnUIThreadAsync<T>(Func<Task<T>> func)
-        {
-            var tcs = new TaskCompletionSource<T>();
-            _agentPane.DispatcherQueue.TryEnqueue(async () =>
-            {
-                try
-                {
-                    T result = await func();
-                    tcs.SetResult(result);
-                }
-                catch (Exception ex)
-                {
-                    tcs.SetException(ex);
-                }
-            });
-            return tcs.Task;
         }
 
         private void StopAgent()
@@ -1710,7 +1426,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _ = AppendRunActivityAsync(context, _getString("AgentActivityStopRequested", "중단 요청됨"));
+            _ = _runOutputController.AppendRunActivityAsync(context, _getString("AgentActivityStopRequested", "중단 요청됨"));
 
             context.Cancellation?.Cancel();
             _confirmationController.CancelPending();
@@ -2037,7 +1753,7 @@ namespace TxtAIEditor.Controls
             AgentRunContext? context = _activeToolRunContext.Value ?? _activeWorkspaceRunContext.Value;
             if (context != null)
             {
-                _ = AppendRunActivityAsync(context, message);
+                _ = _runOutputController.AppendRunActivityAsync(context, message);
                 return;
             }
 
