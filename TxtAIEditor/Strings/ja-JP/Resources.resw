@@ -1913,6 +1913,9 @@
   <data name="AgentNewSessionButton" xml:space="preserve">
     <value>新規セッション</value>
   </data>
+  <data name="AgentRewindSessionTooltip" xml:space="preserve">
+    <value>前のプロンプト入力前まで巻き戻す</value>
+  </data>
   <data name="AgentCreateDialogTitle" xml:space="preserve">
     <value>Agent ファイル新規作成確認: {0}</value>
   </data>
@@ -2103,6 +2106,12 @@
   </data>
   <data name="AgentRevertErrorFormat" xml:space="preserve">
     <value>ファイルを元に戻す際にエラーが発生しました: {0}</value>
+  </data>
+  <data name="AgentSessionRewindErrorTitle" xml:space="preserve">
+    <value>セッション巻き戻しエラー</value>
+  </data>
+  <data name="AgentSessionRewindErrorFormat" xml:space="preserve">
+    <value>セッションの巻き戻し中にエラーが発生しました: {0}</value>
   </data>
   <data name="AgentDiffTitle" xml:space="preserve">
     <value>Agent 変更比較</value>

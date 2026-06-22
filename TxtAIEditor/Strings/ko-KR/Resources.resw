@@ -1912,6 +1912,9 @@
   <data name="AgentNewSessionButton" xml:space="preserve">
     <value>새 세션</value>
   </data>
+  <data name="AgentRewindSessionTooltip" xml:space="preserve">
+    <value>이전 프롬프트 입력 전으로 되감기</value>
+  </data>
   <data name="AgentCreateDialogTitle" xml:space="preserve">
     <value>Agent 파일 생성 확인: {0}</value>
   </data>
@@ -2102,6 +2105,12 @@
   </data>
   <data name="AgentRevertErrorFormat" xml:space="preserve">
     <value>파일을 되돌리는 중 오류가 발생했습니다: {0}</value>
+  </data>
+  <data name="AgentSessionRewindErrorTitle" xml:space="preserve">
+    <value>세션 되감기 오류</value>
+  </data>
+  <data name="AgentSessionRewindErrorFormat" xml:space="preserve">
+    <value>세션을 되감는 중 오류가 발생했습니다: {0}</value>
   </data>
   <data name="AgentDiffTitle" xml:space="preserve">
     <value>Agent 변경 비교</value>

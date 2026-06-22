@@ -1912,6 +1912,9 @@ Plan: {0}</value>
   <data name="AgentNewSessionButton" xml:space="preserve">
     <value>New Session</value>
   </data>
+  <data name="AgentRewindSessionTooltip" xml:space="preserve">
+    <value>Rewind to before the previous prompt</value>
+  </data>
   <data name="AgentCreateDialogTitle" xml:space="preserve">
     <value>Confirm Agent File Creation: {0}</value>
   </data>
@@ -2102,6 +2105,12 @@ Plan: {0}</value>
   </data>
   <data name="AgentRevertErrorFormat" xml:space="preserve">
     <value>An error occurred while reverting the file: {0}</value>
+  </data>
+  <data name="AgentSessionRewindErrorTitle" xml:space="preserve">
+    <value>Session Rewind Error</value>
+  </data>
+  <data name="AgentSessionRewindErrorFormat" xml:space="preserve">
+    <value>An error occurred while rewinding the session: {0}</value>
   </data>
   <data name="AgentDiffTitle" xml:space="preserve">
     <value>Agent Change Compare</value>

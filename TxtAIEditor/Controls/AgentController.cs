@@ -404,6 +404,7 @@ namespace TxtAIEditor.Controls
             _agentPane.RunRequested += async (_, _) => await RunAgentAsync();
             _agentPane.StopRequested += (_, _) => StopAgent();
             _agentPane.NewSessionRequested += (_, _) => CreateNewOpenSession();
+            _agentPane.RewindSessionRequested += async (_, _) => await RewindCurrentSessionAsync();
             _agentPane.OpenSessionsFlyoutOpened += (_, _) =>
             {
                 SaveOpenSessionPromptTitleFromUI();
@@ -484,6 +485,7 @@ namespace TxtAIEditor.Controls
 
             var activeOpenSession = EnsureOpenSession(_currentSessionId);
             SaveActiveOpenSessionFromUI();
+            activeOpenSession.LastRewindSnapshot = AgentSessionRewindSnapshot.Capture(activeOpenSession);
             UpdateOpenSessionTitle(activeOpenSession, userInstruction);
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             activeOpenSession.UpdatedAt = DateTime.Now;
@@ -1715,6 +1717,135 @@ namespace TxtAIEditor.Controls
         private void CloseOpenSession(string sessionId)
         {
             _openSessionController.CloseSession(sessionId);
+        }
+
+        private async Task RewindCurrentSessionAsync()
+        {
+            if (IsCurrentSessionRunning())
+            {
+                return;
+            }
+
+            await _toolExecutionSessionGate.WaitAsync();
+            try
+            {
+                if (IsCurrentSessionRunning())
+                {
+                    return;
+                }
+
+                SaveActiveOpenSessionFromUI();
+
+                var session = EnsureOpenSession(_currentSessionId);
+                AgentSessionRewindSnapshot? snapshot = session.LastRewindSnapshot;
+                if (snapshot == null)
+                {
+                    return;
+                }
+
+                await RevertSessionEditsToSnapshotAsync(snapshot);
+                RestoreOpenSessionFromSnapshot(session, snapshot);
+                await PersistRewoundSessionHistoryAsync(session);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("AgentSessionRewindErrorTitle", "세션 되감기 오류"),
+                    string.Format(_getString("AgentSessionRewindErrorFormat", "세션을 되감는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
+            finally
+            {
+                _toolExecutionSessionGate.Release();
+            }
+        }
+
+        private async Task RevertSessionEditsToSnapshotAsync(AgentSessionRewindSnapshot snapshot)
+        {
+            var currentEdits = _sessionEditController.SessionEdits.ToList();
+            var targetEdits = snapshot.CloneSessionEdits();
+            int commonPrefixLength = CountCommonEditPrefix(currentEdits, targetEdits);
+
+            for (int i = currentEdits.Count - 1; i >= commonPrefixLength; i--)
+            {
+                await _sessionEditController.RevertAsync(currentEdits[i]);
+            }
+
+            _sessionEditController.Replace(targetEdits);
+        }
+
+        private void RestoreOpenSessionFromSnapshot(
+            AgentOpenSessionState session,
+            AgentSessionRewindSnapshot snapshot)
+        {
+            session.Title = string.IsNullOrWhiteSpace(snapshot.Title)
+                ? _getString("AgentOpenSessionUntitled", "새 세션")
+                : snapshot.Title;
+            session.PromptText = snapshot.PromptText;
+            session.OutputText = string.IsNullOrEmpty(snapshot.OutputText)
+                ? _displayText.OutputPlaceholder
+                : snapshot.OutputText;
+            session.ActivityText = string.IsNullOrWhiteSpace(snapshot.ActivityText)
+                ? _displayText.ActivityIdle
+                : snapshot.ActivityText;
+            session.SessionHistoryText = snapshot.SessionHistoryText;
+            session.SessionHistoryTokenCount = snapshot.SessionHistoryTokenCount;
+            session.CurrentRunTranscriptTokens = snapshot.CurrentRunTranscriptTokens;
+            session.Attachments = snapshot.CloneAttachments();
+            session.SessionEdits = snapshot.CloneSessionEdits();
+            session.WorkspaceRoot = snapshot.WorkspaceRoot;
+            session.IsRunning = false;
+            session.LastRewindSnapshot = null;
+            session.UpdatedAt = DateTime.Now;
+            _openSessionController.ClearThinkingState(session);
+            RestoreOpenSession(session);
+        }
+
+        private async Task PersistRewoundSessionHistoryAsync(AgentOpenSessionState session)
+        {
+            if (string.IsNullOrWhiteSpace(session.SessionHistoryText))
+            {
+                await _historyController.DeleteAsync(session.Id, _currentSessionId);
+                return;
+            }
+
+            var item = new AgentHistoryItem
+            {
+                Id = session.Id,
+                Timestamp = DateTime.Now,
+                Title = session.Title,
+                SessionHistoryText = session.SessionHistoryText,
+                SessionHistoryTokenCount = session.SessionHistoryTokenCount,
+                SessionEdits = AgentSessionRewindSnapshot.CloneEdits(session.SessionEdits),
+                WorkspaceRoot = session.WorkspaceRoot
+            };
+
+            await _historyController.SaveSessionAsync(item, _currentSessionId);
+        }
+
+        private static int CountCommonEditPrefix(
+            IReadOnlyList<AgentFileEditPreview> currentEdits,
+            IReadOnlyList<AgentFileEditPreview> targetEdits)
+        {
+            int count = Math.Min(currentEdits.Count, targetEdits.Count);
+            for (int i = 0; i < count; i++)
+            {
+                if (!AreSameEdit(currentEdits[i], targetEdits[i]))
+                {
+                    return i;
+                }
+            }
+
+            return count;
+        }
+
+        private static bool AreSameEdit(AgentFileEditPreview left, AgentFileEditPreview right)
+        {
+            return string.Equals(left.ActionName, right.ActionName, StringComparison.Ordinal) &&
+                string.Equals(left.RelativePath, right.RelativePath, StringComparison.Ordinal) &&
+                string.Equals(left.FullPath, right.FullPath, StringComparison.Ordinal) &&
+                string.Equals(left.OldContent, right.OldContent, StringComparison.Ordinal) &&
+                string.Equals(left.NewContent, right.NewContent, StringComparison.Ordinal) &&
+                left.IsNewFile == right.IsNewFile;
         }
 
         private void UpdateOpenSessionsUI()

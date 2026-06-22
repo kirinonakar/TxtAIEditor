@@ -262,7 +262,7 @@ namespace TxtAIEditor.Controls
                 {
                     ActionName = "edit_tab",
                     RelativePath = relativePath,
-                    FullPath = finalPath,
+                    FullPath = string.IsNullOrEmpty(finalPath) ? tab.Id : finalPath,
                     OldContent = oldContent,
                     NewContent = content,
                     IsNewFile = false

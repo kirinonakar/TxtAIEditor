@@ -118,6 +118,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? RunRequested;
         public event RoutedEventHandler? StopRequested;
         public event RoutedEventHandler? NewSessionRequested;
+        public event RoutedEventHandler? RewindSessionRequested;
         public event RoutedEventHandler? InsertOutputRequested;
         public event RoutedEventHandler? InsertNewTabOutputRequested;
         public event RoutedEventHandler? AddAttachmentRequested;
@@ -172,6 +173,7 @@ namespace TxtAIEditor.Controls
         public bool IsThinkingActivityActive => _thinkingLineActive;
 
         private bool _isBusy;
+        private bool _canRewindSession;
         private string _runButtonText = string.Empty;
         private string _stopButtonText = string.Empty;
         private const string OutputLineBreak = "\r\n";
@@ -254,6 +256,7 @@ namespace TxtAIEditor.Controls
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
             AgentNewSessionButton.Content = getString("AgentNewSessionButton", "새 세션");
+            ToolTipService.SetToolTip(AgentRewindSessionButton, getString("AgentRewindSessionTooltip", "이전 프롬프트 입력 전으로 되감기"));
             ToolTipService.SetToolTip(AgentOpenSessionsButton, getString("AgentOpenSessionsTooltip", "열린 세션"));
             AgentOpenSessionsTitleText.Text = getString("AgentOpenSessionsTitle", "열린 세션");
             ToolTipService.SetToolTip(AgentHistoryButton, getString("AgentHistoryTooltip", "세션 히스토리"));
@@ -296,6 +299,7 @@ namespace TxtAIEditor.Controls
             AgentRunButton.IsEnabled = true;
             AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
             AgentNewSessionButton.IsEnabled = true;
+            UpdateRewindSessionButtonEnabled();
             AgentOpenSessionsButton.IsEnabled = true;
             AgentHistoryButton.IsEnabled = true;
             AgentDeleteHistoryButton.IsEnabled = !isBusy;
@@ -315,6 +319,22 @@ namespace TxtAIEditor.Controls
             {
                 ScrollOutputToEnd(true);
             }
+        }
+
+        public void SetCanRewindSession(bool canRewind)
+        {
+            _canRewindSession = canRewind;
+            UpdateRewindSessionButtonEnabled();
+        }
+
+        private void UpdateRewindSessionButtonEnabled()
+        {
+            if (AgentRewindSessionButton == null)
+            {
+                return;
+            }
+
+            AgentRewindSessionButton.IsEnabled = !_isBusy && _canRewindSession;
         }
 
         public void ClearActivity(string idleText)
@@ -835,6 +855,11 @@ namespace TxtAIEditor.Controls
         private void OnNewSessionClick(object sender, RoutedEventArgs e)
         {
             NewSessionRequested?.Invoke(sender, e);
+        }
+
+        private void OnRewindSessionClick(object sender, RoutedEventArgs e)
+        {
+            RewindSessionRequested?.Invoke(sender, e);
         }
 
         private void OnClearPromptClick(object sender, RoutedEventArgs e)
@@ -2018,6 +2043,8 @@ namespace TxtAIEditor.Controls
             AgentNewSessionButton.CornerRadius = showSessionList
                 ? new CornerRadius(4, 0, 0, 4)
                 : new CornerRadius(4);
+            AgentOpenSessionsButton.CornerRadius = new CornerRadius(0, 4, 4, 0);
+            AgentRewindSessionButton.CornerRadius = new CornerRadius(4);
         }
 
         private void RebuildOpenSessionMenu()

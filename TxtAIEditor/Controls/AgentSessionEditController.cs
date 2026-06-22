@@ -74,7 +74,7 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                int editIndex = FindLatestEditIndex(preview.FullPath);
+                int editIndex = FindLatestEditIndex(preview.FullPath, preview.RelativePath);
                 if (editIndex < 0)
                 {
                     return;
@@ -200,9 +200,9 @@ namespace TxtAIEditor.Controls
             return count;
         }
 
-        private int FindLatestEditIndex(string fullPath)
+        private int FindLatestEditIndex(string fullPath, string relativePath)
         {
-            string targetKey = GetSessionEditKey(fullPath, string.Empty);
+            string targetKey = GetSessionEditKey(fullPath, relativePath);
             for (int i = _sessionEdits.Count - 1; i >= 0; i--)
             {
                 AgentFileEditPreview edit = _sessionEdits[i];
