@@ -114,7 +114,16 @@ namespace TxtAIEditor.Core.Services
             return new PivotItem
             {
                 Header = new TextBlock { Text = header, FontSize = 13 },
-                Content = new ScrollViewer { Content = content }
+                Content = new ScrollViewer
+                {
+                    Content = content,
+                    HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch,
+                    VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    HorizontalScrollMode = ScrollMode.Disabled,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    VerticalScrollMode = ScrollMode.Enabled
+                }
             };
         }
     }
