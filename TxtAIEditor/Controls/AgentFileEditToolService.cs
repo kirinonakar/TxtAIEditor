@@ -769,7 +769,17 @@ namespace TxtAIEditor.Controls
                 return "insert_to_file failed: could not find a unique insertion point matching the provided context lines.";
             }
 
-            string updated = fileContent.Insert(insertIndex, normalizedContent);
+            string insertionText = normalizedContent;
+            if (insertIndex > 0 && fileContent[insertIndex - 1] != '\n')
+            {
+                insertionText = "\n" + insertionText;
+            }
+            if (!insertionText.EndsWith("\n"))
+            {
+                insertionText += "\n";
+            }
+
+            string updated = fileContent.Insert(insertIndex, insertionText);
             if (string.Equals(updated, fileContent, StringComparison.Ordinal))
             {
                 return BuildUnchangedEditResult("insert_to_file", fullPath);
@@ -800,46 +810,71 @@ namespace TxtAIEditor.Controls
             string[] beforeLines = string.IsNullOrEmpty(before) ? Array.Empty<string>() : before.Split('\n');
             string[] afterLines = string.IsNullOrEmpty(after) ? Array.Empty<string>() : after.Split('\n');
 
-            var candidateLineIndices = new List<int>();
-
-            for (int i = 0; i <= lines.Length; i++)
+            List<int> FindCandidates(int mode)
             {
-                bool beforeMatch = true;
-                if (beforeLines.Length > 0)
+                var candidates = new List<int>();
+                for (int i = 0; i <= lines.Length; i++)
                 {
-                    int beforeStart = i - beforeLines.Length;
-                    if (beforeStart < 0) continue;
-                    for (int j = 0; j < beforeLines.Length; j++)
+                    bool beforeMatch = true;
+                    if (beforeLines.Length > 0)
                     {
-                        if (beforeStart + j >= lines.Length ||
-                            lines[beforeStart + j].TrimEnd() != beforeLines[j].TrimEnd())
+                        int beforeStart = i - beforeLines.Length;
+                        if (beforeStart < 0) continue;
+                        for (int j = 0; j < beforeLines.Length; j++)
                         {
-                            beforeMatch = false;
-                            break;
+                            if (beforeStart + j >= lines.Length)
+                            {
+                                beforeMatch = false;
+                                break;
+                            }
+                            string fileLine = lines[beforeStart + j];
+                            string queryLine = beforeLines[j];
+                            bool lineMatches = mode == 1
+                                ? fileLine.TrimEnd() == queryLine.TrimEnd()
+                                : fileLine.Trim() == queryLine.Trim();
+
+                            if (!lineMatches)
+                            {
+                                beforeMatch = false;
+                                break;
+                            }
                         }
                     }
-                }
 
-                if (!beforeMatch) continue;
+                    if (!beforeMatch) continue;
 
-                bool afterMatch = true;
-                if (afterLines.Length > 0)
-                {
-                    if (i + afterLines.Length > lines.Length) continue;
-                    for (int j = 0; j < afterLines.Length; j++)
+                    bool afterMatch = true;
+                    if (afterLines.Length > 0)
                     {
-                        if (lines[i + j].TrimEnd() != afterLines[j].TrimEnd())
+                        if (i + afterLines.Length > lines.Length) continue;
+                        for (int j = 0; j < afterLines.Length; j++)
                         {
-                            afterMatch = false;
-                            break;
+                            string fileLine = lines[i + j];
+                            string queryLine = afterLines[j];
+                            bool lineMatches = mode == 1
+                                ? fileLine.TrimEnd() == queryLine.TrimEnd()
+                                : fileLine.Trim() == queryLine.Trim();
+
+                            if (!lineMatches)
+                            {
+                                afterMatch = false;
+                                break;
+                            }
                         }
                     }
-                }
 
-                if (beforeMatch && afterMatch)
-                {
-                    candidateLineIndices.Add(i);
+                    if (beforeMatch && afterMatch)
+                    {
+                        candidates.Add(i);
+                    }
                 }
+                return candidates;
+            }
+
+            var candidateLineIndices = FindCandidates(1);
+            if (candidateLineIndices.Count == 0)
+            {
+                candidateLineIndices = FindCandidates(2);
             }
 
             if (candidateLineIndices.Count != 1)
@@ -852,6 +887,11 @@ namespace TxtAIEditor.Controls
             for (int i = 0; i < insertLineIndex; i++)
             {
                 offset += lines[i].Length + 1;
+            }
+
+            if (offset > fileContent.Length)
+            {
+                offset = fileContent.Length;
             }
 
             return offset;
