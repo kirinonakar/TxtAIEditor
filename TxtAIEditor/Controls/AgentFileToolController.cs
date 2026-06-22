@@ -542,11 +542,40 @@ namespace TxtAIEditor.Controls
                 return "insert_to_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
             }
 
-            return await _fileTools.InsertIntoFileAsync(
-                path,
-                GetFirstStringArgument(arguments, "content", "text", "newText", "new_text"),
-                GetFirstStringArgument(arguments, "before", "beforeLines", "before_lines", "previous"),
-                GetFirstStringArgument(arguments, "after", "afterLines", "after_lines", "next"));
+            string content = GetFirstStringArgument(arguments, "content", "text", "newText", "new_text");
+
+            string insertAfter = GetFirstStringArgument(arguments, "insert_after", "insertAfter");
+            string insertBefore = GetFirstStringArgument(arguments, "insert_before", "insertBefore");
+
+            string before = string.Empty;
+            string after = string.Empty;
+
+            if (!string.IsNullOrEmpty(insertAfter) || !string.IsNullOrEmpty(insertBefore))
+            {
+                before = insertAfter;
+                after = insertBefore;
+            }
+            else
+            {
+                string rawBefore = GetFirstStringArgument(arguments, "before", "beforeLines", "before_lines", "previous");
+                string rawAfter = GetFirstStringArgument(arguments, "after", "afterLines", "after_lines", "next");
+
+                if (!string.IsNullOrEmpty(rawBefore) && !string.IsNullOrEmpty(rawAfter))
+                {
+                    before = rawBefore;
+                    after = rawAfter;
+                }
+                else if (!string.IsNullOrEmpty(rawAfter))
+                {
+                    before = rawAfter;
+                }
+                else if (!string.IsNullOrEmpty(rawBefore))
+                {
+                    after = rawBefore;
+                }
+            }
+
+            return await _fileTools.InsertIntoFileAsync(path, content, before, after);
         }
 
         public async Task<string> ApplyPatchAsync(JsonElement arguments)
