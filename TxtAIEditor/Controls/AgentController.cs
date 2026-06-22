@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -1529,14 +1530,22 @@ namespace TxtAIEditor.Controls
             string presetSection = _presetController.BuildSelectedPresetSection();
             string mcpSection = _mcpController.BuildSelectedMcpSection();
             string skillSection = _skillController.BuildSelectedSkillSection();
+            string agentsMdSection = BuildWorkspaceAgentsMdSection();
             if (string.IsNullOrWhiteSpace(presetSection) &&
                 string.IsNullOrWhiteSpace(mcpSection) &&
-                string.IsNullOrWhiteSpace(skillSection))
+                string.IsNullOrWhiteSpace(skillSection) &&
+                string.IsNullOrWhiteSpace(agentsMdSection))
             {
                 return userInstruction;
             }
 
             var builder = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(agentsMdSection))
+            {
+                builder.AppendLine(agentsMdSection);
+                builder.AppendLine();
+            }
+
             if (!string.IsNullOrWhiteSpace(presetSection))
             {
                 builder.AppendLine(presetSection);
@@ -1562,6 +1571,45 @@ namespace TxtAIEditor.Controls
             }
 
             return builder.ToString().Trim();
+        }
+
+        private string BuildWorkspaceAgentsMdSection()
+        {
+            if (!_agentPane.PlanningMode)
+            {
+                return string.Empty;
+            }
+
+            string workspaceRoot = _fileTools.WorkspaceRoot;
+            if (string.IsNullOrWhiteSpace(workspaceRoot))
+            {
+                return string.Empty;
+            }
+
+            string agentsMdPath = Path.Combine(workspaceRoot, "AGENTS.md");
+            if (!File.Exists(agentsMdPath))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                string content = File.ReadAllText(agentsMdPath);
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    return string.Empty;
+                }
+
+                var builder = new StringBuilder();
+                builder.AppendLine("[Workspace agent rules]");
+                builder.AppendLine($"Source: {agentsMdPath}");
+                builder.AppendLine(content.Trim());
+                return builder.ToString().Trim();
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private string BuildSessionHistoryForPrompt(
