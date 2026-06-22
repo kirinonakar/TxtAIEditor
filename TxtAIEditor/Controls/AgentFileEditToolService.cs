@@ -393,30 +393,65 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrEmpty(expectedSnippet))
             {
                 string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
-                if (!targetText.Contains(normalizedExpected, StringComparison.Ordinal))
+                if (!string.IsNullOrEmpty(normalizedExpected))
                 {
-                    string cleanTarget = Regex.Replace(targetText, @"\s+", " ").Trim();
-                    string cleanExpected = NormalizeWhitespaceForSnippetComparison(normalizedExpected);
-                    if (!cleanTarget.Contains(cleanExpected, StringComparison.Ordinal))
+                    bool expectedMatchesFullRange =
+                        string.Equals(targetText, normalizedExpected, StringComparison.Ordinal) ||
+                        string.Equals(
+                            NormalizeWhitespaceForSnippetComparison(targetText),
+                            NormalizeWhitespaceForSnippetComparison(normalizedExpected),
+                            StringComparison.Ordinal);
+
+                    if (!expectedMatchesFullRange)
                     {
                         int originalStartLine = startLine;
                         int originalEndLine = endLine;
-                        if (!TryResolveNearbyExpectedSnippetRange(
+
+                        SnippetRangeResolution rangeResolution = TryResolveUniqueExpectedSnippetLineRange(
                             lines,
                             startLine,
                             endLine,
                             normalizedExpected,
-                            allowedStartLine,
-                            allowedEndLine,
+                            false,
                             out int adjustedStartLine,
-                            out int adjustedEndLine))
+                            out int adjustedEndLine);
+                        if (rangeResolution == SnippetRangeResolution.NotFound)
                         {
-                            return $"replace_range failed: expectedSnippet was not found in the target line range ({startLine}-{endLine}).";
+                            rangeResolution = TryResolveUniqueExpectedSnippetLineRange(
+                                lines,
+                                startLine,
+                                endLine,
+                                normalizedExpected,
+                                true,
+                                out adjustedStartLine,
+                                out adjustedEndLine);
+                        }
+
+                        if (rangeResolution == SnippetRangeResolution.Ambiguous)
+                        {
+                            return $"replace_range failed: expectedSnippet matched multiple line ranges inside the requested range ({startLine}-{endLine}). Narrow startLine/endLine or provide a longer expectedSnippet.";
+                        }
+
+                        if (rangeResolution == SnippetRangeResolution.NotFound &&
+                            !TryResolveNearbyExpectedSnippetRange(
+                                lines,
+                                startLine,
+                                endLine,
+                                normalizedExpected,
+                                allowedStartLine,
+                                allowedEndLine,
+                                out adjustedStartLine,
+                                out adjustedEndLine))
+                        {
+                            return $"replace_range failed: expectedSnippet did not match the full requested range or a unique line-aligned subrange ({startLine}-{endLine}). Narrow startLine/endLine or include the full replaced range in expectedSnippet.";
                         }
 
                         startLine = adjustedStartLine;
                         endLine = adjustedEndLine;
-                        rangeAdjustmentNote = $" auto-adjusted lines {originalStartLine}-{originalEndLine} to {startLine}-{endLine} to match expectedSnippet.";
+                        if (startLine != originalStartLine || endLine != originalEndLine)
+                        {
+                            rangeAdjustmentNote = $" auto-adjusted lines {originalStartLine}-{originalEndLine} to {startLine}-{endLine} to match expectedSnippet.";
+                        }
                     }
                 }
             }
@@ -1108,11 +1143,37 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            return TryFindExpectedSnippetLineRange(lines, windowStartLine, windowEndLine, normalizedExpected, false, out adjustedStartLine, out adjustedEndLine) ||
-                   TryFindExpectedSnippetLineRange(lines, windowStartLine, windowEndLine, normalizedExpected, true, out adjustedStartLine, out adjustedEndLine);
+            SnippetRangeResolution resolution = TryResolveUniqueExpectedSnippetLineRange(
+                lines,
+                windowStartLine,
+                windowEndLine,
+                normalizedExpected,
+                false,
+                out adjustedStartLine,
+                out adjustedEndLine);
+            if (resolution == SnippetRangeResolution.NotFound)
+            {
+                resolution = TryResolveUniqueExpectedSnippetLineRange(
+                    lines,
+                    windowStartLine,
+                    windowEndLine,
+                    normalizedExpected,
+                    true,
+                    out adjustedStartLine,
+                    out adjustedEndLine);
+            }
+
+            return resolution == SnippetRangeResolution.Unique;
         }
 
-        private static bool TryFindExpectedSnippetLineRange(
+        private enum SnippetRangeResolution
+        {
+            NotFound,
+            Unique,
+            Ambiguous
+        }
+
+        private static SnippetRangeResolution TryResolveUniqueExpectedSnippetLineRange(
             string[] lines,
             int windowStartLine,
             int windowEndLine,
@@ -1137,13 +1198,21 @@ namespace TxtAIEditor.Controls
                     : candidateText;
                 if (string.Equals(candidateComparable, expectedComparable, StringComparison.Ordinal))
                 {
+                    if (matchStartLine != 0)
+                    {
+                        matchStartLine = 0;
+                        matchEndLine = 0;
+                        return SnippetRangeResolution.Ambiguous;
+                    }
+
                     matchStartLine = candidateStartLine;
                     matchEndLine = candidateStartLine + expectedLineCount - 1;
-                    return true;
                 }
             }
 
-            return false;
+            return matchStartLine == 0
+                ? SnippetRangeResolution.NotFound
+                : SnippetRangeResolution.Unique;
         }
 
         private int FindHunkMatch(List<string> lines, PatchHunk hunk)

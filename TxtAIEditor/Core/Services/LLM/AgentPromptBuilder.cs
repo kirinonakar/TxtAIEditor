@@ -47,6 +47,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- Preserve user-provided file names exactly, including non-English names: 자산.csv stays 자산.csv, 분석2.md stays 분석2.md.");
             builder.AppendLine("- If [User-referenced file names] is present, prefer listed workspace matches for reads and the exact mentioned name for requested outputs.");
             builder.AppendLine("- For writes, provide an explicit path from the user, [Active tab] Path, or a prior file/tool result. Use replace_range for line-scoped edits and overwrite_file only for explicit full rewrites.");
+            builder.AppendLine("- For replace_range, startLine/endLine must describe only the lines being replaced. If expectedSnippet is provided, make it the exact line block being replaced; do not include extra trailing lines in the range unless newText also preserves them.");
             builder.AppendLine("- After a write, rely on the tool result and the edit ledger sections. Do not reread only to confirm a successful write unless the next edit needs exact context.");
             builder.AppendLine("- [Accepted file edits before this user task] records earlier accepted edits. [File edits made during this user task] records edits made by your tool calls for the current user request.");
             builder.AppendLine("- If a mutating tool result says modified/created/inserted, describe the final result as a change you made in this run. Only say no edit was needed when the tool result explicitly says unchanged/already applied.");
