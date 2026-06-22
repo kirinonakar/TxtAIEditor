@@ -27,14 +27,18 @@ namespace TxtAIEditor.Controls
             OpenedTab? activeTab,
             bool includeActiveFile,
             bool hasSelectionRangeContext,
-            IEnumerable<AgentAttachmentState>? attachments = null)
+            IEnumerable<AgentAttachmentState>? attachments = null,
+            string? workspaceRootOverride = null)
         {
+            string workspaceRoot = string.IsNullOrWhiteSpace(workspaceRootOverride)
+                ? _workspaceRootProvider()
+                : workspaceRootOverride;
             var context = new List<string>();
             context.Add("[Workspace root]");
-            context.Add(_workspaceRootProvider());
+            context.Add(workspaceRoot);
             context.Add("");
 
-            AddReferencedPathContext(context, instruction);
+            AddReferencedPathContext(context, instruction, workspaceRoot);
             AddOpenTabsContext(context, activeTab);
             AddActiveTabContext(context, activeTab, includeActiveFile, hasSelectionRangeContext);
             AddAttachmentsContext(context, attachments);
@@ -124,7 +128,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void AddReferencedPathContext(List<string> context, string instruction)
+        private void AddReferencedPathContext(List<string> context, string instruction, string workspaceRoot)
         {
             var mentionedPaths = ExtractMentionedPaths(instruction).Take(20).ToList();
             if (mentionedPaths.Count == 0)
@@ -137,7 +141,7 @@ namespace TxtAIEditor.Controls
             foreach (string mentionedPath in mentionedPaths)
             {
                 context.Add($"- Mentioned exactly: {mentionedPath}");
-                var matches = FindWorkspacePathMatches(mentionedPath, 5).ToList();
+                var matches = FindWorkspacePathMatches(workspaceRoot, mentionedPath, 5).ToList();
                 if (matches.Count == 0)
                 {
                     context.Add("  Workspace match: not found yet; if the user asked to create/save this file, create it with exactly this name.");
@@ -186,9 +190,8 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private IEnumerable<string> FindWorkspacePathMatches(string mentionedPath, int maxResults)
+        private IEnumerable<string> FindWorkspacePathMatches(string root, string mentionedPath, int maxResults)
         {
-            string root = _workspaceRootProvider();
             if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
             {
                 yield break;

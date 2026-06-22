@@ -398,6 +398,47 @@ namespace TxtAIEditor.Controls
                 : context.WorkspaceRoot;
         }
 
+        private string ResolveWorkspaceRootForRun(
+            string preservedWorkspaceRoot,
+            string capturedWorkspaceRoot,
+            string userInstruction)
+        {
+            if (IsApprovedPlanExecutionPrompt(userInstruction) &&
+                IsExistingDirectory(preservedWorkspaceRoot))
+            {
+                return NormalizeDirectoryPath(preservedWorkspaceRoot);
+            }
+
+            if (IsExistingDirectory(capturedWorkspaceRoot))
+            {
+                return NormalizeDirectoryPath(capturedWorkspaceRoot);
+            }
+
+            if (IsExistingDirectory(preservedWorkspaceRoot))
+            {
+                return NormalizeDirectoryPath(preservedWorkspaceRoot);
+            }
+
+            return _fileTools.WorkspaceRoot;
+        }
+
+        private static bool IsApprovedPlanExecutionPrompt(string userInstruction)
+        {
+            return (userInstruction ?? string.Empty)
+                .TrimStart()
+                .StartsWith("[Approved plan execution]", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsExistingDirectory(string path)
+        {
+            return !string.IsNullOrWhiteSpace(path) && Directory.Exists(path);
+        }
+
+        private static string NormalizeDirectoryPath(string path)
+        {
+            return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
         private EditorSettings GetCurrentSessionSettings()
         {
             return _openSessionController.GetCurrentSessionSettings();
@@ -513,13 +554,17 @@ namespace TxtAIEditor.Controls
             }
 
             var activeOpenSession = EnsureOpenSession(_currentSessionId);
+            string preservedWorkspaceRoot = activeOpenSession.WorkspaceRoot;
             SaveActiveOpenSessionFromUI();
             activeOpenSession.RewindSnapshots.Add(AgentSessionRewindSnapshot.Capture(activeOpenSession));
             UpdateOpenSessionTitle(activeOpenSession, userInstruction);
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             activeOpenSession.UpdatedAt = DateTime.Now;
             activeOpenSession.IsRunning = true;
-            activeOpenSession.WorkspaceRoot = _fileTools.WorkspaceRoot;
+            activeOpenSession.WorkspaceRoot = ResolveWorkspaceRootForRun(
+                preservedWorkspaceRoot,
+                activeOpenSession.WorkspaceRoot,
+                userInstruction);
             EditorSettings runSettings = await ResolveRunSessionSettingsAsync(activeOpenSession);
 
             var runContext = new AgentRunContext
@@ -583,7 +628,8 @@ namespace TxtAIEditor.Controls
                     instruction,
                     currentRunActiveTab,
                     currentRunSelectionSnapshot,
-                    runContext.Attachments);
+                    runContext.Attachments,
+                    runContext.WorkspaceRoot);
                 string lastWorkspaceContext = workspaceContext;
                 string runSelectionContext = _selectionContextController.BuildSelectionContext(currentRunSelectionSnapshot);
                 runContext.PlanWorkspaceContext = workspaceContext;
@@ -885,12 +931,21 @@ namespace TxtAIEditor.Controls
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (!AgentToolCallParser.TryParse(response, out string toolName, out JsonElement arguments))
+                    string toolName = string.Empty;
+                    JsonElement arguments = default;
+                    string toolCallFormatIssue = string.Empty;
+                    bool hasToolCallFormatIssue = responseHasToolSyntax &&
+                        AgentToolCallParser.TryGetToolCallFormatIssue(response, out toolCallFormatIssue);
+                    if (hasToolCallFormatIssue ||
+                        !AgentToolCallParser.TryParse(response, out toolName, out arguments))
                     {
                         if (responseHasToolSyntax)
                         {
                             toolCallFormatRetryCount++;
-                            string retryNote = BuildToolCallFormatRetryNote("The tool_call JSON could not be parsed.");
+                            string retryNote = BuildToolCallFormatRetryNote(
+                                hasToolCallFormatIssue
+                                    ? toolCallFormatIssue
+                                    : "The tool_call JSON could not be parsed.");
                             transcript += "\n\n" + retryNote;
                             runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
 
@@ -1110,7 +1165,8 @@ namespace TxtAIEditor.Controls
                             instruction,
                             currentRunActiveTab,
                             currentRunSelectionSnapshot,
-                            runContext.Attachments);
+                            runContext.Attachments,
+                            runContext.WorkspaceRoot);
                         var addedPartBuilder = new StringBuilder();
                         addedPartBuilder.AppendLine();
                         addedPartBuilder.AppendLine();
@@ -1759,14 +1815,16 @@ namespace TxtAIEditor.Controls
             string instruction,
             OpenedTab? activeTab,
             AgentSelectionSnapshot selectionSnapshot,
-            IEnumerable<AgentAttachmentState> attachments)
+            IEnumerable<AgentAttachmentState> attachments,
+            string? workspaceRootOverride = null)
         {
             return _workspaceContextBuilder.Build(
                 instruction,
                 activeTab,
                 true,
                 selectionSnapshot.HasLineRange,
-                attachments);
+                attachments,
+                workspaceRootOverride);
         }
 
         private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForRun(AgentRunContext context)

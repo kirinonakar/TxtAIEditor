@@ -28,6 +28,39 @@ namespace TxtAIEditor.Controls
                 TryExtractSupportedCommandFence(text, out _);
         }
 
+        public static bool TryGetToolCallFormatIssue(string response, out string detail)
+        {
+            detail = string.Empty;
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return false;
+            }
+
+            string text = response.Trim();
+            int openIndex = text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
+            int closeIndex = text.LastIndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase);
+            if (openIndex < 0 && closeIndex < 0)
+            {
+                return false;
+            }
+
+            if (openIndex < 0 || closeIndex < 0 || closeIndex < openIndex)
+            {
+                detail = "The tool_call tag must include one matching <tool_call>...</tool_call> pair.";
+                return true;
+            }
+
+            int afterClose = closeIndex + ToolCallCloseTag.Length;
+            if (!string.IsNullOrWhiteSpace(text.Substring(0, openIndex)) ||
+                !string.IsNullOrWhiteSpace(text.Substring(afterClose)))
+            {
+                detail = "A tool_call response must not include explanatory text outside the tag.";
+                return true;
+            }
+
+            return false;
+        }
+
         public static bool TryParse(string response, out string toolName, out JsonElement arguments)
         {
             toolName = string.Empty;
