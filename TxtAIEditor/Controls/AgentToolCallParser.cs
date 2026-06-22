@@ -82,6 +82,14 @@ namespace TxtAIEditor.Controls
                 {
                     toolName = possibleName;
                     string jsonPart = trimmedPayload.Substring(openBraceIndex);
+
+                    // First try balanced brace extraction to isolate the JSON object
+                    // from any trailing content the LLM may have appended.
+                    if (TryExtractBalancedJsonObject(trimmedPayload, openBraceIndex, out string balancedJson))
+                    {
+                        jsonPart = balancedJson;
+                    }
+
                     try
                     {
                         using var document = JsonDocument.Parse(jsonPart);

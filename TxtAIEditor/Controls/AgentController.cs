@@ -933,17 +933,15 @@ namespace TxtAIEditor.Controls
 
                     string toolName = string.Empty;
                     JsonElement arguments = default;
-                    string toolCallFormatIssue = string.Empty;
-                    bool hasToolCallFormatIssue = responseHasToolSyntax &&
-                        AgentToolCallParser.TryGetToolCallFormatIssue(response, out toolCallFormatIssue);
-                    if (hasToolCallFormatIssue ||
-                        !AgentToolCallParser.TryParse(response, out toolName, out arguments))
+                    bool parsedToolCall = AgentToolCallParser.TryParse(response, out toolName, out arguments);
+                    if (!parsedToolCall)
                     {
                         if (responseHasToolSyntax)
                         {
                             toolCallFormatRetryCount++;
+                            AgentToolCallParser.TryGetToolCallFormatIssue(response, out string toolCallFormatIssue);
                             string retryNote = BuildToolCallFormatRetryNote(
-                                hasToolCallFormatIssue
+                                !string.IsNullOrWhiteSpace(toolCallFormatIssue)
                                     ? toolCallFormatIssue
                                     : "The tool_call JSON could not be parsed.");
                             transcript += "\n\n" + retryNote;
