@@ -37,6 +37,11 @@ namespace TxtAIEditor.Core.Services
             ".zst", ".br", ".lz4", ".ace", ".arj"
         };
 
+        private static readonly HashSet<string> AutoDetectedSearchFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".txt", ".htm", ".html"
+        };
+
         private readonly IFileService _fileService;
         private readonly DocumentTextExtractionService _documentTextExtractionService;
 
@@ -172,8 +177,19 @@ namespace TxtAIEditor.Core.Services
             Action<IReadOnlyList<SearchResultItem>> publishResults,
             CancellationToken cancellationToken)
         {
-            int foundCount = 0;
-            var tempResults = new List<SearchResultItem>(SearchResultBatchSize);
+            if (ShouldAutoDetectSearchEncoding(file))
+            {
+                byte[] bytes = File.ReadAllBytes(file);
+                Encoding encoding = TextEncodingService.GetTextEncoding(bytes, "Auto");
+                using var detectedStream = new MemoryStream(bytes);
+                using var detectedReader = new StreamReader(
+                    detectedStream,
+                    encoding,
+                    detectEncodingFromByteOrderMarks: true,
+                    bufferSize: 64 * 1024);
+
+                return SearchTextReader(file, detectedReader, matcher, publishResults, cancellationToken);
+            }
 
             using var stream = new FileStream(
                 file,
@@ -187,6 +203,19 @@ namespace TxtAIEditor.Core.Services
                 Encoding.UTF8,
                 detectEncodingFromByteOrderMarks: true,
                 bufferSize: 64 * 1024);
+
+            return SearchTextReader(file, reader, matcher, publishResults, cancellationToken);
+        }
+
+        private static int SearchTextReader(
+            string file,
+            TextReader reader,
+            SearchMatcher matcher,
+            Action<IReadOnlyList<SearchResultItem>> publishResults,
+            CancellationToken cancellationToken)
+        {
+            int foundCount = 0;
+            var tempResults = new List<SearchResultItem>(SearchResultBatchSize);
 
             string? line;
             int lineNum = 1;
@@ -325,6 +354,12 @@ namespace TxtAIEditor.Core.Services
                 return false;
             }
             return SkippedFileExtensions.Contains(ext);
+        }
+
+        private static bool ShouldAutoDetectSearchEncoding(string filePath)
+        {
+            string ext = Path.GetExtension(filePath);
+            return AutoDetectedSearchFileExtensions.Contains(ext);
         }
 
         private static IEnumerable<string> EnumerateNormalizedLines(string text)
