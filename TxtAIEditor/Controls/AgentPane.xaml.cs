@@ -1130,7 +1130,7 @@ namespace TxtAIEditor.Controls
             RebuildAgentSkillMenu();
         }
 
-        private void OnAgentSkillRefreshClick(object sender, RoutedEventArgs e)
+        private void OnAgentSkillRefreshClick(object sender, TappedRoutedEventArgs e)
         {
             AgentSkillRefreshRequested?.Invoke(this, EventArgs.Empty);
             AgentSkillFlyout.Hide();

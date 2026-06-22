@@ -643,15 +643,11 @@
                                                FontWeight="SemiBold"
                                                FontSize="12"
                                                VerticalAlignment="Center"/>
-                                    <Button x:Name="AgentSkillRefreshButton"
-                                            Grid.Column="1"
-                                            Click="OnAgentSkillRefreshClick"
-                                            Style="{StaticResource AgentButtonStyle}"
-                                            Padding="6,2"
-                                            MinHeight="0"
-                                            MinWidth="0">
-                                        <FontIcon Glyph="&#xE72C;" FontSize="12"/>
-                                    </Button>
+                                    <FontIcon x:Name="AgentSkillRefreshButton"
+                                              Grid.Column="1"
+                                              Glyph="&#xE72C;"
+                                              FontSize="12"
+                                              Tapped="OnAgentSkillRefreshClick"/>
                                 </Grid>
                                 <MenuFlyoutSeparator Grid.Row="1"/>
                                 <ScrollViewer Grid.Row="2" MaxHeight="260" VerticalScrollBarVisibility="Auto">
