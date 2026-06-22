@@ -2215,6 +2215,9 @@
   <data name="AgentSkillRemoveTooltip" xml:space="preserve">
     <value>スキルの選択を解除</value>
   </data>
+  <data name="AgentSkillRefreshTooltip" xml:space="preserve">
+    <value>スキルディレクトリを再スキャン</value>
+  </data>
   <data name="AgentSkillChipPrefix" xml:space="preserve">
     <value>Skill: </value>
   </data>

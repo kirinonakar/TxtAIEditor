@@ -464,8 +464,8 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentMcpRemoved += (_, serverName) => _mcpController.RemoveSelectedMcp(serverName);
             _agentPane.AgentSkillFlyoutOpened += async (_, _) => await _skillController.LoadIfNeededAsync();
             _agentPane.AgentSkillToggled += (_, skillName) => _skillController.ToggleSkill(skillName);
+            _agentPane.AgentSkillRefreshRequested += async (_, _) => await _skillController.LoadAsync();
             _agentPane.AgentSkillRemoved += (_, skillName) => _skillController.RemoveSelectedSkill(skillName);
-            
             _agentPane.Prompt.TextChanged += (_, _) =>
             {
                 SaveOpenSessionPromptTitleFromUI();

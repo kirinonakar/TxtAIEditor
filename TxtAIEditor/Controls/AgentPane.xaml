@@ -632,11 +632,27 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock x:Name="AgentSkillTitleText"
-                                           Grid.Row="0"
-                                           Text="스킬"
-                                           FontWeight="SemiBold"
-                                           FontSize="12"/>
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="AgentSkillTitleText"
+                                               Grid.Column="0"
+                                               Text="스킬"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"/>
+                                    <Button x:Name="AgentSkillRefreshButton"
+                                            Grid.Column="1"
+                                            Click="OnAgentSkillRefreshClick"
+                                            Style="{StaticResource AgentButtonStyle}"
+                                            Padding="6,2"
+                                            MinHeight="0"
+                                            MinWidth="0">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="12"/>
+                                    </Button>
+                                </Grid>
                                 <MenuFlyoutSeparator Grid.Row="1"/>
                                 <ScrollViewer Grid.Row="2" MaxHeight="260" VerticalScrollBarVisibility="Auto">
                                     <StackPanel x:Name="AgentSkillListPanel" Spacing="4"/>

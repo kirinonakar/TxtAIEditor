@@ -131,6 +131,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? AgentPresetExportRequested;
         public event RoutedEventHandler? AgentPresetImportRequested;
         public event EventHandler? AgentSkillFlyoutOpened;
+        public event EventHandler? AgentSkillRefreshRequested;
         public event EventHandler<string>? AgentSkillToggled;
         public event EventHandler<string>? AgentSkillRemoved;
         public event EventHandler? AgentMcpFlyoutOpened;
@@ -253,6 +254,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentSkillButton, getString("AgentSkillButtonTooltip", "스킬"));
             AgentSkillTitleText.Text = getString("AgentSkillTitle", "스킬");
             ToolTipService.SetToolTip(AgentPresetButton, getString("AgentPresetButtonTooltip", "페르소나/지침 프리셋"));
+            ToolTipService.SetToolTip(AgentSkillRefreshButton, getString("AgentSkillRefreshTooltip", "스킬 디렉터리를 다시 스캔"));
             AgentAddPresetText.Text = getString("AgentPresetAddText", "프리셋 추가");
             AgentExportPresetText.Text = getString("PresetExportText", "내보내기");
             AgentImportPresetText.Text = getString("PresetImportText", "가져오기");
@@ -1126,6 +1128,12 @@ namespace TxtAIEditor.Controls
         {
             AgentSkillFlyoutOpened?.Invoke(this, EventArgs.Empty);
             RebuildAgentSkillMenu();
+        }
+
+        private void OnAgentSkillRefreshClick(object sender, RoutedEventArgs e)
+        {
+            AgentSkillRefreshRequested?.Invoke(this, EventArgs.Empty);
+            AgentSkillFlyout.Hide();
         }
 
         private void OnRemoveAttachmentClick(object sender, RoutedEventArgs e)

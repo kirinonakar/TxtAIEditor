@@ -2214,6 +2214,9 @@
   <data name="AgentSkillRemoveTooltip" xml:space="preserve">
     <value>스킬 선택 해제</value>
   </data>
+  <data name="AgentSkillRefreshTooltip" xml:space="preserve">
+    <value>스킬 디렉터리를 다시 스캔</value>
+  </data>
   <data name="AgentSkillChipPrefix" xml:space="preserve">
     <value>Skill: </value>
   </data>
