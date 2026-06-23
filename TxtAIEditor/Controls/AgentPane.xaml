@@ -634,6 +634,7 @@
                                 </Grid.RowDefinitions>
                                 <Grid Grid.Row="0">
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
@@ -643,8 +644,16 @@
                                                FontWeight="SemiBold"
                                                FontSize="12"
                                                VerticalAlignment="Center"/>
-                                    <FontIcon x:Name="AgentSkillRefreshButton"
+                                    <FontIcon x:Name="AgentSkillOpenFolderButton"
                                               Grid.Column="1"
+                                              Glyph="&#xE8DA;"
+                                              FontSize="12"
+                                              Margin="8,0,0,0"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              Tapped="OnAgentSkillOpenFolderClick"/>
+                                    <FontIcon x:Name="AgentSkillRefreshButton"
+                                              Grid.Column="2"
                                               Glyph="&#xE72C;"
                                               FontSize="12"
                                               Tapped="OnAgentSkillRefreshClick"/>

@@ -2217,6 +2217,9 @@ Plan: {0}</value>
   <data name="AgentSkillRefreshTooltip" xml:space="preserve">
     <value>Rescan skill directory</value>
   </data>
+  <data name="AgentSkillOpenFolderTooltip" xml:space="preserve">
+    <value>Open Skills Folder</value>
+  </data>
   <data name="AgentSkillChipPrefix" xml:space="preserve">
     <value>Skill: </value>
   </data>

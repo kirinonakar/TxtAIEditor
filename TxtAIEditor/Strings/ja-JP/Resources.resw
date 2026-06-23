@@ -2218,6 +2218,9 @@
   <data name="AgentSkillRefreshTooltip" xml:space="preserve">
     <value>スキルディレクトリを再スキャン</value>
   </data>
+  <data name="AgentSkillOpenFolderTooltip" xml:space="preserve">
+    <value>スキルフォルダーを開く</value>
+  </data>
   <data name="AgentSkillChipPrefix" xml:space="preserve">
     <value>Skill: </value>
   </data>

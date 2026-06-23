@@ -255,6 +255,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
             ToolTipService.SetToolTip(AgentSkillButton, getString("AgentSkillButtonTooltip", "스킬"));
             AgentSkillTitleText.Text = getString("AgentSkillTitle", "스킬");
+            ToolTipService.SetToolTip(AgentSkillOpenFolderButton, getString("AgentSkillOpenFolderTooltip", "스킬 폴더 열기"));
             ToolTipService.SetToolTip(AgentPresetButton, getString("AgentPresetButtonTooltip", "페르소나/지침 프리셋"));
             ToolTipService.SetToolTip(AgentSkillRefreshButton, getString("AgentSkillRefreshTooltip", "스킬 디렉터리를 다시 스캔"));
             AgentAddPresetText.Text = getString("AgentPresetAddText", "프리셋 추가");
@@ -1132,6 +1133,31 @@ namespace TxtAIEditor.Controls
         private void OnAgentSkillRefreshClick(object sender, TappedRoutedEventArgs e)
         {
             AgentSkillRefreshRequested?.Invoke(this, EventArgs.Empty);
+            AgentSkillFlyout.Hide();
+        }
+
+        private void OnAgentSkillOpenFolderClick(object sender, TappedRoutedEventArgs e)
+        {
+            try
+            {
+                string path = AgentSkillDirectories.UserSkillsDirectory;
+                if (!System.IO.Directory.Exists(path))
+                {
+                    System.IO.Directory.CreateDirectory(path);
+                }
+
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    UseShellExecute = false
+                };
+                startInfo.ArgumentList.Add(path);
+                System.Diagnostics.Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to open skills directory: {ex.Message}");
+            }
             AgentSkillFlyout.Hide();
         }
 
