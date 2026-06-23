@@ -147,9 +147,6 @@ namespace TxtAIEditor.Controls
                 }
                 cancellationToken.ThrowIfCancellationRequested();
                 _fileToolController.TrackSuccessfulFileToolPath(normalizedToolName, arguments, result);
-                _appendActivity(string.Format(
-                    _getString("AgentActivityToolDoneFormat", "도구 완료: {0}"),
-                    normalizedToolName));
 
                 return result;
             }
