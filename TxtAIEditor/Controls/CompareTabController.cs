@@ -63,9 +63,14 @@ namespace TxtAIEditor.Controls
             string title = customTitle ?? $"비교: {Path.GetFileName(pathA)} ↔ {Path.GetFileName(pathB)}";
 
             OpenedTab? existingTab = null;
+            string diffTitlePrefix = _getString("AgentDiffTitle", "Agent 변경 비교");
+            string fileName = Path.GetFileName(pathA);
             foreach (var t in _viewModel.Tabs)
             {
-                if (string.Equals(t.Title, title, StringComparison.Ordinal))
+                if (string.Equals(t.Title, title, StringComparison.Ordinal) ||
+                    (!string.IsNullOrEmpty(customTitle) && 
+                     t.Title.StartsWith(diffTitlePrefix, StringComparison.Ordinal) && 
+                     t.Title.Contains(fileName)))
                 {
                     existingTab = t;
                     break;
@@ -74,6 +79,19 @@ namespace TxtAIEditor.Controls
 
             if (existingTab != null)
             {
+                if (title != existingTab.Title)
+                {
+                    existingTab.Title = title;
+                    foreach (var item in _editorTabView.TabItems)
+                    {
+                        if (item is TabViewItem tvi && string.Equals(tvi.Tag as string, existingTab.Id, StringComparison.Ordinal))
+                        {
+                            tvi.Header = title;
+                            break;
+                        }
+                    }
+                }
+
                 TabViewItem? existingTabItem = null;
                 foreach (var item in _editorTabView.TabItems)
                 {
@@ -222,16 +240,34 @@ namespace TxtAIEditor.Controls
             string? labelB = null)
         {
             OpenedTab? existingTab = null;
+            string diffTitlePrefix = _getString("AgentDiffTitle", "Agent 변경 비교");
+            string fileName = Path.GetFileName(pathA);
             foreach (var t in _viewModel.Tabs)
             {
-                if (string.Equals(t.Title, title, StringComparison.Ordinal))
+                if (string.Equals(t.Title, title, StringComparison.Ordinal) ||
+                    (t.Title.StartsWith(diffTitlePrefix, StringComparison.Ordinal) && t.Title.Contains(fileName)))
                 {
                     existingTab = t;
                     break;
                 }
             }
 
-            if (existingTab != null && _tabBridges.TryGetValue(existingTab.Id, out var bridgeGroup) && bridgeGroup.WebView != null)
+            if (existingTab != null)
+            {
+                if (title != existingTab.Title)
+                {
+                    existingTab.Title = title;
+                    foreach (var item in _editorTabView.TabItems)
+                    {
+                        if (item is TabViewItem tvi && string.Equals(tvi.Tag as string, existingTab.Id, StringComparison.Ordinal))
+                        {
+                            tvi.Header = title;
+                            break;
+                        }
+                    }
+                }
+
+                if (_tabBridges.TryGetValue(existingTab.Id, out var bridgeGroup) && bridgeGroup.WebView != null)
             {
                 contentA ??= await _fileService.ReadTextFileAsync(pathA);
                 contentB ??= await _fileService.ReadTextFileAsync(pathB);
@@ -262,4 +298,5 @@ namespace TxtAIEditor.Controls
             }
         }
     }
+}
 }

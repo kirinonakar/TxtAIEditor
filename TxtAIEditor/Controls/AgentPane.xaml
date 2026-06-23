@@ -494,7 +494,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                         <FontIcon Glyph="&#xE7C3;" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                                        <TextBlock Text="{Binding RelativePath}" 
+                                        <TextBlock Text="{Binding DisplayRelativePath}" 
                                                    FontSize="11" 
                                                    TextWrapping="NoWrap" 
                                                    TextTrimming="CharacterEllipsis"

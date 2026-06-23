@@ -75,10 +75,13 @@ namespace TxtAIEditor.Controls
             _queueGitStatusRefresh();
 
             var edit = _sessionEditsProvider()
-                .FirstOrDefault(e => string.Equals(e.FullPath, filePath, StringComparison.OrdinalIgnoreCase));
+                .LastOrDefault(e => string.Equals(e.FullPath, filePath, StringComparison.OrdinalIgnoreCase));
             if (edit != null)
             {
-                string title = $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {Path.GetFileName(edit.RelativePath)}";
+                string displayName = edit.TotalModifications > 1
+                    ? $"({edit.ModificationNumber}) {Path.GetFileName(edit.RelativePath)}"
+                    : Path.GetFileName(edit.RelativePath);
+                string title = $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}";
                 await _compareTabController.UpdateCompareTabIfOpenAsync(
                     title,
                     edit.FullPath,
@@ -92,12 +95,16 @@ namespace TxtAIEditor.Controls
 
         public Task OpenDiffViewAsync(AgentFileEditPreview preview)
         {
+            string displayName = preview.TotalModifications > 1
+                ? $"({preview.ModificationNumber}) {Path.GetFileName(preview.RelativePath)}"
+                : Path.GetFileName(preview.RelativePath);
+
             return _compareTabController.OpenCompareTabAsync(
                 preview.FullPath,
                 preview.FullPath,
                 preview.OldContent,
                 preview.NewContent,
-                customTitle: $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {Path.GetFileName(preview.RelativePath)}",
+                customTitle: $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}",
                 labelA: _getString("DiffOriginalLabel", "원본"),
                 labelB: _getString("DiffModifiedLabel", "수정본"));
         }

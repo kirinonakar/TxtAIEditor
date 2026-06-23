@@ -15,6 +15,13 @@ namespace TxtAIEditor.Controls
         public string OldContent { get; init; } = string.Empty;
         public string NewContent { get; init; } = string.Empty;
         public bool IsNewFile { get; init; }
+
+        public int ModificationNumber { get; set; }
+        public int TotalModifications { get; set; }
+
+        public string DisplayRelativePath => TotalModifications > 1
+            ? $"({ModificationNumber}) {RelativePath}"
+            : RelativePath;
     }
 
     public sealed class AgentReadImageResult

@@ -145,7 +145,9 @@ namespace TxtAIEditor.Controls
                 FullPath = preview.FullPath,
                 OldContent = preview.OldContent,
                 NewContent = preview.NewContent,
-                IsNewFile = preview.IsNewFile
+                IsNewFile = preview.IsNewFile,
+                ModificationNumber = preview.ModificationNumber,
+                TotalModifications = preview.TotalModifications
             };
         }
     }

@@ -50,12 +50,14 @@ namespace TxtAIEditor.Controls
             // wrong state, especially for files created and then edited in the same
             // agent session.
             _sessionEdits.Add(Clone(preview));
+            UpdateModificationNumbers();
             UpdateModifiedFilesList();
         }
 
         public void Clear()
         {
             _sessionEdits.Clear();
+            UpdateModificationNumbers();
             UpdateModifiedFilesList();
         }
 
@@ -67,6 +69,7 @@ namespace TxtAIEditor.Controls
                 _sessionEdits.AddRange(edits.Select(Clone));
             }
 
+            UpdateModificationNumbers();
             UpdateModifiedFilesList();
         }
 
@@ -119,6 +122,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 _sessionEdits.RemoveAt(editIndex);
+                UpdateModificationNumbers();
                 UpdateModifiedFilesList();
 
                 _appendActivity(string.Format(
@@ -215,6 +219,28 @@ namespace TxtAIEditor.Controls
             return -1;
         }
 
+        private void UpdateModificationNumbers()
+        {
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var edit in _sessionEdits)
+            {
+                string key = GetSessionEditKey(edit.FullPath, edit.RelativePath);
+                if (!counts.TryGetValue(key, out int count))
+                {
+                    count = 0;
+                }
+                count++;
+                counts[key] = count;
+                edit.ModificationNumber = count;
+            }
+
+            foreach (var edit in _sessionEdits)
+            {
+                string key = GetSessionEditKey(edit.FullPath, edit.RelativePath);
+                edit.TotalModifications = counts[key];
+            }
+        }
+
         private List<AgentFileEditPreview> GetLatestEditsForDisplay()
         {
             var latestByPath = new Dictionary<string, AgentFileEditPreview>(StringComparer.OrdinalIgnoreCase);
@@ -244,7 +270,9 @@ namespace TxtAIEditor.Controls
                 FullPath = preview.FullPath,
                 OldContent = preview.OldContent,
                 NewContent = preview.NewContent,
-                IsNewFile = preview.IsNewFile
+                IsNewFile = preview.IsNewFile,
+                ModificationNumber = preview.ModificationNumber,
+                TotalModifications = preview.TotalModifications
             };
         }
 
