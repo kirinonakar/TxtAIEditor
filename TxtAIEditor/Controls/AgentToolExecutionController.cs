@@ -574,7 +574,10 @@ namespace TxtAIEditor.Controls
                 extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
+                extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".doc", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".xls", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
         }
 
         private string? TryGetSkillNameFromPath(string path)

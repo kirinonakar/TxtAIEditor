@@ -70,7 +70,8 @@ namespace TxtAIEditor.Controls
         private static bool IsExtractedDocumentViewerFile(string? filePath)
         {
             return filePath?.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) == true ||
-                   filePath?.EndsWith(".hwpx", StringComparison.OrdinalIgnoreCase) == true;
+                   filePath?.EndsWith(".hwpx", StringComparison.OrdinalIgnoreCase) == true ||
+                   filePath?.EndsWith(".doc", StringComparison.OrdinalIgnoreCase) == true;
         }
     }
 

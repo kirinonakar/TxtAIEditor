@@ -47,19 +47,61 @@ namespace TxtAIEditor.Core.Services
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(1);
             string extension = Path.GetExtension(filePath).ToLowerInvariant();
-            string text = extension switch
-            {
-                ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                ".hwpx" => await ExtractHwpxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                _ => string.Empty
-            };
+            string tempFilePath = string.Empty;
+            bool isTempFile = false;
 
-            cancellationToken.ThrowIfCancellationRequested();
-            progress?.Report(98);
-            return Truncate(normalize ? NormalizeExtractedText(text) : text, maxChars);
+            try
+            {
+                if (extension == ".doc")
+                {
+                    tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(filePath).ConfigureAwait(false);
+                    filePath = tempFilePath;
+                    extension = ".docx";
+                    isTempFile = true;
+                }
+                else if (extension == ".xls")
+                {
+                    tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(filePath).ConfigureAwait(false);
+                    filePath = tempFilePath;
+                    extension = ".xlsx";
+                    isTempFile = true;
+                }
+                else if (extension == ".ppt")
+                {
+                    tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(filePath).ConfigureAwait(false);
+                    filePath = tempFilePath;
+                    extension = ".pptx";
+                    isTempFile = true;
+                }
+
+                string text = extension switch
+                {
+                    ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                    ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                    ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                    ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                    ".hwpx" => await ExtractHwpxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                    _ => string.Empty
+                };
+
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(98);
+                return Truncate(normalize ? NormalizeExtractedText(text) : text, maxChars);
+            }
+            finally
+            {
+                if (isTempFile && !string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch
+                    {
+                        // Ignore delete errors for temp files
+                    }
+                }
+            }
         }
 
         public static bool IsSupportedExtension(string filePath)
@@ -69,7 +111,10 @@ namespace TxtAIEditor.Core.Services
                 extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
+                extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".doc", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".xls", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)

@@ -69,7 +69,10 @@ namespace TxtAIEditor.Controls
             ".docx",
             ".pptx",
             ".xlsx",
-            ".hwpx"
+            ".hwpx",
+            ".doc",
+            ".xls",
+            ".ppt"
         };
 
         public FileOpenDropController(

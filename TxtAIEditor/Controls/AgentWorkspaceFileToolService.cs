@@ -166,6 +166,9 @@ namespace TxtAIEditor.Controls
                 extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".doc", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".xls", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||

@@ -152,7 +152,9 @@ namespace TxtAIEditor
                 ".markdown" => "\uE8A5",
                 ".csv" => "\uE9D2",
                 ".xlsx" => "\uE9D2",
+                ".xls" => "\uE9D2",
                 ".pptx" => "\uE161",
+                ".ppt" => "\uE161",
                 ".html" => "\uE743", // Web icon
                 ".htm" => "\uE743",
                 ".css" => "\uE743",
@@ -172,6 +174,7 @@ namespace TxtAIEditor
                 ".webp" => "\uEB9F",
                 ".pdf" => "\uE12A",
                 ".docx" => "\uE161",
+                ".doc" => "\uE161",
                 ".hwpx" => "\uE161",
                 _ => "\uE160"       // Generic file icon
             };

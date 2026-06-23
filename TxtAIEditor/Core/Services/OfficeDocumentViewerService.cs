@@ -17,27 +17,69 @@ namespace TxtAIEditor.Core.Services
         public async Task<string> BuildHtmlAsync(string filePath)
         {
             string extension = Path.GetExtension(filePath);
-            if (extension.Equals(".docx", StringComparison.OrdinalIgnoreCase))
-            {
-                return await OfficeTextDocumentHtmlRenderer.BuildWordAsync(filePath, _getString).ConfigureAwait(false);
-            }
+            string tempFilePath = string.Empty;
+            bool isTempFile = false;
 
-            if (extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                return await OfficeTextDocumentHtmlRenderer.BuildHwpxAsync(filePath, _getString).ConfigureAwait(false);
-            }
+                if (extension.Equals(".doc", StringComparison.OrdinalIgnoreCase))
+                {
+                    tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(filePath).ConfigureAwait(false);
+                    filePath = tempFilePath;
+                    extension = ".docx";
+                    isTempFile = true;
+                }
+                else if (extension.Equals(".xls", StringComparison.OrdinalIgnoreCase))
+                {
+                    tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(filePath).ConfigureAwait(false);
+                    filePath = tempFilePath;
+                    extension = ".xlsx";
+                    isTempFile = true;
+                }
+                else if (extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase))
+                {
+                    tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(filePath).ConfigureAwait(false);
+                    filePath = tempFilePath;
+                    extension = ".pptx";
+                    isTempFile = true;
+                }
 
-            if (extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase))
+                if (extension.Equals(".docx", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await OfficeTextDocumentHtmlRenderer.BuildWordAsync(filePath, _getString).ConfigureAwait(false);
+                }
+
+                if (extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await OfficeTextDocumentHtmlRenderer.BuildHwpxAsync(filePath, _getString).ConfigureAwait(false);
+                }
+
+                if (extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await OfficePresentationDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false);
+                }
+
+                if (extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await OfficeWorkbookDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false);
+                }
+
+                return BuildErrorHtml(_getString("OfficeViewerUnsupportedDocument", "Unsupported Office document."));
+            }
+            finally
             {
-                return await OfficePresentationDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false);
+                if (isTempFile && !string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch
+                    {
+                        // Ignore delete errors for temp files
+                    }
+                }
             }
-
-            if (extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
-            {
-                return await OfficeWorkbookDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false);
-            }
-
-            return BuildErrorHtml(_getString("OfficeViewerUnsupportedDocument", "Unsupported Office document."));
         }
 
         private static string BuildErrorHtml(string message)

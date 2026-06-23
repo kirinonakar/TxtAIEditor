@@ -238,7 +238,8 @@ namespace TxtAIEditor.Controls
         {
             string extension = Path.GetExtension(filePath);
             return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase);
+                   extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".doc", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsOfficeDocumentFile(string filePath)
@@ -247,7 +248,10 @@ namespace TxtAIEditor.Controls
             return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
+                   extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".doc", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".xls", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<OpenedTab> OpenReadOnlyDocumentFileAsync(string filePath)

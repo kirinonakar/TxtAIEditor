@@ -2458,13 +2458,13 @@ Plan: {0}</value>
      <value>Document text extraction completed: {0}</value>
    </data>
    <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
-     <value>extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, XLSX, or HWPX file path.</value>
+     <value>extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS, or PPT file path.</value>
    </data>
    <data name="AgentExtractDocumentFailedFormat" xml:space="preserve">
      <value>extract_document failed: {0}</value>
    </data>
    <data name="AgentExtractDocumentUnsupportedTypeFormat" xml:space="preserve">
-     <value>extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx, .hwpx.</value>
+     <value>extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx, .hwpx, .doc, .xls, .ppt.</value>
    </data>
    <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
      <value>extract_document failed: could not extract text from {0}: {1}</value>
