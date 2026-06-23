@@ -111,6 +111,8 @@ namespace TxtAIEditor.Controls
                 new PointerEventHandler(OnOutputPointerReleased),
                 true);
 
+            ActualThemeChanged += (sender, args) => UpdateRichText(_rawOutputText);
+
             ResetOutput(_displayText.OutputPlaceholder);
             Localize(_displayText.GetString);
         }
@@ -1253,7 +1255,31 @@ namespace TxtAIEditor.Controls
             while (i < displayLines.Count)
             {
                 string line = displayLines[i];
-                if (i + 1 < displayLines.Count && IsTableRow(line) && IsTableSeparatorRow(displayLines[i + 1]))
+                string trimmed = line.Trim();
+
+                if (trimmed.StartsWith("```"))
+                {
+                    int j = i + 1;
+                    List<string> codeLines = new List<string>();
+                    while (j < displayLines.Count && !displayLines[j].Trim().StartsWith("```"))
+                    {
+                        codeLines.Add(displayLines[j]);
+                        j++;
+                    }
+
+                    Block codeBlock = RenderCodeBlock(codeLines, trimmed.Substring(3).Trim());
+                    AgentOutputText.Blocks.Add(codeBlock);
+
+                    if (j < displayLines.Count)
+                    {
+                        i = j + 1;
+                    }
+                    else
+                    {
+                        i = j;
+                    }
+                }
+                else if (i + 1 < displayLines.Count && IsTableRow(line) && IsTableSeparatorRow(displayLines[i + 1]))
                 {
                     List<string> tableLines = new List<string>();
                     tableLines.Add(line);
@@ -1277,6 +1303,45 @@ namespace TxtAIEditor.Controls
                     i++;
                 }
             }
+        }
+
+        private Block RenderCodeBlock(List<string> codeLines, string language)
+        {
+            string codeText = string.Join("\n", codeLines);
+
+            var textBlock = new TextBlock
+            {
+                Text = codeText,
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.Black),
+                IsTextSelectionEnabled = true
+            };
+
+            textBlock.SelectionChanged += (sender, args) =>
+            {
+                if (sender is TextBlock tb && !string.IsNullOrEmpty(tb.SelectedText))
+                {
+                    _hasExplicitOutputSelection = true;
+                    _explicitSelectedOutputText = tb.SelectedText;
+                }
+            };
+
+            var border = new Border
+            {
+                Margin = new Thickness(0, 6, 0, 6),
+                Padding = new Thickness(10, 8, 10, 8),
+                BorderBrush = GetBrushResource("AgentButtonBorderBrush", Microsoft.UI.Colors.LightGray),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Child = textBlock
+            };
+
+            var paragraph = new Paragraph();
+            paragraph.Inlines.Add(new InlineUIContainer { Child = border });
+            return paragraph;
         }
 
         private static bool IsTableRow(string line)
@@ -1405,16 +1470,16 @@ namespace TxtAIEditor.Controls
 
                 while (cells.Count < colCount) cells.Add(string.Empty);
 
-                Brush? rowBg = null;
-                if (rowCount % 2 == 1)
-                {
-                    rowBg = GetBrushResource("AgentButtonBackground", Microsoft.UI.Colors.Transparent);
-                }
-
                 for (int c = 0; c < colCount; c++)
                 {
                     var cellText = cells[c];
                     var cellContent = CreateCellElement(cellText, alignments[c], isHeader: false);
+
+                    Brush? rowBg = null;
+                    if (rowCount % 2 == 1)
+                    {
+                        rowBg = GetBrushResource("AgentButtonBackground", Microsoft.UI.Colors.Transparent);
+                    }
 
                     var cellBorder = new Border
                     {
@@ -1445,13 +1510,23 @@ namespace TxtAIEditor.Controls
                 HorizontalAlignment = alignment,
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 12,
-                Foreground = GetBrushResource("AgentOutputForeground", Microsoft.UI.Colors.Black)
+                Foreground = GetBrushResource("AgentOutputForeground", Microsoft.UI.Colors.Black),
+                IsTextSelectionEnabled = true
             };
 
             if (isHeader)
             {
                 textBlock.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
             }
+
+            textBlock.SelectionChanged += (sender, args) =>
+            {
+                if (sender is TextBlock tb && !string.IsNullOrEmpty(tb.SelectedText))
+                {
+                    _hasExplicitOutputSelection = true;
+                    _explicitSelectedOutputText = tb.SelectedText;
+                }
+            };
 
             ParseLineToInlines(cellText, textBlock.Inlines);
             return textBlock;
@@ -1517,8 +1592,7 @@ namespace TxtAIEditor.Controls
                 var bulletRun = new Run
                 {
                     Text = listBullet,
-                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                    Foreground = GetBrushResource("AgentOutputForeground", Microsoft.UI.Colors.Gray)
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold
                 };
                 paragraph.Inlines.Add(bulletRun);
 
@@ -1630,6 +1704,7 @@ namespace TxtAIEditor.Controls
                 {
                     var run = CreateTextRun($"[{text}]", isHeading || isBold, headingFontSize);
                     run.FontFamily = new FontFamily("Consolas");
+                    run.Foreground = GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.DarkRed);
                     inlines.Add(run);
                 }
                 else
@@ -1755,14 +1830,46 @@ namespace TxtAIEditor.Controls
 
         private Brush GetBrushResource(string key, Windows.UI.Color fallbackColor)
         {
-            if (Resources.TryGetValue(key, out object resource) && resource is Brush localBrush)
+            string themeName = "Light";
+            var theme = ActualTheme;
+            if (theme == ElementTheme.Default)
             {
-                return localBrush;
+                themeName = Application.Current.RequestedTheme == ApplicationTheme.Dark ? "Dark" : "Light";
+            }
+            else
+            {
+                themeName = theme == ElementTheme.Dark ? "Dark" : "Light";
             }
 
-            if (Application.Current.Resources.TryGetValue(key, out resource) && resource is Brush appBrush)
+            object? dictObj;
+            object? resource;
+
+            // 1. Try Control's Theme Dictionary
+            if (Resources.ThemeDictionaries.TryGetValue(themeName, out dictObj) &&
+                dictObj is ResourceDictionary themeDict &&
+                themeDict.TryGetValue(key, out resource) &&
+                resource is Brush brush1)
             {
-                return appBrush;
+                return brush1;
+            }
+
+            // 2. Try App's Theme Dictionary
+            if (Application.Current.Resources.ThemeDictionaries.TryGetValue(themeName, out dictObj) &&
+                dictObj is ResourceDictionary appThemeDict &&
+                appThemeDict.TryGetValue(key, out resource) &&
+                resource is Brush brush2)
+            {
+                return brush2;
+            }
+
+            // 3. Try standard resources (direct lookup)
+            if (Resources.TryGetValue(key, out resource) && resource is Brush brush3)
+            {
+                return brush3;
+            }
+            if (Application.Current.Resources.TryGetValue(key, out resource) && resource is Brush brush4)
+            {
+                return brush4;
             }
 
             return new SolidColorBrush(fallbackColor);
