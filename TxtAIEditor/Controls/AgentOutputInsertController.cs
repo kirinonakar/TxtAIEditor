@@ -60,7 +60,7 @@ namespace TxtAIEditor.Controls
         {
             string fullOutput = _agentPane.Output.Text;
             string selectedOutput = _agentPane.Output.SelectedText;
-            return IsSelectionFromOutput(selectedOutput, fullOutput)
+            return !string.IsNullOrWhiteSpace(selectedOutput)
                 ? selectedOutput
                 : fullOutput;
         }

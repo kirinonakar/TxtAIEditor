@@ -1033,10 +1033,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            string selectedText = AgentOutputText.SelectedText;
-            _explicitSelectedOutputText = IsTextFromOutput(selectedText)
-                ? selectedText
-                : string.Empty;
+            _explicitSelectedOutputText = AgentOutputText.SelectedText;
         }
 
         private void ClearExplicitOutputSelection()
