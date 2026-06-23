@@ -346,12 +346,34 @@ namespace TxtAIEditor.Controls
                 {
                     bool isSelected = string.Equals(session.Id, currentSessionId, StringComparison.Ordinal);
                     bool isRunning = session.IsRunning || _runningSessions.ContainsKey(session.Id);
+                    
+                    string wRoot = !string.IsNullOrWhiteSpace(session.WorkspaceRoot)
+                        ? session.WorkspaceRoot
+                        : CaptureCurrentWorkspaceRoot();
+
+                    string prefix = string.Empty;
+                    if (!string.IsNullOrWhiteSpace(wRoot))
+                    {
+                        try
+                        {
+                            string trimmed = wRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                            string lastDir = Path.GetFileName(trimmed);
+                            if (!string.IsNullOrEmpty(lastDir))
+                            {
+                                prefix = $"[{lastDir}] ";
+                            }
+                        }
+                        catch { }
+                    }
+
+                    string rawTitle = string.IsNullOrWhiteSpace(session.Title)
+                        ? GetUntitledOpenSessionTitle()
+                        : session.Title;
+
                     return new AgentOpenSessionItemViewModel
                     {
                         Id = session.Id,
-                        Title = string.IsNullOrWhiteSpace(session.Title)
-                            ? GetUntitledOpenSessionTitle()
-                            : session.Title,
+                        Title = $"{prefix}{rawTitle}",
                         IsSelected = isSelected,
                         IsRunning = isRunning,
                         CanSelect = true,

@@ -120,11 +120,28 @@ namespace TxtAIEditor.Controls
         {
             var viewModels = _history
                 .OrderByDescending(h => h.Timestamp)
-                .Select(h => new AgentHistoryItemViewModel
+                .Select(h =>
                 {
-                    Id = h.Id,
-                    Title = h.Title,
-                    TimeText = h.Timestamp.ToString("MM-dd HH:mm")
+                    string prefix = string.Empty;
+                    if (!string.IsNullOrWhiteSpace(h.WorkspaceRoot))
+                    {
+                        try
+                        {
+                            string trimmed = h.WorkspaceRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                            string lastDir = Path.GetFileName(trimmed);
+                            if (!string.IsNullOrEmpty(lastDir))
+                            {
+                                prefix = $"[{lastDir}] ";
+                            }
+                        }
+                        catch { }
+                    }
+                    return new AgentHistoryItemViewModel
+                    {
+                        Id = h.Id,
+                        Title = $"{prefix}{h.Title}",
+                        TimeText = h.Timestamp.ToString("MM-dd HH:mm")
+                    };
                 })
                 .ToList();
 
