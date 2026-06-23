@@ -7,9 +7,9 @@ namespace TxtAIEditor.Core.Services
 {
     public static class OfficeDocumentConverter
     {
-        public static Task<string> ConvertToDocxAsync(string docPath)
+        public static async Task<string> ConvertToDocxAsync(string docPath)
         {
-            return Task.Run(() =>
+            var task = Task.Run(() =>
             {
                 string tempFile = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "TempConversion");
                 Directory.CreateDirectory(tempFile);
@@ -61,11 +61,20 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
             });
+
+            var delayTask = Task.Delay(TimeSpan.FromSeconds(15));
+            var completedTask = await Task.WhenAny(task, delayTask).ConfigureAwait(false);
+            if (completedTask == delayTask)
+            {
+                throw new TimeoutException("Word conversion timed out after 15 seconds.");
+            }
+
+            return await task.ConfigureAwait(false);
         }
 
-        public static Task<string> ConvertToXlsxAsync(string xlsPath)
+        public static async Task<string> ConvertToXlsxAsync(string xlsPath)
         {
-            return Task.Run(() =>
+            var task = Task.Run(() =>
             {
                 string tempFile = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "TempConversion");
                 Directory.CreateDirectory(tempFile);
@@ -117,11 +126,20 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
             });
+
+            var delayTask = Task.Delay(TimeSpan.FromSeconds(15));
+            var completedTask = await Task.WhenAny(task, delayTask).ConfigureAwait(false);
+            if (completedTask == delayTask)
+            {
+                throw new TimeoutException("Excel conversion timed out after 15 seconds.");
+            }
+
+            return await task.ConfigureAwait(false);
         }
 
-        public static Task<string> ConvertToPptxAsync(string pptPath)
+        public static async Task<string> ConvertToPptxAsync(string pptPath)
         {
-            return Task.Run(() =>
+            var task = Task.Run(() =>
             {
                 string tempFile = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "TempConversion");
                 Directory.CreateDirectory(tempFile);
@@ -172,6 +190,15 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
             });
+
+            var delayTask = Task.Delay(TimeSpan.FromSeconds(15));
+            var completedTask = await Task.WhenAny(task, delayTask).ConfigureAwait(false);
+            if (completedTask == delayTask)
+            {
+                throw new TimeoutException("PowerPoint conversion timed out after 15 seconds.");
+            }
+
+            return await task.ConfigureAwait(false);
         }
     }
 }

@@ -133,6 +133,16 @@ namespace TxtAIEditor.Controls
                 _showError("검색 실패", $"정규식이 올바르지 않습니다.\n{ex.Message}");
                 return;
             }
+            catch (Exception ex)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                _showError("검색 실패", $"검색 중 오류가 발생했습니다.\n{ex.Message}");
+                return;
+            }
             finally
             {
                 if (searchVersion == _searchVersion)
@@ -345,7 +355,7 @@ namespace TxtAIEditor.Controls
             };
         }
 
-        private void CancelActiveSearch()
+        public void CancelActiveSearch()
         {
             CancellationTokenSource? cancellationTokenSource = _searchCancellationTokenSource;
             cancellationTokenSource?.Cancel();

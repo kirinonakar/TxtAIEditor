@@ -110,6 +110,7 @@ namespace TxtAIEditor
                 if (_currentFolderPath != value)
                 {
                     _currentFolderPath = value;
+                    _searchReplaceController?.CancelActiveSearch();
                     UpdateAutoSaveStatus();
                     UpdateAllTabWorkspaceIndicators();
                 }

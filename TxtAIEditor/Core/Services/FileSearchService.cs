@@ -382,7 +382,8 @@ namespace TxtAIEditor.Core.Services
                 ex is XmlException ||
                 ex is ArgumentException ||
                 ex is InvalidOperationException ||
-                ex is System.Runtime.InteropServices.ExternalException;
+                ex is System.Runtime.InteropServices.ExternalException ||
+                ex is TimeoutException;
         }
 
         private static bool IsPathIgnored(string absolutePath, List<GitIgnoreFile> gitIgnoreStack, bool isDir)
