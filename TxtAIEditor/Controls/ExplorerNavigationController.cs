@@ -538,6 +538,16 @@ namespace TxtAIEditor.Controls
             var dirsToProcess = new System.Collections.Generic.Stack<string>();
             dirsToProcess.Push(rootPath);
 
+            var visited = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                visited.Add(Path.GetFullPath(rootPath));
+            }
+            catch
+            {
+                visited.Add(rootPath);
+            }
+
             var ignoredFolderNames = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "node_modules", "obj", ".git", ".vs", ".idea", "dist", "build", "out"
@@ -553,6 +563,7 @@ namespace TxtAIEditor.Controls
                     if (currentDir != rootPath)
                     {
                         if (dirInfo.Attributes.HasFlag(FileAttributes.Hidden) ||
+                            dirInfo.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
                             ignoredFolderNames.Contains(dirInfo.Name))
                         {
                             continue;
@@ -585,7 +596,23 @@ namespace TxtAIEditor.Controls
                     foreach (var subDir in dirInfo.GetDirectories())
                     {
                         if (subDir.Attributes.HasFlag(FileAttributes.Hidden) ||
+                            subDir.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
                             ignoredFolderNames.Contains(subDir.Name))
+                        {
+                            continue;
+                        }
+
+                        string canonicalSubPath;
+                        try
+                        {
+                            canonicalSubPath = Path.GetFullPath(subDir.FullName);
+                        }
+                        catch
+                        {
+                            canonicalSubPath = subDir.FullName;
+                        }
+
+                        if (!visited.Add(canonicalSubPath))
                         {
                             continue;
                         }

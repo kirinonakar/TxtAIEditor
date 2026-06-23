@@ -93,15 +93,18 @@ namespace TxtAIEditor.Controls
             string searchRoot = _searchRootProvider();
             if (string.IsNullOrEmpty(searchRoot))
             {
+                CancelActiveSearch();
                 _showError("검색 실패", "먼저 탐색기에서 작업할 폴더를 선택하십시오.");
                 return;
             }
+
+            // Cancel any active search and reset state
+            CancelActiveSearch();
 
             _lastSearchQuery = query;
             _viewModel.SearchResults.Clear();
             _viewModel.SearchResultsGrouped.Clear();
 
-            _searchCancellationTokenSource?.Cancel();
             var searchCancellationTokenSource = new CancellationTokenSource();
             _searchCancellationTokenSource = searchCancellationTokenSource;
             int searchVersion = unchecked(++_searchVersion);
@@ -145,13 +148,9 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
-                if (searchVersion == _searchVersion)
+                if (ReferenceEquals(_searchCancellationTokenSource, searchCancellationTokenSource) || _searchCancellationTokenSource == null)
                 {
-                    if (ReferenceEquals(_searchCancellationTokenSource, searchCancellationTokenSource))
-                    {
-                        _searchCancellationTokenSource = null;
-                    }
-
+                    _searchCancellationTokenSource = null;
                     SetSearchHeaderText(isSearching: false);
                 }
 

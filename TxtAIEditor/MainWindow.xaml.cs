@@ -1071,6 +1071,7 @@ namespace TxtAIEditor
         private void WireLeftSidebarEvents()
         {
             LeftSidebarTabView.SearchQueryInputKeyDown += OnSearchQueryInputKeyDown;
+            LeftSidebarTabView.SearchQuery.TextChanged += OnSearchQueryTextChanged;
             LeftSidebarTabView.SearchAllFilesClick += OnSearchAllFilesClick;
             LeftSidebarTabView.ReplaceAllClick += OnReplaceAllClick;
             LeftSidebarTabView.ReplaceOneClick += OnReplaceOneClick;
@@ -2017,6 +2018,14 @@ namespace TxtAIEditor
             {
                 e.Handled = true;
                 await _searchReplaceController.HandleSearchQueryEnterAsync();
+            }
+        }
+
+        private void OnSearchQueryTextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is TextBox textBox && string.IsNullOrWhiteSpace(textBox.Text))
+            {
+                _searchReplaceController.CancelActiveSearch();
             }
         }
 

@@ -332,7 +332,8 @@ namespace TxtAIEditor.Core.Services
                 Debug.WriteLine($"Error resolving parent gitignores: {ex.Message}");
             }
 
-            return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack);
+            var visitedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack, visitedDirs);
         }
 
         private static bool ShouldSkipDirectoryName(string dirName)
@@ -417,8 +418,15 @@ namespace TxtAIEditor.Core.Services
         private static IEnumerable<string> EnumerateDirectoryRecursive(
             string currentDir,
             string searchRoot,
-            List<GitIgnoreFile> gitIgnoreStack)
+            List<GitIgnoreFile> gitIgnoreStack,
+            HashSet<string> visitedDirs)
         {
+            string canonicalPath = Path.GetFullPath(currentDir);
+            if (!visitedDirs.Add(canonicalPath))
+            {
+                yield break;
+            }
+
             string dirName = Path.GetFileName(currentDir);
             if (string.IsNullOrEmpty(dirName))
             {
@@ -489,7 +497,21 @@ namespace TxtAIEditor.Core.Services
 
             foreach (var subDir in subDirs)
             {
-                foreach (var f in EnumerateDirectoryRecursive(subDir, searchRoot, gitIgnoreStack))
+                try
+                {
+                    var attributes = File.GetAttributes(subDir);
+                    if (attributes.HasFlag(FileAttributes.ReparsePoint))
+                    {
+                        continue; // Skip symlinks and junctions to prevent infinite loops/duplicate results
+                    }
+                }
+                catch
+                {
+                    // Ignore attribute read failures and skip to be safe.
+                    continue;
+                }
+
+                foreach (var f in EnumerateDirectoryRecursive(subDir, searchRoot, gitIgnoreStack, visitedDirs))
                 {
                     yield return f;
                 }
