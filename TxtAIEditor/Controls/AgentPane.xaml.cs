@@ -1242,39 +1242,297 @@ namespace TxtAIEditor.Controls
                 displayLines.AddRange(lines);
             }
 
-            // Adjust the number of blocks in AgentOutputText and cache to match displayLines.Count
-            while (AgentOutputText.Blocks.Count > displayLines.Count)
-            {
-                AgentOutputText.Blocks.RemoveAt(AgentOutputText.Blocks.Count - 1);
-            }
-            while (_renderedLines.Count > displayLines.Count)
-            {
-                _renderedLines.RemoveAt(_renderedLines.Count - 1);
-            }
+            _renderedLines.Clear();
+            _renderedLines.AddRange(displayLines);
 
-            while (AgentOutputText.Blocks.Count < displayLines.Count)
-            {
-                AgentOutputText.Blocks.Add(new Paragraph());
-            }
-            while (_renderedLines.Count < displayLines.Count)
-            {
-                _renderedLines.Add(null!);
-            }
+            RenderDisplayLinesToBlocks(displayLines);
+        }
 
-            // Update only the changed lines
-            for (int k = 0; k < displayLines.Count; k++)
+        private void RenderDisplayLinesToBlocks(List<string> displayLines)
+        {
+            AgentOutputText.Blocks.Clear();
+
+            int i = 0;
+            while (i < displayLines.Count)
             {
-                string line = displayLines[k];
-                if (_renderedLines[k] != line)
+                string line = displayLines[i];
+                if (i + 1 < displayLines.Count && IsTableRow(line) && IsTableSeparatorRow(displayLines[i + 1]))
                 {
-                    if (AgentOutputText.Blocks[k] is Paragraph paragraph)
+                    List<string> tableLines = new List<string>();
+                    tableLines.Add(line);
+                    tableLines.Add(displayLines[i + 1]);
+
+                    int j = i + 2;
+                    while (j < displayLines.Count && IsTableRow(displayLines[j]))
                     {
-                        paragraph.Inlines.Clear();
-                        ParseLineToInlines(line, paragraph.Inlines);
+                        tableLines.Add(displayLines[j]);
+                        j++;
                     }
-                    _renderedLines[k] = line;
+
+                    Block tableBlock = RenderTable(tableLines);
+                    AgentOutputText.Blocks.Add(tableBlock);
+                    i = j;
+                }
+                else
+                {
+                    Block lineBlock = RenderRegularLine(line);
+                    AgentOutputText.Blocks.Add(lineBlock);
+                    i++;
                 }
             }
+        }
+
+        private static bool IsTableRow(string line)
+        {
+            string trimmed = line.Trim();
+            return trimmed.StartsWith("|") && trimmed.EndsWith("|") && trimmed.Length > 1;
+        }
+
+        private static bool IsTableSeparatorRow(string line)
+        {
+            string trimmed = line.Trim();
+            if (!trimmed.StartsWith("|") || !trimmed.EndsWith("|")) return false;
+            foreach (char c in trimmed)
+            {
+                if (c != '|' && c != '-' && c != ':' && c != ' ' && c != '\t')
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static List<string> ParseTableRow(string line)
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("|")) trimmed = trimmed.Substring(1);
+            if (trimmed.EndsWith("|")) trimmed = trimmed.Substring(0, trimmed.Length - 1);
+
+            var cells = trimmed.Split('|');
+            var result = new List<string>();
+            foreach (var cell in cells)
+            {
+                result.Add(cell.Trim());
+            }
+            return result;
+        }
+
+        private static List<HorizontalAlignment> ParseTableAlignments(string separatorLine, int colCount)
+        {
+            var cells = ParseTableRow(separatorLine);
+            var alignments = new List<HorizontalAlignment>();
+            for (int i = 0; i < colCount; i++)
+            {
+                if (i >= cells.Count)
+                {
+                    alignments.Add(HorizontalAlignment.Left);
+                    continue;
+                }
+
+                string cell = cells[i].Trim();
+                bool left = cell.StartsWith(":");
+                bool right = cell.EndsWith(":");
+                if (left && right)
+                {
+                    alignments.Add(HorizontalAlignment.Center);
+                }
+                else if (right)
+                {
+                    alignments.Add(HorizontalAlignment.Right);
+                }
+                else
+                {
+                    alignments.Add(HorizontalAlignment.Left);
+                }
+            }
+            return alignments;
+        }
+
+        private Block RenderTable(List<string> tableLines)
+        {
+            var headerCells = ParseTableRow(tableLines[0]);
+            int colCount = headerCells.Count;
+            if (colCount == 0)
+            {
+                return RenderRegularLine(string.Join("\n", tableLines));
+            }
+
+            var alignments = ParseTableAlignments(tableLines[1], colCount);
+
+            var grid = new Grid
+            {
+                Margin = new Thickness(0, 8, 0, 8),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = GetBrushResource("AgentOutputBackground", Microsoft.UI.Colors.Transparent),
+                BorderBrush = GetBrushResource("AgentButtonBorderBrush", Microsoft.UI.Colors.LightGray),
+                BorderThickness = new Thickness(1, 1, 0, 0),
+                CornerRadius = new CornerRadius(4)
+            };
+
+            for (int c = 0; c < colCount; c++)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            }
+
+            int rowCount = 0;
+
+            // Header row
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var headerBg = GetBrushResource("AgentButtonBackground", Microsoft.UI.Colors.LightGray);
+
+            for (int c = 0; c < colCount; c++)
+            {
+                var cellText = headerCells[c];
+                var cellContent = CreateCellElement(cellText, alignments[c], isHeader: true);
+
+                var cellBorder = new Border
+                {
+                    Background = headerBg,
+                    BorderBrush = GetBrushResource("AgentButtonBorderBrush", Microsoft.UI.Colors.LightGray),
+                    BorderThickness = new Thickness(0, 0, 1, 1),
+                    Child = cellContent,
+                    Padding = new Thickness(8, 6, 8, 6)
+                };
+
+                Grid.SetRow(cellBorder, rowCount);
+                Grid.SetColumn(cellBorder, c);
+                grid.Children.Add(cellBorder);
+            }
+            rowCount++;
+
+            // Data rows
+            for (int r = 2; r < tableLines.Count; r++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var cells = ParseTableRow(tableLines[r]);
+
+                while (cells.Count < colCount) cells.Add(string.Empty);
+
+                Brush? rowBg = null;
+                if (rowCount % 2 == 1)
+                {
+                    rowBg = GetBrushResource("AgentButtonBackground", Microsoft.UI.Colors.Transparent);
+                }
+
+                for (int c = 0; c < colCount; c++)
+                {
+                    var cellText = cells[c];
+                    var cellContent = CreateCellElement(cellText, alignments[c], isHeader: false);
+
+                    var cellBorder = new Border
+                    {
+                        Background = rowBg,
+                        BorderBrush = GetBrushResource("AgentButtonBorderBrush", Microsoft.UI.Colors.LightGray),
+                        BorderThickness = new Thickness(0, 0, 1, 1),
+                        Child = cellContent,
+                        Padding = new Thickness(8, 5, 8, 5)
+                    };
+
+                    Grid.SetRow(cellBorder, rowCount);
+                    Grid.SetColumn(cellBorder, c);
+                    grid.Children.Add(cellBorder);
+                }
+                rowCount++;
+            }
+
+            var paragraph = new Paragraph();
+            paragraph.Inlines.Add(new InlineUIContainer { Child = grid });
+            return paragraph;
+        }
+
+        private UIElement CreateCellElement(string cellText, HorizontalAlignment alignment, bool isHeader)
+        {
+            var textBlock = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                HorizontalAlignment = alignment,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 12,
+                Foreground = GetBrushResource("AgentOutputForeground", Microsoft.UI.Colors.Black)
+            };
+
+            if (isHeader)
+            {
+                textBlock.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
+            }
+
+            ParseLineToInlines(cellText, textBlock.Inlines);
+            return textBlock;
+        }
+
+        private Block RenderRegularLine(string line)
+        {
+            var paragraph = new Paragraph
+            {
+                Margin = new Thickness(0, 2, 0, 2)
+            };
+
+            if (string.IsNullOrEmpty(line))
+            {
+                paragraph.Inlines.Add(new Run { Text = string.Empty });
+                return paragraph;
+            }
+
+            bool isHeading = TryParseMarkdownHeading(line, out int headingLevel, out string displayLine);
+            double headingFontSize = GetMarkdownHeadingFontSize(headingLevel);
+            line = displayLine;
+
+            if (isHeading)
+            {
+                paragraph.Margin = new Thickness(0, 8, 0, 4);
+                paragraph.Inlines.Add(CreateTextRun(line, isBold: true, headingFontSize));
+                return paragraph;
+            }
+
+            int spaces = 0;
+            while (spaces < line.Length && (line[spaces] == ' ' || line[spaces] == '\t'))
+            {
+                spaces++;
+            }
+
+            string trimmedStart = line.Substring(spaces);
+            bool isListItem = false;
+            int indentLevel = spaces / 2;
+            string listBullet = "";
+            string itemText = trimmedStart;
+
+            if (trimmedStart.StartsWith("* ") || trimmedStart.StartsWith("- ") || trimmedStart.StartsWith("+ "))
+            {
+                isListItem = true;
+                listBullet = "• ";
+                itemText = trimmedStart.Substring(2);
+            }
+            else
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(trimmedStart, @"^(\d+)\.\s+");
+                if (match.Success)
+                {
+                    isListItem = true;
+                    listBullet = match.Value;
+                    itemText = trimmedStart.Substring(match.Length);
+                }
+            }
+
+            if (isListItem)
+            {
+                paragraph.Margin = new Thickness(12 + indentLevel * 16, 2, 0, 2);
+
+                var bulletRun = new Run
+                {
+                    Text = listBullet,
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = GetBrushResource("AgentOutputForeground", Microsoft.UI.Colors.Gray)
+                };
+                paragraph.Inlines.Add(bulletRun);
+
+                ParseLineToInlines(itemText, paragraph.Inlines);
+            }
+            else
+            {
+                ParseLineToInlines(line, paragraph.Inlines);
+            }
+
+            return paragraph;
         }
 
         private void AppendRenderedText(string text)
@@ -1285,32 +1543,34 @@ namespace TxtAIEditor.Controls
             EnsureRenderedLineExists();
 
             int lastIndex = _renderedLines.Count - 1;
-            SetRenderedLine(lastIndex, _renderedLines[lastIndex] + parts[0]);
+            _renderedLines[lastIndex] = _renderedLines[lastIndex] + parts[0];
 
             for (int i = 1; i < parts.Length; i++)
             {
-                AddRenderedLine(parts[i]);
+                _renderedLines.Add(parts[i]);
             }
+
+            string raw = string.Join("\n", _renderedLines);
+            UpdateRichText(raw);
         }
 
         private void EnsureRenderedLineExists()
         {
-            if (_renderedLines.Count > 0 && AgentOutputText.Blocks.Count > 0)
+            if (_renderedLines.Count > 0)
             {
                 return;
             }
 
             _renderedLines.Clear();
             AgentOutputText.Blocks.Clear();
-            AddRenderedLine(string.Empty);
+            _renderedLines.Add(string.Empty);
         }
 
         private void AddRenderedLine(string line)
         {
-            var paragraph = new Paragraph();
-            AgentOutputText.Blocks.Add(paragraph);
-            _renderedLines.Add(string.Empty);
-            SetRenderedLine(_renderedLines.Count - 1, line);
+            _renderedLines.Add(line);
+            string raw = string.Join("\n", _renderedLines);
+            UpdateRichText(raw);
         }
 
         private void SetRenderedLine(int index, string line)
@@ -1320,10 +1580,6 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            while (AgentOutputText.Blocks.Count <= index)
-            {
-                AgentOutputText.Blocks.Add(new Paragraph());
-            }
             while (_renderedLines.Count <= index)
             {
                 _renderedLines.Add(string.Empty);
@@ -1334,12 +1590,10 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (AgentOutputText.Blocks[index] is Paragraph paragraph)
-            {
-                paragraph.Inlines.Clear();
-                ParseLineToInlines(line, paragraph.Inlines);
-            }
             _renderedLines[index] = line;
+
+            string raw = string.Join("\n", _renderedLines);
+            UpdateRichText(raw);
         }
 
         private void ParseLineToInlines(string line, InlineCollection inlines)
@@ -1377,34 +1631,9 @@ namespace TxtAIEditor.Controls
 
                 if (isCode)
                 {
-                    var container = new InlineUIContainer();
-                    Brush bgBrush = GetBrushResource("AgentCodeBackground", Microsoft.UI.Colors.LightGray);
-                    Brush fgBrush = GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.Black);
-
-                    var border = new Border
-                    {
-                        Background = bgBrush,
-                        CornerRadius = new CornerRadius(3),
-                        Padding = new Thickness(4, 1, 4, 1),
-                        Margin = new Thickness(2, 2.5, 2, -2.5)
-                    };
-
-                    var textBlock = new TextBlock
-                    {
-                        Text = text,
-                        FontFamily = new FontFamily("Consolas"),
-                        FontSize = isHeading ? headingFontSize : 12,
-                        FontWeight = isHeading
-                            ? Microsoft.UI.Text.FontWeights.Bold
-                            : Microsoft.UI.Text.FontWeights.Normal,
-                        VerticalAlignment = VerticalAlignment.Center
-                    };
-
-                    textBlock.Foreground = fgBrush;
-
-                    border.Child = textBlock;
-                    container.Child = border;
-                    inlines.Add(container);
+                    var run = CreateTextRun($"[{text}]", isHeading || isBold, headingFontSize);
+                    run.FontFamily = new FontFamily("Consolas");
+                    inlines.Add(run);
                 }
                 else
                 {
