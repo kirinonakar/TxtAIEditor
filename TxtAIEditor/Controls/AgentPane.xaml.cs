@@ -1358,6 +1358,7 @@ namespace TxtAIEditor.Controls
             {
                 Margin = new Thickness(0, 6, 0, 6),
                 Padding = new Thickness(10, 8, 10, 8),
+                Background = GetBrushResource("AgentCodeBackground", Microsoft.UI.Colors.Transparent),
                 BorderBrush = GetBrushResource("AgentButtonBorderBrush", Microsoft.UI.Colors.LightGray),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4),
