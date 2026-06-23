@@ -35,6 +35,13 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private bool HasThinking => !string.IsNullOrEmpty(_thinkingLevel) && _thinkingLevel != "none";
 
+        private static bool IsDeepSeekOrGlm(string model)
+        {
+            if (string.IsNullOrEmpty(model)) return false;
+            return model.Contains("deepseek", StringComparison.OrdinalIgnoreCase) ||
+                   model.Contains("glm", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static readonly HashSet<string> _anthropicModels = new(StringComparer.OrdinalIgnoreCase)
         {
             "minimax-m3", "minimax-m2.7", "minimax-m2.5",
@@ -72,7 +79,12 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (HasThinking)
             {
-                payloadDict["reasoning_effort"] = _thinkingLevel.ToLowerInvariant();
+                string effort = _thinkingLevel.ToLowerInvariant();
+                if (effort == "xhigh" && IsDeepSeekOrGlm(model))
+                {
+                    effort = "max";
+                }
+                payloadDict["reasoning_effort"] = effort;
             }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
@@ -136,7 +148,12 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (HasThinking)
             {
-                payloadDict["reasoning_effort"] = _thinkingLevel.ToLowerInvariant();
+                string effort = _thinkingLevel.ToLowerInvariant();
+                if (effort == "xhigh" && IsDeepSeekOrGlm(model))
+                {
+                    effort = "max";
+                }
+                payloadDict["reasoning_effort"] = effort;
             }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
