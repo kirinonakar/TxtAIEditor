@@ -17,7 +17,7 @@
                     <SolidColorBrush x:Key="AgentOutputBackground" Color="#FCFCFC"/>
                     <SolidColorBrush x:Key="AgentOutputForeground" Color="#1F2937"/>
                     <SolidColorBrush x:Key="AgentCodeBackground" Color="#EAEAEA"/>
-                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#C7254E"/>
+                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#A62828"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="AgentButtonBackground" Color="#2B2D31"/>
@@ -25,7 +25,7 @@
                     <SolidColorBrush x:Key="AgentOutputBackground" Color="#151618"/>
                     <SolidColorBrush x:Key="AgentOutputForeground" Color="#D4D4D4"/>
                     <SolidColorBrush x:Key="AgentCodeBackground" Color="#252526"/>
-                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#DCDCAA"/>
+                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#CE916C"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
