@@ -22,26 +22,33 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                if (extension.Equals(".doc", StringComparison.OrdinalIgnoreCase))
+                try
                 {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(filePath).ConfigureAwait(false);
-                    filePath = tempFilePath;
-                    extension = ".docx";
-                    isTempFile = true;
+                    if (extension.Equals(".doc", StringComparison.OrdinalIgnoreCase))
+                    {
+                        tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(filePath).ConfigureAwait(false);
+                        filePath = tempFilePath;
+                        extension = ".docx";
+                        isTempFile = true;
+                    }
+                    else if (extension.Equals(".xls", StringComparison.OrdinalIgnoreCase))
+                    {
+                        tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(filePath).ConfigureAwait(false);
+                        filePath = tempFilePath;
+                        extension = ".xlsx";
+                        isTempFile = true;
+                    }
+                    else if (extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(filePath).ConfigureAwait(false);
+                        filePath = tempFilePath;
+                        extension = ".pptx";
+                        isTempFile = true;
+                    }
                 }
-                else if (extension.Equals(".xls", StringComparison.OrdinalIgnoreCase))
+                catch (Exception ex)
                 {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(filePath).ConfigureAwait(false);
-                    filePath = tempFilePath;
-                    extension = ".xlsx";
-                    isTempFile = true;
-                }
-                else if (extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase))
-                {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(filePath).ConfigureAwait(false);
-                    filePath = tempFilePath;
-                    extension = ".pptx";
-                    isTempFile = true;
+                    return BuildErrorHtml(ex.Message);
                 }
 
                 if (extension.Equals(".docx", StringComparison.OrdinalIgnoreCase))

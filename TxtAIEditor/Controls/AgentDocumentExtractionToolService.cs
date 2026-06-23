@@ -82,23 +82,33 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                if (extension == ".doc")
+                try
                 {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(fullPath).ConfigureAwait(false);
-                    targetPathForExtraction = tempFilePath;
-                    isTempFile = true;
+                    if (extension == ".doc")
+                    {
+                        tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(fullPath).ConfigureAwait(false);
+                        targetPathForExtraction = tempFilePath;
+                        isTempFile = true;
+                    }
+                    else if (extension == ".xls")
+                    {
+                        tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(fullPath).ConfigureAwait(false);
+                        targetPathForExtraction = tempFilePath;
+                        isTempFile = true;
+                    }
+                    else if (extension == ".ppt")
+                    {
+                        tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(fullPath).ConfigureAwait(false);
+                        targetPathForExtraction = tempFilePath;
+                        isTempFile = true;
+                    }
                 }
-                else if (extension == ".xls")
+                catch (Exception ex)
                 {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(fullPath).ConfigureAwait(false);
-                    targetPathForExtraction = tempFilePath;
-                    isTempFile = true;
-                }
-                else if (extension == ".ppt")
-                {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(fullPath).ConfigureAwait(false);
-                    targetPathForExtraction = tempFilePath;
-                    isTempFile = true;
+                    return string.Format(
+                        _getString("AgentExtractDocumentReadFailedFormat", "extract_document failed: could not extract text from {0}: {1}"),
+                        path,
+                        ex.Message);
                 }
 
                 if (Path.GetExtension(targetPathForExtraction).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
