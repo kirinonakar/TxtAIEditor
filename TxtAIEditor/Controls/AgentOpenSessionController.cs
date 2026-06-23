@@ -811,6 +811,7 @@ namespace TxtAIEditor.Controls
                 LlmConfirmBeforeSending = settings.LlmConfirmBeforeSending,
                 LlmAgentVerbose = settings.LlmAgentVerbose,
                 LlmAgentAutoApproveGitEdits = settings.LlmAgentAutoApproveGitEdits,
+                LlmAgentAutoApprovePlanning = settings.LlmAgentAutoApprovePlanning,
                 LlmMaxToolCalls = settings.LlmMaxToolCalls,
                 LlmSourceLanguage = settings.LlmSourceLanguage,
                 LlmTargetLanguage = settings.LlmTargetLanguage

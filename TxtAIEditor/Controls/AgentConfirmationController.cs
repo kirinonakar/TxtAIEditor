@@ -125,6 +125,13 @@ namespace TxtAIEditor.Controls
 
         public async Task<bool> ConfirmPlanExecutionAsync(string planPath, CancellationToken cancellationToken = default)
         {
+            var settings = _settingsService.CurrentSettings;
+            if (settings.LlmAgentAutoApprovePlanning)
+            {
+                _appendActivity(_getString("AgentActivityPlanApproved", "계획 실행 승인됨"));
+                return true;
+            }
+
             _appendActivity(_getString("AgentActivityPlanApprovalPending", "계획 실행 승인 대기 중"));
 
             return await _runOnUIThreadAsync(async () =>

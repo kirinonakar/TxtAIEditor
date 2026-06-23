@@ -23,6 +23,7 @@ namespace TxtAIEditor.Core.Services
         private readonly CheckBox _confirmBeforeSendingCheck;
         private readonly CheckBox _agentVerboseCheck;
         private readonly CheckBox _agentAutoApproveGitEditsCheck;
+        private readonly CheckBox _agentAutoApprovePlanningCheck;
         private readonly ComboBox _sourceLangCombo;
         private readonly ComboBox _targetLangCombo;
         private readonly ComboBox _llmThinkingLevelCombo;
@@ -47,6 +48,7 @@ namespace TxtAIEditor.Core.Services
             _confirmBeforeSendingCheck = new CheckBox { Content = getString("SettingsLlmConfirmBeforeSending", "전송 전 확인"), IsChecked = settings.LlmConfirmBeforeSending };
             _agentVerboseCheck = new CheckBox { Content = getString("SettingsLlmAgentVerbose", "Agent 상세 출력 활성화 (Verbose)"), IsChecked = settings.LlmAgentVerbose };
             _agentAutoApproveGitEditsCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApproveGitEdits", "Git 폴더 내 파일 변경/생성 자동 승인"), IsChecked = settings.LlmAgentAutoApproveGitEdits };
+            _agentAutoApprovePlanningCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApprovePlanning", "계획 실행 자동 승인"), IsChecked = settings.LlmAgentAutoApprovePlanning };
             _sourceLangCombo = CreateSourceLanguageCombo(settings, getString);
             _targetLangCombo = CreateTargetLanguageCombo(settings, getString);
             _llmThinkingLevelCombo = CreateThinkingLevelCombo(settings, getString);
@@ -92,6 +94,7 @@ namespace TxtAIEditor.Core.Services
             settings.LlmConfirmBeforeSending = _confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = _agentVerboseCheck.IsChecked == true;
             settings.LlmAgentAutoApproveGitEdits = _agentAutoApproveGitEditsCheck.IsChecked == true;
+            settings.LlmAgentAutoApprovePlanning = _agentAutoApprovePlanningCheck.IsChecked == true;
             settings.LlmMaxToolCalls = (int)Math.Clamp(_maxToolCallsBox.Value, 0, 500);
             settings.LlmThinkingLevel = _llmThinkingLevelCombo.SelectedIndex switch
             {
@@ -188,6 +191,7 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(_confirmBeforeSendingCheck);
             section.Children.Add(_agentVerboseCheck);
             section.Children.Add(_agentAutoApproveGitEditsCheck);
+            section.Children.Add(_agentAutoApprovePlanningCheck);
 
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)"));
             section.Children.Add(_maxToolCallsBox);

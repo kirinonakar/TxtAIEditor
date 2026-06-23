@@ -2037,6 +2037,9 @@ Plan: {0}</value>
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>Auto-approve file changes/creation in Git folders</value>
   </data>
+  <data name="SettingsLlmAgentAutoApprovePlanning" xml:space="preserve">
+    <value>Auto-approve plan execution (Planning mode)</value>
+  </data>
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
     <value>Read file: {0}</value>
   </data>
