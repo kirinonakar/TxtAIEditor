@@ -97,8 +97,18 @@ namespace TxtAIEditor.Core.Services
         public async Task<string> TranslateTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default)
         {
             var settings = _settingsService.CurrentSettings;
+            string langCode = GetActiveLanguage();
             string srcLang = settings.LlmSourceLanguage ?? "Auto";
-            string tgtLang = settings.LlmTargetLanguage ?? "Korean";
+            string tgtLang = settings.LlmTargetLanguage ?? "Default";
+            if (string.IsNullOrEmpty(tgtLang) || tgtLang.Equals("Default", StringComparison.OrdinalIgnoreCase))
+            {
+                tgtLang = langCode switch
+                {
+                    "ko-KR" => "Korean",
+                    "ja-JP" => "Japanese",
+                    _ => "English"
+                };
+            }
 
             string srcLangDisplay = srcLang switch
             {
@@ -123,7 +133,6 @@ namespace TxtAIEditor.Core.Services
                 _ => "한국어 (Korean)"
             };
 
-            string langCode = GetActiveLanguage();
             string systemPrompt = langCode switch
             {
                 "ja-JP" => $"あなたはプロの翻訳家です。ユーザーが提供した選択範囲のみを翻訳します。入力テキストの言語（{srcLangDisplay}）を翻訳対象言語（{tgtLangDisplay}）に正確に翻訳してください。コードブロック、Markdown構文、URL、ファイルパス、変数名、関数名、コマンドなどはそのまま保持し、コメントや一般の文のみを翻訳します。挨拶、導入説明、解説、要約、『以下は翻訳結果です』といったメタテキスト、および不要なマークダウンのコードブロック包み（```）などは一切追加せず、純粋な翻訳結果のテキストのみを出力してください。",
@@ -192,7 +201,17 @@ namespace TxtAIEditor.Core.Services
         public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false)
         {
             string langCode = GetActiveLanguage();
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode);
+            string targetLanguage = _settingsService.CurrentSettings?.LlmTargetLanguage ?? "Default";
+            if (string.IsNullOrEmpty(targetLanguage) || targetLanguage.Equals("Default", StringComparison.OrdinalIgnoreCase))
+            {
+                targetLanguage = langCode switch
+                {
+                    "ko-KR" => "Korean",
+                    "ja-JP" => "Japanese",
+                    _ => "English"
+                };
+            }
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode, targetLanguage);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
             return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments);
         }
@@ -200,7 +219,17 @@ namespace TxtAIEditor.Core.Services
         public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false)
         {
             string langCode = GetActiveLanguage(settings);
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode);
+            string targetLanguage = settings.LlmTargetLanguage ?? "Default";
+            if (string.IsNullOrEmpty(targetLanguage) || targetLanguage.Equals("Default", StringComparison.OrdinalIgnoreCase))
+            {
+                targetLanguage = langCode switch
+                {
+                    "ko-KR" => "Korean",
+                    "ja-JP" => "Japanese",
+                    _ => "English"
+                };
+            }
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode, targetLanguage);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
             return await ExecuteLlmAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments);
         }

@@ -265,7 +265,7 @@ namespace TxtAIEditor.Controls
                 _leftSidebar.Localize(_getLocalizedString, string.IsNullOrEmpty(_getCurrentFolderPath()), _isGitNotDetectedText);
                 _statusBarPane.Localize(_getLocalizedString, _isGitNotDetectedText);
                 _rightSidebar.Localize(_getLocalizedString);
-                _rightSidebar.UpdateTranslateLanguage(_settingsService.CurrentSettings?.LlmTargetLanguage ?? "Korean");
+                _rightSidebar.UpdateTranslateLanguage(_settingsService.CurrentSettings?.ResolveTargetLanguage() ?? "Korean");
                 _markdownToolbar.LocalizeTooltips(_getLocalizedString);
                 _stickyNoteBar.Localize(_getLocalizedString);
 

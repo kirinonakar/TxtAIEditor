@@ -4,7 +4,7 @@ namespace TxtAIEditor.Core.Services.LLM
 {
     public static class AgentPromptBuilder
     {
-        public static string BuildSystemPrompt(string languageCode, bool isPlanningMode = false)
+        public static string BuildSystemPrompt(string languageCode, bool isPlanningMode = false, string? targetLanguage = null)
         {
             string outputLanguage = languageCode switch
             {
@@ -12,6 +12,11 @@ namespace TxtAIEditor.Core.Services.LLM
                 "en-US" => "English",
                 _ => "Korean"
             };
+
+            if (isPlanningMode && !string.IsNullOrWhiteSpace(targetLanguage))
+            {
+                outputLanguage = targetLanguage;
+            }
 
             var builder = new StringBuilder();
             builder.AppendLine("You are TxtAIEditor Agent, an autonomous coding-and-writing agent inside a desktop editor.");
@@ -81,6 +86,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 builder.AppendLine();
                 builder.AppendLine("Planning mode:");
                 builder.AppendLine("- This is a plan-only run. Investigate the task, then call make_plan with the detailed Markdown implementation plan.");
+                builder.AppendLine($"- The plan (Markdown content for the make_plan tool) MUST be written in {outputLanguage}.");
                 builder.AppendLine("- Do not create, modify, delete, move, format, stage, commit, build, restore, install, or otherwise change files or external state in planning mode, except for the make_plan tool.");
                 builder.AppendLine("- Do not use create_file, overwrite_file, append_to_file, edit_tab, save_tab, or other ordinary write tools to create the plan file.");
                 builder.AppendLine("- The make_plan tool is visible only in planning mode. Its input must be only Markdown plan content; do not provide a path or filename.");

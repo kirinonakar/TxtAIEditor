@@ -461,6 +461,9 @@
   <data name="SettingsLlmTargetLanguage" xml:space="preserve">
     <value>Target Language</value>
   </data>
+  <data name="LlmTargetLanguageDefault" xml:space="preserve">
+    <value>Default (UI Language)</value>
+  </data>
   <data name="LlmLangAutoDetect" xml:space="preserve">
     <value>Auto Detect</value>
   </data>

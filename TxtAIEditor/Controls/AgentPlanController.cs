@@ -55,11 +55,12 @@ namespace TxtAIEditor.Controls
             _getString = getString;
         }
 
-        public static string BuildPlanningModeRequest(string userInstruction)
+        public static string BuildPlanningModeRequest(string userInstruction, string targetLanguage = "Korean")
         {
             var builder = new StringBuilder();
             builder.AppendLine("[Planning-mode task]");
             builder.AppendLine("Investigate first, then call make_plan with the detailed Markdown plan.");
+            builder.AppendLine($"The plan (Markdown content for the make_plan tool) MUST be written in {targetLanguage}.");
             builder.AppendLine("Do not edit, create, delete, move, format, build, restore, install, stage, commit, or save files in this run, except by calling make_plan once for the plan document.");
             builder.AppendLine("Do not use ordinary file creation or tab saving tools for the plan. The make_plan tool chooses the filename and opens the saved plan.");
             builder.AppendLine("The make_plan Markdown must include target files, edit scope, areas not to touch, evidence/context summary, step-by-step implementation, verification, and rollback/failure criteria.");

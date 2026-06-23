@@ -89,5 +89,33 @@ namespace TxtAIEditor.Core.Models
 
         // Language
         public string Language { get; set; } = "Default";
+
+        public string ResolveTargetLanguage()
+        {
+            string tgtLang = LlmTargetLanguage;
+            if (string.IsNullOrEmpty(tgtLang) || tgtLang.Equals("Default", StringComparison.OrdinalIgnoreCase))
+            {
+                string lang = Language;
+                if (string.IsNullOrEmpty(lang) || lang.Equals("Default", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        lang = System.Globalization.CultureInfo.CurrentUICulture.Name;
+                    }
+                    catch
+                    {
+                        lang = "en-US";
+                    }
+                }
+
+                if (lang != null)
+                {
+                    if (lang.StartsWith("ko", StringComparison.OrdinalIgnoreCase)) return "Korean";
+                    if (lang.StartsWith("ja", StringComparison.OrdinalIgnoreCase)) return "Japanese";
+                }
+                return "English";
+            }
+            return tgtLang;
+        }
     }
 }

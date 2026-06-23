@@ -542,8 +542,9 @@ namespace TxtAIEditor.Controls
             }
 
             await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
+            string targetLanguage = settings?.ResolveTargetLanguage() ?? "Korean";
             string instruction = BuildAgentInstruction(requestedPlanningMode
-                ? AgentPlanController.BuildPlanningModeRequest(userInstruction)
+                ? AgentPlanController.BuildPlanningModeRequest(userInstruction, targetLanguage)
                 : userInstruction);
             if (string.IsNullOrWhiteSpace(instruction))
             {

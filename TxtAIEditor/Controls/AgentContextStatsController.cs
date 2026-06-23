@@ -152,7 +152,8 @@ namespace TxtAIEditor.Controls
         private double EstimateContextTokens()
         {
             string langCode = _displayText.LanguageCode;
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, _agentPane.PlanningMode);
+            string targetLanguage = _settingsProvider()?.ResolveTargetLanguage() ?? "Korean";
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, _agentPane.PlanningMode, targetLanguage);
 
             string instruction = _buildAgentInstruction(_agentPane.Prompt.Text?.Trim() ?? string.Empty);
             string workspaceContext = _buildWorkspaceContext(instruction);

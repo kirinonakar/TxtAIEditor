@@ -461,6 +461,9 @@
   <data name="SettingsLlmTargetLanguage" xml:space="preserve">
     <value>번역 대상 언어 (Target Language)</value>
   </data>
+  <data name="LlmTargetLanguageDefault" xml:space="preserve">
+    <value>기본값 (UI 언어)</value>
+  </data>
   <data name="LlmLangAutoDetect" xml:space="preserve">
     <value>자동 감지 (Auto Detect)</value>
   </data>

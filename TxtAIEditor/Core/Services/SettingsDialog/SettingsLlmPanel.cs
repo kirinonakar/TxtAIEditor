@@ -117,13 +117,14 @@ namespace TxtAIEditor.Core.Services
             };
             settings.LlmTargetLanguage = _targetLangCombo.SelectedIndex switch
             {
-                1 => "English",
-                2 => "Japanese",
-                3 => "Chinese",
-                4 => "French",
-                5 => "Spanish",
-                6 => "German",
-                _ => "Korean"
+                1 => "Korean",
+                2 => "English",
+                3 => "Japanese",
+                4 => "Chinese",
+                5 => "French",
+                6 => "Spanish",
+                7 => "German",
+                _ => "Default"
             };
             SettingsLlmModelCatalog.SaveProviderModel(settings);
             settings.ExaEndpoint = _exaEndpointBox.Text.Trim();
@@ -402,6 +403,7 @@ namespace TxtAIEditor.Core.Services
         private static ComboBox CreateTargetLanguageCombo(EditorSettings settings, Func<string, string, string> getString)
         {
             var comboBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+            comboBox.Items.Add(getString("LlmTargetLanguageDefault", "기본값 (UI 언어)"));
             comboBox.Items.Add(getString("LlmLangKorean", "한국어 (Korean)"));
             comboBox.Items.Add(getString("LlmLangEnglish", "영어 (English)"));
             comboBox.Items.Add(getString("LlmLangJapanese", "일본어 (Japanese)"));
@@ -411,12 +413,13 @@ namespace TxtAIEditor.Core.Services
             comboBox.Items.Add(getString("LlmLangGerman", "독일어 (German)"));
             comboBox.SelectedIndex = settings.LlmTargetLanguage switch
             {
-                "English" => 1,
-                "Japanese" => 2,
-                "Chinese" => 3,
-                "French" => 4,
-                "Spanish" => 5,
-                "German" => 6,
+                "Korean" => 1,
+                "English" => 2,
+                "Japanese" => 3,
+                "Chinese" => 4,
+                "French" => 5,
+                "Spanish" => 6,
+                "German" => 7,
                 _ => 0
             };
             return comboBox;

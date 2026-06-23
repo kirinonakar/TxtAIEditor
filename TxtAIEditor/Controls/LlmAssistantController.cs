@@ -96,7 +96,7 @@ namespace TxtAIEditor.Controls
 
             WireEvents();
 
-            var initialTargetLang = _settingsService.CurrentSettings?.LlmTargetLanguage ?? "Korean";
+            var initialTargetLang = _settingsService.CurrentSettings?.ResolveTargetLanguage() ?? "Korean";
             _rightSidebar.UpdateTranslateLanguage(initialTargetLang);
             UpdateModelDisplay();
 
@@ -1105,7 +1105,7 @@ namespace TxtAIEditor.Controls
             settings.LlmTargetLanguage = targetLanguage;
             await _settingsService.SaveSettingsAsync(settings);
 
-            _rightSidebar.UpdateTranslateLanguage(targetLanguage);
+            _rightSidebar.UpdateTranslateLanguage(settings.ResolveTargetLanguage());
         }
 
         private async Task LoadPresetsAsync()
