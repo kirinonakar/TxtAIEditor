@@ -626,6 +626,36 @@
   <data name="GitRestoreFile" xml:space="preserve">
     <value>ファイル復元</value>
   </data>
+  <data name="GitRestoreFileDialogTitle" xml:space="preserve">
+    <value>Git ファイル復元</value>
+  </data>
+  <data name="GitRestoreFileDialogContentFormat" xml:space="preserve">
+    <value>{0} の変更を復元します。追跡されていないファイル（Untracked）は削除されます。</value>
+  </data>
+  <data name="GitRestoreFileDialogConfirm" xml:space="preserve">
+    <value>復元</value>
+  </data>
+  <data name="GitRestoreFileDialogCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="GitRestoreFailureTitle" xml:space="preserve">
+    <value>Git 復元失敗</value>
+  </data>
+  <data name="GitRestoreFileFailureMessage" xml:space="preserve">
+    <value>ファイルの復元処理に失敗しました。</value>
+  </data>
+  <data name="GitRestoreAllDialogTitle" xml:space="preserve">
+    <value>Git すべて復元</value>
+  </data>
+  <data name="GitRestoreAllDialogContent" xml:space="preserve">
+    <value>すべての変更を復元します。追跡されていないファイル（Untracked）は削除されます。</value>
+  </data>
+  <data name="GitRestoreAllDialogConfirm" xml:space="preserve">
+    <value>すべて復元</value>
+  </data>
+  <data name="GitRestoreAllFailureMessage" xml:space="preserve">
+    <value>すべての復元処理に失敗しました。</value>
+  </data>
   <data name="ExplorerUpTooltip" xml:space="preserve">
     <value>親フォルダ</value>
   </data>

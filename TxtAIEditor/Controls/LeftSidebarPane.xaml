@@ -437,7 +437,7 @@
                                                     <TextBlock Text="{Binding StatusText}" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                 </Border>
                                                 <Button Grid.Column="2" Content="{Binding ActionGlyph}" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnGitStageToggleClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" FontSize="10"/>
-                                                <Button Grid.Column="3" Content="&#xE777;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnGitRestoreFileClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" ToolTipService.ToolTip="파일 복원" FontSize="10"/>
+                                                <Button Grid.Column="3" Content="&#xE777;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnGitRestoreFileClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" ToolTipService.ToolTip="{Binding Path=GitRestoreFileTooltip, Source={StaticResource LocBridge}}" FontSize="10"/>
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>

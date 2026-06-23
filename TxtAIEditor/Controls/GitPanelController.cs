@@ -252,10 +252,10 @@ namespace TxtAIEditor.Controls
             _beforeDialog?.Invoke();
             var dialog = new ContentDialog
             {
-                Title = "Git 파일 복원",
-                Content = $"{GetDisplayName(filePath)} 변경 사항을 복원합니다. Untracked 파일은 삭제됩니다.",
-                PrimaryButtonText = "복원",
-                CloseButtonText = "취소",
+                Title = _getString("GitRestoreFileDialogTitle", "Git 파일 복원"),
+                Content = string.Format(_getString("GitRestoreFileDialogContentFormat", "{0} 변경 사항을 복원합니다. Untracked 파일은 삭제됩니다."), GetDisplayName(filePath)),
+                PrimaryButtonText = _getString("GitRestoreFileDialogConfirm", "복원"),
+                CloseButtonText = _getString("GitRestoreFileDialogCancel", "취소"),
                 XamlRoot = _xamlRootProvider(),
                 RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light
             };
@@ -275,7 +275,9 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                _showError("Git Restore 실패", "파일 복원 처리에 실패했습니다.");
+                _showError(
+                    _getString("GitRestoreFailureTitle", "Git Restore 실패"),
+                    _getString("GitRestoreFileFailureMessage", "파일 복원 처리에 실패했습니다."));
             }
         }
 
@@ -454,10 +456,10 @@ namespace TxtAIEditor.Controls
             _beforeDialog?.Invoke();
             var dialog = new ContentDialog
             {
-                Title = "Git 전체 복원",
-                Content = "모든 변경 사항을 복원합니다. Untracked 파일은 삭제됩니다.",
-                PrimaryButtonText = "전체 복원",
-                CloseButtonText = "취소",
+                Title = _getString("GitRestoreAllDialogTitle", "Git 전체 복원"),
+                Content = _getString("GitRestoreAllDialogContent", "모든 변경 사항을 복원합니다. Untracked 파일은 삭제됩니다."),
+                PrimaryButtonText = _getString("GitRestoreAllDialogConfirm", "전체 복원"),
+                CloseButtonText = _getString("GitRestoreFileDialogCancel", "취소"),
                 XamlRoot = _xamlRootProvider(),
                 RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light
             };
@@ -477,7 +479,9 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                _showError("Git Restore 실패", "전체 복원 처리에 실패했습니다.");
+                _showError(
+                    _getString("GitRestoreFailureTitle", "Git Restore 실패"),
+                    _getString("GitRestoreAllFailureMessage", "전체 복원 처리에 실패했습니다."));
             }
         }
 

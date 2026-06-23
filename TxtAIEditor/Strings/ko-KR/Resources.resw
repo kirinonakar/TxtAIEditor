@@ -626,6 +626,36 @@
   <data name="GitRestoreFile" xml:space="preserve">
     <value>파일 복원</value>
   </data>
+  <data name="GitRestoreFileDialogTitle" xml:space="preserve">
+    <value>Git 파일 복원</value>
+  </data>
+  <data name="GitRestoreFileDialogContentFormat" xml:space="preserve">
+    <value>{0} 변경 사항을 복원합니다. Untracked 파일은 삭제됩니다.</value>
+  </data>
+  <data name="GitRestoreFileDialogConfirm" xml:space="preserve">
+    <value>복원</value>
+  </data>
+  <data name="GitRestoreFileDialogCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="GitRestoreFailureTitle" xml:space="preserve">
+    <value>Git Restore 실패</value>
+  </data>
+  <data name="GitRestoreFileFailureMessage" xml:space="preserve">
+    <value>파일 복원 처리에 실패했습니다.</value>
+  </data>
+  <data name="GitRestoreAllDialogTitle" xml:space="preserve">
+    <value>Git 전체 복원</value>
+  </data>
+  <data name="GitRestoreAllDialogContent" xml:space="preserve">
+    <value>모든 변경 사항을 복원합니다. Untracked 파일은 삭제됩니다.</value>
+  </data>
+  <data name="GitRestoreAllDialogConfirm" xml:space="preserve">
+    <value>전체 복원</value>
+  </data>
+  <data name="GitRestoreAllFailureMessage" xml:space="preserve">
+    <value>전체 복원 처리에 실패했습니다.</value>
+  </data>
   <data name="ExplorerUpTooltip" xml:space="preserve">
     <value>상위 폴더</value>
   </data>

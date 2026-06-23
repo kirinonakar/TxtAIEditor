@@ -228,12 +228,14 @@ namespace TxtAIEditor.Controls
             SearchAllButton.Content = getString("SearchAllFiles", "전체 검색");
             ReplaceAllButton.Content = getString("ReplaceAllFiles", "모두 바꾸기");
             ReplaceOneTooltip = getString("SearchReplaceOneTooltip", "이 항목만 바꾸기");
+            var gitRestoreFileTooltipVal = getString("GitRestoreFile", "파일 복원");
 
             if (Resources.TryGetValue("LocBridge", out var bridgeObj) && bridgeObj is LocalizationBridge bridge)
             {
                 bridge.SnippetEditTooltip = SnippetEditTooltip;
                 bridge.SnippetDeleteTooltip = SnippetDeleteTooltip;
                 bridge.ReplaceOneTooltip = ReplaceOneTooltip;
+                bridge.GitRestoreFileTooltip = gitRestoreFileTooltipVal;
             }
 
             GitHeaderText.Text = getString("GitRepoHeader", "Git 저장소 관리");
@@ -389,6 +391,20 @@ namespace TxtAIEditor.Controls
                 {
                     _replaceOneTooltip = value;
                     OnPropertyChanged(nameof(ReplaceOneTooltip));
+                }
+            }
+        }
+
+        private string _gitRestoreFileTooltip = "파일 복원";
+        public string GitRestoreFileTooltip
+        {
+            get => _gitRestoreFileTooltip;
+            set
+            {
+                if (_gitRestoreFileTooltip != value)
+                {
+                    _gitRestoreFileTooltip = value;
+                    OnPropertyChanged(nameof(GitRestoreFileTooltip));
                 }
             }
         }

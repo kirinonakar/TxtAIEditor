@@ -626,6 +626,36 @@
   <data name="GitRestoreFile" xml:space="preserve">
     <value>Restore File</value>
   </data>
+  <data name="GitRestoreFileDialogTitle" xml:space="preserve">
+    <value>Git Restore File</value>
+  </data>
+  <data name="GitRestoreFileDialogContentFormat" xml:space="preserve">
+    <value>Are you sure you want to restore changes in {0}? Untracked files will be deleted.</value>
+  </data>
+  <data name="GitRestoreFileDialogConfirm" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="GitRestoreFileDialogCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="GitRestoreFailureTitle" xml:space="preserve">
+    <value>Git Restore Failed</value>
+  </data>
+  <data name="GitRestoreFileFailureMessage" xml:space="preserve">
+    <value>Failed to restore the file.</value>
+  </data>
+  <data name="GitRestoreAllDialogTitle" xml:space="preserve">
+    <value>Git Restore All</value>
+  </data>
+  <data name="GitRestoreAllDialogContent" xml:space="preserve">
+    <value>Are you sure you want to restore all changes? Untracked files will be deleted.</value>
+  </data>
+  <data name="GitRestoreAllDialogConfirm" xml:space="preserve">
+    <value>Restore All</value>
+  </data>
+  <data name="GitRestoreAllFailureMessage" xml:space="preserve">
+    <value>Failed to restore all changes.</value>
+  </data>
   <data name="ExplorerUpTooltip" xml:space="preserve">
     <value>Parent Folder</value>
   </data>
