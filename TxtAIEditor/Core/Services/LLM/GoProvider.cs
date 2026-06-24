@@ -97,6 +97,25 @@ namespace TxtAIEditor.Core.Services.LLM
                 ["max_tokens"] = outputLimit
             };
 
+            if (tools != null && tools.Count > 0)
+            {
+                var toolsList = new List<object>();
+                foreach (var tool in tools)
+                {
+                    toolsList.Add(new
+                    {
+                        type = "function",
+                        function = new
+                        {
+                            name = tool.Name,
+                            description = tool.Description,
+                            parameters = tool.Parameters
+                        }
+                    });
+                }
+                payloadDict["tools"] = toolsList;
+            }
+
             if (HasThinking)
             {
                 string effort = _thinkingLevel.ToLowerInvariant();
@@ -124,11 +143,19 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var doc = JsonDocument.Parse(responseBody))
                     {
                         var root = doc.RootElement;
-                        if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                        if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                         {
                             var firstChoice = choices[0];
                             if (firstChoice.TryGetProperty("message", out var message))
                             {
+                                if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
+                                {
+                                    var firstToolCall = toolCalls[0];
+                                    string fName = firstToolCall.GetProperty("function").GetProperty("name").GetString() ?? string.Empty;
+                                    string fArgs = firstToolCall.GetProperty("function").GetProperty("arguments").GetString() ?? string.Empty;
+                                    return $"<tool_call>{{\"name\":\"{fName}\",\"arguments\":{fArgs}}}</tool_call>";
+                                }
+
                                 if (message.TryGetProperty("content", out var content) &&
                                     content.ValueKind == JsonValueKind.String)
                                 {
@@ -194,6 +221,25 @@ namespace TxtAIEditor.Core.Services.LLM
                 ["max_tokens"] = outputLimit
             };
 
+            if (tools != null && tools.Count > 0)
+            {
+                var toolsList = new List<object>();
+                foreach (var tool in tools)
+                {
+                    toolsList.Add(new
+                    {
+                        type = "function",
+                        function = new
+                        {
+                            name = tool.Name,
+                            description = tool.Description,
+                            parameters = tool.Parameters
+                        }
+                    });
+                }
+                payloadDict["tools"] = toolsList;
+            }
+
             if (HasThinking)
             {
                 string effort = _thinkingLevel.ToLowerInvariant();
@@ -218,6 +264,9 @@ namespace TxtAIEditor.Core.Services.LLM
                         throw new HttpRequestException(string.Format(_localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
+                    var toolAccumulator = new StreamToolCallAccumulator();
+                    bool hasToolCalls = false;
+
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     using (var reader = new System.IO.StreamReader(stream))
                     {
@@ -238,13 +287,39 @@ namespace TxtAIEditor.Core.Services.LLM
                                 using (var doc = JsonDocument.Parse(data))
                                 {
                                     var root = doc.RootElement;
-                                    if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                                    if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];
                                         if (firstChoice.TryGetProperty("delta", out var delta))
                                         {
-                                            if (delta.TryGetProperty("content", out var content) &&
-                                                content.ValueKind == JsonValueKind.String)
+                                            if (delta.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
+                                            {
+                                                hasToolCalls = true;
+                                                var tc = toolCalls[0];
+                                                if (tc.TryGetProperty("function", out var func))
+                                                {
+                                                    if (func.TryGetProperty("name", out var nameProp))
+                                                    {
+                                                        toolAccumulator.Name += nameProp.GetString() ?? string.Empty;
+                                                    }
+                                                    if (func.TryGetProperty("arguments", out var argsProp))
+                                                    {
+                                                        string argsChunk = argsProp.GetString() ?? string.Empty;
+                                                        if (!string.IsNullOrEmpty(argsChunk))
+                                                        {
+                                                            toolAccumulator.Arguments.Append(argsChunk);
+                                                            if (!toolAccumulator.SentHeader && !string.IsNullOrEmpty(toolAccumulator.Name))
+                                                            {
+                                                                toolAccumulator.SentHeader = true;
+                                                                await onChunk($"<tool_call>{{\"name\":\"{toolAccumulator.Name}\",\"arguments\":");
+                                                            }
+                                                            await onChunk(argsChunk);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            else if (delta.TryGetProperty("content", out var content) &&
+                                                     content.ValueKind == JsonValueKind.String)
                                             {
                                                 string? text = content.GetString();
                                                 if (!string.IsNullOrEmpty(text))
@@ -282,6 +357,15 @@ namespace TxtAIEditor.Core.Services.LLM
                             catch (JsonException)
                             {
                             }
+                        }
+
+                        if (hasToolCalls)
+                        {
+                            if (!toolAccumulator.SentHeader)
+                            {
+                                await onChunk($"<tool_call>{{\"name\":\"{toolAccumulator.Name}\",\"arguments\":{{}}");
+                            }
+                            await onChunk("}</tool_call>");
                         }
 
                         if (truncated) throw new ResponseTruncatedException();

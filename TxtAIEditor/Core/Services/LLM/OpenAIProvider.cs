@@ -113,12 +113,12 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var doc = JsonDocument.Parse(responseBody))
                     {
                         var root = doc.RootElement;
-                        if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                        if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                         {
                             var firstChoice = choices[0];
                             if (firstChoice.TryGetProperty("message", out var message))
                             {
-                                if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.GetArrayLength() > 0)
+                                if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
                                 {
                                     var firstToolCall = toolCalls[0];
                                     string fName = firstToolCall.GetProperty("function").GetProperty("name").GetString() ?? string.Empty;
@@ -230,12 +230,12 @@ namespace TxtAIEditor.Core.Services.LLM
                                 using (var doc = JsonDocument.Parse(data))
                                 {
                                     var root = doc.RootElement;
-                                    if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                                    if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];
                                         if (firstChoice.TryGetProperty("delta", out var delta))
                                         {
-                                            if (delta.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.GetArrayLength() > 0)
+                                            if (delta.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
                                             {
                                                 hasToolCalls = true;
                                                 var tc = toolCalls[0];
