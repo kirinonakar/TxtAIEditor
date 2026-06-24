@@ -198,7 +198,7 @@ namespace TxtAIEditor.Core.Services
             return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }
 
-        public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false)
+        public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null)
         {
             string langCode = GetActiveLanguage();
             string targetLanguage = _settingsService.CurrentSettings?.LlmTargetLanguage ?? "Default";
@@ -213,10 +213,10 @@ namespace TxtAIEditor.Core.Services
             }
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode, targetLanguage);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
-            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments);
+            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning);
         }
 
-        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false)
+        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null)
         {
             string langCode = GetActiveLanguage(settings);
             string targetLanguage = settings.LlmTargetLanguage ?? "Default";
@@ -231,7 +231,7 @@ namespace TxtAIEditor.Core.Services
             }
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode, targetLanguage);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
-            return await ExecuteLlmAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments);
+            return await ExecuteLlmAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning);
         }
 
         public Task SaveApiKeyAsync(string provider, string apiKey)
@@ -274,12 +274,12 @@ namespace TxtAIEditor.Core.Services
         // Private dynamic Provider Dispatcher
         // ----------------------------------------------------
 
-        private async Task<string> ExecuteLlmAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
+        private async Task<string> ExecuteLlmAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null)
         {
-            return await ExecuteLlmAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments);
+            return await ExecuteLlmAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning);
         }
 
-        private async Task<string> ExecuteLlmAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
+        private async Task<string> ExecuteLlmAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
@@ -321,6 +321,7 @@ namespace TxtAIEditor.Core.Services
                 if (onChunk != null)
                 {
                     var fullResponse = new StringBuilder();
+                    var reasoningResponse = new StringBuilder();
                     await provider.GenerateCompletionStreamAsync(
                         settings.LlmEndpoint,
                         apiKey,
@@ -333,9 +334,14 @@ namespace TxtAIEditor.Core.Services
                             await onChunk(chunk);
                         },
                         cancellationToken,
-                        attachments
+                        attachments,
+                        async reasoningChunk =>
+                        {
+                            reasoningResponse.Append(reasoningChunk);
+                            if (onReasoning != null) await onReasoning(reasoningChunk);
+                        }
                     );
-                    return fullResponse.ToString();
+                    return fullResponse.Length > 0 ? fullResponse.ToString() : reasoningResponse.ToString();
                 }
                 else
                 {

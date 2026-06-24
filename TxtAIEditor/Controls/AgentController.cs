@@ -689,6 +689,16 @@ namespace TxtAIEditor.Controls
                         currentTaskStartEditIndex,
                         runContext.SessionEdits);
 
+                    Func<string, Task>? onReasoning = null;
+                    if (runContext.LlmSettings.LlmAgentVerbose)
+                    {
+                        onReasoning = async reasoningChunk =>
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, reasoningChunk);
+                        };
+                    }
+
                     response = await _llmService.RunAgentAsync(
                         runContext.LlmSettings,
                         instruction,
@@ -849,7 +859,8 @@ namespace TxtAIEditor.Controls
                         },
                         cancellationToken,
                         GetImageAttachmentsForRun(runContext),
-                        planningMode);
+                        planningMode,
+                        onReasoning);
 
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
