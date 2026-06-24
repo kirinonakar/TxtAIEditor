@@ -30,18 +30,18 @@ namespace TxtAIEditor.Core.Services.LLM
             return output > 0 ? output : 0;
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null)
         {
             var sb = new StringBuilder();
             await GenerateCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, chunk =>
             {
                 sb.Append(chunk);
                 return Task.CompletedTask;
-            }, cancellationToken, attachments);
+            }, cancellationToken, attachments, null, tools);
             return sb.ToString();
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -62,6 +62,26 @@ namespace TxtAIEditor.Core.Services.LLM
                 ["temperature"] = IsKimiModel(model) ? 1.0 : 0.5,
                 ["stream"] = true
             };
+
+            if (tools != null && tools.Count > 0)
+            {
+                var toolsList = new List<object>();
+                foreach (var tool in tools)
+                {
+                    toolsList.Add(new
+                    {
+                        type = "function",
+                        function = new
+                        {
+                            name = tool.Name,
+                            description = tool.Description,
+                            parameters = tool.Parameters
+                        }
+                    });
+                }
+                payloadDict["tools"] = toolsList;
+            }
+
             if (outputLimit > 0)
             {
                 payloadDict["max_tokens"] = outputLimit;
@@ -83,6 +103,9 @@ namespace TxtAIEditor.Core.Services.LLM
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                         throw new HttpRequestException(string.Format(_localizationService.GetString("OpenRouterErrorStreamCallFailed", "OpenRouter API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
+
+                    var toolAccumulator = new StreamToolCallAccumulator();
+                    bool hasToolCalls = false;
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     using (var reader = new System.IO.StreamReader(stream))
@@ -108,14 +131,42 @@ namespace TxtAIEditor.Core.Services.LLM
                                     if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];
-                                        if (firstChoice.TryGetProperty("delta", out var delta) &&
-                                            delta.TryGetProperty("content", out var content))
+                                        if (firstChoice.TryGetProperty("delta", out var delta))
                                         {
-                                            string? text = content.GetString();
-                                            if (!string.IsNullOrEmpty(text))
+                                            if (delta.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.GetArrayLength() > 0)
                                             {
-                                                cancellationToken.ThrowIfCancellationRequested();
-                                                await onChunk(text);
+                                                hasToolCalls = true;
+                                                var tc = toolCalls[0];
+                                                if (tc.TryGetProperty("function", out var func))
+                                                {
+                                                    if (func.TryGetProperty("name", out var nameProp))
+                                                    {
+                                                        toolAccumulator.Name += nameProp.GetString() ?? string.Empty;
+                                                    }
+                                                    if (func.TryGetProperty("arguments", out var argsProp))
+                                                    {
+                                                        string argsChunk = argsProp.GetString() ?? string.Empty;
+                                                        if (!string.IsNullOrEmpty(argsChunk))
+                                                        {
+                                                            toolAccumulator.Arguments.Append(argsChunk);
+                                                            if (!toolAccumulator.SentHeader && !string.IsNullOrEmpty(toolAccumulator.Name))
+                                                            {
+                                                                toolAccumulator.SentHeader = true;
+                                                                await onChunk($"<tool_call>{{\"name\":\"{toolAccumulator.Name}\",\"arguments\":");
+                                                            }
+                                                            await onChunk(argsChunk);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            else if (delta.TryGetProperty("content", out var content))
+                                            {
+                                                string? text = content.GetString();
+                                                if (!string.IsNullOrEmpty(text))
+                                                {
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    await onChunk(text);
+                                                }
                                             }
                                         }
                                     }
@@ -124,6 +175,15 @@ namespace TxtAIEditor.Core.Services.LLM
                             catch (JsonException)
                             {
                             }
+                        }
+
+                        if (hasToolCalls)
+                        {
+                            if (!toolAccumulator.SentHeader)
+                            {
+                                await onChunk($"<tool_call>{{\"name\":\"{toolAccumulator.Name}\",\"arguments\":{{}}");
+                            }
+                            await onChunk("}</tool_call>");
                         }
                     }
                 }

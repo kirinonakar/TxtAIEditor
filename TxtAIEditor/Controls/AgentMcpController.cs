@@ -785,7 +785,18 @@ namespace TxtAIEditor.Controls
 
         public bool TryGetToolAlias(string aliasName, out AgentMcpToolAlias alias)
         {
-            return _toolAliases.TryGetValue(aliasName, out alias!);
+            lock (_toolAliases)
+            {
+                return _toolAliases.TryGetValue(aliasName, out alias!);
+            }
+        }
+
+        public IReadOnlyList<AgentMcpToolAlias> GetActiveToolAliases()
+        {
+            lock (_toolAliases)
+            {
+                return _toolAliases.Values.ToList();
+            }
         }
 
         public async Task<string> ExecuteToolAsync(string aliasName, JsonElement arguments, CancellationToken cancellationToken)
@@ -1092,7 +1103,9 @@ namespace TxtAIEditor.Controls
 
         private void RebuildAliases()
         {
-            _toolAliases.Clear();
+            lock (_toolAliases)
+            {
+                _toolAliases.Clear();
             var usedAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
             {
@@ -1129,6 +1142,7 @@ namespace TxtAIEditor.Controls
                         InputSchemaJson = string.IsNullOrWhiteSpace(tool.InputSchemaJson) ? "{}" : tool.InputSchemaJson
                     };
                 }
+            }
             }
         }
 
