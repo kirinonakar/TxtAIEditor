@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -15,6 +17,12 @@ namespace TxtAIEditor.Core.Services
         private const int EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
         private const int CREATE_UNICODE_ENVIRONMENT = 0x00000400;
         private const int HPCON_INVALID = unchecked((int)0x80070057);
+        private const int GENERIC_READ = unchecked((int)0x80000000);
+        private const int FILE_SHARE_READ = 0x00000001;
+        private const int FILE_SHARE_WRITE = 0x00000002;
+        private const int OPEN_EXISTING = 3;
+        private const int FILE_FLAG_BACKUP_SEMANTICS = 0x02000000;
+        private const int FILE_NAME_NORMALIZED = 0x0;
 
         private readonly object _disposeLock = new object();
         private readonly CancellationTokenSource _readCancellation = new CancellationTokenSource();
@@ -66,6 +74,7 @@ namespace TxtAIEditor.Core.Services
             IntPtr attributeList = IntPtr.Zero;
             IntPtr processHandle = IntPtr.Zero;
             IntPtr threadHandle = IntPtr.Zero;
+            IntPtr environmentBlock = IntPtr.Zero;
 
             try
             {
@@ -110,13 +119,23 @@ namespace TxtAIEditor.Core.Services
                         string fullPath = Path.GetFullPath(workingDirectory);
                         if (Directory.Exists(fullPath))
                         {
-                            resolvedWorkingDirectory = fullPath;
+                            string? finalPath = ResolveFinalPath(fullPath);
+                            resolvedWorkingDirectory = finalPath ?? fullPath;
                         }
                     }
                     catch
                     {
                         resolvedWorkingDirectory = null;
                     }
+                }
+
+                try
+                {
+                    environmentBlock = BuildEnvironmentBlock();
+                }
+                catch
+                {
+                    environmentBlock = IntPtr.Zero;
                 }
 
                 bool created = CreateProcess(
@@ -126,7 +145,7 @@ namespace TxtAIEditor.Core.Services
                     IntPtr.Zero,
                     false,
                     EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
-                    IntPtr.Zero,
+                    environmentBlock,
                     resolvedWorkingDirectory,
                     ref startupInfo,
                     out PROCESS_INFORMATION processInfo);
@@ -174,6 +193,11 @@ namespace TxtAIEditor.Core.Services
                 if (pseudoConsole != IntPtr.Zero)
                 {
                     ClosePseudoConsole(pseudoConsole);
+                }
+
+                if (environmentBlock != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(environmentBlock);
                 }
             }
         }
@@ -282,6 +306,112 @@ namespace TxtAIEditor.Core.Services
             });
         }
 
+        private static string? ResolveFinalPath(string path)
+        {
+            try
+            {
+                using SafeFileHandle handle = CreateFile(
+                    path,
+                    GENERIC_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    IntPtr.Zero,
+                    OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS,
+                    IntPtr.Zero);
+
+                if (handle.IsInvalid)
+                {
+                    return null;
+                }
+
+                var sb = new StringBuilder(32768);
+                int len = GetFinalPathNameByHandle(handle, sb, sb.Capacity, FILE_NAME_NORMALIZED);
+                if (len > 0 && len < sb.Capacity)
+                {
+                    string result = sb.ToString(0, len);
+                    if (result.StartsWith(@"\\?\", StringComparison.Ordinal))
+                    {
+                        result = result.Substring(4);
+                    }
+                    return result;
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private static string CleanPathEnvironment(string pathValue)
+        {
+            string[] entries = pathValue.Split(Path.PathSeparator);
+            for (int i = 0; i < entries.Length; i++)
+            {
+                string entry = entries[i].Trim();
+                if (string.IsNullOrEmpty(entry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var info = new DirectoryInfo(entry);
+                    if (info.Exists && (info.Attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        string? finalPath = ResolveFinalPath(entry);
+                        if (!string.IsNullOrEmpty(finalPath) && Directory.Exists(finalPath))
+                        {
+                            entries[i] = finalPath;
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return string.Join(Path.PathSeparator.ToString(), entries);
+        }
+
+        private static IntPtr BuildEnvironmentBlock()
+        {
+            var variables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (DictionaryEntry de in Environment.GetEnvironmentVariables())
+            {
+                if (de.Key is string key && de.Value is string value)
+                {
+                    if (key.Equals("PATH", StringComparison.OrdinalIgnoreCase))
+                    {
+                        value = CleanPathEnvironment(value);
+                    }
+                    variables[key] = value;
+                }
+            }
+
+            int sizeBytes = 0;
+            foreach (KeyValuePair<string, string> kvp in variables)
+            {
+                sizeBytes += (kvp.Key.Length + 1 + kvp.Value.Length + 1) * 2;
+            }
+            sizeBytes += 2;
+
+            IntPtr block = Marshal.AllocHGlobal(sizeBytes);
+            int offset = 0;
+            foreach (KeyValuePair<string, string> kvp in variables)
+            {
+                string entry = kvp.Key + "=" + kvp.Value + "\0";
+                byte[] bytes = Encoding.Unicode.GetBytes(entry);
+                Marshal.Copy(bytes, 0, block + offset, bytes.Length);
+                offset += bytes.Length;
+            }
+
+            byte[] terminator = new byte[] { 0, 0 };
+            Marshal.Copy(terminator, 0, block + offset, 2);
+
+            return block;
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct COORD
         {
@@ -330,6 +460,23 @@ namespace TxtAIEditor.Core.Services
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CreatePipe(out SafeFileHandle hReadPipe, out SafeFileHandle hWritePipe, IntPtr lpPipeAttributes, int nSize);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern SafeFileHandle CreateFile(
+            string lpFileName,
+            int dwDesiredAccess,
+            int dwShareMode,
+            IntPtr lpSecurityAttributes,
+            int dwCreationDisposition,
+            int dwFlagsAndAttributes,
+            IntPtr hTemplateFile);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern int GetFinalPathNameByHandle(
+            SafeFileHandle hFile,
+            StringBuilder lpszFilePath,
+            int cchFilePath,
+            int dwFlags);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern int CreatePseudoConsole(COORD size, SafeFileHandle hInput, SafeFileHandle hOutput, uint dwFlags, out IntPtr phPC);
