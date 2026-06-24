@@ -18,6 +18,7 @@ namespace TxtAIEditor.Core.Services.LLM
         private static readonly HttpClient _httpClient = new HttpClient();
 
         private readonly bool _verbose;
+        private readonly string _providerName;
         private string _accumulatedText = string.Empty;
         private int _lastProcessedIndex = 0;
         private bool _inThought = false;
@@ -31,10 +32,17 @@ namespace TxtAIEditor.Core.Services.LLM
             new Regex(@"<\|channel\>thought(.*?)(?:<channel\|>|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase)
         };
 
-        public GeminiProvider(ILocalizationService localizationService, bool verbose = false)
+        public GeminiProvider(ILocalizationService localizationService, bool verbose = false, string providerName = "Gemini")
         {
             _localizationService = localizationService;
             _verbose = verbose;
+            _providerName = providerName ?? "Gemini";
+        }
+
+        private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
+        {
+            var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
+            return output > 0 ? output : 0;
         }
 
         private static bool IsGemma4(string model)
@@ -292,6 +300,8 @@ namespace TxtAIEditor.Core.Services.LLM
             string baseUrl = string.IsNullOrWhiteSpace(endpoint) ? "https://generativelanguage.googleapis.com" : endpoint.TrimEnd('/');
             string requestUrl = BuildGeminiUrl(baseUrl, model, false);
 
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+
             var payload = new
             {
                 contents = new[]
@@ -311,7 +321,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 },
                 generationConfig = new
                 {
-                    temperature = 0.5
+                    temperature = 0.5,
+                    maxOutputTokens = outputLimit > 0 ? outputLimit : 65536
                 }
             };
 
@@ -403,6 +414,8 @@ namespace TxtAIEditor.Core.Services.LLM
             string baseUrl = string.IsNullOrWhiteSpace(endpoint) ? "https://generativelanguage.googleapis.com" : endpoint.TrimEnd('/');
             string requestUrl = BuildGeminiUrl(baseUrl, model, true);
 
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+
             var payload = new
             {
                 contents = new[]
@@ -422,7 +435,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 },
                 generationConfig = new
                 {
-                    temperature = 0.5
+                    temperature = 0.5,
+                    maxOutputTokens = outputLimit > 0 ? outputLimit : 65536
                 }
             };
 

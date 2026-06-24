@@ -14,12 +14,20 @@ namespace TxtAIEditor.Core.Services.LLM
     public class OpenRouterProvider : ILLMProvider
     {
         private readonly ILocalizationService _localizationService;
+        private readonly string _providerName;
 
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public OpenRouterProvider(ILocalizationService localizationService)
+        public OpenRouterProvider(ILocalizationService localizationService, string providerName = "OpenRouter")
         {
             _localizationService = localizationService;
+            _providerName = providerName ?? "OpenRouter";
+        }
+
+        private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
+        {
+            var (context, output) = await ModelsDevCatalog.GetBestLimitsAsync(_providerName, model, cancellationToken);
+            return output > 0 ? output : 0;
         }
 
         public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
@@ -41,19 +49,25 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            var payload = new
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+
+            var payloadDict = new Dictionary<string, object>
             {
-                model = model,
-                messages = new[]
+                ["model"] = model,
+                ["messages"] = new[]
                 {
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                temperature = IsKimiModel(model) ? 1.0 : 0.5,
-                stream = true
+                ["temperature"] = IsKimiModel(model) ? 1.0 : 0.5,
+                ["stream"] = true
             };
+            if (outputLimit > 0)
+            {
+                payloadDict["max_tokens"] = outputLimit;
+            }
 
-            string jsonPayload = JsonSerializer.Serialize(payload);
+            string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);

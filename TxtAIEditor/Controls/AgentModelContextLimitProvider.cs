@@ -71,7 +71,7 @@ namespace TxtAIEditor.Controls
                 });
             }
 
-            var modelsDevLimits = ModelsDevCatalog.GetCachedLimits(
+            var modelsDevLimits = ModelsDevCatalog.GetBestCachedLimits(
                 settings.LlmProvider ?? string.Empty,
                 settings.LlmModel ?? string.Empty);
             if (modelsDevLimits.context > 0)

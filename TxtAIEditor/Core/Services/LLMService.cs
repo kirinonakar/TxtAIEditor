@@ -298,22 +298,22 @@ namespace TxtAIEditor.Core.Services
 
             ILLMProvider provider = providerName.ToLower() switch
             {
-                "gemini" => new GeminiProvider(_localizationService, settings.LlmAgentVerbose),
-                "openai oauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel),
-                "openaioauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel),
-                "openrouter" => new OpenRouterProvider(_localizationService),
+                "gemini" => new GeminiProvider(_localizationService, settings.LlmAgentVerbose, providerName),
+                "openai oauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
+                "openaioauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
+                "openrouter" => new OpenRouterProvider(_localizationService, providerName),
                 "lm studio" => new LMStudioProvider(_localizationService),
                 "lmstudio" => new LMStudioProvider(_localizationService),
-                "ollama" => new OllamaProvider(_localizationService, isCloud: false),
-                "ollama cloud" => new OllamaProvider(_localizationService, isCloud: true),
-                "ollamacloud" => new OllamaProvider(_localizationService, isCloud: true),
+                "ollama" => new OllamaProvider(_localizationService, isCloud: false, providerName: providerName),
+                "ollama cloud" => new OllamaProvider(_localizationService, isCloud: true, providerName: providerName),
+                "ollamacloud" => new OllamaProvider(_localizationService, isCloud: true, providerName: providerName),
                 "opencode go" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "opencodego" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "go" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
-                _ => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel)
+                _ => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName)
             };
 
             try

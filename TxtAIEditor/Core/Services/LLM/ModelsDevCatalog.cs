@@ -68,6 +68,50 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("opencode", "minimax-m2.7"), (204800, 131072) },
                 { ("opencode", "qwen3.5-plus"), (262144, 65536) },
                 { ("opencode", "qwen3.6-plus"), (262144, 65536) },
+
+                { ("openai", "gpt-5"), (400000, 128000) },
+                { ("openai", "gpt-5-pro"), (400000, 128000) },
+                { ("openai", "gpt-5-nano"), (400000, 128000) },
+                { ("openai", "gpt-5.1"), (400000, 128000) },
+                { ("openai", "gpt-5.2"), (400000, 128000) },
+                { ("openai", "gpt-5.3-chat-latest"), (128000, 16384) },
+                { ("openai", "gpt-5.4"), (1050000, 128000) },
+                { ("openai", "gpt-5.4-mini"), (400000, 128000) },
+                { ("openai", "gpt-5.4-nano"), (400000, 128000) },
+                { ("openai", "gpt-5.4-pro"), (1050000, 128000) },
+                { ("openai", "gpt-5.5"), (1050000, 128000) },
+                { ("openai", "gpt-5.5-pro"), (1050000, 128000) },
+                { ("openai", "gpt-4o"), (128000, 16384) },
+                { ("openai", "gpt-4"), (8192, 8192) },
+                { ("openai", "gpt-3.5-turbo"), (16385, 4096) },
+                { ("openai", "o3"), (200000, 100000) },
+                { ("openai", "o3-pro"), (200000, 100000) },
+                { ("openai", "o4-mini"), (200000, 100000) },
+
+                { ("google", "gemini-flash-lite-latest"), (1048576, 65536) },
+                { ("google", "gemini-flash-latest"), (1048576, 65536) },
+                { ("google", "gemini-pro-latest"), (1048576, 65536) },
+                { ("google", "gemini-2.5-flash"), (1048576, 65536) },
+                { ("google", "gemini-2.5-flash-lite"), (1048576, 65536) },
+                { ("google", "gemini-2.5-pro"), (1048576, 65536) },
+                { ("google", "gemini-3.5-flash"), (1048576, 65536) },
+                { ("google", "gemini-3.1-pro-preview"), (1048576, 65536) },
+                { ("google", "gemini-3-pro-image-preview"), (1048576, 65536) },
+                { ("google", "gemma-4-26b-a4b-it"), (262144, 32768) },
+                { ("google", "gemma-4-31b-it"), (262144, 32768) },
+
+                { ("ollama-cloud", "deepseek-v4-flash"), (1048576, 1048576) },
+                { ("ollama-cloud", "glm-4.7"), (204800, 131072) },
+                { ("ollama-cloud", "minimax-m2.5"), (204800, 131072) },
+                { ("ollama-cloud", "minimax-m2.1"), (204800, 131072) },
+                { ("ollama-cloud", "gpt-oss:120b"), (131072, 32768) },
+                { ("ollama-cloud", "devstral-small-2:24b"), (131072, 32768) },
+
+                { ("openrouter", "meta-llama/llama-3.3-70b-instruct"), (131072, 16384) },
+                { ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"), (131072, 16384) },
+                { ("openrouter", "deepseek/deepseek-chat"), (131072, 16384) },
+                { ("openrouter", "google/gemini-2.5-flash"), (131072, 16384) },
+                { ("openrouter", "anthropic/claude-3.5-sonnet"), (200000, 8192) },
             };
 
         public static string MapProviderKey(string appProvider)
@@ -77,6 +121,12 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 "opencode go" or "opencodego" or "go" => "opencode-go",
                 "opencode zen" or "opencodezen" or "zen" => "opencode",
+                "gemini" => "google",
+                "openai" or "openai oauth" or "openaioauth" => "openai",
+                "ollama" => "ollama",
+                "ollama cloud" or "ollamacloud" => "ollama-cloud",
+                "openrouter" => "openrouter",
+                "lm studio" or "lmstudio" => "lmstudio",
                 _ => p.Replace(" ", "-"),
             };
         }
@@ -110,6 +160,56 @@ namespace TxtAIEditor.Core.Services.LLM
             return Resolve(appProvider, model);
         }
 
+        public static async Task<(int context, int output)> GetBestLimitsAsync(string appProvider, string model, CancellationToken cancellationToken = default)
+        {
+            var (context, output) = await GetLimitsAsync(appProvider, model, cancellationToken);
+
+            if (IsOpenRouter(appProvider))
+            {
+                string bare = ExtractBareModel(model);
+                var (goCtx, goOut) = await GetLimitsAsync("OpenCode Go", bare, cancellationToken);
+                if (goOut > output) output = goOut;
+                if (goCtx > context) context = goCtx;
+                var (zenCtx, zenOut) = await GetLimitsAsync("OpenCode Zen", bare, cancellationToken);
+                if (zenOut > output) output = zenOut;
+                if (zenCtx > context) context = zenCtx;
+            }
+
+            return (context, output);
+        }
+
+        public static (int context, int output) GetBestCachedLimits(string appProvider, string model)
+        {
+            var (context, output) = GetCachedLimits(appProvider, model);
+
+            if (IsOpenRouter(appProvider))
+            {
+                string bare = ExtractBareModel(model);
+                var (goCtx, goOut) = GetCachedLimits("OpenCode Go", bare);
+                if (goOut > output) output = goOut;
+                if (goCtx > context) context = goCtx;
+                var (zenCtx, zenOut) = GetCachedLimits("OpenCode Zen", bare);
+                if (zenOut > output) output = zenOut;
+                if (zenCtx > context) context = zenCtx;
+            }
+
+            return (context, output);
+        }
+
+        private static bool IsOpenRouter(string appProvider)
+            => (appProvider ?? string.Empty).Contains("openrouter", StringComparison.OrdinalIgnoreCase);
+
+        private static string ExtractBareModel(string model)
+        {
+            if (string.IsNullOrEmpty(model)) return model;
+            string m = model;
+            int slash = m.IndexOf('/');
+            if (slash >= 0) m = m.Substring(slash + 1);
+            int colon = m.IndexOf(':');
+            if (colon >= 0) m = m.Substring(0, colon);
+            return m;
+        }
+
         public static bool IsLoaded => _doc != null;
 
         private static (int context, int output) Resolve(string appProvider, string model)
@@ -134,6 +234,13 @@ namespace TxtAIEditor.Core.Services.LLM
                     }
                 }
                 catch { }
+            }
+
+            if (providerKey == "google" && modelKey == "gemini-pro-latest")
+            {
+                if (_fallback.TryGetValue((providerKey, "gemini-2.5-pro"), out var proFb))
+                    return proFb;
+                return (1048576, 65536);
             }
 
             if (_fallback.TryGetValue((providerKey, modelKey), out var fb))

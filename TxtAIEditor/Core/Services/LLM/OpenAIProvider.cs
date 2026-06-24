@@ -16,14 +16,29 @@ namespace TxtAIEditor.Core.Services.LLM
         private readonly ILocalizationService _localizationService;
         private readonly bool _isOAuth;
         private readonly string _thinkingLevel;
+        private readonly string _providerName;
 
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public OpenAIProvider(ILocalizationService localizationService, bool isOAuth = false, string thinkingLevel = "")
+        public OpenAIProvider(ILocalizationService localizationService, bool isOAuth = false, string thinkingLevel = "", string providerName = "OpenAI")
         {
             _localizationService = localizationService;
             _isOAuth = isOAuth;
             _thinkingLevel = thinkingLevel ?? "";
+            _providerName = providerName ?? "OpenAI";
+        }
+
+        private static bool IsReasoningModel(string model)
+        {
+            if (string.IsNullOrEmpty(model)) return false;
+            string m = model.ToLowerInvariant();
+            return m.StartsWith("o1") || m.StartsWith("o3") || m.StartsWith("o4") || m.StartsWith("o5");
+        }
+
+        private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
+        {
+            var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
+            return output > 0 ? output : 0;
         }
 
         public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null)
@@ -36,34 +51,30 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            object payload;
-            if (_isOAuth)
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            bool reasoning = IsReasoningModel(model);
+            string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
+
+            var payloadDict = new Dictionary<string, object>
             {
-                payload = new
+                ["model"] = model,
+                ["messages"] = new[]
                 {
-                    model = model,
-                    messages = new[]
-                    {
-                        new { role = "system", content = (object)systemPrompt },
-                        new { role = "user", content = BuildUserContent(userContent, attachments) }
-                    }
-                };
+                    new { role = "system", content = (object)systemPrompt },
+                    new { role = "user", content = BuildUserContent(userContent, attachments) }
+                }
+            };
+
+            if (!_isOAuth)
+            {
+                payloadDict["temperature"] = IsKimiModel(model) ? 1.0 : 0.5;
             }
-            else
+            if (outputLimit > 0)
             {
-                payload = new
-                {
-                    model = model,
-                    messages = new[]
-                    {
-                        new { role = "system", content = (object)systemPrompt },
-                        new { role = "user", content = BuildUserContent(userContent, attachments) }
-                    },
-                    temperature = IsKimiModel(model) ? 1.0 : 0.5
-                };
+                payloadDict[tokenField] = outputLimit;
             }
 
-            string jsonPayload = JsonSerializer.Serialize(payload);
+            string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 if (!string.IsNullOrEmpty(apiKey))
@@ -109,36 +120,31 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            object payload;
-            if (_isOAuth)
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            bool reasoning = IsReasoningModel(model);
+            string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
+
+            var payloadDict = new Dictionary<string, object>
             {
-                payload = new
+                ["model"] = model,
+                ["messages"] = new[]
                 {
-                    model = model,
-                    messages = new[]
-                    {
-                        new { role = "system", content = (object)systemPrompt },
-                        new { role = "user", content = BuildUserContent(userContent, attachments) }
-                    },
-                    stream = true
-                };
+                    new { role = "system", content = (object)systemPrompt },
+                    new { role = "user", content = BuildUserContent(userContent, attachments) }
+                },
+                ["stream"] = true
+            };
+
+            if (!_isOAuth)
+            {
+                payloadDict["temperature"] = IsKimiModel(model) ? 1.0 : 0.5;
             }
-            else
+            if (outputLimit > 0)
             {
-                payload = new
-                {
-                    model = model,
-                    messages = new[]
-                    {
-                        new { role = "system", content = (object)systemPrompt },
-                        new { role = "user", content = BuildUserContent(userContent, attachments) }
-                    },
-                    temperature = IsKimiModel(model) ? 1.0 : 0.5,
-                    stream = true
-                };
+                payloadDict[tokenField] = outputLimit;
             }
 
-            string jsonPayload = JsonSerializer.Serialize(payload);
+            string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 if (!string.IsNullOrEmpty(apiKey))
