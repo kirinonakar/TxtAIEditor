@@ -62,6 +62,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             "minimax-m3", "minimax-m2.7", "minimax-m2.5",
             "qwen3.7-max", "qwen3.7-plus", "qwen3.6-plus", "qwen3.5-plus",
+            "claude-fable-5",
             "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5", "claude-opus-4-1",
             "claude-sonnet-4-6", "claude-sonnet-4-5", "claude-sonnet-4",
             "claude-haiku-4-5", "claude-3-5-haiku",

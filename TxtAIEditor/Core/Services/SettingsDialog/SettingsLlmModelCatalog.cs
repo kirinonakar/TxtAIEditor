@@ -112,21 +112,19 @@ namespace TxtAIEditor.Core.Services
             {
                 return new[]
                 {
-                    "deepseek-v4-flash",
-                    "deepseek-v4-pro",
-                    "glm-5",
+                    "glm-5.2",
                     "glm-5.1",
-                    "kimi-k2.5",
+                    "kimi-k2.7-code",
                     "kimi-k2.6",
                     "mimo-v2.5",
                     "mimo-v2.5-pro",
                     "minimax-m3",
                     "minimax-m2.7",
-                    "minimax-m2.5",
                     "qwen3.7-max",
                     "qwen3.7-plus",
                     "qwen3.6-plus",
-                    "qwen3.5-plus"
+                    "deepseek-v4-pro",
+                    "deepseek-v4-flash"
                 };
             }
 
@@ -140,37 +138,90 @@ namespace TxtAIEditor.Core.Services
                     "gpt-5.4-pro",
                     "gpt-5.4-mini",
                     "gpt-5.4-nano",
+                    "gpt-5.3-codex",
+                    "gpt-5.3-codex-spark",
+                    "gpt-5.2",
+                    "gpt-5.2-codex",
+                    "gpt-5.1",
+                    "gpt-5.1-codex",
+                    "gpt-5.1-codex-max",
+                    "gpt-5.1-codex-mini",
+                    "gpt-5",
                     "gpt-5-codex",
                     "gpt-5-nano",
+                    "claude-fable-5",
+                    "claude-opus-4-8",
                     "claude-opus-4-7",
+                    "claude-opus-4-6",
+                    "claude-opus-4-5",
+                    "claude-opus-4-1",
                     "claude-sonnet-4-6",
+                    "claude-sonnet-4-5",
+                    "claude-sonnet-4",
                     "claude-haiku-4-5",
+                    "claude-3-5-haiku",
                     "gemini-3.5-flash",
                     "gemini-3.1-pro",
                     "gemini-3-flash",
-                    "deepseek-v4-flash",
-                    "glm-5.1",
-                    "kimi-k2.6",
-                    "minimax-m2.7",
-                    "minimax-m2.5",
-                    "grok-build-0.1",
                     "qwen3.7-max",
                     "qwen3.7-plus",
                     "qwen3.6-plus",
-                    "qwen3.5-plus"
+                    "qwen3.5-plus",
+                    "deepseek-v4-pro",
+                    "deepseek-v4-flash",
+                    "minimax-m2.7",
+                    "minimax-m2.5",
+                    "glm-5.2",
+                    "glm-5.1",
+                    "glm-5",
+                    "kimi-k2.5",
+                    "kimi-k2.6",
+                    "grok-build-0.1",
+                    "big-pickle",
+                    "mimo-v2.5-free",
+                    "north-mini-code-free",
+                    "nemotron-3-ultra-free",
+                    "deepseek-v4-flash-free"
                 };
             }
 
-            if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) ||
-                provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
             {
                 return new[]
                 {
-                    "llama3:latest",
-                    "gemma2:latest",
-                    "mistral:latest",
-                    "phi3:latest",
-                    "qwen2.5-coder:latest"
+                    "gemma4:31b",
+                    "gemma4:26b",
+                    "gemma4:12b",
+                    "gemma4:4b"
+                };
+            }
+
+            if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            {
+                return new[]
+                {
+                    "gpt-oss:20b",
+                    "qwen3.5:397b",
+                    "glm-5.2",
+                    "gpt-oss:120b",
+                    "nemotron-3-nano:30b",
+                    "ministral-3:14b",
+                    "gemma3:4b",
+                    "nemotron-3-super",
+                    "deepseek-v3.1:671b",
+                    "devstral-2:123b",
+                    "devstral-small-2:24b",
+                    "gemini-3-flash-preview",
+                    "minimax-m3",
+                    "deepseek-v4-flash",
+                    "nemotron-3-ultra",
+                    "qwen3-coder:480b",
+                    "deepseek-v4-pro",
+                    "ministral-3:8b",
+                    "kimi-k2.7-code",
+                    "gemma4:31b",
+                    "qwen3-coder-next",
+                    "mistral-large-3:675b"
                 };
             }
 
