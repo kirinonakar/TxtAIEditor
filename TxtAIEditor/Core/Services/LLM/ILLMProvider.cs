@@ -22,7 +22,8 @@ namespace TxtAIEditor.Core.Services.LLM
     public class StreamToolCallAccumulator
     {
         public string Name { get; set; } = string.Empty;
-        public bool SentHeader { get; set; }
+        public bool SentStartTag { get; set; }
+        public bool SentArgumentsHeader { get; set; }
         public StringBuilder Arguments { get; } = new StringBuilder();
     }
 

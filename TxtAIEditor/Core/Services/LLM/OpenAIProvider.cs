@@ -247,10 +247,14 @@ namespace TxtAIEditor.Core.Services.LLM
                                                         if (!string.IsNullOrEmpty(nameChunk))
                                                         {
                                                             toolAccumulator.Name += nameChunk;
-                                                            if (!toolAccumulator.SentHeader && !string.IsNullOrEmpty(toolAccumulator.Name))
+                                                            if (!toolAccumulator.SentStartTag)
                                                             {
-                                                                toolAccumulator.SentHeader = true;
-                                                                await onChunk($"<tool_call>{{\"name\":\"{toolAccumulator.Name}\",\"arguments\":");
+                                                                toolAccumulator.SentStartTag = true;
+                                                                await onChunk($"<tool_call>{{\"name\":\"{nameChunk}");
+                                                            }
+                                                            else
+                                                            {
+                                                                await onChunk(nameChunk);
                                                             }
                                                         }
                                                     }
@@ -260,10 +264,16 @@ namespace TxtAIEditor.Core.Services.LLM
                                                         if (!string.IsNullOrEmpty(argsChunk))
                                                         {
                                                             toolAccumulator.Arguments.Append(argsChunk);
-                                                            if (!toolAccumulator.SentHeader && !string.IsNullOrEmpty(toolAccumulator.Name))
+                                                            if (!toolAccumulator.SentStartTag)
                                                             {
-                                                                toolAccumulator.SentHeader = true;
-                                                                await onChunk($"<tool_call>{{\"name\":\"{toolAccumulator.Name}\",\"arguments\":");
+                                                                toolAccumulator.SentStartTag = true;
+                                                                await onChunk($"<tool_call>{{\"name\":\"\",\"arguments\":");
+                                                                toolAccumulator.SentArgumentsHeader = true;
+                                                            }
+                                                            else if (!toolAccumulator.SentArgumentsHeader)
+                                                            {
+                                                                toolAccumulator.SentArgumentsHeader = true;
+                                                                await onChunk($"\",\"arguments\":");
                                                             }
                                                             await onChunk(argsChunk);
                                                         }
@@ -290,9 +300,13 @@ namespace TxtAIEditor.Core.Services.LLM
 
                         if (hasToolCalls)
                         {
-                            if (!toolAccumulator.SentHeader)
+                            if (!toolAccumulator.SentStartTag)
                             {
-                                await onChunk($"<tool_call>{{\"name\":\"{toolAccumulator.Name}\",\"arguments\":{{}}");
+                                await onChunk($"<tool_call>{{\"name\":\"\",\"arguments\":{{}}");
+                            }
+                            else if (!toolAccumulator.SentArgumentsHeader)
+                            {
+                                await onChunk($"\",\"arguments\":{{}}");
                             }
                             await onChunk("}</tool_call>");
                         }
