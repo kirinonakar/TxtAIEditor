@@ -1710,6 +1710,12 @@
   <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
     <value>ツール呼び出し形式のエラーが繰り返されたため、Agentの実行を停止しました。タスクを再実行してください。</value>
   </data>
+  <data name="AgentSkillNotCalledRetry" xml:space="preserve">
+    <value>スキルを呼び出さず説明のみでした。ツール呼び出しを再試行します。</value>
+  </data>
+  <data name="AgentActivityTruncatedRetry" xml:space="preserve">
+    <value>応答が途切れたため、続きを書きます。</value>
+  </data>
   <data name="AgentActivityFinalAnswer" xml:space="preserve">
     <value>最終回答の作成完了</value>
   </data>

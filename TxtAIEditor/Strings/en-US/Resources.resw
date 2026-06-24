@@ -1709,6 +1709,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
     <value>Tool call format errors repeated, so Agent execution was stopped. Please run the task again.</value>
   </data>
+  <data name="AgentSkillNotCalledRetry" xml:space="preserve">
+    <value>The model described the skill but did not call it. Retrying the tool call.</value>
+  </data>
+  <data name="AgentActivityTruncatedRetry" xml:space="preserve">
+    <value>Response was truncated; continuing.</value>
+  </data>
   <data name="AgentActivityFinalAnswer" xml:space="preserve">
     <value>Final answer generated</value>
   </data>

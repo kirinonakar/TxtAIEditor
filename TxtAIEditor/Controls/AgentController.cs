@@ -663,6 +663,8 @@ namespace TxtAIEditor.Controls
                 const int maxToolCallFormatRetries = 2;
                 int makePlanRetryCount = 0;
                 const int maxMakePlanRetries = 2;
+                int skillMentionRetryCount = 0;
+                const int maxSkillMentionRetries = 2;
                 int repeatedDuplicateToolSkipCount = 0;
                 string? lastDuplicateToolInvocationKey = null;
                 const int maxRepeatedDuplicateToolSkips = 3;
@@ -1072,6 +1074,37 @@ namespace TxtAIEditor.Controls
                                 break;
                             }
 
+                            continue;
+                        }
+
+                        if (!planningMode &&
+                            skillMentionRetryCount < maxSkillMentionRetries &&
+                            instruction.Contains("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase) &&
+                            ResponseMentionsSkillIntent(response))
+                        {
+                            skillMentionRetryCount++;
+                            string retryNote =
+                                "\n\n[Skill not called]\n" +
+                                "You described intent to use a skill in prose but did not emit the skill_use tool_call. " +
+                                "Do not describe intent. Reply now with exactly one skill_use tool_call for the relevant skill:\n" +
+                                "<tool_call>{\"name\":\"skill_use\",\"arguments\":{\"name\":\"skill-name\"}}>";
+
+                            await _uiDispatcher.RunAsync(() =>
+                            {
+                                transcript += "\n\n" + response + retryNote;
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + retryNote);
+                                UpdateContextStatsImmediate(force: true);
+                            });
+
+                            string retryMessage = _getString(
+                                "AgentSkillNotCalledRetry",
+                                "스킬을 호출하지 않고 설명만 했습니다. 도구 호출을 다시 시도합니다.");
+                            await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
+                            await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
+                            if (_runOutputController.IsSessionVisible(runContext.SessionId))
+                            {
+                                UpdateContextStatsImmediate(force: true);
+                            }
                             continue;
                         }
 
@@ -1575,6 +1608,40 @@ namespace TxtAIEditor.Controls
                 StartsWithFenceLanguage(fenceInfo, "jsonc") ||
                 StartsWithFenceLanguage(fenceInfo, "tool_call") ||
                 StartsWithFenceLanguage(fenceInfo, "tool-call");
+        }
+
+        private static bool ResponseMentionsSkillIntent(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response)) return false;
+            string lower = response.ToLowerInvariant();
+
+            if (lower.Contains("skill_use") || lower.Contains("skill use")) return true;
+            if (!lower.Contains("skill")) return false;
+
+            string[] intentMarkers =
+            {
+                "i should use",
+                "i need to use",
+                "i'll use",
+                "i will use",
+                "let me use",
+                "let me call",
+                "i should call",
+                "i need to call",
+                "i'll call",
+                "i will call",
+                "going to use",
+                "going to call",
+                "use the",
+                "call the",
+            };
+
+            foreach (string marker in intentMarkers)
+            {
+                if (lower.Contains(marker) && lower.Contains("skill")) return true;
+            }
+
+            return false;
         }
 
         private static bool StartsWithFenceLanguage(string fenceInfo, string language)
