@@ -66,13 +66,79 @@ namespace TxtAIEditor.Controls
             toolName = string.Empty;
             arguments = default;
 
-            if (!TryExtractToolCallPayload(response, out string payload))
+            if (string.IsNullOrWhiteSpace(response))
             {
-                return TryParseSupportedCommandFence(response, out toolName, out arguments);
+                return false;
+            }
+
+            string text = response.Trim();
+
+            // 1. Try to find any tag-based tool call that parses successfully.
+            int searchStart = 0;
+            while (searchStart < text.Length)
+            {
+                int openIndex = text.IndexOf(ToolCallOpenTag, searchStart, StringComparison.OrdinalIgnoreCase);
+                if (openIndex < 0)
+                {
+                    break;
+                }
+
+                int payloadStart = openIndex + ToolCallOpenTag.Length;
+                int closeIndex = text.IndexOf(ToolCallCloseTag, payloadStart, StringComparison.OrdinalIgnoreCase);
+                
+                if (closeIndex < 0)
+                {
+                    // No matching close tag. Try parsing the rest of the text.
+                    string possiblePayload = text.Substring(payloadStart).Trim();
+                    if (TryParsePayload(possiblePayload, out toolName, out arguments))
+                    {
+                        return true;
+                    }
+                    break;
+                }
+
+                string payload = text.Substring(payloadStart, closeIndex - payloadStart).Trim();
+                if (TryParsePayload(payload, out toolName, out arguments))
+                {
+                    return true;
+                }
+
+                searchStart = payloadStart;
+            }
+
+            // 2. Try bare payload.
+            if (TryExtractBareToolCallPayload(text, out string barePayload))
+            {
+                if (TryParsePayload(barePayload, out toolName, out arguments))
+                {
+                    return true;
+                }
+            }
+
+            // 3. Try command fence.
+            return TryParseSupportedCommandFence(response, out toolName, out arguments);
+        }
+
+        private static bool TryParsePayload(string payload, out string toolName, out JsonElement arguments)
+        {
+            toolName = string.Empty;
+            arguments = default;
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return false;
             }
 
             string fixedPayload = FixJsonCarriageReturnEscapes(payload);
             string trimmedPayload = fixedPayload.Trim();
+
+            while (trimmedPayload.StartsWith(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase))
+            {
+                trimmedPayload = trimmedPayload.Substring(ToolCallOpenTag.Length).Trim();
+            }
+            while (trimmedPayload.EndsWith(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase))
+            {
+                trimmedPayload = trimmedPayload.Substring(0, trimmedPayload.Length - ToolCallCloseTag.Length).Trim();
+            }
 
             int openBraceIndex = trimmedPayload.IndexOf('{');
             if (openBraceIndex > 0)
@@ -83,8 +149,6 @@ namespace TxtAIEditor.Controls
                     toolName = possibleName;
                     string jsonPart = trimmedPayload.Substring(openBraceIndex);
 
-                    // First try balanced brace extraction to isolate the JSON object
-                    // from any trailing content the LLM may have appended.
                     if (TryExtractBalancedJsonObject(trimmedPayload, openBraceIndex, out string balancedJson))
                     {
                         jsonPart = balancedJson;
@@ -99,12 +163,13 @@ namespace TxtAIEditor.Controls
                     }
                     catch
                     {
-                        // Fall through to lenient/other parsing methods on failure.
+                        // Fall through
                     }
                 }
             }
 
-            if (TryExtractToolCallJson(response, out string json))
+            int jsonStart = trimmedPayload.IndexOf('{');
+            if (jsonStart >= 0 && TryExtractBalancedJsonObject(trimmedPayload, jsonStart, out string json))
             {
                 string fixedJson = FixJsonCarriageReturnEscapes(json);
                 try
@@ -121,7 +186,7 @@ namespace TxtAIEditor.Controls
                 }
                 catch
                 {
-                    // Fall through to lenient parsing.
+                    // Fall through
                 }
             }
 
@@ -271,38 +336,45 @@ namespace TxtAIEditor.Controls
             toolName = string.Empty;
             arguments = default;
 
-            string? name = ExtractLenientStringProperty(json, "name");
-            if (string.IsNullOrWhiteSpace(name))
+            try
+            {
+                string? name = ExtractLenientStringProperty(json, "name");
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    return false;
+                }
+
+                string argumentsText = ExtractLenientObjectProperty(json, "arguments") ?? "{}";
+                var argumentValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var property in ExtractLenientStringProperties(argumentsText))
+                {
+                    argumentValues[property.Key] = property.Value;
+                }
+
+                var numberMatches = Regex.Matches(
+                    argumentsText,
+                    "\"(?<key>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"\\s*:\\s*(?<value>-?\\d+)",
+                    RegexOptions.Singleline);
+
+                foreach (Match match in numberMatches)
+                {
+                    string key = DecodeLenientJsonString(match.Groups["key"].Value);
+                    if (!argumentValues.ContainsKey(key))
+                    {
+                        argumentValues[key] = match.Groups["value"].Value;
+                    }
+                }
+
+                string repairedJson = JsonSerializer.Serialize(argumentValues);
+                using var argumentsDocument = JsonDocument.Parse(repairedJson);
+                toolName = DecodeLenientJsonString(name);
+                arguments = argumentsDocument.RootElement.Clone();
+                return !string.IsNullOrWhiteSpace(toolName);
+            }
+            catch
             {
                 return false;
             }
-
-            string argumentsText = ExtractLenientObjectProperty(json, "arguments") ?? "{}";
-            var argumentValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var property in ExtractLenientStringProperties(argumentsText))
-            {
-                argumentValues[property.Key] = property.Value;
-            }
-
-            var numberMatches = Regex.Matches(
-                argumentsText,
-                "\"(?<key>[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"\\s*:\\s*(?<value>-?\\d+)",
-                RegexOptions.Singleline);
-
-            foreach (Match match in numberMatches)
-            {
-                string key = DecodeLenientJsonString(match.Groups["key"].Value);
-                if (!argumentValues.ContainsKey(key))
-                {
-                    argumentValues[key] = match.Groups["value"].Value;
-                }
-            }
-
-            string repairedJson = JsonSerializer.Serialize(argumentValues);
-            using var argumentsDocument = JsonDocument.Parse(repairedJson);
-            toolName = DecodeLenientJsonString(name);
-            arguments = argumentsDocument.RootElement.Clone();
-            return !string.IsNullOrWhiteSpace(toolName);
         }
 
         private static IEnumerable<KeyValuePair<string, string>> ExtractLenientStringProperties(string objectText)
