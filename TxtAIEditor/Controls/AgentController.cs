@@ -657,6 +657,8 @@ namespace TxtAIEditor.Controls
                 bool reachedToolStepLimit = false;
                 int emptyResponseRetryCount = 0;
                 const int maxEmptyResponseRetries = 1;
+                int truncationRetryCount = 0;
+                const int maxTruncationRetries = 3;
                 int toolCallFormatRetryCount = 0;
                 const int maxToolCallFormatRetries = 2;
                 int makePlanRetryCount = 0;
@@ -699,6 +701,9 @@ namespace TxtAIEditor.Controls
                         };
                     }
 
+                    bool truncated = false;
+                    try
+                    {
                     response = await _llmService.RunAgentAsync(
                         runContext.LlmSettings,
                         instruction,
@@ -861,9 +866,40 @@ namespace TxtAIEditor.Controls
                         GetImageAttachmentsForRun(runContext),
                         planningMode,
                         onReasoning);
+                    }
+                    catch (ResponseTruncatedException)
+                    {
+                        truncated = true;
+                    }
 
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
+
+                    if (truncated && !string.IsNullOrWhiteSpace(response))
+                    {
+                        await _runOutputController.StopRunThinkingActivityAsync(runContext);
+
+                        if (truncationRetryCount < maxTruncationRetries)
+                        {
+                            truncationRetryCount++;
+                            string continuationNote =
+                                "\n\n[Agent response truncated]\n" +
+                                "Your previous response was cut off due to the output token limit. " +
+                                "Continue exactly from where you stopped. Do not repeat what you already wrote. " +
+                                "If you were about to write a tool_call, write it now.";
+
+                            await _uiDispatcher.RunAsync(() =>
+                            {
+                                transcript += response + continuationNote;
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + continuationNote);
+                                UpdateContextStatsImmediate(force: true);
+                            });
+                            await _runOutputController.AppendRunActivityAsync(runContext, _getString(
+                                "AgentActivityTruncatedRetry",
+                                "응답이 잘려 이어서 작성합니다."));
+                            continue;
+                        }
+                    }
 
                     if (string.IsNullOrWhiteSpace(response))
                     {
