@@ -66,28 +66,58 @@ namespace TxtAIEditor.Controls
         {
             if (_selectedExplorerItemProvider() is TxtAIEditor.ExplorerItem selectedItem)
             {
-                if (selectedItem.IsFolder && Directory.Exists(selectedItem.Path))
+                if (!string.IsNullOrWhiteSpace(selectedItem.Path))
                 {
-                    return selectedItem.Path;
-                }
+                    try
+                    {
+                        string fullPath = Path.GetFullPath(selectedItem.Path);
+                        if (selectedItem.IsFolder && Directory.Exists(fullPath))
+                        {
+                            return fullPath;
+                        }
 
-                string? selectedFileDirectory = Path.GetDirectoryName(selectedItem.Path);
-                if (!string.IsNullOrWhiteSpace(selectedFileDirectory) && Directory.Exists(selectedFileDirectory))
-                {
-                    return selectedFileDirectory;
+                        string? selectedFileDirectory = Path.GetDirectoryName(fullPath);
+                        if (!string.IsNullOrWhiteSpace(selectedFileDirectory) && Directory.Exists(selectedFileDirectory))
+                        {
+                            return selectedFileDirectory;
+                        }
+                    }
+                    catch
+                    {
+                    }
                 }
             }
 
             string currentFolderPath = _currentFolderProvider();
-            if (!string.IsNullOrWhiteSpace(currentFolderPath) && Directory.Exists(currentFolderPath))
+            if (!string.IsNullOrWhiteSpace(currentFolderPath))
             {
-                return currentFolderPath;
+                try
+                {
+                    string fullPath = Path.GetFullPath(currentFolderPath);
+                    if (Directory.Exists(fullPath))
+                    {
+                        return fullPath;
+                    }
+                }
+                catch
+                {
+                }
             }
 
             string currentRepoPath = _currentRepoProvider();
-            if (!string.IsNullOrWhiteSpace(currentRepoPath) && Directory.Exists(currentRepoPath))
+            if (!string.IsNullOrWhiteSpace(currentRepoPath))
             {
-                return currentRepoPath;
+                try
+                {
+                    string fullPath = Path.GetFullPath(currentRepoPath);
+                    if (Directory.Exists(fullPath))
+                    {
+                        return fullPath;
+                    }
+                }
+                catch
+                {
+                }
             }
 
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

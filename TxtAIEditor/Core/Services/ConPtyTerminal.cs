@@ -102,6 +102,23 @@ namespace TxtAIEditor.Core.Services
                 string commandLineValue = profile.BuildCommandLine();
                 var commandLine = new StringBuilder(commandLineValue);
 
+                string? resolvedWorkingDirectory = null;
+                if (!string.IsNullOrWhiteSpace(workingDirectory))
+                {
+                    try
+                    {
+                        string fullPath = Path.GetFullPath(workingDirectory);
+                        if (Directory.Exists(fullPath))
+                        {
+                            resolvedWorkingDirectory = fullPath;
+                        }
+                    }
+                    catch
+                    {
+                        resolvedWorkingDirectory = null;
+                    }
+                }
+
                 bool created = CreateProcess(
                     null,
                     commandLine,
@@ -110,7 +127,7 @@ namespace TxtAIEditor.Core.Services
                     false,
                     EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
                     IntPtr.Zero,
-                    Directory.Exists(workingDirectory) ? workingDirectory : null,
+                    resolvedWorkingDirectory,
                     ref startupInfo,
                     out PROCESS_INFORMATION processInfo);
 

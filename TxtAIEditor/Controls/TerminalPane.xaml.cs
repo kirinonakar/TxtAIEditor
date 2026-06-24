@@ -73,12 +73,27 @@ namespace TxtAIEditor.Controls
 
         public void OpenTerminal(string workingDirectory, string? profileId)
         {
-            if (string.IsNullOrWhiteSpace(workingDirectory) || !Directory.Exists(workingDirectory))
+            if (string.IsNullOrWhiteSpace(workingDirectory))
             {
                 return;
             }
 
-            _ = StartTerminalAsync(workingDirectory, profileId);
+            string resolvedDirectory;
+            try
+            {
+                resolvedDirectory = Path.GetFullPath(workingDirectory);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (!Directory.Exists(resolvedDirectory))
+            {
+                return;
+            }
+
+            _ = StartTerminalAsync(resolvedDirectory, profileId);
         }
 
         public void SuspendNativeWindows()
