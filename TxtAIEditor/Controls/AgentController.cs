@@ -688,6 +688,12 @@ namespace TxtAIEditor.Controls
                     bool hasToolCall = false;
                     bool suppressStreamingText = planningMode;
 
+                    // Thinking state machine variables
+                    bool inThoughtBlock = false;
+                    var thoughtTextBuilder = new StringBuilder();
+                    var cleanStreamTextBuilder = new StringBuilder();
+                    int rawProcessedLength = 0;
+
                     string currentTranscript = _runTranscriptService.BuildWithEditLedger(
                         transcript,
                         currentTaskStartEditIndex,
@@ -717,7 +723,140 @@ namespace TxtAIEditor.Controls
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             responseBuilder.Append(chunk);
-                            string streamedText = responseBuilder.ToString();
+                            string rawStreamedText = responseBuilder.ToString();
+
+                            if (!runContext.LlmSettings.LlmAgentVerbose)
+                            {
+                                // Compute holdBack for tags
+                                int holdBack = 0;
+                                string[] tagsToHold = {
+                                    "<think>", "<thought>", "<|channel>thought",
+                                    "</think>", "</thought>", "<channel|>",
+                                    "<tool_call>"
+                                };
+                                foreach (var tag in tagsToHold)
+                                {
+                                    for (int i = 1; i < tag.Length; i++)
+                                    {
+                                        string sub = tag.Substring(0, i);
+                                        if (rawStreamedText.EndsWith(sub, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            holdBack = Math.Max(holdBack, i);
+                                            break;
+                                        }
+                                    }
+                                }
+                                int rawSafeLength = rawStreamedText.Length - holdBack;
+
+                                // Parse raw stream to clean stream
+                                string[] thinkStartTags = { "<think>", "<thought>", "<|channel>thought" };
+                                string[] thinkEndTags = { "</think>", "</thought>", "<channel|>" };
+
+                                int currentPos = rawProcessedLength;
+                                while (currentPos < rawSafeLength)
+                                {
+                                    if (!inThoughtBlock)
+                                    {
+                                        int earliestStartIdx = -1;
+                                        string matchedStartTag = "";
+                                        foreach (var tag in thinkStartTags)
+                                        {
+                                            int idx = rawStreamedText.IndexOf(tag, currentPos, StringComparison.OrdinalIgnoreCase);
+                                            if (idx >= 0 && idx < rawSafeLength)
+                                            {
+                                                if (earliestStartIdx == -1 || idx < earliestStartIdx)
+                                                {
+                                                    earliestStartIdx = idx;
+                                                    matchedStartTag = tag;
+                                                }
+                                            }
+                                        }
+
+                                        if (earliestStartIdx >= 0)
+                                        {
+                                            if (earliestStartIdx > currentPos)
+                                            {
+                                                cleanStreamTextBuilder.Append(rawStreamedText.Substring(currentPos, earliestStartIdx - currentPos));
+                                            }
+                                            inThoughtBlock = true;
+                                            thoughtTextBuilder.Clear();
+                                            currentPos = earliestStartIdx + matchedStartTag.Length;
+
+                                            string label = string.Format(
+                                                _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
+                                                _getString("AgentActivityThinking", "생각중"),
+                                                _displayText.FormatInlineTokenCount(0)
+                                            );
+                                            _runOutputController.EnqueueRunUi(
+                                                runContext,
+                                                () => _agentPane.BeginThinkingActivity(label),
+                                                session => _openSessionController.BeginThinkingInSession(session, label));
+                                        }
+                                        else
+                                        {
+                                            cleanStreamTextBuilder.Append(rawStreamedText.Substring(currentPos, rawSafeLength - currentPos));
+                                            currentPos = rawSafeLength;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        int earliestEndIdx = -1;
+                                        string matchedEndTag = "";
+                                        foreach (var tag in thinkEndTags)
+                                        {
+                                            int idx = rawStreamedText.IndexOf(tag, currentPos, StringComparison.OrdinalIgnoreCase);
+                                            if (idx >= 0 && idx < rawSafeLength)
+                                            {
+                                                if (earliestEndIdx == -1 || idx < earliestEndIdx)
+                                                {
+                                                    earliestEndIdx = idx;
+                                                    matchedEndTag = tag;
+                                                }
+                                            }
+                                        }
+
+                                        if (earliestEndIdx >= 0)
+                                        {
+                                            if (earliestEndIdx > currentPos)
+                                            {
+                                                thoughtTextBuilder.Append(rawStreamedText.Substring(currentPos, earliestEndIdx - currentPos));
+                                            }
+                                            inThoughtBlock = false;
+                                            currentPos = earliestEndIdx + matchedEndTag.Length;
+
+                                            int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
+                                            string label = string.Format(
+                                                _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
+                                                _getString("AgentActivityThinking", "생각중"),
+                                                _displayText.FormatInlineTokenCount(tokenCount)
+                                            );
+                                            _runOutputController.EnqueueRunUi(
+                                                runContext,
+                                                () => _agentPane.UpdateThinkingActivity(label),
+                                                session => _openSessionController.UpdateThinkingInSession(session, label));
+                                        }
+                                        else
+                                        {
+                                            thoughtTextBuilder.Append(rawStreamedText.Substring(currentPos, rawSafeLength - currentPos));
+                                            currentPos = rawSafeLength;
+
+                                            int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
+                                            string label = string.Format(
+                                                _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
+                                                _getString("AgentActivityThinking", "생각중"),
+                                                _displayText.FormatInlineTokenCount(tokenCount)
+                                            );
+                                            _runOutputController.EnqueueRunUi(
+                                                runContext,
+                                                () => _agentPane.UpdateThinkingActivity(label),
+                                                session => _openSessionController.UpdateThinkingInSession(session, label));
+                                        }
+                                    }
+                                }
+                                rawProcessedLength = rawSafeLength;
+                            }
+
+                            string streamedText = runContext.LlmSettings.LlmAgentVerbose ? rawStreamedText : cleanStreamTextBuilder.ToString();
 
                             if (isJsonToolCall == null)
                             {
@@ -798,8 +937,7 @@ namespace TxtAIEditor.Controls
                                 return;
                             }
 
-                            int checkStart = Math.Max(0, streamedText.Length - chunk.Length - 11);
-                            int toolCallIndex = streamedText.IndexOf("<tool_call>", checkStart, StringComparison.OrdinalIgnoreCase);
+                            int toolCallIndex = streamedText.IndexOf("<tool_call>", printedLength, StringComparison.OrdinalIgnoreCase);
                             if (toolCallIndex >= 0)
                             {
                                 hasToolCall = true;
@@ -879,6 +1017,108 @@ namespace TxtAIEditor.Controls
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
 
+                    if (!runContext.LlmSettings.LlmAgentVerbose && responseBuilder.Length > 0)
+                    {
+                        string finalRawText = responseBuilder.ToString();
+                        int finalSafeLength = finalRawText.Length;
+
+                        string[] thinkStartTags = { "<think>", "<thought>", "<|channel>thought" };
+                        string[] thinkEndTags = { "</think>", "</thought>", "<channel|>" };
+
+                        int currentPos = rawProcessedLength;
+                        while (currentPos < finalSafeLength)
+                        {
+                            if (!inThoughtBlock)
+                            {
+                                int earliestStartIdx = -1;
+                                string matchedStartTag = "";
+                                foreach (var tag in thinkStartTags)
+                                {
+                                    int idx = finalRawText.IndexOf(tag, currentPos, StringComparison.OrdinalIgnoreCase);
+                                    if (idx >= 0 && idx < finalSafeLength)
+                                    {
+                                        if (earliestStartIdx == -1 || idx < earliestStartIdx)
+                                        {
+                                            earliestStartIdx = idx;
+                                            matchedStartTag = tag;
+                                        }
+                                    }
+                                }
+
+                                if (earliestStartIdx >= 0)
+                                {
+                                    if (earliestStartIdx > currentPos)
+                                    {
+                                        cleanStreamTextBuilder.Append(finalRawText.Substring(currentPos, earliestStartIdx - currentPos));
+                                    }
+                                    inThoughtBlock = true;
+                                    thoughtTextBuilder.Clear();
+                                    currentPos = earliestStartIdx + matchedStartTag.Length;
+                                }
+                                else
+                                {
+                                    cleanStreamTextBuilder.Append(finalRawText.Substring(currentPos, finalSafeLength - currentPos));
+                                    currentPos = finalSafeLength;
+                                }
+                            }
+                            else
+                            {
+                                int earliestEndIdx = -1;
+                                string matchedEndTag = "";
+                                foreach (var tag in thinkEndTags)
+                                {
+                                    int idx = finalRawText.IndexOf(tag, currentPos, StringComparison.OrdinalIgnoreCase);
+                                    if (idx >= 0 && idx < finalSafeLength)
+                                    {
+                                        if (earliestEndIdx == -1 || idx < earliestEndIdx)
+                                        {
+                                            earliestEndIdx = idx;
+                                            matchedEndTag = tag;
+                                        }
+                                    }
+                                }
+
+                                if (earliestEndIdx >= 0)
+                                {
+                                    if (earliestEndIdx > currentPos)
+                                    {
+                                        thoughtTextBuilder.Append(finalRawText.Substring(currentPos, earliestEndIdx - currentPos));
+                                    }
+                                    inThoughtBlock = false;
+                                    currentPos = earliestEndIdx + matchedEndTag.Length;
+
+                                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
+                                    string label = string.Format(
+                                        _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
+                                        _getString("AgentActivityThinking", "생각중"),
+                                        _displayText.FormatInlineTokenCount(tokenCount)
+                                    );
+                                    _runOutputController.EnqueueRunUi(
+                                        runContext,
+                                        () => _agentPane.UpdateThinkingActivity(label),
+                                        session => _openSessionController.UpdateThinkingInSession(session, label));
+                                }
+                                else
+                                {
+                                    thoughtTextBuilder.Append(finalRawText.Substring(currentPos, finalSafeLength - currentPos));
+                                    currentPos = finalSafeLength;
+
+                                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
+                                    string label = string.Format(
+                                        _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
+                                        _getString("AgentActivityThinking", "생각중"),
+                                        _displayText.FormatInlineTokenCount(tokenCount)
+                                    );
+                                    _runOutputController.EnqueueRunUi(
+                                        runContext,
+                                        () => _agentPane.UpdateThinkingActivity(label),
+                                        session => _openSessionController.UpdateThinkingInSession(session, label));
+                                }
+                            }
+                        }
+                        rawProcessedLength = finalSafeLength;
+                    }
+
                     if (truncated && !string.IsNullOrWhiteSpace(response))
                     {
                         await _runOutputController.StopRunThinkingActivityAsync(runContext);
@@ -954,29 +1194,31 @@ namespace TxtAIEditor.Controls
 
                     bool responseHasToolSyntax = AgentToolCallParser.ContainsToolCallSyntax(response);
 
-                    int endLength = response.Length;
+                    string cleanResponse = runContext.LlmSettings.LlmAgentVerbose ? response : cleanStreamTextBuilder.ToString();
+
+                    int endLength = cleanResponse.Length;
                     if (!runContext.LlmSettings.LlmAgentVerbose)
                     {
-                        int toolCallIndex = response.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                        int toolCallIndex = cleanResponse.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
                         if (toolCallIndex >= 0)
                         {
                             endLength = toolCallIndex;
                         }
                     }
 
-                    if (!planningMode && !responseHasToolSyntax && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(response))
+                    if (!planningMode && !responseHasToolSyntax && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
                     {
                         visibleTextFlushed = true;
-                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, response);
+                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, cleanResponse);
                     }
-                    else if (!planningMode && !responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(response))
+                    else if (!planningMode && !responseHasToolSyntax && suppressStreamingText && !string.IsNullOrEmpty(cleanResponse))
                     {
                         visibleTextFlushed = true;
-                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, response);
+                        await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, cleanResponse);
                     }
                     else if (!planningMode && !responseHasToolSyntax && printedLength < endLength)
                     {
-                        string remainingText = response.Substring(printedLength, endLength - printedLength);
+                        string remainingText = cleanResponse.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;
                         await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, remainingText);
                     }
