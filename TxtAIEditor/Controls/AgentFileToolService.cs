@@ -206,7 +206,11 @@ namespace TxtAIEditor.Controls
             string newText,
             string? expectedSnippet,
             int? allowedStartLine = null,
-            int? allowedEndLine = null)
+            int? allowedEndLine = null,
+            List<string>? expectedBeforeLines = null,
+            List<string>? expectedStartLines = null,
+            List<string>? expectedEndLines = null,
+            List<string>? expectedAfterLines = null)
         {
             return _edits.ReplaceRangeAsync(
                 path,
@@ -215,7 +219,11 @@ namespace TxtAIEditor.Controls
                 newText,
                 expectedSnippet,
                 allowedStartLine,
-                allowedEndLine);
+                allowedEndLine,
+                expectedBeforeLines,
+                expectedStartLines,
+                expectedEndLines,
+                expectedAfterLines);
         }
 
         public Task<string> ApplyPatchAsync(string path, string patchText)

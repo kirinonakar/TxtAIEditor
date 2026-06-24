@@ -2717,7 +2717,11 @@ namespace TxtAIEditor.Controls
                             startLine = new { type = "integer", description = "Start line number to replace" },
                             endLine = new { type = "integer", description = "End line number to replace" },
                             newText = new { type = "string", description = "New text to insert" },
-                            expectedSnippet = new { type = "string", description = "Optional exact text expected at the range to verify correctness" }
+                            expectedSnippet = new { type = "string", description = "For ranges < 5 lines, the exact text expected at the range to verify correctness." },
+                            expectedBeforeLines = new { type = "array", items = new { type = "string" }, description = "For ranges >= 5 lines, the exact content of up to 2 lines immediately preceding the range." },
+                            expectedStartLines = new { type = "array", items = new { type = "string" }, description = "For ranges >= 5 lines, the exact content of the first 2 lines inside the range." },
+                            expectedEndLines = new { type = "array", items = new { type = "string" }, description = "For ranges >= 5 lines, the exact content of the last 2 lines inside the range." },
+                            expectedAfterLines = new { type = "array", items = new { type = "string" }, description = "For ranges >= 5 lines, the exact content of up to 2 lines immediately following the range." }
                         },
                         required = new[] { "path", "startLine", "endLine", "newText" }
                     }

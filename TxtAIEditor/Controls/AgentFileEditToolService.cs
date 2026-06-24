@@ -372,7 +372,11 @@ namespace TxtAIEditor.Controls
             string newText,
             string? expectedSnippet,
             int? allowedStartLine = null,
-            int? allowedEndLine = null)
+            int? allowedEndLine = null,
+            List<string>? expectedBeforeLines = null,
+            List<string>? expectedStartLines = null,
+            List<string>? expectedEndLines = null,
+            List<string>? expectedAfterLines = null)
         {
             string fullPath = _workspace.ResolveInsideWorkspace(path);
             if (!File.Exists(fullPath))
@@ -402,21 +406,143 @@ namespace TxtAIEditor.Controls
             }
             string targetText = string.Join("\n", targetLines);
 
-            if (!string.IsNullOrEmpty(expectedSnippet))
+            bool LinesMatch(string actual, string expected)
             {
-                string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
-                if (!string.IsNullOrEmpty(normalizedExpected))
+                if (string.Equals(actual, expected, StringComparison.Ordinal))
                 {
-                    bool expectedMatchesFullRange =
-                        string.Equals(targetText, normalizedExpected, StringComparison.Ordinal) ||
-                        string.Equals(
-                            NormalizeWhitespaceForSnippetComparison(targetText),
-                            NormalizeWhitespaceForSnippetComparison(normalizedExpected),
-                            StringComparison.Ordinal);
+                    return true;
+                }
+                return string.Equals(
+                    NormalizeWhitespaceForSnippetComparison(actual),
+                    NormalizeWhitespaceForSnippetComparison(expected),
+                    StringComparison.Ordinal);
+            }
 
-                    if (!expectedMatchesFullRange)
+            int lineCount = endLine - startLine + 1;
+            if (lineCount >= 5)
+            {
+                // Boundary verification
+                int expectedCountBefore = 0;
+                if (startLine == 2) expectedCountBefore = 1;
+                else if (startLine >= 3) expectedCountBefore = 2;
+
+                if (expectedCountBefore > 0)
+                {
+                    if (expectedBeforeLines == null || expectedBeforeLines.Count != expectedCountBefore)
                     {
-                        return $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).";
+                        return $"replace_range failed: expectedBeforeLines is required and must have exactly {expectedCountBefore} elements for startLine {startLine}.";
+                    }
+                    if (expectedCountBefore == 1)
+                    {
+                        if (!LinesMatch(lines[0], expectedBeforeLines[0]))
+                        {
+                            return "replace_range failed: expectedBeforeLines[0] did not match line 1 of the file.";
+                        }
+                    }
+                    else
+                    {
+                        if (!LinesMatch(lines[startLine - 3], expectedBeforeLines[0]))
+                        {
+                            return $"replace_range failed: expectedBeforeLines[0] did not match line {startLine - 2} of the file.";
+                        }
+                        if (!LinesMatch(lines[startLine - 2], expectedBeforeLines[1]))
+                        {
+                            return $"replace_range failed: expectedBeforeLines[1] did not match line {startLine - 1} of the file.";
+                        }
+                    }
+                }
+                else
+                {
+                    if (expectedBeforeLines != null && expectedBeforeLines.Count > 0)
+                    {
+                        return "replace_range failed: expectedBeforeLines must be empty or null since startLine is 1.";
+                    }
+                }
+
+                // expectedStartLines
+                if (expectedStartLines == null || expectedStartLines.Count != 2)
+                {
+                    return "replace_range failed: expectedStartLines is required and must have exactly 2 elements.";
+                }
+                if (!LinesMatch(lines[startLine - 1], expectedStartLines[0]))
+                {
+                    return $"replace_range failed: expectedStartLines[0] did not match line {startLine} of the file.";
+                }
+                if (!LinesMatch(lines[startLine], expectedStartLines[1]))
+                {
+                    return $"replace_range failed: expectedStartLines[1] did not match line {startLine + 1} of the file.";
+                }
+
+                // expectedEndLines
+                if (expectedEndLines == null || expectedEndLines.Count != 2)
+                {
+                    return "replace_range failed: expectedEndLines is required and must have exactly 2 elements.";
+                }
+                if (!LinesMatch(lines[endLine - 2], expectedEndLines[0]))
+                {
+                    return $"replace_range failed: expectedEndLines[0] did not match line {endLine - 1} of the file.";
+                }
+                if (!LinesMatch(lines[endLine - 1], expectedEndLines[1]))
+                {
+                    return $"replace_range failed: expectedEndLines[1] did not match line {endLine} of the file.";
+                }
+
+                // expectedAfterLines
+                int expectedCountAfter = 0;
+                if (endLine == lines.Length - 1) expectedCountAfter = 1;
+                else if (endLine <= lines.Length - 2) expectedCountAfter = 2;
+
+                if (expectedCountAfter > 0)
+                {
+                    if (expectedAfterLines == null || expectedAfterLines.Count != expectedCountAfter)
+                    {
+                        return $"replace_range failed: expectedAfterLines is required and must have exactly {expectedCountAfter} elements for endLine {endLine} in a file with {lines.Length} lines.";
+                    }
+                    if (expectedCountAfter == 1)
+                    {
+                        if (!LinesMatch(lines[endLine], expectedAfterLines[0]))
+                        {
+                            return $"replace_range failed: expectedAfterLines[0] did not match line {endLine + 1} of the file.";
+                        }
+                    }
+                    else
+                    {
+                        if (!LinesMatch(lines[endLine], expectedAfterLines[0]))
+                        {
+                            return $"replace_range failed: expectedAfterLines[0] did not match line {endLine + 1} of the file.";
+                        }
+                        if (!LinesMatch(lines[endLine + 1], expectedAfterLines[1]))
+                        {
+                            return $"replace_range failed: expectedAfterLines[1] did not match line {endLine + 2} of the file.";
+                        }
+                    }
+                }
+                else
+                {
+                    if (expectedAfterLines != null && expectedAfterLines.Count > 0)
+                    {
+                        return "replace_range failed: expectedAfterLines must be empty or null since endLine is at the end of the file.";
+                    }
+                }
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(expectedSnippet))
+                {
+                    string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
+                    if (!string.IsNullOrEmpty(normalizedExpected))
+                    {
+                        bool expectedMatchesFullRange =
+                            string.Equals(targetText, normalizedExpected, StringComparison.Ordinal) ||
+                            string.Equals(
+                                NormalizeWhitespaceForSnippetComparison(targetText),
+                                NormalizeWhitespaceForSnippetComparison(normalizedExpected),
+                                StringComparison.Ordinal);
+
+                        if (!expectedMatchesFullRange)
+                        {
+                            return $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).";
+                        }
                     }
                 }
             }

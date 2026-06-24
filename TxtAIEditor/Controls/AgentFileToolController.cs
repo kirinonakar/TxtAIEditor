@@ -593,20 +593,44 @@ namespace TxtAIEditor.Controls
                 return $"replace_range failed: The file '{path}' has been modified since it was last read. You must call read_file to get the updated line numbers before making another replace_range edit on this file.";
             }
 
-            string expectedSnippet = GetReplaceRangeExpectedSnippetArgument(arguments, path);
-            if (string.IsNullOrWhiteSpace(expectedSnippet))
+            int startLine = GetReplaceRangeStartLineArgument(arguments, path);
+            int endLine = GetReplaceRangeEndLineArgument(arguments, path);
+            int lineCount = endLine - startLine + 1;
+
+            string? expectedSnippet = null;
+            List<string>? expectedBeforeLines = null;
+            List<string>? expectedStartLines = null;
+            List<string>? expectedEndLines = null;
+            List<string>? expectedAfterLines = null;
+
+            if (lineCount >= 5)
             {
-                return "replace_range failed: expectedSnippet is required for replace_range edits to ensure edit safety.";
+                expectedBeforeLines = GetStringListArgument(arguments, "expectedBeforeLines", "expected_before_lines");
+                expectedStartLines = GetStringListArgument(arguments, "expectedStartLines", "expected_start_lines");
+                expectedEndLines = GetStringListArgument(arguments, "expectedEndLines", "expected_end_lines");
+                expectedAfterLines = GetStringListArgument(arguments, "expectedAfterLines", "expected_after_lines");
+            }
+            else
+            {
+                expectedSnippet = GetReplaceRangeExpectedSnippetArgument(arguments, path);
+                if (string.IsNullOrWhiteSpace(expectedSnippet))
+                {
+                    return "replace_range failed: expectedSnippet is required for replace_range edits to ensure edit safety.";
+                }
             }
 
             return await _fileTools.ReplaceRangeAsync(
                 path,
-                GetReplaceRangeStartLineArgument(arguments, path),
-                GetReplaceRangeEndLineArgument(arguments, path),
+                startLine,
+                endLine,
                 GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
                 expectedSnippet,
                 null,
-                null);
+                null,
+                expectedBeforeLines,
+                expectedStartLines,
+                expectedEndLines,
+                expectedAfterLines);
         }
 
         public async Task<string> InsertIntoFileAsync(JsonElement arguments)
@@ -729,6 +753,29 @@ namespace TxtAIEditor.Controls
             return ShouldUseActiveSelectionRangeForPath(path)
                 ? selection.Text
                 : string.Empty;
+        }
+
+        private List<string>? GetStringListArgument(JsonElement arguments, params string[] names)
+        {
+            if (arguments.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            foreach (string name in names)
+            {
+                if (arguments.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.Array)
+                {
+                    var list = new List<string>();
+                    foreach (var item in prop.EnumerateArray())
+                    {
+                        list.Add(item.GetString() ?? string.Empty);
+                    }
+                    return list;
+                }
+            }
+
+            return null;
         }
 
         private bool PathsReferToSameFile(string path, string selectionPath)
