@@ -198,8 +198,13 @@ body { padding: 28px 16px 40px; }
     color: #111827;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    padding: 4px 6px;
+    padding: 0;
     line-height: 1.16;
+}
+.ppt-text {
+    display: block;
+    width: 100%;
+    transform-origin: top left;
 }
 .ppt-shape p { width: 100%; margin: 0 0 .24em; line-height: inherit; }
 .ppt-shape p:last-child { margin-bottom: 0; }
@@ -237,11 +242,32 @@ body { padding: 28px 16px 40px; }
 {{slides}}
 </main>
 <script>
+function fitTextBox(box) {
+    const text = box.querySelector(':scope > .ppt-text');
+    if (!text) return;
+
+    text.style.transform = '';
+    text.style.width = '100%';
+    text.style.height = 'auto';
+
+    const availableWidth = Math.max(1, box.clientWidth);
+    const availableHeight = Math.max(1, box.clientHeight);
+    const neededWidth = Math.max(1, text.scrollWidth);
+    const neededHeight = Math.max(1, text.scrollHeight);
+    const scale = Math.min(1, availableWidth / neededWidth, availableHeight / neededHeight);
+
+    if (scale < 0.995) {
+        const fitScale = Math.max(0.45, scale * 0.985);
+        text.style.width = `${100 / fitScale}%`;
+        text.style.transform = `scale(${fitScale})`;
+    }
+}
 function fitSlide(slide) {
     const canvas = slide.querySelector('.slide-canvas');
     if (!canvas) return;
     const baseWidth = parseFloat(getComputedStyle(slide).getPropertyValue('--base-width')) || 960;
     canvas.style.transform = `scale(${slide.clientWidth / baseWidth})`;
+    slide.querySelectorAll('.ppt-shape').forEach(fitTextBox);
 }
 const observer = new ResizeObserver(entries => {
     for (const entry of entries) fitSlide(entry.target);
@@ -250,6 +276,9 @@ document.querySelectorAll('.slide').forEach(slide => {
     fitSlide(slide);
     observer.observe(slide);
 });
+if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => document.querySelectorAll('.slide').forEach(fitSlide));
+}
 </script>
 </body>
 </html>
@@ -426,10 +455,12 @@ document.querySelectorAll('.slide').forEach(slide => {
             string boundsStyle = TryReadBounds(element, slideWidth, slideHeight, baseWidthPx, baseHeightPx, groupTransform, placeholderBounds, out string readBounds)
                 ? readBounds
                 : "left:48px;top:27px;width:864px;height:auto;";
+            XElement? textBody = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "txBody");
             string textHtml = BuildShapeTextHtml(element, themeColors, slideWidth, baseWidthPx);
             if (!string.IsNullOrWhiteSpace(textHtml))
             {
-                yield return "<div class=\"ppt-shape\" style=\"" + boundsStyle + boxStyle + "\">" + textHtml + "</div>";
+                string textBoxStyle = ReadTextBodyBoxStyle(textBody, slideWidth, slideHeight, baseWidthPx, baseHeightPx);
+                yield return "<div class=\"ppt-shape\" style=\"" + boundsStyle + boxStyle + textBoxStyle + "\"><div class=\"ppt-text\">" + textHtml + "</div></div>";
                 yield break;
             }
 
@@ -453,6 +484,7 @@ document.querySelectorAll('.slide').forEach(slide => {
             }
 
             double fontScale = ReadNormAutofitScale(txBody);
+            double fallbackFontSizePx = PointsToPixels(ReadFallbackFontPoint(shape), slideWidth, baseWidthPx) * fontScale;
 
             foreach (XElement paragraph in txBody.Elements().Where(e => e.Name.LocalName == "p"))
             {
@@ -464,7 +496,9 @@ document.querySelectorAll('.slide').forEach(slide => {
 
                 bool hasBullet = paragraph.Descendants().Any(e => e.Name.LocalName == "buChar" || e.Name.LocalName == "buAutoNum");
                 string paragraphStyle = ReadParagraphStyle(paragraph, slideWidth, baseWidthPx);
+                string paragraphDefaultRunStyle = ReadParagraphDefaultRunStyle(paragraph, txBody, themeColors, slideWidth, baseWidthPx, fontScale, fallbackFontSizePx);
                 paragraphs.Append("<p");
+                paragraphStyle += paragraphDefaultRunStyle;
                 if (!string.IsNullOrWhiteSpace(paragraphStyle))
                 {
                     paragraphs.Append(" style=\"").Append(Html(paragraphStyle)).Append('"');
@@ -477,7 +511,7 @@ document.querySelectorAll('.slide').forEach(slide => {
                     paragraphs.Append("<span>").Append(Html(bullet)).Append(' ').Append("</span>");
                 }
 
-                paragraphs.Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx, fontScale));
+                paragraphs.Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx, fontScale, txBody, fallbackFontSizePx));
                 paragraphs.Append("</p>");
             }
 
@@ -489,11 +523,12 @@ document.querySelectorAll('.slide').forEach(slide => {
             IReadOnlyList<string> themeColors,
             long slideWidth,
             double baseWidthPx,
-            double fontScale = 1.0)
+            double fontScale = 1.0,
+            XElement? txBody = null,
+            double fallbackFontSizePx = 0)
         {
             var builder = new StringBuilder();
-            XElement? defaultRunProperties = paragraph.Elements().FirstOrDefault(e => e.Name.LocalName == "pPr")
-                ?.Elements().FirstOrDefault(e => e.Name.LocalName == "defRPr");
+            XElement? defaultRunProperties = ReadParagraphDefaultRunProperties(paragraph, txBody);
             foreach (XElement element in paragraph.Elements())
             {
                 if (element.Name.LocalName == "r" || element.Name.LocalName == "fld")
@@ -695,7 +730,7 @@ document.querySelectorAll('.slide').forEach(slide => {
                 }
 
                 builder.Append('>')
-                    .Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx, fontScale))
+                    .Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx, fontScale, txBody, 0))
                     .Append("</p>");
             }
 
@@ -723,6 +758,92 @@ document.querySelectorAll('.slide').forEach(slide => {
             }
 
             return builder.ToString();
+        }
+
+
+        private static string ReadTextBodyBoxStyle(
+            XElement? txBody,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx)
+        {
+            XElement? bodyPr = txBody?.Elements().FirstOrDefault(e => e.Name.LocalName == "bodyPr");
+            long left = ReadInsetEmu(bodyPr, "lIns", 91440);
+            long right = ReadInsetEmu(bodyPr, "rIns", 91440);
+            long top = ReadInsetEmu(bodyPr, "tIns", 45720);
+            long bottom = ReadInsetEmu(bodyPr, "bIns", 45720);
+            return "padding:" + Pixels(top, slideHeight, baseHeightPx) + " " +
+                Pixels(right, slideWidth, baseWidthPx) + " " +
+                Pixels(bottom, slideHeight, baseHeightPx) + " " +
+                Pixels(left, slideWidth, baseWidthPx) + ";";
+        }
+
+        private static long ReadInsetEmu(XElement? bodyPr, string attributeName, long fallback)
+        {
+            return bodyPr != null && TryReadLong(bodyPr, attributeName, out long value) && value >= 0
+                ? value
+                : fallback;
+        }
+
+        private static XElement? ReadParagraphDefaultRunProperties(XElement paragraph, XElement? txBody)
+        {
+            XElement? paragraphProperties = paragraph.Elements().FirstOrDefault(e => e.Name.LocalName == "pPr");
+            XElement? defaultRunProperties = paragraphProperties?.Elements().FirstOrDefault(e => e.Name.LocalName == "defRPr") ??
+                paragraph.Elements().FirstOrDefault(e => e.Name.LocalName == "endParaRPr");
+            if (defaultRunProperties != null)
+            {
+                return defaultRunProperties;
+            }
+
+            int level = 0;
+            if (paragraphProperties != null &&
+                int.TryParse(paragraphProperties.Attribute("lvl")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int readLevel) &&
+                readLevel >= 0)
+            {
+                level = Math.Min(8, readLevel);
+            }
+
+            XElement? listStyle = txBody?.Elements().FirstOrDefault(e => e.Name.LocalName == "lstStyle");
+            return listStyle?.Elements().FirstOrDefault(e => e.Name.LocalName == "lvl" + (level + 1).ToString(CultureInfo.InvariantCulture) + "pPr")
+                ?.Elements().FirstOrDefault(e => e.Name.LocalName == "defRPr");
+        }
+
+        private static string ReadParagraphDefaultRunStyle(
+            XElement paragraph,
+            XElement? txBody,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            double baseWidthPx,
+            double fontScale,
+            double fallbackFontSizePx)
+        {
+            XElement? defaultRunProperties = ReadParagraphDefaultRunProperties(paragraph, txBody);
+            string style = ReadRunTextStyle(defaultRunProperties, themeColors, slideWidth, baseWidthPx, fontScale);
+            if (!style.Contains("font-size:", StringComparison.OrdinalIgnoreCase) && fallbackFontSizePx > 0)
+            {
+                style = "font-size:" + FormatInvariant(fallbackFontSizePx) + "px;" + style;
+            }
+
+            return style;
+        }
+
+        private static double ReadFallbackFontPoint(XElement shape)
+        {
+            TryReadPlaceholderInfo(shape, out string? placeholderType, out _);
+            return NormalizePlaceholderType(placeholderType) switch
+            {
+                "title" => 44.0,
+                "subtitle" => 32.0,
+                "dt" or "sldNum" or "ftr" => 12.0,
+                _ => 18.0
+            };
+        }
+
+        private static double PointsToPixels(double points, long slideWidth, double baseWidthPx)
+        {
+            double pixelsPerInch = baseWidthPx / (slideWidth / 914400.0);
+            return points / 72.0 * pixelsPerInch;
         }
 
         /// <summary>
@@ -803,13 +924,12 @@ document.querySelectorAll('.slide').forEach(slide => {
             double fontScale = 1.0)
         {
             var style = new StringBuilder();
-            double pixelsPerInch = baseWidthPx / (slideWidth / 914400.0);
             if (runProperties?.Attribute("sz")?.Value is string sizeValue &&
                 int.TryParse(sizeValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int size) &&
                 size > 0)
             {
                 style.Append("font-size:")
-                    .Append(FormatInvariant(size / 100.0 / 72.0 * pixelsPerInch * fontScale))
+                    .Append(FormatInvariant(PointsToPixels(size / 100.0, slideWidth, baseWidthPx) * fontScale))
                     .Append("px;");
             }
 
@@ -1155,8 +1275,7 @@ document.querySelectorAll('.slide').forEach(slide => {
 
         private static double TextMarginToPixels(long value, long slideWidth, double baseWidthPx)
         {
-            double pixelsPerInch = baseWidthPx / (slideWidth / 914400.0);
-            return value / 1000.0 / 72.0 * pixelsPerInch;
+            return PointsToPixels(value / 1000.0, slideWidth, baseWidthPx);
         }
 
         private static bool TryReadBounds(

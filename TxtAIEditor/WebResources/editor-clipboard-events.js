@@ -9,6 +9,7 @@ import {
     insertTextAtCaret,
     replaceSelectionWith
 } from './editor-commands.js';
+import { hideAutocomplete } from './editor-autocomplete.js';
 
 export function bindClipboardEvents() {
     let suppressNativePasteUntil = 0;
@@ -60,6 +61,9 @@ export function bindClipboardEvents() {
         const clipboardText = (event.clipboardData?.getData('text/plain') || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         const element = document.activeElement?.closest?.('.line-text');
         if (!element || element.getAttribute('contenteditable') !== 'true') return;
+
+        // Ctrl+V 붙여넣기 시 자동완성 팝업이 뜨지 않도록 억제
+        hideAutocomplete(500);
 
         if (hasCustomSelection()) {
             const sel = normalizeSelection();
