@@ -1276,27 +1276,48 @@ namespace TxtAIEditor.Controls
         private void RenderDisplayLinesToBlocks(List<string> displayLines)
         {
             AgentOutputText.Blocks.Clear();
+            RenderLinesToBlocksInternal(displayLines);
+        }
 
+        private void RenderLinesToBlocksInternal(List<string> lines)
+        {
             int i = 0;
-            while (i < displayLines.Count)
+            while (i < lines.Count)
             {
-                string line = displayLines[i];
+                string line = lines[i];
                 string trimmed = line.Trim();
 
                 if (trimmed.StartsWith("```"))
                 {
                     int j = i + 1;
                     List<string> codeLines = new List<string>();
-                    while (j < displayLines.Count && !displayLines[j].Trim().StartsWith("```"))
+                    while (j < lines.Count && !lines[j].Trim().StartsWith("```"))
                     {
-                        codeLines.Add(displayLines[j]);
+                        codeLines.Add(lines[j]);
                         j++;
                     }
 
-                    Block codeBlock = RenderCodeBlock(codeLines, trimmed.Substring(3).Trim());
-                    AgentOutputText.Blocks.Add(codeBlock);
+                    bool containsTable = false;
+                    for (int k = 0; k + 1 < codeLines.Count; k++)
+                    {
+                        if (IsTableRow(codeLines[k]) && IsTableSeparatorRow(codeLines[k + 1]))
+                        {
+                            containsTable = true;
+                            break;
+                        }
+                    }
 
-                    if (j < displayLines.Count)
+                    if (containsTable)
+                    {
+                        RenderLinesToBlocksInternal(codeLines);
+                    }
+                    else
+                    {
+                        Block codeBlock = RenderCodeBlock(codeLines, trimmed.Substring(3).Trim());
+                        AgentOutputText.Blocks.Add(codeBlock);
+                    }
+
+                    if (j < lines.Count)
                     {
                         i = j + 1;
                     }
@@ -1305,16 +1326,16 @@ namespace TxtAIEditor.Controls
                         i = j;
                     }
                 }
-                else if (i + 1 < displayLines.Count && IsTableRow(line) && IsTableSeparatorRow(displayLines[i + 1]))
+                else if (i + 1 < lines.Count && IsTableRow(line) && IsTableSeparatorRow(lines[i + 1]))
                 {
                     List<string> tableLines = new List<string>();
                     tableLines.Add(line);
-                    tableLines.Add(displayLines[i + 1]);
+                    tableLines.Add(lines[i + 1]);
 
                     int j = i + 2;
-                    while (j < displayLines.Count && IsTableRow(displayLines[j]))
+                    while (j < lines.Count && IsTableRow(lines[j]))
                     {
-                        tableLines.Add(displayLines[j]);
+                        tableLines.Add(lines[j]);
                         j++;
                     }
 
