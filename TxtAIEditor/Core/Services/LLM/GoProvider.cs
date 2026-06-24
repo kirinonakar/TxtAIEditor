@@ -298,7 +298,16 @@ namespace TxtAIEditor.Core.Services.LLM
                                                 {
                                                     if (func.TryGetProperty("name", out var nameProp))
                                                     {
-                                                        toolAccumulator.Name += nameProp.GetString() ?? string.Empty;
+                                                        string nameChunk = nameProp.GetString() ?? string.Empty;
+                                                        if (!string.IsNullOrEmpty(nameChunk))
+                                                        {
+                                                            toolAccumulator.Name += nameChunk;
+                                                            if (!toolAccumulator.SentHeader && !string.IsNullOrEmpty(toolAccumulator.Name))
+                                                            {
+                                                                toolAccumulator.SentHeader = true;
+                                                                await onChunk($"<tool_call>{{\"name\":\"{toolAccumulator.Name}\",\"arguments\":");
+                                                            }
+                                                        }
                                                     }
                                                     if (func.TryGetProperty("arguments", out var argsProp))
                                                     {
