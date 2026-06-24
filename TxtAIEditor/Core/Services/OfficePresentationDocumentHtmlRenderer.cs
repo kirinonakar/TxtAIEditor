@@ -218,7 +218,6 @@ body { padding: 28px 16px 40px; }
     table-layout: fixed;
     background: rgba(255, 255, 255, .88);
     color: #111827;
-    font-size: clamp(9px, 1.35vw, 15px);
 }
 .ppt-table td {
     border: 1px solid rgba(31, 41, 55, .28);
@@ -453,6 +452,8 @@ document.querySelectorAll('.slide').forEach(slide => {
                 return string.Empty;
             }
 
+            double fontScale = ReadNormAutofitScale(txBody);
+
             foreach (XElement paragraph in txBody.Elements().Where(e => e.Name.LocalName == "p"))
             {
                 string text = ReadParagraphText(paragraph);
@@ -476,7 +477,7 @@ document.querySelectorAll('.slide').forEach(slide => {
                     paragraphs.Append("<span>").Append(Html(bullet)).Append(' ').Append("</span>");
                 }
 
-                paragraphs.Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx));
+                paragraphs.Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx, fontScale));
                 paragraphs.Append("</p>");
             }
 
@@ -487,7 +488,8 @@ document.querySelectorAll('.slide').forEach(slide => {
             XElement paragraph,
             IReadOnlyList<string> themeColors,
             long slideWidth,
-            double baseWidthPx)
+            double baseWidthPx,
+            double fontScale = 1.0)
         {
             var builder = new StringBuilder();
             XElement? defaultRunProperties = paragraph.Elements().FirstOrDefault(e => e.Name.LocalName == "pPr")
@@ -497,7 +499,7 @@ document.querySelectorAll('.slide').forEach(slide => {
                 if (element.Name.LocalName == "r" || element.Name.LocalName == "fld")
                 {
                     XElement? runProperties = element.Elements().FirstOrDefault(e => e.Name.LocalName == "rPr") ?? defaultRunProperties;
-                    string runStyle = ReadRunTextStyle(runProperties, themeColors, slideWidth, baseWidthPx);
+                    string runStyle = ReadRunTextStyle(runProperties, themeColors, slideWidth, baseWidthPx, fontScale);
                     string text = string.Concat(element.Descendants().Where(e => e.Name.LocalName == "t").Select(e => e.Value));
                     if (string.IsNullOrEmpty(text))
                     {
@@ -666,8 +668,16 @@ document.querySelectorAll('.slide').forEach(slide => {
             XElement cell,
             IReadOnlyList<string> themeColors,
             long slideWidth,
-            double baseWidthPx)
+            double baseWidthPx,
+            double fontScale = 1.0)
         {
+            // 셀 내부에 txBody가 있으면 normAutofit fontScale을 읽어 적용
+            XElement? txBody = cell.Elements().FirstOrDefault(e => e.Name.LocalName == "txBody");
+            if (txBody != null)
+            {
+                fontScale = ReadNormAutofitScale(txBody);
+            }
+
             var builder = new StringBuilder();
             foreach (XElement paragraph in cell.Descendants().Where(e => e.Name.LocalName == "p"))
             {
@@ -685,7 +695,7 @@ document.querySelectorAll('.slide').forEach(slide => {
                 }
 
                 builder.Append('>')
-                    .Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx))
+                    .Append(BuildParagraphRunsHtml(paragraph, themeColors, slideWidth, baseWidthPx, fontScale))
                     .Append("</p>");
             }
 
@@ -713,6 +723,37 @@ document.querySelectorAll('.slide').forEach(slide => {
             }
 
             return builder.ToString();
+        }
+
+        /// <summary>
+        /// Reads the normAutofit fontScale from a txBody element.
+        /// PowerPoint uses this to automatically shrink text so it fits inside the shape.
+        /// When normAutofit is present, fontScale (default 100000 = 100%) controls the actual
+        /// rendered size as a percentage of the original font size.
+        /// </summary>
+        private static double ReadNormAutofitScale(XElement txBody)
+        {
+            XElement? bodyPr = txBody.Elements().FirstOrDefault(e => e.Name.LocalName == "bodyPr");
+            if (bodyPr == null)
+            {
+                return 1.0;
+            }
+
+            XElement? normAutofit = bodyPr.Elements().FirstOrDefault(e => e.Name.LocalName == "normAutofit");
+            if (normAutofit == null)
+            {
+                return 1.0;
+            }
+
+            // fontScale is in thousandths of a percent; 100000 = 100%
+            if (int.TryParse(normAutofit.Attribute("fontScale")?.Value,
+                    NumberStyles.Integer, CultureInfo.InvariantCulture, out int fontScale) &&
+                fontScale > 0)
+            {
+                return fontScale / 100000.0;
+            }
+
+            return 1.0;
         }
 
         private static string ReadParagraphStyle(XElement paragraph, long slideWidth, double baseWidthPx)
@@ -758,7 +799,8 @@ document.querySelectorAll('.slide').forEach(slide => {
             XElement? runProperties,
             IReadOnlyList<string> themeColors,
             long slideWidth,
-            double baseWidthPx)
+            double baseWidthPx,
+            double fontScale = 1.0)
         {
             var style = new StringBuilder();
             double pixelsPerInch = baseWidthPx / (slideWidth / 914400.0);
@@ -767,7 +809,7 @@ document.querySelectorAll('.slide').forEach(slide => {
                 size > 0)
             {
                 style.Append("font-size:")
-                    .Append(FormatInvariant(size / 100.0 / 72.0 * pixelsPerInch))
+                    .Append(FormatInvariant(size / 100.0 / 72.0 * pixelsPerInch * fontScale))
                     .Append("px;");
             }
 
