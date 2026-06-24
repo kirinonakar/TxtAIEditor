@@ -203,7 +203,7 @@ namespace TxtAIEditor.Controls
                 value => _currentSessionId = value,
                 () => _sessionHistory.ToString(),
                 () => _sessionHistoryTokenCount,
-                () => _currentRunTranscriptTokens,
+                GetCurrentRunTranscriptTokens,
                 RestoreSessionHistoryState,
                 StopAgent,
                 () => UpdateContextStatsImmediate(),
@@ -244,7 +244,7 @@ namespace TxtAIEditor.Controls
                 BuildAgentInstruction,
                 BuildWorkspaceContext,
                 BuildSessionHistoryForPrompt,
-                () => _currentRunTranscriptTokens,
+                GetCurrentRunTranscriptTokens,
                 RefreshOutputDisplay,
                 _getString,
                 _modelContextLimits,
@@ -699,23 +699,24 @@ namespace TxtAIEditor.Controls
                         currentTaskStartEditIndex,
                         runContext.SessionEdits);
 
+                    var stepReasoningBuilder = new StringBuilder();
                     Func<string, Task>? onReasoning = null;
                     if (runContext.LlmSettings.LlmAgentVerbose)
                     {
                         onReasoning = async reasoningChunk =>
                         {
                             cancellationToken.ThrowIfCancellationRequested();
+                            stepReasoningBuilder.Append(reasoningChunk);
                             await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, reasoningChunk);
                         };
                     }
                     else
                     {
-                        var reasoningAccumulator = new StringBuilder();
                         onReasoning = async reasoningChunk =>
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            reasoningAccumulator.Append(reasoningChunk);
-                            int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(reasoningAccumulator.ToString()));
+                            stepReasoningBuilder.Append(reasoningChunk);
+                            int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(stepReasoningBuilder.ToString()));
                             string label = string.Format(
                                 _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
                                 _getString("AgentActivityThinking", "생각중"),
@@ -1037,6 +1038,16 @@ namespace TxtAIEditor.Controls
                     cancellationToken.ThrowIfCancellationRequested();
                     response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
 
+                    double stepReasoningTokens = AgentTokenEstimator.Estimate(stepReasoningBuilder.ToString());
+                    if (stepReasoningTokens > 0)
+                    {
+                        await _uiDispatcher.RunAsync(() =>
+                        {
+                            runContext.CurrentRunTranscriptTokens += stepReasoningTokens;
+                            UpdateContextStatsImmediate(force: true);
+                        });
+                    }
+
                     if (!runContext.LlmSettings.LlmAgentVerbose && responseBuilder.Length > 0)
                     {
                         string finalRawText = responseBuilder.ToString();
@@ -1206,6 +1217,7 @@ namespace TxtAIEditor.Controls
                         AppendRunSessionHistoryLine();
                         _ = PersistRunSessionToHistoryAsync();
 
+                        runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(emptyResponseMessage);
                         completed = true;
                         break;
                     }
@@ -1289,6 +1301,7 @@ namespace TxtAIEditor.Controls
                                 AppendRunSessionHistoryLine();
                                 _ = PersistRunSessionToHistoryAsync();
 
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(limitMessage);
                                 completed = true;
                                 break;
                             }
@@ -1334,6 +1347,7 @@ namespace TxtAIEditor.Controls
                                 AppendRunSessionHistoryLine();
                                 _ = PersistRunSessionToHistoryAsync();
 
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(limitMessage);
                                 completed = true;
                                 break;
                             }
@@ -1394,6 +1408,7 @@ namespace TxtAIEditor.Controls
                         AppendRunSessionHistoryLine();
                         _ = PersistRunSessionToHistoryAsync();
 
+                        runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response);
                         completed = true;
                         break;
                     }
@@ -2263,6 +2278,16 @@ namespace TxtAIEditor.Controls
             _statsDebounceTimer.Stop();
             _statsDebounceTimer.Interval = TimeSpan.FromMilliseconds(delayMilliseconds);
             _statsDebounceTimer.Start();
+        }
+
+        private double GetCurrentRunTranscriptTokens()
+        {
+            var activeRunContext = _activeToolRunContext.Value ?? _activeWorkspaceRunContext.Value;
+            if (activeRunContext != null)
+            {
+                return activeRunContext.CurrentRunTranscriptTokens;
+            }
+            return _currentRunTranscriptTokens;
         }
 
         private void UpdateContextStatsImmediate(bool force = false)
