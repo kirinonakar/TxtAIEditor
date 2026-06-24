@@ -598,17 +598,13 @@ namespace TxtAIEditor.Controls
             int lineCount = endLine - startLine + 1;
 
             string? expectedSnippet = null;
-            List<string>? expectedBeforeLines = null;
             List<string>? expectedStartLines = null;
             List<string>? expectedEndLines = null;
-            List<string>? expectedAfterLines = null;
 
             if (lineCount >= 5)
             {
-                expectedBeforeLines = GetStringListArgument(arguments, "expectedBeforeLines", "expected_before_lines");
                 expectedStartLines = GetStringListArgument(arguments, "expectedStartLines", "expected_start_lines");
                 expectedEndLines = GetStringListArgument(arguments, "expectedEndLines", "expected_end_lines");
-                expectedAfterLines = GetStringListArgument(arguments, "expectedAfterLines", "expected_after_lines");
             }
             else
             {
@@ -627,10 +623,8 @@ namespace TxtAIEditor.Controls
                 expectedSnippet,
                 null,
                 null,
-                expectedBeforeLines,
                 expectedStartLines,
-                expectedEndLines,
-                expectedAfterLines);
+                expectedEndLines);
         }
 
         public async Task<string> InsertIntoFileAsync(JsonElement arguments)

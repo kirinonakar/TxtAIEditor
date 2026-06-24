@@ -373,10 +373,8 @@ namespace TxtAIEditor.Controls
             string? expectedSnippet,
             int? allowedStartLine = null,
             int? allowedEndLine = null,
-            List<string>? expectedBeforeLines = null,
             List<string>? expectedStartLines = null,
-            List<string>? expectedEndLines = null,
-            List<string>? expectedAfterLines = null)
+            List<string>? expectedEndLines = null)
         {
             string fullPath = _workspace.ResolveInsideWorkspace(path);
             if (!File.Exists(fullPath))
@@ -422,42 +420,6 @@ namespace TxtAIEditor.Controls
             if (lineCount >= 5)
             {
                 // Boundary verification
-                int expectedCountBefore = 0;
-                if (startLine == 2) expectedCountBefore = 1;
-                else if (startLine >= 3) expectedCountBefore = 2;
-
-                if (expectedCountBefore > 0)
-                {
-                    if (expectedBeforeLines == null || expectedBeforeLines.Count != expectedCountBefore)
-                    {
-                        return $"replace_range failed: expectedBeforeLines is required and must have exactly {expectedCountBefore} elements for startLine {startLine}.";
-                    }
-                    if (expectedCountBefore == 1)
-                    {
-                        if (!LinesMatch(lines[0], expectedBeforeLines[0]))
-                        {
-                            return "replace_range failed: expectedBeforeLines[0] did not match line 1 of the file.";
-                        }
-                    }
-                    else
-                    {
-                        if (!LinesMatch(lines[startLine - 3], expectedBeforeLines[0]))
-                        {
-                            return $"replace_range failed: expectedBeforeLines[0] did not match line {startLine - 2} of the file.";
-                        }
-                        if (!LinesMatch(lines[startLine - 2], expectedBeforeLines[1]))
-                        {
-                            return $"replace_range failed: expectedBeforeLines[1] did not match line {startLine - 1} of the file.";
-                        }
-                    }
-                }
-                else
-                {
-                    if (expectedBeforeLines != null && expectedBeforeLines.Count > 0)
-                    {
-                        return "replace_range failed: expectedBeforeLines must be empty or null since startLine is 1.";
-                    }
-                }
 
                 // expectedStartLines
                 if (expectedStartLines == null || expectedStartLines.Count != 2)
@@ -485,44 +447,6 @@ namespace TxtAIEditor.Controls
                 if (!LinesMatch(lines[endLine - 1], expectedEndLines[1]))
                 {
                     return $"replace_range failed: expectedEndLines[1] did not match line {endLine} of the file.";
-                }
-
-                // expectedAfterLines
-                int expectedCountAfter = 0;
-                if (endLine == lines.Length - 1) expectedCountAfter = 1;
-                else if (endLine <= lines.Length - 2) expectedCountAfter = 2;
-
-                if (expectedCountAfter > 0)
-                {
-                    if (expectedAfterLines == null || expectedAfterLines.Count != expectedCountAfter)
-                    {
-                        return $"replace_range failed: expectedAfterLines is required and must have exactly {expectedCountAfter} elements for endLine {endLine} in a file with {lines.Length} lines.";
-                    }
-                    if (expectedCountAfter == 1)
-                    {
-                        if (!LinesMatch(lines[endLine], expectedAfterLines[0]))
-                        {
-                            return $"replace_range failed: expectedAfterLines[0] did not match line {endLine + 1} of the file.";
-                        }
-                    }
-                    else
-                    {
-                        if (!LinesMatch(lines[endLine], expectedAfterLines[0]))
-                        {
-                            return $"replace_range failed: expectedAfterLines[0] did not match line {endLine + 1} of the file.";
-                        }
-                        if (!LinesMatch(lines[endLine + 1], expectedAfterLines[1]))
-                        {
-                            return $"replace_range failed: expectedAfterLines[1] did not match line {endLine + 2} of the file.";
-                        }
-                    }
-                }
-                else
-                {
-                    if (expectedAfterLines != null && expectedAfterLines.Count > 0)
-                    {
-                        return "replace_range failed: expectedAfterLines must be empty or null since endLine is at the end of the file.";
-                    }
                 }
             }
             else
