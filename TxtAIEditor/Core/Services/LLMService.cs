@@ -307,12 +307,12 @@ namespace TxtAIEditor.Core.Services
                 "ollama" => new OllamaProvider(_localizationService, isCloud: false),
                 "ollama cloud" => new OllamaProvider(_localizationService, isCloud: true),
                 "ollamacloud" => new OllamaProvider(_localizationService, isCloud: true),
-                "opencode go" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
-                "opencodego" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
-                "go" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
-                "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
-                "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
-                "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel),
+                "opencode go" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
+                "opencodego" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
+                "go" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
+                "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
+                "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
+                "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 _ => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel)
             };
 
@@ -357,6 +357,10 @@ namespace TxtAIEditor.Core.Services
                 }
             }
             catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (ResponseTruncatedException)
             {
                 throw;
             }

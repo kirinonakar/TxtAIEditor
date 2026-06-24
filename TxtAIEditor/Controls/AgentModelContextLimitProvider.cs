@@ -2,6 +2,7 @@ using System;
 using System.Text.Json;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Controls
 {
@@ -12,6 +13,7 @@ namespace TxtAIEditor.Controls
         private string? _lmStudioLastFetchedEndpoint;
         private bool _lmStudioFetchInProgress;
         private DateTime _lmStudioLastFetchedTime = DateTime.MinValue;
+        private bool _modelsDevPriming;
 
         public void ResetLmStudioCache()
         {
@@ -52,6 +54,29 @@ namespace TxtAIEditor.Controls
                 }
 
                 return 0;
+            }
+
+            if (!ModelsDevCatalog.IsLoaded && !_modelsDevPriming)
+            {
+                _modelsDevPriming = true;
+                _ = Task.Run(async () =>
+                {
+                    try { await ModelsDevCatalog.PrimeAsync(); }
+                    catch { }
+                    finally
+                    {
+                        _modelsDevPriming = false;
+                        onContextLimitChanged();
+                    }
+                });
+            }
+
+            var modelsDevLimits = ModelsDevCatalog.GetCachedLimits(
+                settings.LlmProvider ?? string.Empty,
+                settings.LlmModel ?? string.Empty);
+            if (modelsDevLimits.context > 0)
+            {
+                return modelsDevLimits.context;
             }
 
             if (model.Contains("gemini"))

@@ -17,11 +17,13 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private static readonly HttpClient _httpClient = new HttpClient();
         private readonly string _thinkingLevel;
+        private readonly string _providerName;
 
-        public GoProvider(ILocalizationService localizationService, string thinkingLevel = "")
+        public GoProvider(ILocalizationService localizationService, string thinkingLevel = "", string providerName = "OpenCode Go")
         {
             _localizationService = localizationService;
             _thinkingLevel = thinkingLevel ?? "";
+            _providerName = providerName ?? "OpenCode Go";
         }
 
         private static int GetThinkingBudget(string level) => level.ToLowerInvariant() switch
@@ -34,6 +36,20 @@ namespace TxtAIEditor.Core.Services.LLM
         };
 
         private bool HasThinking => !string.IsNullOrEmpty(_thinkingLevel) && _thinkingLevel != "none";
+
+        private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
+        {
+            var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
+            if (output > 0) return output;
+
+            int maxTokens = 8192;
+            if (HasThinking)
+            {
+                int budget = GetThinkingBudget(_thinkingLevel);
+                maxTokens = Math.Max(8192, Math.Min(budget + 8192, 32768));
+            }
+            return maxTokens;
+        }
 
         private static bool IsDeepSeekOrGlm(string model)
         {
@@ -66,6 +82,8 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+
             var payloadDict = new Dictionary<string, object>
             {
                 ["model"] = model,
@@ -74,7 +92,8 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                ["temperature"] = 0.5
+                ["temperature"] = IsKimiModel(model) ? 1.0 : 0.5,
+                ["max_tokens"] = outputLimit
             };
 
             if (HasThinking)
@@ -130,6 +149,13 @@ namespace TxtAIEditor.Core.Services.LLM
                                     if (!string.IsNullOrEmpty(reasoningText)) return reasoningText;
                                 }
                             }
+
+                            if (firstChoice.TryGetProperty("finish_reason", out var fr) &&
+                                fr.ValueKind == JsonValueKind.String &&
+                                fr.GetString() == "length")
+                            {
+                                throw new ResponseTruncatedException();
+                            }
                         }
                     }
 
@@ -152,6 +178,8 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+
             var payloadDict = new Dictionary<string, object>
             {
                 ["model"] = model,
@@ -161,7 +189,8 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
                 ["temperature"] = 0.5,
-                ["stream"] = true
+                ["stream"] = true,
+                ["max_tokens"] = outputLimit
             };
 
             if (HasThinking)
@@ -191,6 +220,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     using (var reader = new System.IO.StreamReader(stream))
                     {
+                        bool truncated = false;
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -238,6 +268,13 @@ namespace TxtAIEditor.Core.Services.LLM
                                                 }
                                             }
                                         }
+
+                                        if (firstChoice.TryGetProperty("finish_reason", out var fr) &&
+                                            fr.ValueKind == JsonValueKind.String &&
+                                            fr.GetString() == "length")
+                                        {
+                                            truncated = true;
+                                        }
                                     }
                                 }
                             }
@@ -245,6 +282,8 @@ namespace TxtAIEditor.Core.Services.LLM
                             {
                             }
                         }
+
+                        if (truncated) throw new ResponseTruncatedException();
                     }
                 }
             }
@@ -253,6 +292,9 @@ namespace TxtAIEditor.Core.Services.LLM
         private async Task<string> GenerateAnthropicCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments)
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
+
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            if (outputLimit <= 0) outputLimit = 8192;
 
             var messagesList = new List<object>();
             var userMsg = new Dictionary<string, object>
@@ -265,7 +307,7 @@ namespace TxtAIEditor.Core.Services.LLM
             var payloadDict = new Dictionary<string, object>
             {
                 ["model"] = model,
-                ["max_tokens"] = 8192,
+                ["max_tokens"] = outputLimit,
                 ["messages"] = messagesList
             };
 
@@ -279,6 +321,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 int budget = GetThinkingBudget(_thinkingLevel);
                 if (budget > 0)
                 {
+                    if (budget >= outputLimit) budget = Math.Max(1024, outputLimit - 1024);
                     payloadDict["thinking"] = new Dictionary<string, object>
                     {
                         ["type"] = "enabled",
@@ -336,13 +379,16 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
+            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            if (outputLimit <= 0) outputLimit = 8192;
+
             var messagesList = new List<object>();
             messagesList.Add(new { role = "user", content = userContent });
 
             var payloadDict = new Dictionary<string, object>
             {
                 ["model"] = model,
-                ["max_tokens"] = 8192,
+                ["max_tokens"] = outputLimit,
                 ["messages"] = messagesList,
                 ["stream"] = true
             };
@@ -357,6 +403,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 int budget = GetThinkingBudget(_thinkingLevel);
                 if (budget > 0)
                 {
+                    if (budget >= outputLimit) budget = Math.Max(1024, outputLimit - 1024);
                     payloadDict["thinking"] = new Dictionary<string, object>
                     {
                         ["type"] = "enabled",
@@ -456,6 +503,13 @@ namespace TxtAIEditor.Core.Services.LLM
                     }
                 }
             }
+        }
+
+        private static bool IsKimiModel(string model)
+        {
+            if (string.IsNullOrEmpty(model)) return false;
+            return model.Contains("kimi", StringComparison.OrdinalIgnoreCase) ||
+                   model.Contains("moonshot", StringComparison.OrdinalIgnoreCase);
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)

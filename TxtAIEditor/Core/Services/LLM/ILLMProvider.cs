@@ -5,6 +5,12 @@ using System.Threading.Tasks;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
+    public class ResponseTruncatedException : Exception
+    {
+        public ResponseTruncatedException() : base("Response truncated due to token limit.") { }
+        public ResponseTruncatedException(string message) : base(message) { }
+    }
+
     public interface ILLMProvider
     {
         Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null);

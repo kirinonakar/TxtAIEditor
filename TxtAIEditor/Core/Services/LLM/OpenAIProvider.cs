@@ -59,7 +59,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         new { role = "system", content = (object)systemPrompt },
                         new { role = "user", content = BuildUserContent(userContent, attachments) }
                     },
-                    temperature = 0.5
+                    temperature = IsKimiModel(model) ? 1.0 : 0.5
                 };
             }
 
@@ -133,7 +133,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         new { role = "system", content = (object)systemPrompt },
                         new { role = "user", content = BuildUserContent(userContent, attachments) }
                     },
-                    temperature = 0.5,
+                    temperature = IsKimiModel(model) ? 1.0 : 0.5,
                     stream = true
                 };
             }
@@ -197,6 +197,13 @@ namespace TxtAIEditor.Core.Services.LLM
                     }
                 }
             }
+        }
+
+        private static bool IsKimiModel(string model)
+        {
+            if (string.IsNullOrEmpty(model)) return false;
+            return model.Contains("kimi", StringComparison.OrdinalIgnoreCase) ||
+                   model.Contains("moonshot", StringComparison.OrdinalIgnoreCase);
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
