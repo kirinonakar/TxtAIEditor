@@ -62,54 +62,99 @@ namespace TxtAIEditor.Controls
             _getString = getString;
         }
 
-        public async Task HandleFileModifiedAsync(string filePath)
+        private async Task RunOnUiAsync(Func<Task> action)
         {
-            await _tabSyncController.HandleFileModifiedAsync(filePath);
-
-            string currentFolder = _currentFolderProvider();
-            if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
+            var dispatcher = _primaryTabView.DispatcherQueue;
+            if (dispatcher != null && !dispatcher.HasThreadAccess)
             {
-                _loadDirectoryRoot(currentFolder);
+                var tcs = new TaskCompletionSource();
+                dispatcher.TryEnqueue(async () =>
+                {
+                    try
+                    {
+                        await action();
+                        tcs.SetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.SetException(ex);
+                    }
+                });
+                await tcs.Task;
             }
-
-            _queueGitStatusRefresh();
-
-            var edit = _sessionEditsProvider()
-                .LastOrDefault(e => string.Equals(e.FullPath, filePath, StringComparison.OrdinalIgnoreCase));
-            if (edit != null)
+            else
             {
-                string displayName = edit.TotalModifications > 1
-                    ? $"({edit.ModificationNumber}) {Path.GetFileName(edit.RelativePath)}"
-                    : Path.GetFileName(edit.RelativePath);
-                string title = $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}";
-                await _compareTabController.UpdateCompareTabIfOpenAsync(
-                    title,
-                    edit.FullPath,
-                    edit.FullPath,
-                    edit.OldContent,
-                    edit.NewContent,
-                    labelA: _getString("DiffOriginalLabel", "원본"),
-                    labelB: _getString("DiffModifiedLabel", "수정본"));
+                await action();
             }
         }
 
-        public Task OpenDiffViewAsync(AgentFileEditPreview preview)
+        public async Task HandleFileModifiedAsync(string filePath)
         {
-            string displayName = preview.TotalModifications > 1
-                ? $"({preview.ModificationNumber}) {Path.GetFileName(preview.RelativePath)}"
-                : Path.GetFileName(preview.RelativePath);
+            await RunOnUiAsync(async () =>
+            {
+                await _tabSyncController.HandleFileModifiedAsync(filePath);
 
-            return _compareTabController.OpenCompareTabAsync(
-                preview.FullPath,
-                preview.FullPath,
-                preview.OldContent,
-                preview.NewContent,
-                customTitle: $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}",
-                labelA: _getString("DiffOriginalLabel", "원본"),
-                labelB: _getString("DiffModifiedLabel", "수정본"));
+                string currentFolder = _currentFolderProvider();
+                if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
+                {
+                    _loadDirectoryRoot(currentFolder);
+                }
+
+                _queueGitStatusRefresh();
+
+                var edit = _sessionEditsProvider()
+                    .LastOrDefault(e => string.Equals(e.FullPath, filePath, StringComparison.OrdinalIgnoreCase));
+                if (edit != null)
+                {
+                    string displayName = edit.TotalModifications > 1
+                        ? $"({edit.ModificationNumber}) {Path.GetFileName(edit.RelativePath)}"
+                        : Path.GetFileName(edit.RelativePath);
+                    string title = $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}";
+                    await _compareTabController.UpdateCompareTabIfOpenAsync(
+                        title,
+                        edit.FullPath,
+                        edit.FullPath,
+                        edit.OldContent,
+                        edit.NewContent,
+                        labelA: _getString("DiffOriginalLabel", "원본"),
+                        labelB: _getString("DiffModifiedLabel", "수정본"));
+                }
+            });
+        }
+
+        public async Task OpenDiffViewAsync(AgentFileEditPreview preview)
+        {
+            await RunOnUiAsync(async () =>
+            {
+                string displayName = preview.TotalModifications > 1
+                    ? $"({preview.ModificationNumber}) {Path.GetFileName(preview.RelativePath)}"
+                    : Path.GetFileName(preview.RelativePath);
+
+                await _compareTabController.OpenCompareTabAsync(
+                    preview.FullPath,
+                    preview.FullPath,
+                    preview.OldContent,
+                    preview.NewContent,
+                    customTitle: $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}",
+                    labelA: _getString("DiffOriginalLabel", "원본"),
+                    labelB: _getString("DiffModifiedLabel", "수정본"));
+            });
         }
 
         public void CloseTabById(string tabId)
+        {
+            var dispatcher = _primaryTabView.DispatcherQueue;
+            if (dispatcher != null && !dispatcher.HasThreadAccess)
+            {
+                dispatcher.TryEnqueue(() => CloseTabByIdInternal(tabId));
+            }
+            else
+            {
+                CloseTabByIdInternal(tabId);
+            }
+        }
+
+        private void CloseTabByIdInternal(string tabId)
         {
             var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
             if (tab == null)
@@ -126,25 +171,28 @@ namespace TxtAIEditor.Controls
 
         public async Task RevertTabOrFileAsync(string pathOrId, string oldContent, bool isNewFile)
         {
-            var tab = _viewModel.Tabs.FirstOrDefault(t =>
-                t.Id == pathOrId ||
-                string.Equals(t.FilePath, pathOrId, StringComparison.OrdinalIgnoreCase));
-            if (tab != null)
+            await RunOnUiAsync(async () =>
             {
-                await RevertOpenTabAsync(tab, oldContent, isNewFile);
-                return;
-            }
+                var tab = _viewModel.Tabs.FirstOrDefault(t =>
+                    t.Id == pathOrId ||
+                    string.Equals(t.FilePath, pathOrId, StringComparison.OrdinalIgnoreCase));
+                if (tab != null)
+                {
+                    await RevertOpenTabAsync(tab, oldContent, isNewFile);
+                    return;
+                }
 
-            if (isNewFile)
-            {
-                TryDeleteFile(pathOrId);
-                return;
-            }
+                if (isNewFile)
+                {
+                    TryDeleteFile(pathOrId);
+                    return;
+                }
 
-            if (Path.IsPathRooted(pathOrId))
-            {
-                await File.WriteAllTextAsync(pathOrId, oldContent);
-            }
+                if (Path.IsPathRooted(pathOrId))
+                {
+                    await File.WriteAllTextAsync(pathOrId, oldContent);
+                }
+            });
         }
 
         public string GetWorkspaceRoot()

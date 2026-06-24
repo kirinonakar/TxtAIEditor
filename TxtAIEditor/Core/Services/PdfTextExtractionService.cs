@@ -135,7 +135,7 @@ namespace TxtAIEditor.Core.Services
                 return rawStreamLength > MaxRawStreamBytesToDecode;
             }
 
-            string compact = Regex.Replace(dictionary, @"\s+", " ");
+            string compact = Regex.Replace(dictionary, @"\s+", " ", RegexOptions.NonBacktracking);
             string[] binaryMarkers =
             {
                 "/Subtype /Image",
@@ -234,7 +234,7 @@ namespace TxtAIEditor.Core.Services
         {
             var builder = new StringBuilder();
 
-            foreach (Match match in Regex.Matches(content, @"\[(?<array>(?:\\.|[^\]])*)\]\s*TJ|(?<text>\((?:\\.|[^\\)])*\)|<(?<hex>[0-9A-Fa-f\s]+)>)\s*(?:Tj|'|"")|(?<newline>T\*|Td|TD)", RegexOptions.Singleline))
+            foreach (Match match in Regex.Matches(content, @"\[(?<array>(?:\\.|[^\]\\])*)\]\s*TJ|(?<text>\((?:\\.|[^\\)])*\)|<(?<hex>[0-9A-Fa-f\s]+)>)\s*(?:Tj|'|"")|(?<newline>T\*|Td|TD)", RegexOptions.Singleline | RegexOptions.NonBacktracking))
             {
                 if (match.Groups["array"].Success)
                 {
@@ -255,7 +255,7 @@ namespace TxtAIEditor.Core.Services
 
         private static void AppendArrayText(StringBuilder builder, string arrayText)
         {
-            foreach (Match token in Regex.Matches(arrayText, @"\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>|-?\d+(?:\.\d+)?", RegexOptions.Singleline))
+            foreach (Match token in Regex.Matches(arrayText, @"\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>|-?\d+(?:\.\d+)?", RegexOptions.Singleline | RegexOptions.NonBacktracking))
             {
                 string value = token.Value;
                 if (double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double spacing))
@@ -343,7 +343,7 @@ namespace TxtAIEditor.Core.Services
 
         private static string DecodeHexString(string hex)
         {
-            string compact = Regex.Replace(hex, @"\s+", string.Empty);
+            string compact = Regex.Replace(hex, @"\s+", string.Empty, RegexOptions.NonBacktracking);
             if (compact.Length == 0)
             {
                 return string.Empty;
@@ -382,7 +382,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             var builder = new StringBuilder();
-            foreach (Match match in Regex.Matches(raw, @"\((?:\\.|[^\\)]){3,}\)"))
+            foreach (Match match in Regex.Matches(raw, @"\((?:\\.|[^\\)]){3,}\)", RegexOptions.NonBacktracking))
             {
                 string text = DecodeLiteralString(match.Value.Substring(1, match.Value.Length - 2));
                 if (LooksLikeText(text))
@@ -439,9 +439,9 @@ namespace TxtAIEditor.Core.Services
             string normalized = text
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
                 .Replace('\r', '\n');
-            normalized = Regex.Replace(normalized, @"[ \t\f\v]+", " ");
-            normalized = Regex.Replace(normalized, @" *\n *", "\n");
-            normalized = Regex.Replace(normalized, @"\n{3,}", "\n\n");
+            normalized = Regex.Replace(normalized, @"[ \t\f\v]+", " ", RegexOptions.NonBacktracking);
+            normalized = Regex.Replace(normalized, @" *\n *", "\n", RegexOptions.NonBacktracking);
+            normalized = Regex.Replace(normalized, @"\n{3,}", "\n\n", RegexOptions.NonBacktracking);
             return normalized.Trim();
         }
 
