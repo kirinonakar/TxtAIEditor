@@ -958,7 +958,7 @@ namespace TxtAIEditor.Controls
                                 return;
                             }
 
-                            int toolCallIndex = streamedText.IndexOf("<tool_call>", printedLength, StringComparison.OrdinalIgnoreCase);
+                            int toolCallIndex = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
                             if (toolCallIndex >= 0)
                             {
                                 hasToolCall = true;
