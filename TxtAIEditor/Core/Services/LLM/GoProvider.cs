@@ -272,7 +272,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            string? line = await reader.ReadLineAsync(cancellationToken);
+                            string? line = await reader.ReadLineAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
                             if (line == null) break;
                             if (string.IsNullOrEmpty(line)) continue;
                             if (!line.StartsWith("data: ")) continue;
@@ -517,7 +517,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            string? line = await reader.ReadLineAsync(cancellationToken);
+                            string? line = await reader.ReadLineAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
                             if (line == null) break;
 
                             if (line.StartsWith("event: "))

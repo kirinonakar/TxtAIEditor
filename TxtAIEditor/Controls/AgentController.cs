@@ -708,6 +708,26 @@ namespace TxtAIEditor.Controls
                             await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, reasoningChunk);
                         };
                     }
+                    else
+                    {
+                        var reasoningAccumulator = new StringBuilder();
+                        onReasoning = async reasoningChunk =>
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            reasoningAccumulator.Append(reasoningChunk);
+                            int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(reasoningAccumulator.ToString()));
+                            string label = string.Format(
+                                _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
+                                _getString("AgentActivityThinking", "생각중"),
+                                _displayText.FormatInlineTokenCount(tokenCount)
+                            );
+                            _runOutputController.EnqueueRunUi(
+                                runContext,
+                                () => _agentPane.UpdateThinkingActivity(label),
+                                session => _openSessionController.UpdateThinkingInSession(session, label));
+                            await Task.CompletedTask;
+                        };
+                    }
 
                     bool truncated = false;
                     try
