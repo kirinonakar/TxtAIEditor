@@ -416,54 +416,7 @@ namespace TxtAIEditor.Controls
 
                     if (!expectedMatchesFullRange)
                     {
-                        int originalStartLine = startLine;
-                        int originalEndLine = endLine;
-
-                        SnippetRangeResolution rangeResolution = TryResolveUniqueExpectedSnippetLineRange(
-                            lines,
-                            startLine,
-                            endLine,
-                            normalizedExpected,
-                            false,
-                            out int adjustedStartLine,
-                            out int adjustedEndLine);
-                        if (rangeResolution == SnippetRangeResolution.NotFound)
-                        {
-                            rangeResolution = TryResolveUniqueExpectedSnippetLineRange(
-                                lines,
-                                startLine,
-                                endLine,
-                                normalizedExpected,
-                                true,
-                                out adjustedStartLine,
-                                out adjustedEndLine);
-                        }
-
-                        if (rangeResolution == SnippetRangeResolution.Ambiguous)
-                        {
-                            return $"replace_range failed: expectedSnippet matched multiple line ranges inside the requested range ({startLine}-{endLine}). Narrow startLine/endLine or provide a longer expectedSnippet.";
-                        }
-
-                        if (rangeResolution == SnippetRangeResolution.NotFound &&
-                            !TryResolveNearbyExpectedSnippetRange(
-                                lines,
-                                startLine,
-                                endLine,
-                                normalizedExpected,
-                                allowedStartLine,
-                                allowedEndLine,
-                                out adjustedStartLine,
-                                out adjustedEndLine))
-                        {
-                            return $"replace_range failed: expectedSnippet did not match the full requested range or a unique line-aligned subrange ({startLine}-{endLine}). Narrow startLine/endLine or include the full replaced range in expectedSnippet.";
-                        }
-
-                        startLine = adjustedStartLine;
-                        endLine = adjustedEndLine;
-                        if (startLine != originalStartLine || endLine != originalEndLine)
-                        {
-                            rangeAdjustmentNote = $" auto-adjusted lines {originalStartLine}-{originalEndLine} to {startLine}-{endLine} to match expectedSnippet.";
-                        }
+                        return $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).";
                     }
                 }
             }
