@@ -1238,8 +1238,8 @@ namespace TxtAIEditor.Controls
                                 !string.IsNullOrWhiteSpace(toolCallFormatIssue)
                                     ? toolCallFormatIssue
                                     : "The tool_call JSON could not be parsed.");
-                            transcript += "\n\n" + retryNote;
-                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+                            transcript += "\n\n" + response + "\n\n" + retryNote;
+                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + "\n\n" + retryNote);
 
                             string retryMessage = _getString(
                                 "AgentToolCallFormatRetry",
@@ -1283,8 +1283,8 @@ namespace TxtAIEditor.Controls
                                 "\n\n[Planning mode make_plan required]\n" +
                                 "Do not answer with the plan as plain text. Save it by replying with exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
 
-                            transcript += retryNote;
-                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+                            transcript += "\n\n" + response + "\n\n" + retryNote;
+                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + "\n\n" + retryNote);
 
                             string retryMessage = _getString(
                                 "AgentMakePlanRequired",
