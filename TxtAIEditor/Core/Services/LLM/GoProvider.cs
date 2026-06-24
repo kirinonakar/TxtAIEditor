@@ -189,7 +189,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                ["temperature"] = 0.5,
+                ["temperature"] = IsKimiModel(model) ? 1.0 : 0.5,
                 ["stream"] = true,
                 ["max_tokens"] = outputLimit
             };
