@@ -42,13 +42,6 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("opencode-go", "qwen3.7-max"), (1000000, 65536) },
                 { ("opencode-go", "qwen3.7-plus"), (1000000, 65536) },
 
-                { ("opencode", "deepseek-v4-flash"), (1000000, 384000) },
-                { ("opencode", "deepseek-v4-pro"), (1000000, 384000) },
-                { ("opencode", "glm-5"), (204800, 131072) },
-                { ("opencode", "glm-5.1"), (204800, 131072) },
-                { ("opencode", "glm-5.2"), (1000000, 131072) },
-                { ("opencode", "gpt-5"), (400000, 128000) },
-                { ("opencode", "gpt-5-codex"), (400000, 128000) },
                 { ("opencode", "gpt-5-nano"), (400000, 128000) },
                 { ("opencode", "gpt-5.4"), (1050000, 128000) },
                 { ("opencode", "gpt-5.4-mini"), (400000, 128000) },
