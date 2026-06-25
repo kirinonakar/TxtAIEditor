@@ -2445,6 +2445,9 @@ Plan: {0}</value>
    <data name="SettingsBackupImportedMessage" xml:space="preserve">
      <value>All settings were imported. Current settings were reloaded, and some items may require a restart.</value>
    </data>
+   <data name="Ok" xml:space="preserve">
+     <value>OK</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key is invalid. Please check your settings first.</value>
    </data>

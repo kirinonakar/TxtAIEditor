@@ -2160,6 +2160,9 @@
   <data name="AgentVerboseEditTabOnly" xml:space="preserve">
     <value>탭 내용을 수정했습니다: {0}</value>
   </data>
+  <data name="Ok" xml:space="preserve">
+    <value>확인</value>
+  </data>
   <data name="AgentVerboseOpenFileOnly" xml:space="preserve">
     <value>파일을 열었습니다: {0}</value>
   </data>

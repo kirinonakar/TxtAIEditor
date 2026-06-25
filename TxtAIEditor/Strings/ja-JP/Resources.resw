@@ -2446,6 +2446,9 @@
    <data name="SettingsBackupImportedMessage" xml:space="preserve">
      <value>すべての設定を読み込みました。現在の設定は再読み込み済みです。一部の項目は再起動後に反映される場合があります。</value>
    </data>
+   <data name="Ok" xml:space="preserve">
+     <value>OK</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key が無効です。設定を先に確認してください。</value>
    </data>

@@ -236,7 +236,8 @@ namespace TxtAIEditor
                 GetCurrentElementTheme,
                 () => EditorWorkspace.IsTerminalVisible,
                 () => TerminalPane.SuspendNativeWindows(),
-                () => TerminalPane.ResumeNativeWindows());
+                () => TerminalPane.ResumeNativeWindows(),
+                GetLocalizedString);
             _windowTitleController = new WindowTitleController(
                 this,
                 AppTitleTextBlock,

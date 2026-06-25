@@ -13,19 +13,22 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isTerminalVisible;
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
+        private readonly Func<string, string, string> _getString;
 
         public WindowDialogController(
             Func<XamlRoot?> xamlRootProvider,
             Func<ElementTheme> getCurrentElementTheme,
             Func<bool> isTerminalVisible,
             Action suspendTerminal,
-            Action resumeTerminal)
+            Action resumeTerminal,
+            Func<string, string, string> getString)
         {
             _xamlRootProvider = xamlRootProvider;
             _getCurrentElementTheme = getCurrentElementTheme;
             _isTerminalVisible = isTerminalVisible;
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
+            _getString = getString;
         }
 
         public async Task<XamlRoot?> WaitForDialogXamlRootAsync()
@@ -66,7 +69,7 @@ namespace TxtAIEditor.Controls
                 {
                     Title = title,
                     Content = message,
-                    CloseButtonText = "확인",
+                    CloseButtonText = _getString("Ok", "확인"),
                     XamlRoot = xamlRoot,
                     RequestedTheme = _getCurrentElementTheme()
                 };
