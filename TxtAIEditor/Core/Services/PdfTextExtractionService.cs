@@ -34,13 +34,21 @@ namespace TxtAIEditor.Core.Services
                 streams.Add(stream);
             }
 
-            var fontUnicodeMaps = BuildFontUnicodeMaps(raw, streams);
+            var streamFontUnicodeMaps = BuildContentStreamFontUnicodeMaps(raw, streams);
+            var fallbackFontUnicodeMaps = BuildUnambiguousFontUnicodeMaps(raw, streams);
 
             foreach (var stream in streams)
             {
                 if (!LooksLikeTextContentStream(stream.DecodedText))
                 {
                     continue;
+                }
+
+                Dictionary<string, ToUnicodeCMap> fontUnicodeMaps = fallbackFontUnicodeMaps;
+                if (stream.ObjectNumber.HasValue &&
+                    streamFontUnicodeMaps.TryGetValue(stream.ObjectNumber.Value, out Dictionary<string, ToUnicodeCMap>? localFontUnicodeMaps))
+                {
+                    fontUnicodeMaps = localFontUnicodeMaps;
                 }
 
                 string extracted = ExtractTextFromContentStream(stream.DecodedText, fontUnicodeMaps);
@@ -240,6 +248,241 @@ namespace TxtAIEditor.Core.Services
             }
 
             return null;
+        }
+
+        private sealed class PdfObjectInfo
+        {
+            public PdfObjectInfo(int objectNumber, string body)
+            {
+                ObjectNumber = objectNumber;
+                Body = body;
+            }
+
+            public int ObjectNumber { get; }
+
+            public string Body { get; }
+        }
+
+        private static Dictionary<int, Dictionary<string, ToUnicodeCMap>> BuildContentStreamFontUnicodeMaps(string raw, List<PdfStreamInfo> streams)
+        {
+            var result = new Dictionary<int, Dictionary<string, ToUnicodeCMap>>();
+            var toUnicodeByObjectNumber = BuildToUnicodeMapsByObjectNumber(streams);
+            var fontObjectToCMap = BuildFontObjectToUnicodeMaps(raw, toUnicodeByObjectNumber);
+            var objects = ParsePdfObjects(raw);
+            var objectBodies = new Dictionary<int, string>();
+            foreach (var obj in objects)
+            {
+                objectBodies[obj.ObjectNumber] = obj.Body;
+            }
+
+            foreach (var obj in objects)
+            {
+                string body = obj.Body;
+                if (!body.Contains("/Type /Page", StringComparison.Ordinal) ||
+                    body.Contains("/Type /Pages", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string? resourceBody = GetPageResourceBody(body, objectBodies);
+                if (string.IsNullOrEmpty(resourceBody))
+                {
+                    continue;
+                }
+
+                Dictionary<string, ToUnicodeCMap> pageFontMaps = BuildFontUnicodeMapsFromResourceText(resourceBody, fontObjectToCMap);
+                if (pageFontMaps.Count == 0)
+                {
+                    continue;
+                }
+
+                foreach (int contentObject in ExtractContentObjectNumbers(body))
+                {
+                    result[contentObject] = pageFontMaps;
+                }
+            }
+
+            return result;
+        }
+
+        private static Dictionary<string, ToUnicodeCMap> BuildUnambiguousFontUnicodeMaps(string raw, List<PdfStreamInfo> streams)
+        {
+            var toUnicodeByObjectNumber = BuildToUnicodeMapsByObjectNumber(streams);
+            var fontObjectToCMap = BuildFontObjectToUnicodeMaps(raw, toUnicodeByObjectNumber);
+            var byName = new Dictionary<string, int>(StringComparer.Ordinal);
+            var ambiguous = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (string fontBlock in EnumerateFontResourceBlocks(raw))
+            {
+                foreach (Match entry in Regex.Matches(fontBlock, @"/(?<name>[A-Za-z0-9_.+\-#]+)\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking))
+                {
+                    string name = DecodePdfName(entry.Groups["name"].Value);
+                    if (!int.TryParse(entry.Groups["obj"].Value, out int fontObject) || !fontObjectToCMap.ContainsKey(fontObject))
+                    {
+                        continue;
+                    }
+
+                    if (byName.TryGetValue(name, out int existingFontObject) && existingFontObject != fontObject)
+                    {
+                        ambiguous.Add(name);
+                    }
+                    else
+                    {
+                        byName[name] = fontObject;
+                    }
+                }
+            }
+
+            var result = new Dictionary<string, ToUnicodeCMap>(StringComparer.Ordinal);
+            foreach (var entry in byName)
+            {
+                if (!ambiguous.Contains(entry.Key) && fontObjectToCMap.TryGetValue(entry.Value, out ToUnicodeCMap? cmap))
+                {
+                    result[entry.Key] = cmap;
+                }
+            }
+
+            return result;
+        }
+
+        private static Dictionary<int, ToUnicodeCMap> BuildToUnicodeMapsByObjectNumber(List<PdfStreamInfo> streams)
+        {
+            var result = new Dictionary<int, ToUnicodeCMap>();
+            foreach (var stream in streams)
+            {
+                if (!stream.ObjectNumber.HasValue || !LooksLikeToUnicodeCMap(stream.DecodedText))
+                {
+                    continue;
+                }
+
+                ToUnicodeCMap cmap = ParseToUnicodeCMap(stream.DecodedText);
+                if (cmap.Count > 0)
+                {
+                    result[stream.ObjectNumber.Value] = cmap;
+                }
+            }
+
+            return result;
+        }
+
+        private static Dictionary<int, ToUnicodeCMap> BuildFontObjectToUnicodeMaps(string raw, Dictionary<int, ToUnicodeCMap> toUnicodeByObjectNumber)
+        {
+            var result = new Dictionary<int, ToUnicodeCMap>();
+            foreach (Match match in Regex.Matches(raw, @"(?<obj>\d+)\s+\d+\s+obj(?<body>.*?)endobj", RegexOptions.Singleline | RegexOptions.NonBacktracking))
+            {
+                string body = match.Groups["body"].Value;
+                if (!body.Contains("/ToUnicode", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                Match toUnicodeMatch = Regex.Match(body, @"/ToUnicode\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
+                if (!toUnicodeMatch.Success || !int.TryParse(toUnicodeMatch.Groups["obj"].Value, out int toUnicodeObject))
+                {
+                    continue;
+                }
+
+                if (!toUnicodeByObjectNumber.TryGetValue(toUnicodeObject, out ToUnicodeCMap? cmap))
+                {
+                    continue;
+                }
+
+                if (int.TryParse(match.Groups["obj"].Value, out int fontObject))
+                {
+                    result[fontObject] = cmap;
+                }
+            }
+
+            return result;
+        }
+
+        private static List<PdfObjectInfo> ParsePdfObjects(string raw)
+        {
+            var objects = new List<PdfObjectInfo>();
+            foreach (Match match in Regex.Matches(raw, @"(?<obj>\d+)\s+\d+\s+obj\b(?<body>.*?)endobj", RegexOptions.Singleline | RegexOptions.NonBacktracking))
+            {
+                if (int.TryParse(match.Groups["obj"].Value, out int objectNumber))
+                {
+                    objects.Add(new PdfObjectInfo(objectNumber, match.Groups["body"].Value));
+                }
+            }
+
+            return objects;
+        }
+
+        private static IEnumerable<int> ExtractContentObjectNumbers(string pageBody)
+        {
+            Match contents = Regex.Match(pageBody, @"/Contents\s+(?<value>\[(?<array>.*?)\]|(?<obj>\d+)\s+\d+\s+R)", RegexOptions.Singleline | RegexOptions.NonBacktracking);
+            if (!contents.Success)
+            {
+                yield break;
+            }
+
+            if (contents.Groups["obj"].Success && int.TryParse(contents.Groups["obj"].Value, out int singleObject))
+            {
+                yield return singleObject;
+                yield break;
+            }
+
+            foreach (Match item in Regex.Matches(contents.Groups["array"].Value, @"(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking))
+            {
+                if (int.TryParse(item.Groups["obj"].Value, out int objectNumber))
+                {
+                    yield return objectNumber;
+                }
+            }
+        }
+
+        private static string? GetPageResourceBody(string pageBody, Dictionary<int, string> objectBodies)
+        {
+            Match indirect = Regex.Match(pageBody, @"/Resources\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
+            if (indirect.Success && int.TryParse(indirect.Groups["obj"].Value, out int resourceObject) &&
+                objectBodies.TryGetValue(resourceObject, out string? resourceBody))
+            {
+                return resourceBody;
+            }
+
+            int resourcesIndex = pageBody.IndexOf("/Resources", StringComparison.Ordinal);
+            if (resourcesIndex < 0)
+            {
+                return null;
+            }
+
+            int dictStart = pageBody.IndexOf("<<", resourcesIndex, StringComparison.Ordinal);
+            if (dictStart < 0)
+            {
+                return null;
+            }
+
+            int dictEnd = FindMatchingDictionaryEnd(pageBody, dictStart);
+            if (dictEnd < 0)
+            {
+                return null;
+            }
+
+            return pageBody.Substring(dictStart, dictEnd - dictStart + 2);
+        }
+
+        private static Dictionary<string, ToUnicodeCMap> BuildFontUnicodeMapsFromResourceText(string resourceText, Dictionary<int, ToUnicodeCMap> fontObjectToCMap)
+        {
+            var result = new Dictionary<string, ToUnicodeCMap>(StringComparer.Ordinal);
+            foreach (string fontBlock in EnumerateFontResourceBlocks(resourceText))
+            {
+                foreach (Match entry in Regex.Matches(fontBlock, @"/(?<name>[A-Za-z0-9_.+\-#]+)\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking))
+                {
+                    if (!int.TryParse(entry.Groups["obj"].Value, out int fontObject))
+                    {
+                        continue;
+                    }
+
+                    if (fontObjectToCMap.TryGetValue(fontObject, out ToUnicodeCMap? cmap))
+                    {
+                        result[DecodePdfName(entry.Groups["name"].Value)] = cmap;
+                    }
+                }
+            }
+
+            return result;
         }
 
         private static Dictionary<string, ToUnicodeCMap> BuildFontUnicodeMaps(string raw, List<PdfStreamInfo> streams)
