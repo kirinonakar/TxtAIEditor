@@ -196,10 +196,10 @@
                                                  TextChanged="OnExplorerFilterTextChanged"/>
                                     </Grid>
                                 </StackPanel>
-                                <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFileListViewItemClick">
+                                <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFileListViewItemClick" AllowDrop="True" DragOver="OnFileListViewDragOver" Drop="OnFileListViewDrop">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Padding="0,3,0,3" RightTapped="OnFileListViewItemRightTapped">
+                                            <Grid Padding="0,3,0,3" RightTapped="OnFileListViewItemRightTapped" AllowDrop="True" DragOver="OnFileListViewItemDragOver" Drop="OnFileListViewItemDrop">
                                                 <Grid.ContextFlyout>
                                                     <MenuFlyout>
                                                         <MenuFlyoutItem Text="즐겨찾기에 추가" Icon="Favorite" Click="OnAddFileToFavoritesClick" Tag="{Binding}"/>

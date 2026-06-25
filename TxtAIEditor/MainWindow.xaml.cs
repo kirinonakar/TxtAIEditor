@@ -571,6 +571,7 @@ namespace TxtAIEditor
                 _tabNavigationController.GetTabViewForItem);
             _fileOpenDropController = new FileOpenDropController(
                 DragOverlay,
+                LeftSidebarTabView,
                 InitializePickerWindow,
                 LoadFileIntoTabAsync,
                 (folderPath, revealInLeftPanel) => NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel),

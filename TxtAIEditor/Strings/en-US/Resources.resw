@@ -2790,4 +2790,37 @@ Plan: {0}</value>
   <data name="SearchReplaceReadOnlyContent" xml:space="preserve">
     <value>Document search results are read-only and cannot be replaced.</value>
   </data>
+  <data name="DragDropCopyRootCaption" xml:space="preserve">
+    <value>Copy to explorer folder</value>
+  </data>
+  <data name="DragDropCopyItemCaptionFormat" xml:space="preserve">
+    <value>Copy to '{0}'</value>
+  </data>
+  <data name="DragDropCopyItemCaption" xml:space="preserve">
+    <value>Copy to this location</value>
+  </data>
+  <data name="DragDropCopyErrorTitle" xml:space="preserve">
+    <value>Drag &amp; Drop Copy Error</value>
+  </data>
+  <data name="CopyOverwriteTitle" xml:space="preserve">
+    <value>Confirm Overwrite</value>
+  </data>
+  <data name="CopyOverwriteMessage" xml:space="preserve">
+    <value>File '{0}' already exists. Do you want to overwrite it?</value>
+  </data>
+  <data name="CopyOverwriteFolderMessage" xml:space="preserve">
+    <value>Folder '{0}' already exists. Do you want to merge/overwrite it? (Existing files will be kept or overwritten)</value>
+  </data>
+  <data name="CopyOverwriteOK" xml:space="preserve">
+    <value>Overwrite</value>
+  </data>
+  <data name="CopyOverwriteCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="CopyFolderErrorTitle" xml:space="preserve">
+    <value>Folder Copy Error</value>
+  </data>
+  <data name="CopyFolderSelfParent" xml:space="preserve">
+    <value>Cannot copy a folder into itself or its own subfolder.</value>
+  </data>
 </root>

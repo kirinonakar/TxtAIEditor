@@ -84,6 +84,10 @@ namespace TxtAIEditor.Controls
             _leftSidebar.CopyFolderPathClick += OnCopyFolderPathClick;
             _leftSidebar.RenameClick += OnRenameClick;
             _leftSidebar.DeleteClick += OnDeleteClick;
+            _leftSidebar.FileListViewDragOver += OnFileListViewDragOver;
+            _leftSidebar.FileListViewDrop += OnFileListViewDrop;
+            _leftSidebar.FileListViewItemDragOver += OnFileListViewItemDragOver;
+            _leftSidebar.FileListViewItemDrop += OnFileListViewItemDrop;
         }
 
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -506,6 +510,211 @@ namespace TxtAIEditor.Controls
                    extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void OnFileListViewDragOver(object sender, DragEventArgs e)
+        {
+            if (e.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                e.AcceptedOperation = DataPackageOperation.Copy;
+                e.DragUIOverride.Caption = _getString("DragDropCopyRootCaption", "탐색기 폴더로 복사");
+                e.DragUIOverride.IsCaptionVisible = true;
+                e.DragUIOverride.IsContentVisible = true;
+                e.Handled = true;
+            }
+        }
+
+        private async void OnFileListViewDrop(object sender, DragEventArgs e)
+        {
+            e.Handled = true;
+            if (!e.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                return;
+            }
+
+            string currentFolder = _currentFolderProvider();
+            if (string.IsNullOrWhiteSpace(currentFolder) || !Directory.Exists(currentFolder))
+            {
+                return;
+            }
+
+            var deferral = e.GetDeferral();
+            try
+            {
+                var items = await e.DataView.GetStorageItemsAsync();
+                foreach (var item in items)
+                {
+                    await CopyStorageItemAsync(item.Path, currentFolder);
+                }
+                _loadDirectoryRoot(currentFolder);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("DragDropCopyErrorTitle", "드래그 앤 드롭 복사 오류"),
+                    ex.Message);
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        }
+
+        private void OnFileListViewItemDragOver(object sender, DragEventArgs e)
+        {
+            if (e.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                e.AcceptedOperation = DataPackageOperation.Copy;
+
+                string targetName = string.Empty;
+                if (sender is FrameworkElement element && element.DataContext is ExplorerItem item)
+                {
+                    targetName = item.Name;
+                }
+
+                if (!string.IsNullOrEmpty(targetName))
+                {
+                    string format = _getString("DragDropCopyItemCaptionFormat", "'{0}' 위치로 복사");
+                    e.DragUIOverride.Caption = string.Format(format, targetName);
+                }
+                else
+                {
+                    e.DragUIOverride.Caption = _getString("DragDropCopyItemCaption", "해당 위치로 복사");
+                }
+                e.DragUIOverride.IsCaptionVisible = true;
+                e.DragUIOverride.IsContentVisible = true;
+                e.Handled = true;
+            }
+        }
+
+        private async void OnFileListViewItemDrop(object sender, DragEventArgs e)
+        {
+            e.Handled = true;
+            if (!e.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                return;
+            }
+
+            if (sender is not FrameworkElement element || element.DataContext is not ExplorerItem targetItem)
+            {
+                return;
+            }
+
+            string targetDir;
+            if (targetItem.IsFolder)
+            {
+                targetDir = targetItem.Path;
+            }
+            else
+            {
+                targetDir = Path.GetDirectoryName(targetItem.Path) ?? string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(targetDir))
+            {
+                return;
+            }
+
+            var deferral = e.GetDeferral();
+            try
+            {
+                var items = await e.DataView.GetStorageItemsAsync();
+                foreach (var item in items)
+                {
+                    await CopyStorageItemAsync(item.Path, targetDir);
+                }
+                _loadDirectoryRoot(_currentFolderProvider());
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("DragDropCopyErrorTitle", "드래그 앤 드롭 복사 오류"),
+                    ex.Message);
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        }
+
+        private async Task CopyStorageItemAsync(string sourcePath, string targetDir)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath)) return;
+
+            string name = Path.GetFileName(sourcePath);
+            string destPath = Path.Combine(targetDir, name);
+
+            if (File.Exists(sourcePath))
+            {
+                if (File.Exists(destPath))
+                {
+                    var confirmDialog = new ContentDialog
+                    {
+                        Title = _getString("CopyOverwriteTitle", "덮어쓰기 확인"),
+                        Content = string.Format(_getString("CopyOverwriteMessage", "'{0}' 파일이 이미 존재합니다. 덮어쓰시겠습니까?"), name),
+                        PrimaryButtonText = _getString("CopyOverwriteOK", "덮어쓰기"),
+                        CloseButtonText = _getString("CopyOverwriteCancel", "취소"),
+                        DefaultButton = ContentDialogButton.Close,
+                        XamlRoot = _xamlRootProvider(),
+                        RequestedTheme = _themeProvider()
+                    };
+
+                    if (await ShowDialogAsync(confirmDialog) != ContentDialogResult.Primary)
+                    {
+                        return;
+                    }
+                }
+
+                await Task.Run(() => File.Copy(sourcePath, destPath, true));
+            }
+            else if (Directory.Exists(sourcePath))
+            {
+                if (destPath.StartsWith(sourcePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _showError(
+                        _getString("CopyFolderErrorTitle", "폴더 복사 오류"),
+                        _getString("CopyFolderSelfParent", "폴더를 자기 자신 또는 하위 폴더에 복사할 수 없습니다."));
+                    return;
+                }
+
+                if (Directory.Exists(destPath))
+                {
+                    var confirmDialog = new ContentDialog
+                    {
+                        Title = _getString("CopyOverwriteTitle", "덮어쓰기 확인"),
+                        Content = string.Format(_getString("CopyOverwriteFolderMessage", "'{0}' 폴더가 이미 존재합니다. 덮어쓰시겠습니까? (기존 파일은 유지되거나 덮어써집니다)"), name),
+                        PrimaryButtonText = _getString("CopyOverwriteOK", "덮어쓰기"),
+                        CloseButtonText = _getString("CopyOverwriteCancel", "취소"),
+                        DefaultButton = ContentDialogButton.Close,
+                        XamlRoot = _xamlRootProvider(),
+                        RequestedTheme = _themeProvider()
+                    };
+
+                    if (await ShowDialogAsync(confirmDialog) != ContentDialogResult.Primary)
+                    {
+                        return;
+                    }
+                }
+
+                await Task.Run(() => CopyDirectory(sourcePath, destPath));
+            }
+        }
+
+        private static void CopyDirectory(string sourceDir, string destDir)
+        {
+            Directory.CreateDirectory(destDir);
+
+            foreach (string file in Directory.GetFiles(sourceDir))
+            {
+                string dest = Path.Combine(destDir, Path.GetFileName(file));
+                File.Copy(file, dest, true);
+            }
+
+            foreach (string folder in Directory.GetDirectories(sourceDir))
+            {
+                string dest = Path.Combine(destDir, Path.GetFileName(folder));
+                CopyDirectory(folder, dest);
+            }
         }
     }
 }

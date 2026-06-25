@@ -2791,4 +2791,37 @@
   <data name="SearchReplaceReadOnlyContent" xml:space="preserve">
     <value>ドキュメントファイルの検索結果は内容検索専用のため、置換できません。</value>
   </data>
+  <data name="DragDropCopyRootCaption" xml:space="preserve">
+    <value>エクスプローラーフォルダにコピー</value>
+  </data>
+  <data name="DragDropCopyItemCaptionFormat" xml:space="preserve">
+    <value>'{0}' の場所にコピー</value>
+  </data>
+  <data name="DragDropCopyItemCaption" xml:space="preserve">
+    <value>この場所にコピー</value>
+  </data>
+  <data name="DragDropCopyErrorTitle" xml:space="preserve">
+    <value>ドラッグ＆ドロップコピーエラー</value>
+  </data>
+  <data name="CopyOverwriteTitle" xml:space="preserve">
+    <value>上書きの確認</value>
+  </data>
+  <data name="CopyOverwriteMessage" xml:space="preserve">
+    <value>ファイル '{0}' は既に存在します。上書きしますか？</value>
+  </data>
+  <data name="CopyOverwriteFolderMessage" xml:space="preserve">
+    <value>フォルダ '{0}' は既に存在します。上書きしますか？ (既存のファイルは維持または上書きされます)</value>
+  </data>
+  <data name="CopyOverwriteOK" xml:space="preserve">
+    <value>上書き</value>
+  </data>
+  <data name="CopyOverwriteCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="CopyFolderErrorTitle" xml:space="preserve">
+    <value>フォルダコピーエラー</value>
+  </data>
+  <data name="CopyFolderSelfParent" xml:space="preserve">
+    <value>フォルダを自分自身またはそのサブフォルダにコピーすることはできません。</value>
+  </data>
 </root>

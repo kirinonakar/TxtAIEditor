@@ -10,6 +10,7 @@ namespace TxtAIEditor.Controls
     public sealed class FileOpenDropController
     {
         private readonly FrameworkElement _dragOverlay;
+        private readonly FrameworkElement _leftSidebar;
         private readonly Action<object> _initializePickerWindow;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Func<string, bool, Task> _navigateExplorerToFolderAsync;
@@ -77,6 +78,7 @@ namespace TxtAIEditor.Controls
 
         public FileOpenDropController(
             FrameworkElement dragOverlay,
+            FrameworkElement leftSidebar,
             Action<object> initializePickerWindow,
             Func<string, Task> loadFileIntoTabAsync,
             Func<string, bool, Task> navigateExplorerToFolderAsync,
@@ -84,6 +86,7 @@ namespace TxtAIEditor.Controls
             Action<string, string> showError)
         {
             _dragOverlay = dragOverlay;
+            _leftSidebar = leftSidebar;
             _initializePickerWindow = initializePickerWindow;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
@@ -110,10 +113,44 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private bool IsHoveringOverLeftSidebar(DragEventArgs e)
+        {
+            if (!_isLeftSidebarVisible())
+            {
+                return false;
+            }
+
+            if (_leftSidebar is LeftSidebarPane sidebarPane)
+            {
+                if (sidebarPane.ExplorerActivity?.IsChecked != true)
+                {
+                    return false;
+                }
+            }
+
+            try
+            {
+                var pos = e.GetPosition(_leftSidebar);
+                return pos.X >= 0 && pos.X <= _leftSidebar.ActualWidth &&
+                       pos.Y >= 0 && pos.Y <= _leftSidebar.ActualHeight;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public void HandleRootDragOver(DragEventArgs e)
         {
             if (e.Handled)
             {
+                return;
+            }
+
+            if (IsHoveringOverLeftSidebar(e))
+            {
+                _dragOverlay.Visibility = Visibility.Collapsed;
+                e.AcceptedOperation = DataPackageOperation.None;
                 return;
             }
 
@@ -132,6 +169,13 @@ namespace TxtAIEditor.Controls
 
         public void HandleDragOverlayOver(DragEventArgs e)
         {
+            if (IsHoveringOverLeftSidebar(e))
+            {
+                _dragOverlay.Visibility = Visibility.Collapsed;
+                e.AcceptedOperation = DataPackageOperation.None;
+                return;
+            }
+
             ApplyFileOpenDragUi(e);
         }
 

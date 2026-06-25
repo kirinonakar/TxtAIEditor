@@ -103,6 +103,10 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? RemoveRecentFileClick;
         public event ItemClickEventHandler? TocItemClick;
         public event TextChangedEventHandler? ExplorerFilterTextChanged;
+        public event DragEventHandler? FileListViewDragOver;
+        public event DragEventHandler? FileListViewDrop;
+        public event DragEventHandler? FileListViewItemDragOver;
+        public event DragEventHandler? FileListViewItemDrop;
 
         public Grid ExplorerPage => ExplorerSidebarPage;
         public Grid FavoritesPage => FavoritesSidebarPage;
@@ -348,6 +352,10 @@ namespace TxtAIEditor.Controls
         private void OnRemoveRecentFileClick(object sender, RoutedEventArgs e) => RemoveRecentFileClick?.Invoke(sender, e);
         private void OnTocItemClick(object sender, ItemClickEventArgs e) => TocItemClick?.Invoke(sender, e);
         private void OnExplorerFilterTextChanged(object sender, TextChangedEventArgs e) => ExplorerFilterTextChanged?.Invoke(sender, e);
+        private void OnFileListViewDragOver(object sender, DragEventArgs e) => FileListViewDragOver?.Invoke(sender, e);
+        private void OnFileListViewDrop(object sender, DragEventArgs e) => FileListViewDrop?.Invoke(sender, e);
+        private void OnFileListViewItemDragOver(object sender, DragEventArgs e) => FileListViewItemDragOver?.Invoke(sender, e);
+        private void OnFileListViewItemDrop(object sender, DragEventArgs e) => FileListViewItemDrop?.Invoke(sender, e);
     }
 
     public class LocalizationBridge : System.ComponentModel.INotifyPropertyChanged

@@ -2790,4 +2790,37 @@
   <data name="SearchReplaceReadOnlyContent" xml:space="preserve">
     <value>문서 파일의 검색 결과는 내용 검색 전용이라 바꾸기할 수 없습니다.</value>
   </data>
+  <data name="DragDropCopyRootCaption" xml:space="preserve">
+    <value>탐색기 폴더로 복사</value>
+  </data>
+  <data name="DragDropCopyItemCaptionFormat" xml:space="preserve">
+    <value>'{0}' 위치로 복사</value>
+  </data>
+  <data name="DragDropCopyItemCaption" xml:space="preserve">
+    <value>해당 위치로 복사</value>
+  </data>
+  <data name="DragDropCopyErrorTitle" xml:space="preserve">
+    <value>드래그 앤 드롭 복사 오류</value>
+  </data>
+  <data name="CopyOverwriteTitle" xml:space="preserve">
+    <value>덮어쓰기 확인</value>
+  </data>
+  <data name="CopyOverwriteMessage" xml:space="preserve">
+    <value>'{0}' 파일이 이미 존재합니다. 덮어쓰시겠습니까?</value>
+  </data>
+  <data name="CopyOverwriteFolderMessage" xml:space="preserve">
+    <value>'{0}' 폴더가 이미 존재합니다. 덮어쓰시겠습니까? (기존 파일은 유지되거나 덮어써집니다)</value>
+  </data>
+  <data name="CopyOverwriteOK" xml:space="preserve">
+    <value>덮어쓰기</value>
+  </data>
+  <data name="CopyOverwriteCancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="CopyFolderErrorTitle" xml:space="preserve">
+    <value>폴더 복사 오류</value>
+  </data>
+  <data name="CopyFolderSelfParent" xml:space="preserve">
+    <value>폴더를 자기 자신 또는 하위 폴더에 복사할 수 없습니다.</value>
+  </data>
 </root>
