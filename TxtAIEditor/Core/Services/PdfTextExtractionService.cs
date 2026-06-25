@@ -27,10 +27,23 @@ namespace TxtAIEditor.Core.Services
             progress?.Report(5);
             string raw = Encoding.Latin1.GetString(bytes);
             var parts = new List<string>();
+            var streams = new List<PdfStreamInfo>();
 
-            foreach (var streamText in EnumerateDecodedStreams(raw, progress))
+            foreach (var stream in EnumeratePdfStreams(raw, progress))
             {
-                string extracted = ExtractTextFromContentStream(streamText);
+                streams.Add(stream);
+            }
+
+            var fontUnicodeMaps = BuildFontUnicodeMaps(raw, streams);
+
+            foreach (var stream in streams)
+            {
+                if (!LooksLikeTextContentStream(stream.DecodedText))
+                {
+                    continue;
+                }
+
+                string extracted = ExtractTextFromContentStream(stream.DecodedText, fontUnicodeMaps);
                 if (!string.IsNullOrWhiteSpace(extracted))
                 {
                     parts.Add(extracted);
@@ -57,7 +70,90 @@ namespace TxtAIEditor.Core.Services
             return text.Length > maxChars ? text.Substring(0, maxChars) : text;
         }
 
-        private static IEnumerable<string> EnumerateDecodedStreams(string raw, IProgress<int>? progress)
+        private sealed class PdfStreamInfo
+        {
+            public PdfStreamInfo(int? objectNumber, string dictionary, string decodedText)
+            {
+                ObjectNumber = objectNumber;
+                Dictionary = dictionary;
+                DecodedText = decodedText;
+            }
+
+            public int? ObjectNumber { get; }
+
+            public string Dictionary { get; }
+
+            public string DecodedText { get; }
+        }
+
+        private sealed class ToUnicodeCMap
+        {
+            private readonly Dictionary<string, string> _map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            public int MaxCodeBytes { get; private set; } = 1;
+
+            public int Count => _map.Count;
+
+            public void Add(byte[] sourceCode, string unicodeText)
+            {
+                if (sourceCode.Length == 0 || string.IsNullOrEmpty(unicodeText))
+                {
+                    return;
+                }
+
+                string key = BytesToHexKey(sourceCode, 0, sourceCode.Length);
+                _map[key] = unicodeText;
+                MaxCodeBytes = Math.Max(MaxCodeBytes, sourceCode.Length);
+            }
+
+            public string? Decode(byte[] bytes)
+            {
+                if (bytes.Length == 0 || _map.Count == 0)
+                {
+                    return null;
+                }
+
+                var builder = new StringBuilder();
+                int mapped = 0;
+                int i = 0;
+                while (i < bytes.Length)
+                {
+                    string? unicode = null;
+                    int matchedLength = 0;
+                    int maxLength = Math.Min(MaxCodeBytes, bytes.Length - i);
+
+                    for (int length = maxLength; length >= 1; length--)
+                    {
+                        string key = BytesToHexKey(bytes, i, length);
+                        if (_map.TryGetValue(key, out unicode))
+                        {
+                            matchedLength = length;
+                            break;
+                        }
+                    }
+
+                    if (unicode != null)
+                    {
+                        builder.Append(unicode);
+                        mapped++;
+                        i += matchedLength;
+                        continue;
+                    }
+
+                    // Keep simple ASCII operators/punctuation readable when the map is partial.
+                    if (bytes[i] == '\r' || bytes[i] == '\n' || bytes[i] == '\t' || (bytes[i] >= 0x20 && bytes[i] <= 0x7E))
+                    {
+                        builder.Append((char)bytes[i]);
+                    }
+
+                    i++;
+                }
+
+                return mapped > 0 ? builder.ToString() : null;
+            }
+        }
+
+        private static IEnumerable<PdfStreamInfo> EnumeratePdfStreams(string raw, IProgress<int>? progress)
         {
             int searchStart = 0;
             int inspectedStreams = 0;
@@ -101,9 +197,9 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 string? decoded = DecodeStream(streamData, dictionary);
-                if (!string.IsNullOrEmpty(decoded) && LooksLikeTextContentStream(decoded))
+                if (!string.IsNullOrEmpty(decoded))
                 {
-                    yield return decoded;
+                    yield return new PdfStreamInfo(GetObjectNumberBefore(raw, streamIndex), dictionary, decoded);
                 }
 
                 searchStart = endIndex + "endstream".Length;
@@ -113,6 +209,265 @@ namespace TxtAIEditor.Core.Services
                     lastReportedPercent = percent;
                     progress?.Report(percent);
                 }
+            }
+        }
+
+        private static IEnumerable<string> EnumerateDecodedStreams(string raw, IProgress<int>? progress)
+        {
+            foreach (var stream in EnumeratePdfStreams(raw, progress))
+            {
+                if (LooksLikeTextContentStream(stream.DecodedText))
+                {
+                    yield return stream.DecodedText;
+                }
+            }
+        }
+
+        private static int? GetObjectNumberBefore(string raw, int streamIndex)
+        {
+            int searchStart = Math.Max(0, streamIndex - 4096);
+            string prefix = raw.Substring(searchStart, streamIndex - searchStart);
+            MatchCollection matches = Regex.Matches(prefix, @"(?<obj>\d+)\s+\d+\s+obj\b", RegexOptions.NonBacktracking);
+            if (matches.Count == 0)
+            {
+                return null;
+            }
+
+            Match match = matches[matches.Count - 1];
+            if (int.TryParse(match.Groups["obj"].Value, out int objectNumber))
+            {
+                return objectNumber;
+            }
+
+            return null;
+        }
+
+        private static Dictionary<string, ToUnicodeCMap> BuildFontUnicodeMaps(string raw, List<PdfStreamInfo> streams)
+        {
+            var toUnicodeByObjectNumber = new Dictionary<int, ToUnicodeCMap>();
+            foreach (var stream in streams)
+            {
+                if (!stream.ObjectNumber.HasValue || !LooksLikeToUnicodeCMap(stream.DecodedText))
+                {
+                    continue;
+                }
+
+                ToUnicodeCMap cmap = ParseToUnicodeCMap(stream.DecodedText);
+                if (cmap.Count > 0)
+                {
+                    toUnicodeByObjectNumber[stream.ObjectNumber.Value] = cmap;
+                }
+            }
+
+            var fontObjectToCMap = new Dictionary<int, ToUnicodeCMap>();
+            foreach (Match match in Regex.Matches(raw, @"(?<obj>\d+)\s+\d+\s+obj(?<body>.*?)endobj", RegexOptions.Singleline | RegexOptions.NonBacktracking))
+            {
+                string body = match.Groups["body"].Value;
+                if (!body.Contains("/ToUnicode", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                Match toUnicodeMatch = Regex.Match(body, @"/ToUnicode\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
+                if (!toUnicodeMatch.Success || !int.TryParse(toUnicodeMatch.Groups["obj"].Value, out int toUnicodeObject))
+                {
+                    continue;
+                }
+
+                if (!toUnicodeByObjectNumber.TryGetValue(toUnicodeObject, out ToUnicodeCMap? cmap))
+                {
+                    continue;
+                }
+
+                if (int.TryParse(match.Groups["obj"].Value, out int fontObject))
+                {
+                    fontObjectToCMap[fontObject] = cmap;
+                }
+            }
+
+            var byResourceName = new Dictionary<string, ToUnicodeCMap>(StringComparer.Ordinal);
+            foreach (string fontBlock in EnumerateFontResourceBlocks(raw))
+            {
+                foreach (Match entry in Regex.Matches(fontBlock, @"/(?<name>[A-Za-z0-9_.+\-#]+)\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking))
+                {
+                    if (!int.TryParse(entry.Groups["obj"].Value, out int fontObject))
+                    {
+                        continue;
+                    }
+
+                    if (fontObjectToCMap.TryGetValue(fontObject, out ToUnicodeCMap? cmap))
+                    {
+                        byResourceName[DecodePdfName(entry.Groups["name"].Value)] = cmap;
+                    }
+                }
+            }
+
+            return byResourceName;
+        }
+
+        private static bool LooksLikeToUnicodeCMap(string text)
+        {
+            return text.Contains("begincmap", StringComparison.Ordinal) &&
+                (text.Contains("beginbfchar", StringComparison.Ordinal) || text.Contains("beginbfrange", StringComparison.Ordinal));
+        }
+
+        private static IEnumerable<string> EnumerateFontResourceBlocks(string raw)
+        {
+            int searchStart = 0;
+            while (searchStart < raw.Length)
+            {
+                int fontIndex = raw.IndexOf("/Font", searchStart, StringComparison.Ordinal);
+                if (fontIndex < 0)
+                {
+                    yield break;
+                }
+
+                searchStart = fontIndex + 5;
+                if (fontIndex + 5 < raw.Length && IsPdfNameCharacter(raw[fontIndex + 5]))
+                {
+                    continue;
+                }
+
+                int dictStart = fontIndex + 5;
+                while (dictStart < raw.Length && char.IsWhiteSpace(raw[dictStart]))
+                {
+                    dictStart++;
+                }
+
+                if (dictStart + 1 >= raw.Length || raw[dictStart] != '<' || raw[dictStart + 1] != '<')
+                {
+                    continue;
+                }
+
+                int dictEnd = FindMatchingDictionaryEnd(raw, dictStart);
+                if (dictEnd < 0)
+                {
+                    continue;
+                }
+
+                yield return raw.Substring(dictStart + 2, dictEnd - dictStart - 2);
+                searchStart = dictEnd + 2;
+            }
+        }
+
+        private static int FindMatchingDictionaryEnd(string raw, int dictStart)
+        {
+            int depth = 0;
+            for (int i = dictStart; i + 1 < raw.Length; i++)
+            {
+                if (raw[i] == '<' && raw[i + 1] == '<')
+                {
+                    depth++;
+                    i++;
+                    continue;
+                }
+
+                if (raw[i] == '>' && raw[i + 1] == '>')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return i;
+                    }
+
+                    i++;
+                }
+            }
+
+            return -1;
+        }
+
+        private static ToUnicodeCMap ParseToUnicodeCMap(string cmapText)
+        {
+            var cmap = new ToUnicodeCMap();
+
+            foreach (Match section in Regex.Matches(cmapText, @"beginbfchar(?<body>.*?)endbfchar", RegexOptions.Singleline | RegexOptions.NonBacktracking))
+            {
+                foreach (Match entry in Regex.Matches(section.Groups["body"].Value, @"<(?<src>[0-9A-Fa-f\s]+)>\s*<(?<dst>[0-9A-Fa-f\s]+)>", RegexOptions.NonBacktracking))
+                {
+                    byte[] source = ParseHexStringBytes(entry.Groups["src"].Value);
+                    string target = DecodeUnicodeHexString(entry.Groups["dst"].Value);
+                    cmap.Add(source, target);
+                }
+            }
+
+            foreach (Match section in Regex.Matches(cmapText, @"beginbfrange(?<body>.*?)endbfrange", RegexOptions.Singleline | RegexOptions.NonBacktracking))
+            {
+                string body = section.Groups["body"].Value;
+
+                foreach (Match entry in Regex.Matches(body, @"<(?<start>[0-9A-Fa-f\s]+)>\s*<(?<end>[0-9A-Fa-f\s]+)>\s*\[(?<array>.*?)\]", RegexOptions.Singleline | RegexOptions.NonBacktracking))
+                {
+                    AddCMapArrayRange(cmap, entry.Groups["start"].Value, entry.Groups["end"].Value, entry.Groups["array"].Value);
+                }
+
+                string bodyWithoutArrays = Regex.Replace(body, @"<(?<start>[0-9A-Fa-f\s]+)>\s*<(?<end>[0-9A-Fa-f\s]+)>\s*\[(?<array>.*?)\]", string.Empty, RegexOptions.Singleline | RegexOptions.NonBacktracking);
+                foreach (Match entry in Regex.Matches(bodyWithoutArrays, @"<(?<start>[0-9A-Fa-f\s]+)>\s*<(?<end>[0-9A-Fa-f\s]+)>\s*<(?<dst>[0-9A-Fa-f\s]+)>", RegexOptions.NonBacktracking))
+                {
+                    AddCMapSequentialRange(cmap, entry.Groups["start"].Value, entry.Groups["end"].Value, entry.Groups["dst"].Value);
+                }
+            }
+
+            return cmap;
+        }
+
+        private static void AddCMapArrayRange(ToUnicodeCMap cmap, string startHex, string endHex, string arrayText)
+        {
+            byte[] startBytes = ParseHexStringBytes(startHex);
+            byte[] endBytes = ParseHexStringBytes(endHex);
+            if (startBytes.Length == 0 || startBytes.Length != endBytes.Length)
+            {
+                return;
+            }
+
+            int current = HexBytesToInt(startBytes);
+            int end = HexBytesToInt(endBytes);
+            if (end < current || end - current > 4096)
+            {
+                return;
+            }
+
+            foreach (Match item in Regex.Matches(arrayText, @"<(?<dst>[0-9A-Fa-f\s]+)>", RegexOptions.NonBacktracking))
+            {
+                if (current > end)
+                {
+                    break;
+                }
+
+                cmap.Add(IntToBigEndianBytes(current, startBytes.Length), DecodeUnicodeHexString(item.Groups["dst"].Value));
+                current++;
+            }
+        }
+
+        private static void AddCMapSequentialRange(ToUnicodeCMap cmap, string startHex, string endHex, string destinationStartHex)
+        {
+            byte[] startBytes = ParseHexStringBytes(startHex);
+            byte[] endBytes = ParseHexStringBytes(endHex);
+            byte[] destinationBytes = ParseHexStringBytes(destinationStartHex);
+            if (startBytes.Length == 0 || startBytes.Length != endBytes.Length || destinationBytes.Length < 2 || destinationBytes.Length % 2 != 0)
+            {
+                return;
+            }
+
+            int start = HexBytesToInt(startBytes);
+            int end = HexBytesToInt(endBytes);
+            if (end < start || end - start > 4096)
+            {
+                return;
+            }
+
+            int destinationLastCodeUnit = (destinationBytes[destinationBytes.Length - 2] << 8) | destinationBytes[destinationBytes.Length - 1];
+            byte[] prefix = new byte[destinationBytes.Length - 2];
+            Array.Copy(destinationBytes, prefix, prefix.Length);
+
+            for (int code = start; code <= end; code++)
+            {
+                int offset = code - start;
+                byte[] target = new byte[destinationBytes.Length];
+                Array.Copy(prefix, target, prefix.Length);
+                int codeUnit = destinationLastCodeUnit + offset;
+                target[target.Length - 2] = (byte)((codeUnit >> 8) & 0xFF);
+                target[target.Length - 1] = (byte)(codeUnit & 0xFF);
+                cmap.Add(IntToBigEndianBytes(code, startBytes.Length), Encoding.BigEndianUnicode.GetString(target));
             }
         }
 
@@ -230,19 +585,25 @@ namespace TxtAIEditor.Core.Services
             return Encoding.Latin1.GetString(output.ToArray());
         }
 
-        private static string ExtractTextFromContentStream(string content)
+        private static string ExtractTextFromContentStream(string content, Dictionary<string, ToUnicodeCMap> fontUnicodeMaps)
         {
             var builder = new StringBuilder();
+            ToUnicodeCMap? currentFontMap = null;
 
-            foreach (Match match in Regex.Matches(content, @"\[(?<array>(?:\\.|[^\]\\])*)\]\s*TJ|(?<text>\((?:\\.|[^\\)])*\)|<(?<hex>[0-9A-Fa-f\s]+)>)\s*(?:Tj|'|"")|(?<newline>T\*|Td|TD)", RegexOptions.Singleline | RegexOptions.NonBacktracking))
+            foreach (Match match in Regex.Matches(content, @"/(?<font>[A-Za-z0-9_.+\-#]+)\s+[-+]?\d*\.?\d+\s+Tf|\[(?<array>(?:\\.|[^\]\\])*)\]\s*TJ|(?:(?:[-+]?\d*\.?\d+\s+){0,2})(?<text>\((?:\\.|[^\\)])*\)|<(?<hex>[0-9A-Fa-f\s]+)>)\s*(?:Tj|'|"")|(?<newline>T\*|Td|TD)", RegexOptions.Singleline | RegexOptions.NonBacktracking))
             {
-                if (match.Groups["array"].Success)
+                if (match.Groups["font"].Success)
                 {
-                    AppendArrayText(builder, match.Groups["array"].Value);
+                    string fontName = DecodePdfName(match.Groups["font"].Value);
+                    fontUnicodeMaps.TryGetValue(fontName, out currentFontMap);
+                }
+                else if (match.Groups["array"].Success)
+                {
+                    AppendArrayText(builder, match.Groups["array"].Value, currentFontMap);
                 }
                 else if (match.Groups["text"].Success)
                 {
-                    AppendTokenText(builder, match.Groups["text"].Value);
+                    AppendTokenText(builder, match.Groups["text"].Value, currentFontMap);
                 }
                 else if (match.Groups["newline"].Success)
                 {
@@ -253,7 +614,7 @@ namespace TxtAIEditor.Core.Services
             return builder.ToString();
         }
 
-        private static void AppendArrayText(StringBuilder builder, string arrayText)
+        private static void AppendArrayText(StringBuilder builder, string arrayText, ToUnicodeCMap? currentFontMap)
         {
             foreach (Match token in Regex.Matches(arrayText, @"\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>|-?\d+(?:\.\d+)?", RegexOptions.Singleline | RegexOptions.NonBacktracking))
             {
@@ -267,15 +628,20 @@ namespace TxtAIEditor.Core.Services
                     continue;
                 }
 
-                AppendTokenText(builder, value);
+                AppendTokenText(builder, value, currentFontMap);
             }
         }
 
-        private static void AppendTokenText(StringBuilder builder, string token)
+        private static void AppendTokenText(StringBuilder builder, string token, ToUnicodeCMap? currentFontMap)
         {
-            string text = token.StartsWith("(", StringComparison.Ordinal) && token.EndsWith(")", StringComparison.Ordinal)
-                ? DecodeLiteralString(token.Substring(1, token.Length - 2))
-                : DecodeHexString(token.Trim('<', '>'));
+            byte[] bytes = token.StartsWith("(", StringComparison.Ordinal) && token.EndsWith(")", StringComparison.Ordinal)
+                ? DecodeLiteralStringBytes(token.Substring(1, token.Length - 2))
+                : ParseHexStringBytes(token.Trim('<', '>'));
+
+            string? mappedText = currentFontMap?.Decode(bytes);
+            string text = !string.IsNullOrEmpty(mappedText)
+                ? mappedText
+                : DecodePdfStringBytes(bytes);
 
             if (string.IsNullOrEmpty(text))
             {
@@ -287,28 +653,33 @@ namespace TxtAIEditor.Core.Services
 
         private static string DecodeLiteralString(string value)
         {
-            var builder = new StringBuilder(value.Length);
+            return DecodePdfStringBytes(DecodeLiteralStringBytes(value));
+        }
+
+        private static byte[] DecodeLiteralStringBytes(string value)
+        {
+            using var bytes = new MemoryStream(value.Length);
             for (int i = 0; i < value.Length; i++)
             {
                 char ch = value[i];
                 if (ch != '\\' || i + 1 >= value.Length)
                 {
-                    builder.Append(ch);
+                    bytes.WriteByte(ch <= 0xFF ? (byte)ch : (byte)'?');
                     continue;
                 }
 
                 char next = value[++i];
                 switch (next)
                 {
-                    case 'n': builder.Append('\n'); break;
-                    case 'r': builder.Append('\r'); break;
-                    case 't': builder.Append('\t'); break;
-                    case 'b': builder.Append('\b'); break;
-                    case 'f': builder.Append('\f'); break;
+                    case 'n': bytes.WriteByte((byte)'\n'); break;
+                    case 'r': bytes.WriteByte((byte)'\r'); break;
+                    case 't': bytes.WriteByte((byte)'\t'); break;
+                    case 'b': bytes.WriteByte((byte)'\b'); break;
+                    case 'f': bytes.WriteByte((byte)'\f'); break;
                     case '(':
                     case ')':
                     case '\\':
-                        builder.Append(next);
+                        bytes.WriteByte((byte)next);
                         break;
                     case '\r':
                         if (i + 1 < value.Length && value[i + 1] == '\n')
@@ -328,25 +699,30 @@ namespace TxtAIEditor.Core.Services
                                 octal = (octal * 8) + (value[++i] - '0');
                                 count++;
                             }
-                            builder.Append((char)octal);
+                            bytes.WriteByte((byte)(octal & 0xFF));
                         }
                         else
                         {
-                            builder.Append(next);
+                            bytes.WriteByte(next <= 0xFF ? (byte)next : (byte)'?');
                         }
                         break;
                 }
             }
 
-            return DecodeUtf16BeIfBomPresent(builder.ToString());
+            return bytes.ToArray();
         }
 
         private static string DecodeHexString(string hex)
         {
+            return DecodePdfStringBytes(ParseHexStringBytes(hex));
+        }
+
+        private static byte[] ParseHexStringBytes(string hex)
+        {
             string compact = Regex.Replace(hex, @"\s+", string.Empty, RegexOptions.NonBacktracking);
             if (compact.Length == 0)
             {
-                return string.Empty;
+                return Array.Empty<byte>();
             }
 
             if (compact.Length % 2 == 1)
@@ -358,6 +734,16 @@ namespace TxtAIEditor.Core.Services
             for (int i = 0; i < bytes.Length; i++)
             {
                 bytes[i] = Convert.ToByte(compact.Substring(i * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static string DecodePdfStringBytes(byte[] bytes)
+        {
+            if (bytes.Length == 0)
+            {
+                return string.Empty;
             }
 
             if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
@@ -393,6 +779,99 @@ namespace TxtAIEditor.Core.Services
 
             bool looksUtf16 = bytes.Length > 2 && bytes.Length % 2 == 0 && bytes[0] == 0;
             return looksUtf16 ? Encoding.BigEndianUnicode.GetString(bytes) : Encoding.Latin1.GetString(bytes);
+        }
+
+        private static string DecodeUnicodeHexString(string hex)
+        {
+            byte[] bytes = ParseHexStringBytes(hex);
+            if (bytes.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
+            {
+                return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+            }
+
+            if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+            {
+                return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+            }
+
+            return bytes.Length % 2 == 0
+                ? Encoding.BigEndianUnicode.GetString(bytes)
+                : Encoding.Latin1.GetString(bytes);
+        }
+
+        private static int HexBytesToInt(byte[] bytes)
+        {
+            int value = 0;
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                value = (value << 8) | bytes[i];
+            }
+
+            return value;
+        }
+
+        private static byte[] IntToBigEndianBytes(int value, int byteCount)
+        {
+            byte[] bytes = new byte[byteCount];
+            for (int i = byteCount - 1; i >= 0; i--)
+            {
+                bytes[i] = (byte)(value & 0xFF);
+                value >>= 8;
+            }
+
+            return bytes;
+        }
+
+        private static string BytesToHexKey(byte[] bytes, int offset, int length)
+        {
+            var builder = new StringBuilder(length * 2);
+            for (int i = 0; i < length; i++)
+            {
+                builder.Append(bytes[offset + i].ToString("X2", System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string DecodePdfName(string name)
+        {
+            if (string.IsNullOrEmpty(name) || name.IndexOf('#') < 0)
+            {
+                return name;
+            }
+
+            var builder = new StringBuilder(name.Length);
+            for (int i = 0; i < name.Length; i++)
+            {
+                if (name[i] == '#' && i + 2 < name.Length && IsHexDigit(name[i + 1]) && IsHexDigit(name[i + 2]))
+                {
+                    builder.Append((char)Convert.ToByte(name.Substring(i + 1, 2), 16));
+                    i += 2;
+                }
+                else
+                {
+                    builder.Append(name[i]);
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static bool IsPdfNameCharacter(char ch)
+        {
+            return ch > 0x20 && ch != '/' && ch != '<' && ch != '>' && ch != '[' && ch != ']' && ch != '(' && ch != ')' && ch != '{' && ch != '}' && ch != '%';
+        }
+
+        private static bool IsHexDigit(char ch)
+        {
+            return (ch >= '0' && ch <= '9') ||
+                (ch >= 'A' && ch <= 'F') ||
+                (ch >= 'a' && ch <= 'f');
         }
 
         private static string DecodeUtf16BeIfBomPresent(string text)
