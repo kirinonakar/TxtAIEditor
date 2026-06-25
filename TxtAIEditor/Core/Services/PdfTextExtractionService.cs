@@ -34,30 +34,50 @@ namespace TxtAIEditor.Core.Services
                 streams.Add(stream);
             }
 
-            var streamFontUnicodeMaps = BuildContentStreamFontUnicodeMaps(raw, streams);
             var fallbackFontUnicodeMaps = BuildUnambiguousFontUnicodeMaps(raw, streams);
+            var pageContents = BuildPageContentInfos(raw, streams, fallbackFontUnicodeMaps);
+            var handledContentStreams = new HashSet<int>();
 
-            foreach (var stream in streams)
+            foreach (var page in pageContents)
             {
-                if (!LooksLikeTextContentStream(stream.DecodedText))
-                {
-                    continue;
-                }
-
-                Dictionary<string, ToUnicodeCMap> fontUnicodeMaps = fallbackFontUnicodeMaps;
-                if (stream.ObjectNumber.HasValue &&
-                    streamFontUnicodeMaps.TryGetValue(stream.ObjectNumber.Value, out Dictionary<string, ToUnicodeCMap>? localFontUnicodeMaps))
-                {
-                    fontUnicodeMaps = localFontUnicodeMaps;
-                }
-
-                string extracted = ExtractTextFromContentStream(stream.DecodedText, fontUnicodeMaps);
+                string extracted = ExtractTextFromContentStream(page.Content, page.FontUnicodeMaps);
                 if (!string.IsNullOrWhiteSpace(extracted))
                 {
                     parts.Add(extracted);
+                    foreach (int contentObjectNumber in page.ContentObjectNumbers)
+                    {
+                        handledContentStreams.Add(contentObjectNumber);
+                    }
+
                     if (TotalLength(parts) >= maxChars)
                     {
                         break;
+                    }
+                }
+            }
+
+            if (TotalLength(parts) < maxChars)
+            {
+                foreach (var stream in streams)
+                {
+                    if (stream.ObjectNumber.HasValue && handledContentStreams.Contains(stream.ObjectNumber.Value))
+                    {
+                        continue;
+                    }
+
+                    if (!LooksLikeTextContentStream(stream.DecodedText))
+                    {
+                        continue;
+                    }
+
+                    string extracted = ExtractTextFromContentStream(stream.DecodedText, fallbackFontUnicodeMaps);
+                    if (!string.IsNullOrWhiteSpace(extracted))
+                    {
+                        parts.Add(extracted);
+                        if (TotalLength(parts) >= maxChars)
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -148,8 +168,11 @@ namespace TxtAIEditor.Core.Services
                         continue;
                     }
 
-                    // Keep simple ASCII operators/punctuation readable when the map is partial.
-                    if (bytes[i] == '\r' || bytes[i] == '\n' || bytes[i] == '\t' || (bytes[i] >= 0x20 && bytes[i] <= 0x7E))
+                    // For one-byte fonts, keep simple ASCII punctuation readable when the map is partial.
+                    // For multi-byte CID fonts, do not reinterpret a single byte as ASCII because that corrupts
+                    // encoded glyph IDs such as 00 23 or C9 02.
+                    if (MaxCodeBytes == 1 &&
+                        (bytes[i] == '\r' || bytes[i] == '\n' || bytes[i] == '\t' || (bytes[i] >= 0x20 && bytes[i] <= 0x7E)))
                     {
                         builder.Append((char)bytes[i]);
                     }
@@ -263,6 +286,104 @@ namespace TxtAIEditor.Core.Services
             public string Body { get; }
         }
 
+        private sealed class PdfPageContentInfo
+        {
+            public PdfPageContentInfo(string content, Dictionary<string, ToUnicodeCMap> fontUnicodeMaps, HashSet<int> contentObjectNumbers)
+            {
+                Content = content;
+                FontUnicodeMaps = fontUnicodeMaps;
+                ContentObjectNumbers = contentObjectNumbers;
+            }
+
+            public string Content { get; }
+
+            public Dictionary<string, ToUnicodeCMap> FontUnicodeMaps { get; }
+
+            public HashSet<int> ContentObjectNumbers { get; }
+        }
+
+        private static List<PdfPageContentInfo> BuildPageContentInfos(string raw, List<PdfStreamInfo> streams, Dictionary<string, ToUnicodeCMap> fallbackFontUnicodeMaps)
+        {
+            var result = new List<PdfPageContentInfo>();
+            var streamByObjectNumber = new Dictionary<int, PdfStreamInfo>();
+            foreach (var stream in streams)
+            {
+                if (stream.ObjectNumber.HasValue)
+                {
+                    streamByObjectNumber[stream.ObjectNumber.Value] = stream;
+                }
+            }
+
+            var toUnicodeByObjectNumber = BuildToUnicodeMapsByObjectNumber(streams);
+            var fontObjectToCMap = BuildFontObjectToUnicodeMaps(raw, toUnicodeByObjectNumber);
+            var objects = ParsePdfObjects(raw);
+            var objectBodies = new Dictionary<int, string>();
+            foreach (var obj in objects)
+            {
+                objectBodies[obj.ObjectNumber] = obj.Body;
+            }
+
+            var processedPageObjects = new HashSet<int>();
+            foreach (var obj in objects)
+            {
+                if (!processedPageObjects.Add(obj.ObjectNumber))
+                {
+                    continue;
+                }
+
+                string body = obj.Body;
+                if (!IsPageObjectBody(body))
+                {
+                    continue;
+                }
+
+                var pageContent = new StringBuilder();
+                var contentObjectNumbers = new HashSet<int>();
+                foreach (int contentObject in ExtractContentObjectNumbers(body))
+                {
+                    if (!streamByObjectNumber.TryGetValue(contentObject, out PdfStreamInfo? stream) ||
+                        !LooksLikeTextContentStream(stream.DecodedText))
+                    {
+                        continue;
+                    }
+
+                    if (pageContent.Length > 0 && pageContent[pageContent.Length - 1] != '\n')
+                    {
+                        pageContent.Append('\n');
+                    }
+
+                    pageContent.Append(stream.DecodedText);
+                    contentObjectNumbers.Add(contentObject);
+                }
+
+                if (pageContent.Length == 0)
+                {
+                    continue;
+                }
+
+                Dictionary<string, ToUnicodeCMap> fontUnicodeMaps = fallbackFontUnicodeMaps;
+                string? resourceBody = GetPageResourceBody(body, objectBodies);
+                if (!string.IsNullOrEmpty(resourceBody))
+                {
+                    Dictionary<string, ToUnicodeCMap> pageFontMaps = BuildFontUnicodeMapsFromResourceText(resourceBody, fontObjectToCMap);
+                    if (pageFontMaps.Count > 0)
+                    {
+                        fontUnicodeMaps = pageFontMaps;
+                    }
+                }
+
+                result.Add(new PdfPageContentInfo(pageContent.ToString(), fontUnicodeMaps, contentObjectNumbers));
+            }
+
+            return result;
+        }
+
+        private static bool IsPageObjectBody(string body)
+        {
+            return Regex.IsMatch(body, @"/Type\s*/Page\b", RegexOptions.NonBacktracking) &&
+                !Regex.IsMatch(body, @"/Type\s*/Pages\b", RegexOptions.NonBacktracking);
+        }
+
         private static Dictionary<int, Dictionary<string, ToUnicodeCMap>> BuildContentStreamFontUnicodeMaps(string raw, List<PdfStreamInfo> streams)
         {
             var result = new Dictionary<int, Dictionary<string, ToUnicodeCMap>>();
@@ -278,8 +399,7 @@ namespace TxtAIEditor.Core.Services
             foreach (var obj in objects)
             {
                 string body = obj.Body;
-                if (!body.Contains("/Type /Page", StringComparison.Ordinal) ||
-                    body.Contains("/Type /Pages", StringComparison.Ordinal))
+                if (!IsPageObjectBody(body))
                 {
                     continue;
                 }
@@ -376,7 +496,7 @@ namespace TxtAIEditor.Core.Services
                     continue;
                 }
 
-                Match toUnicodeMatch = Regex.Match(body, @"/ToUnicode\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
+                Match toUnicodeMatch = Regex.Match(body, @"/ToUnicode\s*(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
                 if (!toUnicodeMatch.Success || !int.TryParse(toUnicodeMatch.Groups["obj"].Value, out int toUnicodeObject))
                 {
                     continue;
@@ -412,7 +532,7 @@ namespace TxtAIEditor.Core.Services
 
         private static IEnumerable<int> ExtractContentObjectNumbers(string pageBody)
         {
-            Match contents = Regex.Match(pageBody, @"/Contents\s+(?<value>\[(?<array>.*?)\]|(?<obj>\d+)\s+\d+\s+R)", RegexOptions.Singleline | RegexOptions.NonBacktracking);
+            Match contents = Regex.Match(pageBody, @"/Contents\s*(?<value>\[(?<array>.*?)\]|(?<obj>\d+)\s+\d+\s+R)", RegexOptions.Singleline | RegexOptions.NonBacktracking);
             if (!contents.Success)
             {
                 yield break;
@@ -435,7 +555,7 @@ namespace TxtAIEditor.Core.Services
 
         private static string? GetPageResourceBody(string pageBody, Dictionary<int, string> objectBodies)
         {
-            Match indirect = Regex.Match(pageBody, @"/Resources\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
+            Match indirect = Regex.Match(pageBody, @"/Resources\s*(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
             if (indirect.Success && int.TryParse(indirect.Groups["obj"].Value, out int resourceObject) &&
                 objectBodies.TryGetValue(resourceObject, out string? resourceBody))
             {
@@ -511,7 +631,7 @@ namespace TxtAIEditor.Core.Services
                     continue;
                 }
 
-                Match toUnicodeMatch = Regex.Match(body, @"/ToUnicode\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
+                Match toUnicodeMatch = Regex.Match(body, @"/ToUnicode\s*(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking);
                 if (!toUnicodeMatch.Success || !int.TryParse(toUnicodeMatch.Groups["obj"].Value, out int toUnicodeObject))
                 {
                     continue;
