@@ -381,10 +381,11 @@ namespace TxtAIEditor.Core.Services
             }
 
             // Try UTF-16BE for CJK/Korean text without BOM
-            if (bytes.Length >= 2 && bytes.Length % 2 == 0)
+            // (conservative: skip plain ASCII)
+            if (bytes.Length >= 2 && bytes.Length % 2 == 0 && !LooksLikePlainAsciiBytes(bytes))
             {
                 string utf16be = Encoding.BigEndianUnicode.GetString(bytes);
-                if (ContainsCjkCharacters(utf16be))
+                if (LooksLikeRealCjkText(utf16be))
                 {
                     return utf16be;
                 }
@@ -407,10 +408,11 @@ namespace TxtAIEditor.Core.Services
             }
 
             // Try UTF-16BE without BOM for CJK/Korean text
-            if (text.Length >= 2 && text.Length % 2 == 0)
+            // (conservative: skip plain ASCII)
+            if (text.Length >= 2 && text.Length % 2 == 0 && !LooksLikePlainAsciiText(text))
             {
                 string utf16be = DecodeUtf16FromStringBytes(text, 0, bigEndian: true);
-                if (ContainsCjkCharacters(utf16be))
+                if (LooksLikeRealCjkText(utf16be))
                 {
                     return utf16be;
                 }
@@ -467,6 +469,100 @@ namespace TxtAIEditor.Core.Services
             // Fullwidth Forms
             if (ch >= 0xFF00 && ch <= 0xFFEF) return true;
             return false;
+        }
+
+        private static bool LooksLikePlainAsciiText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return false;
+            }
+
+            int printable = 0;
+            int total = 0;
+            foreach (char ch in text)
+            {
+                if (ch == '\r' || ch == '\n' || ch == '\t')
+                {
+                    printable++;
+                    total++;
+                }
+                else if (ch >= 0x20 && ch <= 0x7E)
+                {
+                    printable++;
+                    total++;
+                }
+                else
+                {
+                    total++;
+                }
+            }
+
+            return total > 0 && printable * 100 / total >= 85;
+        }
+
+        private static bool LooksLikePlainAsciiBytes(byte[] bytes)
+        {
+            if (bytes.Length == 0)
+            {
+                return false;
+            }
+
+            int printable = 0;
+            foreach (byte b in bytes)
+            {
+                if (b == '\r' || b == '\n' || b == '\t' || (b >= 0x20 && b <= 0x7E))
+                {
+                    printable++;
+                }
+            }
+
+            return printable * 100 / bytes.Length >= 85;
+        }
+
+        private static bool LooksLikeRealCjkText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return false;
+            }
+
+            int cjk = 0;
+            int bad = 0;
+            int meaningful = 0;
+
+            foreach (char ch in text)
+            {
+                if (char.IsControl(ch) && ch != '\r' && ch != '\n' && ch != '\t')
+                {
+                    bad++;
+                    continue;
+                }
+
+                if (!char.IsWhiteSpace(ch))
+                {
+                    meaningful++;
+                }
+
+                if (IsCjkCharacter(ch))
+                {
+                    cjk++;
+                }
+            }
+
+            if (meaningful == 0)
+            {
+                return false;
+            }
+
+            // Reject if there are garbled control characters
+            if (bad > 0)
+            {
+                return false;
+            }
+
+            // Pass only when CJK is at least 2 chars and a meaningful ratio
+            return cjk >= 2 && cjk * 100 / meaningful >= 30;
         }
 
         private static string ExtractLooseLiteralText(string raw)
