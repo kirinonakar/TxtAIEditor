@@ -1149,6 +1149,42 @@
   <data name="GitCommitSuccessMessage" xml:space="preserve">
     <value>正常にコミットが完了しました！</value>
   </data>
+  <data name="GitCommitEmptyMessage" xml:space="preserve">
+    <value>コミットメッセージを入力してください。</value>
+  </data>
+  <data name="GitCommitFailureTitle" xml:space="preserve">
+    <value>Git コミット失敗</value>
+  </data>
+  <data name="GitCommitFailureMessage" xml:space="preserve">
+    <value>コミット中にエラーが発生しました。ステージング済みの変更（Staged）が登録されているか確認してください。</value>
+  </data>
+  <data name="GitStageFailureTitle" xml:space="preserve">
+    <value>Git ステージング失敗</value>
+  </data>
+  <data name="GitStageAllFailureMessage" xml:space="preserve">
+    <value>すべての変更のステージングに失敗しました。</value>
+  </data>
+  <data name="GitStageToggleFailureTitle" xml:space="preserve">
+    <value>Git ステージング状態の変更失敗</value>
+  </data>
+  <data name="GitStageToggleFailureMessage" xml:space="preserve">
+    <value>Git CLI コマンドの処理に失敗しました。</value>
+  </data>
+  <data name="GitCommitDetailsFailureTitle" xml:space="preserve">
+    <value>コミット詳細の取得に失敗しました</value>
+  </data>
+  <data name="GitInitTitle" xml:space="preserve">
+    <value>Git 初期化</value>
+  </data>
+  <data name="GitInitSelectFolderMessage" xml:space="preserve">
+    <value>先にエクスプローラーでフォルダーを選択してください。</value>
+  </data>
+  <data name="GitInitFailureTitle" xml:space="preserve">
+    <value>Git 初期化失敗</value>
+  </data>
+  <data name="GitInitFailureMessage" xml:space="preserve">
+    <value>Git リポジトリの作成に失敗しました。</value>
+  </data>
   <data name="UntitledNewTab" xml:space="preserve">
     <value>無題</value>
   </data>

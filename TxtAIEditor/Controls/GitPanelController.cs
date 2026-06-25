@@ -182,7 +182,9 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                _showError("Git Stage 실패", "전체 Stage 처리에 실패했습니다.");
+                _showError(
+                    _getString("GitStageFailureTitle", "Git Stage 실패"),
+                    _getString("GitStageAllFailureMessage", "전체 Stage 처리에 실패했습니다."));
             }
         }
 
@@ -209,7 +211,9 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                _showError("Git Stage 변경 실패", "Git CLI 명령 처리에 실패했습니다.");
+                _showError(
+                    _getString("GitStageToggleFailureTitle", "Git Stage 변경 실패"),
+                    _getString("GitStageToggleFailureMessage", "Git CLI 명령 처리에 실패했습니다."));
             }
         }
 
@@ -286,7 +290,9 @@ namespace TxtAIEditor.Controls
             string message = _leftSidebar.GitCommitMessage.Text;
             if (string.IsNullOrEmpty(message))
             {
-                _showError("Git 커밋", "커밋 메시지를 채워주십시오.");
+                _showError(
+                    _getString("GitCommitSuccessTitle", "Git 커밋"),
+                    _getString("GitCommitEmptyMessage", "커밋 메시지를 채워주십시오."));
                 return;
             }
 
@@ -301,7 +307,9 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                _showError("Git 커밋 실패", "커밋 도중 에러가 났습니다. 변경 조각(Staged)이 등록되었는지 확인하십시오.");
+                _showError(
+                    _getString("GitCommitFailureTitle", "Git 커밋 실패"),
+                    _getString("GitCommitFailureMessage", "커밋 도중 에러가 났습니다. 변경 조각(Staged)이 등록되었는지 확인하십시오."));
             }
         }
 
@@ -507,7 +515,9 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showError("커밋 상세 조회 실패", ex.Message);
+                _showError(
+                    _getString("GitCommitDetailsFailureTitle", "커밋 상세 조회 실패"),
+                    ex.Message);
             }
         }
 
@@ -816,7 +826,9 @@ namespace TxtAIEditor.Controls
             string targetPath = _folderPathProvider();
             if (string.IsNullOrEmpty(targetPath))
             {
-                _showError("Git 초기화", "탐색기에서 폴더를 먼저 선택하세요.");
+                _showError(
+                    _getString("GitInitTitle", "Git 초기화"),
+                    _getString("GitInitSelectFolderMessage", "탐색기에서 폴더를 먼저 선택하세요."));
                 return;
             }
 
@@ -827,7 +839,9 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                _showError("Git 초기화 실패", "Git 저장소 생성에 실패했습니다.");
+                _showError(
+                    _getString("GitInitFailureTitle", "Git 초기화 실패"),
+                    _getString("GitInitFailureMessage", "Git 저장소 생성에 실패했습니다."));
             }
         }
     }

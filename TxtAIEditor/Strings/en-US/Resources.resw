@@ -1148,6 +1148,42 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="GitCommitSuccessMessage" xml:space="preserve">
     <value>Successfully committed!</value>
   </data>
+  <data name="GitCommitEmptyMessage" xml:space="preserve">
+    <value>Please fill in the commit message.</value>
+  </data>
+  <data name="GitCommitFailureTitle" xml:space="preserve">
+    <value>Git Commit Failed</value>
+  </data>
+  <data name="GitCommitFailureMessage" xml:space="preserve">
+    <value>An error occurred during commit. Please verify if staged changes exist.</value>
+  </data>
+  <data name="GitStageFailureTitle" xml:space="preserve">
+    <value>Git Stage Failed</value>
+  </data>
+  <data name="GitStageAllFailureMessage" xml:space="preserve">
+    <value>Failed to stage all changes.</value>
+  </data>
+  <data name="GitStageToggleFailureTitle" xml:space="preserve">
+    <value>Git Stage Change Failed</value>
+  </data>
+  <data name="GitStageToggleFailureMessage" xml:space="preserve">
+    <value>Failed to process the Git CLI command.</value>
+  </data>
+  <data name="GitCommitDetailsFailureTitle" xml:space="preserve">
+    <value>Failed to Retrieve Commit Details</value>
+  </data>
+  <data name="GitInitTitle" xml:space="preserve">
+    <value>Git Initialization</value>
+  </data>
+  <data name="GitInitSelectFolderMessage" xml:space="preserve">
+    <value>Please select a folder in the explorer first.</value>
+  </data>
+  <data name="GitInitFailureTitle" xml:space="preserve">
+    <value>Git Initialization Failed</value>
+  </data>
+  <data name="GitInitFailureMessage" xml:space="preserve">
+    <value>Failed to create a Git repository.</value>
+  </data>
   <data name="UntitledNewTab" xml:space="preserve">
     <value>Untitled</value>
   </data>
