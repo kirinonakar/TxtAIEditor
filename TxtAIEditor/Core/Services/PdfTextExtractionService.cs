@@ -338,7 +338,7 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
-            return builder.ToString();
+            return DecodeUtf16BeIfBomPresent(builder.ToString());
         }
 
         private static string DecodeHexString(string hex)
@@ -370,8 +370,103 @@ namespace TxtAIEditor.Core.Services
                 return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
             }
 
+            // Try UTF-8 for CJK/Korean text without BOM
+            if (bytes.Length >= 3)
+            {
+                string utf8 = Encoding.UTF8.GetString(bytes);
+                if (utf8.IndexOf('\uFFFD') < 0 && ContainsCjkCharacters(utf8))
+                {
+                    return utf8;
+                }
+            }
+
+            // Try UTF-16BE for CJK/Korean text without BOM
+            if (bytes.Length >= 2 && bytes.Length % 2 == 0)
+            {
+                string utf16be = Encoding.BigEndianUnicode.GetString(bytes);
+                if (ContainsCjkCharacters(utf16be))
+                {
+                    return utf16be;
+                }
+            }
+
             bool looksUtf16 = bytes.Length > 2 && bytes.Length % 2 == 0 && bytes[0] == 0;
             return looksUtf16 ? Encoding.BigEndianUnicode.GetString(bytes) : Encoding.Latin1.GetString(bytes);
+        }
+
+        private static string DecodeUtf16BeIfBomPresent(string text)
+        {
+            if (text.Length >= 3 && text[0] == '\u00FE' && text[1] == '\u00FF')
+            {
+                return DecodeUtf16FromStringBytes(text, 2, bigEndian: true);
+            }
+
+            if (text.Length >= 3 && text[0] == '\u00FF' && text[1] == '\u00FE')
+            {
+                return DecodeUtf16FromStringBytes(text, 2, bigEndian: false);
+            }
+
+            // Try UTF-16BE without BOM for CJK/Korean text
+            if (text.Length >= 2 && text.Length % 2 == 0)
+            {
+                string utf16be = DecodeUtf16FromStringBytes(text, 0, bigEndian: true);
+                if (ContainsCjkCharacters(utf16be))
+                {
+                    return utf16be;
+                }
+            }
+
+            return text;
+        }
+
+        private static string DecodeUtf16FromStringBytes(string text, int offset, bool bigEndian)
+        {
+            byte[] bytes = new byte[text.Length - offset];
+            for (int i = offset; i < text.Length; i++)
+            {
+                bytes[i - offset] = text[i] <= 0xFF ? (byte)text[i] : (byte)'?';
+            }
+            return bigEndian
+                ? Encoding.BigEndianUnicode.GetString(bytes)
+                : Encoding.Unicode.GetString(bytes);
+        }
+
+        private static bool ContainsCjkCharacters(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return false;
+            }
+
+            foreach (char ch in text)
+            {
+                if (IsCjkCharacter(ch))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsCjkCharacter(char ch)
+        {
+            // Hangul Syllables (Korean)
+            if (ch >= 0xAC00 && ch <= 0xD7AF) return true;
+            // Hangul Jamo
+            if (ch >= 0x1100 && ch <= 0x11FF) return true;
+            // Hangul Compatibility Jamo
+            if (ch >= 0x3130 && ch <= 0x318F) return true;
+            // CJK Unified Ideographs
+            if (ch >= 0x4E00 && ch <= 0x9FFF) return true;
+            // CJK Extension A
+            if (ch >= 0x3400 && ch <= 0x4DBF) return true;
+            // Hiragana
+            if (ch >= 0x3040 && ch <= 0x309F) return true;
+            // Katakana
+            if (ch >= 0x30A0 && ch <= 0x30FF) return true;
+            // Fullwidth Forms
+            if (ch >= 0xFF00 && ch <= 0xFFEF) return true;
+            return false;
         }
 
         private static string ExtractLooseLiteralText(string raw)
