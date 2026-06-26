@@ -1254,10 +1254,8 @@ namespace TxtAIEditor.Controls
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    string toolName = string.Empty;
-                    JsonElement arguments = default;
-                    bool parsedToolCall = AgentToolCallParser.TryParse(response, out toolName, out arguments);
-                    if (!parsedToolCall)
+                    bool parsedToolCall = AgentToolCallParser.TryParseMulti(response, out List<AgentToolCallParser.ToolCallInfo> toolCalls);
+                    if (!parsedToolCall || toolCalls.Count == 0)
                     {
                         if (responseHasToolSyntax)
                         {
@@ -1410,94 +1408,111 @@ namespace TxtAIEditor.Controls
                         break;
                     }
 
-                    string normalizedToolName = NormalizeToolName(toolName);
-                    string toolInvocationKey = BuildToolInvocationKey(normalizedToolName, arguments);
-                    bool skippedDuplicateTool = false;
-                    bool stopAfterDuplicateLoopGuard = false;
-                    string toolResult;
-                    string toolResultForTranscript;
-                    toolCallFormatRetryCount = 0;
+                    bool stopAfterLoopGuard = false;
+                    var toolCallResults = new List<(string Name, JsonElement Args, string Result, string ResultForTranscript, bool Skipped, string NormalizedName)>();
 
-                    if (!planningMode && normalizedToolName == "make_plan")
+                    foreach (var tc in toolCalls)
                     {
-                        toolResult = "make_plan failed: this tool is only available when planning mode is enabled.";
-                        toolResultForTranscript = toolResult;
-                    }
-                    else if (planningMode && IsMutatingTool(normalizedToolName) && normalizedToolName != "make_plan")
-                    {
-                        toolResult =
-                            "blocked: planning mode is plan-only and cannot run file/editor mutation tools. " +
-                            "Continue with safe inspection if needed, or write the detailed Markdown plan as the final answer.";
-                        toolResultForTranscript = toolResult;
-                    }
-                    else if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
-                        successfulToolResults.TryGetValue(toolInvocationKey, out string? cachedToolResult))
-                    {
-                        skippedDuplicateTool = true;
-                        toolResult = cachedToolResult ?? string.Empty;
-                        if (string.Equals(lastDuplicateToolInvocationKey, toolInvocationKey, StringComparison.Ordinal))
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        string currentToolName = tc.ToolName;
+                        JsonElement currentArguments = tc.Arguments;
+
+                        string normalizedToolName = NormalizeToolName(currentToolName);
+                        string toolInvocationKey = BuildToolInvocationKey(normalizedToolName, currentArguments);
+                        bool skippedDuplicateTool = false;
+                        string toolResult;
+                        string toolResultForTranscript;
+                        toolCallFormatRetryCount = 0;
+
+                        if (!planningMode && normalizedToolName == "make_plan")
                         {
-                            repeatedDuplicateToolSkipCount++;
+                            toolResult = "make_plan failed: this tool is only available when planning mode is enabled.";
+                            toolResultForTranscript = toolResult;
+                        }
+                        else if (planningMode && IsMutatingTool(normalizedToolName) && normalizedToolName != "make_plan")
+                        {
+                            toolResult =
+                                "blocked: planning mode is plan-only and cannot run file/editor mutation tools. " +
+                                "Continue with safe inspection if needed, or write the detailed Markdown plan as the final answer.";
+                            toolResultForTranscript = toolResult;
+                        }
+                        else if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
+                            successfulToolResults.TryGetValue(toolInvocationKey, out string? cachedToolResult))
+                        {
+                            skippedDuplicateTool = true;
+                            toolResult = cachedToolResult ?? string.Empty;
+                            if (string.Equals(lastDuplicateToolInvocationKey, toolInvocationKey, StringComparison.Ordinal))
+                            {
+                                repeatedDuplicateToolSkipCount++;
+                            }
+                            else
+                            {
+                                lastDuplicateToolInvocationKey = toolInvocationKey;
+                                repeatedDuplicateToolSkipCount = 1;
+                            }
+
+                            var duplicateResultBuilder = new StringBuilder();
+                            duplicateResultBuilder.AppendLine("[Tool execution skipped: identical successful call already ran earlier in this agent run. Cached result follows; use it instead of calling the tool again.]");
+                            duplicateResultBuilder.AppendLine(toolResult);
+                            if (repeatedDuplicateToolSkipCount >= 2)
+                            {
+                                duplicateResultBuilder.AppendLine();
+                                duplicateResultBuilder.AppendLine("[Loop guard] You repeated the same skipped tool call. Choose exactly one different next action, or write the final answer. Do not call this tool again unless a later mutating tool changes the relevant files or workspace state.");
+                            }
+
+                            stopAfterLoopGuard = repeatedDuplicateToolSkipCount >= maxRepeatedDuplicateToolSkips;
+                            toolResultForTranscript = duplicateResultBuilder.ToString().TrimEnd();
                         }
                         else
                         {
-                            lastDuplicateToolInvocationKey = toolInvocationKey;
-                            repeatedDuplicateToolSkipCount = 1;
-                        }
-
-                        var duplicateResultBuilder = new StringBuilder();
-                        duplicateResultBuilder.AppendLine("[Tool execution skipped: identical successful call already ran earlier in this agent run. Cached result follows; use it instead of calling the tool again.]");
-                        duplicateResultBuilder.AppendLine(toolResult);
-                        if (repeatedDuplicateToolSkipCount >= 2)
-                        {
-                            duplicateResultBuilder.AppendLine();
-                            duplicateResultBuilder.AppendLine("[Loop guard] You repeated the same skipped tool call. Choose exactly one different next action, or write the final answer. Do not call this tool again unless a later mutating tool changes the relevant files or workspace state.");
-                        }
-
-                        stopAfterDuplicateLoopGuard = repeatedDuplicateToolSkipCount >= maxRepeatedDuplicateToolSkips;
-                        toolResultForTranscript = duplicateResultBuilder.ToString().TrimEnd();
-                    }
-                    else
-                    {
-                        lastDuplicateToolInvocationKey = null;
-                        repeatedDuplicateToolSkipCount = 0;
-                        await _toolExecutionSessionGate.WaitAsync(cancellationToken);
-                        try
-                        {
-                            _activeToolRunContext.Value = runContext;
-                            await _uiDispatcher.RunAsync(() =>
+                            lastDuplicateToolInvocationKey = null;
+                            repeatedDuplicateToolSkipCount = 0;
+                            await _toolExecutionSessionGate.WaitAsync(cancellationToken);
+                            try
                             {
-                                _sessionEditController.Replace(runContext.SessionEdits);
-                            });
-                            toolResult = await _toolExecutionController.ExecuteAsync(toolName, arguments, cancellationToken);
-                            runContext.SessionEdits = _sessionEditController.SessionEdits.ToList();
-                            EnsureOpenSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
-                            if (!_runOutputController.IsSessionVisible(runContext.SessionId))
-                            {
+                                _activeToolRunContext.Value = runContext;
                                 await _uiDispatcher.RunAsync(() =>
                                 {
-                                    var visibleSession = EnsureOpenSession(_currentSessionId);
-                                    _sessionEditController.Replace(visibleSession.SessionEdits);
+                                    _sessionEditController.Replace(runContext.SessionEdits);
                                 });
+                                toolResult = await _toolExecutionController.ExecuteAsync(currentToolName, currentArguments, cancellationToken);
+                                runContext.SessionEdits = _sessionEditController.SessionEdits.ToList();
+                                EnsureOpenSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
+                                if (!_runOutputController.IsSessionVisible(runContext.SessionId))
+                                {
+                                    await _uiDispatcher.RunAsync(() =>
+                                    {
+                                        var visibleSession = EnsureOpenSession(_currentSessionId);
+                                        _sessionEditController.Replace(visibleSession.SessionEdits);
+                                    });
+                                }
+                            }
+                            finally
+                            {
+                                _activeToolRunContext.Value = null;
+                                _toolExecutionSessionGate.Release();
+                            }
+                            toolResultForTranscript = toolResult;
+                            if (IsSuccessfulToolResult(toolResult))
+                            {
+                                if (IsMutatingTool(normalizedToolName) ||
+                                    string.Equals(normalizedToolName, "run_powershell", StringComparison.Ordinal))
+                                {
+                                    successfulToolResults.Clear();
+                                }
+
+                                if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
+                                {
+                                    successfulToolResults[toolInvocationKey] = toolResult;
+                                }
                             }
                         }
-                        finally
-                        {
-                            _activeToolRunContext.Value = null;
-                            _toolExecutionSessionGate.Release();
-                        }
-                        toolResultForTranscript = toolResult;
+
                         if (IsSuccessfulToolResult(toolResult))
                         {
-                            if (IsMutatingTool(normalizedToolName) ||
-                                string.Equals(normalizedToolName, "run_powershell", StringComparison.Ordinal))
+                            if (!skippedDuplicateTool)
                             {
-                                successfulToolResults.Clear();
-                            }
-
-                            if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
-                            {
-                                successfulToolResults[toolInvocationKey] = toolResult;
                                 toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
                             }
                         }
@@ -1510,6 +1525,13 @@ namespace TxtAIEditor.Controls
                             normalizedToolName,
                             toolResultForTranscript,
                             toolResult);
+
+                        toolCallResults.Add((currentToolName, currentArguments, toolResult, toolResultForTranscript, skippedDuplicateTool, normalizedToolName));
+
+                        if (!IsSuccessfulToolResult(toolResult) || stopAfterLoopGuard)
+                        {
+                            break;
+                        }
                     }
 
                     cancellationToken.ThrowIfCancellationRequested();
@@ -1527,9 +1549,14 @@ namespace TxtAIEditor.Controls
                         addedPartBuilder.AppendLine();
                         addedPartBuilder.AppendLine("[Agent tool call]");
                         addedPartBuilder.AppendLine(response);
-                        addedPartBuilder.AppendLine();
-                        addedPartBuilder.AppendLine($"[Tool result: {toolName}]");
-                        addedPartBuilder.AppendLine(toolResultForTranscript);
+
+                        foreach (var tcRes in toolCallResults)
+                        {
+                            addedPartBuilder.AppendLine();
+                            addedPartBuilder.AppendLine($"[Tool result: {tcRes.Name}]");
+                            addedPartBuilder.AppendLine(tcRes.ResultForTranscript);
+                        }
+
                         addedPartBuilder.AppendLine();
                         addedPartBuilder.AppendLine("[Current workspace context snapshot]");
                         if (string.Equals(refreshedContext, lastWorkspaceContext, StringComparison.Ordinal))
@@ -1548,20 +1575,24 @@ namespace TxtAIEditor.Controls
                         UpdateContextStatsImmediate(force: true);
                     });
                     
-                    string displayResult = _toolExecutionController.FormatDisplayResult(
-                        normalizedToolName,
-                        arguments,
-                        toolResult,
-                        skippedDuplicateTool,
-                        runContext.LlmSettings.LlmAgentVerbose);
+                    foreach (var tcRes in toolCallResults)
+                    {
+                        string displayResult = _toolExecutionController.FormatDisplayResult(
+                            tcRes.NormalizedName,
+                            tcRes.Args,
+                            tcRes.Result,
+                            tcRes.Skipped,
+                            runContext.LlmSettings.LlmAgentVerbose);
 
-                    string outputHeader = skippedDuplicateTool
-                        ? _getString("AgentDuplicateToolSkipped", "도구 중복 호출 건너뜀")
-                        : _getString("AgentToolRunning", "도구 실행 중");
-                    await _runOutputController.AppendRunOutputLineAsync(runContext, $"{outputHeader}: {toolName}");
-                    await _runOutputController.AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
+                        string outputHeader = tcRes.Skipped
+                            ? _getString("AgentDuplicateToolSkipped", "도구 중복 호출 건너뜀")
+                            : _getString("AgentToolRunning", "도구 실행 중");
+                        await _runOutputController.AppendRunOutputLineAsync(runContext, $"{outputHeader}: {tcRes.Name}");
+                        await _runOutputController.AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
+                    }
 
-                    if (planningMode && normalizedToolName == "make_plan" && IsSuccessfulToolResult(toolResult))
+                    var makePlanRes = toolCallResults.FirstOrDefault(tc => tc.NormalizedName == "make_plan" && IsSuccessfulToolResult(tc.Result));
+                    if (planningMode && makePlanRes.Name != null)
                     {
                         approvedPlanExecutionPrompt = await _planController.WaitForSavedPlanApprovalAsync(
                             runContext,
@@ -1586,7 +1617,7 @@ namespace TxtAIEditor.Controls
                         break;
                     }
 
-                    if (stopAfterDuplicateLoopGuard)
+                    if (stopAfterLoopGuard)
                     {
                         string loopMessage = _getString(
                             "AgentLoopGuardStopped",
@@ -1607,33 +1638,33 @@ namespace TxtAIEditor.Controls
                         completed = true;
                         break;
                     }
-
-
-
-                    string verifyToolName = NormalizeToolName(toolName);
-                    bool isFileEditTool = verifyToolName is "replace_in_file" or "search_replace" or "replace_range"
-                        or "apply_patch" or "overwrite_file" or "append_to_file";
-                    if (isFileEditTool && IsUnchangedEditCompletionResult(toolResult))
+                    if (toolCalls.Count == 1)
                     {
-                        string completeMsg = _getString(
-                            "AgentFileEditAlreadyComplete",
-                            "요청한 작업을 완료하였습니다.");
-
-                        transcript += "\n\n[File edit verification: requested content already matches the current file. Task complete.]";
-
-                        await _runOutputController.AppendRunOutputLineAsync(runContext, completeMsg);
-
-                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                        string unchangedRunTranscript = transcript.Substring(initialTranscript.Length);
-                        if (!string.IsNullOrWhiteSpace(unchangedRunTranscript))
+                        var tcRes = toolCallResults[0];
+                        bool isFileEditTool = tcRes.NormalizedName is "replace_in_file" or "search_replace" or "replace_range"
+                            or "apply_patch" or "overwrite_file" or "append_to_file";
+                        if (isFileEditTool && IsUnchangedEditCompletionResult(tcRes.Result))
                         {
-                            AppendRunSessionHistoryLine(unchangedRunTranscript.Trim());
-                        }
-                        AppendRunSessionHistoryLine();
-                        _ = PersistRunSessionToHistoryAsync();
+                            string completeMsg = _getString(
+                                "AgentFileEditAlreadyComplete",
+                                "요청한 작업을 완료하였습니다.");
 
-                        completed = true;
-                        break;
+                            transcript += "\n\n[File edit verification: requested content already matches the current file. Task complete.]";
+
+                            await _runOutputController.AppendRunOutputLineAsync(runContext, completeMsg);
+
+                            AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
+                            string unchangedRunTranscript = transcript.Substring(initialTranscript.Length);
+                            if (!string.IsNullOrWhiteSpace(unchangedRunTranscript))
+                            {
+                                AppendRunSessionHistoryLine(unchangedRunTranscript.Trim());
+                            }
+                            AppendRunSessionHistoryLine();
+                            _ = PersistRunSessionToHistoryAsync();
+
+                            completed = true;
+                            break;
+                        }
                     }
 
                     if (step == maxToolSteps - 1)

@@ -61,10 +61,30 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
+        internal struct ToolCallInfo
+        {
+            public string ToolName;
+            public JsonElement Arguments;
+        }
+
         public static bool TryParse(string response, out string toolName, out JsonElement arguments)
         {
             toolName = string.Empty;
             arguments = default;
+
+            if (TryParseMulti(response, out var list) && list.Count > 0)
+            {
+                toolName = list[0].ToolName;
+                arguments = list[0].Arguments;
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool TryParseMulti(string response, out List<ToolCallInfo> toolCalls)
+        {
+            toolCalls = new List<ToolCallInfo>();
 
             if (string.IsNullOrWhiteSpace(response))
             {
@@ -90,17 +110,17 @@ namespace TxtAIEditor.Controls
                 {
                     // No matching close tag. Try parsing the rest of the text.
                     string possiblePayload = text.Substring(payloadStart).Trim();
-                    if (TryParsePayload(possiblePayload, out toolName, out arguments))
+                    if (TryParsePayloads(possiblePayload, toolCalls))
                     {
-                        return true;
+                        return toolCalls.Count > 0;
                     }
                     break;
                 }
 
                 string payload = text.Substring(payloadStart, closeIndex - payloadStart).Trim();
-                if (TryParsePayload(payload, out toolName, out arguments))
+                if (TryParsePayloads(payload, toolCalls))
                 {
-                    return true;
+                    return toolCalls.Count > 0;
                 }
 
                 searchStart = payloadStart;
@@ -109,14 +129,164 @@ namespace TxtAIEditor.Controls
             // 2. Try bare payload.
             if (TryExtractBareToolCallPayload(text, out string barePayload))
             {
-                if (TryParsePayload(barePayload, out toolName, out arguments))
+                if (TryParsePayloads(barePayload, toolCalls))
                 {
-                    return true;
+                    return toolCalls.Count > 0;
                 }
             }
 
             // 3. Try command fence.
-            return TryParseSupportedCommandFence(response, out toolName, out arguments);
+            if (TryParseSupportedCommandFence(response, out string toolName, out JsonElement arguments))
+            {
+                toolCalls.Add(new ToolCallInfo { ToolName = toolName, Arguments = arguments });
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryParsePayloads(string payload, List<ToolCallInfo> toolCalls)
+        {
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return false;
+            }
+
+            string fixedPayload = FixJsonCarriageReturnEscapes(payload);
+            string trimmedPayload = fixedPayload.Trim();
+
+            while (trimmedPayload.StartsWith(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase))
+            {
+                trimmedPayload = trimmedPayload.Substring(ToolCallOpenTag.Length).Trim();
+            }
+            while (trimmedPayload.EndsWith(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase))
+            {
+                trimmedPayload = trimmedPayload.Substring(0, trimmedPayload.Length - ToolCallCloseTag.Length).Trim();
+            }
+
+            int index = 0;
+            var list = new List<ToolCallInfo>();
+
+            while (index < trimmedPayload.Length)
+            {
+                // Skip whitespace
+                while (index < trimmedPayload.Length && char.IsWhiteSpace(trimmedPayload[index]))
+                {
+                    index++;
+                }
+                if (index >= trimmedPayload.Length)
+                {
+                    break;
+                }
+
+                if (trimmedPayload[index] == '{')
+                {
+                    if (TryExtractBalancedJsonObject(trimmedPayload, index, out string jsonStr))
+                    {
+                        index += jsonStr.Length;
+                        if (TryParseJsonToolCall(jsonStr, out string tName, out JsonElement args))
+                        {
+                            list.Add(new ToolCallInfo { ToolName = tName, Arguments = args });
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    int openBraceIndex = trimmedPayload.IndexOf('{', index);
+                    if (openBraceIndex > index)
+                    {
+                        string possibleName = trimmedPayload.Substring(index, openBraceIndex - index).Trim();
+                        if (Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$"))
+                        {
+                            if (TryExtractBalancedJsonObject(trimmedPayload, openBraceIndex, out string jsonStr))
+                            {
+                                index = openBraceIndex + jsonStr.Length;
+                                if (TryParseBareArguments(jsonStr, out JsonElement args))
+                                {
+                                    list.Add(new ToolCallInfo { ToolName = possibleName, Arguments = args });
+                                }
+                                else
+                                {
+                                    return false;
+                                }
+                            }
+                            else
+                            {
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            if (list.Count > 0)
+            {
+                toolCalls.AddRange(list);
+                return true;
+            }
+
+            // Fallback: try parsing as a single payload
+            if (TryParsePayload(payload, out string fallbackName, out JsonElement fallbackArgs))
+            {
+                toolCalls.Add(new ToolCallInfo { ToolName = fallbackName, Arguments = fallbackArgs });
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryParseJsonToolCall(string jsonStr, out string toolName, out JsonElement arguments)
+        {
+            toolName = string.Empty;
+            arguments = default;
+            try
+            {
+                using var document = JsonDocument.Parse(jsonStr);
+                var root = document.RootElement.Clone();
+                if (root.TryGetProperty("name", out var nameProp))
+                {
+                    toolName = nameProp.GetString() ?? string.Empty;
+                    arguments = BuildArgumentsElement(root, stripNameProperty: true);
+                    return !string.IsNullOrWhiteSpace(toolName);
+                }
+            }
+            catch
+            {
+                // Fall through
+            }
+            return false;
+        }
+
+        private static bool TryParseBareArguments(string jsonStr, out JsonElement arguments)
+        {
+            arguments = default;
+            try
+            {
+                using var document = JsonDocument.Parse(jsonStr);
+                var root = document.RootElement.Clone();
+                arguments = BuildArgumentsElement(root, stripNameProperty: false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static bool TryParsePayload(string payload, out string toolName, out JsonElement arguments)
