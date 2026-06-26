@@ -745,7 +745,7 @@
                              Padding="0"
                              MinHeight="0"
                              MinWidth="0"
-                             Margin="2,1,0,-12"
+                             Margin="2,1,0,-13"
                              Click="OnModelNameClick">
                 <TextBlock x:Name="AgentModelNameText"
                            FontSize="11"
