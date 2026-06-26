@@ -1788,18 +1788,6 @@
   <data name="AgentActivityToolFailedFormat" xml:space="preserve">
     <value>ツール失敗: {0}</value>
   </data>
-  <data name="AgentActivityToolBlockedFormat" xml:space="preserve">
-    <value>ツールをブロック: {0}</value>
-  </data>
-  <data name="AgentSelectionEditDifferentFileBlockedFormat" xml:space="preserve">
-    <value>{0} 失敗: 選択範囲の作業では {1} のみ編集できますが、要求された編集対象は {2} です。選択範囲外を編集しないでください。選択範囲の作業がすでに完了している場合は、最終回答を作成してください。</value>
-  </data>
-  <data name="AgentSelectionEditToolBlockedFormat" xml:space="preserve">
-    <value>{0} 失敗: 選択範囲の作業では {1} の中だけファイル編集できます。選択された行範囲内で replace_range を使用してください。選択範囲の作業がすでに完了している場合は、最終回答を作成してください。</value>
-  </data>
-  <data name="AgentSelectionEditRangeBlockedFormat" xml:space="preserve">
-    <value>replace_range 失敗: 選択範囲の作業では {0} のみ編集できますが、要求された編集範囲は {1}-{2} 行目です。選択範囲外を編集しないでください。選択範囲の作業がすでに完了している場合は、最終回答を作成してください。</value>
-  </data>
   <data name="AgentActivityStopRequested" xml:space="preserve">
     <value>中止が要求されました</value>
   </data>

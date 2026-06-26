@@ -57,14 +57,6 @@ namespace TxtAIEditor.Controls
                 cancellationToken.ThrowIfCancellationRequested();
                 string normalizedToolName = NormalizeToolName(toolName);
                 bool isMcpTool = _mcpController.TryGetToolAlias(normalizedToolName, out _);
-                string? selectionScopeError = _fileToolController.ValidateSelectionEditScope(normalizedToolName, arguments);
-                if (!isMcpTool && !string.IsNullOrEmpty(selectionScopeError))
-                {
-                    _appendActivity(string.Format(
-                        _getString("AgentActivityToolBlockedFormat", "도구 차단: {0}"),
-                        normalizedToolName));
-                    return selectionScopeError;
-                }
 
                 _appendActivity(GetToolStartMessage(normalizedToolName, arguments));
 

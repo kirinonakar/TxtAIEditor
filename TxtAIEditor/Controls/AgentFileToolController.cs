@@ -24,7 +24,6 @@ namespace TxtAIEditor.Controls
         private sealed class RunFileToolState
         {
             public string? LastFilePath { get; set; }
-            public bool RestrictEditsToSelection { get; set; }
             public AgentSelectionSnapshot? SelectionSnapshot { get; set; }
             public string? ActiveTabPath { get; set; }
             public HashSet<string> WrittenFiles { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -51,12 +50,6 @@ namespace TxtAIEditor.Controls
             _currentRunState.Value = new RunFileToolState();
         }
 
-        public void SetRestrictEditsToSelection(bool restrictEditsToSelection)
-        {
-            RunFileToolState state = _currentRunState.Value ??= new RunFileToolState();
-            state.RestrictEditsToSelection = restrictEditsToSelection;
-        }
-
         public void SetRunContext(AgentSelectionSnapshot selectionSnapshot, OpenedTab? activeTab)
         {
             RunFileToolState state = _currentRunState.Value ??= new RunFileToolState();
@@ -67,62 +60,6 @@ namespace TxtAIEditor.Controls
         public void FinishRun()
         {
             _currentRunState.Value = null;
-        }
-
-        public string? ValidateSelectionEditScope(string normalizedToolName, JsonElement arguments)
-        {
-            RunFileToolState? state = _currentRunState.Value;
-            if (state == null || !state.RestrictEditsToSelection)
-            {
-                return null;
-            }
-
-            if (!AgentToolHelpers.IsFileEditingTool(normalizedToolName))
-            {
-                return null;
-            }
-
-            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            if (!selection.HasLineRange)
-            {
-                return null;
-            }
-
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return null;
-            }
-
-            if (!PathsReferToSameFile(path, selection.SourcePath!))
-            {
-                return string.Format(
-                    _getString("AgentSelectionEditDifferentFileBlockedFormat", "{0} failed: selection scope allows edits only in {1}, but the requested edit targets {2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
-                    normalizedToolName,
-                    FormatSelectionScope(selection),
-                    path);
-            }
-
-            if (normalizedToolName != "replace_range")
-            {
-                return string.Format(
-                    _getString("AgentSelectionEditToolBlockedFormat", "{0} failed: selection scope allows file edits only in {1}. Use replace_range inside the selected line range. If the selected-range task is already complete, write the final answer."),
-                    normalizedToolName,
-                    FormatSelectionScope(selection));
-            }
-
-            int startLine = GetReplaceRangeStartLineArgument(arguments, path);
-            int endLine = GetReplaceRangeEndLineArgument(arguments, path);
-            if (startLine < selection.StartLine || endLine > selection.EndLine)
-            {
-                return string.Format(
-                    _getString("AgentSelectionEditRangeBlockedFormat", "replace_range failed: selection scope allows edits only in {0}, but the requested edit targets lines {1}-{2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer."),
-                    FormatSelectionScope(selection),
-                    startLine,
-                    endLine);
-            }
-
-            return null;
         }
 
         public void TrackSuccessfulFileToolPath(string normalizedToolName, JsonElement arguments, string result)
@@ -808,11 +745,6 @@ namespace TxtAIEditor.Controls
             {
                 return path;
             }
-        }
-
-        private string FormatSelectionScope(AgentSelectionSnapshot selection)
-        {
-            return _selectionContextController.FormatSelectionScope(selection);
         }
     }
 }

@@ -622,9 +622,6 @@ namespace TxtAIEditor.Controls
                 AgentSelectionSnapshot currentRunSelectionSnapshot = _selectionContextController.CaptureSelectionForRun(_isRunning);
                 runContext.StreamToTabTargetTabId = currentRunActiveTab?.Id;
                 _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab);
-                _fileToolController.SetRestrictEditsToSelection(
-                    currentRunSelectionSnapshot.HasLineRange &&
-                    !UserRequestAllowsEditsOutsideSelection(instruction));
                 string workspaceContext = BuildWorkspaceContext(
                     instruction,
                     currentRunActiveTab,

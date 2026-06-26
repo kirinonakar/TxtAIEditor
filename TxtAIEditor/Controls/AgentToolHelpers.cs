@@ -238,19 +238,6 @@ namespace TxtAIEditor.Controls
                 or "insert_to_file";
         }
 
-        public static bool UserRequestAllowsEditsOutsideSelection(string instruction)
-        {
-            if (string.IsNullOrWhiteSpace(instruction))
-            {
-                return false;
-            }
-
-            return Regex.IsMatch(
-                instruction,
-                @"\b(whole|entire|full)\s+(file|document|workspace|project|repository)\b|\b(all|every)\s+(file|document)\b|전체\s*(파일|문서|워크스페이스|작업공간|프로젝트|저장소)|(?:파일|문서|프로젝트|저장소)\s*전체|すべての(?:ファイル|文書)|(?:ファイル|文書|ワークスペース|プロジェクト|リポジトリ)全体",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        }
-
         public static bool IsSuccessfulToolResult(string result)
         {
             if (string.IsNullOrWhiteSpace(result))

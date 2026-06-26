@@ -1787,18 +1787,6 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityToolFailedFormat" xml:space="preserve">
     <value>Tool failed: {0}</value>
   </data>
-  <data name="AgentActivityToolBlockedFormat" xml:space="preserve">
-    <value>Tool blocked: {0}</value>
-  </data>
-  <data name="AgentSelectionEditDifferentFileBlockedFormat" xml:space="preserve">
-    <value>{0} failed: selection scope allows edits only in {1}, but the requested edit targets {2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer.</value>
-  </data>
-  <data name="AgentSelectionEditToolBlockedFormat" xml:space="preserve">
-    <value>{0} failed: selection scope allows file edits only in {1}. Use replace_range inside the selected line range. If the selected-range task is already complete, write the final answer.</value>
-  </data>
-  <data name="AgentSelectionEditRangeBlockedFormat" xml:space="preserve">
-    <value>replace_range failed: selection scope allows edits only in {0}, but the requested edit targets lines {1}-{2}. Do not edit outside the selected range. If the selected-range task is already complete, write the final answer.</value>
-  </data>
   <data name="AgentActivityStopRequested" xml:space="preserve">
     <value>Stop requested</value>
   </data>

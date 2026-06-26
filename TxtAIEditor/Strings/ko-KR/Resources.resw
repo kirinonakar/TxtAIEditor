@@ -1787,18 +1787,6 @@
   <data name="AgentActivityToolFailedFormat" xml:space="preserve">
     <value>도구 실패: {0}</value>
   </data>
-  <data name="AgentActivityToolBlockedFormat" xml:space="preserve">
-    <value>도구 차단: {0}</value>
-  </data>
-  <data name="AgentSelectionEditDifferentFileBlockedFormat" xml:space="preserve">
-    <value>{0} 실패: 선택 범위 작업은 {1} 안에서만 수정할 수 있지만, 요청한 수정 대상은 {2}입니다. 선택 범위 밖은 수정하지 마세요. 선택 범위 작업이 이미 완료되었다면 최종 응답을 작성하세요.</value>
-  </data>
-  <data name="AgentSelectionEditToolBlockedFormat" xml:space="preserve">
-    <value>{0} 실패: 선택 범위 작업은 {1} 안에서만 파일을 수정할 수 있습니다. 선택된 줄 범위 안에서 replace_range를 사용하세요. 선택 범위 작업이 이미 완료되었다면 최종 응답을 작성하세요.</value>
-  </data>
-  <data name="AgentSelectionEditRangeBlockedFormat" xml:space="preserve">
-    <value>replace_range 실패: 선택 범위 작업은 {0} 안에서만 수정할 수 있지만, 요청한 수정 범위는 {1}-{2}줄입니다. 선택 범위 밖은 수정하지 마세요. 선택 범위 작업이 이미 완료되었다면 최종 응답을 작성하세요.</value>
-  </data>
   <data name="AgentActivityStopRequested" xml:space="preserve">
     <value>중단 요청됨</value>
   </data>
