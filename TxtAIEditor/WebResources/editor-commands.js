@@ -1574,8 +1574,17 @@ function replaceSelectionWith(selection, text, editSelection = null) {
         state.dirtyLines.set(start.line + i, 'add');
     }
 
+    const savedScrollTop = scrollContainer.scrollTop;
+    const editLineTop = lineTop(start.line);
+
     state.lineCount = Math.max(1, state.lineCount + netLines);
     setupVirtualHeight();
+
+    // 삭제된 줄이 뷰포트 위쪽에 있을 때 스크롤 위치를 유지합니다.
+    if (netLines < 0 && editLineTop < savedScrollTop) {
+        const scrollAdjust = -netLines * state.lineHeight;
+        scrollContainer.scrollTop = Math.max(0, savedScrollTop - scrollAdjust);
+    }
     beginEditTransaction();
     try {
         post({ type: 'lineChanged', lineNumber: start.line, text: newLines[0] });
@@ -1650,12 +1659,21 @@ function deleteCurrentLine(element) {
         }
         shiftCachedLines(lineNumber + 1, -1);
         state.cache.set(lineNumber, current + nextText);
+
+        const savedScrollTop = scrollContainer.scrollTop;
+        const deletedLineTop = lineTop(lineNumber);
+
         state.lineCount = Math.max(1, state.lineCount - 1);
         if (!cleanDirtyMarker(lineNumber)) {
             markDirty(lineNumber, 'mod');
         }
         state.dirtyLines.delete(lineNumber + 1);
         setupVirtualHeight();
+
+        // 삭제된 줄이 뷰포트 위쪽에 있을 때 스크롤 위치를 유지합니다.
+        if (deletedLineTop < savedScrollTop) {
+            scrollContainer.scrollTop = Math.max(0, savedScrollTop - state.lineHeight);
+        }
         post({ type: 'mergeLineWithPrevious', lineNumber: lineNumber + 1 });
         post({ type: 'contentChanged' });
         queueRender(true);
