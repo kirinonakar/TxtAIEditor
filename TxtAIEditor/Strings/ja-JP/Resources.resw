@@ -527,6 +527,9 @@
   <data name="GitRepoPathLabel" xml:space="preserve">
     <value>パス</value>
   </data>
+  <data name="GitRepoPathNone" xml:space="preserve">
+    <value>ルートパスなし</value>
+  </data>
   <data name="GitBranchPlaceholder" xml:space="preserve">
     <value>ブランチ一覧</value>
   </data>

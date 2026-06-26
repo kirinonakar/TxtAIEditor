@@ -92,7 +92,7 @@ namespace TxtAIEditor.Controls
             {
                 string notDetected = _getString("GitNotDetected", "Git: 감지 안됨");
                 _leftSidebar.GitPanelBranch.Text = notDetected;
-                _leftSidebar.GitRepoPath.Text = string.Empty;
+                _leftSidebar.GitRepoPath.Text = _getString("GitRepoPathNone", "Root 경로없음");
                 _statusGitBranch.Text = notDetected;
                 UpdateInitButtonState(null);
                 _viewModel.GitFiles.Clear();
