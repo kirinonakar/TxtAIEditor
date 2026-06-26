@@ -2139,6 +2139,9 @@ Plan: {0}</value>
   <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
     <value>Completed Ripgrep All search: {0}</value>
   </data>
+  <data name="AgentVerboseRunPowerShellOnly" xml:space="preserve">
+    <value>Completed PowerShell command: {0}</value>
+  </data>
   <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
     <value>Completed pdftotext conversion: {0}</value>
   </data>

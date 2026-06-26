@@ -2140,6 +2140,9 @@
   <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
     <value>Ripgrep All 検索を完了しました: {0}</value>
   </data>
+  <data name="AgentVerboseRunPowerShellOnly" xml:space="preserve">
+    <value>PowerShell コマンドを実行しました: {0}</value>
+  </data>
   <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
     <value>PdfToText 変換を完了しました: {0}</value>
   </data>

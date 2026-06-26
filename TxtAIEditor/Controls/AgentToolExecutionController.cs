@@ -232,6 +232,9 @@ namespace TxtAIEditor.Controls
                 {
                     return string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
                 }
+                return string.Format(
+                    _getString("AgentVerboseRunPowerShellOnly", "PowerShell 명령을 실행했습니다: {0}"),
+                    TruncateForActivity(command));
             }
 
             if (normalizedToolName == "extract_document")
