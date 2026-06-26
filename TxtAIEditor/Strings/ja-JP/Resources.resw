@@ -566,6 +566,12 @@
   <data name="GitRemote" xml:space="preserve">
     <value>Remote</value>
   </data>
+  <data name="GitScp" xml:space="preserve">
+    <value>S/C/P</value>
+  </data>
+  <data name="GitScpTooltip" xml:space="preserve">
+    <value>Stage/Commit/Push</value>
+  </data>
   <data name="GitPullSuccessTitle" xml:space="preserve">
     <value>Git Pull</value>
   </data>

@@ -91,6 +91,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? GitPullClick;
         public event RoutedEventHandler? GitRebaseClick;
         public event RoutedEventHandler? GitRemoteClick;
+        public event RoutedEventHandler? GitScpClick;
         public event RoutedEventHandler? GitRefreshClick;
         public event ItemClickEventHandler? GitHistoryItemClick;
         public event RoutedEventHandler? GitInitRepoClick;
@@ -143,6 +144,7 @@ namespace TxtAIEditor.Controls
         public Button GitRestoreAllBtn => GitRestoreAllButton;
         public SplitButton GitPushBtn => GitPushButton;
         public Button GitRemoteBtn => GitRemoteButton;
+        public Button GitScpBtn => GitScpButton;
         public Button GitRefreshBtn => GitRefreshButton;
         public TextBlock GitHistoryHeaderLabel => GitHistoryHeader;
         public Button ExplorerUpBtn => ExplorerUpButton;
@@ -255,6 +257,8 @@ namespace TxtAIEditor.Controls
             GitPullMenuItem.Text = getString("GitPull", "Pull");
             GitRebaseMenuItem.Text = getString("GitRebase", "Rebase");
             GitRemoteButton.Content = getString("GitRemote", "Remote");
+            GitScpButton.Content = getString("GitScp", "S/C/P");
+            ToolTipService.SetToolTip(GitScpButton, getString("GitScpTooltip", "Stage/Commit/Push"));
             var gitRefreshText = getString("GitRefresh", "새로고침");
             GitRefreshButton.Content = new FontIcon { Glyph = "\xE72C", FontSize = 10 };
             ToolTipService.SetToolTip(GitRefreshButton, gitRefreshText);
@@ -340,6 +344,7 @@ namespace TxtAIEditor.Controls
         private void OnGitPullClick(object sender, RoutedEventArgs e) => GitPullClick?.Invoke(sender, e);
         private void OnGitRebaseClick(object sender, RoutedEventArgs e) => GitRebaseClick?.Invoke(sender, e);
         private void OnGitRemoteClick(object sender, RoutedEventArgs e) => GitRemoteClick?.Invoke(sender, e);
+        private void OnGitScpClick(object sender, RoutedEventArgs e) => GitScpClick?.Invoke(sender, e);
         private void OnGitRefreshClick(object sender, RoutedEventArgs e) => GitRefreshClick?.Invoke(sender, e);
         private void OnGitHistoryItemClick(object sender, ItemClickEventArgs e) => GitHistoryItemClick?.Invoke(sender, e);
         private void OnGitInitRepoClick(object sender, RoutedEventArgs e) => GitInitRepoClick?.Invoke(sender, e);

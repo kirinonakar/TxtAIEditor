@@ -301,9 +301,6 @@ namespace TxtAIEditor.Controls
             {
                 _leftSidebar.GitCommitMessage.Text = string.Empty;
                 await RefreshAsync(repoPath);
-                _showError(
-                    _getString("GitCommitSuccessTitle", "Git 커밋"),
-                    _getString("GitCommitSuccessMessage", "성공적으로 커밋 완료되었습니다!"));
             }
             else
             {
@@ -319,9 +316,6 @@ namespace TxtAIEditor.Controls
             if (success)
             {
                 await RefreshAsync(repoPath);
-                _showError(
-                    _getString("GitPushSuccessTitle", "Git Push"),
-                    _getString("GitPushSuccessMessage", "Push가 완료되었습니다."));
             }
             else
             {
@@ -329,6 +323,55 @@ namespace TxtAIEditor.Controls
                     _getString("GitPushFailureTitle", "Git Push 실패"),
                     _getString("GitPushFailureMessage", "Push 처리에 실패했습니다. 원격 저장소/인증/업스트림 설정을 확인하십시오."));
             }
+        }
+
+        public async Task StageCommitPushAsync(string repoPath)
+        {
+            string message = _leftSidebar.GitCommitMessage.Text;
+            if (string.IsNullOrEmpty(message))
+            {
+                _showError(
+                    _getString("GitCommitSuccessTitle", "Git 커밋"),
+                    _getString("GitCommitEmptyMessage", "커밋 메시지를 채워주십시오."));
+                return;
+            }
+
+            bool stageSuccess = await _gitService.StageAllAsync(repoPath);
+            if (!stageSuccess)
+            {
+                _showError(
+                    _getString("GitStageFailureTitle", "Git Stage 실패"),
+                    _getString("GitStageAllFailureMessage", "전체 Stage 처리에 실패했습니다."));
+                return;
+            }
+
+            bool commitSuccess = await _gitService.CommitAsync(repoPath, message);
+            if (!commitSuccess)
+            {
+                await RefreshAsync(repoPath);
+                _showError(
+                    _getString("GitCommitFailureTitle", "Git 커밋 실패"),
+                    _getString("GitCommitFailureMessage", "커밋 도중 에러가 났습니다. 변경 조각(Staged)이 등록되었는지 확인하십시오."));
+                return;
+            }
+
+            _leftSidebar.GitCommitMessage.Text = string.Empty;
+
+            string remoteUrl = await _gitService.GetRemoteUrlAsync(repoPath);
+            if (!string.IsNullOrEmpty(remoteUrl))
+            {
+                bool pushSuccess = await _gitService.PushAsync(repoPath);
+                if (!pushSuccess)
+                {
+                    await RefreshAsync(repoPath);
+                    _showError(
+                        _getString("GitPushFailureTitle", "Git Push 실패"),
+                        _getString("GitPushFailureMessage", "Push 처리에 실패했습니다. 원격 저장소/인증/업스트림 설정을 확인하십시오."));
+                    return;
+                }
+            }
+
+            await RefreshAsync(repoPath);
         }
 
         public async Task PullAsync(string repoPath)
@@ -754,6 +797,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitPullClick += OnGitPullClick;
             _leftSidebar.GitRebaseClick += OnGitRebaseClick;
             _leftSidebar.GitRemoteClick += OnGitRemoteClick;
+            _leftSidebar.GitScpClick += OnGitScpClick;
             _leftSidebar.GitRefreshClick += OnGitRefreshClick;
             _leftSidebar.GitHistoryItemClick += OnGitHistoryItemClick;
             _leftSidebar.GitInitRepoClick += OnGitInitRepoClick;
@@ -803,6 +847,11 @@ namespace TxtAIEditor.Controls
         private async void OnGitRemoteClick(object sender, RoutedEventArgs e)
         {
             await ConfigureRemoteAsync(_repoPathProvider());
+        }
+
+        private async void OnGitScpClick(object sender, RoutedEventArgs e)
+        {
+            await StageCommitPushAsync(_repoPathProvider());
         }
 
         private async void OnGitRestoreAllClick(object sender, RoutedEventArgs e)

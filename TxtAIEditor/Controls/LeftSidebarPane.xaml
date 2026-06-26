@@ -445,7 +445,14 @@
     
                                 <StackPanel Grid.Row="2" Spacing="8" Margin="10,10,10,0">
                                     <TextBox x:Name="GitCommitMessageInput" PlaceholderText="커밋 메시지 입력..." Height="32" FontSize="12" FontFamily="Segoe UI, Malgun Gothic" VerticalContentAlignment="Center" Padding="10,8,10,0" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
-                                    <Button x:Name="GitCommitButton" Content="커밋 (Commit)" HorizontalAlignment="Stretch" Click="OnGitCommitClick" Style="{StaticResource AccentButtonStyle}" FontSize="11"/>
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="GitCommitButton" Grid.Column="0" Content="커밋 (Commit)" HorizontalAlignment="Stretch" Click="OnGitCommitClick" Style="{StaticResource AccentButtonStyle}" FontSize="11"/>
+                                        <Button x:Name="GitScpButton" Grid.Column="1" Content="S/C/P" Click="OnGitScpClick" FontSize="11" Height="32" Padding="12,3" ToolTipService.ToolTip="Stage/Commit/Push"/>
+                                    </Grid>
                                 </StackPanel>
     
                                 <StackPanel Grid.Row="3" Spacing="8" Margin="10,8,10,0">
