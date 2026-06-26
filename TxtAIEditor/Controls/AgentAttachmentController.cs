@@ -1,14 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Text;
 using System.Threading.Tasks;
-using Windows.Graphics.Imaging;
 using Windows.Storage;
 using Windows.Storage.Pickers;
-using Windows.Storage.Streams;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.Core.Services.LLM;
 
@@ -29,9 +24,6 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentAttachmentController
     {
-        private const int MaxAttachmentTextChars = 120_000;
-        private const int MaxImageDimension = 1024;
-
         private readonly AgentPane _agentPane;
         private readonly Action<object> _initializePickerWindow;
         private readonly Action<string, string> _showError;
@@ -219,115 +211,20 @@ namespace TxtAIEditor.Controls
             return new[] { "*" };
         }
 
-        private async Task<AgentAttachmentState?> CreateAttachmentAsync(StorageFile file)
+        private Task<AgentAttachmentState?> CreateAttachmentAsync(StorageFile file)
         {
             string displayName = file.Name;
             string path = file.Path ?? displayName;
-            string mimeType = GetMimeType(file);
 
-            if (IsDocumentFile(file))
-            {
-                int pathOnlyEstimatedTokens = (int)Math.Round(_estimateTokenCount(path));
-                return new AgentAttachmentState
-                {
-                    Path = path,
-                    DisplayName = displayName,
-                    Detail = _getString("AgentAttachmentDocumentPathOnlyDetail", "Document, path only"),
-                    EstimatedTokens = pathOnlyEstimatedTokens,
-                    IsPathOnlyDocument = true
-                };
-            }
-
-            if (IsImageFile(file, mimeType))
-            {
-                var image = await CreateImageAttachmentAsync(file, displayName, mimeType);
-                return new AgentAttachmentState
-                {
-                    Path = path,
-                    DisplayName = displayName,
-                    Detail = $"{image.MimeType}, {image.Width}x{image.Height}",
-                    ImageContent = image,
-                    EstimatedTokens = image.EstimatedTokens
-                };
-            }
-
-            string text = await ReadAttachmentTextAsync(file);
-            int estimatedTokens = (int)Math.Round(_estimateTokenCount(text));
-            bool truncated = text.Length >= MaxAttachmentTextChars;
-            return new AgentAttachmentState
+            int pathOnlyEstimatedTokens = (int)Math.Round(_estimateTokenCount(path));
+            return Task.FromResult<AgentAttachmentState?>(new AgentAttachmentState
             {
                 Path = path,
                 DisplayName = displayName,
-                Detail = truncated
-                    ? string.Format(_getString("AgentAttachmentFileTruncatedDetail", "File, included first {0:N0} chars"), text.Length)
-                    : string.Format(_getString("AgentAttachmentFileDetail", "File, {0:N0} chars"), text.Length),
-                TextContent = text,
-                EstimatedTokens = estimatedTokens
-            };
-        }
-
-        private async Task<LlmMessageAttachment> CreateImageAttachmentAsync(StorageFile file, string displayName, string mimeType)
-        {
-            using IRandomAccessStream input = await file.OpenReadAsync();
-            BitmapDecoder decoder = await BitmapDecoder.CreateAsync(input);
-            uint originalWidth = decoder.PixelWidth;
-            uint originalHeight = decoder.PixelHeight;
-            uint outputWidth = originalWidth;
-            uint outputHeight = originalHeight;
-            string outputMimeType = string.IsNullOrWhiteSpace(mimeType) ? "image/png" : mimeType;
-            byte[] bytes;
-
-            if (Math.Max(originalWidth, originalHeight) > MaxImageDimension)
-            {
-                double scale = MaxImageDimension / (double)Math.Max(originalWidth, originalHeight);
-                outputWidth = Math.Max(1, (uint)Math.Round(originalWidth * scale));
-                outputHeight = Math.Max(1, (uint)Math.Round(originalHeight * scale));
-
-                var transform = new BitmapTransform
-                {
-                    ScaledWidth = outputWidth,
-                    ScaledHeight = outputHeight,
-                    InterpolationMode = BitmapInterpolationMode.Fant
-                };
-
-                PixelDataProvider pixelData = await decoder.GetPixelDataAsync(
-                    BitmapPixelFormat.Bgra8,
-                    BitmapAlphaMode.Premultiplied,
-                    transform,
-                    ExifOrientationMode.RespectExifOrientation,
-                    ColorManagementMode.ColorManageToSRgb);
-
-                using var output = new InMemoryRandomAccessStream();
-                BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, output);
-                encoder.SetPixelData(
-                    BitmapPixelFormat.Bgra8,
-                    BitmapAlphaMode.Premultiplied,
-                    outputWidth,
-                    outputHeight,
-                    96,
-                    96,
-                    pixelData.DetachPixelData());
-                await encoder.FlushAsync();
-                output.Seek(0);
-                bytes = await ReadRandomAccessStreamAsync(output);
-                outputMimeType = "image/jpeg";
-            }
-            else
-            {
-                input.Seek(0);
-                bytes = await ReadRandomAccessStreamAsync(input);
-            }
-
-            int estimatedTokens = EstimateImageTokens((int)outputWidth, (int)outputHeight);
-            return new LlmMessageAttachment
-            {
-                DisplayName = displayName,
-                MimeType = outputMimeType,
-                Base64Data = Convert.ToBase64String(bytes),
-                Width = (int)outputWidth,
-                Height = (int)outputHeight,
-                EstimatedTokens = estimatedTokens
-            };
+                Detail = _getString("AgentAttachmentDocumentPathOnlyDetail", "Document, path only"),
+                EstimatedTokens = pathOnlyEstimatedTokens,
+                IsPathOnlyDocument = true
+            });
         }
 
         private void RefreshAttachments()
@@ -344,110 +241,6 @@ namespace TxtAIEditor.Controls
                 })
                 .ToList();
             _agentPane.UpdateAttachments(items);
-        }
-
-        private static async Task<byte[]> ReadRandomAccessStreamAsync(IRandomAccessStream stream)
-        {
-            using var managedStream = stream.AsStreamForRead();
-            using var memory = new MemoryStream();
-            await managedStream.CopyToAsync(memory);
-            return memory.ToArray();
-        }
-
-        private static async Task<string> ReadAttachmentTextAsync(StorageFile file)
-        {
-            if (!string.IsNullOrWhiteSpace(file.Path) && File.Exists(file.Path))
-            {
-                using var stream = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-                char[] buffer = new char[MaxAttachmentTextChars + 1];
-                int read = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
-                string text = new string(buffer, 0, Math.Min(read, MaxAttachmentTextChars));
-                return StripBinaryControlCharacters(text);
-            }
-
-            string fallback = await FileIO.ReadTextAsync(file);
-            if (fallback.Length > MaxAttachmentTextChars)
-            {
-                fallback = fallback.Substring(0, MaxAttachmentTextChars);
-            }
-
-            return StripBinaryControlCharacters(fallback);
-        }
-
-        private static int EstimateImageTokens(int width, int height)
-        {
-            int tilesWide = Math.Max(1, (int)Math.Ceiling(width / 512.0));
-            int tilesHigh = Math.Max(1, (int)Math.Ceiling(height / 512.0));
-            return 85 + (tilesWide * tilesHigh * 170);
-        }
-
-        private static string StripBinaryControlCharacters(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return string.Empty;
-            }
-
-            var builder = new StringBuilder(text.Length);
-            foreach (char ch in text)
-            {
-                if (ch == '\r' || ch == '\n' || ch == '\t' || ch >= ' ')
-                {
-                    builder.Append(ch);
-                }
-            }
-            return builder.ToString();
-        }
-
-        private static bool IsImageFile(StorageFile file, string mimeType)
-        {
-            if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            string extension = Path.GetExtension(file.Name);
-            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsDocumentFile(StorageFile file)
-        {
-            string extension = Path.GetExtension(file.Name);
-            return extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".doc", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".xls", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string GetMimeType(StorageFile file)
-        {
-            if (!string.IsNullOrWhiteSpace(file.ContentType) &&
-                !file.ContentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase))
-            {
-                return file.ContentType;
-            }
-
-            string extension = Path.GetExtension(file.Name).ToLowerInvariant();
-            return extension switch
-            {
-                ".png" => "image/png",
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".webp" => "image/webp",
-                ".bmp" => "image/bmp",
-                ".gif" => "image/gif",
-                ".pdf" => "application/pdf",
-                _ => "text/plain"
-            };
         }
     }
 }
