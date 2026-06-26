@@ -912,8 +912,21 @@ namespace TxtAIEditor.Controls
                             {
                                 if (!runContext.LlmSettings.LlmAgentVerbose)
                                 {
+                                    bool toolCallClosed = streamedText.TrimEnd().EndsWith("}");
                                     int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
-                                    string label = _displayText.FormatPreparingToolLabel(tokenCount);
+                                    string label;
+                                    if (toolCallClosed)
+                                    {
+                                        label = string.Format(
+                                            _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
+                                            _getString("AgentActivityThinking", "생각중"),
+                                            _displayText.FormatInlineTokenCount(tokenCount)
+                                        );
+                                    }
+                                    else
+                                    {
+                                        label = _displayText.FormatPreparingToolLabel(tokenCount);
+                                    }
                                     _runOutputController.EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.UpdateThinkingActivity(label),
@@ -936,9 +949,26 @@ namespace TxtAIEditor.Controls
                                 if (!runContext.LlmSettings.LlmAgentVerbose)
                                 {
                                     int idx = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
-                                    string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
-                                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(toolCallText));
-                                    string label = _displayText.FormatPreparingToolLabel(tokenCount);
+                                    int lastCloseIdx = streamedText.LastIndexOf("</tool_call>", StringComparison.OrdinalIgnoreCase);
+                                    bool toolCallClosed = lastCloseIdx >= 0 && lastCloseIdx > idx;
+
+                                    string label;
+                                    if (toolCallClosed)
+                                    {
+                                        int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
+                                        label = string.Format(
+                                            _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
+                                            _getString("AgentActivityThinking", "생각중"),
+                                            _displayText.FormatInlineTokenCount(tokenCount)
+                                        );
+                                    }
+                                    else
+                                    {
+                                        string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
+                                        int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(toolCallText));
+                                        label = _displayText.FormatPreparingToolLabel(tokenCount);
+                                    }
+
                                     _runOutputController.EnqueueRunUi(
                                         runContext,
                                         () => _agentPane.UpdateThinkingActivity(label),
