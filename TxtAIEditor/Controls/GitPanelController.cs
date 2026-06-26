@@ -130,7 +130,7 @@ namespace TxtAIEditor.Controls
 
             // Update UI components in a single synchronous block to prevent duplicate display and empty states
             _leftSidebar.GitPanelBranch.Text = branchText;
-            _leftSidebar.GitRepoPath.Text = $": {repoPath}";
+            _leftSidebar.GitRepoPath.Text = $"{repoPath}";
             ToolTipService.SetToolTip(_leftSidebar.GitRepoPath, repoPath);
             _statusGitBranch.Text = branchText;
             UpdateInitButtonState(repoPath);
