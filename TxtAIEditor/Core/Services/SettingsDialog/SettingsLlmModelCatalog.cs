@@ -46,6 +46,17 @@ namespace TxtAIEditor.Core.Services
                 provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
         }
 
+        public static string GetThinkingLevelDisplay(string thinkingLevel, string provider)
+        {
+            if (string.IsNullOrWhiteSpace(thinkingLevel) ||
+                thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase) ||
+                !SupportsThinkingLevel(provider))
+            {
+                return string.Empty;
+            }
+            return thinkingLevel.ToLowerInvariant();
+        }
+
         public static bool IsKnownDefaultEndpoint(string endpoint)
         {
             return string.IsNullOrWhiteSpace(endpoint) ||

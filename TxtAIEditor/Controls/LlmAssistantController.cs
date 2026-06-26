@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using Windows.Storage.Pickers;
 
 namespace TxtAIEditor.Controls
@@ -139,8 +140,10 @@ namespace TxtAIEditor.Controls
             {
                 string provider = settings.LlmProvider ?? string.Empty;
                 string model = settings.LlmModel ?? string.Empty;
+                string thinkingLevel = SettingsLlmModelCatalog.GetThinkingLevelDisplay(settings.LlmThinkingLevel, provider);
+                string displayInfo = string.IsNullOrEmpty(thinkingLevel) ? provider : $"{provider}, {thinkingLevel}";
                 string format = _getString("AgentModelFormat", "모델: {0} ({1})");
-                _rightSidebar.UpdateLlmModelName(string.Format(format, model, provider));
+                _rightSidebar.UpdateLlmModelName(string.Format(format, model, displayInfo));
             }
         }
 

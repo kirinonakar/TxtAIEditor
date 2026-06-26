@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Controls
@@ -136,8 +137,10 @@ namespace TxtAIEditor.Controls
 
                 string provider = settings.LlmProvider ?? string.Empty;
                 string model = settings.LlmModel ?? string.Empty;
+                string thinkingLevel = SettingsLlmModelCatalog.GetThinkingLevelDisplay(settings.LlmThinkingLevel, provider);
+                string displayInfo = string.IsNullOrEmpty(thinkingLevel) ? provider : $"{provider}, {thinkingLevel}";
                 string format = _getString("AgentModelFormat", "모델: {0} ({1})");
-                string result = string.Format(format, model, provider);
+                string result = string.Format(format, model, displayInfo);
                 if (settings.LlmAgentVerbose)
                 {
                     result += " -v";
