@@ -169,8 +169,8 @@ namespace TxtAIEditor.Controls
 
             while (index < trimmedPayload.Length)
             {
-                // Skip whitespace
-                while (index < trimmedPayload.Length && char.IsWhiteSpace(trimmedPayload[index]))
+                // Skip whitespace and closing braces
+                while (index < trimmedPayload.Length && (char.IsWhiteSpace(trimmedPayload[index]) || trimmedPayload[index] == '}'))
                 {
                     index++;
                 }
@@ -181,7 +181,13 @@ namespace TxtAIEditor.Controls
 
                 if (trimmedPayload[index] == '{')
                 {
-                    if (TryExtractBalancedJsonObject(trimmedPayload, index, out string jsonStr))
+                    int tempIndex = index;
+                    if (TryExtractJsonToolCall(trimmedPayload, ref tempIndex, out var tc))
+                    {
+                        index = tempIndex;
+                        list.Add(tc);
+                    }
+                    else if (TryExtractBalancedJsonObject(trimmedPayload, index, out string jsonStr))
                     {
                         index += jsonStr.Length;
                         if (TryParseJsonToolCall(jsonStr, out string tName, out JsonElement args))
@@ -246,6 +252,44 @@ namespace TxtAIEditor.Controls
             {
                 toolCalls.Add(new ToolCallInfo { ToolName = fallbackName, Arguments = fallbackArgs });
                 return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryExtractJsonToolCall(string payload, ref int index, out ToolCallInfo toolCall)
+        {
+            toolCall = default;
+            
+            var nameMatch = Regex.Match(payload.Substring(index), @"\""name\""\s*:\s*\""(?<name>[^\""\\\\]*(?:\\\\.[^\""\\\\]*)*)\""", RegexOptions.IgnoreCase);
+            if (!nameMatch.Success)
+            {
+                return false;
+            }
+
+            var argsMatch = Regex.Match(payload.Substring(index), @"\""arguments\""\s*:\s*", RegexOptions.IgnoreCase);
+            if (!argsMatch.Success)
+            {
+                return false;
+            }
+
+            string toolName = DecodeLenientJsonString(nameMatch.Groups["name"].Value);
+            
+            int absoluteArgsMatchIndex = index + argsMatch.Index + argsMatch.Length;
+            int openBraceIndex = payload.IndexOf('{', absoluteArgsMatchIndex);
+            if (openBraceIndex < 0)
+            {
+                return false;
+            }
+
+            if (TryExtractBalancedJsonObject(payload, openBraceIndex, out string jsonStr))
+            {
+                if (TryParseBareArguments(jsonStr, out JsonElement args))
+                {
+                    toolCall = new ToolCallInfo { ToolName = toolName, Arguments = args };
+                    index = openBraceIndex + jsonStr.Length;
+                    return true;
+                }
             }
 
             return false;
