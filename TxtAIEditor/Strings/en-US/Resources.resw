@@ -524,6 +524,9 @@
   <data name="GitRepoHeader" xml:space="preserve">
     <value>Git Repository</value>
   </data>
+  <data name="GitRepoPathLabel" xml:space="preserve">
+    <value>Path</value>
+  </data>
   <data name="GitBranchPlaceholder" xml:space="preserve">
     <value>Branch List</value>
   </data>

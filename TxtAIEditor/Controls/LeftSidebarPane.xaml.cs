@@ -165,6 +165,7 @@ namespace TxtAIEditor.Controls
         public ListView TocList => TocListView;
 
         public TextBlock GitPanelBranch => GitPanelBranchText;
+        public TextBlock GitRepoPath => GitRepoPathText;
         public Button GitInitRepoBtn => GitInitRepoButton;
         public ComboBox GitBranches => GitBranchesCombo;
         public TextBox GitCommitMessage => GitCommitMessageInput;
@@ -245,6 +246,9 @@ namespace TxtAIEditor.Controls
             }
 
             GitHeaderText.Text = getString("GitRepoHeader", "Git 저장소 관리");
+            var gitRepoPathLabel = getString("GitRepoPathLabel", "경로");
+            ToolTipService.SetToolTip(GitRepoPathText, gitRepoPathLabel);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(GitRepoPathText, gitRepoPathLabel);
             GitInitRepoButton.Content = getString("GitCreateRepo", "Git 생성");
             ToolTipService.SetToolTip(GitInitRepoButton, getString("GitCreateRepoTooltip", "Git 저장소 생성"));
             GitBranchesCombo.PlaceholderText = getString("GitBranchPlaceholder", "브랜치 목록");

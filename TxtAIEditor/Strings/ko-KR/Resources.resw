@@ -524,6 +524,9 @@
   <data name="GitRepoHeader" xml:space="preserve">
     <value>Git 저장소 관리</value>
   </data>
+  <data name="GitRepoPathLabel" xml:space="preserve">
+    <value>경로</value>
+  </data>
   <data name="GitBranchPlaceholder" xml:space="preserve">
     <value>브랜치 목록</value>
   </data>

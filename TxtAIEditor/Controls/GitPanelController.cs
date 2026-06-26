@@ -92,6 +92,7 @@ namespace TxtAIEditor.Controls
             {
                 string notDetected = _getString("GitNotDetected", "Git: 감지 안됨");
                 _leftSidebar.GitPanelBranch.Text = notDetected;
+                _leftSidebar.GitRepoPath.Text = string.Empty;
                 _statusGitBranch.Text = notDetected;
                 UpdateInitButtonState(null);
                 _viewModel.GitFiles.Clear();
@@ -129,6 +130,8 @@ namespace TxtAIEditor.Controls
 
             // Update UI components in a single synchronous block to prevent duplicate display and empty states
             _leftSidebar.GitPanelBranch.Text = branchText;
+            _leftSidebar.GitRepoPath.Text = $": {repoPath}";
+            ToolTipService.SetToolTip(_leftSidebar.GitRepoPath, repoPath);
             _statusGitBranch.Text = branchText;
             UpdateInitButtonState(repoPath);
             _startAutoRefresh();
