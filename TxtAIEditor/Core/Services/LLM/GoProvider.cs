@@ -146,19 +146,22 @@ namespace TxtAIEditor.Core.Services.LLM
                             var firstChoice = choices[0];
                             if (firstChoice.TryGetProperty("message", out var message))
                             {
-                                if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
-                                {
-                                    var firstToolCall = toolCalls[0];
-                                    string fName = firstToolCall.GetProperty("function").GetProperty("name").GetString() ?? string.Empty;
-                                    string fArgs = firstToolCall.GetProperty("function").GetProperty("arguments").GetString() ?? string.Empty;
-                                    return $"<tool_call>{{\"name\":\"{fName}\",\"arguments\":{fArgs}}}</tool_call>";
-                                }
-
+                                string? contentText = null;
                                 if (message.TryGetProperty("content", out var content) &&
                                     content.ValueKind == JsonValueKind.String)
                                 {
-                                    string? text = content.GetString();
-                                    if (!string.IsNullOrEmpty(text)) return text;
+                                    contentText = content.GetString();
+                                }
+
+                                if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
+                                {
+                                    var firstToolCall = toolCalls[0];
+                                    return LlmToolCallTextFormatter.FormatAssistantResponseWithFunctionToolCall(contentText, firstToolCall);
+                                }
+
+                                if (contentText != null)
+                                {
+                                    if (!string.IsNullOrEmpty(contentText)) return contentText;
                                 }
 
                                 if (message.TryGetProperty("reasoning_content", out var reasoning) &&

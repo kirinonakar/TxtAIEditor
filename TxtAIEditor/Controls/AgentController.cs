@@ -770,7 +770,7 @@ namespace TxtAIEditor.Controls
                             emptyResponseRetryCount++;
                             string retryNote =
                                 "\n\n[Agent empty response]\n" +
-                                "The model returned no visible content. Continue by writing exactly one tool_call or a final answer.";
+                                "The model returned no visible content. Continue with a final tool_call or a final answer.";
 
                             await _uiDispatcher.RunAsync(() =>
                             {
@@ -890,7 +890,7 @@ namespace TxtAIEditor.Controls
                             makePlanRetryCount++;
                             string retryNote =
                                 "\n\n[Planning mode make_plan required]\n" +
-                                "Do not answer with the plan as plain text. Save it by replying with exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
+                                "Do not answer with the plan as plain text. Save it by ending with exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename, and do not put text after the tool_call.";
 
                             transcript += "\n\n" + response + "\n\n" + retryNote;
                             runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + "\n\n" + retryNote);
@@ -940,7 +940,7 @@ namespace TxtAIEditor.Controls
                             string retryNote =
                                 "\n\n[Skill not called]\n" +
                                 "You described intent to use a skill in prose but did not emit the skill_use tool_call. " +
-                                "Do not describe intent. Reply now with exactly one skill_use tool_call for the relevant skill:\n" +
+                                "Briefly state why if useful, then end with exactly one skill_use tool_call for the relevant skill:\n" +
                                 "<tool_call>{\"name\":\"skill_use\",\"arguments\":{\"name\":\"skill-name\"}}>";
 
                             await _uiDispatcher.RunAsync(() =>

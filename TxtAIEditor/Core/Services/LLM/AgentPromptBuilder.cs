@@ -23,9 +23,11 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("Use the supplied context and tools. Inspect before editing, choose the smallest correct action, and answer in " + outputLanguage + ".");
             builder.AppendLine();
             builder.AppendLine("Tool protocol:");
-            builder.AppendLine("- If the next step needs a tool, reply with exactly one tag and no other text:");
+            builder.AppendLine("- If the next step needs a tool, you may briefly summarize what you learned and why the tool is needed, then put exactly one tool call as the final action.");
+            builder.AppendLine("- Use a native function tool call when the provider supports it. If you must emit a text tool call, put this tag after any explanation:");
             builder.AppendLine("<tool_call>{\"name\":\"read_file\",\"arguments\":{\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":1,\"lineCount\":120}}</tool_call>");
-            builder.AppendLine("- Otherwise reply in plain text with no tool_call tag. Plain text ends the current agent turn.");
+            builder.AppendLine("- The tool call must be the last non-empty content in the response. Do not put text, markdown, or another tool call after it.");
+            builder.AppendLine("- Otherwise reply in plain text with no tool_call tag or function tool call. Plain text ends the current agent turn.");
             builder.AppendLine("- Tool names must match exactly. Arguments are JSON; escape Windows backslashes as \\\\ or use /.");
             builder.AppendLine("- Do not repeat an identical successful tool call. If the host returns a cached duplicate result, use it and choose a different next action or final answer. Reread after a mutating tool only when fresh context is needed.");
             builder.AppendLine();
@@ -93,9 +95,9 @@ namespace TxtAIEditor.Core.Services.LLM
                 builder.AppendLine("- Use only safe inspection tools such as list_files, search_text, read_file, skill_use, read_image, web tools, run_rg, run_rga, or clearly read-only run_powershell commands.");
                 builder.AppendLine("- The make_plan Markdown must include: goal, target files, edit scope, areas not to touch, current cause/context summary, concrete implementation steps, verification, and rollback/failure criteria.");
                 builder.AppendLine("- Keep scope minimal. Avoid unrelated refactoring, formatting, renaming, dependency changes, or architecture changes.");
-                builder.AppendLine("- If more tool work is needed, emit only the next tool_call; do not output progress or the plan first.");
+                builder.AppendLine("- If more tool work is needed, you may briefly state the finding, then put exactly one next tool_call as the final non-empty content.");
                 builder.AppendLine("- Ask the user only when requirements conflict, scope must expand, or a risky/destructive action is necessary.");
-                builder.AppendLine("- When ready, reply with exactly one make_plan tool_call and no plain text. Plain text does not save a plan.");
+                builder.AppendLine("- When ready, end with exactly one make_plan tool_call as the final non-empty content. Plain text without the final make_plan tool_call does not save a plan.");
             }
             return builder.ToString();
         }

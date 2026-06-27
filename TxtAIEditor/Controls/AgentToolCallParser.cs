@@ -44,6 +44,9 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
+            openIndex = text.LastIndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
+            closeIndex = text.LastIndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase);
+
             if (openIndex < 0 || closeIndex < 0 || closeIndex < openIndex)
             {
                 detail = "The tool_call tag must include one matching <tool_call>...</tool_call> pair.";
@@ -51,10 +54,9 @@ namespace TxtAIEditor.Controls
             }
 
             int afterClose = closeIndex + ToolCallCloseTag.Length;
-            if (!string.IsNullOrWhiteSpace(text.Substring(0, openIndex)) ||
-                !string.IsNullOrWhiteSpace(text.Substring(afterClose)))
+            if (!string.IsNullOrWhiteSpace(text.Substring(afterClose)))
             {
-                detail = "A tool_call response must not include explanatory text outside the tag.";
+                detail = "The tool_call must be the final non-empty content; put any explanation before it, not after it.";
                 return true;
             }
 
@@ -92,38 +94,20 @@ namespace TxtAIEditor.Controls
             }
 
             string text = response.Trim();
+            bool hasToolCallTagSyntax =
+                text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0;
 
-            // 1. Try to find any tag-based tool call that parses successfully.
-            int searchStart = 0;
-            while (searchStart < text.Length)
+            // 1. Prefer the final text tool call, so explanatory examples earlier in the response are ignored.
+            if (TryExtractTrailingToolCallTagPayload(text, out string trailingTagPayload) &&
+                TryParsePayloads(trailingTagPayload, toolCalls))
             {
-                int openIndex = text.IndexOf(ToolCallOpenTag, searchStart, StringComparison.OrdinalIgnoreCase);
-                if (openIndex < 0)
-                {
-                    break;
-                }
+                return toolCalls.Count > 0;
+            }
 
-                int payloadStart = openIndex + ToolCallOpenTag.Length;
-                int closeIndex = text.IndexOf(ToolCallCloseTag, payloadStart, StringComparison.OrdinalIgnoreCase);
-                
-                if (closeIndex < 0)
-                {
-                    // No matching close tag. Try parsing the rest of the text.
-                    string possiblePayload = text.Substring(payloadStart).Trim();
-                    if (TryParsePayloads(possiblePayload, toolCalls))
-                    {
-                        return toolCalls.Count > 0;
-                    }
-                    break;
-                }
-
-                string payload = text.Substring(payloadStart, closeIndex - payloadStart).Trim();
-                if (TryParsePayloads(payload, toolCalls))
-                {
-                    return toolCalls.Count > 0;
-                }
-
-                searchStart = payloadStart;
+            if (hasToolCallTagSyntax)
+            {
+                return false;
             }
 
             // 2. Try bare payload.
@@ -143,6 +127,45 @@ namespace TxtAIEditor.Controls
             }
 
             return false;
+        }
+
+        private static bool TryExtractTrailingToolCallTagPayload(string text, out string payload)
+        {
+            payload = string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            string trimmed = text.Trim();
+            int closeIndex = trimmed.LastIndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase);
+            if (closeIndex >= 0)
+            {
+                int afterClose = closeIndex + ToolCallCloseTag.Length;
+                if (!string.IsNullOrWhiteSpace(trimmed.Substring(afterClose)))
+                {
+                    return false;
+                }
+
+                int openIndex = trimmed.LastIndexOf(ToolCallOpenTag, closeIndex, StringComparison.OrdinalIgnoreCase);
+                if (openIndex < 0)
+                {
+                    return false;
+                }
+
+                int payloadStart = openIndex + ToolCallOpenTag.Length;
+                payload = trimmed.Substring(payloadStart, closeIndex - payloadStart).Trim();
+                return !string.IsNullOrWhiteSpace(payload);
+            }
+
+            int trailingOpenIndex = trimmed.LastIndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
+            if (trailingOpenIndex < 0)
+            {
+                return false;
+            }
+
+            payload = trimmed.Substring(trailingOpenIndex + ToolCallOpenTag.Length).Trim();
+            return !string.IsNullOrWhiteSpace(payload);
         }
 
         private static bool TryParsePayloads(string payload, List<ToolCallInfo> toolCalls)
@@ -872,7 +895,7 @@ namespace TxtAIEditor.Controls
             string normalized = response.Replace("\r\n", "\n").Replace('\r', '\n');
             foreach (Match match in Regex.Matches(
                 normalized,
-                @"(?ms)^[ \t]*```(?<info>[^\n`]*)\n(?<body>.*?)(?:\n)[ \t]*```[ \t]*$"))
+                @"(?ms)^[ \t]*```(?<info>[^\n`]*)\n(?<body>.*?)(?:\n)[ \t]*```[ \t]*\z"))
             {
                 string info = match.Groups["info"].Value.Trim();
                 string body = match.Groups["body"].Value;
@@ -885,7 +908,7 @@ namespace TxtAIEditor.Controls
 
             foreach (Match match in Regex.Matches(
                 normalized,
-                @"(?ms)^[ \t]*`(?<info>bash|sh|shell|powershell|pwsh|ps1)[ \t]*\n(?<body>.*?)(?:\n)[ \t]*`[ \t]*$"))
+                @"(?ms)^[ \t]*`(?<info>bash|sh|shell|powershell|pwsh|ps1)[ \t]*\n(?<body>.*?)(?:\n)[ \t]*`[ \t]*\z"))
             {
                 string info = match.Groups["info"].Value.Trim();
                 string body = match.Groups["body"].Value;
@@ -1049,81 +1072,149 @@ namespace TxtAIEditor.Controls
             }
 
             string trimmed = text.Trim();
-            if (TryExtractSingleMarkdownCodeFencePayload(trimmed, out string fencedPayload))
+            if (TryExtractTrailingMarkdownCodeFencePayload(trimmed, out string fencedPayload))
             {
                 return TryExtractBareToolCallPayload(fencedPayload, out payload);
             }
 
             if (trimmed.StartsWith("{", StringComparison.Ordinal))
             {
-                return TryExtractBalancedJsonObject(trimmed, 0, out payload) &&
-                    payload.Length == trimmed.Length;
+                if (TryExtractBalancedJsonObject(trimmed, 0, out payload) &&
+                    payload.Length == trimmed.Length)
+                {
+                    return true;
+                }
+
+                return TryExtractTrailingBareToolCallPayload(trimmed, out payload);
             }
 
             int openBraceIndex = trimmed.IndexOf('{');
             if (openBraceIndex <= 0)
             {
-                return false;
+                return TryExtractTrailingBareToolCallPayload(trimmed, out payload);
             }
 
             string possibleName = trimmed.Substring(0, openBraceIndex).Trim();
             if (!Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$"))
             {
-                return false;
+                return TryExtractTrailingBareToolCallPayload(trimmed, out payload);
             }
 
             if (!TryExtractBalancedJsonObject(trimmed, openBraceIndex, out string json) ||
                 openBraceIndex + json.Length != trimmed.Length)
             {
-                return false;
+                return TryExtractTrailingBareToolCallPayload(trimmed, out payload);
             }
 
             payload = trimmed;
             return true;
         }
 
-        private static bool TryExtractSingleMarkdownCodeFencePayload(string text, out string payload)
+        private static bool TryExtractTrailingBareToolCallPayload(string text, out string payload)
         {
             payload = string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
             string trimmed = text.Trim();
-            if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+            foreach (Match match in Regex.Matches(
+                trimmed,
+                @"(?m)^[ \t]*(?<name>[a-zA-Z0-9_\-]+)[ \t]*(?=\{)"))
+            {
+                int lineStart = match.Index;
+                int nameEnd = match.Index + match.Length;
+                int openBraceIndex = trimmed.IndexOf('{', nameEnd);
+                if (openBraceIndex < 0)
+                {
+                    continue;
+                }
+
+                if (!TryExtractBalancedJsonObject(trimmed, openBraceIndex, out string json) ||
+                    openBraceIndex + json.Length != trimmed.Length)
+                {
+                    continue;
+                }
+
+                payload = trimmed.Substring(lineStart).Trim();
+                return true;
+            }
+
+            for (int i = 0; i < trimmed.Length; i++)
+            {
+                if (trimmed[i] != '{' || !IsAtLineStart(trimmed, i))
+                {
+                    continue;
+                }
+
+                if (!TryExtractBalancedJsonObject(trimmed, i, out string json) ||
+                    i + json.Length != trimmed.Length)
+                {
+                    continue;
+                }
+
+                if (TryParseJsonToolCall(json, out _, out _))
+                {
+                    payload = json;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryExtractTrailingMarkdownCodeFencePayload(string text, out string payload)
+        {
+            payload = string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
             {
                 return false;
             }
 
-            int infoLineEnd = FindFirstLineEnd(trimmed, 3);
-            if (infoLineEnd < 0)
+            string normalized = text.Trim().Replace("\r\n", "\n").Replace('\r', '\n');
+            int closingFenceIndex = normalized.LastIndexOf("```", StringComparison.Ordinal);
+            if (closingFenceIndex <= 0 ||
+                !IsAtLineStart(normalized, closingFenceIndex) ||
+                !string.IsNullOrWhiteSpace(normalized.Substring(closingFenceIndex + 3)))
             {
                 return false;
             }
 
-            string info = trimmed.Substring(3, infoLineEnd - 3).Trim();
-            if (!IsToolCallFenceInfo(info))
+            int searchIndex = closingFenceIndex - 1;
+            while (searchIndex >= 0)
             {
-                return false;
+                int openingFenceIndex = normalized.LastIndexOf("```", searchIndex, StringComparison.Ordinal);
+                if (openingFenceIndex < 0)
+                {
+                    return false;
+                }
+
+                if (!IsAtLineStart(normalized, openingFenceIndex))
+                {
+                    searchIndex = openingFenceIndex - 1;
+                    continue;
+                }
+
+                int infoLineEnd = FindFirstLineEnd(normalized, openingFenceIndex + 3);
+                if (infoLineEnd < 0 || infoLineEnd >= closingFenceIndex)
+                {
+                    searchIndex = openingFenceIndex - 1;
+                    continue;
+                }
+
+                string info = normalized.Substring(openingFenceIndex + 3, infoLineEnd - openingFenceIndex - 3).Trim();
+                if (!IsToolCallFenceInfo(info))
+                {
+                    return false;
+                }
+
+                int contentStart = infoLineEnd + 1;
+                payload = normalized.Substring(contentStart, closingFenceIndex - contentStart).Trim();
+                return !string.IsNullOrWhiteSpace(payload);
             }
 
-            int closingFenceIndex = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-            if (closingFenceIndex <= infoLineEnd ||
-                !IsAtLineStart(trimmed, closingFenceIndex) ||
-                !string.IsNullOrWhiteSpace(trimmed.Substring(closingFenceIndex + 3)))
-            {
-                return false;
-            }
-
-            int contentStart = infoLineEnd;
-            if (contentStart < trimmed.Length && trimmed[contentStart] == '\r')
-            {
-                contentStart++;
-            }
-
-            if (contentStart < trimmed.Length && trimmed[contentStart] == '\n')
-            {
-                contentStart++;
-            }
-
-            payload = trimmed.Substring(contentStart, closingFenceIndex - contentStart).Trim();
-            return !string.IsNullOrWhiteSpace(payload);
+            return false;
         }
 
         private static bool IsToolCallFenceInfo(string info)

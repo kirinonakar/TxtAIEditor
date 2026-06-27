@@ -10,9 +10,9 @@ namespace TxtAIEditor.Controls
             var builder = new StringBuilder();
             builder.AppendLine("[Agent tool call format error]");
             builder.AppendLine("The previous assistant response was not executed.");
-            builder.AppendLine("A tool turn must be exactly one <tool_call>...</tool_call> tag and no other text.");
-            builder.AppendLine("Progress updates, plans, markdown, and explanations must be in a separate plain-text response with no tool_call tag.");
-            builder.AppendLine("Re-emit only the tool_call now, or write the final answer with no tool_call tag.");
+            builder.AppendLine("A tool turn may include a brief explanation before the tool call.");
+            builder.AppendLine("The tool call itself must be exactly one final <tool_call>...</tool_call> tag or native function tool call, with no text after it.");
+            builder.AppendLine("Re-emit the explanation if useful, then put only the tool_call as the final non-empty content, or write the final answer with no tool_call tag.");
             if (!string.IsNullOrWhiteSpace(detail))
             {
                 builder.AppendLine($"Parser detail: {detail}");

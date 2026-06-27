@@ -118,16 +118,21 @@ namespace TxtAIEditor.Core.Services.LLM
                             var firstChoice = choices[0];
                             if (firstChoice.TryGetProperty("message", out var message))
                             {
+                                string? contentText = null;
+                                if (message.TryGetProperty("content", out var content) &&
+                                    content.ValueKind == JsonValueKind.String)
+                                {
+                                    contentText = content.GetString();
+                                }
+
                                 if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
                                 {
                                     var firstToolCall = toolCalls[0];
-                                    string fName = firstToolCall.GetProperty("function").GetProperty("name").GetString() ?? string.Empty;
-                                    string fArgs = firstToolCall.GetProperty("function").GetProperty("arguments").GetString() ?? string.Empty;
-                                    return $"<tool_call>{{\"name\":\"{fName}\",\"arguments\":{fArgs}}}</tool_call>";
+                                    return LlmToolCallTextFormatter.FormatAssistantResponseWithFunctionToolCall(contentText, firstToolCall);
                                 }
-                                if (message.TryGetProperty("content", out var content))
+                                if (contentText != null)
                                 {
-                                    return content.GetString() ?? string.Empty;
+                                    return contentText;
                                 }
                             }
                         }

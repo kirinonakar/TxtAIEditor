@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -25,6 +26,58 @@ namespace TxtAIEditor.Core.Services.LLM
         public bool SentStartTag { get; set; }
         public bool SentArgumentsHeader { get; set; }
         public StringBuilder Arguments { get; } = new StringBuilder();
+    }
+
+    internal static class LlmToolCallTextFormatter
+    {
+        public static string FormatFunctionToolCall(string functionName, string argumentsJson)
+        {
+            string nameJson = JsonSerializer.Serialize(functionName ?? string.Empty);
+            string arguments = NormalizeArgumentsJson(argumentsJson);
+            return $"<tool_call>{{\"name\":{nameJson},\"arguments\":{arguments}}}</tool_call>";
+        }
+
+        public static string FormatAssistantResponseWithFunctionToolCall(string? content, JsonElement toolCall)
+        {
+            if (!toolCall.TryGetProperty("function", out var function))
+            {
+                return content ?? string.Empty;
+            }
+
+            string functionName = function.TryGetProperty("name", out var nameProperty)
+                ? nameProperty.GetString() ?? string.Empty
+                : string.Empty;
+            string argumentsJson = function.TryGetProperty("arguments", out var argumentsProperty)
+                ? argumentsProperty.GetString() ?? string.Empty
+                : string.Empty;
+            string toolCallText = FormatFunctionToolCall(functionName, argumentsJson);
+
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return toolCallText;
+            }
+
+            return content.TrimEnd() + Environment.NewLine + Environment.NewLine + toolCallText;
+        }
+
+        private static string NormalizeArgumentsJson(string argumentsJson)
+        {
+            string arguments = (argumentsJson ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                return "{}";
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(arguments);
+                return document.RootElement.GetRawText();
+            }
+            catch
+            {
+                return "{}";
+            }
+        }
     }
 
     public interface ILLMProvider
