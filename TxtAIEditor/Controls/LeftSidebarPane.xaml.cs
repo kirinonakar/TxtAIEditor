@@ -81,6 +81,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExportSnippetsClick;
         public event RoutedEventHandler? ImportSnippetsClick;
         public event RoutedEventHandler? ResetSnippetsClick;
+        public event RoutedEventHandler? AutocompleteDictClick;
         public event ItemClickEventHandler? GitFileItemClick;
         public event RoutedEventHandler? GitStageToggleClick;
         public event RoutedEventHandler? GitRestoreFileClick;
@@ -132,6 +133,7 @@ namespace TxtAIEditor.Controls
         public Button ExportSnippets => ExportSnippetsButton;
         public Button ImportSnippets => ImportSnippetsButton;
         public Button ResetSnippets => ResetSnippetsButton;
+        public Button AutocompleteDict => AutocompleteDictButton;
 
         public TextBlock SearchHeaderLabel => SearchHeaderText;
         public FrameworkElement SearchProgressIndicator => SearchProgressDot;
@@ -201,6 +203,7 @@ namespace TxtAIEditor.Controls
             ExportSnippetsButton.Content = getString("SnippetExport", "내보내기");
             ImportSnippetsButton.Content = getString("SnippetImport", "가져오기");
             ResetSnippetsButton.Content = getString("SnippetReset", "초기화");
+            AutocompleteDictButton.Content = getString("AutocompleteDict", "자동완성 사전...");
             SnippetEditTooltip = getString("SnippetEditTooltip", "수정");
             SnippetDeleteTooltip = getString("SnippetDeleteTooltip", "삭제");
 
@@ -338,6 +341,7 @@ namespace TxtAIEditor.Controls
         private void OnExportSnippetsClick(object sender, RoutedEventArgs e) => ExportSnippetsClick?.Invoke(sender, e);
         private void OnImportSnippetsClick(object sender, RoutedEventArgs e) => ImportSnippetsClick?.Invoke(sender, e);
         private void OnResetSnippetsClick(object sender, RoutedEventArgs e) => ResetSnippetsClick?.Invoke(sender, e);
+        private void OnAutocompleteDictClick(object sender, RoutedEventArgs e) => AutocompleteDictClick?.Invoke(sender, e);
         private void OnGitFileItemClick(object sender, ItemClickEventArgs e) => GitFileItemClick?.Invoke(sender, e);
         private void OnGitStageToggleClick(object sender, RoutedEventArgs e) => GitStageToggleClick?.Invoke(sender, e);
         private void OnGitRestoreFileClick(object sender, RoutedEventArgs e) => GitRestoreFileClick?.Invoke(sender, e);

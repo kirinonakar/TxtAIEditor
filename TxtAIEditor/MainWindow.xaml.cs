@@ -1354,11 +1354,12 @@ namespace TxtAIEditor
         private async Task SyncSnippetsToOpenEditorsAsync()
         {
             var snippets = _snippetService.GetSnippets();
+            var autocompleteWords = _snippetService.GetAutocompleteWords();
             foreach (var grp in _tabBridges.Values)
             {
                 if (grp.Bridge != null)
                 {
-                    await grp.Bridge.UpdateSnippetsAsync(snippets);
+                    await grp.Bridge.UpdateSnippetsAsync(snippets, autocompleteWords);
                 }
             }
         }

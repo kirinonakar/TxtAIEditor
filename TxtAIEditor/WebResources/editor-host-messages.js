@@ -140,6 +140,7 @@ export function createHostMessageHandler({
             break;
         case 'updateSnippets':
             state.snippets = Array.isArray(msg.snippets) ? msg.snippets : [];
+            state.autocompleteWords = Array.isArray(msg.autocompleteWords) ? msg.autocompleteWords : [];
             if (autocompleteState.isOpen) {
                 const element = autocompleteState.element;
                 if (element) triggerAutocomplete(element);

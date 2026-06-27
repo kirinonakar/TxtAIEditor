@@ -510,7 +510,7 @@ namespace TxtAIEditor.Editor
             await SendMessageAsync(new { action = "endStreamInsert" });
         }
 
-        public async Task UpdateSnippetsAsync(IReadOnlyList<SnippetItem> snippets)
+        public async Task UpdateSnippetsAsync(IReadOnlyList<SnippetItem> snippets, IReadOnlyList<string>? autocompleteWords = null)
         {
             var msg = new
             {
@@ -521,7 +521,8 @@ namespace TxtAIEditor.Editor
                     keyword = s.Keyword ?? string.Empty,
                     description = s.Description ?? string.Empty,
                     content = s.Content ?? string.Empty
-                }).ToArray()
+                }).ToArray(),
+                autocompleteWords = autocompleteWords ?? Array.Empty<string>()
             };
             await SendMessageAsync(msg);
         }

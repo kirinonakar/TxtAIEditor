@@ -52,6 +52,7 @@ const state = {
     autocompleteOnTab: true,
     snippets: [],
     scrollSyncEnabled: true,
+    autocompleteWords: [],
     inlineLivePreviewEnabled: false,
     livePreviewBaseHref: '',
     inlineLivePreviewSourceLine: null,

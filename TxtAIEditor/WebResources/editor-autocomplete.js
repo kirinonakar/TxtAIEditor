@@ -182,6 +182,35 @@ function getAutocompleteCandidates(currentWord, fullTextBeforeCaret) {
         }
     }
 
+    for (const dictWord of state.autocompleteWords) {
+        const word = String(dictWord || '').trim();
+        if (!word) continue;
+        if (word.length <= currentWord.length) continue;
+        if (word === currentWord) continue;
+
+        let isWordMatched = false;
+        if (regex) {
+            isWordMatched = regex.test(word);
+        } else {
+            isWordMatched = word.toLowerCase().startsWith(lowerCurrent);
+        }
+
+        if (isWordMatched) {
+            const key = `dict:${word.toLowerCase()}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const candidate = {
+                kind: 'word',
+                label: word,
+                insertText: word,
+                detail: ''
+            };
+            if (!isAutocompleteSameAsInput(candidate, currentWord)) {
+                candidates.push(candidate);
+            }
+        }
+    }
+
     for (const text of state.cache.values()) {
         if (!text) continue;
         const words = text.match(/[\w\-ㄱ-ㅎㅏ-ㅣ가-힣]+/g);

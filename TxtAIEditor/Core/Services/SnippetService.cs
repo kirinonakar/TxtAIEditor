@@ -11,7 +11,9 @@ namespace TxtAIEditor.Core.Services
     public class SnippetService : ISnippetService
     {
         private List<SnippetItem> _snippets = new List<SnippetItem>();
+        private List<string> _autocompleteWords = new List<string>();
         private readonly string _filePath;
+        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions { WriteIndented = true };
 
         public SnippetService()
         {
@@ -38,13 +40,31 @@ namespace TxtAIEditor.Core.Services
                 {
                     // Create beautiful default premium templates
                     _snippets = GetDefaultSnippets();
+                    _autocompleteWords = GetDefaultAutocompleteWords();
                     await SaveSnippetsAsync();
                     return;
                 }
 
                 string json = await File.ReadAllTextAsync(_filePath);
-                var items = JsonSerializer.Deserialize<List<SnippetItem>>(json);
-                _snippets = items ?? GetDefaultSnippets();
+
+                // Support both new format (object with snippets + autocompleteWords) and legacy format (plain array)
+                using (var doc = JsonDocument.Parse(json))
+                {
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        var store = JsonSerializer.Deserialize<SnippetStore>(json, _jsonOptions);
+                        _snippets = store?.Snippets ?? GetDefaultSnippets();
+                        _autocompleteWords = store?.AutocompleteWords ?? new List<string>();
+                    }
+                    else
+                    {
+                        // Legacy format: plain array of SnippetItem
+                        var items = JsonSerializer.Deserialize<List<SnippetItem>>(json);
+                        _snippets = items ?? GetDefaultSnippets();
+                        _autocompleteWords = new List<string>();
+                    }
+                }
+
                 NormalizeSnippets();
                 await SaveSnippetsAsync();
             }
@@ -52,6 +72,7 @@ namespace TxtAIEditor.Core.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to load snippets: {ex.Message}");
                 _snippets = GetDefaultSnippets();
+                _autocompleteWords = new List<string>();
             }
         }
 
@@ -59,8 +80,12 @@ namespace TxtAIEditor.Core.Services
         {
             try
             {
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                string json = JsonSerializer.Serialize(_snippets, options);
+                var store = new SnippetStore
+                {
+                    Snippets = _snippets,
+                    AutocompleteWords = _autocompleteWords
+                };
+                string json = JsonSerializer.Serialize(store, _jsonOptions);
                 await File.WriteAllTextAsync(_filePath, json);
             }
             catch (Exception ex)
@@ -72,6 +97,22 @@ namespace TxtAIEditor.Core.Services
         public List<SnippetItem> GetSnippets()
         {
             return _snippets;
+        }
+
+        public List<string> GetAutocompleteWords()
+        {
+            return _autocompleteWords;
+        }
+
+        public async Task SaveAutocompleteWordsAsync(List<string> words)
+        {
+            _autocompleteWords = (words ?? new List<string>())
+                .SelectMany(w => w?.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>())
+                .Select(w => w.Trim())
+                .Where(w => !string.IsNullOrWhiteSpace(w))
+                .Distinct()
+                .ToList();
+            await SaveSnippetsAsync();
         }
 
         public async Task AddSnippetAsync(SnippetItem item)
@@ -109,33 +150,76 @@ namespace TxtAIEditor.Core.Services
 
         public async Task ExportSnippetsAsync(string filePath)
         {
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(_snippets, options);
+            var store = new SnippetStore
+            {
+                Snippets = _snippets,
+                AutocompleteWords = _autocompleteWords
+            };
+            string json = JsonSerializer.Serialize(store, _jsonOptions);
             await File.WriteAllTextAsync(filePath, json);
         }
 
         public async Task ImportSnippetsAsync(string filePath)
         {
             string json = await File.ReadAllTextAsync(filePath);
-            var items = JsonSerializer.Deserialize<List<SnippetItem>>(json);
-            if (items == null) return;
 
-            foreach (var item in items)
+            using (var doc = JsonDocument.Parse(json))
             {
-                NormalizeSnippet(item);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    var store = JsonSerializer.Deserialize<SnippetStore>(json, _jsonOptions);
+                    if (store?.Snippets != null)
+                    {
+                        foreach (var item in store.Snippets)
+                        {
+                            NormalizeSnippet(item);
+                        }
+
+                        foreach (var item in store.Snippets)
+                        {
+                            _snippets.RemoveAll(s => s.Title.Equals(item.Title, StringComparison.OrdinalIgnoreCase));
+                            _snippets.Add(item);
+                        }
+                    }
+
+                    if (store?.AutocompleteWords != null)
+                    {
+                        foreach (var word in store.AutocompleteWords)
+                        {
+                            var trimmed = word?.Trim();
+                            if (!string.IsNullOrWhiteSpace(trimmed) && !_autocompleteWords.Contains(trimmed))
+                            {
+                                _autocompleteWords.Add(trimmed);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Legacy format: plain array of SnippetItem
+                    var items = JsonSerializer.Deserialize<List<SnippetItem>>(json);
+                    if (items == null) return;
+
+                    foreach (var item in items)
+                    {
+                        NormalizeSnippet(item);
+                    }
+
+                    foreach (var item in items)
+                    {
+                        _snippets.RemoveAll(s => s.Title.Equals(item.Title, StringComparison.OrdinalIgnoreCase));
+                        _snippets.Add(item);
+                    }
+                }
             }
 
-            foreach (var item in items)
-            {
-                _snippets.RemoveAll(s => s.Title.Equals(item.Title, StringComparison.OrdinalIgnoreCase));
-                _snippets.Add(item);
-            }
             await SaveSnippetsAsync();
         }
 
         public async Task ResetSnippetsAsync()
         {
             _snippets = GetDefaultSnippets();
+            _autocompleteWords = GetDefaultAutocompleteWords();
             await SaveSnippetsAsync();
         }
 
@@ -207,6 +291,31 @@ namespace TxtAIEditor.Core.Services
                     Content = "private string _fieldName;\npublic string FieldName\n{\n    get => _fieldName;\n    set\n    {\n        if (_fieldName != value)\n        {\n            _fieldName = value;\n            // OnPropertyChanged();\n        }\n    }\n}"
                 }
             };
+        }
+
+        private List<string> GetDefaultAutocompleteWords()
+        {
+            return new List<string>
+            {
+                "function",
+                "variable",
+                "constant",
+                "parameter",
+                "return",
+                "async",
+                "await",
+                "callback",
+                "iterator",
+                "namespace",
+                "recommend",
+                "summary"
+            };
+        }
+
+        private class SnippetStore
+        {
+            public List<SnippetItem> Snippets { get; set; } = new List<SnippetItem>();
+            public List<string> AutocompleteWords { get; set; } = new List<string>();
         }
     }
 }

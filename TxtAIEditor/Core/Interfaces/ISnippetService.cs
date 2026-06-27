@@ -22,5 +22,7 @@ namespace TxtAIEditor.Core.Interfaces
         Task ExportSnippetsAsync(string filePath);
         Task ImportSnippetsAsync(string filePath);
         Task ResetSnippetsAsync();
+        List<string> GetAutocompleteWords();
+        Task SaveAutocompleteWordsAsync(List<string> words);
     }
 }

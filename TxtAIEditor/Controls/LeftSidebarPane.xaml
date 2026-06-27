@@ -531,6 +531,7 @@
                                 </ListView>
                                 <StackPanel Grid.Row="2" Margin="10,10,10,0" Spacing="8">
                                     <Button x:Name="AddSnippetButton" Content="스니펫 추가..." HorizontalAlignment="Stretch" Click="OnAddSnippetClick" Style="{StaticResource AccentButtonStyle}"/>
+                                    <Button x:Name="AutocompleteDictButton" Content="자동완성 사전..." HorizontalAlignment="Stretch" Click="OnAutocompleteDictClick" FontSize="11"/>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>

@@ -1548,6 +1548,24 @@
   <data name="SnippetDeleteTooltip" xml:space="preserve">
     <value>削除</value>
   </data>
+  <data name="AutocompleteDict" xml:space="preserve">
+    <value>自動補完辞書...</value>
+  </data>
+  <data name="AutocompleteDictTitle" xml:space="preserve">
+    <value>自動補完辞書の編集</value>
+  </data>
+  <data name="AutocompleteDictSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="AutocompleteDictPlaceholder" xml:space="preserve">
+    <value>1行に1単語ずつ入力...</value>
+  </data>
+  <data name="AutocompleteDictLabel" xml:space="preserve">
+    <value>自動補完単語リスト</value>
+  </data>
+  <data name="AutocompleteDictHint" xml:space="preserve">
+    <value>各行に入力した単語がエディタの自動補完候補として表示されます。</value>
+  </data>
   <data name="StickyNoteTitle" xml:space="preserve">
     <value>付箋モード</value>
   </data>

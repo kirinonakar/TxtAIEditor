@@ -1547,6 +1547,24 @@
   <data name="SnippetDeleteTooltip" xml:space="preserve">
     <value>삭제</value>
   </data>
+  <data name="AutocompleteDict" xml:space="preserve">
+    <value>자동완성 사전...</value>
+  </data>
+  <data name="AutocompleteDictTitle" xml:space="preserve">
+    <value>자동완성 사전 편집</value>
+  </data>
+  <data name="AutocompleteDictSave" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="AutocompleteDictPlaceholder" xml:space="preserve">
+    <value>한 줄에 한 단어씩 입력...</value>
+  </data>
+  <data name="AutocompleteDictLabel" xml:space="preserve">
+    <value>자동완성 단어 목록</value>
+  </data>
+  <data name="AutocompleteDictHint" xml:space="preserve">
+    <value>각 줄에 입력한 단어가 에디터 자동완성 후보로 나타납니다.</value>
+  </data>
   <data name="StickyNoteTitle" xml:space="preserve">
     <value>스티커 노트</value>
   </data>

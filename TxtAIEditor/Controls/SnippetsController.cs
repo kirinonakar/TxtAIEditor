@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -78,6 +80,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExportSnippetsClick += OnExportSnippetsClick;
             _leftSidebar.ImportSnippetsClick += OnImportSnippetsClick;
             _leftSidebar.ResetSnippetsClick += OnResetSnippetsClick;
+            _leftSidebar.AutocompleteDictClick += OnAutocompleteDictClick;
         }
 
         private async void OnSnippetItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
@@ -297,6 +300,64 @@ namespace TxtAIEditor.Controls
         private Task NotifySnippetsChangedAsync()
         {
             return _snippetsChangedAsync?.Invoke() ?? Task.CompletedTask;
+        }
+
+        private async void OnAutocompleteDictClick(object sender, RoutedEventArgs e)
+        {
+            var wordsBox = new TextBox
+            {
+                PlaceholderText = _getString("AutocompleteDictPlaceholder", "한 줄에 한 단어씩 입력..."),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.NoWrap,
+                MinHeight = 300,
+                MaxHeight = 500,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                FontFamily = new FontFamily("Consolas"),
+                IsSpellCheckEnabled = false,
+                IsTextPredictionEnabled = false
+            };
+            var existingWords = _snippetService.GetAutocompleteWords();
+            wordsBox.Text = string.Join("\r\n", existingWords);
+            ScrollViewer.SetVerticalScrollBarVisibility(wordsBox, ScrollBarVisibility.Auto);
+            ScrollViewer.SetHorizontalScrollBarVisibility(wordsBox, ScrollBarVisibility.Auto);
+
+            var stack = new StackPanel { Spacing = 10, Width = 450 };
+            stack.Children.Add(new TextBlock
+            {
+                Text = _getString("AutocompleteDictLabel", "자동완성 단어 목록"),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            stack.Children.Add(wordsBox);
+            stack.Children.Add(new TextBlock
+            {
+                Text = _getString("AutocompleteDictHint", "각 줄에 입력한 단어가 에디터 자동완성 후보로 나타납니다."),
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray),
+                TextWrapping = TextWrapping.Wrap
+            });
+
+            _beforeDialog?.Invoke();
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AutocompleteDictTitle", "자동완성 사전 편집"),
+                Content = stack,
+                PrimaryButtonText = _getString("AutocompleteDictSave", "저장"),
+                CloseButtonText = _getString("SnippetCancel", "취소"),
+                XamlRoot = _xamlRootProvider(),
+                RequestedTheme = _leftSidebar.ActualTheme
+            };
+
+            var result = await dialog.ShowAsync();
+            _afterDialog?.Invoke();
+            if (result != ContentDialogResult.Primary) return;
+
+            var words = wordsBox.Text
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(w => w.Trim())
+                .Where(w => !string.IsNullOrWhiteSpace(w))
+                .ToList();
+            await _snippetService.SaveAutocompleteWordsAsync(words);
+            await NotifySnippetsChangedAsync();
         }
     }
 }

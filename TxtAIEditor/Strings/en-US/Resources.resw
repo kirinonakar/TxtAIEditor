@@ -1547,6 +1547,24 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="SnippetDeleteTooltip" xml:space="preserve">
     <value>Delete</value>
   </data>
+  <data name="AutocompleteDict" xml:space="preserve">
+    <value>Autocomplete Dictionary...</value>
+  </data>
+  <data name="AutocompleteDictTitle" xml:space="preserve">
+    <value>Edit Autocomplete Dictionary</value>
+  </data>
+  <data name="AutocompleteDictSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="AutocompleteDictPlaceholder" xml:space="preserve">
+    <value>Enter one word per line...</value>
+  </data>
+  <data name="AutocompleteDictLabel" xml:space="preserve">
+    <value>Autocomplete Word List</value>
+  </data>
+  <data name="AutocompleteDictHint" xml:space="preserve">
+    <value>Each word entered on a line will appear as an autocomplete candidate in the editor.</value>
+  </data>
   <data name="StickyNoteTitle" xml:space="preserve">
     <value>Sticky Note</value>
   </data>
