@@ -1,23 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Net.Sockets;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Interfaces;
 using Windows.Storage.Pickers;
+using static TxtAIEditor.Controls.AgentMcpAuthTypes;
 
 namespace TxtAIEditor.Controls
 {
@@ -63,10 +57,6 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentMcpController
     {
         private const string ProtocolVersion = "2025-06-18";
-        private const string AuthTypeNone = "none";
-        private const string AuthTypeApiKey = "apiKey";
-        private const string AuthTypeOAuthBearer = "oauthBearer";
-        private const string AuthTypeOAuthAuthorizationCode = "oauthAuthorizationCode";
         private static readonly HttpClient HttpClient = new()
         {
             Timeout = TimeSpan.FromSeconds(30)
@@ -74,7 +64,9 @@ namespace TxtAIEditor.Controls
 
         private readonly AgentPane _agentPane;
         private readonly Action<object> _initializePickerWindow;
-        private readonly ICredentialService _credentialService;
+        private readonly AgentMcpCredentialStore _credentialStore;
+        private readonly AgentMcpOAuthService _oauthService;
+        private readonly AgentMcpDialogService _dialogService;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly Action _contextChanged;
@@ -102,12 +94,14 @@ namespace TxtAIEditor.Controls
         {
             _agentPane = agentPane;
             _initializePickerWindow = initializePickerWindow;
-            _credentialService = credentialService;
             _showError = showError;
             _getString = getString;
+            _credentialStore = new AgentMcpCredentialStore(credentialService);
+            _oauthService = new AgentMcpOAuthService(_credentialStore, _getString, SaveAsync);
             _contextChanged = contextChanged;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
+            _dialogService = new AgentMcpDialogService(_agentPane, _getString, _beforeDialog, _afterDialog);
             _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, fileModifiedAsync);
 
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -145,8 +139,8 @@ namespace TxtAIEditor.Controls
                                 migratedPlaintextOAuth |= !string.IsNullOrWhiteSpace(s.OAuthAccessToken) ||
                                     !string.IsNullOrWhiteSpace(s.OAuthRefreshToken) ||
                                     !string.IsNullOrWhiteSpace(s.OAuthClientSecret);
-                                MoveInlineHeaderValuesToCredential(s);
-                                MoveInlineOAuthSecretsToCredential(s);
+                                _credentialStore.MoveInlineHeaderValuesToCredential(s);
+                                _credentialStore.MoveInlineOAuthSecretsToCredential(s);
                                 return s;
                             }));
                     }
@@ -172,106 +166,14 @@ namespace TxtAIEditor.Controls
 
         public async Task AddMcpAsync()
         {
-            var nameBox = CreateTextBox(_getString("AgentMcpNamePlaceholder", "MCP 이름 입력..."));
-            var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
-            var authTypeBox = CreateAuthTypeComboBox(AuthTypeNone);
-            var headerNameLabel = CreateLabel(_getString("AgentMcpHeaderNameLabel", "API Key Header 이름"));
-            var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "Authorization"));
-            var apiKeyLabel = CreateLabel(_getString("AgentMcpApiKeyLabel", "API Key"));
-            var apiKeyBox = CreatePasswordBox(_getString("AgentMcpApiKeyPlaceholder", "API Key 입력..."));
-            var oauthTokenLabel = CreateLabel(_getString("AgentMcpOAuthTokenLabel", "OAuth Access Token"));
-            var oauthTokenBox = CreatePasswordBox(_getString("AgentMcpOAuthTokenPlaceholder", "OAuth Access Token 입력..."));
-            var oauthClientIdLabel = CreateLabel(_getString("AgentMcpOAuthClientIdLabel", "OAuth Client ID"));
-            var oauthClientIdBox = CreateTextBox(_getString("AgentMcpOAuthClientIdPlaceholder", "OAuth Client ID 입력..."));
-            var oauthClientSecretLabel = CreateLabel(_getString("AgentMcpOAuthClientSecretLabel", "OAuth Client Secret"));
-            var oauthClientSecretBox = CreatePasswordBox(_getString("AgentMcpOAuthClientSecretPlaceholder", "OAuth Client Secret 입력..."));
-            var oauthAuthorizationEndpointLabel = CreateLabel(_getString("AgentMcpOAuthAuthorizationEndpointLabel", "Authorization URL"));
-            var oauthAuthorizationEndpointBox = CreateTextBox(_getString("AgentMcpOAuthAuthorizationEndpointPlaceholder", "https://auth.example.com/oauth/authorize"));
-            var oauthTokenEndpointLabel = CreateLabel(_getString("AgentMcpOAuthTokenEndpointLabel", "Token URL"));
-            var oauthTokenEndpointBox = CreateTextBox(_getString("AgentMcpOAuthTokenEndpointPlaceholder", "https://auth.example.com/oauth/token"));
-            var oauthScopesLabel = CreateLabel(_getString("AgentMcpOAuthScopesLabel", "OAuth Scope"));
-            var oauthScopesBox = CreateTextBox(_getString("AgentMcpOAuthScopesPlaceholder", "scope1 scope2"));
-            authTypeBox.SelectionChanged += (_, _) => UpdateAuthFieldVisibility(
-                authTypeBox,
-                headerNameLabel,
-                headerNameBox,
-                apiKeyLabel,
-                apiKeyBox,
-                oauthTokenLabel,
-                oauthTokenBox,
-                oauthClientIdLabel,
-                oauthClientIdBox,
-                oauthClientSecretLabel,
-                oauthClientSecretBox,
-                oauthAuthorizationEndpointLabel,
-                oauthAuthorizationEndpointBox,
-                oauthTokenEndpointLabel,
-                oauthTokenEndpointBox,
-                oauthScopesLabel,
-                oauthScopesBox);
-            UpdateAuthFieldVisibility(
-                authTypeBox,
-                headerNameLabel,
-                headerNameBox,
-                apiKeyLabel,
-                apiKeyBox,
-                oauthTokenLabel,
-                oauthTokenBox,
-                oauthClientIdLabel,
-                oauthClientIdBox,
-                oauthClientSecretLabel,
-                oauthClientSecretBox,
-                oauthAuthorizationEndpointLabel,
-                oauthAuthorizationEndpointBox,
-                oauthTokenEndpointLabel,
-                oauthTokenEndpointBox,
-                oauthScopesLabel,
-                oauthScopesBox);
-
-            var stack = new StackPanel { Spacing = 10, Width = 420 };
-            stack.Children.Add(CreateLabel(_getString("AgentMcpNameLabel", "MCP 이름")));
-            stack.Children.Add(nameBox);
-            stack.Children.Add(CreateLabel(_getString("AgentMcpEndpointLabel", "MCP 주소")));
-            stack.Children.Add(endpointBox);
-            stack.Children.Add(CreateLabel(_getString("AgentMcpAuthTypeLabel", "인증 방식")));
-            stack.Children.Add(authTypeBox);
-            stack.Children.Add(headerNameLabel);
-            stack.Children.Add(headerNameBox);
-            stack.Children.Add(apiKeyLabel);
-            stack.Children.Add(apiKeyBox);
-            stack.Children.Add(oauthTokenLabel);
-            stack.Children.Add(oauthTokenBox);
-            stack.Children.Add(oauthClientIdLabel);
-            stack.Children.Add(oauthClientIdBox);
-            stack.Children.Add(oauthClientSecretLabel);
-            stack.Children.Add(oauthClientSecretBox);
-            stack.Children.Add(oauthAuthorizationEndpointLabel);
-            stack.Children.Add(oauthAuthorizationEndpointBox);
-            stack.Children.Add(oauthTokenEndpointLabel);
-            stack.Children.Add(oauthTokenEndpointBox);
-            stack.Children.Add(oauthScopesLabel);
-            stack.Children.Add(oauthScopesBox);
-            stack.Children.Add(CreateInfoText(_getString("AgentMcpCredentialInfo", "API Key, OAuth Client Secret, OAuth 토큰은 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
-
-            var dialog = new ContentDialog
-            {
-                Title = _getString("AgentMcpAddText", "MCP 추가"),
-                Content = stack,
-                PrimaryButtonText = _getString("AgentMcpSaveAddButton", "추가"),
-                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
-                DefaultButton = ContentDialogButton.None,
-                XamlRoot = _agentPane.XamlRoot,
-                RequestedTheme = _agentPane.ActualTheme
-            };
-
-            var result = await ShowDialogAsync(dialog);
-            if (result != ContentDialogResult.Primary)
+            AgentMcpDialogInput? input = await _dialogService.ShowAddAsync();
+            if (input == null)
             {
                 return;
             }
 
-            string name = nameBox.Text?.Trim() ?? string.Empty;
-            string endpoint = endpointBox.Text?.Trim() ?? string.Empty;
+            string name = input.Name.Trim();
+            string endpoint = input.Endpoint.Trim();
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(endpoint))
             {
                 _showError(
@@ -288,17 +190,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            string authType = GetSelectedAuthType(authTypeBox);
+            string authType = input.AuthType;
             if (!TryBuildAuthSettings(
                 authType,
-                headerNameBox.Text,
-                apiKeyBox.Password,
-                oauthTokenBox.Password,
-                oauthClientIdBox.Text,
-                oauthClientSecretBox.Password,
-                oauthAuthorizationEndpointBox.Text,
-                oauthTokenEndpointBox.Text,
-                oauthScopesBox.Text,
+                input.HeaderName,
+                input.ApiKey,
+                input.OAuthAccessToken,
+                input.OAuthClientId,
+                input.OAuthClientSecret,
+                input.OAuthAuthorizationEndpoint,
+                input.OAuthTokenEndpoint,
+                input.OAuthScopes,
                 out var authSettings,
                 out string authError))
             {
@@ -312,10 +214,10 @@ namespace TxtAIEditor.Controls
             var existing = _servers.FirstOrDefault(server => server.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
-                DeleteCredentialsForRemovedHeaders(existing, authSettings.Headers);
+                _credentialStore.DeleteCredentialsForRemovedHeaders(existing, authSettings.Headers);
                 if (!IsOAuthAuthType(existing.AuthType) || !IsOAuthAuthType(authType))
                 {
-                    DeleteOAuthCredentials(existing);
+                    _credentialStore.DeleteOAuthCredentials(existing);
                 }
 
                 existing.Endpoint = endpoint;
@@ -337,7 +239,7 @@ namespace TxtAIEditor.Controls
             }
 
             await SaveAsync();
-            await RunInitialOAuthLoginIfNeededAsync(savedServer, _getString("AgentMcpAddErrorTitle", "MCP 추가 오류"));
+            await _oauthService.RunInitialLoginIfNeededAsync(savedServer, _getString("AgentMcpAddErrorTitle", "MCP 추가 오류"), _showError);
         }
 
         public async Task ExportMcpAsync()
@@ -382,120 +284,31 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var nameBox = CreateTextBox(_getString("AgentMcpNamePlaceholder", "MCP 이름 입력..."));
-            nameBox.Text = server.Name;
-            var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
-            endpointBox.Text = server.Endpoint;
             server.AuthType = NormalizeAuthType(server.AuthType, server.Headers);
-            var authTypeBox = CreateAuthTypeComboBox(server.AuthType);
             var existingHeader = server.Headers.FirstOrDefault();
-            var headerNameLabel = CreateLabel(_getString("AgentMcpHeaderNameLabel", "API Key Header 이름"));
-            var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "Authorization"));
-            headerNameBox.Text = existingHeader.Key ?? string.Empty;
-            var apiKeyLabel = CreateLabel(_getString("AgentMcpApiKeyLabel", "API Key"));
-            var apiKeyBox = CreatePasswordBox(_getString("AgentMcpApiKeyPlaceholder", "API Key 입력..."));
-            apiKeyBox.Password = string.IsNullOrWhiteSpace(existingHeader.Key)
-                ? string.Empty
-                : GetHeaderSecret(server, existingHeader.Key, existingHeader.Value);
-            var oauthTokenLabel = CreateLabel(_getString("AgentMcpOAuthTokenLabel", "OAuth Access Token"));
-            var oauthTokenBox = CreatePasswordBox(_getString("AgentMcpOAuthTokenPlaceholder", "OAuth Access Token 입력..."));
-            oauthTokenBox.Password = GetOAuthSecret(server);
-            var oauthClientIdLabel = CreateLabel(_getString("AgentMcpOAuthClientIdLabel", "OAuth Client ID"));
-            var oauthClientIdBox = CreateTextBox(_getString("AgentMcpOAuthClientIdPlaceholder", "OAuth Client ID 입력..."));
-            oauthClientIdBox.Text = server.OAuthClientId;
-            var oauthClientSecretLabel = CreateLabel(_getString("AgentMcpOAuthClientSecretLabel", "OAuth Client Secret"));
-            var oauthClientSecretBox = CreatePasswordBox(_getString("AgentMcpOAuthClientSecretPlaceholder", "OAuth Client Secret 입력..."));
-            oauthClientSecretBox.Password = GetOAuthClientSecret(server);
-            var oauthAuthorizationEndpointLabel = CreateLabel(_getString("AgentMcpOAuthAuthorizationEndpointLabel", "Authorization URL"));
-            var oauthAuthorizationEndpointBox = CreateTextBox(_getString("AgentMcpOAuthAuthorizationEndpointPlaceholder", "https://auth.example.com/oauth/authorize"));
-            oauthAuthorizationEndpointBox.Text = server.OAuthAuthorizationEndpoint;
-            var oauthTokenEndpointLabel = CreateLabel(_getString("AgentMcpOAuthTokenEndpointLabel", "Token URL"));
-            var oauthTokenEndpointBox = CreateTextBox(_getString("AgentMcpOAuthTokenEndpointPlaceholder", "https://auth.example.com/oauth/token"));
-            oauthTokenEndpointBox.Text = server.OAuthTokenEndpoint;
-            var oauthScopesLabel = CreateLabel(_getString("AgentMcpOAuthScopesLabel", "OAuth Scope"));
-            var oauthScopesBox = CreateTextBox(_getString("AgentMcpOAuthScopesPlaceholder", "scope1 scope2"));
-            oauthScopesBox.Text = server.OAuthScopes;
-            authTypeBox.SelectionChanged += (_, _) => UpdateAuthFieldVisibility(
-                authTypeBox,
-                headerNameLabel,
-                headerNameBox,
-                apiKeyLabel,
-                apiKeyBox,
-                oauthTokenLabel,
-                oauthTokenBox,
-                oauthClientIdLabel,
-                oauthClientIdBox,
-                oauthClientSecretLabel,
-                oauthClientSecretBox,
-                oauthAuthorizationEndpointLabel,
-                oauthAuthorizationEndpointBox,
-                oauthTokenEndpointLabel,
-                oauthTokenEndpointBox,
-                oauthScopesLabel,
-                oauthScopesBox);
-            UpdateAuthFieldVisibility(
-                authTypeBox,
-                headerNameLabel,
-                headerNameBox,
-                apiKeyLabel,
-                apiKeyBox,
-                oauthTokenLabel,
-                oauthTokenBox,
-                oauthClientIdLabel,
-                oauthClientIdBox,
-                oauthClientSecretLabel,
-                oauthClientSecretBox,
-                oauthAuthorizationEndpointLabel,
-                oauthAuthorizationEndpointBox,
-                oauthTokenEndpointLabel,
-                oauthTokenEndpointBox,
-                oauthScopesLabel,
-                oauthScopesBox);
-
-            var stack = new StackPanel { Spacing = 10, Width = 420 };
-            stack.Children.Add(CreateLabel(_getString("AgentMcpNameLabel", "MCP 이름")));
-            stack.Children.Add(nameBox);
-            stack.Children.Add(CreateLabel(_getString("AgentMcpEndpointLabel", "MCP 주소")));
-            stack.Children.Add(endpointBox);
-            stack.Children.Add(CreateLabel(_getString("AgentMcpAuthTypeLabel", "인증 방식")));
-            stack.Children.Add(authTypeBox);
-            stack.Children.Add(headerNameLabel);
-            stack.Children.Add(headerNameBox);
-            stack.Children.Add(apiKeyLabel);
-            stack.Children.Add(apiKeyBox);
-            stack.Children.Add(oauthTokenLabel);
-            stack.Children.Add(oauthTokenBox);
-            stack.Children.Add(oauthClientIdLabel);
-            stack.Children.Add(oauthClientIdBox);
-            stack.Children.Add(oauthClientSecretLabel);
-            stack.Children.Add(oauthClientSecretBox);
-            stack.Children.Add(oauthAuthorizationEndpointLabel);
-            stack.Children.Add(oauthAuthorizationEndpointBox);
-            stack.Children.Add(oauthTokenEndpointLabel);
-            stack.Children.Add(oauthTokenEndpointBox);
-            stack.Children.Add(oauthScopesLabel);
-            stack.Children.Add(oauthScopesBox);
-            stack.Children.Add(CreateInfoText(_getString("AgentMcpCredentialInfo", "API Key, OAuth Client Secret, OAuth 토큰은 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
-
-            var dialog = new ContentDialog
+            AgentMcpDialogInput? input = await _dialogService.ShowEditAsync(new AgentMcpDialogInput
             {
-                Title = _getString("AgentMcpEditTitle", "MCP 수정"),
-                Content = stack,
-                PrimaryButtonText = _getString("AgentMcpEditSaveButton", "저장"),
-                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
-                DefaultButton = ContentDialogButton.None,
-                XamlRoot = _agentPane.XamlRoot,
-                RequestedTheme = _agentPane.ActualTheme
-            };
-
-            var result = await ShowDialogAsync(dialog);
-            if (result != ContentDialogResult.Primary)
+                Name = server.Name,
+                Endpoint = server.Endpoint,
+                AuthType = server.AuthType,
+                HeaderName = existingHeader.Key ?? string.Empty,
+                ApiKey = string.IsNullOrWhiteSpace(existingHeader.Key)
+                    ? string.Empty
+                    : _credentialStore.GetHeaderSecret(server, existingHeader.Key, existingHeader.Value),
+                OAuthAccessToken = _credentialStore.GetOAuthAccessToken(server),
+                OAuthClientId = server.OAuthClientId,
+                OAuthClientSecret = _credentialStore.GetOAuthClientSecret(server),
+                OAuthAuthorizationEndpoint = server.OAuthAuthorizationEndpoint,
+                OAuthTokenEndpoint = server.OAuthTokenEndpoint,
+                OAuthScopes = server.OAuthScopes
+            });
+            if (input == null)
             {
                 return;
             }
 
-            string name = nameBox.Text?.Trim() ?? string.Empty;
-            string endpoint = endpointBox.Text?.Trim() ?? string.Empty;
+            string name = input.Name.Trim();
+            string endpoint = input.Endpoint.Trim();
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(endpoint))
             {
                 _showError(
@@ -512,17 +325,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            string authType = GetSelectedAuthType(authTypeBox);
+            string authType = input.AuthType;
             if (!TryBuildAuthSettings(
                 authType,
-                headerNameBox.Text,
-                apiKeyBox.Password,
-                oauthTokenBox.Password,
-                oauthClientIdBox.Text,
-                oauthClientSecretBox.Password,
-                oauthAuthorizationEndpointBox.Text,
-                oauthTokenEndpointBox.Text,
-                oauthScopesBox.Text,
+                input.HeaderName,
+                input.ApiKey,
+                input.OAuthAccessToken,
+                input.OAuthClientId,
+                input.OAuthClientSecret,
+                input.OAuthAuthorizationEndpoint,
+                input.OAuthTokenEndpoint,
+                input.OAuthScopes,
                 out var authSettings,
                 out string authError))
             {
@@ -537,7 +350,7 @@ namespace TxtAIEditor.Controls
                 item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (duplicate != null)
             {
-                DeleteAllCredentials(duplicate);
+                _credentialStore.DeleteAllCredentials(duplicate);
                 _servers.Remove(duplicate);
                 _selectedServerIds.Remove(duplicate.Id);
                 _sessions.Remove(duplicate.Id);
@@ -546,17 +359,17 @@ namespace TxtAIEditor.Controls
 
             server.Name = name;
             server.Endpoint = endpoint;
-            DeleteCredentialsForRemovedHeaders(server, authSettings.Headers);
+            _credentialStore.DeleteCredentialsForRemovedHeaders(server, authSettings.Headers);
             if (!IsOAuthAuthType(server.AuthType) || !IsOAuthAuthType(authType))
             {
-                DeleteOAuthCredentials(server);
+                _credentialStore.DeleteOAuthCredentials(server);
             }
 
             ApplyAuthSettings(server, authSettings, deleteEmptySecrets: true);
             _sessions.Remove(server.Id);
             _serverStatus.Remove(server.Id);
             await SaveAsync();
-            await RunInitialOAuthLoginIfNeededAsync(server, _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"));
+            await _oauthService.RunInitialLoginIfNeededAsync(server, _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"), _showError);
         }
 
         public async Task ImportMcpAsync()
@@ -599,9 +412,9 @@ namespace TxtAIEditor.Controls
                     if (existing != null)
                     {
                         var headers = NormalizeHeaders(item.Headers);
-                        DeleteCredentialsForRemovedHeaders(existing, headers);
+                        _credentialStore.DeleteCredentialsForRemovedHeaders(existing, headers);
                         existing.Endpoint = endpoint;
-                        existing.Headers = StoreHeaderSecrets(existing, headers);
+                        existing.Headers = _credentialStore.StoreHeaderSecrets(existing, headers);
                         _sessions.Remove(existing.Id);
                         _serverStatus.Remove(existing.Id);
                     }
@@ -612,7 +425,7 @@ namespace TxtAIEditor.Controls
                             Name = name,
                             Endpoint = endpoint
                         };
-                        server.Headers = StoreHeaderSecrets(server, NormalizeHeaders(item.Headers));
+                        server.Headers = _credentialStore.StoreHeaderSecrets(server, NormalizeHeaders(item.Headers));
                         _servers.Add(server);
                     }
                 }
@@ -674,7 +487,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            DeleteAllCredentials(server);
+            _credentialStore.DeleteAllCredentials(server);
             _servers.Remove(server);
             _selectedServerIds.Remove(server.Id);
             _sessions.Remove(server.Id);
@@ -835,7 +648,7 @@ namespace TxtAIEditor.Controls
 
             if (TryGetRpcError(response.RootElement, out string error))
             {
-                return $"MCP tool failed: {RedactServerSecrets(server, error)}";
+                return $"MCP tool failed: {_credentialStore.RedactServerSecrets(server, error)}";
             }
 
             if (!TryGetResult(response.RootElement, out var result))
@@ -843,7 +656,7 @@ namespace TxtAIEditor.Controls
                 return "MCP tool returned no result.";
             }
 
-            return RedactServerSecrets(server, FormatToolCallResult(alias, result));
+            return _credentialStore.RedactServerSecrets(server, FormatToolCallResult(alias, result));
         }
 
         private async Task<string> ExecuteBuiltInToolAsync(
@@ -1024,7 +837,7 @@ namespace TxtAIEditor.Controls
             {
                 foreach (var header in server.Headers)
                 {
-                    string headerValue = GetHeaderSecret(server, header.Key, header.Value);
+                    string headerValue = _credentialStore.GetHeaderSecret(server, header.Key, header.Value);
                     if (!string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(headerValue))
                     {
                         request.Headers.TryAddWithoutValidation(header.Key, headerValue);
@@ -1033,7 +846,7 @@ namespace TxtAIEditor.Controls
             }
             else if (IsOAuthAuthType(server.AuthType))
             {
-                string accessToken = await EnsureOAuthAccessTokenAsync(server, cancellationToken);
+                string accessToken = await _oauthService.EnsureAccessTokenAsync(server, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -1054,7 +867,7 @@ namespace TxtAIEditor.Controls
             string body = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException(RedactServerSecrets(server, $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}"));
+                throw new InvalidOperationException(_credentialStore.RedactServerSecrets(server, $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}"));
             }
 
             return body;
@@ -1413,12 +1226,12 @@ namespace TxtAIEditor.Controls
         {
             server.AuthType = settings.AuthType;
             server.Headers = settings.AuthType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase)
-                ? StoreHeaderSecrets(server, settings.Headers, deleteEmptySecrets)
+                ? _credentialStore.StoreHeaderSecrets(server, settings.Headers, deleteEmptySecrets)
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             if (!settings.AuthType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase))
             {
-                DeleteCredentialsForRemovedHeaders(server, server.Headers);
+                _credentialStore.DeleteCredentialsForRemovedHeaders(server, server.Headers);
             }
 
             server.OAuthClientId = settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase)
@@ -1436,16 +1249,16 @@ namespace TxtAIEditor.Controls
 
             if (settings.AuthType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase))
             {
-                server.OAuthAccessToken = StoreOAuthSecret(server, "access_token", settings.OAuthAccessToken, deleteEmptySecrets);
+                server.OAuthAccessToken = _credentialStore.StoreOAuthSecret(server, "access_token", settings.OAuthAccessToken, deleteEmptySecrets);
                 server.OAuthRefreshToken = string.Empty;
                 server.OAuthClientSecret = string.Empty;
                 server.OAuthAccessTokenExpiresAt = DateTimeOffset.MaxValue;
             }
             else if (settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase))
             {
-                server.OAuthAccessToken = StoreOAuthSecret(server, "access_token", settings.OAuthAccessToken, deleteEmptySecrets);
-                server.OAuthRefreshToken = StoreOAuthSecret(server, "refresh_token", settings.OAuthRefreshToken, deleteEmptySecrets);
-                server.OAuthClientSecret = StoreOAuthSecret(server, "client_secret", settings.OAuthClientSecret, deleteEmptySecrets);
+                server.OAuthAccessToken = _credentialStore.StoreOAuthSecret(server, "access_token", settings.OAuthAccessToken, deleteEmptySecrets);
+                server.OAuthRefreshToken = _credentialStore.StoreOAuthSecret(server, "refresh_token", settings.OAuthRefreshToken, deleteEmptySecrets);
+                server.OAuthClientSecret = _credentialStore.StoreOAuthSecret(server, "client_secret", settings.OAuthClientSecret, deleteEmptySecrets);
                 if (settings.OAuthAccessTokenExpiresAt != default)
                 {
                     server.OAuthAccessTokenExpiresAt = settings.OAuthAccessTokenExpiresAt;
@@ -1458,447 +1271,6 @@ namespace TxtAIEditor.Controls
                 server.OAuthClientSecret = string.Empty;
                 server.OAuthAccessTokenExpiresAt = default;
             }
-        }
-
-        private static string NormalizeAuthType(string authType, Dictionary<string, string>? headers)
-        {
-            authType = authType?.Trim() ?? string.Empty;
-            if (authType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase) ||
-                authType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase) ||
-                authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) ||
-                authType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase))
-            {
-                return authType;
-            }
-
-            return headers != null && headers.Count > 0 ? AuthTypeApiKey : AuthTypeNone;
-        }
-
-        private static bool IsOAuthAuthType(string authType)
-        {
-            return authType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase) ||
-                authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private async Task<string> EnsureOAuthAccessTokenAsync(AgentMcpServer server, CancellationToken cancellationToken)
-        {
-            if (server.AuthType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase))
-            {
-                return GetOAuthSecret(server, "access_token", server.OAuthAccessToken);
-            }
-
-            if (!server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase))
-            {
-                return string.Empty;
-            }
-
-            string accessToken = GetOAuthSecret(server, "access_token", server.OAuthAccessToken);
-            if (!string.IsNullOrWhiteSpace(accessToken) &&
-                server.OAuthAccessTokenExpiresAt > DateTimeOffset.UtcNow.AddMinutes(1))
-            {
-                return accessToken;
-            }
-
-            string refreshToken = GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken);
-            if (!string.IsNullOrWhiteSpace(refreshToken))
-            {
-                try
-                {
-                    return await RefreshOAuthAccessTokenAsync(server, refreshToken, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to refresh MCP OAuth token: {ex.Message}");
-                }
-            }
-
-            return await RunBrowserOAuthLoginAsync(server, cancellationToken);
-        }
-
-        private async Task<string> RefreshOAuthAccessTokenAsync(AgentMcpServer server, string refreshToken, CancellationToken cancellationToken)
-        {
-            var form = new Dictionary<string, string>
-            {
-                ["grant_type"] = "refresh_token",
-                ["refresh_token"] = refreshToken,
-                ["client_id"] = server.OAuthClientId,
-                ["client_secret"] = GetOAuthClientSecret(server)
-            };
-            OAuthTokenResponse token = await SendOAuthTokenRequestAsync(server.OAuthTokenEndpoint, form, cancellationToken);
-            SaveOAuthTokenResponse(server, token, refreshToken);
-            await SaveAsync();
-            return token.AccessToken;
-        }
-
-        private async Task<string> RunBrowserOAuthLoginAsync(AgentMcpServer server, CancellationToken cancellationToken)
-        {
-            string clientSecret = GetOAuthClientSecret(server);
-            if (string.IsNullOrWhiteSpace(server.OAuthClientId) ||
-                string.IsNullOrWhiteSpace(clientSecret) ||
-                string.IsNullOrWhiteSpace(server.OAuthAuthorizationEndpoint) ||
-                string.IsNullOrWhiteSpace(server.OAuthTokenEndpoint))
-            {
-                throw new InvalidOperationException(_getString("AgentMcpOAuthClientConfigRequired", "OAuth Client ID, Client Secret, Authorization URL, Token URL을 입력해주세요."));
-            }
-
-            int port = GetFreeTcpPort();
-            string redirectUri = $"http://127.0.0.1:{port}/callback/";
-            string state = CreateRandomBase64Url(32);
-            string codeVerifier = CreateRandomBase64Url(64);
-            string codeChallenge = CreateCodeChallenge(codeVerifier);
-            using var listener = new HttpListener();
-            listener.Prefixes.Add(redirectUri);
-            listener.Start();
-
-            string authorizationUrl = BuildUrl(server.OAuthAuthorizationEndpoint, new Dictionary<string, string>
-            {
-                ["response_type"] = "code",
-                ["client_id"] = server.OAuthClientId,
-                ["redirect_uri"] = redirectUri,
-                ["scope"] = server.OAuthScopes,
-                ["state"] = state,
-                ["code_challenge"] = codeChallenge,
-                ["code_challenge_method"] = "S256",
-                ["access_type"] = "offline",
-                ["prompt"] = "consent"
-            });
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = authorizationUrl,
-                UseShellExecute = true
-            });
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromMinutes(5));
-            Task<HttpListenerContext> contextTask = listener.GetContextAsync();
-            Task completed = await Task.WhenAny(contextTask, Task.Delay(Timeout.InfiniteTimeSpan, timeoutCts.Token));
-            if (completed != contextTask)
-            {
-                throw new TimeoutException(_getString("AgentMcpOAuthLoginTimeout", "OAuth 브라우저 로그인이 시간 초과되었습니다."));
-            }
-
-            HttpListenerContext context = await contextTask;
-            string? error = context.Request.QueryString["error"];
-            string? code = context.Request.QueryString["code"];
-            string? returnedState = context.Request.QueryString["state"];
-            byte[] responseBytes = Encoding.UTF8.GetBytes("<html><body>OAuth login complete. You can close this window.</body></html>");
-            context.Response.ContentType = "text/html; charset=utf-8";
-            context.Response.ContentLength64 = responseBytes.Length;
-            await context.Response.OutputStream.WriteAsync(responseBytes, cancellationToken);
-            context.Response.Close();
-
-            if (!string.IsNullOrWhiteSpace(error))
-            {
-                throw new InvalidOperationException(error);
-            }
-
-            if (string.IsNullOrWhiteSpace(code) || !string.Equals(state, returnedState, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(_getString("AgentMcpOAuthLoginInvalidResponse", "OAuth 로그인 응답이 올바르지 않습니다."));
-            }
-
-            var form = new Dictionary<string, string>
-            {
-                ["grant_type"] = "authorization_code",
-                ["code"] = code,
-                ["redirect_uri"] = redirectUri,
-                ["client_id"] = server.OAuthClientId,
-                ["client_secret"] = clientSecret,
-                ["code_verifier"] = codeVerifier
-            };
-            OAuthTokenResponse token = await SendOAuthTokenRequestAsync(server.OAuthTokenEndpoint, form, cancellationToken);
-            SaveOAuthTokenResponse(server, token, GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken));
-            await SaveAsync();
-            return token.AccessToken;
-        }
-
-        private async Task RunInitialOAuthLoginIfNeededAsync(AgentMcpServer? server, string errorTitle)
-        {
-            if (server == null ||
-                !server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) ||
-                !string.IsNullOrWhiteSpace(GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken)))
-            {
-                return;
-            }
-
-            try
-            {
-                await RunBrowserOAuthLoginAsync(server, CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                _showError(errorTitle, ex.Message);
-            }
-        }
-
-        private static async Task<OAuthTokenResponse> SendOAuthTokenRequestAsync(string tokenEndpoint, Dictionary<string, string> form, CancellationToken cancellationToken)
-        {
-            using var content = new FormUrlEncodedContent(form.Where(item => !string.IsNullOrWhiteSpace(item.Value)));
-            using HttpResponseMessage response = await HttpClient.PostAsync(tokenEndpoint, content, cancellationToken);
-            string json = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new InvalidOperationException($"{(int)response.StatusCode} {response.ReasonPhrase}: {json}");
-            }
-
-            using JsonDocument document = JsonDocument.Parse(json);
-            string accessToken = TryGetStringProperty(document.RootElement, "access_token");
-            if (string.IsNullOrWhiteSpace(accessToken))
-            {
-                throw new InvalidOperationException("OAuth token response did not include an access token.");
-            }
-
-            int expiresIn = 3600;
-            if (document.RootElement.TryGetProperty("expires_in", out var expiresElement) &&
-                expiresElement.TryGetInt32(out int parsedExpiresIn))
-            {
-                expiresIn = parsedExpiresIn;
-            }
-
-            return new OAuthTokenResponse
-            {
-                AccessToken = accessToken,
-                RefreshToken = TryGetStringProperty(document.RootElement, "refresh_token"),
-                ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, expiresIn))
-            };
-        }
-
-        private void SaveOAuthTokenResponse(AgentMcpServer server, OAuthTokenResponse token, string existingRefreshToken)
-        {
-            server.OAuthAccessToken = StoreOAuthSecret(server, "access_token", token.AccessToken, deleteEmptySecret: true);
-            server.OAuthRefreshToken = StoreOAuthSecret(
-                server,
-                "refresh_token",
-                string.IsNullOrWhiteSpace(token.RefreshToken) ? existingRefreshToken : token.RefreshToken,
-                deleteEmptySecret: false);
-            server.OAuthAccessTokenExpiresAt = token.ExpiresAt;
-        }
-
-        private static int GetFreeTcpPort()
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
-        }
-
-        private static string BuildUrl(string baseUrl, Dictionary<string, string> query)
-        {
-            var builder = new StringBuilder(baseUrl);
-            builder.Append(baseUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?');
-            builder.Append(string.Join("&", query
-                .Where(item => !string.IsNullOrWhiteSpace(item.Value))
-                .Select(item => $"{Uri.EscapeDataString(item.Key)}={Uri.EscapeDataString(item.Value)}")));
-            return builder.ToString();
-        }
-
-        private static string CreateRandomBase64Url(int byteCount)
-        {
-            byte[] bytes = RandomNumberGenerator.GetBytes(byteCount);
-            return Base64UrlEncode(bytes);
-        }
-
-        private static string CreateCodeChallenge(string codeVerifier)
-        {
-            byte[] hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
-            return Base64UrlEncode(hash);
-        }
-
-        private static string Base64UrlEncode(byte[] bytes)
-        {
-            return Convert.ToBase64String(bytes)
-                .TrimEnd('=')
-                .Replace('+', '-')
-                .Replace('/', '_');
-        }
-
-        private Dictionary<string, string> StoreHeaderSecrets(
-            AgentMcpServer server,
-            Dictionary<string, string> headers,
-            bool deleteEmptySecrets = false)
-        {
-            var storedHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var header in headers)
-            {
-                string key = header.Key?.Trim() ?? string.Empty;
-                string value = header.Value?.Trim() ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(key))
-                {
-                    continue;
-                }
-
-                storedHeaders[key] = string.Empty;
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    _credentialService.WriteCredential(
-                        GetHeaderCredentialTarget(server, key),
-                        "TxtAIEditor_mcp",
-                        value);
-                }
-                else if (deleteEmptySecrets)
-                {
-                    _credentialService.DeleteCredential(GetHeaderCredentialTarget(server, key));
-                }
-            }
-
-            return storedHeaders;
-        }
-
-        private void MoveInlineHeaderValuesToCredential(AgentMcpServer server)
-        {
-            server.Headers = StoreHeaderSecrets(server, NormalizeHeaders(server.Headers));
-        }
-
-        private void DeleteCredentialsForRemovedHeaders(AgentMcpServer server, Dictionary<string, string> nextHeaders)
-        {
-            var nextHeaderNames = new HashSet<string>(nextHeaders.Keys, StringComparer.OrdinalIgnoreCase);
-            foreach (string oldHeaderName in server.Headers.Keys.ToList())
-            {
-                if (!nextHeaderNames.Contains(oldHeaderName))
-                {
-                    _credentialService.DeleteCredential(GetHeaderCredentialTarget(server, oldHeaderName));
-                }
-            }
-        }
-
-        private void DeleteAllCredentials(AgentMcpServer server)
-        {
-            foreach (string headerName in server.Headers.Keys.ToList())
-            {
-                _credentialService.DeleteCredential(GetHeaderCredentialTarget(server, headerName));
-            }
-
-            DeleteOAuthCredentials(server);
-        }
-
-        private string GetHeaderSecret(AgentMcpServer server, string headerName, string fallbackValue)
-        {
-            if (string.IsNullOrWhiteSpace(headerName))
-            {
-                return string.Empty;
-            }
-
-            string? credential = _credentialService.ReadCredential(GetHeaderCredentialTarget(server, headerName));
-            if (!string.IsNullOrEmpty(credential))
-            {
-                return credential;
-            }
-
-            return fallbackValue ?? string.Empty;
-        }
-
-        private string StoreOAuthSecret(AgentMcpServer server, string secretName, string value, bool deleteEmptySecret)
-        {
-            value = value?.Trim() ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                _credentialService.WriteCredential(
-                    GetOAuthCredentialTarget(server, secretName),
-                    "TxtAIEditor_mcp",
-                    value);
-            }
-            else if (deleteEmptySecret)
-            {
-                _credentialService.DeleteCredential(GetOAuthCredentialTarget(server, secretName));
-            }
-
-            return string.Empty;
-        }
-
-        private void MoveInlineOAuthSecretsToCredential(AgentMcpServer server)
-        {
-            server.OAuthAccessToken = StoreOAuthSecret(server, "access_token", server.OAuthAccessToken, deleteEmptySecret: false);
-            server.OAuthRefreshToken = StoreOAuthSecret(server, "refresh_token", server.OAuthRefreshToken, deleteEmptySecret: false);
-            server.OAuthClientSecret = StoreOAuthSecret(server, "client_secret", server.OAuthClientSecret, deleteEmptySecret: false);
-        }
-
-        private void DeleteOAuthCredentials(AgentMcpServer server)
-        {
-            _credentialService.DeleteCredential(GetOAuthCredentialTarget(server, "access_token"));
-            _credentialService.DeleteCredential(GetOAuthCredentialTarget(server, "refresh_token"));
-            _credentialService.DeleteCredential(GetOAuthCredentialTarget(server, "client_secret"));
-        }
-
-        private string GetOAuthSecret(AgentMcpServer server)
-        {
-            return GetOAuthSecret(server, "access_token", server.OAuthAccessToken);
-        }
-
-        private string GetOAuthClientSecret(AgentMcpServer server)
-        {
-            return GetOAuthSecret(server, "client_secret", server.OAuthClientSecret);
-        }
-
-        private string GetOAuthSecret(AgentMcpServer server, string secretName, string fallbackValue)
-        {
-            string? credential = _credentialService.ReadCredential(GetOAuthCredentialTarget(server, secretName));
-            if (!string.IsNullOrEmpty(credential))
-            {
-                return credential;
-            }
-
-            return fallbackValue ?? string.Empty;
-        }
-
-        private string RedactServerSecrets(AgentMcpServer server, string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return text;
-            }
-
-            var secrets = new List<string>();
-            foreach (var header in server.Headers)
-            {
-                string secret = GetHeaderSecret(server, header.Key, header.Value);
-                if (!string.IsNullOrWhiteSpace(secret))
-                {
-                    secrets.Add(secret);
-                }
-            }
-
-            AddSecretIfPresent(secrets, GetOAuthSecret(server, "access_token", server.OAuthAccessToken));
-            AddSecretIfPresent(secrets, GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken));
-            AddSecretIfPresent(secrets, GetOAuthSecret(server, "client_secret", server.OAuthClientSecret));
-
-            string redacted = text;
-            foreach (string secret in secrets.Distinct(StringComparer.Ordinal))
-            {
-                if (secret.Length < 4)
-                {
-                    continue;
-                }
-
-                redacted = redacted.Replace(secret, "[redacted]", StringComparison.Ordinal);
-            }
-
-            return redacted;
-        }
-
-        private static void AddSecretIfPresent(List<string> secrets, string value)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                secrets.Add(value);
-            }
-        }
-
-        private static string GetHeaderCredentialTarget(AgentMcpServer server, string headerName)
-        {
-            return $"TxtAIEditor_MCP_{server.Id}_{SanitizeCredentialSegment(headerName)}";
-        }
-
-        private static string GetOAuthCredentialTarget(AgentMcpServer server, string secretName)
-        {
-            return $"TxtAIEditor_MCP_{server.Id}_oauth_{SanitizeCredentialSegment(secretName)}";
-        }
-
-        private static string SanitizeCredentialSegment(string value)
-        {
-            string normalized = Regex.Replace(value ?? string.Empty, @"[^A-Za-z0-9_.-]+", "_").Trim('_');
-            return string.IsNullOrWhiteSpace(normalized) ? "header" : normalized;
         }
 
         private AgentMcpServer? FindServer(string name)
@@ -1917,164 +1289,6 @@ namespace TxtAIEditor.Controls
             return _servers
                 .Where(server => _selectedServerIds.Contains(server.Id))
                 .ToList();
-        }
-
-        private ComboBox CreateAuthTypeComboBox(string selectedAuthType)
-        {
-            var comboBox = new ComboBox
-            {
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Height = 32
-            };
-            comboBox.Items.Add(CreateAuthTypeItem(AuthTypeNone, _getString("AgentMcpAuthTypeNone", "없음")));
-            comboBox.Items.Add(CreateAuthTypeItem(AuthTypeApiKey, _getString("AgentMcpAuthTypeApiKey", "API Key Header")));
-            comboBox.Items.Add(CreateAuthTypeItem(AuthTypeOAuthBearer, _getString("AgentMcpAuthTypeOAuthBearer", "OAuth Access Token")));
-            comboBox.Items.Add(CreateAuthTypeItem(AuthTypeOAuthAuthorizationCode, _getString("AgentMcpAuthTypeOAuthBrowser", "OAuth 브라우저 로그인")));
-
-            selectedAuthType = NormalizeAuthType(selectedAuthType, null);
-            foreach (var item in comboBox.Items.OfType<ComboBoxItem>())
-            {
-                if (string.Equals(item.Tag as string, selectedAuthType, StringComparison.OrdinalIgnoreCase))
-                {
-                    comboBox.SelectedItem = item;
-                    break;
-                }
-            }
-
-            comboBox.SelectedIndex = comboBox.SelectedIndex < 0 ? 0 : comboBox.SelectedIndex;
-            return comboBox;
-        }
-
-        private static ComboBoxItem CreateAuthTypeItem(string authType, string label)
-        {
-            return new ComboBoxItem
-            {
-                Tag = authType,
-                Content = label
-            };
-        }
-
-        private static string GetSelectedAuthType(ComboBox comboBox)
-        {
-            return comboBox.SelectedItem is ComboBoxItem item && item.Tag is string authType
-                ? authType
-                : AuthTypeNone;
-        }
-
-        private static void UpdateAuthFieldVisibility(
-            ComboBox authTypeBox,
-            TextBlock headerNameLabel,
-            TextBox headerNameBox,
-            TextBlock apiKeyLabel,
-            PasswordBox apiKeyBox,
-            TextBlock oauthTokenLabel,
-            PasswordBox oauthTokenBox,
-            TextBlock oauthClientIdLabel,
-            TextBox oauthClientIdBox,
-            TextBlock oauthClientSecretLabel,
-            PasswordBox oauthClientSecretBox,
-            TextBlock oauthAuthorizationEndpointLabel,
-            TextBox oauthAuthorizationEndpointBox,
-            TextBlock oauthTokenEndpointLabel,
-            TextBox oauthTokenEndpointBox,
-            TextBlock oauthScopesLabel,
-            TextBox oauthScopesBox)
-        {
-            string authType = GetSelectedAuthType(authTypeBox);
-            bool showApiKey = authType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase);
-            bool showBearer = authType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase);
-            bool showBrowserOAuth = authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase);
-
-            SetVisible(headerNameLabel, showApiKey);
-            SetVisible(headerNameBox, showApiKey);
-            SetVisible(apiKeyLabel, showApiKey);
-            SetVisible(apiKeyBox, showApiKey);
-            SetVisible(oauthTokenLabel, showBearer);
-            SetVisible(oauthTokenBox, showBearer);
-            SetVisible(oauthClientIdLabel, showBrowserOAuth);
-            SetVisible(oauthClientIdBox, showBrowserOAuth);
-            SetVisible(oauthClientSecretLabel, showBrowserOAuth);
-            SetVisible(oauthClientSecretBox, showBrowserOAuth);
-            SetVisible(oauthAuthorizationEndpointLabel, showBrowserOAuth);
-            SetVisible(oauthAuthorizationEndpointBox, showBrowserOAuth);
-            SetVisible(oauthTokenEndpointLabel, showBrowserOAuth);
-            SetVisible(oauthTokenEndpointBox, showBrowserOAuth);
-            SetVisible(oauthScopesLabel, showBrowserOAuth);
-            SetVisible(oauthScopesBox, showBrowserOAuth);
-        }
-
-        private static void SetVisible(UIElement element, bool isVisible)
-        {
-            element.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private TextBlock CreateLabel(string text)
-        {
-            return new TextBlock
-            {
-                Text = text
-            };
-        }
-
-        private TextBox CreateTextBox(string placeholder)
-        {
-            return new TextBox
-            {
-                PlaceholderText = placeholder,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Height = 32,
-                IsSpellCheckEnabled = false,
-                IsTextPredictionEnabled = false,
-                FontFamily = new FontFamily("Segoe UI, Malgun Gothic"),
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
-        }
-
-        private PasswordBox CreatePasswordBox(string placeholder)
-        {
-            return new PasswordBox
-            {
-                PlaceholderText = placeholder,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Height = 32,
-                FontFamily = new FontFamily("Segoe UI, Malgun Gothic"),
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
-        }
-
-        private TextBlock CreateInfoText(string text)
-        {
-            return new TextBlock
-            {
-                Text = text,
-                FontSize = 11,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = CreateSecondaryTextBrush()
-            };
-        }
-
-        private Brush CreateSecondaryTextBrush()
-        {
-            bool isLightTheme = _agentPane.ActualTheme == ElementTheme.Light ||
-                (_agentPane.ActualTheme == ElementTheme.Default &&
-                    Application.Current.RequestedTheme == ApplicationTheme.Light);
-
-            return new SolidColorBrush(isLightTheme
-                ? Windows.UI.Color.FromArgb(255, 75, 85, 99)
-                : Windows.UI.Color.FromArgb(255, 229, 231, 235));
-        }
-
-        private async Task<ContentDialogResult> ShowDialogAsync(ContentDialog dialog)
-        {
-            _beforeDialog?.Invoke();
-            try
-            {
-                return await dialog.ShowAsync();
-            }
-            finally
-            {
-                _afterDialog?.Invoke();
-            }
         }
 
         private static string FormatToolCallResult(AgentMcpToolAlias alias, JsonElement result)
@@ -2210,11 +1424,5 @@ namespace TxtAIEditor.Controls
             public DateTimeOffset OAuthAccessTokenExpiresAt { get; set; }
         }
 
-        private sealed class OAuthTokenResponse
-        {
-            public string AccessToken { get; set; } = string.Empty;
-            public string RefreshToken { get; set; } = string.Empty;
-            public DateTimeOffset ExpiresAt { get; set; }
-        }
     }
 }
