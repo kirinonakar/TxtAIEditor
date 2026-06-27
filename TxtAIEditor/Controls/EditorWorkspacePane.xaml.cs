@@ -43,7 +43,10 @@ namespace TxtAIEditor.Controls
             SecondaryTabActions.SizeChanged += (_, _) => UpdateTabActionSpacers();
             StickyNoteBar.RegisterPropertyChangedCallback(VisibilityProperty, (_, __) => UpdateTabActionSpacers());
             ActiveTabView = EditorTabView;
-            Loaded += (_, __) => DisableTabItemTransitions();
+            Loaded += (_, __) => {
+                DisableTabItemTransitions();
+                UpdateTabActionSpacers();
+            };
         }
 
         public event TypedEventHandler<TabView, object>? PrimaryAddTabButtonClick;
@@ -104,8 +107,74 @@ namespace TxtAIEditor.Controls
 
         private void UpdateTabActionSpacers()
         {
-            PrimaryTabActionsSpacer.Width = Math.Max(72, PrimaryTabActions.ActualWidth + 12);
-            SecondaryTabActionsSpacer.Width = Math.Max(72, SecondaryTabActions.ActualWidth + 12);
+            double primaryWidth = Math.Max(72, PrimaryTabActions.ActualWidth + 12);
+            double secondaryWidth = Math.Max(72, SecondaryTabActions.ActualWidth + 12);
+
+            PrimaryTabActionsSpacer.Width = primaryWidth;
+            SecondaryTabActionsSpacer.Width = secondaryWidth;
+
+            var primaryListView = FindTabViewListView(EditorTabView);
+            if (primaryListView != null)
+            {
+                double availableWidth = EditorTabView.ActualWidth - primaryWidth - 44;
+                primaryListView.MaxWidth = Math.Max(0, availableWidth);
+            }
+
+            var secondaryListView = FindTabViewListView(EditorTabView2);
+            if (secondaryListView != null)
+            {
+                double availableWidth = EditorTabView2.ActualWidth - secondaryWidth - 44;
+                secondaryListView.MaxWidth = Math.Max(0, availableWidth);
+            }
+        }
+
+        private static ListViewBase? FindTabViewListView(TabView tabView)
+        {
+            try
+            {
+                tabView.ApplyTemplate();
+                var queue = new Queue<DependencyObject>();
+                queue.Enqueue(tabView);
+                int visited = 0;
+
+                while (queue.Count > 0 && visited < 256)
+                {
+                    visited++;
+                    var current = queue.Dequeue();
+                    if (current is ListViewBase listView &&
+                        current.GetType().Name.Contains("TabViewListView", StringComparison.Ordinal))
+                    {
+                        return listView;
+                    }
+
+                    int childCount;
+                    try
+                    {
+                        childCount = VisualTreeHelper.GetChildrenCount(current);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    for (int i = 0; i < childCount; i++)
+                    {
+                        try
+                        {
+                            queue.Enqueue(VisualTreeHelper.GetChild(current, i));
+                        }
+                        catch
+                        {
+                            // Ignore visual tree access issues
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignored
+            }
+            return null;
         }
 
         private static void TryDisableTabItemTransitions(TabView tabView)
@@ -485,6 +554,7 @@ namespace TxtAIEditor.Controls
             {
                 _terminalPane?.QueueEmbeddedTerminalResize();
             }
+            UpdateTabActionSpacers();
         }
 
         private void OnEditorSplitterPointerPressed(object sender, PointerRoutedEventArgs e)
