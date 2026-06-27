@@ -892,7 +892,7 @@ namespace TxtAIEditor.Controls
                             makePlanRetryCount++;
                             string retryNote =
                                 "\n\n[Planning mode make_plan required]\n" +
-                                "Do not answer with the plan as plain text. Save it by ending with exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename, and do not put text after the tool_call.";
+                                "Do not answer with the plan as plain text. Save it by including exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
 
                             transcript += "\n\n" + response + "\n\n" + retryNote;
                             runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + "\n\n" + retryNote);

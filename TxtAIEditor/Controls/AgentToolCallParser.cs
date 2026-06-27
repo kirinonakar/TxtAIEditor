@@ -52,14 +52,6 @@ namespace TxtAIEditor.Controls
                     return true;
                 }
                 
-                int closeTagLength = GetCloseTagLengthAt(text, xmlCloseIndex);
-                int afterClose = xmlCloseIndex + closeTagLength;
-                if (afterClose < text.Length && !string.IsNullOrWhiteSpace(text.Substring(afterClose)))
-                {
-                    detail = "The tool_call must be the final non-empty content; put any explanation before it, not after it.";
-                    return true;
-                }
-                
                 return false;
             }
 
@@ -76,13 +68,6 @@ namespace TxtAIEditor.Controls
             if (openIndex < 0 || closeIndex < 0 || closeIndex < openIndex)
             {
                 detail = "The tool_call tag must include one matching <tool_call>...</tool_call> pair.";
-                return true;
-            }
-
-            int afterCloseStd = closeIndex + ToolCallCloseTag.Length;
-            if (!string.IsNullOrWhiteSpace(text.Substring(afterCloseStd)))
-            {
-                detail = "The tool_call must be the final non-empty content; put any explanation before it, not after it.";
                 return true;
             }
 
@@ -131,7 +116,7 @@ namespace TxtAIEditor.Controls
                 text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0;
 
-            // 1. Prefer the final text tool call, so explanatory examples earlier in the response are ignored.
+            // 1. Prefer the last text tool call, so explanatory examples earlier in the response are ignored.
             if (TryExtractTrailingToolCallTagPayload(text, out string trailingTagPayload) &&
                 TryParsePayloads(trailingTagPayload, toolCalls))
             {
@@ -174,12 +159,6 @@ namespace TxtAIEditor.Controls
             int closeIndex = trimmed.LastIndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase);
             if (closeIndex >= 0)
             {
-                int afterClose = closeIndex + ToolCallCloseTag.Length;
-                if (!string.IsNullOrWhiteSpace(trimmed.Substring(afterClose)))
-                {
-                    return false;
-                }
-
                 int openIndex = trimmed.LastIndexOf(ToolCallOpenTag, closeIndex, StringComparison.OrdinalIgnoreCase);
                 if (openIndex < 0)
                 {
