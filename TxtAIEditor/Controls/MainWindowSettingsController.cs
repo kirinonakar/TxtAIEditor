@@ -141,7 +141,7 @@ namespace TxtAIEditor.Controls
             }
             else if (settings.Theme == "Dark")
             {
-                settings.Theme = "CatppuccinMacchiato";
+                settings.Theme = "PastelDark";
             }
             else
             {

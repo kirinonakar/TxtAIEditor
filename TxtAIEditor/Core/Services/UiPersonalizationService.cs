@@ -21,9 +21,9 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            if (settings.Theme == "CatppuccinMacchiato")
+            if (settings.Theme == "PastelDark")
             {
-                ApplyCatppuccinTheme();
+                ApplyPastelDarkTheme();
                 rootElement.RequestedTheme = ElementTheme.Light;
                 rootElement.RequestedTheme = ElementTheme.Dark;
             }
@@ -48,12 +48,12 @@ namespace TxtAIEditor.Core.Services
             ApplyRootBackground(settings, rootElement);
         }
 
-        private static void ApplyCatppuccinTheme()
+        private static void ApplyPastelDarkTheme()
         {
             var resources = Application.Current.Resources;
-            resources["ActiveTheme"] = "CatppuccinMacchiato";
+            resources["ActiveTheme"] = "PastelDark";
 
-            // Catppuccin Macchiato Palette
+            // Pastel Dark Palette
             var baseColor = Windows.UI.Color.FromArgb(255, 36, 39, 58); // #24273a
             var mantleColor = Windows.UI.Color.FromArgb(255, 30, 32, 48); // #1e2030
             var crustColor = Windows.UI.Color.FromArgb(255, 24, 25, 38); // #181926
@@ -87,7 +87,7 @@ namespace TxtAIEditor.Core.Services
             SetBrush("EditorSurfaceBackgroundBrush", baseColor);
             SetBrush("TabBarBackgroundBrush", mantleColor);
 
-            // AI Assistant & Agent panel brushes (Catppuccin Macchiato)
+            // AI Assistant & Agent panel brushes (Pastel Dark)
             SetBrush("LlmOutputBackground", crustColor);
             SetBrush("LlmOutputForeground", textColor);
             SetBrush("ButtonBackground", surface0Color);
@@ -251,22 +251,22 @@ namespace TxtAIEditor.Core.Services
             {
                 var titleBar = appWindow.TitleBar;
                 bool light = settings.Theme == "Light";
-                bool catppuccin = settings.Theme == "CatppuccinMacchiato";
-
+                bool pastelDark = settings.Theme == "PastelDark";
+ 
                 Windows.UI.Color background = TryParseHexColor(settings.CustomBackgroundColor, out var customBg)
                     ? customBg
-                    : (catppuccin
+                    : (pastelDark
                         ? Windows.UI.Color.FromArgb(255, 30, 32, 48)
                         : (light ? Windows.UI.Color.FromArgb(255, 243, 244, 246) : Windows.UI.Color.FromArgb(255, 30, 30, 30)));
                 Windows.UI.Color foreground = TryParseHexColor(settings.CustomForegroundColor, out var customFg)
                     ? customFg
-                    : (catppuccin
+                    : (pastelDark
                         ? Windows.UI.Color.FromArgb(255, 202, 211, 245)
                         : (light ? Windows.UI.Color.FromArgb(255, 31, 41, 55) : Windows.UI.Color.FromArgb(255, 212, 212, 212)));
-                Windows.UI.Color inactiveBackground = catppuccin
+                Windows.UI.Color inactiveBackground = pastelDark
                     ? Windows.UI.Color.FromArgb(255, 54, 57, 79)
                     : (light ? Windows.UI.Color.FromArgb(255, 229, 231, 235) : Windows.UI.Color.FromArgb(255, 45, 49, 57));
-                Windows.UI.Color hoverBackground = catppuccin
+                Windows.UI.Color hoverBackground = pastelDark
                     ? Windows.UI.Color.FromArgb(255, 54, 57, 79)
                     : (light ? Windows.UI.Color.FromArgb(255, 229, 231, 235) : Windows.UI.Color.FromArgb(255, 45, 49, 57));
 
@@ -297,7 +297,7 @@ namespace TxtAIEditor.Core.Services
             {
                 Windows.UI.Color background = TryParseHexColor(settings.MarkdownToolbarBackgroundColor, out var customToolbarBg)
                     ? customToolbarBg
-                    : (settings.Theme == "CatppuccinMacchiato"
+                    : (settings.Theme == "PastelDark"
                         ? Windows.UI.Color.FromArgb(255, 30, 32, 48)
                         : (settings.Theme == "Light"
                             ? Windows.UI.Color.FromArgb(255, 243, 244, 246)

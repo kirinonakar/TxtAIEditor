@@ -33,12 +33,12 @@ namespace TxtAIEditor.Core.Services
 
             int themeIdx = 0; // Dark
             if (settings.Theme == "Light") themeIdx = 1;
-            else if (settings.Theme == "CatppuccinMacchiato") themeIdx = 2;
+            else if (settings.Theme == "PastelDark") themeIdx = 2;
 
             _themeCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, SelectedIndex = themeIdx };
             _themeCombo.Items.Add("Dark Theme (vs-dark)");
             _themeCombo.Items.Add("Light Theme (vs)");
-            _themeCombo.Items.Add("Catppuccin Macchiato");
+            _themeCombo.Items.Add("Pastel Dark");
 
             _editorSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.FontSize, StepFrequency = 1 };
             _previewSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.PreviewFontSize, StepFrequency = 1 };
@@ -46,8 +46,8 @@ namespace TxtAIEditor.Core.Services
             _uiFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.UiFontFamily, fontFamilies);
             _previewFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.PreviewFontFamily, fontFamilies);
 
-            string defaultBg = settings.Theme == "Light" ? "#ffffff" : (settings.Theme == "CatppuccinMacchiato" ? "#24273a" : "#1e1e1e");
-            string defaultFg = settings.Theme == "Light" ? "#111111" : (settings.Theme == "CatppuccinMacchiato" ? "#cad3f5" : "#d4d4d4");
+            string defaultBg = settings.Theme == "Light" ? "#ffffff" : (settings.Theme == "PastelDark" ? "#24273a" : "#1e1e1e");
+            string defaultFg = settings.Theme == "Light" ? "#111111" : (settings.Theme == "PastelDark" ? "#cad3f5" : "#d4d4d4");
 
             _customBgCheck = new CheckBox { Content = getString("SettingsUseCustomBg", "커스텀 에디터 배경색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.CustomBackgroundColor) };
             _customFgCheck = new CheckBox { Content = getString("SettingsUseCustomFg", "커스텀 에디터 글자색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.CustomForegroundColor) };
@@ -121,7 +121,7 @@ namespace TxtAIEditor.Core.Services
             {
                 0 => "Dark",
                 1 => "Light",
-                2 => "CatppuccinMacchiato",
+                2 => "PastelDark",
                 _ => "Dark"
             };
             settings.FontSize = _editorSizeSlider.Value;

@@ -186,7 +186,7 @@ namespace TxtAIEditor
             // If a custom theme is active, resolve resource from Application.Current.Resources
             if (Application.Current.Resources.TryGetValue("ActiveTheme", out var activeThemeObj) &&
                 activeThemeObj is string activeTheme &&
-                activeTheme == "CatppuccinMacchiato")
+                activeTheme == "PastelDark")
             {
                 if (Application.Current.Resources.TryGetValue(resourceKey, out object resource) && resource is Brush brush)
                 {

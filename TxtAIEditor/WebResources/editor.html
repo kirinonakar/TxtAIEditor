@@ -35,8 +35,8 @@
         const version = urlParams.get('v') || Date.now();
         window.__TxtAIEditorVersion = version;
         const theme = urlParams.get('theme') || 'Dark';
-        const bg = urlParams.get('customBg') || (theme === 'CatppuccinMacchiato' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e'));
-        const fg = urlParams.get('customFg') || (theme === 'CatppuccinMacchiato' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
+        const bg = urlParams.get('customBg') || (theme === 'PastelDark' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e'));
+        const fg = urlParams.get('customFg') || (theme === 'PastelDark' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
         
         // Instantly style the root element before body is parsed to prevent FOUC (flicker)
         document.documentElement.style.background = bg;
