@@ -578,7 +578,8 @@ namespace TxtAIEditor
                 LoadFileIntoTabAsync,
                 (folderPath, revealInLeftPanel) => NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel),
                 () => _shellPanelLayoutService.IsLeftSidebarVisible,
-                _dialogController.ShowErrorMessage);
+                _dialogController.ShowErrorMessage,
+                GetLocalizedString);
             _rootKeyboardShortcutController = new RootKeyboardShortcutController(
                 () => OpenNewTab(),
                 ToggleLeftPanelAsync,

@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, bool, Task> _navigateExplorerToFolderAsync;
         private readonly Func<bool> _isLeftSidebarVisible;
         private readonly Action<string, string> _showError;
+        private readonly Func<string, string, string> _getString;
 
         private static readonly string[] TextFileExtensions =
         {
@@ -85,7 +86,8 @@ namespace TxtAIEditor.Controls
             Func<string, Task> loadFileIntoTabAsync,
             Func<string, bool, Task> navigateExplorerToFolderAsync,
             Func<bool> isLeftSidebarVisible,
-            Action<string, string> showError)
+            Action<string, string> showError,
+            Func<string, string, string> getString)
         {
             _dragOverlay = dragOverlay;
             _leftSidebar = leftSidebar;
@@ -95,6 +97,7 @@ namespace TxtAIEditor.Controls
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
             _isLeftSidebarVisible = isLeftSidebarVisible;
             _showError = showError;
+            _getString = getString;
         }
 
         public async Task OpenFileAsync()
@@ -272,7 +275,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showError("드래그 앤 드롭 오류", ex.Message);
+                _showError(_getString("DragDropErrorTitle", "드래그 앤 드롭 오류"), ex.Message);
             }
             finally
             {
@@ -280,10 +283,10 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static void ApplyFileOpenDragUi(DragEventArgs e)
+        private void ApplyFileOpenDragUi(DragEventArgs e)
         {
             e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "파일 열기";
+            e.DragUIOverride.Caption = _getString("DragDropOpenFileCaption", "파일 열기");
             e.DragUIOverride.IsCaptionVisible = true;
             e.DragUIOverride.IsContentVisible = true;
         }

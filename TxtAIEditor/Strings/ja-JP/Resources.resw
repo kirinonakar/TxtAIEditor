@@ -2855,7 +2855,7 @@
     <value>ドキュメントファイルの検索結果は内容検索専用のため、置換できません。</value>
   </data>
   <data name="DragDropCopyRootCaption" xml:space="preserve">
-    <value>エクスプローラーフォルダにコピー</value>
+    <value>コピー</value>
   </data>
   <data name="DragDropCopyItemCaptionFormat" xml:space="preserve">
     <value>'{0}' の場所にコピー</value>

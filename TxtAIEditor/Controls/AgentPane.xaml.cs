@@ -1091,7 +1091,7 @@ namespace TxtAIEditor.Controls
             if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
             {
                 e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
-                e.DragUIOverride.Caption = "파일 첨부";
+                e.DragUIOverride.Caption = _getString?.Invoke("AgentAttachFileCaption", "파일 첨부") ?? "파일 첨부";
                 e.DragUIOverride.IsCaptionVisible = true;
                 e.DragUIOverride.IsContentVisible = true;
                 e.Handled = true;
