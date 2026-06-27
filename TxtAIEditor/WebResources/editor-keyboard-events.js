@@ -221,7 +221,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
         const earlyKey = event.key ? event.key.toLowerCase() : '';
         if (earlyCtrl && earlyKey === 's') {
             event.preventDefault();
-            hideAutocomplete();
+            hideAutocomplete(300);
             post({ type: 'shortcut', name: 'save' });
             return;
         }
@@ -343,7 +343,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
             if (key === 's') {
                 event.preventDefault();
-                hideAutocomplete();
+                hideAutocomplete(300);
                 post({ type: 'shortcut', name: 'save' });
                 return;
             }
