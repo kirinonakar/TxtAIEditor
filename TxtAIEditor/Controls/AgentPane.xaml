@@ -10,25 +10,6 @@
 
     <UserControl.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="AgentButtonBackground" Color="#FCFCFC"/>
-                    <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#E0E0E0"/>
-                    <SolidColorBrush x:Key="AgentOutputBackground" Color="#FCFCFC"/>
-                    <SolidColorBrush x:Key="AgentOutputForeground" Color="#1F2937"/>
-                    <SolidColorBrush x:Key="AgentCodeBackground" Color="#EAEAEA"/>
-                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#A62828"/>
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="AgentButtonBackground" Color="#2B2D31"/>
-                    <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#2E3033"/>
-                    <SolidColorBrush x:Key="AgentOutputBackground" Color="#151618"/>
-                    <SolidColorBrush x:Key="AgentOutputForeground" Color="#D4D4D4"/>
-                    <SolidColorBrush x:Key="AgentCodeBackground" Color="#252526"/>
-                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#CE916C"/>
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-
             <Style x:Key="AgentButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="{ThemeResource AgentButtonBackground}"/>
                 <Setter Property="BorderBrush" Value="{ThemeResource AgentButtonBorderBrush}"/>

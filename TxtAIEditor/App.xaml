@@ -21,6 +21,23 @@
                     <SolidColorBrush x:Key="SplitterHoverBackgroundBrush" Color="#C8CCD0"/>
                     <SolidColorBrush x:Key="EditorSurfaceBackgroundBrush" Color="#FFFFFF"/>
                     <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#FFFFFF"/>
+
+                    <!-- AI Assistant & Agent panel brushes (Light Theme) -->
+                    <SolidColorBrush x:Key="ButtonBackground" Color="#FCFCFC"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#F0F0F0"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#E5E5E5"/>
+                    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#E0E0E0"/>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#D5D5D5"/>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#C5C5C5"/>
+                    <SolidColorBrush x:Key="LlmOutputBackground" Color="#FCFCFC"/>
+                    <SolidColorBrush x:Key="LlmOutputForeground" Color="#1F2937"/>
+                    
+                    <SolidColorBrush x:Key="AgentButtonBackground" Color="#FCFCFC"/>
+                    <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#E0E0E0"/>
+                    <SolidColorBrush x:Key="AgentOutputBackground" Color="#FCFCFC"/>
+                    <SolidColorBrush x:Key="AgentOutputForeground" Color="#1F2937"/>
+                    <SolidColorBrush x:Key="AgentCodeBackground" Color="#EAEAEA"/>
+                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#A62828"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="TitleBarBackgroundBrush" Color="#18191B"/>
@@ -63,6 +80,23 @@
                     <SolidColorBrush x:Key="TabViewItemHeaderBorderBrush" Color="Transparent"/>
                     <SolidColorBrush x:Key="TabViewBorderBrush" Color="#2E3033"/>
                     <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#181818"/>
+
+                    <!-- AI Assistant & Agent panel brushes (Dark Theme) -->
+                    <SolidColorBrush x:Key="ButtonBackground" Color="#2B2D31"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#35373C"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#3F4248"/>
+                    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#2E3033"/>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#3B3E45"/>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#4E525C"/>
+                    <SolidColorBrush x:Key="LlmOutputBackground" Color="#151618"/>
+                    <SolidColorBrush x:Key="LlmOutputForeground" Color="#D4D4D4"/>
+                    
+                    <SolidColorBrush x:Key="AgentButtonBackground" Color="#2B2D31"/>
+                    <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#2E3033"/>
+                    <SolidColorBrush x:Key="AgentOutputBackground" Color="#151618"/>
+                    <SolidColorBrush x:Key="AgentOutputForeground" Color="#D4D4D4"/>
+                    <SolidColorBrush x:Key="AgentCodeBackground" Color="#252526"/>
+                    <SolidColorBrush x:Key="AgentCodeForeground" Color="#CE916C"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
             <ResourceDictionary.MergedDictionaries>

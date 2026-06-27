@@ -11,29 +11,6 @@
                 <Grid x:Name="RightSidebarRoot" Background="{ThemeResource SidebarBackgroundBrush}">
                     <Grid.Resources>
                         <ResourceDictionary>
-                            <ResourceDictionary.ThemeDictionaries>
-                                <ResourceDictionary x:Key="Light">
-                                    <SolidColorBrush x:Key="ButtonBackground" Color="#FCFCFC"/>
-                                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#F0F0F0"/>
-                                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#E5E5E5"/>
-                                    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#E0E0E0"/>
-                                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#D5D5D5"/>
-                                    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#C5C5C5"/>
-                                    <SolidColorBrush x:Key="LlmOutputBackground" Color="#FCFCFC"/>
-                                    <SolidColorBrush x:Key="LlmOutputForeground" Color="#1F2937"/>
-                                </ResourceDictionary>
-                                <ResourceDictionary x:Key="Dark">
-                                    <SolidColorBrush x:Key="ButtonBackground" Color="#2B2D31"/>
-                                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#35373C"/>
-                                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#3F4248"/>
-                                    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#2E3033"/>
-                                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#3B3E45"/>
-                                    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#4E525C"/>
-                                    <SolidColorBrush x:Key="LlmOutputBackground" Color="#151618"/>
-                                    <SolidColorBrush x:Key="LlmOutputForeground" Color="#D4D4D4"/>
-                                </ResourceDictionary>
-                            </ResourceDictionary.ThemeDictionaries>
-
                             <Style x:Key="RightSidebarButtonStyle" TargetType="Button">
                                 <Setter Property="Background" Value="{ThemeResource ButtonBackground}"/>
                                 <Setter Property="BorderBrush" Value="{ThemeResource ButtonBorderBrush}"/>

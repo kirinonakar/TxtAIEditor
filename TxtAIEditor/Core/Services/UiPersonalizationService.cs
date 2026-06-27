@@ -87,6 +87,23 @@ namespace TxtAIEditor.Core.Services
             SetBrush("EditorSurfaceBackgroundBrush", baseColor);
             SetBrush("TabBarBackgroundBrush", mantleColor);
 
+            // AI Assistant & Agent panel brushes (Catppuccin Macchiato)
+            SetBrush("LlmOutputBackground", crustColor);
+            SetBrush("LlmOutputForeground", textColor);
+            SetBrush("ButtonBackground", surface0Color);
+            SetBrush("ButtonBackgroundPointerOver", surface1Color);
+            SetBrush("ButtonBackgroundPressed", surface2Color);
+            SetBrush("ButtonBorderBrush", surface0Color);
+            SetBrush("ButtonBorderBrushPointerOver", surface1Color);
+            SetBrush("ButtonBorderBrushPressed", surface2Color);
+
+            SetBrush("AgentButtonBackground", surface0Color);
+            SetBrush("AgentButtonBorderBrush", surface0Color);
+            SetBrush("AgentOutputBackground", crustColor);
+            SetBrush("AgentOutputForeground", textColor);
+            SetBrush("AgentCodeBackground", surface0Color);
+            SetBrush("AgentCodeForeground", mauveColor);
+
             // TabView & TabViewItem overrides
             SetBrush("TabViewTabStripBackground", mantleColor);
             SetBrush("TabViewItemHeaderBackground", mantleColor);
@@ -188,6 +205,12 @@ namespace TxtAIEditor.Core.Services
             var keysToRemove = new[]
             {
                 "ActiveTheme",
+                "ButtonBackground", "ButtonBackgroundPointerOver", "ButtonBackgroundPressed",
+                "ButtonBorderBrush", "ButtonBorderBrushPointerOver", "ButtonBorderBrushPressed",
+                "LlmOutputBackground", "LlmOutputForeground",
+                "AgentButtonBackground", "AgentButtonBorderBrush",
+                "AgentOutputBackground", "AgentOutputForeground",
+                "AgentCodeBackground", "AgentCodeForeground",
                 "TitleBarBackgroundBrush", "TitleBarForegroundBrush", "ToolbarBackgroundBrush", "ToolbarBorderBrush",
                 "SidebarBackgroundBrush", "ActivityBarBackgroundBrush", "SidebarBorderBrush", "StatusBarBackgroundBrush",
                 "StatusBarForegroundBrush", "SplitterBackgroundBrush", "SplitterHoverBackgroundBrush", "EditorSurfaceBackgroundBrush",
