@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.Web.WebView2.Core;
 using WinRT.Interop;
 using TxtAIEditor.Core.Interfaces;
@@ -78,6 +76,10 @@ namespace TxtAIEditor
         private readonly EditorWebViewInitializationController _editorWebViewInitializationController;
         private readonly EditorLineNavigationController _editorLineNavigationController;
         private readonly EditorTabOpenController _editorTabOpenController;
+        private readonly ActiveEditorInsertionController _activeEditorInsertionController;
+        private readonly PreviewScrollSyncController _previewScrollSyncController;
+        private readonly TabTextContextProvider _tabTextContextProvider;
+        private readonly WebViewShortcutController _webViewShortcutController;
         private readonly SplitImeSyncController _splitImeSyncController;
         private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly TabSaveController _tabSaveController;
@@ -100,7 +102,6 @@ namespace TxtAIEditor
         private bool _startupInitializationComplete;
         private string _currentFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         private string _currentRepoPath = string.Empty;
-        private string? _activeEditorStreamTabId;
 
         private string CurrentFolderPath
         {
@@ -277,6 +278,20 @@ namespace TxtAIEditor
                 ReloadTabWithEncodingAsync,
                 MarkTabDirtyFromStatusBar,
                 PerformLineNavigationAsync);
+            _webViewShortcutController = new WebViewShortcutController(
+                () => _toolbarCommandController?.Find(),
+                () => _toolbarCommandController?.ToggleLivePreview(),
+                _stickyNoteModeController.ToggleTopMostFromShortcut,
+                () => _toolbarCommandController?.ToggleTheme(),
+                ToggleMaximize,
+                _stickyNoteModeController.ToggleMode,
+                () => _toolbarCommandController?.Print(),
+                TogglePreviewWidth);
+            _previewScrollSyncController = new PreviewScrollSyncController(
+                EditorWorkspace,
+                _tabBridges,
+                _tabNavigationController.GetActiveTab,
+                _tabNavigationController.GetOppositeTabView);
             _compareTabController = new CompareTabController(
                 _fileService,
                 _settingsService,
@@ -286,7 +301,7 @@ namespace TxtAIEditor
                 _tabBridges,
                 GetLocalizedString,
                 NormalizeWebMessageJson,
-                HandleWebViewShortcut);
+                _webViewShortcutController.Handle);
             _livePreviewController = new LivePreviewController(
                 PreviewGrid,
                 _settingsService,
@@ -297,8 +312,8 @@ namespace TxtAIEditor
                 () => _currentRepoPath,
                 () => _scrollSyncEnabled,
                 NormalizeWebMessageJson,
-                HandleWebViewShortcut,
-                SyncPreviewScrollToEditors,
+                _webViewShortcutController.Handle,
+                _previewScrollSyncController.SyncToEditors,
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString);
             _editorWebViewInitializationController = new EditorWebViewInitializationController(
@@ -337,6 +352,14 @@ namespace TxtAIEditor
                 _tabBridges,
                 _editorSessions,
                 UpdateWindowTitle);
+            _activeEditorInsertionController = new ActiveEditorInsertionController(
+                _viewModel,
+                _tabBridges,
+                _tabNavigationController.GetCurrentActiveTabView,
+                _tabDirtyStateController);
+            _tabTextContextProvider = new TabTextContextProvider(
+                _pdfTextExtractionService,
+                tabId => _editorSessions.TryGetValue(tabId, out var session) ? session : null);
             _editorBridgeShortcutController = new EditorBridgeShortcutController(
                 () => _toolbarCommandController?.ToggleLivePreview(),
                 _stickyNoteModeController.ToggleTopMostFromShortcut,
@@ -548,7 +571,7 @@ namespace TxtAIEditor
                 _tabNavigationController.GetActiveTab,
                 LoadDirectoryRoot,
                 LoadFileIntoTabAsync,
-                InsertTextIntoActiveEditorAsync,
+                _activeEditorInsertionController.InsertTextAsync,
                 CloseTabAndCleanup,
                 () => this.Content.XamlRoot,
                 GetCurrentElementTheme,
@@ -613,7 +636,7 @@ namespace TxtAIEditor
                 _viewModel,
                 LeftSidebarTabView,
                 () => this.Content.XamlRoot,
-                InsertTextIntoActiveEditorAsync,
+                _activeEditorInsertionController.InsertTextAsync,
                 SyncSnippetsToOpenEditorsAsync,
                 _dialogController.ShowErrorMessage,
                 GetLocalizedString,
@@ -627,8 +650,8 @@ namespace TxtAIEditor
                 PreviewGrid,
                 () => this.Content.XamlRoot,
                 _tabNavigationController.GetActiveTab,
-                GetTabTextForLlmContext,
-                InsertTextIntoActiveEditorAsync,
+                _tabTextContextProvider.GetText,
+                _activeEditorInsertionController.InsertTextAsync,
                 (title, content) =>
                 {
                     string uniqueTitle = string.IsNullOrWhiteSpace(title) ? GetLocalizedString("UntitledNewTab", "제목 없음") : title;
@@ -683,8 +706,8 @@ namespace TxtAIEditor
                 PreviewGrid.AgentPane,
                 _tabNavigationController.GetActiveTab,
                 () => _viewModel.Tabs.ToList(),
-                GetTabTextForLlmContext,
-                InsertTextIntoActiveEditorAsync,
+                _tabTextContextProvider.GetText,
+                _activeEditorInsertionController.InsertTextAsync,
                 (title, content) =>
                 {
                     string uniqueTitle = string.IsNullOrWhiteSpace(title) ? GetLocalizedString("UntitledNewTab", "제목 없음") : title;
@@ -764,9 +787,9 @@ namespace TxtAIEditor
                     UpdateWindowTitle();
                     return true;
                 },
-                beginStreamIntoActiveEditorAsync: BeginStreamIntoActiveEditorAsync,
-                streamTextIntoActiveEditorAsync: InsertStreamTextIntoActiveEditorAsync,
-                endStreamIntoActiveEditorAsync: EndStreamIntoActiveEditorAsync);
+                beginStreamIntoActiveEditorAsync: _activeEditorInsertionController.BeginStreamAsync,
+                streamTextIntoActiveEditorAsync: _activeEditorInsertionController.InsertStreamTextAsync,
+                endStreamIntoActiveEditorAsync: _activeEditorInsertionController.EndStreamAsync);
             _tocController = new TocController(
                 _viewModel,
                 LeftSidebarTabView,
@@ -815,7 +838,7 @@ namespace TxtAIEditor
                 EditorTabView,
                 _tabBridges,
                 LoadFileIntoTabAsync,
-                InsertTextIntoActiveEditorAsync,
+                _activeEditorInsertionController.InsertTextAsync,
                 _dialogController.ShowErrorMessage);
             _tabSelectionController = new TabSelectionController(
                 EditorWorkspace,
@@ -1068,7 +1091,7 @@ namespace TxtAIEditor
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to prepare initial window placement: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Failed to prepare initial window placement: {ex.Message}");
             }
         }
 
@@ -1605,264 +1628,6 @@ namespace TxtAIEditor
             }
 
             return json;
-        }
-
-        private void SyncPreviewScrollToEditors(int firstLine, double offset)
-        {
-            var activeTab = _tabNavigationController.GetActiveTab();
-            if (activeTab == null)
-            {
-                return;
-            }
-
-            if (_tabBridges.TryGetValue(activeTab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-            {
-                _ = bridgeGroup.Bridge.SyncScrollFromPreviewAsync(firstLine, offset);
-            }
-
-            if (EditorWorkspace.CurrentSplitMode == TxtAIEditor.Controls.EditorSplitMode.None)
-            {
-                return;
-            }
-
-            var otherTabView = _tabNavigationController.GetOppositeTabView(activeTab);
-
-            if (otherTabView?.SelectedItem is TabViewItem otherItem &&
-                otherItem.Tag is string otherTabId &&
-                _tabBridges.TryGetValue(otherTabId, out var otherBridgeGroup) &&
-                otherBridgeGroup.Bridge != null)
-            {
-                _ = otherBridgeGroup.Bridge.SyncScrollFromPreviewAsync(firstLine, offset);
-            }
-        }
-
-        private void HandleWebViewShortcut(string name)
-        {
-            if (string.Equals(name, "find", StringComparison.Ordinal))
-            {
-                _toolbarCommandController?.Find();
-            }
-            else if (string.Equals(name, "f4", StringComparison.Ordinal))
-            {
-                _toolbarCommandController?.ToggleLivePreview();
-            }
-            else if (string.Equals(name, "f9", StringComparison.Ordinal))
-            {
-                _stickyNoteModeController.ToggleTopMostFromShortcut();
-            }
-            else if (string.Equals(name, "f10", StringComparison.Ordinal))
-            {
-                _toolbarCommandController?.ToggleTheme();
-            }
-            else if (string.Equals(name, "f11", StringComparison.Ordinal))
-            {
-                ToggleMaximize();
-            }
-            else if (string.Equals(name, "f12", StringComparison.Ordinal))
-            {
-                _stickyNoteModeController.ToggleMode();
-            }
-            else if (string.Equals(name, "print", StringComparison.Ordinal))
-            {
-                _toolbarCommandController?.Print();
-            }
-            else if (string.Equals(name, "expandRightPanel", StringComparison.Ordinal))
-            {
-                TogglePreviewWidth();
-            }
-        }
-
-
-        private async Task<bool> InsertTextIntoActiveEditorAsync(string text)
-        {
-            var activeTabView = _tabNavigationController.GetCurrentActiveTabView();
-            if (activeTabView.SelectedItem is not TabViewItem activeTabItem ||
-                activeTabItem.Tag is not string tabId ||
-                !_tabBridges.TryGetValue(tabId, out var bridgeGroup) ||
-                bridgeGroup.Bridge == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                bridgeGroup.WebView.Focus(FocusState.Programmatic);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to focus editor: {ex.Message}");
-            }
-
-            await bridgeGroup.Bridge.InsertTextAsync(text);
-
-            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-            if (tab != null)
-            {
-                _tabDirtyStateController.MarkTabDirty(tab, activeTabItem);
-                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-            }
-
-            return true;
-        }
-
-        private bool TryGetCurrentActiveEditorBridge(
-            out string tabId,
-            out TabViewItem? activeTabItem,
-            out (WebView2 WebView, MonacoBridge Bridge) bridgeGroup)
-        {
-            tabId = string.Empty;
-            activeTabItem = null;
-            bridgeGroup = default;
-
-            var activeTabView = _tabNavigationController.GetCurrentActiveTabView();
-            if (activeTabView.SelectedItem is not TabViewItem selectedTabItem ||
-                selectedTabItem.Tag is not string selectedTabId ||
-                !_tabBridges.TryGetValue(selectedTabId, out var selectedBridgeGroup) ||
-                selectedBridgeGroup.Bridge == null)
-            {
-                return false;
-            }
-
-            tabId = selectedTabId;
-            activeTabItem = selectedTabItem;
-            bridgeGroup = selectedBridgeGroup;
-            return true;
-        }
-
-        private async Task<bool> BeginStreamIntoActiveEditorAsync(string? targetTabId)
-        {
-            if (string.IsNullOrEmpty(targetTabId))
-            {
-                await EndStreamIntoActiveEditorAsync(null);
-            }
-
-            if (!TryGetStreamEditorBridge(targetTabId, out string tabId, out var bridgeGroup))
-            {
-                return false;
-            }
-
-            if (string.IsNullOrEmpty(targetTabId))
-            {
-                _activeEditorStreamTabId = tabId;
-                try
-                {
-                    bridgeGroup.WebView.Focus(FocusState.Programmatic);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to focus editor for stream insert: {ex.Message}");
-                }
-            }
-
-            await bridgeGroup.Bridge.BeginStreamInsertAsync();
-            return true;
-        }
-
-        private async Task<bool> InsertStreamTextIntoActiveEditorAsync(string? targetTabId, string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return true;
-            }
-
-            string? tabId = string.IsNullOrEmpty(targetTabId) ? _activeEditorStreamTabId : targetTabId;
-            if (string.IsNullOrEmpty(tabId) ||
-                !_tabBridges.TryGetValue(tabId, out var bridgeGroup) ||
-                bridgeGroup.Bridge == null)
-            {
-                return false;
-            }
-
-            await bridgeGroup.Bridge.InsertStreamTextAsync(text);
-
-            var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-            if (tab != null)
-            {
-                _tabDirtyStateController.MarkTabDirty(tab);
-                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-            }
-
-            return true;
-        }
-
-        private async Task EndStreamIntoActiveEditorAsync(string? targetTabId)
-        {
-            string? tabId = string.IsNullOrEmpty(targetTabId) ? _activeEditorStreamTabId : targetTabId;
-            if (string.IsNullOrEmpty(targetTabId))
-            {
-                _activeEditorStreamTabId = null;
-            }
-
-            if (!string.IsNullOrEmpty(tabId) &&
-                _tabBridges.TryGetValue(tabId, out var bridgeGroup) &&
-                bridgeGroup.Bridge != null)
-            {
-                await bridgeGroup.Bridge.EndStreamInsertAsync();
-            }
-        }
-
-        private bool TryGetStreamEditorBridge(
-            string? targetTabId,
-            out string tabId,
-            out (WebView2 WebView, MonacoBridge Bridge) bridgeGroup)
-        {
-            tabId = string.Empty;
-            bridgeGroup = default;
-
-            if (!string.IsNullOrEmpty(targetTabId) &&
-                _tabBridges.TryGetValue(targetTabId, out var targetBridgeGroup) &&
-                targetBridgeGroup.Bridge != null)
-            {
-                tabId = targetTabId;
-                bridgeGroup = targetBridgeGroup;
-                return true;
-            }
-
-            return TryGetCurrentActiveEditorBridge(out tabId, out _, out bridgeGroup);
-        }
-
-        private string GetTabTextForLlmContext(OpenedTab tab, int maxChars)
-        {
-            if (tab.IsPdfViewer && !string.IsNullOrWhiteSpace(tab.FilePath))
-            {
-                string cached = tab.Content ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(cached))
-                {
-                    return cached.Length > maxChars ? cached.Substring(0, maxChars) : cached;
-                }
-
-                string extracted = _pdfTextExtractionService
-                    .ExtractTextAsync(tab.FilePath, maxChars)
-                    .ConfigureAwait(false)
-                    .GetAwaiter()
-                    .GetResult();
-                tab.Content = extracted;
-                return extracted;
-            }
-
-            if (tab.IsOfficeDocumentViewer && !string.IsNullOrWhiteSpace(tab.FilePath))
-            {
-                string cached = tab.Content ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(cached))
-                {
-                    return cached.Length > maxChars ? cached.Substring(0, maxChars) : cached;
-                }
-
-                string extracted = new DocumentTextExtractionService()
-                    .ExtractTextAsync(tab.FilePath, maxChars)
-                    .ConfigureAwait(false)
-                    .GetAwaiter()
-                    .GetResult();
-                tab.Content = extracted;
-                return extracted;
-            }
-
-            if (_editorSessions.TryGetValue(tab.Id, out var session))
-            {
-                return session.GetText(maxChars);
-            }
-
-            return tab.Content ?? string.Empty;
         }
 
         private void UpdateWindowTitle()
