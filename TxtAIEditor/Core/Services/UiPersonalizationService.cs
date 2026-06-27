@@ -162,6 +162,15 @@ namespace TxtAIEditor.Core.Services
             SetBrush("ComboBoxBorderBrushFocused", mauveColor);
             SetBrush("ComboBoxForeground", textColor);
             SetBrush("ComboBoxForegroundPointerOver", textColor);
+            SetBrush("ComboBoxDropDownBackground", mantleColor);
+            SetBrush("ComboBoxDropDownBorderBrush", surface0Color);
+            SetBrush("ComboBoxDropDownItemBackground", Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            SetBrush("ComboBoxDropDownItemBackgroundPointerOver", surface0Color);
+            SetBrush("ComboBoxDropDownItemBackgroundSelected", surface1Color);
+            SetBrush("ComboBoxDropDownItemBackgroundSelectedPointerOver", surface2Color);
+            SetBrush("ComboBoxDropDownItemForeground", textColor);
+            SetBrush("ComboBoxDropDownItemForegroundPointerOver", textColor);
+            SetBrush("ComboBoxDropDownItemForegroundSelected", mauveColor);
 
             SetBrush("ButtonBackground", surface0Color);
             SetBrush("ButtonBackgroundPointerOver", surface1Color);
@@ -228,6 +237,9 @@ namespace TxtAIEditor.Core.Services
                 "NavigationViewContentBackground", "NavigationViewDefaultPaneBackground", "NavigationViewTopPaneBackground",
                 "TextBoxBackground", "TextBoxBackgroundPointerOver", "TextBoxBackgroundFocused", "TextBoxBorderBrush", "TextBoxBorderBrushFocused", "TextBoxForeground", "TextBoxForegroundFocused",
                 "ComboBoxBackground", "ComboBoxBackgroundPointerOver", "ComboBoxBackgroundPressed", "ComboBoxBorderBrush", "ComboBoxBorderBrushFocused", "ComboBoxForeground", "ComboBoxForegroundPointerOver",
+                "ComboBoxDropDownBackground", "ComboBoxDropDownBorderBrush", "ComboBoxDropDownItemBackground", "ComboBoxDropDownItemBackgroundPointerOver",
+                "ComboBoxDropDownItemBackgroundSelected", "ComboBoxDropDownItemBackgroundSelectedPointerOver", "ComboBoxDropDownItemForeground", "ComboBoxDropDownItemForegroundPointerOver",
+                "ComboBoxDropDownItemForegroundSelected",
                 "ButtonBackground", "ButtonBackgroundPointerOver", "ButtonBackgroundPressed", "ButtonForeground", "ButtonForegroundPointerOver", "ButtonForegroundPressed", "ButtonBorderBrush", "ButtonBorderBrushPointerOver",
                 "CheckBoxForeground", "CheckBoxForegroundPointerOver", "CheckBoxForegroundPressed",
                 "SliderTrackFill", "SliderThumbBackground",
