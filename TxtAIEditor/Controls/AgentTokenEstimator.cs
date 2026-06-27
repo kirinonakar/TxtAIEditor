@@ -1,3 +1,7 @@
+using System.Collections.Generic;
+using System.Text.Json;
+using TxtAIEditor.Core.Services.LLM;
+
 namespace TxtAIEditor.Controls
 {
     internal static class AgentTokenEstimator
@@ -14,6 +18,36 @@ namespace TxtAIEditor.Controls
             {
                 char c = text[i];
                 tokens += c <= 127 ? 0.25 : 0.7;
+            }
+
+            return tokens;
+        }
+
+        public static double EstimateToolsTokens(IEnumerable<LlmTool>? tools)
+        {
+            if (tools == null)
+            {
+                return 0;
+            }
+
+            double tokens = 0;
+            foreach (var tool in tools)
+            {
+                tokens += 12; // Base overhead per tool function
+                tokens += Estimate(tool.Name);
+                tokens += Estimate(tool.Description);
+                if (tool.Parameters != null)
+                {
+                    try
+                    {
+                        string paramsJson = JsonSerializer.Serialize(tool.Parameters);
+                        tokens += Estimate(paramsJson);
+                    }
+                    catch
+                    {
+                        // Fallback
+                    }
+                }
             }
 
             return tokens;

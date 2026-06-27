@@ -322,6 +322,13 @@ namespace TxtAIEditor.Controls
             return best;
         }
 
+        public double EstimateToolCatalogTokens()
+        {
+            var mcpAliases = _mcpController.GetActiveToolAliases();
+            var tools = new AgentLlmToolCatalog().Build(_agentPane.PlanningMode, mcpAliases);
+            return AgentTokenEstimator.EstimateToolsTokens(tools);
+        }
+
         private double EstimateAgentPromptTokens(
             string instruction,
             string workspaceContext,
@@ -338,7 +345,8 @@ namespace TxtAIEditor.Controls
 
             return AgentTokenEstimator.Estimate(systemPrompt) +
                 AgentTokenEstimator.Estimate(userContent) +
-                _attachmentController.EstimatedImageTokens;
+                _attachmentController.EstimatedImageTokens +
+                EstimateToolCatalogTokens();
         }
 
         private int GetModelContextLimitForPromptBudget()

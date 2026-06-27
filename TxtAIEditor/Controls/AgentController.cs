@@ -284,6 +284,7 @@ namespace TxtAIEditor.Controls
                 _sessionHistoryCoordinator.RefreshOutputDisplay,
                 _getString,
                 _modelContextLimits,
+                _promptContextService.EstimateToolCatalogTokens,
                 GetCurrentSessionSettings);
             _outputInsertController = new AgentOutputInsertController(
                 _agentPane,

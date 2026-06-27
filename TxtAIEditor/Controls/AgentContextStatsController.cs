@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly AgentModelContextLimitProvider _modelContextLimits;
         private readonly Func<EditorSettings> _settingsProvider;
+        private readonly Func<double> _toolCatalogTokensProvider;
 
         public AgentContextStatsController(
             ISettingsService settingsService,
@@ -42,6 +43,7 @@ namespace TxtAIEditor.Controls
             Action refreshOutputDisplay,
             Func<string, string, string> getString,
             AgentModelContextLimitProvider modelContextLimits,
+            Func<double> toolCatalogTokensProvider,
             Func<EditorSettings>? settingsProvider = null)
         {
             _settingsService = settingsService;
@@ -59,6 +61,7 @@ namespace TxtAIEditor.Controls
             _refreshOutputDisplay = refreshOutputDisplay;
             _getString = getString;
             _modelContextLimits = modelContextLimits;
+            _toolCatalogTokensProvider = toolCatalogTokensProvider;
             _settingsProvider = settingsProvider ?? (() => _settingsService.CurrentSettings);
         }
 
@@ -184,7 +187,7 @@ namespace TxtAIEditor.Controls
                 tokens += AgentTokenEstimator.Estimate(workspaceContext + Environment.NewLine + Environment.NewLine);
             }
 
-            return tokens + _currentRunTranscriptTokensProvider() + _attachmentController.EstimatedImageTokens;
+            return tokens + _currentRunTranscriptTokensProvider() + _attachmentController.EstimatedImageTokens + _toolCatalogTokensProvider();
         }
 
         private int GetModelContextLimit()
