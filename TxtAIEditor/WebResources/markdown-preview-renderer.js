@@ -1,5 +1,16 @@
 const mermaidCache = new Map();
 const DEFAULT_MAX_MERGED_PARAGRAPH_LINES = 12;
+const LATEX_ENVIRONMENT_ALIASES = new Map([
+    ['displaymath', ''],
+    ['math', ''],
+    ['subequations', ''],
+    ['eqnarray', 'aligned'],
+    ['eqnarray*', 'aligned'],
+    ['flalign', 'aligned'],
+    ['flalign*', 'aligned'],
+    ['multline', 'gathered'],
+    ['multline*', 'gathered']
+]);
 
 function maxMergedParagraphLines(options = {}) {
     const value = Number(options.maxMergedParagraphLines ?? DEFAULT_MAX_MERGED_PARAGRAPH_LINES);
@@ -23,10 +34,44 @@ function escapeAttribute(value) {
         .replace(/>/g, '&gt;');
 }
 
+function stripLatexCommentLine(line) {
+    const text = String(line ?? '');
+    for (let i = 0; i < text.length; i++) {
+        if (text[i] !== '%') continue;
+        let slashCount = 0;
+        for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) {
+            slashCount++;
+        }
+        if (slashCount % 2 === 0) {
+            return text.slice(0, i);
+        }
+    }
+    return text;
+}
+
+function stripLatexComments(text) {
+    return String(text ?? '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .map(stripLatexCommentLine)
+        .join('\n');
+}
+
+function normalizeLatexEnvironmentAliases(text) {
+    return String(text ?? '').replace(/\\(begin|end)\{([^}]+)\}/g, (match, kind, rawName) => {
+        const alias = LATEX_ENVIRONMENT_ALIASES.get(String(rawName || '').toLowerCase());
+        if (alias === undefined) return match;
+        return alias ? `\\${kind}{${alias}}` : '';
+    });
+}
+
 function cleanupLatex(text) {
-    return String(text || '')
-        .replace(/\\begin\{document\}|\\end\{document\}/g, '')
+    return normalizeLatexEnvironmentAliases(stripLatexComments(text))
+        .replace(/\\begin\{document\}|\\end\{document\}/gi, '')
+        .replace(/^\s*\\(?:documentclass|usepackage|RequirePackage|title|author|date|maketitle|tableofcontents|pagestyle|thispagestyle|bibliography|bibliographystyle)(?:\[[^\]]*\])?(?:\{[^{}]*\})*\s*$/gmi, '')
         .replace(/\\\(|\\\)|\\\[|\\\]|\$\$/g, '')
+        .replace(/(^|[^\\])\$([^$\n]+?)\$/g, '$1$2')
         .trim();
 }
 
@@ -373,6 +418,118 @@ function collectDisplayMathBlock(startLine, maxLine, getLine) {
         parts.push(text);
     }
     return { text: parts.join('\n'), endLine: maxLine };
+}
+
+function regexEscape(value) {
+    return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function countRegexMatches(value, regex) {
+    let count = 0;
+    regex.lastIndex = 0;
+    while (regex.exec(value) !== null) {
+        count++;
+    }
+    return count;
+}
+
+function isLatexDocumentControlLine(line) {
+    const trimmed = stripLatexCommentLine(line).trim();
+    if (!trimmed) return true;
+    if (/^\\(?:begin|end)\{document\}\s*$/i.test(trimmed)) return true;
+    return /^\\(?:documentclass|usepackage|RequirePackage|title|author|date|maketitle|tableofcontents|pagestyle|thispagestyle|bibliography|bibliographystyle)(?:\s|\[|\{|$)/i.test(trimmed);
+}
+
+function isLatexStandaloneClosingLine(line) {
+    return /^\\end\{[^}]+\}\s*$/.test(stripLatexCommentLine(line).trim());
+}
+
+function latexDelimiterInfo(line) {
+    const trimmed = stripLatexCommentLine(line).trim();
+    const opener = trimmed.startsWith('$$')
+        ? '$$'
+        : trimmed.startsWith('\\[')
+            ? '\\['
+            : trimmed.startsWith('\\(')
+                ? '\\('
+                : '';
+    if (!opener) return null;
+
+    const closer = opener === '$$' ? '$$' : opener === '\\[' ? '\\]' : '\\)';
+    if (trimmed.slice(opener.length).includes(closer)) return null;
+    return { opener, closer };
+}
+
+function collectLatexDelimitedBlock(startLine, maxLine, getLine, delimiter) {
+    const parts = [];
+    for (let line = startLine; line <= maxLine; line++) {
+        const text = getLine(line);
+        if (text === undefined) {
+            return { pending: true, endLine: line, extendRangeEnd: line };
+        }
+        parts.push(text);
+        if (line > startLine && stripLatexCommentLine(text).includes(delimiter.closer)) {
+            return { text: parts.join('\n'), endLine: line };
+        }
+    }
+    return { text: parts.join('\n'), endLine: maxLine };
+}
+
+function latexEnvironmentStart(line) {
+    const match = /\\begin\{([^}]+)\}/.exec(stripLatexCommentLine(line));
+    if (!match) return null;
+    const name = match[1].trim();
+    return name && name.toLowerCase() !== 'document' ? name : null;
+}
+
+function collectLatexEnvironmentBlock(startLine, maxLine, getLine, environmentName) {
+    const escapedName = regexEscape(environmentName);
+    const beginPattern = new RegExp(`\\\\begin\\{${escapedName}\\}`, 'g');
+    const endPattern = new RegExp(`\\\\end\\{${escapedName}\\}`, 'g');
+    const parts = [];
+    let depth = 0;
+
+    for (let line = startLine; line <= maxLine; line++) {
+        const text = getLine(line);
+        if (text === undefined) {
+            return { pending: true, endLine: line, extendRangeEnd: line };
+        }
+
+        parts.push(text);
+        const uncommented = stripLatexCommentLine(text);
+        depth += countRegexMatches(uncommented, beginPattern);
+        depth -= countRegexMatches(uncommented, endPattern);
+        if (depth <= 0) {
+            return { text: parts.join('\n'), endLine: line };
+        }
+    }
+
+    return { text: parts.join('\n'), endLine: maxLine };
+}
+
+function renderLatexBlockAt(lineNumber, maxLine, getLine) {
+    const line = getLine(lineNumber);
+    if (line === undefined) return null;
+    const trimmed = stripLatexCommentLine(line).trim();
+    if (!trimmed || isLatexDocumentControlLine(line) || isLatexStandaloneClosingLine(line)) {
+        return { html: '', endLine: lineNumber };
+    }
+
+    const delimiter = latexDelimiterInfo(line);
+    if (delimiter) {
+        const block = collectLatexDelimitedBlock(lineNumber, maxLine, getLine, delimiter);
+        if (block?.pending) return block;
+        return { html: renderLatexLine(block.text), endLine: block.endLine };
+    }
+
+    const environmentName = latexEnvironmentStart(line);
+    if (environmentName) {
+        const block = collectLatexEnvironmentBlock(lineNumber, maxLine, getLine, environmentName);
+        if (block?.pending) return block;
+        return { html: renderLatexLine(block.text), endLine: block.endLine };
+    }
+
+    return { html: renderLatexLine(line), endLine: lineNumber };
 }
 
 function htmlBlockTagName(line) {
@@ -931,6 +1088,9 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
     const line = getLine(lineNumber);
     if (line === undefined) return null;
     const mode = options.mode || 'markdown';
+    if (mode === 'latex') {
+        return renderLatexBlockAt(lineNumber, maxLine, getLine);
+    }
     if (mode !== 'markdown') {
         return { html: renderLine(line, mode, options), endLine: lineNumber };
     }

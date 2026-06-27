@@ -872,7 +872,7 @@
         function render() {
             if (state.mode === 'csv') return;
             const visible = visibleRange();
-            const contextStart = state.mode === 'markdown'
+            const contextStart = state.mode === 'markdown' || state.mode === 'latex'
                 ? Math.max(1, visible.start - state.blockContextLines)
                 : visible.start;
 
