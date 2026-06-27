@@ -124,35 +124,71 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        var attachment = await CreateAttachmentAsync(file);
-                        if (attachment != null)
-                        {
-                            _attachments.RemoveAll(existing =>
-                                string.Equals(existing.Path, attachment.Path, StringComparison.OrdinalIgnoreCase));
-                            _attachments.Add(attachment);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _showError(
-                            _getString("AgentAttachmentErrorTitle", "Attachment Error"),
-                            string.Format(
-                                _getString("AgentAttachmentErrorFormat", "An error occurred while adding the attachment: {0}"),
-                                ex.Message));
-                    }
-                }
-
-                RefreshAttachments();
-                _contextChanged();
+                await AddStorageFilesAsync(files);
             }
             finally
             {
                 _afterDialog?.Invoke();
             }
+        }
+
+        public async Task AddDroppedFilesAsync(IEnumerable<string> filePaths)
+        {
+            if (_isRunningProvider())
+            {
+                return;
+            }
+
+            var storageFiles = new List<StorageFile>();
+            foreach (string filePath in filePaths)
+            {
+                try
+                {
+                    var file = await StorageFile.GetFileFromPathAsync(filePath);
+                    storageFiles.Add(file);
+                }
+                catch (Exception ex)
+                {
+                    _showError(
+                        _getString("AgentAttachmentErrorTitle", "Attachment Error"),
+                        string.Format(
+                            _getString("AgentAttachmentErrorFormat", "An error occurred while adding the attachment: {0}"),
+                            ex.Message));
+                }
+            }
+
+            if (storageFiles.Count > 0)
+            {
+                await AddStorageFilesAsync(storageFiles);
+            }
+        }
+
+        private async Task AddStorageFilesAsync(IEnumerable<StorageFile> files)
+        {
+            foreach (var file in files)
+            {
+                try
+                {
+                    var attachment = await CreateAttachmentAsync(file);
+                    if (attachment != null)
+                    {
+                        _attachments.RemoveAll(existing =>
+                            string.Equals(existing.Path, attachment.Path, StringComparison.OrdinalIgnoreCase));
+                        _attachments.Add(attachment);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _showError(
+                        _getString("AgentAttachmentErrorTitle", "Attachment Error"),
+                        string.Format(
+                            _getString("AgentAttachmentErrorFormat", "An error occurred while adding the attachment: {0}"),
+                            ex.Message));
+                }
+            }
+
+            RefreshAttachments();
+            _contextChanged();
         }
 
         public void RemoveAttachment(string id)

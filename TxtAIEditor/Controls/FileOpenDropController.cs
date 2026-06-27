@@ -11,6 +11,7 @@ namespace TxtAIEditor.Controls
     {
         private readonly FrameworkElement _dragOverlay;
         private readonly FrameworkElement _leftSidebar;
+        private readonly FrameworkElement _rightSidebar;
         private readonly Action<object> _initializePickerWindow;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Func<string, bool, Task> _navigateExplorerToFolderAsync;
@@ -79,6 +80,7 @@ namespace TxtAIEditor.Controls
         public FileOpenDropController(
             FrameworkElement dragOverlay,
             FrameworkElement leftSidebar,
+            FrameworkElement rightSidebar,
             Action<object> initializePickerWindow,
             Func<string, Task> loadFileIntoTabAsync,
             Func<string, bool, Task> navigateExplorerToFolderAsync,
@@ -87,6 +89,7 @@ namespace TxtAIEditor.Controls
         {
             _dragOverlay = dragOverlay;
             _leftSidebar = leftSidebar;
+            _rightSidebar = rightSidebar;
             _initializePickerWindow = initializePickerWindow;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
@@ -140,6 +143,30 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private bool IsHoveringOverRightSidebar(DragEventArgs e)
+        {
+            if (_rightSidebar == null || _rightSidebar.Visibility != Visibility.Visible)
+            {
+                return false;
+            }
+
+            try
+            {
+                var pos = e.GetPosition(_rightSidebar);
+                return pos.X >= 0 && pos.X <= _rightSidebar.ActualWidth &&
+                       pos.Y >= 0 && pos.Y <= _rightSidebar.ActualHeight;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool IsHoveringOverSidebar(DragEventArgs e)
+        {
+            return IsHoveringOverLeftSidebar(e) || IsHoveringOverRightSidebar(e);
+        }
+
         public void HandleRootDragOver(DragEventArgs e)
         {
             if (e.Handled)
@@ -147,7 +174,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (IsHoveringOverLeftSidebar(e))
+            if (IsHoveringOverSidebar(e))
             {
                 _dragOverlay.Visibility = Visibility.Collapsed;
                 e.AcceptedOperation = DataPackageOperation.None;
@@ -169,7 +196,7 @@ namespace TxtAIEditor.Controls
 
         public void HandleDragOverlayOver(DragEventArgs e)
         {
-            if (IsHoveringOverLeftSidebar(e))
+            if (IsHoveringOverSidebar(e))
             {
                 _dragOverlay.Visibility = Visibility.Collapsed;
                 e.AcceptedOperation = DataPackageOperation.None;
@@ -181,6 +208,12 @@ namespace TxtAIEditor.Controls
 
         public async Task HandleDragOverlayDropAsync(DragEventArgs e)
         {
+            if (IsHoveringOverRightSidebar(e))
+            {
+                _dragOverlay.Visibility = Visibility.Collapsed;
+                return;
+            }
+
             _dragOverlay.Visibility = Visibility.Collapsed;
             await HandleRootDropAsync(e);
         }
@@ -192,6 +225,16 @@ namespace TxtAIEditor.Controls
 
         public async Task HandleRootDropAsync(DragEventArgs e)
         {
+            if (e.Handled)
+            {
+                return;
+            }
+
+            if (IsHoveringOverRightSidebar(e))
+            {
+                return;
+            }
+
             e.Handled = true;
             e.AcceptedOperation = DataPackageOperation.Copy;
             _dragOverlay.Visibility = Visibility.Collapsed;

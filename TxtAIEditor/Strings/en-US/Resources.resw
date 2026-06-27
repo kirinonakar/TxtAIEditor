@@ -2886,4 +2886,13 @@ Plan: {0}</value>
   <data name="CopyFolderSelfParent" xml:space="preserve">
     <value>Cannot copy a folder into itself or its own subfolder.</value>
   </data>
+  <data name="DragDropOpenFileCaption" xml:space="preserve">
+    <value>Open File</value>
+  </data>
+  <data name="DragDropErrorTitle" xml:space="preserve">
+    <value>Drag &amp; Drop Error</value>
+  </data>
+  <data name="AgentAttachFileCaption" xml:space="preserve">
+    <value>Attach File</value>
+  </data>
 </root>

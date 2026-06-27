@@ -22,7 +22,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid Padding="15" RowSpacing="6">
+    <Grid Padding="15" RowSpacing="6" AllowDrop="True" DragOver="OnAgentGridDragOver" Drop="OnAgentGridDrop">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -289,7 +289,10 @@
                           MaxHeight="96"
                           SelectionMode="None"
                           Visibility="Collapsed"
-                          Padding="0">
+                          Padding="0"
+                          AllowDrop="True"
+                          DragOver="OnAgentGridDragOver"
+                          Drop="OnAgentGridDrop">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>

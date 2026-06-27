@@ -132,6 +132,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? InsertNewTabOutputRequested;
         public event RoutedEventHandler? AddAttachmentRequested;
         public event EventHandler<AgentAttachmentItem>? RemoveAttachmentRequested;
+        public event EventHandler<IEnumerable<string>>? FilesDropped;
         public event RoutedEventHandler? AgentPresetAddRequested;
         public event EventHandler<string>? AgentPresetToggled;
         public event EventHandler<string>? AgentPresetEdited;
@@ -1083,6 +1084,54 @@ namespace TxtAIEditor.Controls
         private void OnAddAttachmentClick(object sender, RoutedEventArgs e)
         {
             AddAttachmentRequested?.Invoke(sender, e);
+        }
+
+        private void OnAgentGridDragOver(object sender, DragEventArgs e)
+        {
+            if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+            {
+                e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
+                e.DragUIOverride.Caption = "파일 첨부";
+                e.DragUIOverride.IsCaptionVisible = true;
+                e.DragUIOverride.IsContentVisible = true;
+                e.Handled = true;
+            }
+            else
+            {
+                e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.None;
+                e.Handled = true;
+            }
+        }
+
+        private async void OnAgentGridDrop(object sender, DragEventArgs e)
+        {
+            if (!e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+            {
+                return;
+            }
+
+            e.Handled = true;
+            try
+            {
+                var items = await e.DataView.GetStorageItemsAsync();
+                var filePaths = new List<string>();
+                foreach (var item in items)
+                {
+                    if (!string.IsNullOrWhiteSpace(item.Path) && System.IO.File.Exists(item.Path))
+                    {
+                        filePaths.Add(item.Path);
+                    }
+                }
+
+                if (filePaths.Count > 0)
+                {
+                    FilesDropped?.Invoke(this, filePaths);
+                }
+            }
+            catch
+            {
+                // 드롭 처리 중 오류 무시
+            }
         }
 
         private void OnAgentAddPresetClickInPanel(object sender, RoutedEventArgs e)

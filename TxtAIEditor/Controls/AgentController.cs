@@ -529,6 +529,7 @@ namespace TxtAIEditor.Controls
             _agentPane.InsertOutputRequested += async (_, _) => await _outputInsertController.InsertOutputAsync();
             _agentPane.InsertNewTabOutputRequested += async (_, _) => await _outputInsertController.InsertNewTabOutputAsync();
             _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
+            _agentPane.FilesDropped += async (_, filePaths) => await _attachmentController.AddDroppedFilesAsync(filePaths);
             _agentPane.RemoveAttachmentRequested += (_, attachment) => _attachmentController.RemoveAttachment(attachment.Id);
             _agentPane.AgentPresetAddRequested += async (_, _) => await _presetController.AddPresetAsync();
             _agentPane.AgentPresetToggled += (_, presetName) => _presetController.TogglePreset(presetName);

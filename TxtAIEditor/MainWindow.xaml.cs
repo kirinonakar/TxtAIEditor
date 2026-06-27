@@ -573,6 +573,7 @@ namespace TxtAIEditor
             _fileOpenDropController = new FileOpenDropController(
                 DragOverlay,
                 LeftSidebarTabView,
+                PreviewGrid,
                 InitializePickerWindow,
                 LoadFileIntoTabAsync,
                 (folderPath, revealInLeftPanel) => NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel),

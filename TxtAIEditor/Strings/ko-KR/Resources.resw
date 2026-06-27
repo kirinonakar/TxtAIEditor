@@ -2886,4 +2886,13 @@
   <data name="CopyFolderSelfParent" xml:space="preserve">
     <value>폴더를 자기 자신 또는 하위 폴더에 복사할 수 없습니다.</value>
   </data>
+  <data name="DragDropOpenFileCaption" xml:space="preserve">
+    <value>파일 열기</value>
+  </data>
+  <data name="DragDropErrorTitle" xml:space="preserve">
+    <value>드래그 앤 드롭 오류</value>
+  </data>
+  <data name="AgentAttachFileCaption" xml:space="preserve">
+    <value>파일 첨부</value>
+  </data>
 </root>

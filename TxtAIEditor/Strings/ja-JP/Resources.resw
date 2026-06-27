@@ -2887,4 +2887,13 @@
   <data name="CopyFolderSelfParent" xml:space="preserve">
     <value>フォルダを自分自身またはそのサブフォルダにコピーすることはできません。</value>
   </data>
+  <data name="DragDropOpenFileCaption" xml:space="preserve">
+    <value>ファイルを開く</value>
+  </data>
+  <data name="DragDropErrorTitle" xml:space="preserve">
+    <value>ドラッグ＆ドロップエラー</value>
+  </data>
+  <data name="AgentAttachFileCaption" xml:space="preserve">
+    <value>ファイル添付</value>
+  </data>
 </root>
