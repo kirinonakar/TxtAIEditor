@@ -295,6 +295,7 @@ namespace TxtAIEditor
             _compareTabController = new CompareTabController(
                 _fileService,
                 _settingsService,
+                LoadFileIntoTabAsync,
                 _viewModel,
                 EditorWorkspace,
                 EditorTabView,

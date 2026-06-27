@@ -91,7 +91,8 @@
 
         .panel-header {
             background: var(--header-bg);
-            padding: 6px 12px;
+            padding: 4px 8px;
+            display: flex;
             font-size: 12px;
             color: var(--gutter-fg);
             border-bottom: 1px solid var(--border);
@@ -99,6 +100,29 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .panel-header-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 24px;
+        }
+
+        .open-file-btn {
+            background: none;
+            border: none;
+            color: var(--gutter-fg);
+            cursor: pointer;
+            padding: 2px 6px;
+            margin: 0;
+            font-size: 16px;
+            line-height: 1;
+            border-radius: 4px;
+        }
+        .open-file-btn:hover {
+            background: rgba(128, 128, 128, 0.2);
         }
 
         /* Wrapper that contains both the scrollable content and the scrollmap */
@@ -278,7 +302,10 @@
             </div>
             <!-- Right Panel (Modified) -->
             <div class="diff-column">
-                <div class="panel-header" id="right-header">비교 대상 파일 (Modified)</div>
+                <div class="panel-header" id="right-header">
+                    <span class="panel-header-text" id="right-header-text">비교 대상 파일 (Modified)</span>
+                    <button class="open-file-btn" id="right-open-btn" title="파일 열기" onclick="openRightFile()">📂</button>
+                </div>
                 <div class="panel-body">
                     <div class="view-wrapper" id="right-wrapper">
                         <div class="scroll-spacer" id="right-spacer"></div>
@@ -314,6 +341,15 @@
         // Prevent dragging duplicate windows
         window.addEventListener('dragover', e => e.preventDefault());
         window.addEventListener('drop',     e => e.preventDefault());
+
+        // ── Right panel file open ────────────────────────────────────────
+        let rightFilePath = '';
+
+        function openRightFile() {
+            if (rightFilePath) {
+                post({ type: 'openFile', path: rightFilePath });
+            }
+        }
 
         // ── Keyboard shortcut forwarding ──────────────────────────────────
         function post(msg) {
@@ -638,7 +674,17 @@
             const defaultLabelB = data.modifiedFileLabel || '비교 대상 파일 (Modified)';
 
             document.getElementById('left-header').textContent  = `${prefixA}${data.titleA || defaultLabelA}`;
-            document.getElementById('right-header').textContent = `${prefixB}${data.titleB || defaultLabelB}`;
+            const rightHeaderText = document.getElementById('right-header-text');
+            if (rightHeaderText) {
+                rightHeaderText.textContent = `${prefixB}${data.titleB || defaultLabelB}`;
+            }
+
+            // Store pathB and tooltip for open file button
+            rightFilePath = data.pathB || '';
+            const openBtn = document.getElementById('right-open-btn');
+            if (openBtn && data.openFileTooltip) {
+                openBtn.title = data.openFileTooltip;
+            }
 
             // Set spacer height
             const totalHeight = diffA.length * rowHeight;

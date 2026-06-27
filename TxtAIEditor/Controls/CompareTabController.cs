@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -25,10 +26,12 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Func<CoreWebView2WebMessageReceivedEventArgs, string> _normalizeWebMessageJson;
         private readonly Action<string> _shortcutHandler;
+        private readonly Func<string, Task> _openFileAsync;
 
         public CompareTabController(
             IFileService fileService,
             ISettingsService settingsService,
+            Func<string, Task> openFileAsync,
             MainWindowViewModel viewModel,
             EditorWorkspacePane editorWorkspace,
             TabView editorTabView,
@@ -39,6 +42,7 @@ namespace TxtAIEditor.Controls
         {
             _fileService = fileService;
             _settingsService = settingsService;
+            _openFileAsync = openFileAsync;
             _viewModel = viewModel;
             _editorWorkspace = editorWorkspace;
             _editorTabView = editorTabView;
@@ -130,7 +134,9 @@ namespace TxtAIEditor.Controls
                             modifiedFileLabel = _getString("DiffModifiedFileLabel", "비교 대상 파일 (Modified)"),
                             originalPrefix = _getString("DiffOriginalPrefix", "원본: "),
                             modifiedPrefix = _getString("DiffModifiedPrefix", "수정본: "),
-                            diffStatsFormat = _getString("DiffStatsFormat", "변경사항: 추가 {0}줄, 삭제 {1}줄")
+                            diffStatsFormat = _getString("DiffStatsFormat", "변경사항: 추가 {0}줄, 삭제 {1}줄"),
+                            pathB = pathB,
+                            openFileTooltip = _getString("DiffOpenFileTooltip", "파일 열기")
                         };
                         string json = JsonSerializer.Serialize(msg);
                         existingCoreWebView.PostWebMessageAsJson(json);
@@ -203,7 +209,9 @@ namespace TxtAIEditor.Controls
                     modifiedFileLabel = _getString("DiffModifiedFileLabel", "비교 대상 파일 (Modified)"),
                     originalPrefix = _getString("DiffOriginalPrefix", "원본: "),
                     modifiedPrefix = _getString("DiffModifiedPrefix", "수정본: "),
-                    diffStatsFormat = _getString("DiffStatsFormat", "변경사항: 추가 {0}줄, 삭제 {1}줄")
+                    diffStatsFormat = _getString("DiffStatsFormat", "변경사항: 추가 {0}줄, 삭제 {1}줄"),
+                    pathB = pathB,
+                    openFileTooltip = _getString("DiffOpenFileTooltip", "파일 열기")
                 };
                 string json = JsonSerializer.Serialize(msg);
                 diffWebView.CoreWebView2.PostWebMessageAsJson(json);
@@ -215,19 +223,29 @@ namespace TxtAIEditor.Controls
             _editorTabView.SelectedItem = tabItem;
         }
 
-        private void OnDiffWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+        private async void OnDiffWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
         {
             try
             {
                 string json = _normalizeWebMessageJson(args);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
-                if (root.TryGetProperty("type", out var typeProp) &&
-                    string.Equals(typeProp.GetString(), "shortcut", StringComparison.Ordinal) &&
-                    root.TryGetProperty("name", out var nameProp))
+                if (root.TryGetProperty("type", out var typeProp))
                 {
-                    string name = nameProp.GetString() ?? string.Empty;
-                    sender.DispatcherQueue.TryEnqueue(() => _shortcutHandler(name));
+                    string type = typeProp.GetString() ?? string.Empty;
+                    if (string.Equals(type, "shortcut", StringComparison.Ordinal) &&
+                        root.TryGetProperty("name", out var nameProp))
+                    {
+                        string name = nameProp.GetString() ?? string.Empty;
+                        sender.DispatcherQueue.TryEnqueue(() => _shortcutHandler(name));
+                    }
+                    else if (string.Equals(type, "openFile", StringComparison.Ordinal) &&
+                             root.TryGetProperty("path", out var pathProp))
+                    {
+                        string filePath = pathProp.GetString() ?? string.Empty;
+                        if (!string.IsNullOrEmpty(filePath))
+                            await _openFileAsync(filePath);
+                    }
                 }
             }
             catch { }
@@ -293,7 +311,9 @@ namespace TxtAIEditor.Controls
                         modifiedFileLabel = _getString("DiffModifiedFileLabel", "비교 대상 파일 (Modified)"),
                         originalPrefix = _getString("DiffOriginalPrefix", "원본: "),
                         modifiedPrefix = _getString("DiffModifiedPrefix", "수정본: "),
-                        diffStatsFormat = _getString("DiffStatsFormat", "변경사항: 추가 {0}줄, 삭제 {1}줄")
+                        diffStatsFormat = _getString("DiffStatsFormat", "변경사항: 추가 {0}줄, 삭제 {1}줄"),
+                        pathB = pathB,
+                        openFileTooltip = _getString("DiffOpenFileTooltip", "파일 열기")
                     };
                     string json = JsonSerializer.Serialize(msg);
                     coreWebView.PostWebMessageAsJson(json);

@@ -1511,6 +1511,9 @@
   <data name="DiffStatsFormat" xml:space="preserve">
     <value>변경사항: 추가 {0}줄, 삭제 {1}줄</value>
   </data>
+  <data name="DiffOpenFileTooltip" xml:space="preserve">
+    <value>파일 열기</value>
+  </data>
   <data name="GitPreviousCommitFormat" xml:space="preserve">
     <value>{0} (이전 커밋)</value>
   </data>

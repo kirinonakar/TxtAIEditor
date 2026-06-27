@@ -1511,6 +1511,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="DiffStatsFormat" xml:space="preserve">
     <value>Changes: {0} additions, {1} deletions</value>
   </data>
+  <data name="DiffOpenFileTooltip" xml:space="preserve">
+    <value>Open file</value>
+  </data>
   <data name="GitPreviousCommitFormat" xml:space="preserve">
     <value>{0} (Previous Commit)</value>
   </data>
