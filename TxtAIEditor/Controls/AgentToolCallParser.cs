@@ -22,8 +22,10 @@ namespace TxtAIEditor.Controls
             }
 
             string text = response.Trim();
-            return text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
+            return text.IndexOf("<tool_call", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("</invoke>", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 LooksLikeBareToolCallEnvelope(text) ||
                 TryExtractSupportedCommandFence(text, out _);
         }
@@ -37,6 +39,30 @@ namespace TxtAIEditor.Controls
             }
 
             string text = response.Trim();
+
+            // Check XML/DSML format first
+            int xmlOpenIndex = FindToolCallIndex(text);
+            int xmlCloseIndex = FindLastToolCallCloseIndex(text);
+            
+            if (xmlOpenIndex >= 0 || xmlCloseIndex >= 0)
+            {
+                if (xmlOpenIndex < 0 || xmlCloseIndex < 0 || xmlCloseIndex < xmlOpenIndex)
+                {
+                    detail = "The tool_call tag must include one matching <tool_call ...>...</invoke> (or </tool_call>) pair.";
+                    return true;
+                }
+                
+                int closeTagLength = GetCloseTagLengthAt(text, xmlCloseIndex);
+                int afterClose = xmlCloseIndex + closeTagLength;
+                if (afterClose < text.Length && !string.IsNullOrWhiteSpace(text.Substring(afterClose)))
+                {
+                    detail = "The tool_call must be the final non-empty content; put any explanation before it, not after it.";
+                    return true;
+                }
+                
+                return false;
+            }
+
             int openIndex = text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
             int closeIndex = text.LastIndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase);
             if (openIndex < 0 && closeIndex < 0)
@@ -53,8 +79,8 @@ namespace TxtAIEditor.Controls
                 return true;
             }
 
-            int afterClose = closeIndex + ToolCallCloseTag.Length;
-            if (!string.IsNullOrWhiteSpace(text.Substring(afterClose)))
+            int afterCloseStd = closeIndex + ToolCallCloseTag.Length;
+            if (!string.IsNullOrWhiteSpace(text.Substring(afterCloseStd)))
             {
                 detail = "The tool_call must be the final non-empty content; put any explanation before it, not after it.";
                 return true;
@@ -94,6 +120,13 @@ namespace TxtAIEditor.Controls
             }
 
             string text = response.Trim();
+
+            // Try XML/DSML tool calls first
+            if (text.IndexOf("<tool_call", StringComparison.OrdinalIgnoreCase) >= 0 && TryParseXmlToolCalls(text, toolCalls))
+            {
+                return toolCalls.Count > 0;
+            }
+
             bool hasToolCallTagSyntax =
                 text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0;
@@ -1162,6 +1195,136 @@ namespace TxtAIEditor.Controls
             }
 
             return false;
+        }
+
+        public static int FindToolCallIndex(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return -1;
+            int idx = 0;
+            while (true)
+            {
+                idx = text.IndexOf("<tool_call", idx, StringComparison.OrdinalIgnoreCase);
+                if (idx < 0) return -1;
+                
+                int nextCharIdx = idx + "<tool_call".Length;
+                if (nextCharIdx >= text.Length)
+                {
+                    return idx; // streaming boundary
+                }
+                
+                char nextChar = text[nextCharIdx];
+                if (nextChar == '>' || char.IsWhiteSpace(nextChar))
+                {
+                    return idx;
+                }
+                idx += 10;
+            }
+        }
+
+        public static int FindLastToolCallCloseIndex(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return -1;
+            string[] closeTags = { "</tool_call>", "</invoke>", "</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>" };
+            int lastIdx = -1;
+            foreach (var tag in closeTags)
+            {
+                int idx = text.LastIndexOf(tag, StringComparison.OrdinalIgnoreCase);
+                if (idx > lastIdx)
+                {
+                    lastIdx = idx;
+                }
+            }
+            return lastIdx;
+        }
+
+        private static int GetCloseTagLengthAt(string text, int index)
+        {
+            string[] closeTags = { "</tool_call>", "</invoke>", "</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>" };
+            foreach (var tag in closeTags)
+            {
+                if (index + tag.Length <= text.Length &&
+                    text.Substring(index, tag.Length).Equals(tag, StringComparison.OrdinalIgnoreCase))
+                {
+                    return tag.Length;
+                }
+            }
+            return 0;
+        }
+
+        private static bool TryParseXmlToolCalls(string text, List<ToolCallInfo> toolCalls)
+        {
+            var toolCallRegex = new Regex("<tool_call\\s+name=[\"']?(?<name>[a-zA-Z0-9_\\-]+)[\"']?\\s*>(?<body>.*?)(?:</invoke>|</tool_call>|</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>|\\z)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            
+            var matches = toolCallRegex.Matches(text);
+            if (matches.Count == 0)
+            {
+                return false;
+            }
+
+            bool anyParsed = false;
+            foreach (Match match in matches)
+            {
+                string toolName = match.Groups["name"].Value;
+                string body = match.Groups["body"].Value;
+
+                var paramRegex = new Regex("<parameter\\s+name=[\"']?(?<paramName>[a-zA-Z0-9_\\-]+)[\"']?[^>]*>(?<paramValue>.*?)</parameter>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                
+                var paramMatches = paramRegex.Matches(body);
+                var argumentValues = new Dictionary<string, object>();
+                
+                foreach (Match paramMatch in paramMatches)
+                {
+                    string paramName = paramMatch.Groups["paramName"].Value;
+                    string paramValueRaw = paramMatch.Groups["paramValue"].Value;
+                    
+                    string paramValue = System.Net.WebUtility.HtmlDecode(paramValueRaw);
+                    object parsedValue = paramValue;
+                    
+                    bool isStringForce = paramMatch.Value.Contains("string=\"true\"", StringComparison.OrdinalIgnoreCase) ||
+                                         paramMatch.Value.Contains("type=\"string\"", StringComparison.OrdinalIgnoreCase) ||
+                                         paramMatch.Value.Contains("type='string'", StringComparison.OrdinalIgnoreCase);
+                                         
+                    if (!isStringForce)
+                    {
+                        if (string.Equals(paramValue, "true", StringComparison.OrdinalIgnoreCase))
+                        {
+                            parsedValue = true;
+                        }
+                        else if (string.Equals(paramValue, "false", StringComparison.OrdinalIgnoreCase))
+                        {
+                            parsedValue = false;
+                        }
+                        else if (int.TryParse(paramValue, out int intVal))
+                        {
+                            parsedValue = intVal;
+                        }
+                        else if (double.TryParse(paramValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double doubleVal))
+                        {
+                            parsedValue = doubleVal;
+                        }
+                    }
+                    
+                    argumentValues[paramName] = parsedValue;
+                }
+
+                try
+                {
+                    string jsonStr = JsonSerializer.Serialize(argumentValues);
+                    using var doc = JsonDocument.Parse(jsonStr);
+                    toolCalls.Add(new ToolCallInfo
+                    {
+                        ToolName = toolName,
+                        Arguments = doc.RootElement.Clone()
+                    });
+                    anyParsed = true;
+                }
+                catch
+                {
+                    // Ignore
+                }
+            }
+
+            return anyParsed;
         }
 
         private static bool TryExtractTrailingMarkdownCodeFencePayload(string text, out string payload)

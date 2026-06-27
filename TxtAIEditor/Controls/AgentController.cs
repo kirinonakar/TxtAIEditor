@@ -816,7 +816,7 @@ namespace TxtAIEditor.Controls
                     int endLength = cleanResponse.Length;
                     if (!runContext.LlmSettings.LlmAgentVerbose)
                     {
-                        int toolCallIndex = cleanResponse.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                        int toolCallIndex = AgentToolCallParser.FindToolCallIndex(cleanResponse);
                         if (toolCallIndex >= 0)
                         {
                             endLength = toolCallIndex;

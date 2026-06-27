@@ -122,7 +122,7 @@ namespace TxtAIEditor.Controls
                             string[] tagsToHold = {
                                 "<think>", "<thought>", "<|channel>thought",
                                 "</think>", "</thought>", "<channel|>",
-                                "<tool_call>"
+                                "<tool_call"
                             };
                             foreach (var tag in tagsToHold)
                             {
@@ -319,8 +319,8 @@ namespace TxtAIEditor.Controls
                         {
                             if (!runContext.LlmSettings.LlmAgentVerbose)
                             {
-                                int idx = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
-                                int lastCloseIdx = streamedText.LastIndexOf("</tool_call>", StringComparison.OrdinalIgnoreCase);
+                                int idx = AgentToolCallParser.FindToolCallIndex(streamedText);
+                                int lastCloseIdx = AgentToolCallParser.FindLastToolCallCloseIndex(streamedText);
                                 bool toolCallClosed = lastCloseIdx >= 0 && lastCloseIdx > idx;
 
                                 string label;
@@ -356,7 +356,7 @@ namespace TxtAIEditor.Controls
                             return;
                         }
 
-                        int toolCallIndex = streamedText.IndexOf("<tool_call>", StringComparison.OrdinalIgnoreCase);
+                        int toolCallIndex = AgentToolCallParser.FindToolCallIndex(streamedText);
                         if (toolCallIndex >= 0)
                         {
                             hasToolCall = true;
@@ -397,7 +397,7 @@ namespace TxtAIEditor.Controls
                         else
                         {
                             int holdBack = 0;
-                            string tag = "<tool_call>";
+                            string tag = "<tool_call";
                             for (int i = 1; i < tag.Length; i++)
                             {
                                 string sub = tag.Substring(0, i);
