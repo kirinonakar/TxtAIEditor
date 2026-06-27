@@ -16,7 +16,8 @@ namespace TxtAIEditor.Core.Services
                     return;
                 }
 
-                bool isDark = string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase);
+                bool isDark = string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(theme, "CatppuccinMacchiato", StringComparison.OrdinalIgnoreCase);
                 coreWebView.Profile.PreferredColorScheme = isDark
                     ? CoreWebView2PreferredColorScheme.Dark
                     : CoreWebView2PreferredColorScheme.Light;
@@ -30,6 +31,11 @@ namespace TxtAIEditor.Core.Services
                 TryParseHexColor(settings.CustomBackgroundColor, out var parsedBackground))
             {
                 return parsedBackground;
+            }
+
+            if (string.Equals(settings.Theme, "CatppuccinMacchiato", StringComparison.OrdinalIgnoreCase))
+            {
+                return Windows.UI.Color.FromArgb(255, 36, 39, 58);
             }
 
             bool isLight = string.Equals(settings.Theme, "Light", StringComparison.OrdinalIgnoreCase);

@@ -183,6 +183,21 @@ namespace TxtAIEditor
         {
             Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
 
+            // If a custom theme is active, resolve resource from Application.Current.Resources
+            if (Application.Current.Resources.TryGetValue("ActiveTheme", out var activeThemeObj) &&
+                activeThemeObj is string activeTheme &&
+                activeTheme == "CatppuccinMacchiato")
+            {
+                if (Application.Current.Resources.TryGetValue(resourceKey, out object resource) && resource is Brush brush)
+                {
+                    if (OpaqueBackground)
+                        Background = brush;
+                    _visualLine.Background = brush;
+                    return;
+                }
+            }
+
+            // Otherwise, fall back to standard theme dictionaries based on ActualTheme
             string themeKey = this.ActualTheme == ElementTheme.Dark ? "Dark" : "Light";
             if (Application.Current.Resources.ThemeDictionaries.TryGetValue(themeKey, out var dictObj) &&
                 dictObj is ResourceDictionary themeDict &&
@@ -195,13 +210,7 @@ namespace TxtAIEditor
                 return;
             }
 
-            if (Application.Current.Resources.TryGetValue(resourceKey, out object resource) && resource is Brush brush)
-            {
-                if (OpaqueBackground)
-                    Background = brush;
-                _visualLine.Background = brush;
-            }
-            else if (this.Resources.TryGetValue(resourceKey, out object localResource) && localResource is Brush localBrush)
+            if (this.Resources.TryGetValue(resourceKey, out object localResource) && localResource is Brush localBrush)
             {
                 if (OpaqueBackground)
                     Background = localBrush;

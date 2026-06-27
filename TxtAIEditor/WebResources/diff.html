@@ -724,16 +724,16 @@
         resizeObs.observe(leftWrapper);
 
         function applyThemeSettings(theme, uiFontFamily, editorFontFamily) {
-            const bg    = theme === 'Light' ? '#ffffff' : '#1e1e1e';
-            const fg    = theme === 'Light' ? '#1a1a1a' : '#d4d4d4';
-            const empty = theme === 'Light' ? '#f9f9f9' : '#171717';
+            const bg    = theme === 'CatppuccinMacchiato' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e');
+            const fg    = theme === 'CatppuccinMacchiato' ? '#cad3f5' : (theme === 'Light' ? '#1a1a1a' : '#d4d4d4');
+            const empty = theme === 'CatppuccinMacchiato' ? '#181926' : (theme === 'Light' ? '#f9f9f9' : '#171717');
             
             document.documentElement.style.setProperty('--bg',         bg);
             document.documentElement.style.setProperty('--fg',         fg);
             document.documentElement.style.setProperty('--empty-bg',   empty);
-            document.documentElement.style.setProperty('--header-bg',  theme === 'Light' ? '#f3f3f3' : '#252526');
-            document.documentElement.style.setProperty('--gutter-bg',  theme === 'Light' ? '#f3f3f3' : '#1e1e1e');
-            document.documentElement.style.setProperty('--border',     theme === 'Light' ? '#e1e4e8' : '#3e3e3e');
+            document.documentElement.style.setProperty('--header-bg',  theme === 'CatppuccinMacchiato' ? '#1e2030' : (theme === 'Light' ? '#f3f3f3' : '#252526'));
+            document.documentElement.style.setProperty('--gutter-bg',  theme === 'CatppuccinMacchiato' ? '#1e2030' : (theme === 'Light' ? '#f3f3f3' : '#1e1e1e'));
+            document.documentElement.style.setProperty('--border',     theme === 'CatppuccinMacchiato' ? '#36394f' : (theme === 'Light' ? '#e1e4e8' : '#3e3e3e'));
             
             if (uiFontFamily) {
                 document.documentElement.style.setProperty('--ui-font',    uiFontFamily);
@@ -742,8 +742,8 @@
                 document.documentElement.style.setProperty('--font-family', editorFontFamily);
             }
 
-            const addedText   = theme === 'Light' ? '#22863a' : '#3fb950';
-            const removedText = theme === 'Light' ? '#cb2431' : '#f85149';
+            const addedText   = theme === 'CatppuccinMacchiato' ? '#a6da95' : (theme === 'Light' ? '#22863a' : '#3fb950');
+            const removedText = theme === 'CatppuccinMacchiato' ? '#ed8796' : (theme === 'Light' ? '#cb2431' : '#f85149');
             document.documentElement.style.setProperty('--added-text',   addedText);
             document.documentElement.style.setProperty('--removed-text', removedText);
         }

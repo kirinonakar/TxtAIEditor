@@ -21,14 +21,205 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            rootElement.RequestedTheme = settings.Theme == "Light"
-                ? ElementTheme.Light
-                : ElementTheme.Dark;
+            if (settings.Theme == "CatppuccinMacchiato")
+            {
+                ApplyCatppuccinTheme();
+                rootElement.RequestedTheme = ElementTheme.Light;
+                rootElement.RequestedTheme = ElementTheme.Dark;
+            }
+            else
+            {
+                ClearCustomThemeOverrides();
+                if (settings.Theme == "Light")
+                {
+                    rootElement.RequestedTheme = ElementTheme.Dark;
+                    rootElement.RequestedTheme = ElementTheme.Light;
+                }
+                else
+                {
+                    rootElement.RequestedTheme = ElementTheme.Light;
+                    rootElement.RequestedTheme = ElementTheme.Dark;
+                }
+            }
 
             ApplyTitleBarTheme(settings, appWindow);
             ApplyMarkdownToolbarTheme(settings, applyMarkdownToolbarBackground);
             ApplyShellFont(settings, rootElement);
             ApplyRootBackground(settings, rootElement);
+        }
+
+        private static void ApplyCatppuccinTheme()
+        {
+            var resources = Application.Current.Resources;
+            resources["ActiveTheme"] = "CatppuccinMacchiato";
+
+            // Catppuccin Macchiato Palette
+            var baseColor = Windows.UI.Color.FromArgb(255, 36, 39, 58); // #24273a
+            var mantleColor = Windows.UI.Color.FromArgb(255, 30, 32, 48); // #1e2030
+            var crustColor = Windows.UI.Color.FromArgb(255, 24, 25, 38); // #181926
+            var surface0Color = Windows.UI.Color.FromArgb(255, 54, 57, 79); // #36394f
+            var surface1Color = Windows.UI.Color.FromArgb(255, 73, 77, 100); // #494d64
+            var surface2Color = Windows.UI.Color.FromArgb(255, 91, 96, 120); // #5b6078
+            var textColor = Windows.UI.Color.FromArgb(255, 202, 211, 245); // #cad3f5
+            var subtext0Color = Windows.UI.Color.FromArgb(255, 165, 173, 203); // #a5adcb
+            var subtext1Color = Windows.UI.Color.FromArgb(255, 184, 192, 224); // #b8c0e0
+            var mauveColor = Windows.UI.Color.FromArgb(255, 198, 160, 246); // #c6a0f6
+            var redColor = Windows.UI.Color.FromArgb(255, 237, 135, 150); // #ed8796
+            var greenColor = Windows.UI.Color.FromArgb(255, 166, 218, 149); // #a6da95
+
+            void SetBrush(string key, Windows.UI.Color color)
+            {
+                resources[key] = new Microsoft.UI.Xaml.Media.SolidColorBrush(color);
+            }
+
+            // Custom application brushes
+            SetBrush("TitleBarBackgroundBrush", mantleColor);
+            SetBrush("TitleBarForegroundBrush", textColor);
+            SetBrush("ToolbarBackgroundBrush", baseColor);
+            SetBrush("ToolbarBorderBrush", surface0Color);
+            SetBrush("SidebarBackgroundBrush", mantleColor);
+            SetBrush("ActivityBarBackgroundBrush", crustColor);
+            SetBrush("SidebarBorderBrush", surface0Color);
+            SetBrush("StatusBarBackgroundBrush", mantleColor);
+            SetBrush("StatusBarForegroundBrush", textColor);
+            SetBrush("SplitterBackgroundBrush", surface1Color);
+            SetBrush("SplitterHoverBackgroundBrush", mauveColor);
+            SetBrush("EditorSurfaceBackgroundBrush", baseColor);
+            SetBrush("TabBarBackgroundBrush", mantleColor);
+
+            // TabView & TabViewItem overrides
+            SetBrush("TabViewTabStripBackground", mantleColor);
+            SetBrush("TabViewItemHeaderBackground", mantleColor);
+            SetBrush("TabViewItemHeaderForeground", subtext0Color);
+            SetBrush("TabViewItemHeaderBackgroundPointerOver", surface0Color);
+            SetBrush("TabViewItemHeaderForegroundPointerOver", textColor);
+            SetBrush("TabViewItemHeaderBackgroundPressed", surface1Color);
+            SetBrush("TabViewItemHeaderForegroundPressed", textColor);
+            SetBrush("TabViewItemHeaderBackgroundSelected", baseColor);
+            SetBrush("TabViewItemHeaderForegroundSelected", mauveColor);
+            SetBrush("TabViewItemHeaderBackgroundSelectedPointerOver", surface0Color);
+            SetBrush("TabViewItemHeaderBackgroundSelectedPressed", surface1Color);
+            SetBrush("TabViewItemHeaderBorderBrush", Microsoft.UI.Colors.Transparent);
+            SetBrush("TabViewBorderBrush", surface0Color);
+
+            // Popups, Menus & Dialogs overrides
+            SetBrush("ContentDialogBackground", mantleColor);
+            SetBrush("ContentDialogBorderBrush", surface0Color);
+            SetBrush("ContentDialogForeground", textColor);
+
+            SetBrush("FlyoutPresenterBackground", mantleColor);
+            SetBrush("FlyoutPresenterBorderBrush", surface0Color);
+            SetBrush("MenuFlyoutPresenterBackground", mantleColor);
+            SetBrush("MenuFlyoutPresenterBorderBrush", surface0Color);
+            SetBrush("MenuFlyoutItemForeground", textColor);
+            SetBrush("MenuFlyoutItemForegroundPointerOver", mauveColor);
+            SetBrush("MenuFlyoutItemForegroundPressed", mauveColor);
+            SetBrush("MenuFlyoutItemBackgroundPointerOver", surface0Color);
+            SetBrush("MenuFlyoutItemBackgroundPressed", surface1Color);
+            SetBrush("MenuFlyoutItemKeyboardAcceleratorTextForeground", subtext0Color);
+
+            // Lists & NavigationView
+            SetBrush("ListViewItemBackgroundPointerOver", surface0Color);
+            SetBrush("ListViewItemBackgroundSelected", surface1Color);
+            SetBrush("ListViewItemBackgroundSelectedPointerOver", surface2Color);
+            SetBrush("ListViewItemForegroundPointerOver", textColor);
+            SetBrush("ListViewItemForegroundSelected", mauveColor);
+
+            SetBrush("NavigationViewContentBackground", baseColor);
+            SetBrush("NavigationViewDefaultPaneBackground", mantleColor);
+            SetBrush("NavigationViewTopPaneBackground", mantleColor);
+
+            // Interactive Controls inside Dialogs/Settings
+            SetBrush("TextBoxBackground", baseColor);
+            SetBrush("TextBoxBackgroundPointerOver", surface0Color);
+            SetBrush("TextBoxBackgroundFocused", baseColor);
+            SetBrush("TextBoxBorderBrush", surface1Color);
+            SetBrush("TextBoxBorderBrushFocused", mauveColor);
+            SetBrush("TextBoxForeground", textColor);
+            SetBrush("TextBoxForegroundFocused", textColor);
+
+            SetBrush("ComboBoxBackground", baseColor);
+            SetBrush("ComboBoxBackgroundPointerOver", surface0Color);
+            SetBrush("ComboBoxBackgroundPressed", surface1Color);
+            SetBrush("ComboBoxBorderBrush", surface1Color);
+            SetBrush("ComboBoxBorderBrushFocused", mauveColor);
+            SetBrush("ComboBoxForeground", textColor);
+            SetBrush("ComboBoxForegroundPointerOver", textColor);
+
+            SetBrush("ButtonBackground", surface0Color);
+            SetBrush("ButtonBackgroundPointerOver", surface1Color);
+            SetBrush("ButtonBackgroundPressed", surface2Color);
+            SetBrush("ButtonForeground", textColor);
+            SetBrush("ButtonForegroundPointerOver", textColor);
+            SetBrush("ButtonForegroundPressed", textColor);
+            SetBrush("ButtonBorderBrush", surface1Color);
+            SetBrush("ButtonBorderBrushPointerOver", surface2Color);
+
+            SetBrush("CheckBoxForeground", textColor);
+            SetBrush("CheckBoxForegroundPointerOver", textColor);
+            SetBrush("CheckBoxForegroundPressed", textColor);
+
+            SetBrush("SliderTrackFill", mauveColor);
+            SetBrush("SliderThumbBackground", mauveColor);
+
+            // System Control chrome backgrounds
+            SetBrush("SystemControlBackgroundChromeMediumLowBrush", mantleColor);
+            SetBrush("SystemControlBackgroundChromeMediumBrush", baseColor);
+            SetBrush("SystemControlBackgroundAltHighBrush", baseColor);
+            SetBrush("SystemControlBackgroundBaseLowBrush", surface0Color);
+            SetBrush("SystemControlBackgroundBaseMediumBrush", subtext0Color);
+            SetBrush("SystemControlBackgroundBaseMediumLowBrush", surface1Color);
+            SetBrush("SystemControlBackgroundListLowBrush", surface0Color);
+            SetBrush("SystemControlBackgroundListMediumBrush", surface1Color);
+            SetBrush("SystemControlForegroundBaseHighBrush", textColor);
+            SetBrush("SystemControlForegroundBaseMediumBrush", subtext0Color);
+
+            // WinUI Accent Color Overrides
+            SetBrush("SystemAccentColor", mauveColor);
+            SetBrush("SystemControlHighlightAccentBrush", mauveColor);
+            SetBrush("SystemControlForegroundAccentBrush", mauveColor);
+            SetBrush("SystemControlHighlightListAccentLowBrush", surface0Color);
+            SetBrush("SystemControlHighlightListAccentMediumBrush", surface1Color);
+        }
+
+        private static void ClearCustomThemeOverrides()
+        {
+            var resources = Application.Current.Resources;
+            var keysToRemove = new[]
+            {
+                "ActiveTheme",
+                "TitleBarBackgroundBrush", "TitleBarForegroundBrush", "ToolbarBackgroundBrush", "ToolbarBorderBrush",
+                "SidebarBackgroundBrush", "ActivityBarBackgroundBrush", "SidebarBorderBrush", "StatusBarBackgroundBrush",
+                "StatusBarForegroundBrush", "SplitterBackgroundBrush", "SplitterHoverBackgroundBrush", "EditorSurfaceBackgroundBrush",
+                "TabBarBackgroundBrush", "TabViewTabStripBackground", "TabViewItemHeaderBackground", "TabViewItemHeaderForeground",
+                "TabViewItemHeaderBackgroundPointerOver", "TabViewItemHeaderForegroundPointerOver", "TabViewItemHeaderBackgroundPressed",
+                "TabViewItemHeaderForegroundPressed", "TabViewItemHeaderBackgroundSelected", "TabViewItemHeaderForegroundSelected",
+                "TabViewItemHeaderBackgroundSelectedPointerOver", "TabViewItemHeaderBackgroundSelectedPressed",
+                "TabViewItemHeaderBorderBrush", "TabViewBorderBrush",
+                "ContentDialogBackground", "ContentDialogBorderBrush", "ContentDialogForeground",
+                "FlyoutPresenterBackground", "FlyoutPresenterBorderBrush", "MenuFlyoutPresenterBackground", "MenuFlyoutPresenterBorderBrush",
+                "MenuFlyoutItemForeground", "MenuFlyoutItemForegroundPointerOver", "MenuFlyoutItemForegroundPressed",
+                "MenuFlyoutItemBackgroundPointerOver", "MenuFlyoutItemBackgroundPressed", "MenuFlyoutItemKeyboardAcceleratorTextForeground",
+                "ListViewItemBackgroundPointerOver", "ListViewItemBackgroundSelected", "ListViewItemBackgroundSelectedPointerOver",
+                "ListViewItemForegroundPointerOver", "ListViewItemForegroundSelected",
+                "NavigationViewContentBackground", "NavigationViewDefaultPaneBackground", "NavigationViewTopPaneBackground",
+                "TextBoxBackground", "TextBoxBackgroundPointerOver", "TextBoxBackgroundFocused", "TextBoxBorderBrush", "TextBoxBorderBrushFocused", "TextBoxForeground", "TextBoxForegroundFocused",
+                "ComboBoxBackground", "ComboBoxBackgroundPointerOver", "ComboBoxBackgroundPressed", "ComboBoxBorderBrush", "ComboBoxBorderBrushFocused", "ComboBoxForeground", "ComboBoxForegroundPointerOver",
+                "ButtonBackground", "ButtonBackgroundPointerOver", "ButtonBackgroundPressed", "ButtonForeground", "ButtonForegroundPointerOver", "ButtonForegroundPressed", "ButtonBorderBrush", "ButtonBorderBrushPointerOver",
+                "CheckBoxForeground", "CheckBoxForegroundPointerOver", "CheckBoxForegroundPressed",
+                "SliderTrackFill", "SliderThumbBackground",
+                "SystemControlBackgroundChromeMediumLowBrush", "SystemControlBackgroundChromeMediumBrush", "SystemControlBackgroundAltHighBrush",
+                "SystemControlBackgroundBaseLowBrush", "SystemControlBackgroundBaseMediumBrush", "SystemControlBackgroundBaseMediumLowBrush",
+                "SystemControlBackgroundListLowBrush", "SystemControlBackgroundListMediumBrush", "SystemControlForegroundBaseHighBrush",
+                "SystemControlForegroundBaseMediumBrush",
+                "SystemAccentColor", "SystemControlHighlightAccentBrush", "SystemControlForegroundAccentBrush",
+                "SystemControlHighlightListAccentLowBrush", "SystemControlHighlightListAccentMediumBrush"
+            };
+
+            foreach (var key in keysToRemove)
+            {
+                resources.Remove(key);
+            }
         }
 
         private static void ApplyTitleBarTheme(EditorSettings settings, AppWindow appWindow)
@@ -37,19 +228,24 @@ namespace TxtAIEditor.Core.Services
             {
                 var titleBar = appWindow.TitleBar;
                 bool light = settings.Theme == "Light";
+                bool catppuccin = settings.Theme == "CatppuccinMacchiato";
 
                 Windows.UI.Color background = TryParseHexColor(settings.CustomBackgroundColor, out var customBg)
                     ? customBg
-                    : (light ? Windows.UI.Color.FromArgb(255, 243, 244, 246) : Windows.UI.Color.FromArgb(255, 30, 30, 30));
+                    : (catppuccin
+                        ? Windows.UI.Color.FromArgb(255, 30, 32, 48)
+                        : (light ? Windows.UI.Color.FromArgb(255, 243, 244, 246) : Windows.UI.Color.FromArgb(255, 30, 30, 30)));
                 Windows.UI.Color foreground = TryParseHexColor(settings.CustomForegroundColor, out var customFg)
                     ? customFg
-                    : (light ? Windows.UI.Color.FromArgb(255, 31, 41, 55) : Windows.UI.Color.FromArgb(255, 212, 212, 212));
-                Windows.UI.Color inactiveBackground = light
-                    ? Windows.UI.Color.FromArgb(255, 229, 231, 235)
-                    : Windows.UI.Color.FromArgb(255, 45, 49, 57);
-                Windows.UI.Color hoverBackground = light
-                    ? Windows.UI.Color.FromArgb(255, 229, 231, 235)
-                    : Windows.UI.Color.FromArgb(255, 45, 49, 57);
+                    : (catppuccin
+                        ? Windows.UI.Color.FromArgb(255, 202, 211, 245)
+                        : (light ? Windows.UI.Color.FromArgb(255, 31, 41, 55) : Windows.UI.Color.FromArgb(255, 212, 212, 212)));
+                Windows.UI.Color inactiveBackground = catppuccin
+                    ? Windows.UI.Color.FromArgb(255, 54, 57, 79)
+                    : (light ? Windows.UI.Color.FromArgb(255, 229, 231, 235) : Windows.UI.Color.FromArgb(255, 45, 49, 57));
+                Windows.UI.Color hoverBackground = catppuccin
+                    ? Windows.UI.Color.FromArgb(255, 54, 57, 79)
+                    : (light ? Windows.UI.Color.FromArgb(255, 229, 231, 235) : Windows.UI.Color.FromArgb(255, 45, 49, 57));
 
                 titleBar.BackgroundColor = background;
                 titleBar.ForegroundColor = foreground;
@@ -78,9 +274,11 @@ namespace TxtAIEditor.Core.Services
             {
                 Windows.UI.Color background = TryParseHexColor(settings.MarkdownToolbarBackgroundColor, out var customToolbarBg)
                     ? customToolbarBg
-                    : (settings.Theme == "Light"
-                        ? Windows.UI.Color.FromArgb(255, 243, 244, 246)
-                        : Windows.UI.Color.FromArgb(255, 43, 47, 54));
+                    : (settings.Theme == "CatppuccinMacchiato"
+                        ? Windows.UI.Color.FromArgb(255, 30, 32, 48)
+                        : (settings.Theme == "Light"
+                            ? Windows.UI.Color.FromArgb(255, 243, 244, 246)
+                            : Windows.UI.Color.FromArgb(255, 43, 47, 54)));
                 applyMarkdownToolbarBackground(background);
             }
             catch (Exception ex)

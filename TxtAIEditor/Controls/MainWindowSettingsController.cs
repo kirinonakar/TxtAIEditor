@@ -135,11 +135,21 @@ namespace TxtAIEditor.Controls
         public async Task ToggleThemeAsync()
         {
             var settings = _settingsService.CurrentSettings;
-            settings.Theme = settings.Theme == "Light" ? "Dark" : "Light";
+            if (settings.Theme == "Light")
+            {
+                settings.Theme = "Dark";
+            }
+            else if (settings.Theme == "Dark")
+            {
+                settings.Theme = "CatppuccinMacchiato";
+            }
+            else
+            {
+                settings.Theme = "Light";
+            }
             await _settingsService.SaveSettingsAsync(settings);
 
             ApplyUiPersonalization(settings);
-            RefreshAllSplitters();
             _livePreviewController.ApplyPreferredColorScheme(settings.Theme);
             ApplyPreferredColorSchemeToOpenEditors(settings.Theme);
             await ApplySettingsToOpenEditorsAsync(settings);
@@ -242,6 +252,7 @@ namespace TxtAIEditor.Controls
                 _rootElementProvider(),
                 ApplyMarkdownToolbarBackground);
             ApplyEditorSurfaceBackground(settings);
+            RefreshAllSplitters();
         }
 
         public void ApplyToolbarSettings(EditorSettings settings)

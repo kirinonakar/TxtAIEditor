@@ -241,9 +241,9 @@ function snapCssPixelsToDevicePixels(value) {
 
 function applyOptions(msg) {
     const theme = msg.theme || 'Dark';
-    const bg = msg.customBackgroundColor || (theme === 'Light' ? '#ffffff' : '#1e1e1e');
-    const preferredFg = msg.customForegroundColor || (theme === 'Light' ? '#111111' : '#d4d4d4');
-    const fg = resolveReadableColor(bg, preferredFg, theme === 'Light' ? '#111111' : '#d4d4d4');
+    const bg = msg.customBackgroundColor || (theme === 'CatppuccinMacchiato' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e'));
+    const preferredFg = msg.customForegroundColor || (theme === 'CatppuccinMacchiato' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
+    const fg = resolveReadableColor(bg, preferredFg, theme === 'CatppuccinMacchiato' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
     const fontSize = Number(msg.fontSize || 14);
     const baseLineHeight = Math.max(18, Math.ceil(fontSize + 8));
     const previousLineHeight = state.lineHeight;
@@ -257,10 +257,10 @@ function applyOptions(msg) {
 
     document.documentElement.style.setProperty('--bg', bg);
     document.documentElement.style.setProperty('--fg', fg);
-    document.documentElement.style.setProperty('--gutter-bg', theme === 'Light' ? '#f3f3f3' : '#252526');
-    document.documentElement.style.setProperty('--gutter-fg', theme === 'Light' ? '#6b6b6b' : '#858585');
-    document.documentElement.style.setProperty('--selection', theme === 'Light' ? 'rgba(0, 95, 184, 0.28)' : 'rgba(0, 120, 212, 0.38)');
-    document.documentElement.style.setProperty('--preview-code-bg', theme === 'Light' ? '#f3f5f7' : '#2d2d2d');
+    document.documentElement.style.setProperty('--gutter-bg', theme === 'CatppuccinMacchiato' ? '#1e2030' : (theme === 'Light' ? '#f3f3f3' : '#252526'));
+    document.documentElement.style.setProperty('--gutter-fg', theme === 'CatppuccinMacchiato' ? '#a5adcb' : (theme === 'Light' ? '#6b6b6b' : '#858585'));
+    document.documentElement.style.setProperty('--selection', theme === 'CatppuccinMacchiato' ? 'rgba(198, 160, 246, 0.3)' : (theme === 'Light' ? 'rgba(0, 95, 184, 0.28)' : 'rgba(0, 120, 212, 0.38)'));
+    document.documentElement.style.setProperty('--preview-code-bg', theme === 'CatppuccinMacchiato' ? '#1e2030' : (theme === 'Light' ? '#f3f5f7' : '#2d2d2d'));
     document.documentElement.style.setProperty('--font-size', `${fontSize}px`);
     document.documentElement.style.setProperty('--font-family', msg.fontFamily || 'Consolas, "Courier New", monospace');
     document.documentElement.style.setProperty('--line-height', `${state.lineHeight}px`);
@@ -296,6 +296,25 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--bracket-depth-3', '#a31515');
         document.documentElement.style.setProperty('--bracket-depth-4', '#267f99');
         document.documentElement.style.setProperty('--bracket-depth-5', '#af00db');
+    } else if (theme === 'CatppuccinMacchiato') {
+        document.documentElement.style.setProperty('--token-comment', '#939ab7');
+        document.documentElement.style.setProperty('--token-keyword', '#c6a0f6');
+        document.documentElement.style.setProperty('--token-control', '#f5bde6');
+        document.documentElement.style.setProperty('--token-string', '#a6da95');
+        document.documentElement.style.setProperty('--token-number', '#f5a97f');
+        document.documentElement.style.setProperty('--token-type', '#eed49f');
+        document.documentElement.style.setProperty('--token-function', '#8aadf4');
+        document.documentElement.style.setProperty('--token-variable', '#cad3f5');
+        document.documentElement.style.setProperty('--token-operator', '#91d7e3');
+        document.documentElement.style.setProperty('--token-punctuation', '#8bd5ca');
+        document.documentElement.style.setProperty('--token-tag', '#c6a0f6');
+        document.documentElement.style.setProperty('--token-attr', '#eed49f');
+        document.documentElement.style.setProperty('--bracket-depth-0', '#cad3f5');
+        document.documentElement.style.setProperty('--bracket-depth-1', '#f5bde6');
+        document.documentElement.style.setProperty('--bracket-depth-2', '#8aadf4');
+        document.documentElement.style.setProperty('--bracket-depth-3', '#eed49f');
+        document.documentElement.style.setProperty('--bracket-depth-4', '#a6da95');
+        document.documentElement.style.setProperty('--bracket-depth-5', '#c6a0f6');
     } else {
         document.documentElement.style.setProperty('--token-comment', '#6a9955');
         document.documentElement.style.setProperty('--token-keyword', '#569cd6');

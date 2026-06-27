@@ -31,9 +31,14 @@ namespace TxtAIEditor.Core.Services
         {
             _languageCombo = CreateLanguageCombo(settings, getString);
 
-            _themeCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, SelectedIndex = settings.Theme == "Dark" ? 0 : 1 };
+            int themeIdx = 0; // Dark
+            if (settings.Theme == "Light") themeIdx = 1;
+            else if (settings.Theme == "CatppuccinMacchiato") themeIdx = 2;
+
+            _themeCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, SelectedIndex = themeIdx };
             _themeCombo.Items.Add("Dark Theme (vs-dark)");
             _themeCombo.Items.Add("Light Theme (vs)");
+            _themeCombo.Items.Add("Catppuccin Macchiato");
 
             _editorSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.FontSize, StepFrequency = 1 };
             _previewSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.PreviewFontSize, StepFrequency = 1 };
@@ -41,15 +46,18 @@ namespace TxtAIEditor.Core.Services
             _uiFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.UiFontFamily, fontFamilies);
             _previewFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.PreviewFontFamily, fontFamilies);
 
+            string defaultBg = settings.Theme == "Light" ? "#ffffff" : (settings.Theme == "CatppuccinMacchiato" ? "#24273a" : "#1e1e1e");
+            string defaultFg = settings.Theme == "Light" ? "#111111" : (settings.Theme == "CatppuccinMacchiato" ? "#cad3f5" : "#d4d4d4");
+
             _customBgCheck = new CheckBox { Content = getString("SettingsUseCustomBg", "커스텀 에디터 배경색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.CustomBackgroundColor) };
             _customFgCheck = new CheckBox { Content = getString("SettingsUseCustomFg", "커스텀 에디터 글자색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.CustomForegroundColor) };
             var customBgDropdown = SettingsDialogUi.CreateColorDropdown(
                 getString("SettingsUseCustomBg", "에디터 배경색"),
-                SettingsDialogUi.ResolvePickerColor(settings.CustomBackgroundColor, settings.Theme == "Light" ? "#ffffff" : "#1e1e1e"),
+                SettingsDialogUi.ResolvePickerColor(settings.CustomBackgroundColor, defaultBg),
                 out _customBgPicker);
             var customFgDropdown = SettingsDialogUi.CreateColorDropdown(
                 getString("SettingsUseCustomFg", "에디터 글자색"),
-                SettingsDialogUi.ResolvePickerColor(settings.CustomForegroundColor, settings.Theme == "Light" ? "#111111" : "#d4d4d4"),
+                SettingsDialogUi.ResolvePickerColor(settings.CustomForegroundColor, defaultFg),
                 out _customFgPicker);
             BindEnabled(_customBgCheck, customBgDropdown);
             BindEnabled(_customFgCheck, customFgDropdown);
@@ -58,11 +66,11 @@ namespace TxtAIEditor.Core.Services
             _previewFgCheck = new CheckBox { Content = getString("SettingsPreviewUseCustomFg", "커스텀 프리뷰 글자색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.PreviewCustomForegroundColor) };
             var previewBgDropdown = SettingsDialogUi.CreateColorDropdown(
                 getString("SettingsPreviewUseCustomBg", "프리뷰 배경색"),
-                SettingsDialogUi.ResolvePickerColor(settings.PreviewCustomBackgroundColor, settings.Theme == "Light" ? "#ffffff" : "#1e1e1e"),
+                SettingsDialogUi.ResolvePickerColor(settings.PreviewCustomBackgroundColor, defaultBg),
                 out _previewBgPicker);
             var previewFgDropdown = SettingsDialogUi.CreateColorDropdown(
                 getString("SettingsPreviewUseCustomFg", "프리뷰 글자색"),
-                SettingsDialogUi.ResolvePickerColor(settings.PreviewCustomForegroundColor, settings.Theme == "Light" ? "#111111" : "#d4d4d4"),
+                SettingsDialogUi.ResolvePickerColor(settings.PreviewCustomForegroundColor, defaultFg),
                 out _previewFgPicker);
             BindEnabled(_previewBgCheck, previewBgDropdown);
             BindEnabled(_previewFgCheck, previewFgDropdown);
@@ -109,7 +117,13 @@ namespace TxtAIEditor.Core.Services
                 3 => "ja-JP",
                 _ => "Default"
             };
-            settings.Theme = _themeCombo.SelectedIndex == 0 ? "Dark" : "Light";
+            settings.Theme = _themeCombo.SelectedIndex switch
+            {
+                0 => "Dark",
+                1 => "Light",
+                2 => "CatppuccinMacchiato",
+                _ => "Dark"
+            };
             settings.FontSize = _editorSizeSlider.Value;
             settings.CustomBackgroundColor = _customBgCheck.IsChecked == true ? SettingsDialogUi.ColorToHex(_customBgPicker.Color) : string.Empty;
             settings.CustomForegroundColor = _customFgCheck.IsChecked == true ? SettingsDialogUi.ColorToHex(_customFgPicker.Color) : string.Empty;
