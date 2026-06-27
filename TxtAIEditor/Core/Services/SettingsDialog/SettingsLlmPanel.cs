@@ -102,7 +102,7 @@ namespace TxtAIEditor.Core.Services
                 2 => "medium",
                 3 => "high",
                 4 => "xhigh",
-                _ => ""
+                _ => "default"
             };
             settings.LlmSourceLanguage = _sourceLangCombo.SelectedIndex switch
             {
@@ -428,7 +428,7 @@ namespace TxtAIEditor.Core.Services
         private static ComboBox CreateThinkingLevelCombo(EditorSettings settings, Func<string, string, string> getString)
         {
             var comboBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, Visibility = Visibility.Collapsed };
-            comboBox.Items.Add(getString("SettingsLlmThinkingLevelNone", "사용 안함"));
+            comboBox.Items.Add(getString("SettingsLlmThinkingLevelDefault", "기본값 (Default)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelLow", "낮음 (Low)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelMedium", "중간 (Medium)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelHigh", "높음 (High)"));

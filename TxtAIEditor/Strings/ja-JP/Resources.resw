@@ -386,8 +386,8 @@
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>
-  <data name="SettingsLlmThinkingLevelNone" xml:space="preserve">
-    <value>なし</value>
+  <data name="SettingsLlmThinkingLevelDefault" xml:space="preserve">
+    <value>デフォルト (Default)</value>
   </data>
   <data name="SettingsLlmThinkingLevelLow" xml:space="preserve">
     <value>低い (Low)</value>

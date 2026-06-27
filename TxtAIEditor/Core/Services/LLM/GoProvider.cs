@@ -35,7 +35,9 @@ namespace TxtAIEditor.Core.Services.LLM
             _ => 0
         };
 
-        private bool HasThinking => !string.IsNullOrEmpty(_thinkingLevel) && _thinkingLevel != "none";
+        private bool HasThinking => !string.IsNullOrEmpty(_thinkingLevel) &&
+                                    !_thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase) &&
+                                    !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase);
 
         private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
         {
