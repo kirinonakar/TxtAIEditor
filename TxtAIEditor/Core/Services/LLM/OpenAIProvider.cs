@@ -35,6 +35,10 @@ namespace TxtAIEditor.Core.Services.LLM
             return m.StartsWith("o1") || m.StartsWith("o3") || m.StartsWith("o4") || m.StartsWith("o5");
         }
 
+        private bool HasThinking => !string.IsNullOrEmpty(_thinkingLevel) &&
+                                    !_thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase) &&
+                                    !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase);
+
         private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
         {
             var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
@@ -91,6 +95,21 @@ namespace TxtAIEditor.Core.Services.LLM
             if (outputLimit > 0)
             {
                 payloadDict[tokenField] = outputLimit;
+            }
+            if (HasThinking)
+            {
+                payloadDict["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = _thinkingLevel.ToLowerInvariant()
+                };
+            }
+            else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
+                     _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                payloadDict["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = "none"
+                };
             }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
@@ -194,6 +213,21 @@ namespace TxtAIEditor.Core.Services.LLM
             if (outputLimit > 0)
             {
                 payloadDict[tokenField] = outputLimit;
+            }
+            if (HasThinking)
+            {
+                payloadDict["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = _thinkingLevel.ToLowerInvariant()
+                };
+            }
+            else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
+                     _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                payloadDict["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = "none"
+                };
             }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);

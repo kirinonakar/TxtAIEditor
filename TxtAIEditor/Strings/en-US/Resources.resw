@@ -389,6 +389,9 @@
   <data name="SettingsLlmThinkingLevelDefault" xml:space="preserve">
     <value>Default</value>
   </data>
+  <data name="SettingsLlmThinkingLevelDisabled" xml:space="preserve">
+    <value>Disable</value>
+  </data>
   <data name="SettingsLlmThinkingLevelLow" xml:space="preserve">
     <value>Low</value>
   </data>

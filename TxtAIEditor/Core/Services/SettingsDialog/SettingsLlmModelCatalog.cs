@@ -51,6 +51,7 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrWhiteSpace(thinkingLevel) ||
                 thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase) ||
                 thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase) ||
+                thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
                 !SupportsThinkingLevel(provider))
             {
                 return string.Empty;

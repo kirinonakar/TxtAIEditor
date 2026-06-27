@@ -125,6 +125,13 @@ namespace TxtAIEditor.Core.Services.LLM
                 }
                 payloadDict["reasoning_effort"] = effort;
             }
+            else if (IsDeepSeekOrGlm(model) && (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) || _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase)))
+            {
+                payloadDict["thinking"] = new Dictionary<string, object>
+                {
+                    ["type"] = "disabled"
+                };
+            }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
@@ -251,6 +258,13 @@ namespace TxtAIEditor.Core.Services.LLM
                     effort = "max";
                 }
                 payloadDict["reasoning_effort"] = effort;
+            }
+            else if (IsDeepSeekOrGlm(model) && (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) || _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase)))
+            {
+                payloadDict["thinking"] = new Dictionary<string, object>
+                {
+                    ["type"] = "disabled"
+                };
             }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);

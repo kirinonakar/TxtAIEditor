@@ -389,6 +389,9 @@
   <data name="SettingsLlmThinkingLevelDefault" xml:space="preserve">
     <value>기본값 (Default)</value>
   </data>
+  <data name="SettingsLlmThinkingLevelDisabled" xml:space="preserve">
+    <value>비활성화 (Disable)</value>
+  </data>
   <data name="SettingsLlmThinkingLevelLow" xml:space="preserve">
     <value>낮음 (Low)</value>
   </data>
