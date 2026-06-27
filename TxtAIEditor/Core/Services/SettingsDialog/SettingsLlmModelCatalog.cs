@@ -43,7 +43,8 @@ namespace TxtAIEditor.Core.Services
                 provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) ||
-                provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
+                provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string GetThinkingLevelDisplay(string thinkingLevel, string provider)

@@ -298,7 +298,7 @@ namespace TxtAIEditor.Core.Services
 
             ILLMProvider provider = providerName.ToLower() switch
             {
-                "gemini" => new GeminiProvider(_localizationService, settings.LlmAgentVerbose, providerName),
+                "gemini" => new GeminiProvider(_localizationService, settings.LlmAgentVerbose, settings.LlmThinkingLevel, providerName),
                 "openai oauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
                 "openaioauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
                 "openrouter" => new OpenRouterProvider(_localizationService, providerName),

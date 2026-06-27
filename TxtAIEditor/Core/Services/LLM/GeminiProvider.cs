@@ -18,6 +18,7 @@ namespace TxtAIEditor.Core.Services.LLM
         private static readonly HttpClient _httpClient = new HttpClient();
 
         private readonly bool _verbose;
+        private readonly string _thinkingLevel;
         private readonly string _providerName;
         private string _accumulatedText = string.Empty;
         private int _lastProcessedIndex = 0;
@@ -32,10 +33,16 @@ namespace TxtAIEditor.Core.Services.LLM
             new Regex(@"<\|channel\>thought(.*?)(?:<channel\|>|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase)
         };
 
-        public GeminiProvider(ILocalizationService localizationService, bool verbose = false, string providerName = "Gemini")
+        private bool HasThinking => !string.IsNullOrEmpty(_thinkingLevel) &&
+                                    !_thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase) &&
+                                    !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase) &&
+                                    !_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase);
+
+        public GeminiProvider(ILocalizationService localizationService, bool verbose = false, string thinkingLevel = "", string providerName = "Gemini")
         {
             _localizationService = localizationService;
             _verbose = verbose;
+            _thinkingLevel = thinkingLevel ?? "";
             _providerName = providerName ?? "Gemini";
         }
 
@@ -302,9 +309,33 @@ namespace TxtAIEditor.Core.Services.LLM
 
             int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
 
-            var payload = new
+            var generationConfigDict = new Dictionary<string, object>
             {
-                contents = new[]
+                ["temperature"] = 0.5,
+                ["maxOutputTokens"] = outputLimit > 0 ? outputLimit : 65536
+            };
+
+            if (HasThinking)
+            {
+                string levelStr = _thinkingLevel.ToUpperInvariant();
+                if (model.Contains("gemma", StringComparison.OrdinalIgnoreCase) && levelStr == "LOW")
+                {
+                    levelStr = "MINIMAL";
+                }
+                else if (levelStr == "XHIGH")
+                {
+                    levelStr = "HIGH";
+                }
+
+                generationConfigDict["thinkingConfig"] = new Dictionary<string, object>
+                {
+                    ["thinkingLevel"] = levelStr
+                };
+            }
+
+            var payload = new Dictionary<string, object>
+            {
+                ["contents"] = new[]
                 {
                     new
                     {
@@ -312,18 +343,14 @@ namespace TxtAIEditor.Core.Services.LLM
                         parts = BuildUserParts(userContent, attachments)
                     }
                 },
-                systemInstruction = new
+                ["systemInstruction"] = new
                 {
                     parts = new[]
                     {
                         new { text = systemPrompt }
                     }
                 },
-                generationConfig = new
-                {
-                    temperature = 0.5,
-                    maxOutputTokens = outputLimit > 0 ? outputLimit : 65536
-                }
+                ["generationConfig"] = generationConfigDict
             };
 
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
@@ -416,9 +443,33 @@ namespace TxtAIEditor.Core.Services.LLM
 
             int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
 
-            var payload = new
+            var generationConfigDict = new Dictionary<string, object>
             {
-                contents = new[]
+                ["temperature"] = 0.5,
+                ["maxOutputTokens"] = outputLimit > 0 ? outputLimit : 65536
+            };
+
+            if (HasThinking)
+            {
+                string levelStr = _thinkingLevel.ToUpperInvariant();
+                if (model.Contains("gemma", StringComparison.OrdinalIgnoreCase) && levelStr == "LOW")
+                {
+                    levelStr = "MINIMAL";
+                }
+                else if (levelStr == "XHIGH")
+                {
+                    levelStr = "HIGH";
+                }
+
+                generationConfigDict["thinkingConfig"] = new Dictionary<string, object>
+                {
+                    ["thinkingLevel"] = levelStr
+                };
+            }
+
+            var payload = new Dictionary<string, object>
+            {
+                ["contents"] = new[]
                 {
                     new
                     {
@@ -426,18 +477,14 @@ namespace TxtAIEditor.Core.Services.LLM
                         parts = BuildUserParts(userContent, attachments)
                     }
                 },
-                systemInstruction = new
+                ["systemInstruction"] = new
                 {
                     parts = new[]
                     {
                         new { text = systemPrompt }
                     }
                 },
-                generationConfig = new
-                {
-                    temperature = 0.5,
-                    maxOutputTokens = outputLimit > 0 ? outputLimit : 65536
-                }
+                ["generationConfig"] = generationConfigDict
             };
 
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
