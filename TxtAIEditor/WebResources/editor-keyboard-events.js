@@ -43,8 +43,7 @@ import {
     autocompleteState,
     hideAutocomplete,
     insertSelectedCandidate,
-    renderAutocomplete,
-    scrollAutocompleteActiveIntoView,
+    moveAutocompleteActiveIndex,
     triggerAutocomplete
 } from './editor-autocomplete.js';
 
@@ -242,16 +241,12 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
             if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                autocompleteState.activeIndex = (autocompleteState.activeIndex + 1) % autocompleteState.candidates.length;
-                renderAutocomplete();
-                scrollAutocompleteActiveIntoView();
+                moveAutocompleteActiveIndex(1);
                 return;
             }
             if (event.key === 'ArrowUp') {
                 event.preventDefault();
-                autocompleteState.activeIndex = (autocompleteState.activeIndex - 1 + autocompleteState.candidates.length) % autocompleteState.candidates.length;
-                renderAutocomplete();
-                scrollAutocompleteActiveIntoView();
+                moveAutocompleteActiveIndex(-1);
                 return;
             }
             if (event.key === 'Enter') {

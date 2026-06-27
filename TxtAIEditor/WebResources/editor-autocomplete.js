@@ -7,9 +7,10 @@ import {
     queueRender,
     setupVirtualHeight,
     shiftCachedLines,
+    syncCustomSelectionClass,
     state
 } from './editor-core.js';
-import { focusLine, getCaretOffset, lineTextFromElement, updateSingleLine } from './editor-commands.js';
+import { focusLine, getCaretOffset, lineTextFromElement, setCaret, updateSingleLine } from './editor-commands.js';
 import { hasCustomSelection } from './editor-selection.js';
 
 // Auto-complete Popup State
@@ -24,6 +25,8 @@ const autocompleteState = {
     textBeforeCaret: '',
     suppressUntil: 0  // ESC로 닫은 후 compositionend 재오픈 방지용 타임스탬프
 };
+
+let autocompleteCaretRestoreToken = 0;
 
 function getWordUnderCaret(text, caretOffset) {
     let start = caretOffset;
@@ -370,6 +373,30 @@ function scrollAutocompleteActiveIntoView() {
     }
 }
 
+function moveAutocompleteActiveIndex(delta) {
+    if (!autocompleteState.isOpen || autocompleteState.candidates.length === 0) return;
+    autocompleteState.activeIndex = (
+        autocompleteState.activeIndex + delta + autocompleteState.candidates.length
+    ) % autocompleteState.candidates.length;
+    renderAutocomplete();
+    scrollAutocompleteActiveIntoView();
+    restoreAutocompleteInputCaret();
+}
+
+function restoreAutocompleteInputCaret() {
+    const element = autocompleteState.element;
+    if (!element || !element.isConnected || element.getAttribute('contenteditable') !== 'true') return;
+
+    const text = lineTextFromElement(element);
+    const caret = Math.max(0, Math.min(Number(autocompleteState.caret || 0), text.length));
+    if (text.slice(0, caret) !== (autocompleteState.textBeforeCaret || '')) return;
+
+    restoreAutocompleteCaretAfterCommit(
+        Number(element.dataset.line || 1),
+        caret,
+        text);
+}
+
 function insertSelectedCandidate() {
     const candidate = autocompleteState.candidates[autocompleteState.activeIndex];
     const element = autocompleteState.element;
@@ -401,7 +428,7 @@ function replaceWordWithAutocompleteText(element, wordStart, replaceEnd, insertT
         const nextCaret = wordStart + normalized.length;
         const lineNumber = Number(element.dataset.line || 1);
         updateSingleLine(element, nextText, nextCaret);
-        setTimeout(() => focusLine(lineNumber, nextCaret), 0);
+        restoreAutocompleteCaretAfterCommit(lineNumber, nextCaret, nextText);
         return;
     }
 
@@ -428,16 +455,73 @@ function replaceWordWithAutocompleteText(element, wordStart, replaceEnd, insertT
     }
 
     state.lineCount += insertedCount;
+    state.selection = null;
+    state.selectionAnchor = {
+        line: lastLineNumber,
+        column: parts[parts.length - 1]?.length || 0
+    };
+    state.currentLine = lastLineNumber;
+    state.currentColumn = (parts[parts.length - 1]?.length || 0) + 1;
+    syncCustomSelectionClass();
     setupVirtualHeight();
     post({ type: 'contentChanged' });
     queueRender(true);
-    setTimeout(() => focusLine(lastLineNumber, parts[parts.length - 1]?.length || 0), 0);
+    restoreAutocompleteCaretAfterCommit(
+        lastLineNumber,
+        parts[parts.length - 1]?.length || 0,
+        state.cache.get(lastLineNumber) || '');
+}
+
+function restoreAutocompleteCaretAfterCommit(lineNumber, columnZeroBased, expectedLineText) {
+    const token = ++autocompleteCaretRestoreToken;
+    const targetLine = Math.max(1, Number(lineNumber || 1));
+    const targetColumn = Math.max(0, Number(columnZeroBased || 0));
+    const expectedText = String(expectedLineText ?? '');
+
+    const restore = () => {
+        if (token !== autocompleteCaretRestoreToken) return;
+        if ((state.cache.get(targetLine) ?? '') !== expectedText) return;
+
+        const activeElement = document.activeElement;
+        const focusedLine = activeElement?.closest?.('.line-text');
+        const focusedAutocompletePopup = activeElement?.closest?.('#autocomplete-popup');
+        if (!focusedLine && !focusedAutocompletePopup &&
+            activeElement && activeElement !== document.body && activeElement !== document.documentElement) {
+            return;
+        }
+        if (focusedLine && Number(focusedLine.dataset.line || 0) !== targetLine) {
+            return;
+        }
+
+        state.selection = null;
+        state.selectionAnchor = { line: targetLine, column: targetColumn };
+        state.currentLine = targetLine;
+        state.currentColumn = targetColumn + 1;
+        syncCustomSelectionClass();
+
+        const targetElement = focusedLine || document.querySelector(`.line-text[data-line="${targetLine}"]`);
+        if (targetElement && targetElement.getAttribute('contenteditable') === 'true') {
+            setCaret(targetElement, targetColumn);
+        } else {
+            focusLine(targetLine, targetColumn);
+        }
+    };
+
+    restore();
+    setTimeout(restore, 0);
+    requestAnimationFrame(() => {
+        restore();
+        requestAnimationFrame(restore);
+    });
+    setTimeout(restore, 40);
+    setTimeout(restore, 120);
 }
 
 export {
     autocompleteState,
     hideAutocomplete,
     insertSelectedCandidate,
+    moveAutocompleteActiveIndex,
     renderAutocomplete,
     scrollAutocompleteActiveIntoView,
     triggerAutocomplete
