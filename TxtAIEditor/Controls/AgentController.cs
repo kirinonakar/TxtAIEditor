@@ -17,8 +17,6 @@ namespace TxtAIEditor.Controls
 {
     public sealed class AgentController
     {
-        private const int FallbackSessionHistoryPromptChars = 80_000;
-        private const double PromptContextSafetyRatio = 0.95;
         private const int DefaultContextStatsDelayMs = 250;
         private const int SlowContextStatsDelayMs = 900;
 
@@ -51,7 +49,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentHistoryController _historyController;
         private readonly AgentSessionEditController _sessionEditController;
         private readonly AgentOpenSessionController _openSessionController;
-        private readonly AgentWorkspaceContextBuilder _workspaceContextBuilder;
+        private readonly AgentPromptContextService _promptContextService;
         private readonly AgentOutputInsertController _outputInsertController;
         private readonly AgentConfirmationController _confirmationController;
         private readonly AgentTabToolController _tabToolController;
@@ -64,6 +62,9 @@ namespace TxtAIEditor.Controls
         private readonly AgentRunOutputController _runOutputController;
         private readonly AgentRunTranscriptService _runTranscriptService = new();
         private readonly AgentModelContextLimitProvider _modelContextLimits = new();
+        private readonly AgentLlmToolCatalog _llmToolCatalog = new();
+        private readonly AgentResponseInspector _responseInspector = new();
+        private readonly AgentSessionHistoryCoordinator _sessionHistoryCoordinator;
         private readonly Dictionary<string, AgentRunContext> _runningSessions = new(StringComparer.Ordinal);
         private readonly SemaphoreSlim _toolExecutionSessionGate = new(1, 1);
         private readonly AsyncLocal<AgentRunContext?> _activeToolRunContext = new();
@@ -209,6 +210,14 @@ namespace TxtAIEditor.Controls
                 () => UpdateContextStatsImmediate(),
                 _getString,
                 _navigateToFolderAsync);
+            _sessionHistoryCoordinator = new AgentSessionHistoryCoordinator(
+                _agentPane,
+                _settingsService,
+                _historyController,
+                _openSessionController,
+                IsCurrentSessionRunning,
+                () => _currentSessionId,
+                _getString);
             _runOutputController = new AgentRunOutputController(
                 _openSessionController,
                 insertIntoActiveEditorAsync,
@@ -219,19 +228,35 @@ namespace TxtAIEditor.Controls
                 IsCurrentSessionRunning,
                 _toolExecutionSessionGate,
                 () => _currentSessionId,
-                SaveActiveOpenSessionFromUI,
-                EnsureOpenSession,
-                RestoreOpenSession,
+                _openSessionController.SaveActiveFromUI,
+                _openSessionController.EnsureSession,
+                _openSessionController.RestoreSession,
                 _openSessionController.ClearThinkingState,
                 _sessionEditController,
                 _historyController,
                 _displayText,
                 _showError,
                 _getString);
-            _workspaceContextBuilder = new AgentWorkspaceContextBuilder(
+            var workspaceContextBuilder = new AgentWorkspaceContextBuilder(
                 () => _fileTools.WorkspaceRoot,
                 openTabsProvider,
                 _attachmentController);
+            _promptContextService = new AgentPromptContextService(
+                _agentPane,
+                _fileTools,
+                _presetController,
+                _skillController,
+                _mcpController,
+                workspaceContextBuilder,
+                _attachmentController,
+                _displayText,
+                _modelContextLimits,
+                GetActiveTabForContext,
+                CaptureActiveSelectionSnapshot,
+                GetCurrentSessionSettings,
+                () => _sessionHistory.ToString(),
+                () => UpdateContextStatsImmediate(force: true),
+                _getString);
             _contextStatsController = new AgentContextStatsController(
                 _settingsService,
                 _agentPane,
@@ -241,11 +266,11 @@ namespace TxtAIEditor.Controls
                 GetActiveTabForContext,
                 GetActiveSelectionText,
                 BuildActiveSelectionContext,
-                BuildAgentInstruction,
-                BuildWorkspaceContext,
-                BuildSessionHistoryForPrompt,
+                _promptContextService.BuildAgentInstruction,
+                _promptContextService.BuildWorkspaceContext,
+                _promptContextService.BuildSessionHistoryForPrompt,
                 GetCurrentRunTranscriptTokens,
-                RefreshOutputDisplay,
+                _sessionHistoryCoordinator.RefreshOutputDisplay,
                 _getString,
                 _modelContextLimits,
                 GetCurrentSessionSettings);
@@ -324,8 +349,8 @@ namespace TxtAIEditor.Controls
 
             _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
             WireEvents();
-            EnsureOpenSession(_currentSessionId);
-            UpdateOpenSessionsUI();
+            _openSessionController.EnsureSession(_currentSessionId);
+            _openSessionController.UpdateUI();
             UpdateContextStatsImmediate();
             QueueDeferredStartupDataLoad();
         }
@@ -473,18 +498,22 @@ namespace TxtAIEditor.Controls
         {
             _agentPane.RunRequested += async (_, _) => await RunAgentAsync();
             _agentPane.StopRequested += (_, _) => StopAgent();
-            _agentPane.NewSessionRequested += (_, _) => CreateNewOpenSession();
+            _agentPane.NewSessionRequested += (_, _) =>
+            {
+                _agentPane.PlanningModeCheckBox.IsChecked = false;
+                _openSessionController.CreateNewSession();
+            };
             _agentPane.RewindSessionRequested += async (_, _) => await _sessionRewindController.RewindCurrentSessionAsync();
             _agentPane.OpenSessionsFlyoutOpened += (_, _) =>
             {
-                SaveOpenSessionPromptTitleFromUI();
-                UpdateOpenSessionsUI();
+                _openSessionController.SavePromptTitleFromUI();
+                _openSessionController.UpdateUI();
             };
-            _agentPane.OpenSessionSelected += (_, sessionId) => SwitchOpenSession(sessionId);
-            _agentPane.OpenSessionClosed += (_, sessionId) => CloseOpenSession(sessionId);
-            _agentPane.HistorySelected += (_, historyId) => LoadHistorySession(historyId);
-            _agentPane.HistoryDeleted += async (_, historyId) => await DeleteHistorySessionAsync(historyId);
-            _agentPane.HistoryToolbarDeleteClicked += async (_, _) => await ClearAllHistoryAsync();
+            _agentPane.OpenSessionSelected += (_, sessionId) => _openSessionController.SwitchSession(sessionId);
+            _agentPane.OpenSessionClosed += (_, sessionId) => _openSessionController.CloseSession(sessionId);
+            _agentPane.HistorySelected += (_, historyId) => _sessionHistoryCoordinator.LoadHistorySession(historyId);
+            _agentPane.HistoryDeleted += async (_, historyId) => await _sessionHistoryCoordinator.DeleteHistorySessionAsync(historyId);
+            _agentPane.HistoryToolbarDeleteClicked += async (_, _) => await _sessionHistoryCoordinator.ClearAllHistoryAsync();
             _agentPane.InsertOutputRequested += async (_, _) => await _outputInsertController.InsertOutputAsync();
             _agentPane.InsertNewTabOutputRequested += async (_, _) => await _outputInsertController.InsertNewTabOutputAsync();
             _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
@@ -510,7 +539,7 @@ namespace TxtAIEditor.Controls
             _agentPane.AgentSkillRemoved += (_, skillName) => _skillController.RemoveSelectedSkill(skillName);
             _agentPane.Prompt.TextChanged += (_, _) =>
             {
-                SaveOpenSessionPromptTitleFromUI();
+                _openSessionController.SavePromptTitleFromUI();
                 UpdateContextStats();
             };
             _agentPane.PlanningModeCheckBox.Checked += (_, _) => UpdateContextStats();
@@ -543,7 +572,7 @@ namespace TxtAIEditor.Controls
 
             await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
             string targetLanguage = settings?.ResolveTargetLanguage() ?? "Korean";
-            string instruction = BuildAgentInstruction(requestedPlanningMode
+            string instruction = _promptContextService.BuildAgentInstruction(requestedPlanningMode
                 ? AgentPlanController.BuildPlanningModeRequest(userInstruction, targetLanguage)
                 : userInstruction);
             if (string.IsNullOrWhiteSpace(instruction))
@@ -554,11 +583,11 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var activeOpenSession = EnsureOpenSession(_currentSessionId);
+            var activeOpenSession = _openSessionController.EnsureSession(_currentSessionId);
             string preservedWorkspaceRoot = activeOpenSession.WorkspaceRoot;
-            SaveActiveOpenSessionFromUI();
+            _openSessionController.SaveActiveFromUI();
             activeOpenSession.RewindSnapshots.Add(AgentSessionRewindSnapshot.Capture(activeOpenSession));
-            UpdateOpenSessionTitle(activeOpenSession, userInstruction);
+            _openSessionController.UpdateSessionTitle(activeOpenSession, userInstruction);
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             activeOpenSession.UpdatedAt = DateTime.Now;
             activeOpenSession.IsRunning = true;
@@ -566,7 +595,7 @@ namespace TxtAIEditor.Controls
                 preservedWorkspaceRoot,
                 activeOpenSession.WorkspaceRoot,
                 userInstruction);
-            EditorSettings runSettings = await ResolveRunSessionSettingsAsync(activeOpenSession);
+            EditorSettings runSettings = await _openSessionController.ResolveRunSessionSettingsAsync(activeOpenSession);
 
             var runContext = new AgentRunContext
             {
@@ -585,7 +614,7 @@ namespace TxtAIEditor.Controls
   
             _isRunning = true;
             _runningSessions[activeOpenSession.Id] = runContext;
-            UpdateOpenSessionsUI();
+            _openSessionController.UpdateUI();
             _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
             _fileToolController.StartRun();
             _currentRunImageToolAttachments.Clear();
@@ -595,9 +624,9 @@ namespace TxtAIEditor.Controls
             runContext.Cancellation = cancellationSource;
             _runCancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
-            UpdateActiveSessionBusyState();
+            _openSessionController.UpdateActiveSessionBusyState();
             await _runOutputController.ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
-            await _runOutputController.BeginRunOutputBlockAsync(runContext, BuildRunHeader(BuildInstructionDisplay(userInstruction)));
+            await _runOutputController.BeginRunOutputBlockAsync(runContext, BuildRunHeader(_promptContextService.BuildInstructionDisplay(userInstruction)));
             await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
 
             string initialTranscript = string.Empty;
@@ -612,7 +641,7 @@ namespace TxtAIEditor.Controls
 
             Task PersistRunSessionToHistoryAsync()
             {
-                return SaveRunSessionToHistoryAsync(runContext, userInstruction);
+                return _sessionHistoryCoordinator.SaveRunSessionToHistoryAsync(runContext, userInstruction);
             }
 
             _activeWorkspaceRunContext.Value = runContext;
@@ -622,7 +651,7 @@ namespace TxtAIEditor.Controls
                 AgentSelectionSnapshot currentRunSelectionSnapshot = _selectionContextController.CaptureSelectionForRun(_isRunning);
                 runContext.StreamToTabTargetTabId = currentRunActiveTab?.Id;
                 _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab);
-                string workspaceContext = BuildWorkspaceContext(
+                string workspaceContext = _promptContextService.BuildWorkspaceContext(
                     instruction,
                     currentRunActiveTab,
                     currentRunSelectionSnapshot,
@@ -633,7 +662,7 @@ namespace TxtAIEditor.Controls
                 runContext.PlanWorkspaceContext = workspaceContext;
                 runContext.PlanSelectionContext = runSelectionContext;
                 var initialTranscriptBuilder = new StringBuilder();
-                string sessionHistoryForPrompt = BuildSessionHistoryForPrompt(
+                string sessionHistoryForPrompt = _promptContextService.BuildSessionHistoryForPrompt(
                     instruction,
                     workspaceContext,
                     runSelectionContext);
@@ -730,7 +759,7 @@ namespace TxtAIEditor.Controls
                     bool truncated = false;
                     try
                     {
-                    var agentToolsList = BuildLlmToolsList(planningMode);
+                    var agentToolsList = _llmToolCatalog.Build(planningMode, _mcpController.GetActiveToolAliases());
                     response = await _llmService.RunAgentAsync(
                         runContext.LlmSettings,
                         instruction,
@@ -881,7 +910,7 @@ namespace TxtAIEditor.Controls
                                 string trimmed = streamedText.TrimStart();
                                 if (!string.IsNullOrEmpty(trimmed))
                                 {
-                                    isJsonToolCall = LooksLikeStreamedToolCallEnvelopeStart(trimmed);
+                                    isJsonToolCall = _responseInspector.LooksLikeStreamedToolCallEnvelopeStart(trimmed);
                                     if (isJsonToolCall.Value)
                                     {
                                         toolCallPlaceholderShown = true;
@@ -1052,7 +1081,7 @@ namespace TxtAIEditor.Controls
                             await Task.CompletedTask;
                         },
                         cancellationToken,
-                        GetImageAttachmentsForRun(runContext),
+                        _promptContextService.GetImageAttachmentsForRun(runContext),
                         planningMode,
                         onReasoning,
                         agentToolsList);
@@ -1291,7 +1320,7 @@ namespace TxtAIEditor.Controls
                         {
                             toolCallFormatRetryCount++;
                             AgentToolCallParser.TryGetToolCallFormatIssue(response, out string toolCallFormatIssue);
-                            string retryNote = BuildToolCallFormatRetryNote(
+                            string retryNote = _responseInspector.BuildToolCallFormatRetryNote(
                                 !string.IsNullOrWhiteSpace(toolCallFormatIssue)
                                     ? toolCallFormatIssue
                                     : "The tool_call JSON could not be parsed.");
@@ -1383,7 +1412,7 @@ namespace TxtAIEditor.Controls
                         if (!planningMode &&
                             skillMentionRetryCount < maxSkillMentionRetries &&
                             instruction.Contains("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase) &&
-                            ResponseMentionsSkillIntent(response))
+                            _responseInspector.ResponseMentionsSkillIntent(response))
                         {
                             skillMentionRetryCount++;
                             string retryNote =
@@ -1508,12 +1537,12 @@ namespace TxtAIEditor.Controls
                                 });
                                 toolResult = await _toolExecutionController.ExecuteAsync(currentToolName, currentArguments, cancellationToken);
                                 runContext.SessionEdits = _sessionEditController.SessionEdits.ToList();
-                                EnsureOpenSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
+                                _openSessionController.EnsureSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
                                 if (!_runOutputController.IsSessionVisible(runContext.SessionId))
                                 {
                                     await _uiDispatcher.RunAsync(() =>
                                     {
-                                        var visibleSession = EnsureOpenSession(_currentSessionId);
+                                        var visibleSession = _openSessionController.EnsureSession(_currentSessionId);
                                         _sessionEditController.Replace(visibleSession.SessionEdits);
                                     });
                                 }
@@ -1568,7 +1597,7 @@ namespace TxtAIEditor.Controls
 
                     await _uiDispatcher.RunAsync(() =>
                     {
-                        string refreshedContext = BuildWorkspaceContext(
+                        string refreshedContext = _promptContextService.BuildWorkspaceContext(
                             instruction,
                             currentRunActiveTab,
                             currentRunSelectionSnapshot,
@@ -1773,17 +1802,17 @@ namespace TxtAIEditor.Controls
                         activeOpenSession.SessionHistoryTokenCount,
                         activeOpenSession.CurrentRunTranscriptTokens);
                 }
-                UpdateActiveSessionBusyState();
+                _openSessionController.UpdateActiveSessionBusyState();
 
                 if (_openSessionController.IsPendingClose(runContext.SessionId))
                 {
                     string closingSessionId = _openSessionController.ConsumePendingCloseSessionId();
-                    CloseOpenSession(closingSessionId);
+                    _openSessionController.CloseSession(closingSessionId);
                 }
                 else
                 {
                     UpdateContextStatsImmediate();
-                    UpdateOpenSessionsUI();
+                    _openSessionController.UpdateUI();
                 }
             }
 
@@ -1797,9 +1826,9 @@ namespace TxtAIEditor.Controls
         {
             await _uiDispatcher.RunAsync(() =>
             {
-                SaveActiveOpenSessionFromUI();
+                _openSessionController.SaveActiveFromUI();
 
-                var session = EnsureOpenSession(Guid.NewGuid().ToString());
+                var session = _openSessionController.EnsureSession(Guid.NewGuid().ToString());
                 session.Title = _getString("AgentPlanExecutionSessionTitle", "계획 실행");
                 session.PromptText = executionPrompt;
                 session.OutputText = _displayText.OutputPlaceholder;
@@ -1811,75 +1840,14 @@ namespace TxtAIEditor.Controls
                 session.SessionEdits.Clear();
                 session.RewindSnapshots.Clear();
                 session.WorkspaceRoot = string.IsNullOrWhiteSpace(workspaceRoot) ? _fileTools.WorkspaceRoot : workspaceRoot;
-                session.LlmSettings = CreateSessionSettingsSnapshot();
+                session.LlmSettings = _openSessionController.CreateSessionSettingsSnapshot();
                 session.UpdatedAt = DateTime.Now;
 
                 _agentPane.PlanningModeCheckBox.IsChecked = false;
-                RestoreOpenSession(session);
+                _openSessionController.RestoreSession(session);
             });
 
             await _uiDispatcher.RunAsync(async () => await RunAgentAsync());
-        }
-
-        private AgentOpenSessionState EnsureOpenSession(string sessionId)
-        {
-            return _openSessionController.EnsureSession(sessionId);
-        }
-
-        private EditorSettings CreateSessionSettingsSnapshot()
-        {
-            return _openSessionController.CreateSessionSettingsSnapshot();
-        }
-
-        private Task<EditorSettings> ResolveRunSessionSettingsAsync(AgentOpenSessionState session)
-        {
-            return _openSessionController.ResolveRunSessionSettingsAsync(session);
-        }
-
-        private void SaveOpenSessionPromptTitleFromUI()
-        {
-            _openSessionController.SavePromptTitleFromUI();
-        }
-
-        private void SaveActiveOpenSessionFromUI()
-        {
-            _openSessionController.SaveActiveFromUI();
-        }
-
-        private void RestoreOpenSession(AgentOpenSessionState session)
-        {
-            _openSessionController.RestoreSession(session);
-        }
-
-        private void CreateNewOpenSession()
-        {
-            _agentPane.PlanningModeCheckBox.IsChecked = false;
-            _openSessionController.CreateNewSession();
-        }
-
-        private void SwitchOpenSession(string sessionId)
-        {
-            _openSessionController.SwitchSession(sessionId);
-        }
-
-        private void CloseOpenSession(string sessionId)
-        {
-            _openSessionController.CloseSession(sessionId);
-        }
-
-        private void UpdateOpenSessionsUI()
-        {
-            _openSessionController.UpdateUI();
-        }
-
-        private void UpdateOpenSessionTitle(AgentOpenSessionState session, string prompt)
-        {
-            _openSessionController.UpdateSessionTitle(session, prompt);
-        }
-
-        private void UpdateActiveSessionBusyState()
-        {
-            _openSessionController.UpdateActiveSessionBusyState();
         }
 
         private void StopAgent()
@@ -1910,382 +1878,6 @@ namespace TxtAIEditor.Controls
             string modeText = _getString("AgentModeRun", "실행");
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             return $"{timestamp}  Agent {modeText}: {TruncateForActivity(instruction)}";
-        }
-
-        private static string BuildToolCallFormatRetryNote(string detail)
-        {
-            var builder = new StringBuilder();
-            builder.AppendLine("[Agent tool call format error]");
-            builder.AppendLine("The previous assistant response was not executed.");
-            builder.AppendLine("A tool turn must be exactly one <tool_call>...</tool_call> tag and no other text.");
-            builder.AppendLine("Progress updates, plans, markdown, and explanations must be in a separate plain-text response with no tool_call tag.");
-            builder.AppendLine("Re-emit only the tool_call now, or write the final answer with no tool_call tag.");
-            if (!string.IsNullOrWhiteSpace(detail))
-            {
-                builder.AppendLine($"Parser detail: {detail}");
-            }
-
-            return builder.ToString().TrimEnd();
-        }
-
-        private static bool LooksLikeStreamedToolCallEnvelopeStart(string trimmed)
-        {
-            if (trimmed.StartsWith("{", StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            if (!trimmed.StartsWith("```", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            string fenceInfo = trimmed.Substring(3).TrimStart();
-            return StartsWithFenceLanguage(fenceInfo, "json") ||
-                StartsWithFenceLanguage(fenceInfo, "jsonc") ||
-                StartsWithFenceLanguage(fenceInfo, "tool_call") ||
-                StartsWithFenceLanguage(fenceInfo, "tool-call");
-        }
-
-        private static bool ResponseMentionsSkillIntent(string response)
-        {
-            if (string.IsNullOrWhiteSpace(response)) return false;
-            string lower = response.ToLowerInvariant();
-
-            if (lower.Contains("skill_use") || lower.Contains("skill use")) return true;
-            if (!lower.Contains("skill")) return false;
-
-            string[] intentMarkers =
-            {
-                "i should use",
-                "i need to use",
-                "i'll use",
-                "i will use",
-                "let me use",
-                "let me call",
-                "i should call",
-                "i need to call",
-                "i'll call",
-                "i will call",
-                "going to use",
-                "going to call",
-                "use the",
-                "call the",
-            };
-
-            foreach (string marker in intentMarkers)
-            {
-                if (lower.Contains(marker) && lower.Contains("skill")) return true;
-            }
-
-            return false;
-        }
-
-        private static bool StartsWithFenceLanguage(string fenceInfo, string language)
-        {
-            if (!fenceInfo.StartsWith(language, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            if (fenceInfo.Length == language.Length)
-            {
-                return true;
-            }
-
-            return char.IsWhiteSpace(fenceInfo[language.Length]);
-        }
-
-        private string BuildInstructionDisplay(string userInstruction)
-        {
-            var labels = new List<string>();
-            string presetLabel = _presetController.GetSelectedPresetLabel();
-            if (!string.IsNullOrEmpty(presetLabel))
-            {
-                labels.Add(presetLabel);
-            }
-
-            string mcpLabel = _mcpController.GetSelectedMcpLabel();
-            if (!string.IsNullOrEmpty(mcpLabel))
-            {
-                labels.Add(string.Format(_getString("AgentMcpDisplayLabelFormat", "MCP: {0}"), mcpLabel));
-            }
-
-            string skillLabel = _skillController.GetSelectedSkillLabel();
-            if (!string.IsNullOrEmpty(skillLabel))
-            {
-                labels.Add(string.Format(_getString("AgentSkillDisplayLabelFormat", "Skill: {0}"), skillLabel));
-            }
-
-            if (labels.Count == 0)
-            {
-                return userInstruction;
-            }
-
-            string prefix = $"[{string.Join(" · ", labels)}]";
-            if (string.IsNullOrWhiteSpace(userInstruction))
-            {
-                return prefix;
-            }
-
-            return $"{prefix} {userInstruction}";
-        }
-
-        private string BuildAgentInstruction(string userInstruction)
-        {
-            string presetSection = _presetController.BuildSelectedPresetSection();
-            string mcpSection = _mcpController.BuildSelectedMcpSection();
-            string skillSection = _skillController.BuildSelectedSkillSection();
-            string agentsMdSection = BuildWorkspaceAgentsMdSection();
-            if (string.IsNullOrWhiteSpace(presetSection) &&
-                string.IsNullOrWhiteSpace(mcpSection) &&
-                string.IsNullOrWhiteSpace(skillSection) &&
-                string.IsNullOrWhiteSpace(agentsMdSection))
-            {
-                return userInstruction;
-            }
-
-            var builder = new StringBuilder();
-            if (!string.IsNullOrWhiteSpace(agentsMdSection))
-            {
-                builder.AppendLine(agentsMdSection);
-                builder.AppendLine();
-            }
-
-            if (!string.IsNullOrWhiteSpace(presetSection))
-            {
-                builder.AppendLine(presetSection);
-                builder.AppendLine();
-            }
-
-            if (!string.IsNullOrWhiteSpace(mcpSection))
-            {
-                builder.AppendLine(mcpSection);
-                builder.AppendLine();
-            }
-
-            if (!string.IsNullOrWhiteSpace(skillSection))
-            {
-                builder.AppendLine(skillSection);
-                builder.AppendLine();
-            }
-
-            if (!string.IsNullOrWhiteSpace(userInstruction))
-            {
-                builder.AppendLine("[User request]");
-                builder.Append(userInstruction);
-            }
-
-            return builder.ToString().Trim();
-        }
-
-        private string BuildWorkspaceAgentsMdSection()
-        {
-            if (!_agentPane.PlanningMode)
-            {
-                return string.Empty;
-            }
-
-            string workspaceRoot = _fileTools.WorkspaceRoot;
-            if (string.IsNullOrWhiteSpace(workspaceRoot))
-            {
-                return string.Empty;
-            }
-
-            string agentsMdPath = Path.Combine(workspaceRoot, "AGENTS.md");
-            if (!File.Exists(agentsMdPath))
-            {
-                return string.Empty;
-            }
-
-            try
-            {
-                string content = File.ReadAllText(agentsMdPath);
-                if (string.IsNullOrWhiteSpace(content))
-                {
-                    return string.Empty;
-                }
-
-                var builder = new StringBuilder();
-                builder.AppendLine("[Workspace agent rules]");
-                builder.AppendLine($"Source: {agentsMdPath}");
-                builder.AppendLine(content.Trim());
-                return builder.ToString().Trim();
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private string BuildSessionHistoryForPrompt(
-            string instruction,
-            string workspaceContext,
-            string selectedText)
-        {
-            if (_sessionHistory.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            string history = _sessionHistory.ToString();
-            int contextLimit = GetModelContextLimitForPromptBudget();
-            if (contextLimit <= 0)
-            {
-                if (IsLmStudioProvider())
-                {
-                    return string.Empty;
-                }
-
-                return BuildSessionHistoryTail(history, FallbackSessionHistoryPromptChars);
-            }
-
-            double maxPromptTokens = Math.Floor(contextLimit * PromptContextSafetyRatio);
-            double basePromptTokens = EstimateAgentPromptTokens(
-                instruction,
-                workspaceContext,
-                selectedText);
-            double sessionHistoryWrapperTokens = AgentTokenEstimator.Estimate(
-                "[Session History]" + Environment.NewLine +
-                Environment.NewLine +
-                "=================================" + Environment.NewLine + Environment.NewLine);
-            double availableHistoryTokens = maxPromptTokens - basePromptTokens - sessionHistoryWrapperTokens;
-
-            if (availableHistoryTokens <= 0)
-            {
-                return string.Empty;
-            }
-
-            int hardCharCap = Math.Min(history.Length, FallbackSessionHistoryPromptChars);
-            string cappedHistory = BuildSessionHistoryTail(history, hardCharCap);
-            if (AgentTokenEstimator.Estimate(cappedHistory) <= availableHistoryTokens)
-            {
-                return cappedHistory;
-            }
-
-            return TrimSessionHistoryToTokenBudget(history, hardCharCap, availableHistoryTokens);
-        }
-
-        private string BuildSessionHistoryTail(string history, int maxChars)
-        {
-            if (string.IsNullOrEmpty(history) || maxChars <= 0)
-            {
-                return string.Empty;
-            }
-
-            if (history.Length <= maxChars)
-            {
-                return history;
-            }
-
-            string tail = history.Substring(history.Length - maxChars);
-            int firstLineBreak = tail.IndexOf('\n');
-            if (firstLineBreak >= 0 && firstLineBreak + 1 < tail.Length)
-            {
-                tail = tail.Substring(firstLineBreak + 1);
-            }
-
-            return "[... earlier session history omitted to keep the prompt compact ...]" +
-                Environment.NewLine +
-                tail;
-        }
-
-        private string TrimSessionHistoryToTokenBudget(
-            string history,
-            int maxChars,
-            double tokenBudget)
-        {
-            string best = string.Empty;
-            int low = 1;
-            int high = Math.Min(history.Length, maxChars);
-
-            while (low <= high)
-            {
-                int mid = low + ((high - low) / 2);
-                string candidate = BuildSessionHistoryTail(history, mid);
-                double candidateTokens = AgentTokenEstimator.Estimate(candidate);
-
-                if (candidateTokens <= tokenBudget)
-                {
-                    best = candidate;
-                    low = mid + 1;
-                }
-                else
-                {
-                    high = mid - 1;
-                }
-            }
-
-            return best;
-        }
-
-        private double EstimateAgentPromptTokens(
-            string instruction,
-            string workspaceContext,
-            string selectedText)
-        {
-            string languageCode = _displayText.LanguageCode;
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(languageCode);
-            string userContent = AgentPromptBuilder.BuildUserContent(
-                instruction,
-                workspaceContext,
-                selectedText,
-                string.Empty,
-                languageCode);
-
-            return AgentTokenEstimator.Estimate(systemPrompt) +
-                AgentTokenEstimator.Estimate(userContent) +
-                _attachmentController.EstimatedImageTokens;
-        }
-
-        private int GetModelContextLimitForPromptBudget()
-        {
-            return _modelContextLimits.GetContextLimit(
-                GetCurrentSessionSettings(),
-                () => _agentPane.DispatcherQueue.TryEnqueue(() => UpdateContextStatsImmediate(force: true)));
-        }
-
-        private bool IsLmStudioProvider()
-        {
-            string provider = GetCurrentSessionSettings().LlmProvider ?? string.Empty;
-            return provider.Contains("lm studio", StringComparison.OrdinalIgnoreCase) ||
-                provider.Contains("lmstudio", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private string BuildWorkspaceContext(string instruction)
-        {
-            return _workspaceContextBuilder.Build(
-                instruction,
-                GetActiveTabForContext(),
-                true,
-                CaptureActiveSelectionSnapshot().HasLineRange);
-        }
-
-        private string BuildWorkspaceContext(
-            string instruction,
-            OpenedTab? activeTab,
-            AgentSelectionSnapshot selectionSnapshot,
-            IEnumerable<AgentAttachmentState> attachments,
-            string? workspaceRootOverride = null)
-        {
-            return _workspaceContextBuilder.Build(
-                instruction,
-                activeTab,
-                true,
-                selectionSnapshot.HasLineRange,
-                attachments,
-                workspaceRootOverride);
-        }
-
-        private IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForRun(AgentRunContext context)
-        {
-            var attachments = new List<LlmMessageAttachment>();
-            attachments.AddRange(context.Attachments
-                .Select(attachment => attachment.ImageContent)
-                .Where(attachment => attachment != null)
-                .Cast<LlmMessageAttachment>());
-            attachments.AddRange(context.ImageToolAttachments);
-            return attachments;
         }
 
         private void AddCurrentRunImageToolAttachment(LlmMessageAttachment attachment)
@@ -2357,614 +1949,11 @@ namespace TxtAIEditor.Controls
         {
             if (forceClearCache)
             {
-                EnsureOpenSession(_currentSessionId).LlmSettings = CreateSessionSettingsSnapshot();
+                _openSessionController.EnsureSession(_currentSessionId).LlmSettings =
+                    _openSessionController.CreateSessionSettingsSnapshot();
             }
 
             _contextStatsController.UpdateModelDisplay(forceClearCache);
-        }
-
-        private void AppendSessionHistory(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return;
-            _sessionHistory.Append(text);
-            _sessionHistoryTokenCount += AgentTokenEstimator.Estimate(text);
-        }
-
-        private void AppendSessionHistoryLine(string line = "")
-        {
-            _sessionHistory.AppendLine(line);
-            _sessionHistoryTokenCount += AgentTokenEstimator.Estimate(line + Environment.NewLine);
-        }
-
-        private async Task SaveCurrentSessionToHistoryAsync(string userInstruction)
-        {
-            if (_sessionHistory.Length == 0)
-            {
-                return;
-            }
-
-            var openSession = EnsureOpenSession(_currentSessionId);
-            UpdateOpenSessionTitle(openSession, userInstruction);
-            openSession.SessionHistoryText = _sessionHistory.ToString();
-            openSession.SessionHistoryTokenCount = _sessionHistoryTokenCount;
-            openSession.CurrentRunTranscriptTokens = _currentRunTranscriptTokens;
-            openSession.SessionEdits = _sessionEditController.SessionEdits.ToList();
-            openSession.Attachments = _attachmentController.GetState();
-            openSession.UpdatedAt = DateTime.Now;
-            UpdateOpenSessionsUI();
-
-            var item = new AgentHistoryItem
-            {
-                Id = _currentSessionId,
-                Timestamp = DateTime.Now,
-                Title = openSession.Title,
-                SessionHistoryText = _sessionHistory.ToString(),
-                SessionHistoryTokenCount = _sessionHistoryTokenCount,
-                SessionEdits = _sessionEditController.SessionEdits.ToList(),
-                WorkspaceRoot = openSession.WorkspaceRoot
-            };
-
-            await _historyController.SaveSessionAsync(item, _currentSessionId);
-        }
-
-        private async Task SaveRunSessionToHistoryAsync(AgentRunContext context, string userInstruction)
-        {
-            if (context.SessionHistory.Length == 0)
-            {
-                return;
-            }
-
-            var openSession = EnsureOpenSession(context.SessionId);
-            UpdateOpenSessionTitle(openSession, userInstruction);
-            openSession.SessionHistoryText = context.SessionHistory.ToString();
-            openSession.SessionHistoryTokenCount = context.SessionHistoryTokenCount;
-            openSession.CurrentRunTranscriptTokens = context.CurrentRunTranscriptTokens;
-            openSession.SessionEdits = context.SessionEdits.ToList();
-            openSession.Attachments = context.Attachments.ToList();
-            openSession.WorkspaceRoot = context.WorkspaceRoot;
-            openSession.UpdatedAt = DateTime.Now;
-            UpdateOpenSessionsUI();
-
-            var item = new AgentHistoryItem
-            {
-                Id = context.SessionId,
-                Timestamp = DateTime.Now,
-                Title = openSession.Title,
-                SessionHistoryText = context.SessionHistory.ToString(),
-                SessionHistoryTokenCount = context.SessionHistoryTokenCount,
-                SessionEdits = context.SessionEdits.ToList(),
-                WorkspaceRoot = context.WorkspaceRoot
-            };
-
-            await _historyController.SaveSessionAsync(item, context.SessionId);
-        }
-
-        private void LoadHistorySession(string historyId)
-        {
-            if (IsCurrentSessionRunning()) return;
-
-            var item = _historyController.GetSession(historyId);
-            if (item == null) return;
-
-            SaveActiveOpenSessionFromUI();
-
-            var session = EnsureOpenSession(item.Id);
-            session.Title = ResolveHistorySessionTitle(item);
-            session.PromptText = string.Empty;
-            session.OutputText = AgentHistoryFormatter.Format(
-                item.SessionHistoryText,
-                _settingsService.CurrentSettings.LlmAgentVerbose);
-            session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
-            session.SessionHistoryText = item.SessionHistoryText;
-            session.SessionHistoryTokenCount = item.SessionHistoryTokenCount;
-            session.CurrentRunTranscriptTokens = 0;
-            session.SessionEdits = item.SessionEdits.ToList();
-            session.Attachments.Clear();
-            session.RewindSnapshots.Clear();
-            session.WorkspaceRoot = item.WorkspaceRoot ?? string.Empty;
-            _openSessionController.ClearThinkingState(session);
-            session.UpdatedAt = DateTime.Now;
-
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
-                RestoreOpenSession(session);
-            });
-        }
-
-        private string ResolveHistorySessionTitle(AgentHistoryItem item)
-        {
-            string untitled = _getString("AgentOpenSessionUntitled", "새 세션");
-            string savedTitle = item.Title?.Trim() ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(savedTitle) &&
-                !string.Equals(savedTitle, untitled, StringComparison.Ordinal) &&
-                !string.Equals(savedTitle, "New Session", StringComparison.OrdinalIgnoreCase))
-            {
-                return savedTitle;
-            }
-
-            string extractedTitle = ExtractTitleFromSessionHistory(item.SessionHistoryText);
-            if (!string.IsNullOrWhiteSpace(extractedTitle))
-            {
-                return extractedTitle;
-            }
-
-            return string.IsNullOrWhiteSpace(savedTitle) ? untitled : savedTitle;
-        }
-
-        private static string ExtractTitleFromSessionHistory(string historyText)
-        {
-            if (string.IsNullOrWhiteSpace(historyText))
-            {
-                return string.Empty;
-            }
-
-            string[] lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            for (int i = 0; i < lines.Length; i++)
-            {
-                string line = lines[i];
-                if (!line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                string inlinePrompt = line.Substring("[User Prompt]:".Length).Trim();
-                if (!string.IsNullOrWhiteSpace(inlinePrompt) &&
-                    !inlinePrompt.StartsWith("[Agent persona/instruction presets]", StringComparison.OrdinalIgnoreCase) &&
-                    !inlinePrompt.StartsWith("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase) &&
-                    !inlinePrompt.StartsWith("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase))
-                {
-                    return inlinePrompt;
-                }
-
-                for (int j = i + 1; j < lines.Length; j++)
-                {
-                    if (!lines[j].StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    for (int k = j + 1; k < lines.Length; k++)
-                    {
-                        string requestLine = lines[k].Trim();
-                        if (!string.IsNullOrWhiteSpace(requestLine))
-                        {
-                            return requestLine;
-                        }
-                    }
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private async Task DeleteHistorySessionAsync(string historyId)
-        {
-            if (string.IsNullOrEmpty(historyId)) return;
-
-            await _historyController.DeleteAsync(historyId, _currentSessionId);
-
-            if (string.Equals(_currentSessionId, historyId, StringComparison.Ordinal))
-            {
-                CloseOpenSession(historyId);
-            }
-            else
-            {
-                _historyController.UpdateUI(_currentSessionId);
-            }
-        }
-
-        private async Task ClearAllHistoryAsync()
-        {
-            await _historyController.ClearAsync(_currentSessionId);
-            CloseOpenSession(_currentSessionId);
-        }
-
-        private void RefreshOutputDisplay()
-        {
-            if (IsCurrentSessionRunning()) return;
-
-            var session = EnsureOpenSession(_currentSessionId);
-            string text = session.SessionHistoryText ?? string.Empty;
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
-            string formatted = AgentHistoryFormatter.Format(text, _settingsService.CurrentSettings.LlmAgentVerbose);
-            session.OutputText = formatted;
-            _agentPane.ResetOutput(formatted);
-        }
-
-        private IReadOnlyList<LlmTool> BuildLlmToolsList(bool planningMode)
-        {
-            var tools = new List<LlmTool>
-            {
-                new LlmTool
-                {
-                    Name = "list_files",
-                    Description = "List files in the workspace matching a glob pattern.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            glob = new { type = "string", description = "Glob pattern to match files, e.g. **/*.cs" },
-                            maxResults = new { type = "integer", description = "Maximum number of files to return (default: 80)" }
-                        }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "search_text",
-                    Description = "Search for text within files in the workspace matching a glob pattern.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            query = new { type = "string", description = "The text query to search for" },
-                            glob = new { type = "string", description = "Glob pattern to filter files, e.g. **/*" },
-                            maxResults = new { type = "integer", description = "Maximum number of search results to return (default: 80)" }
-                        },
-                        required = new[] { "query" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "run_rg",
-                    Description = "Run ripgrep search with raw arguments.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            arguments = new { type = "string", description = "Ripgrep arguments, e.g. -n \"pattern\" FolderName" },
-                            timeoutMs = new { type = "integer", description = "Execution timeout in milliseconds (default: 10000)" }
-                        },
-                        required = new[] { "arguments" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "run_rga",
-                    Description = "Run ripgrep-all search for text inside PDFs/documents with raw arguments.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            arguments = new { type = "string", description = "Ripgrep-all arguments" },
-                            timeoutMs = new { type = "integer", description = "Timeout in milliseconds" }
-                        },
-                        required = new[] { "arguments" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "run_powershell",
-                    Description = "Run a PowerShell command on the system.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            command = new { type = "string", description = "The PowerShell command to run, e.g. git status --short" },
-                            timeoutMs = new { type = "integer", description = "Timeout in milliseconds" }
-                        },
-                        required = new[] { "command" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "read_file",
-                    Description = "Read a specific line range from a file.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the file in the workspace" },
-                            startLine = new { type = "integer", description = "Start line number, 1-indexed (default: 1)" },
-                            lineCount = new { type = "integer", description = "Number of lines to read (default: 160)" }
-                        },
-                        required = new[] { "path" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "skill_use",
-                    Description = "Read the full SKILL.md for an enabled skill by name or path.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            name = new { type = "string", description = "Name of the skill, e.g., skill-name" }
-                        },
-                        required = new[] { "name" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "read_image",
-                    Description = "Read an image file.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the image" }
-                        },
-                        required = new[] { "path" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "extract_document",
-                    Description = "Extract text from documents (PDF, DOCX, HWPX, etc.).",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Path to the document file" },
-                            outputPath = new { type = "string", description = "Optional output text file path" },
-                            maxChars = new { type = "integer", description = "Maximum number of characters to extract" }
-                        },
-                        required = new[] { "path" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "create_file",
-                    Description = "Create a new file with specified content.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the new file" },
-                            content = new { type = "string", description = "Content of the file" },
-                            openAfterCreate = new { type = "boolean", description = "Whether to open the file in the editor after creation" }
-                        },
-                        required = new[] { "path", "content" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "overwrite_file",
-                    Description = "Overwrite an existing file completely with new content.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            content = new { type = "string", description = "New content of the file" }
-                        },
-                        required = new[] { "path", "content" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "append_to_file",
-                    Description = "Append content to the end of a file.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            content = new { type = "string", description = "Content to append" }
-                        },
-                        required = new[] { "path", "content" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "replace_range",
-                    Description = "Replace a range of lines in a file.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            startLine = new { type = "integer", description = "Start line number to replace" },
-                            endLine = new { type = "integer", description = "End line number to replace" },
-                            newText = new { type = "string", description = "New text to insert" },
-                            expectedSnippet = new { type = "string", description = "For ranges < 5 lines, the exact text expected at the range to verify correctness." },
-                            expectedStartLines = new { type = "array", items = new { type = "string" }, description = "For ranges >= 5 lines, the exact content of the first 2 lines inside the range." },
-                            expectedEndLines = new { type = "array", items = new { type = "string" }, description = "For ranges >= 5 lines, the exact content of the last 2 lines inside the range." }
-                        },
-                        required = new[] { "path", "startLine", "endLine", "newText" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "apply_patch",
-                    Description = "Apply a unified diff patch to a file.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            patch = new { type = "string", description = "Unified diff patch content" }
-                        },
-                        required = new[] { "path", "patch" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "insert_to_file",
-                    Description = "Insert text relative to unique context lines.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            content = new { type = "string", description = "Content to insert" },
-                            insert_after = new { type = "string", description = "Unique context lines to insert after" },
-                            insert_before = new { type = "string", description = "Unique context lines to insert before" }
-                        },
-                        required = new[] { "path", "content" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "insert_text",
-                    Description = "Insert text at the current cursor position in the active editor tab.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            content = new { type = "string", description = "The text to insert" }
-                        },
-                        required = new[] { "content" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "create_tab",
-                    Description = "Create a new editor tab with content.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            title = new { type = "string", description = "Title of the tab" },
-                            content = new { type = "string", description = "Content of the tab" }
-                        },
-                        required = new[] { "title", "content" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "edit_tab",
-                    Description = "Modify the content of an editor tab.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            title = new { type = "string", description = "Tab title or ID" },
-                            content = new { type = "string", description = "New content of the tab" }
-                        },
-                        required = new[] { "title", "content" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "save_tab",
-                    Description = "Save an editor tab to disk.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            title = new { type = "string", description = "Optional tab title/ID" },
-                            path = new { type = "string", description = "Optional workspace path to save to" }
-                        }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "open_file",
-                    Description = "Open a file in the editor.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            path = new { type = "string", description = "Relative path to the file" }
-                        },
-                        required = new[] { "path" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "web_search_exa",
-                    Description = "Search the web using Exa/DuckDuckGo.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            query = new { type = "string", description = "Search query" },
-                            numResults = new { type = "integer", description = "Number of results to return (default: 5)" }
-                        },
-                        required = new[] { "query" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "web_fetch",
-                    Description = "Fetch the content of web pages.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            urls = new { type = "array", items = new { type = "string" }, description = "List of URLs to fetch" }
-                        },
-                        required = new[] { "urls" }
-                    }
-                }
-            };
-
-            if (planningMode)
-            {
-                tools.Add(new LlmTool
-                {
-                    Name = "make_plan",
-                    Description = "Save the implementation plan (Markdown). Use only in planning mode.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            markdown = new { type = "string", description = "Markdown plan content" }
-                        },
-                        required = new[] { "markdown" }
-                    }
-                });
-            }
-
-            var mcpAliases = _mcpController.GetActiveToolAliases();
-            foreach (var alias in mcpAliases)
-            {
-                object parametersObj = new { type = "object", properties = new { } };
-                try
-                {
-                    if (!string.IsNullOrWhiteSpace(alias.InputSchemaJson))
-                    {
-                        var parsed = JsonSerializer.Deserialize<object>(alias.InputSchemaJson);
-                        if (parsed != null)
-                        {
-                            parametersObj = parsed;
-                        }
-                    }
-                }
-                catch
-                {
-                }
-
-                tools.Add(new LlmTool
-                {
-                    Name = alias.Alias,
-                    Description = string.IsNullOrEmpty(alias.Description)
-                        ? $"MCP tool '{alias.ToolName}' from server '{alias.ServerName}'."
-                        : alias.Description,
-                    Parameters = parametersObj
-                });
-            }
-
-            return tools;
         }
 
     }
