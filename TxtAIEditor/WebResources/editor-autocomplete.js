@@ -385,17 +385,19 @@ function insertSelectedCandidate() {
     const caret = text.slice(0, currentCaret) === savedTextBeforeCaret
         ? currentCaret
         : savedCaret;
+    const { end: wordEnd } = getWordUnderCaret(text, caret);
     let wordStart = autocompleteReplaceStart(candidate, text, autocompleteState.wordStart, caret);
 
-    replaceWordWithAutocompleteText(element, wordStart, caret, candidate.insertText || candidate.label || '');
+    replaceWordWithAutocompleteText(element, wordStart, wordEnd, candidate.insertText || candidate.label || '');
     hideAutocomplete();
 }
 
-function replaceWordWithAutocompleteText(element, wordStart, caret, insertText) {
+function replaceWordWithAutocompleteText(element, wordStart, replaceEnd, insertText) {
     const text = lineTextFromElement(element);
     const normalized = String(insertText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const safeReplaceEnd = Math.max(wordStart, Math.min(Number(replaceEnd || wordStart), text.length));
     if (!normalized.includes('\n')) {
-        const nextText = text.slice(0, wordStart) + normalized + text.slice(caret);
+        const nextText = text.slice(0, wordStart) + normalized + text.slice(safeReplaceEnd);
         const nextCaret = wordStart + normalized.length;
         const lineNumber = Number(element.dataset.line || 1);
         updateSingleLine(element, nextText, nextCaret);
@@ -405,7 +407,7 @@ function replaceWordWithAutocompleteText(element, wordStart, caret, insertText) 
 
     const lineNumber = Number(element.dataset.line || 1);
     const before = text.slice(0, wordStart);
-    const after = text.slice(caret);
+    const after = text.slice(safeReplaceEnd);
     const parts = normalized.split('\n');
     const insertedCount = parts.length - 1;
     const firstLine = before + parts[0];
