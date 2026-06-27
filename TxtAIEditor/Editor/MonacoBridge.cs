@@ -332,6 +332,7 @@ namespace TxtAIEditor.Editor
                 ".hpp" => "cpp",
                 ".xml" => "xml",
                 ".xaml" => "xml",
+                ".appxmanifest" => "xml",
                 ".sql" => "sql",
                 ".sh" => "shell",
                 ".bash" => "shell",
