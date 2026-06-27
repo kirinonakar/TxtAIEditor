@@ -48,6 +48,8 @@ namespace TxtAIEditor.Core.Services
                 ".xml" => "xml",
                 ".xaml" => "xml",
                 ".appxmanifest" => "xml",
+                ".csproj" => "xml",
+                ".manifest" => "xml",
                 ".sql" => "sql",
                 ".sh" => "shell",
                 ".bash" => "shell",
