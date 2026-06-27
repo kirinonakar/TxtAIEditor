@@ -296,7 +296,9 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                _dialogController.ShowErrorMessage("비교 오류", "올바른 두 파일 혹은 탭을 선택해 주세요.");
+                _dialogController.ShowErrorMessage(
+                    _getLocalizedString("CompareInvalidSelectionTitle", "비교 오류"),
+                    _getLocalizedString("CompareInvalidSelectionMessage", "올바른 두 파일 혹은 탭을 선택해 주세요."));
             }
         }
 

@@ -1106,6 +1106,18 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="EditorReplaceAllButton" xml:space="preserve">
     <value>Replace All</value>
   </data>
+  <data name="EditorFindClearTooltip" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="EditorFindMatchCaseTooltip" xml:space="preserve">
+    <value>Match Case (Aa)</value>
+  </data>
+  <data name="EditorFindRegexTooltip" xml:space="preserve">
+    <value>Use Regular Expression (.*)</value>
+  </data>
+  <data name="EditorReplaceClearTooltip" xml:space="preserve">
+    <value>Clear</value>
+  </data>
   <data name="EditorFindPrevTooltip" xml:space="preserve">
     <value>Previous</value>
   </data>
@@ -1114,6 +1126,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="EditorFindCloseTooltip" xml:space="preserve">
     <value>Close</value>
+  </data>
+  <data name="EditorLoadingText" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="EditorLongLineProtectionFormat" xml:space="preserve">
+    <value>Long line: {0} chars, render protection</value>
   </data>
   <data name="StatusTotalLinesFormat" xml:space="preserve">
     <value>Total Lines: {0}</value>
@@ -2894,5 +2912,113 @@ Plan: {0}</value>
   </data>
   <data name="AgentAttachFileCaption" xml:space="preserve">
     <value>Attach File</value>
+  </data>
+  <data name="SearchFailedTitle" xml:space="preserve">
+    <value>Search Failed</value>
+  </data>
+  <data name="SearchNoFolderSelectedMessage" xml:space="preserve">
+    <value>Select a folder in Explorer first.</value>
+  </data>
+  <data name="SearchInvalidRegexMessageFormat" xml:space="preserve">
+    <value>The regular expression is invalid.&#10;{0}</value>
+  </data>
+  <data name="SearchErrorMessageFormat" xml:space="preserve">
+    <value>An error occurred while searching.&#10;{0}</value>
+  </data>
+  <data name="SearchCompletedTitle" xml:space="preserve">
+    <value>Search Complete</value>
+  </data>
+  <data name="SearchNoResultsSkippedFormat" xml:space="preserve">
+    <value>No results found.&#10;Skipped unreadable files: {0:N0}</value>
+  </data>
+  <data name="ReplaceFailedTitle" xml:space="preserve">
+    <value>Replace Failed</value>
+  </data>
+  <data name="ReplaceAllWarningTitle" xml:space="preserve">
+    <value>Replace All Warning</value>
+  </data>
+  <data name="ReplaceAllWarningContentFormat" xml:space="preserve">
+    <value>Replace {0:N0} matches with '{1}'?</value>
+  </data>
+  <data name="ReplaceAllConfirmButton" xml:space="preserve">
+    <value>Run Replace</value>
+  </data>
+  <data name="ReplaceCompletedTitle" xml:space="preserve">
+    <value>Replace Complete</value>
+  </data>
+  <data name="ReplaceCompletedMessage" xml:space="preserve">
+    <value>All matching items have been replaced.</value>
+  </data>
+  <data name="ReplaceOneFailureFormat" xml:space="preserve">
+    <value>Replacement failed: {0}</value>
+  </data>
+  <data name="CompareInvalidSelectionTitle" xml:space="preserve">
+    <value>Compare Error</value>
+  </data>
+  <data name="CompareInvalidSelectionMessage" xml:space="preserve">
+    <value>Select two valid files or tabs.</value>
+  </data>
+  <data name="OpenInBrowserDialogTitle" xml:space="preserve">
+    <value>Open in Browser</value>
+  </data>
+  <data name="OpenInBrowserFailedTitle" xml:space="preserve">
+    <value>Open in Browser Failed</value>
+  </data>
+  <data name="OpenInBrowserNoActiveTab" xml:space="preserve">
+    <value>No active tab is available to open in the browser.</value>
+  </data>
+  <data name="CharacterMapOpenFailedTitle" xml:space="preserve">
+    <value>Character Map Launch Failed</value>
+  </data>
+  <data name="EmojiFileOpenFailedTitle" xml:space="preserve">
+    <value>Open Emoji File Failed</value>
+  </data>
+  <data name="StartupOpenFailedTitle" xml:space="preserve">
+    <value>Startup File Open Failed</value>
+  </data>
+  <data name="SaveFailedTitle" xml:space="preserve">
+    <value>Save Failed</value>
+  </data>
+  <data name="EncryptedTabMissingPassword" xml:space="preserve">
+    <value>The encrypted tab has no password. Reopen the file and enter the password.</value>
+  </data>
+  <data name="EncodingChangeFailedTitle" xml:space="preserve">
+    <value>Encoding Change Failed</value>
+  </data>
+  <data name="SaveDialogTextFileFilter" xml:space="preserve">
+    <value>Text File</value>
+  </data>
+  <data name="SaveDialogMarkdownFileFilter" xml:space="preserve">
+    <value>Markdown File</value>
+  </data>
+  <data name="SaveDialogHtmlFileFilter" xml:space="preserve">
+    <value>HTML File</value>
+  </data>
+  <data name="SaveDialogLatexFileFilter" xml:space="preserve">
+    <value>LaTeX File</value>
+  </data>
+  <data name="PreviewCsvEmpty" xml:space="preserve">
+    <value>Empty CSV file.</value>
+  </data>
+  <data name="StickyNotePlaceholder" xml:space="preserve">
+    <value>Quick note...</value>
+  </data>
+  <data name="StickyNoteCloseButton" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="FileLoadErrorTitle" xml:space="preserve">
+    <value>File Load Error</value>
+  </data>
+  <data name="FileOpenFailedTitle" xml:space="preserve">
+    <value>Open File Failed</value>
+  </data>
+  <data name="RecentFileMissingMessageFormat" xml:space="preserve">
+    <value>Recent file does not exist:&#10;{0}</value>
+  </data>
+  <data name="CompareTabTitleFormat" xml:space="preserve">
+    <value>Compare: {0} ↔ {1}</value>
+  </data>
+  <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
+    <value>[Tool completed: {0}]</value>
   </data>
 </root>

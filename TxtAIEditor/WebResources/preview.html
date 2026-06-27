@@ -654,15 +654,16 @@
             spacer.style.height = '0';
 
             const text = String(message.text || '');
+            const emptyMessage = escapeHtml(message.csvEmptyMessage || 'Empty CSV file.');
             if (!text.trim()) {
-                viewport.innerHTML = '<div class="csv-empty">빈 CSV 파일입니다.</div>';
+                viewport.innerHTML = `<div class="csv-empty">${emptyMessage}</div>`;
                 return;
             }
 
             const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
             const nonEmpty = lines.filter(l => l.trim().length > 0);
             if (nonEmpty.length === 0) {
-                viewport.innerHTML = '<div class="csv-empty">빈 CSV 파일입니다.</div>';
+                viewport.innerHTML = `<div class="csv-empty">${emptyMessage}</div>`;
                 return;
             }
 

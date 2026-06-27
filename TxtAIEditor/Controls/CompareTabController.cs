@@ -60,7 +60,10 @@ namespace TxtAIEditor.Controls
             contentA ??= await _fileService.ReadTextFileAsync(pathA);
             contentB ??= await _fileService.ReadTextFileAsync(pathB);
 
-            string title = customTitle ?? $"비교: {Path.GetFileName(pathA)} ↔ {Path.GetFileName(pathB)}";
+            string title = customTitle ?? string.Format(
+                _getString("CompareTabTitleFormat", "비교: {0} ↔ {1}"),
+                Path.GetFileName(pathA),
+                Path.GetFileName(pathB));
 
             OpenedTab? existingTab = null;
             string diffTitlePrefix = _getString("AgentDiffTitle", "Agent 변경 비교");

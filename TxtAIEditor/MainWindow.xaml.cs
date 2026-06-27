@@ -205,7 +205,7 @@ namespace TxtAIEditor
             _languageDetectionService = new LanguageDetectionService();
             _recentFilesService = new RecentFilesService();
             _fileSearchService = new FileSearchService(_fileService);
-            _stickyNoteService = new StickyNoteService();
+            _stickyNoteService = new StickyNoteService(GetLocalizedString);
             _settingsDialogService = new SettingsDialogService(_llmService);
             _uiPersonalizationService = new UiPersonalizationService();
             _pdfTextExtractionService = new PdfTextExtractionService();
@@ -213,7 +213,7 @@ namespace TxtAIEditor
             _editorTabDocumentFactory = new EditorTabDocumentFactory(_languageDetectionService, GetLocalizedString);
             _explorerDirectoryService = new ExplorerDirectoryService();
             _secureNoteEncryptionService = new SecureNoteEncryptionService();
-            var fileSaveDialogService = new FileSaveDialogService();
+            var fileSaveDialogService = new FileSaveDialogService(GetLocalizedString);
             _compareSelectionDialogService = new CompareSelectionDialogService();
             _unsavedChangesDialogService = new UnsavedChangesDialogService();
             _shellPanelLayoutService = new ShellPanelLayoutService(
@@ -500,7 +500,8 @@ namespace TxtAIEditor
                 callback => DispatcherQueue.TryEnqueue(() => callback()),
                 NavigateExplorerToFolderAndRevealAsync,
                 LoadFileIntoTabAsync,
-                _dialogController.ShowErrorMessage);
+                _dialogController.ShowErrorMessage,
+                GetLocalizedString);
             _tabSaveController = new TabSaveController(
                 this,
                 _fileService,
@@ -839,7 +840,8 @@ namespace TxtAIEditor
                 _tabBridges,
                 LoadFileIntoTabAsync,
                 _activeEditorInsertionController.InsertTextAsync,
-                _dialogController.ShowErrorMessage);
+                _dialogController.ShowErrorMessage,
+                GetLocalizedString);
             _tabSelectionController = new TabSelectionController(
                 EditorWorkspace,
                 _viewModel,
@@ -1008,6 +1010,7 @@ namespace TxtAIEditor
                 SyncAgentSettingsAfterLoad,
                 RefreshGitStatusUIAsync,
                 UpdateAutoSaveStatus,
+                GetLocalizedString,
                 _dialogController.ShowErrorMessage);
             _shellInteractionController = new MainWindowShellInteractionController(
                 RootGrid,

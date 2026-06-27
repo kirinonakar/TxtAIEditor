@@ -108,7 +108,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showErrorMessage("인코딩 변경 실패", ex.Message);
+                _showErrorMessage(_getString("EncodingChangeFailedTitle", "인코딩 변경 실패"), ex.Message);
                 _statusBarController.SyncEncodingCombo(tab);
                 _statusBarController.SyncLineEndingText(tab);
             }

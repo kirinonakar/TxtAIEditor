@@ -91,7 +91,8 @@ const state = {
         suppressBeforeInputTypes: new Set()
     },
     originalLines: [],
-    dirtyLines: new Map()
+    dirtyLines: new Map(),
+    longLineProtectionFormat: 'Long line: {0} chars, render protection'
 };
 
 state.lineEndStacks = new Map();
@@ -363,6 +364,22 @@ function applyOptions(msg) {
             el.title = msg.replaceAllButton;
         }
     }
+    if (msg.findClearTooltip !== undefined) {
+        const el = document.getElementById('find-clear');
+        if (el) el.title = msg.findClearTooltip;
+    }
+    if (msg.findMatchCaseTooltip !== undefined) {
+        const el = document.getElementById('find-match-case');
+        if (el) el.title = msg.findMatchCaseTooltip;
+    }
+    if (msg.findRegexTooltip !== undefined) {
+        const el = document.getElementById('find-regex');
+        if (el) el.title = msg.findRegexTooltip;
+    }
+    if (msg.replaceClearTooltip !== undefined) {
+        const el = document.getElementById('replace-clear');
+        if (el) el.title = msg.replaceClearTooltip;
+    }
     if (msg.findPrevTooltip !== undefined) {
         const el = document.getElementById('find-prev');
         if (el) el.title = msg.findPrevTooltip;
@@ -374,6 +391,13 @@ function applyOptions(msg) {
     if (msg.findCloseTooltip !== undefined) {
         const el = document.getElementById('find-close');
         if (el) el.title = msg.findCloseTooltip;
+    }
+    if (msg.editorLoadingText !== undefined) {
+        const el = document.getElementById('loading-overlay');
+        if (el) el.textContent = msg.editorLoadingText;
+    }
+    if (msg.longLineProtectionFormat !== undefined) {
+        state.longLineProtectionFormat = msg.longLineProtectionFormat;
     }
 
     if (msg.autocompleteSnippet !== undefined) {

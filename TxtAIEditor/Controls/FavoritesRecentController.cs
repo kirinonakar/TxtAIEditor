@@ -23,6 +23,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task> _navigateExplorerToFolderAsync;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Action<string, string> _showError;
+        private readonly Func<string, string, string> _getString;
         private readonly Dictionary<string, bool> _favoriteFolderHints = new(StringComparer.OrdinalIgnoreCase);
 
         public FavoritesRecentController(
@@ -33,7 +34,8 @@ namespace TxtAIEditor.Controls
             Action<Action> enqueueOnUiThread,
             Func<string, Task> navigateExplorerToFolderAsync,
             Func<string, Task> loadFileIntoTabAsync,
-            Action<string, string> showError)
+            Action<string, string> showError,
+            Func<string, string, string>? getString = null)
         {
             _settingsService = settingsService;
             _recentFilesService = recentFilesService;
@@ -43,6 +45,7 @@ namespace TxtAIEditor.Controls
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _showError = showError;
+            _getString = getString ?? ((_, fallback) => fallback);
 
             _leftSidebar.FavoritesList.ItemsSource = _viewModel.Favorites;
             _leftSidebar.RecentFilesList.ItemsSource = _viewModel.RecentFiles;
@@ -335,7 +338,9 @@ namespace TxtAIEditor.Controls
 
             if (!File.Exists(item.Path))
             {
-                _showError("파일 열기 실패", $"최근 파일이 존재하지 않습니다:\n{item.Path}");
+                _showError(
+                    _getString("FileOpenFailedTitle", "파일 열기 실패"),
+                    string.Format(_getString("RecentFileMissingMessageFormat", "최근 파일이 존재하지 않습니다:\n{0}"), item.Path));
                 return;
             }
 

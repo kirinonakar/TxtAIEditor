@@ -175,7 +175,10 @@ namespace TxtAIEditor.Controls
 
     internal static class AgentHistoryFormatter
     {
-        public static string Format(string historyText, bool verbose)
+        public static string Format(
+            string historyText,
+            bool verbose,
+            Func<string, string, string>? getString = null)
         {
             if (string.IsNullOrEmpty(historyText))
             {
@@ -227,7 +230,10 @@ namespace TxtAIEditor.Controls
                     afterUserRequest = false;
 
                     string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
-                    result.AppendLine($"[도구 실행 완료: {toolName}]");
+                    string completedFormat = getString?.Invoke(
+                        "AgentHistoryToolCompletedFormat",
+                        "[도구 실행 완료: {0}]") ?? "[도구 실행 완료: {0}]";
+                    result.AppendLine(string.Format(completedFormat, toolName));
                     continue;
                 }
                 else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))

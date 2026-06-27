@@ -94,7 +94,9 @@ namespace TxtAIEditor.Controls
             if (string.IsNullOrEmpty(searchRoot))
             {
                 CancelActiveSearch();
-                _showError("검색 실패", "먼저 탐색기에서 작업할 폴더를 선택하십시오.");
+                _showError(
+                    _getString("SearchFailedTitle", "검색 실패"),
+                    _getString("SearchNoFolderSelectedMessage", "먼저 탐색기에서 작업할 폴더를 선택하십시오."));
                 return;
             }
 
@@ -133,7 +135,9 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                _showError("검색 실패", $"정규식이 올바르지 않습니다.\n{ex.Message}");
+                _showError(
+                    _getString("SearchFailedTitle", "검색 실패"),
+                    string.Format(_getString("SearchInvalidRegexMessageFormat", "정규식이 올바르지 않습니다.\n{0}"), ex.Message));
                 return;
             }
             catch (Exception ex)
@@ -143,7 +147,9 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                _showError("검색 실패", $"검색 중 오류가 발생했습니다.\n{ex.Message}");
+                _showError(
+                    _getString("SearchFailedTitle", "검색 실패"),
+                    string.Format(_getString("SearchErrorMessageFormat", "검색 중 오류가 발생했습니다.\n{0}"), ex.Message));
                 return;
             }
             finally
@@ -164,7 +170,9 @@ namespace TxtAIEditor.Controls
 
             if (summary.FoundCount == 0 && summary.SkippedFiles > 0)
             {
-                _showError("검색 완료", $"검색 결과가 없습니다.\n읽을 수 없어 건너뛴 파일: {summary.SkippedFiles:N0}개");
+                _showError(
+                    _getString("SearchCompletedTitle", "검색 완료"),
+                    string.Format(_getString("SearchNoResultsSkippedFormat", "검색 결과가 없습니다.\n읽을 수 없어 건너뛴 파일: {0:N0}개"), summary.SkippedFiles));
             }
         }
 
@@ -193,17 +201,19 @@ namespace TxtAIEditor.Controls
             }
             catch (ArgumentException ex)
             {
-                _showError("바꾸기 실패", $"정규식이 올바르지 않습니다.\n{ex.Message}");
+                _showError(
+                    _getString("ReplaceFailedTitle", "바꾸기 실패"),
+                    string.Format(_getString("SearchInvalidRegexMessageFormat", "정규식이 올바르지 않습니다.\n{0}"), ex.Message));
                 return;
             }
 
             _beforeDialog?.Invoke();
             var dialog = new ContentDialog
             {
-                Title = "전체 바꾸기 경고",
-                Content = $"{editableResults.Count}개의 일치 항목을 '{replace}'(으)로 일괄 바꾸기하시겠습니까?",
-                PrimaryButtonText = "바꾸기 실행",
-                CloseButtonText = "취소",
+                Title = _getString("ReplaceAllWarningTitle", "전체 바꾸기 경고"),
+                Content = string.Format(_getString("ReplaceAllWarningContentFormat", "{0:N0}개의 일치 항목을 '{1}'(으)로 일괄 바꾸기하시겠습니까?"), editableResults.Count, replace),
+                PrimaryButtonText = _getString("ReplaceAllConfirmButton", "바꾸기 실행"),
+                CloseButtonText = _getString("UnsavedChangesCancel", "취소"),
                 XamlRoot = _xamlRootProvider()
             };
 
@@ -258,7 +268,9 @@ namespace TxtAIEditor.Controls
             }
 
             UpdateGroupedResults();
-            _showError("바꾸기 완료", "모든 매칭 항목의 바꾸기 처리가 완료되었습니다.");
+            _showError(
+                _getString("ReplaceCompletedTitle", "바꾸기 완료"),
+                _getString("ReplaceCompletedMessage", "모든 매칭 항목의 바꾸기 처리가 완료되었습니다."));
             await _refreshGitStatusAsync();
         }
 
@@ -291,7 +303,9 @@ namespace TxtAIEditor.Controls
             }
             catch (ArgumentException ex)
             {
-                _showError("바꾸기 실패", $"정규식이 올바르지 않습니다.\n{ex.Message}");
+                _showError(
+                    _getString("ReplaceFailedTitle", "바꾸기 실패"),
+                    string.Format(_getString("SearchInvalidRegexMessageFormat", "정규식이 올바르지 않습니다.\n{0}"), ex.Message));
                 return;
             }
 
@@ -326,7 +340,9 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showError("바꾸기 실패", $"대체 실패: {ex.Message}");
+                _showError(
+                    _getString("ReplaceFailedTitle", "바꾸기 실패"),
+                    string.Format(_getString("ReplaceOneFailureFormat", "대체 실패: {0}"), ex.Message));
             }
         }
 

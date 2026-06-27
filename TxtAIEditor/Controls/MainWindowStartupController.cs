@@ -42,6 +42,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _syncAgentSettingsAfterLoad;
         private readonly Func<Task> _refreshGitStatusUiAsync;
         private readonly Action _updateAutoSaveStatus;
+        private readonly Func<string, string, string> _getString;
         private readonly Action<string, string> _showErrorMessage;
         private bool _initializePreviewAfterStartup;
 
@@ -72,6 +73,7 @@ namespace TxtAIEditor.Controls
             Action syncAgentSettingsAfterLoad,
             Func<Task> refreshGitStatusUiAsync,
             Action updateAutoSaveStatus,
+            Func<string, string, string> getString,
             Action<string, string> showErrorMessage)
         {
             _window = window;
@@ -100,6 +102,7 @@ namespace TxtAIEditor.Controls
             _syncAgentSettingsAfterLoad = syncAgentSettingsAfterLoad;
             _refreshGitStatusUiAsync = refreshGitStatusUiAsync;
             _updateAutoSaveStatus = updateAutoSaveStatus;
+            _getString = getString;
             _showErrorMessage = showErrorMessage;
         }
 
@@ -136,7 +139,7 @@ namespace TxtAIEditor.Controls
                     _openNewTab();
                 }
 
-                _showErrorMessage("시작 파일 열기 실패", ex.Message);
+                _showErrorMessage(_getString("StartupOpenFailedTitle", "시작 파일 열기 실패"), ex.Message);
             }
         }
 

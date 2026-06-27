@@ -184,8 +184,10 @@ function createEditorRenderer({
             const hasLine = state.cache.has(line);
             const text = hasLine ? state.cache.get(line) : '';
             const isLong = hasLine && text.length > MAX_RENDER_CHARS;
+            const longLineMessage = (state.longLineProtectionFormat || 'Long line: {0} chars, render protection')
+                .replace('{0}', text.length.toLocaleString());
             const displayText = isLong
-                ? `${text.slice(0, MAX_RENDER_CHARS)} ... [긴 줄: ${text.length.toLocaleString()}자, 렌더링 보호]`
+                ? `${text.slice(0, MAX_RENDER_CHARS)} ... [${longLineMessage}]`
                 : text;
             const contentEditable = !state.readOnly && hasLine && !isLong ? 'true' : 'false';
             const selectionBounds = selectionBoundsForLine(line, displayText.length);

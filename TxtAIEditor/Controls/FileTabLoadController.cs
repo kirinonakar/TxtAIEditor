@@ -147,7 +147,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showErrorMessage("파일 로드 에러", ex.Message);
+                _showErrorMessage(_getString("FileLoadErrorTitle", "파일 로드 에러"), ex.Message);
                 return FileTabLoadResult.Failed(filePath, ex.Message);
             }
             finally

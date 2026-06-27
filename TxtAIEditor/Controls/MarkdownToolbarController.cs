@@ -19,6 +19,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Func<string, Task<bool>> _insertTextIntoActiveEditorAsync;
         private readonly Action<string, string> _showError;
+        private readonly Func<string, string, string> _getString;
 
         public MarkdownToolbarController(
             TopCommandBarPane topToolbar,
@@ -27,7 +28,8 @@ namespace TxtAIEditor.Controls
             Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             Func<string, Task> loadFileIntoTabAsync,
             Func<string, Task<bool>> insertTextIntoActiveEditorAsync,
-            Action<string, string> showError)
+            Action<string, string> showError,
+            Func<string, string, string>? getString = null)
         {
             _topToolbar = topToolbar;
             _markdownToolbar = markdownToolbar;
@@ -36,6 +38,7 @@ namespace TxtAIEditor.Controls
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _insertTextIntoActiveEditorAsync = insertTextIntoActiveEditorAsync;
             _showError = showError;
+            _getString = getString ?? ((_, fallback) => fallback);
 
             _markdownToolbar.CommandRequested += OnMarkdownToolbarCommandRequested;
             _topToolbar.ToggleMarkdownToolbarClick += OnToggleMarkdownToolbarClick;
@@ -97,7 +100,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showError("문자표 실행 실패", ex.Message);
+                _showError(_getString("CharacterMapOpenFailedTitle", "문자표 실행 실패"), ex.Message);
             }
         }
 
@@ -113,7 +116,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showError("이모지 파일 열기 실패", ex.Message);
+                _showError(_getString("EmojiFileOpenFailedTitle", "이모지 파일 열기 실패"), ex.Message);
             }
         }
     }

@@ -10,8 +10,14 @@ namespace TxtAIEditor.Core.Services
 {
     public sealed class StickyNoteService : IStickyNoteService
     {
+        private readonly Func<string, string, string> _getString;
         private Window? _stickyNoteWindow;
         private TextBox? _stickyNoteTextBox;
+
+        public StickyNoteService(Func<string, string, string>? getString = null)
+        {
+            _getString = getString ?? ((_, fallback) => fallback);
+        }
 
         [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
@@ -47,7 +53,7 @@ namespace TxtAIEditor.Core.Services
                 Text = initialText,
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap,
-                PlaceholderText = "빠르게 메모...",
+                PlaceholderText = _getString("StickyNotePlaceholder", "빠르게 메모..."),
                 MinWidth = 320,
                 MinHeight = 240,
                 FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI, Malgun Gothic")
@@ -61,8 +67,8 @@ namespace TxtAIEditor.Core.Services
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Spacing = 8
             };
-            var saveButton = new Button { Content = "저장" };
-            var closeButton = new Button { Content = "닫기" };
+            var saveButton = new Button { Content = _getString("SaveFile", "저장") };
+            var closeButton = new Button { Content = _getString("StickyNoteCloseButton", "닫기") };
             actions.Children.Add(saveButton);
             actions.Children.Add(closeButton);
             Grid.SetRow(actions, 1);
@@ -72,7 +78,7 @@ namespace TxtAIEditor.Core.Services
 
             _stickyNoteWindow = new Window
             {
-                Title = "스티커 노트",
+                Title = _getString("StickyNoteTitle", "스티커 노트"),
                 Content = root
             };
 

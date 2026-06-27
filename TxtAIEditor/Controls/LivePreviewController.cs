@@ -356,7 +356,8 @@ namespace TxtAIEditor.Controls
                         previewCustomForegroundColor = _settingsService.CurrentSettings.PreviewCustomForegroundColor,
                         uiFontFamily = _settingsService.CurrentSettings.UiFontFamily,
                         previewFontFamily = _settingsService.CurrentSettings.PreviewFontFamily,
-                        previewFontSize = _settingsService.CurrentSettings.PreviewFontSize
+                        previewFontSize = _settingsService.CurrentSettings.PreviewFontSize,
+                        csvEmptyMessage = _getString("PreviewCsvEmpty", "빈 CSV 파일입니다.")
                     };
                     coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(csvMsg));
                     return;
@@ -767,7 +768,9 @@ namespace TxtAIEditor.Controls
             var tab = _activeTabProvider();
             if (tab == null)
             {
-                _showErrorMessage("브라우저 열기", "브라우저로 열 활성 탭이 없습니다.");
+                _showErrorMessage(
+                    _getString("OpenInBrowserDialogTitle", "브라우저 열기"),
+                    _getString("OpenInBrowserNoActiveTab", "브라우저로 열 활성 탭이 없습니다."));
                 return;
             }
 
@@ -796,7 +799,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showErrorMessage("브라우저 열기 실패", ex.Message);
+                _showErrorMessage(_getString("OpenInBrowserFailedTitle", "브라우저 열기 실패"), ex.Message);
             }
         }
 

@@ -1107,6 +1107,18 @@
   <data name="EditorReplaceAllButton" xml:space="preserve">
     <value>すべて置換</value>
   </data>
+  <data name="EditorFindClearTooltip" xml:space="preserve">
+    <value>クリア</value>
+  </data>
+  <data name="EditorFindMatchCaseTooltip" xml:space="preserve">
+    <value>大文字小文字を区別 (Aa)</value>
+  </data>
+  <data name="EditorFindRegexTooltip" xml:space="preserve">
+    <value>正規表現を使用 (.*)</value>
+  </data>
+  <data name="EditorReplaceClearTooltip" xml:space="preserve">
+    <value>クリア</value>
+  </data>
   <data name="EditorFindPrevTooltip" xml:space="preserve">
     <value>前へ</value>
   </data>
@@ -1115,6 +1127,12 @@
   </data>
   <data name="EditorFindCloseTooltip" xml:space="preserve">
     <value>閉じる</value>
+  </data>
+  <data name="EditorLoadingText" xml:space="preserve">
+    <value>読み込み中...</value>
+  </data>
+  <data name="EditorLongLineProtectionFormat" xml:space="preserve">
+    <value>長い行: {0} 文字, レンダリング保護</value>
   </data>
   <data name="StatusTotalLinesFormat" xml:space="preserve">
     <value>総行数: {0}</value>
@@ -2895,5 +2913,113 @@
   </data>
   <data name="AgentAttachFileCaption" xml:space="preserve">
     <value>ファイル添付</value>
+  </data>
+  <data name="SearchFailedTitle" xml:space="preserve">
+    <value>検索失敗</value>
+  </data>
+  <data name="SearchNoFolderSelectedMessage" xml:space="preserve">
+    <value>先にエクスプローラーで作業するフォルダーを選択してください。</value>
+  </data>
+  <data name="SearchInvalidRegexMessageFormat" xml:space="preserve">
+    <value>正規表現が正しくありません。&#10;{0}</value>
+  </data>
+  <data name="SearchErrorMessageFormat" xml:space="preserve">
+    <value>検索中にエラーが発生しました。&#10;{0}</value>
+  </data>
+  <data name="SearchCompletedTitle" xml:space="preserve">
+    <value>検索完了</value>
+  </data>
+  <data name="SearchNoResultsSkippedFormat" xml:space="preserve">
+    <value>検索結果がありません。&#10;読み取れずスキップしたファイル: {0:N0} 件</value>
+  </data>
+  <data name="ReplaceFailedTitle" xml:space="preserve">
+    <value>置換失敗</value>
+  </data>
+  <data name="ReplaceAllWarningTitle" xml:space="preserve">
+    <value>すべて置換の警告</value>
+  </data>
+  <data name="ReplaceAllWarningContentFormat" xml:space="preserve">
+    <value>{0:N0} 件の一致を '{1}' に一括置換しますか？</value>
+  </data>
+  <data name="ReplaceAllConfirmButton" xml:space="preserve">
+    <value>置換を実行</value>
+  </data>
+  <data name="ReplaceCompletedTitle" xml:space="preserve">
+    <value>置換完了</value>
+  </data>
+  <data name="ReplaceCompletedMessage" xml:space="preserve">
+    <value>すべての一致項目の置換が完了しました。</value>
+  </data>
+  <data name="ReplaceOneFailureFormat" xml:space="preserve">
+    <value>置換失敗: {0}</value>
+  </data>
+  <data name="CompareInvalidSelectionTitle" xml:space="preserve">
+    <value>比較エラー</value>
+  </data>
+  <data name="CompareInvalidSelectionMessage" xml:space="preserve">
+    <value>有効な 2 つのファイルまたはタブを選択してください。</value>
+  </data>
+  <data name="OpenInBrowserDialogTitle" xml:space="preserve">
+    <value>ブラウザーで開く</value>
+  </data>
+  <data name="OpenInBrowserFailedTitle" xml:space="preserve">
+    <value>ブラウザーで開けません</value>
+  </data>
+  <data name="OpenInBrowserNoActiveTab" xml:space="preserve">
+    <value>ブラウザーで開くアクティブなタブがありません。</value>
+  </data>
+  <data name="CharacterMapOpenFailedTitle" xml:space="preserve">
+    <value>文字コード表の起動失敗</value>
+  </data>
+  <data name="EmojiFileOpenFailedTitle" xml:space="preserve">
+    <value>絵文字ファイルを開けません</value>
+  </data>
+  <data name="StartupOpenFailedTitle" xml:space="preserve">
+    <value>起動時ファイルを開けません</value>
+  </data>
+  <data name="SaveFailedTitle" xml:space="preserve">
+    <value>保存失敗</value>
+  </data>
+  <data name="EncryptedTabMissingPassword" xml:space="preserve">
+    <value>暗号化されたタブのパスワードがありません。ファイルを開き直してパスワードを入力してください。</value>
+  </data>
+  <data name="EncodingChangeFailedTitle" xml:space="preserve">
+    <value>エンコード変更失敗</value>
+  </data>
+  <data name="SaveDialogTextFileFilter" xml:space="preserve">
+    <value>テキストファイル</value>
+  </data>
+  <data name="SaveDialogMarkdownFileFilter" xml:space="preserve">
+    <value>Markdown ファイル</value>
+  </data>
+  <data name="SaveDialogHtmlFileFilter" xml:space="preserve">
+    <value>HTML ファイル</value>
+  </data>
+  <data name="SaveDialogLatexFileFilter" xml:space="preserve">
+    <value>LaTeX ファイル</value>
+  </data>
+  <data name="PreviewCsvEmpty" xml:space="preserve">
+    <value>空の CSV ファイルです。</value>
+  </data>
+  <data name="StickyNotePlaceholder" xml:space="preserve">
+    <value>すばやくメモ...</value>
+  </data>
+  <data name="StickyNoteCloseButton" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
+  <data name="FileLoadErrorTitle" xml:space="preserve">
+    <value>ファイル読み込みエラー</value>
+  </data>
+  <data name="FileOpenFailedTitle" xml:space="preserve">
+    <value>ファイルを開けません</value>
+  </data>
+  <data name="RecentFileMissingMessageFormat" xml:space="preserve">
+    <value>最近使ったファイルが存在しません:&#10;{0}</value>
+  </data>
+  <data name="CompareTabTitleFormat" xml:space="preserve">
+    <value>比較: {0} ↔ {1}</value>
+  </data>
+  <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
+    <value>[ツール完了: {0}]</value>
   </data>
 </root>

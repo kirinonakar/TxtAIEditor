@@ -12,10 +12,20 @@ namespace TxtAIEditor.Core.Services
         private const int OFN_OVERWRITEPROMPT = 0x00000002;
         private const int OFN_PATHMUSTEXIST = 0x00000800;
         private const int OFN_NOCHANGEDIR = 0x00000008;
+        private readonly Func<string, string, string> _getString;
+
+        public FileSaveDialogService(Func<string, string, string>? getString = null)
+        {
+            _getString = getString ?? ((_, fallback) => fallback);
+        }
 
         public string? ShowSaveDialog(Window owner, string suggestedName, string? initialDirectory)
         {
-            string filter = "텍스트 파일 (*.txt)\0*.txt\0마크다운 파일 (*.md;*.markdown)\0*.md;*.markdown\0HTML 파일 (*.html)\0*.html\0LaTeX 파일 (*.tex)\0*.tex\0\0";
+            string filter =
+                $"{_getString("SaveDialogTextFileFilter", "텍스트 파일")} (*.txt)\0*.txt\0" +
+                $"{_getString("SaveDialogMarkdownFileFilter", "마크다운 파일")} (*.md;*.markdown)\0*.md;*.markdown\0" +
+                $"{_getString("SaveDialogHtmlFileFilter", "HTML 파일")} (*.html)\0*.html\0" +
+                $"{_getString("SaveDialogLatexFileFilter", "LaTeX 파일")} (*.tex)\0*.tex\0\0";
             var fileNameBuffer = new string('\0', 1024);
             if (!string.IsNullOrEmpty(suggestedName))
             {

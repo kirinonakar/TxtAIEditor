@@ -101,7 +101,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _showErrorMessage("저장 실패", ex.Message);
+                _showErrorMessage(_getString("SaveFailedTitle", "저장 실패"), ex.Message);
                 return false;
             }
         }
@@ -210,7 +210,7 @@ namespace TxtAIEditor.Controls
                 string? password = tab.EncryptionPassword;
                 if (string.IsNullOrWhiteSpace(password))
                 {
-                    throw new InvalidOperationException("암호화된 탭의 암호가 없습니다. 파일을 다시 열어 암호를 입력해 주세요.");
+                    throw new InvalidOperationException(_getString("EncryptedTabMissingPassword", "암호화된 탭의 암호가 없습니다. 파일을 다시 열어 암호를 입력해 주세요."));
                 }
 
                 string text = session != null ? session.GetText() : tab.Content;

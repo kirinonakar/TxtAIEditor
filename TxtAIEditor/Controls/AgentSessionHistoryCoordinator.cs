@@ -82,7 +82,8 @@ namespace TxtAIEditor.Controls
             session.PromptText = string.Empty;
             session.OutputText = AgentHistoryFormatter.Format(
                 item.SessionHistoryText,
-                _settingsService.CurrentSettings.LlmAgentVerbose);
+                _settingsService.CurrentSettings.LlmAgentVerbose,
+                _getString);
             session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
             session.SessionHistoryText = item.SessionHistoryText;
             session.SessionHistoryTokenCount = item.SessionHistoryTokenCount;
@@ -137,7 +138,7 @@ namespace TxtAIEditor.Controls
             }
 
             _agentPane.HideHtmlCodeBlocks = _settingsService.CurrentSettings.LlmAgentVerbose == false;
-            string formatted = AgentHistoryFormatter.Format(text, _settingsService.CurrentSettings.LlmAgentVerbose);
+            string formatted = AgentHistoryFormatter.Format(text, _settingsService.CurrentSettings.LlmAgentVerbose, _getString);
             session.OutputText = formatted;
             _agentPane.ResetOutput(formatted);
         }
