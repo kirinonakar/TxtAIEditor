@@ -590,9 +590,10 @@ namespace TxtAIEditor.Controls
                 await bridge.SetCsvTableModeAsync(_isCsvTableModeEnabled());
 
                 var snippets = _snippetService.GetSnippets();
-                if (snippets.Count > 0)
+                var autocompleteWords = _snippetService.GetAutocompleteWords();
+                if (snippets.Count > 0 || autocompleteWords.Count > 0)
                 {
-                    await bridge.UpdateSnippetsAsync(snippets);
+                    await bridge.UpdateSnippetsAsync(snippets, autocompleteWords);
                 }
             }
             catch (Exception ex)
