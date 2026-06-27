@@ -1138,14 +1138,10 @@ namespace TxtAIEditor.Controls
                             addedPartBuilder.AppendLine(tcRes.ResultForTranscript);
                         }
 
-                        addedPartBuilder.AppendLine();
-                        addedPartBuilder.AppendLine("[Current workspace context snapshot]");
-                        if (string.Equals(refreshedContext, lastWorkspaceContext, StringComparison.Ordinal))
+                        if (!string.Equals(refreshedContext, lastWorkspaceContext, StringComparison.Ordinal))
                         {
-                            addedPartBuilder.AppendLine("Context summary unchanged since the previous snapshot. This only means compact workspace metadata did not change; use the tool result and [File edits made during this user task] to determine whether this run edited files.");
-                        }
-                        else
-                        {
+                            addedPartBuilder.AppendLine();
+                            addedPartBuilder.AppendLine("[Current workspace context snapshot]");
                             addedPartBuilder.AppendLine(refreshedContext);
                             lastWorkspaceContext = refreshedContext;
                         }
