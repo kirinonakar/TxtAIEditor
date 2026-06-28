@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
@@ -181,7 +182,7 @@ namespace TxtAIEditor.Controls
         public ToggleButton FavoritesFileTabButton => FavoritesFileTab;
         public ToggleButton FavoritesFolderTabButton => FavoritesFolderTab;
 
-        public void Localize(Func<string, string, string> getString, bool updateEmptyFolderStatus, Func<string, bool> isGitNotDetected)
+        public void Localize(Func<string, string, string> getString, bool updateEmptyFolderStatus)
         {
             ToolTipService.SetToolTip(ExplorerActivityButton, getString("Explorer", "탐색기"));
             ToolTipService.SetToolTip(FavoritesActivityButton, getString("Favorites", "즐겨찾기"));
@@ -272,7 +273,7 @@ namespace TxtAIEditor.Controls
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(GitRefreshButton, gitRefreshText);
             GitHistoryHeader.Text = getString("GitHistory", "과거 기록");
 
-            if (isGitNotDetected(GitPanelBranchText.Text))
+            if (GitBranchStatus.IsNotDetectedTag(GitPanelBranchText.Tag))
             {
                 GitPanelBranchText.Text = getString("GitNotDetected", "Git: 감지 안됨");
             }

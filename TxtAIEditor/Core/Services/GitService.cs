@@ -36,7 +36,7 @@ namespace TxtAIEditor.Core.Services
         public async Task<string> GetCurrentBranchAsync(string repoPath)
         {
             if (string.IsNullOrEmpty(repoPath) || !Directory.Exists(repoPath))
-                return "Git: 감지 안됨";
+                return string.Empty;
 
             try
             {
@@ -50,7 +50,7 @@ namespace TxtAIEditor.Core.Services
                     {
                         return await GetCurrentBranchAsync(parent.FullName);
                     }
-                    return "Git: 감지 안됨";
+                    return string.Empty;
                 }
 
                 string output = await RunGitCommandAsync(repoPath, "symbolic-ref --quiet --short HEAD");
@@ -59,7 +59,7 @@ namespace TxtAIEditor.Core.Services
                     output = await RunGitCommandAsync(repoPath, "rev-parse --abbrev-ref HEAD");
                     if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                     {
-                        return "Git: 감지 안됨";
+                        return string.Empty;
                     }
                 }
 
@@ -67,7 +67,7 @@ namespace TxtAIEditor.Core.Services
             }
             catch
             {
-                return "Git: 감지 안됨";
+                return string.Empty;
             }
         }
 

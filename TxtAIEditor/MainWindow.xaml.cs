@@ -404,7 +404,6 @@ namespace TxtAIEditor
                     GetCurrentRepoPathForGitRefresh,
                     () => _state.CurrentFolderPath,
                     GetLocalizedString,
-                    IsGitNotDetectedText,
                     () => _explorerNavigationController,
                     path => CurrentRepoPath = path,
                     path => CurrentFolderPath = path,
@@ -682,7 +681,6 @@ namespace TxtAIEditor
                     UpdateAutoSaveStatus,
                     GetLocalizedString,
                     GetCurrentElementTheme,
-                    IsGitNotDetectedText,
                     InitializePickerWindow,
                     GetPreviewBaseHref));
             _lifecycleController = startupControllers.Lifecycle;
@@ -918,14 +916,6 @@ namespace TxtAIEditor
         {
             _settingsController.LocalizeUi();
         }
-
-        private static bool IsGitNotDetectedText(string text)
-        {
-            return text.Equals("Git: 감지 안됨", StringComparison.OrdinalIgnoreCase) ||
-                   text.Equals("Git: Not Detected", StringComparison.OrdinalIgnoreCase) ||
-                   text.Equals("Git: 検出されていません", StringComparison.OrdinalIgnoreCase);
-        }
-
 
         private async Task SyncSnippetsToOpenEditorsAsync()
         {

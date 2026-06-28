@@ -57,7 +57,7 @@ namespace TxtAIEditor.Core.Services
 
             return new GitPanelState
             {
-                IsRepoDetected = true,
+                IsRepoDetected = !GitBranchStatus.IsNotDetected(branch),
                 Branch = branch,
                 Branches = branches,
                 History = history,

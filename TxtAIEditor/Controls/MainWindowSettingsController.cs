@@ -44,7 +44,6 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab?> _getActiveTab;
         private readonly Func<string> _getCurrentFolderPath;
         private readonly Func<string, string, string> _getLocalizedString;
-        private readonly Func<string, bool> _isGitNotDetectedText;
         private readonly Func<bool> _isTerminalVisible;
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
@@ -83,7 +82,6 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> getActiveTab,
             Func<string> getCurrentFolderPath,
             Func<string, string, string> getLocalizedString,
-            Func<string, bool> isGitNotDetectedText,
             Func<bool> isTerminalVisible,
             Action suspendTerminal,
             Action resumeTerminal,
@@ -121,7 +119,6 @@ namespace TxtAIEditor.Controls
             _getActiveTab = getActiveTab;
             _getCurrentFolderPath = getCurrentFolderPath;
             _getLocalizedString = getLocalizedString;
-            _isGitNotDetectedText = isGitNotDetectedText;
             _isTerminalVisible = isTerminalVisible;
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
@@ -273,8 +270,8 @@ namespace TxtAIEditor.Controls
 
                 _topToolbar.Localize(_getLocalizedString);
                 _editorWorkspace.Localize(_getLocalizedString);
-                _leftSidebar.Localize(_getLocalizedString, string.IsNullOrEmpty(_getCurrentFolderPath()), _isGitNotDetectedText);
-                _statusBarPane.Localize(_getLocalizedString, _isGitNotDetectedText);
+                _leftSidebar.Localize(_getLocalizedString, string.IsNullOrEmpty(_getCurrentFolderPath()));
+                _statusBarPane.Localize(_getLocalizedString);
                 _rightSidebar.Localize(_getLocalizedString);
                 _rightSidebar.UpdateTranslateLanguage(_settingsService.CurrentSettings?.ResolveTargetLanguage() ?? "Korean");
                 _markdownToolbar.LocalizeTooltips(_getLocalizedString);

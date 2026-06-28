@@ -411,7 +411,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="GitPanelBranchText" Text="Git: 감지 안됨" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="GitPanelBranchText" Text="" Tag="GitNotDetected" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         <Button x:Name="GitInitRepoButton" Grid.Column="1" Content="Git 생성" FontSize="10" Padding="6,2" Height="22" MinWidth="0" Click="OnGitInitRepoClick" ToolTipService.ToolTip="Git 저장소 생성"/>
                                         <Button x:Name="GitRefreshButton" Grid.Column="2" Width="24" MinWidth="24" Height="24" Margin="4,0,0,0" HorizontalAlignment="Right" Click="OnGitRefreshClick" Padding="0" CornerRadius="4" ToolTipService.ToolTip="새로고침">
                                             <FontIcon Glyph="&#xE72C;" FontSize="10"/>

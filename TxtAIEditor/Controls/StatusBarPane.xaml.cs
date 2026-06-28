@@ -2,6 +2,7 @@ using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
@@ -36,11 +37,11 @@ namespace TxtAIEditor.Controls
         public Button LineNumberButtonControl => LineNumberButton;
         public Button LineEndingButtonControl => LineEndingButton;
 
-        public void Localize(Func<string, string, string> getString, Func<string, bool> isGitNotDetected)
+        public void Localize(Func<string, string, string> getString)
         {
             StatusLineLabel.Text = getString("StatusLineLabel", "줄");
             StatusColumnLabel.Text = getString("StatusColumnLabel", "열");
-            if (isGitNotDetected(StatusGitBranch.Text))
+            if (GitBranchStatus.IsNotDetectedTag(StatusGitBranch.Tag))
             {
                 StatusGitBranch.Text = getString("GitNotDetected", "Git: 감지 안됨");
             }

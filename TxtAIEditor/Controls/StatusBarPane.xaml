@@ -135,7 +135,7 @@
             </StackPanel>
 
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="15" VerticalAlignment="Center">
-                <TextBlock x:Name="StatusGitBranch" Text="Git: 감지 안됨" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusGitBranch" Text="" Tag="GitNotDetected" FontSize="11" VerticalAlignment="Center"/>
                 <TextBlock x:Name="StatusLanguage" Text="PLAINTEXT" FontSize="11" VerticalAlignment="Center"/>
                 <ComboBox x:Name="StatusEncodingCombo"
                           Width="100"

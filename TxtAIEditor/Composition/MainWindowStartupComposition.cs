@@ -29,7 +29,6 @@ namespace TxtAIEditor.Composition
         Action UpdateAutoSaveStatus,
         Func<string, string, string> GetLocalizedString,
         Func<ElementTheme> GetCurrentElementTheme,
-        Func<string, bool> IsGitNotDetectedText,
         Action<object> InitializePickerWindow,
         Func<OpenedTab, string> GetPreviewBaseHref);
 
@@ -115,7 +114,6 @@ namespace TxtAIEditor.Composition
                 tabNavigation.GetActiveTab,
                 callbacks.GetCurrentFolderPath,
                 callbacks.GetLocalizedString,
-                callbacks.IsGitNotDetectedText,
                 () => ui.EditorWorkspace.IsTerminalVisible,
                 () => ui.TerminalPane.SuspendNativeWindows(),
                 () => ui.TerminalPane.ResumeNativeWindows(),

@@ -27,7 +27,6 @@ namespace TxtAIEditor.Controls
         private readonly Func<string> _folderPathProvider;
         private readonly Func<XamlRoot> _xamlRootProvider;
         private readonly Func<string, string, string> _getString;
-        private readonly Func<string, bool> _isGitNotDetected;
         private readonly Action<string, string> _showError;
         private readonly Action _startAutoRefresh;
         private readonly Func<string, string, string?, string?, string?, string?, string?, Task> _openCompareTabAsync;
@@ -45,7 +44,6 @@ namespace TxtAIEditor.Controls
             Func<string> folderPathProvider,
             Func<XamlRoot> xamlRootProvider,
             Func<string, string, string> getString,
-            Func<string, bool> isGitNotDetected,
             Action<string, string> showError,
             Action startAutoRefresh,
             Func<string, string, string?, string?, string?, string?, string?, Task> openCompareTabAsync,
@@ -62,7 +60,6 @@ namespace TxtAIEditor.Controls
             _folderPathProvider = folderPathProvider;
             _xamlRootProvider = xamlRootProvider;
             _getString = getString;
-            _isGitNotDetected = isGitNotDetected;
             _showError = showError;
             _startAutoRefresh = startAutoRefresh;
             _openCompareTabAsync = openCompareTabAsync;
@@ -90,10 +87,8 @@ namespace TxtAIEditor.Controls
         {
             if (string.IsNullOrEmpty(repoPath))
             {
-                string notDetected = _getString("GitNotDetected", "Git: 감지 안됨");
-                _leftSidebar.GitPanelBranch.Text = notDetected;
+                SetBranchText(GetGitNotDetectedText(), isNotDetected: true);
                 _leftSidebar.GitRepoPath.Text = _getString("GitRepoPathNone", "Root 경로없음");
-                _statusGitBranch.Text = notDetected;
                 UpdateInitButtonState(null);
                 _viewModel.GitFiles.Clear();
                 _leftSidebar.GitBranches.Items.Clear();
@@ -102,7 +97,8 @@ namespace TxtAIEditor.Controls
             }
 
             string branch = await _gitService.GetCurrentBranchAsync(repoPath);
-            string localizedBranch = _isGitNotDetected(branch) ? _getString("GitNotDetected", "Git: 감지 안됨") : branch;
+            bool isGitNotDetected = GitBranchStatus.IsNotDetected(branch);
+            string localizedBranch = isGitNotDetected ? GetGitNotDetectedText() : branch;
 
             // Fetch everything asynchronously first to avoid race conditions and UI flickering
             var branchesTask = _gitService.GetBranchesAsync(repoPath);
@@ -119,7 +115,7 @@ namespace TxtAIEditor.Controls
 
             int changedCount = fileStatuses.Count(kvp => kvp.Value != "!!" && kvp.Value.Trim() != "!!");
             string branchText = localizedBranch;
-            if (!_isGitNotDetected(branch))
+            if (!isGitNotDetected)
             {
                 branchText = $"{localizedBranch} ({changedCount})";
                 if (unpushedCount > 0)
@@ -129,11 +125,10 @@ namespace TxtAIEditor.Controls
             }
 
             // Update UI components in a single synchronous block to prevent duplicate display and empty states
-            _leftSidebar.GitPanelBranch.Text = branchText;
+            SetBranchText(branchText, isGitNotDetected);
             _leftSidebar.GitRepoPath.Text = $"{repoPath}";
             ToolTipService.SetToolTip(_leftSidebar.GitRepoPath, repoPath);
-            _statusGitBranch.Text = branchText;
-            UpdateInitButtonState(repoPath);
+            UpdateInitButtonState(isGitNotDetected ? null : repoPath);
             _startAutoRefresh();
 
             _leftSidebar.GitBranches.Items.Clear();
@@ -174,6 +169,20 @@ namespace TxtAIEditor.Controls
             {
                 await _refreshExplorerGitStatus();
             }
+        }
+
+        private string GetGitNotDetectedText()
+        {
+            return _getString("GitNotDetected", "Git: 감지 안됨");
+        }
+
+        private void SetBranchText(string text, bool isNotDetected)
+        {
+            string? stateTag = isNotDetected ? GitBranchStatus.NotDetectedTag : null;
+            _leftSidebar.GitPanelBranch.Text = text;
+            _leftSidebar.GitPanelBranch.Tag = stateTag;
+            _statusGitBranch.Text = text;
+            _statusGitBranch.Tag = stateTag;
         }
 
         public async Task StageAllAsync(string repoPath)
