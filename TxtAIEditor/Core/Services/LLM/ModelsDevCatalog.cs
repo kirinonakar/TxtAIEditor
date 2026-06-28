@@ -24,32 +24,23 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 { ("opencode-go", "deepseek-v4-flash"), (1000000, 384000) },
                 { ("opencode-go", "deepseek-v4-pro"), (1000000, 384000) },
-                { ("opencode-go", "glm-5"), (202752, 32768) },
-                { ("opencode-go", "glm-5.1"), (202752, 32768) },
                 { ("opencode-go", "glm-5.2"), (1000000, 131072) },
-                { ("opencode-go", "kimi-k2.5"), (262144, 65536) },
-                { ("opencode-go", "kimi-k2.6"), (262144, 65536) },
                 { ("opencode-go", "kimi-k2.7-code"), (262144, 262144) },
-                { ("opencode-go", "minimax-m2.5"), (204800, 65536) },
-                { ("opencode-go", "minimax-m2.7"), (204800, 131072) },
                 { ("opencode-go", "minimax-m3"), (512000, 131072) },
                 { ("opencode-go", "mimo-v2.5"), (1000000, 128000) },
                 { ("opencode-go", "mimo-v2.5-pro"), (1048576, 128000) },
                 { ("opencode-go", "mimo-v2-omni"), (262144, 128000) },
-                { ("opencode-go", "mimo-v2-pro"), (1048576, 128000) },
                 { ("opencode-go", "qwen3.5-plus"), (262144, 65536) },
                 { ("opencode-go", "qwen3.6-plus"), (1000000, 65536) },
                 { ("opencode-go", "qwen3.7-max"), (1000000, 65536) },
                 { ("opencode-go", "qwen3.7-plus"), (1000000, 65536) },
 
-                { ("opencode", "gpt-5-nano"), (400000, 128000) },
                 { ("opencode", "gpt-5.4"), (1050000, 128000) },
                 { ("opencode", "gpt-5.4-mini"), (400000, 128000) },
                 { ("opencode", "gpt-5.4-nano"), (400000, 128000) },
                 { ("opencode", "gpt-5.4-pro"), (1050000, 128000) },
                 { ("opencode", "gpt-5.5"), (1050000, 128000) },
                 { ("opencode", "gpt-5.5-pro"), (1050000, 128000) },
-                { ("opencode", "claude-haiku-4-5"), (200000, 64000) },
                 { ("opencode", "claude-opus-4-7"), (1000000, 128000) },
                 { ("opencode", "claude-sonnet-4-6"), (1000000, 64000) },
                 { ("opencode", "gemini-3-flash"), (1048576, 65536) },
@@ -59,78 +50,43 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("opencode", "kimi-k2.6"), (262144, 65536) },
                 { ("opencode", "minimax-m2.5"), (204800, 131072) },
                 { ("opencode", "minimax-m2.7"), (204800, 131072) },
+                { ("opencode", "minimax-m3"), (512000, 131072) },
                 { ("opencode", "qwen3.5-plus"), (262144, 65536) },
                 { ("opencode", "qwen3.6-plus"), (262144, 65536) },
                 { ("opencode", "qwen3.7-max"), (1000000, 65536) },
                 { ("opencode", "qwen3.7-plus"), (1000000, 65536) },
-                { ("opencode", "gpt-5"), (400000, 128000) },
-                { ("opencode", "gpt-5-codex"), (400000, 128000) },
-                { ("opencode", "gpt-5.1"), (400000, 128000) },
-                { ("opencode", "gpt-5.1-codex"), (400000, 128000) },
-                { ("opencode", "gpt-5.1-codex-max"), (400000, 128000) },
-                { ("opencode", "gpt-5.1-codex-mini"), (400000, 128000) },
-                { ("opencode", "gpt-5.2"), (400000, 128000) },
-                { ("opencode", "gpt-5.2-codex"), (400000, 128000) },
-                { ("opencode", "gpt-5.3-codex"), (400000, 128000) },
-                { ("opencode", "gpt-5.3-codex-spark"), (128000, 128000) },
                 { ("opencode", "claude-fable-5"), (1000000, 128000) },
                 { ("opencode", "claude-opus-4-8"), (1000000, 128000) },
                 { ("opencode", "claude-opus-4-6"), (1000000, 128000) },
-                { ("opencode", "claude-opus-4-5"), (200000, 64000) },
-                { ("opencode", "claude-opus-4-1"), (200000, 32000) },
-                { ("opencode", "claude-sonnet-4-5"), (1000000, 64000) },
-                { ("opencode", "claude-sonnet-4"), (1000000, 64000) },
-                { ("opencode", "claude-3-5-haiku"), (200000, 8192) },
                 { ("opencode", "deepseek-v4-pro"), (1000000, 384000) },
                 { ("opencode", "deepseek-v4-flash"), (1000000, 384000) },
                 { ("opencode", "deepseek-v4-flash-free"), (200000, 128000) },
-                { ("opencode", "glm-5"), (204800, 131072) },
-                { ("opencode", "glm-5.1"), (204800, 131072) },
                 { ("opencode", "glm-5.2"), (1000000, 131072) },
                 { ("opencode", "kimi-k2.5"), (262144, 65536) },
                 { ("opencode", "big-pickle"), (200000, 32000) },
                 { ("opencode", "mimo-v2.5-free"), (200000, 32000) },
                 { ("opencode", "north-mini-code-free"), (256000, 64000) },
-                { ("opencode", "nemotron-3-ultra-free"), (1000000, 128000) },
 
-                { ("openai", "gpt-5"), (400000, 128000) },
-                { ("openai", "gpt-5-pro"), (400000, 128000) },
-                { ("openai", "gpt-5-nano"), (400000, 128000) },
-                { ("openai", "gpt-5.1"), (400000, 128000) },
-                { ("openai", "gpt-5.2"), (400000, 128000) },
-                { ("openai", "gpt-5.3-chat-latest"), (128000, 16384) },
                 { ("openai", "gpt-5.4"), (1050000, 128000) },
                 { ("openai", "gpt-5.4-mini"), (400000, 128000) },
                 { ("openai", "gpt-5.4-nano"), (400000, 128000) },
                 { ("openai", "gpt-5.4-pro"), (1050000, 128000) },
                 { ("openai", "gpt-5.5"), (1050000, 128000) },
                 { ("openai", "gpt-5.5-pro"), (1050000, 128000) },
-                { ("openai", "gpt-4o"), (128000, 16384) },
-                { ("openai", "gpt-4"), (8192, 8192) },
-                { ("openai", "gpt-3.5-turbo"), (16385, 4096) },
-                { ("openai", "o3"), (200000, 100000) },
-                { ("openai", "o3-pro"), (200000, 100000) },
-                { ("openai", "o4-mini"), (200000, 100000) },
 
                 { ("google", "gemini-flash-lite-latest"), (1048576, 65536) },
                 { ("google", "gemini-flash-latest"), (1048576, 65536) },
                 { ("google", "gemini-pro-latest"), (1048576, 65536) },
-                { ("google", "gemini-2.5-flash"), (1048576, 65536) },
-                { ("google", "gemini-2.5-flash-lite"), (1048576, 65536) },
-                { ("google", "gemini-2.5-pro"), (1048576, 65536) },
                 { ("google", "gemini-3.5-flash"), (1048576, 65536) },
                 { ("google", "gemini-3.1-pro-preview"), (1048576, 65536) },
                 { ("google", "gemini-3-pro-image-preview"), (1048576, 65536) },
                 { ("google", "gemma-4-26b-a4b-it"), (262144, 32768) },
                 { ("google", "gemma-4-31b-it"), (262144, 32768) },
 
-                { ("ollama-cloud", "gpt-oss:20b"), (131072, 32768) },
                 { ("ollama-cloud", "qwen3.5:397b"), (262144, 65536) },
                 { ("ollama-cloud", "glm-5.2"), (976000, 131072) },
-                { ("ollama-cloud", "gpt-oss:120b"), (131072, 32768) },
                 { ("ollama-cloud", "nemotron-3-nano:30b"), (1048576, 131072) },
                 { ("ollama-cloud", "ministral-3:14b"), (262144, 128000) },
-                { ("ollama-cloud", "gemma3:4b"), (131072, 131072) },
                 { ("ollama-cloud", "nemotron-3-super"), (262144, 65536) },
                 { ("ollama-cloud", "deepseek-v3.1:671b"), (163840, 163840) },
                 { ("ollama-cloud", "devstral-2:123b"), (262144, 262144) },
@@ -147,11 +103,52 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("ollama-cloud", "qwen3-coder-next"), (262144, 65536) },
                 { ("ollama-cloud", "mistral-large-3:675b"), (262144, 262144) },
 
-                { ("openrouter", "meta-llama/llama-3.3-70b-instruct"), (131072, 16384) },
-                { ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"), (131072, 16384) },
-                { ("openrouter", "deepseek/deepseek-chat"), (131072, 16384) },
-                { ("openrouter", "google/gemini-2.5-flash"), (131072, 16384) },
-                { ("openrouter", "anthropic/claude-3.5-sonnet"), (200000, 8192) },
+                { ("openrouter", "openai/gpt-5.4"), (1050000, 128000) },
+                { ("openrouter", "openai/gpt-5.4-mini"), (400000, 128000) },
+                { ("openrouter", "openai/gpt-5.4-nano"), (400000, 128000) },
+                { ("openrouter", "openai/gpt-5.4-pro"), (1050000, 128000) },
+                { ("openrouter", "openai/gpt-5.5"), (1050000, 128000) },
+                { ("openrouter", "openai/gpt-5.5-pro"), (1050000, 128000) },
+                { ("openrouter", "~anthropic/claude-fable-latest"), (1000000, 128000) },
+                { ("openrouter", "anthropic/claude-opus-4.8"), (1000000, 128000) },
+                { ("openrouter", "anthropic/claude-opus-4.7"), (1000000, 128000) },
+                { ("openrouter", "anthropic/claude-opus-4.6"), (1000000, 128000) },
+                { ("openrouter", "anthropic/claude-sonnet-4.6"), (1000000, 128000) },
+                { ("openrouter", "deepseek/deepseek-chat"), (128000, 16000) },
+                { ("openrouter", "deepseek/deepseek-chat-v3.1"), (163840, 32768) },
+                { ("openrouter", "deepseek/deepseek-v4-flash"), (1000000, 65536) },
+                { ("openrouter", "deepseek/deepseek-v4-pro"), (1048576, 384000) },
+                { ("openrouter", "google/gemini-3-flash-preview"), (1048576, 65535) },
+                { ("openrouter", "google/gemini-3.1-pro-preview"), (1048576, 65536) },
+                { ("openrouter", "google/gemini-3.5-flash"), (1048576, 65536) },
+                { ("openrouter", "google/gemma-4-26b-a4b-it"), (262144, 262144) },
+                { ("openrouter", "google/gemma-4-31b-it"), (262144, 262144) },
+                { ("openrouter", "google/gemma-4-31b-it:free"), (262144, 8192) },
+                { ("openrouter", "moonshotai/kimi-k2.5"), (256000, 256000) },
+                { ("openrouter", "moonshotai/kimi-k2.6"), (262144, 262144) },
+                { ("openrouter", "moonshotai/kimi-k2.7-code"), (262144, 16384) },
+                { ("openrouter", "minimax/minimax-m3"), (524288, 512000) },
+                { ("openrouter", "mistralai/devstral-2512"), (262144, 262144) },
+                { ("openrouter", "mistralai/ministral-14b-2512"), (262144, 262144) },
+                { ("openrouter", "mistralai/ministral-8b-2512"), (262144, 262144) },
+                { ("openrouter", "mistralai/mistral-large-2512"), (262144, 262144) },
+                { ("openrouter", "nvidia/nemotron-3-nano-30b-a3b"), (262144, 228000) },
+                { ("openrouter", "nvidia/nemotron-3-super-120b-a12b"), (262144, 16384) },
+                { ("openrouter", "nvidia/nemotron-3-super-120b-a12b:free"), (262144, 262144) },
+                { ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b"), (262144, 16384) },
+                { ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free"), (1000000, 65536) },
+                { ("openrouter", "qwen/qwen3-coder"), (262144, 65536) },
+                { ("openrouter", "qwen/qwen3-coder-next"), (262144, 262144) },
+                { ("openrouter", "qwen/qwen3.5-397b-a17b"), (131072, 64000) },
+                { ("openrouter", "qwen/qwen3.5-plus-20260420"), (1000000, 65536) },
+                { ("openrouter", "qwen/qwen3.6-plus"), (1000000, 65536) },
+                { ("openrouter", "qwen/qwen3.7-max"), (1000000, 65536) },
+                { ("openrouter", "qwen/qwen3.7-plus"), (1000000, 65536) },
+                { ("openrouter", "x-ai/grok-build-0.1"), (256000, 256000) },
+                { ("openrouter", "xiaomi/mimo-v2.5"), (32000, 131072) },
+                { ("openrouter", "xiaomi/mimo-v2.5-pro"), (1048576, 131072) },
+                { ("openrouter", "z-ai/glm-5.2"), (1048576, 32768) },
+                { ("openrouter", "cohere/north-mini-code:free"), (256000, 64000) },
             };
 
         public static string MapProviderKey(string appProvider)
@@ -202,52 +199,12 @@ namespace TxtAIEditor.Core.Services.LLM
 
         public static async Task<(int context, int output)> GetBestLimitsAsync(string appProvider, string model, CancellationToken cancellationToken = default)
         {
-            var (context, output) = await GetLimitsAsync(appProvider, model, cancellationToken);
-
-            if (IsOpenRouter(appProvider))
-            {
-                string bare = ExtractBareModel(model);
-                var (goCtx, goOut) = await GetLimitsAsync("OpenCode Go", bare, cancellationToken);
-                if (goOut > output) output = goOut;
-                if (goCtx > context) context = goCtx;
-                var (zenCtx, zenOut) = await GetLimitsAsync("OpenCode Zen", bare, cancellationToken);
-                if (zenOut > output) output = zenOut;
-                if (zenCtx > context) context = zenCtx;
-            }
-
-            return (context, output);
+            return await GetLimitsAsync(appProvider, model, cancellationToken);
         }
 
         public static (int context, int output) GetBestCachedLimits(string appProvider, string model)
         {
-            var (context, output) = GetCachedLimits(appProvider, model);
-
-            if (IsOpenRouter(appProvider))
-            {
-                string bare = ExtractBareModel(model);
-                var (goCtx, goOut) = GetCachedLimits("OpenCode Go", bare);
-                if (goOut > output) output = goOut;
-                if (goCtx > context) context = goCtx;
-                var (zenCtx, zenOut) = GetCachedLimits("OpenCode Zen", bare);
-                if (zenOut > output) output = zenOut;
-                if (zenCtx > context) context = zenCtx;
-            }
-
-            return (context, output);
-        }
-
-        private static bool IsOpenRouter(string appProvider)
-            => (appProvider ?? string.Empty).Contains("openrouter", StringComparison.OrdinalIgnoreCase);
-
-        private static string ExtractBareModel(string model)
-        {
-            if (string.IsNullOrEmpty(model)) return model;
-            string m = model;
-            int slash = m.IndexOf('/');
-            if (slash >= 0) m = m.Substring(slash + 1);
-            int colon = m.IndexOf(':');
-            if (colon >= 0) m = m.Substring(0, colon);
-            return m;
+            return GetCachedLimits(appProvider, model);
         }
 
         public static bool IsLoaded => _doc != null;
@@ -278,7 +235,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (providerKey == "google" && modelKey == "gemini-pro-latest")
             {
-                if (_fallback.TryGetValue((providerKey, "gemini-2.5-pro"), out var proFb))
+                if (_fallback.TryGetValue((providerKey, "gemini-3.1-pro-preview"), out var proFb))
                     return proFb;
                 return (1048576, 65536);
             }
