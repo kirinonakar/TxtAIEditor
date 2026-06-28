@@ -40,10 +40,10 @@ namespace TxtAIEditor.Core.Services.LLM
                                     !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase) &&
                                     !_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase);
 
-        private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
+        private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
         {
             var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
-            return output > 0 ? output : 0;
+            return (context, output > 0 ? output : 0);
         }
 
         public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null)
@@ -56,7 +56,14 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments,
+                tools);
             bool reasoning = IsReasoningModel(model);
             string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
 
@@ -173,7 +180,14 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments,
+                tools);
             bool reasoning = IsReasoningModel(model);
             string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
 

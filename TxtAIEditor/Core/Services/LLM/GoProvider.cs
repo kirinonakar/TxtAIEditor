@@ -40,10 +40,10 @@ namespace TxtAIEditor.Core.Services.LLM
                                     !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase) &&
                                     !_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase);
 
-        private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
+        private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
         {
             var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
-            if (output > 0) return output;
+            if (output > 0) return (context, output);
 
             int maxTokens = 8192;
             if (HasThinking)
@@ -51,7 +51,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 int budget = GetThinkingBudget(_thinkingLevel);
                 maxTokens = Math.Max(8192, Math.Min(budget + 8192, 32768));
             }
-            return maxTokens;
+            return (context, maxTokens);
         }
 
         private static bool IsDeepSeekOrGlm(string model)
@@ -84,7 +84,14 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments,
+                tools);
 
             var payloadDict = new Dictionary<string, object>
             {
@@ -217,7 +224,14 @@ namespace TxtAIEditor.Core.Services.LLM
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
-            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments,
+                tools);
 
             var payloadDict = new Dictionary<string, object>
             {
@@ -419,8 +433,14 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
-            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             if (outputLimit <= 0) outputLimit = 8192;
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments);
 
             var messagesList = new List<object>();
             var userMsg = new Dictionary<string, object>
@@ -447,12 +467,15 @@ namespace TxtAIEditor.Core.Services.LLM
                 int budget = GetThinkingBudget(_thinkingLevel);
                 if (budget > 0)
                 {
-                    if (budget >= outputLimit) budget = Math.Max(1024, outputLimit - 1024);
-                    payloadDict["thinking"] = new Dictionary<string, object>
+                    if (budget >= outputLimit) budget = outputLimit - 1024;
+                    if (budget >= 1024)
                     {
-                        ["type"] = "enabled",
-                        ["budget_tokens"] = budget
-                    };
+                        payloadDict["thinking"] = new Dictionary<string, object>
+                        {
+                            ["type"] = "enabled",
+                            ["budget_tokens"] = budget
+                        };
+                    }
                 }
             }
 
@@ -505,8 +528,14 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
-            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             if (outputLimit <= 0) outputLimit = 8192;
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments);
 
             var messagesList = new List<object>();
             messagesList.Add(new { role = "user", content = userContent });
@@ -529,12 +558,15 @@ namespace TxtAIEditor.Core.Services.LLM
                 int budget = GetThinkingBudget(_thinkingLevel);
                 if (budget > 0)
                 {
-                    if (budget >= outputLimit) budget = Math.Max(1024, outputLimit - 1024);
-                    payloadDict["thinking"] = new Dictionary<string, object>
+                    if (budget >= outputLimit) budget = outputLimit - 1024;
+                    if (budget >= 1024)
                     {
-                        ["type"] = "enabled",
-                        ["budget_tokens"] = budget
-                    };
+                        payloadDict["thinking"] = new Dictionary<string, object>
+                        {
+                            ["type"] = "enabled",
+                            ["budget_tokens"] = budget
+                        };
+                    }
                 }
             }
 

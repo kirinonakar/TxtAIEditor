@@ -46,10 +46,10 @@ namespace TxtAIEditor.Core.Services.LLM
             _providerName = providerName ?? "Gemini";
         }
 
-        private async Task<int> GetOutputLimitAsync(string model, CancellationToken cancellationToken)
+        private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
         {
             var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
-            return output > 0 ? output : 0;
+            return (context, output > 0 ? output : 0);
         }
 
         private static bool IsGemma4(string model)
@@ -307,12 +307,19 @@ namespace TxtAIEditor.Core.Services.LLM
             string baseUrl = string.IsNullOrWhiteSpace(endpoint) ? "https://generativelanguage.googleapis.com" : endpoint.TrimEnd('/');
             string requestUrl = BuildGeminiUrl(baseUrl, model, false);
 
-            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            if (outputLimit <= 0) outputLimit = 65536;
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments);
 
             var generationConfigDict = new Dictionary<string, object>
             {
                 ["temperature"] = 0.5,
-                ["maxOutputTokens"] = outputLimit > 0 ? outputLimit : 65536
+                ["maxOutputTokens"] = outputLimit
             };
 
             if (HasThinking)
@@ -441,12 +448,19 @@ namespace TxtAIEditor.Core.Services.LLM
             string baseUrl = string.IsNullOrWhiteSpace(endpoint) ? "https://generativelanguage.googleapis.com" : endpoint.TrimEnd('/');
             string requestUrl = BuildGeminiUrl(baseUrl, model, true);
 
-            int outputLimit = await GetOutputLimitAsync(model, cancellationToken);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            if (outputLimit <= 0) outputLimit = 65536;
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments);
 
             var generationConfigDict = new Dictionary<string, object>
             {
                 ["temperature"] = 0.5,
-                ["maxOutputTokens"] = outputLimit > 0 ? outputLimit : 65536
+                ["maxOutputTokens"] = outputLimit
             };
 
             if (HasThinking)
