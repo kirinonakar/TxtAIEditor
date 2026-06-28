@@ -324,9 +324,40 @@ namespace TxtAIEditor.Controls
 
         public double EstimateToolCatalogTokens()
         {
+            if (!SupportsNativeToolCatalog(_settingsProvider()))
+            {
+                return 0;
+            }
+
             var mcpAliases = _mcpController.GetActiveToolAliases();
             var tools = new AgentLlmToolCatalog().Build(_agentPane.PlanningMode, mcpAliases);
             return AgentTokenEstimator.EstimateToolsTokens(tools);
+        }
+
+        private static bool SupportsNativeToolCatalog(EditorSettings? settings)
+        {
+            string provider = NormalizeProviderName(settings?.LlmProvider);
+            string model = settings?.LlmModel ?? string.Empty;
+
+            // These providers currently ignore the native tools argument; their text tool protocol is already counted in the system prompt.
+            if (provider is "gemini" or "lmstudio" or "ollama" or "ollamacloud")
+            {
+                return false;
+            }
+
+            if (provider is "opencodego" or "go" or "opencodezen" or "zen")
+            {
+                return !model.StartsWith("claude-", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return true;
+        }
+
+        private static string NormalizeProviderName(string? provider)
+        {
+            return (provider ?? string.Empty)
+                .Replace(" ", string.Empty, StringComparison.Ordinal)
+                .ToLowerInvariant();
         }
 
         private double EstimateAgentPromptTokens(
