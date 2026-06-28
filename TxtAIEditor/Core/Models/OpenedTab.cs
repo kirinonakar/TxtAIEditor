@@ -9,6 +9,18 @@ namespace TxtAIEditor.Core.Models
 
         public string Id { get; } = Guid.NewGuid().ToString();
 
+        public string PreviewResourceVersion { get; private set; } = NewPreviewResourceVersion();
+
+        public void RefreshPreviewResourceVersion()
+        {
+            PreviewResourceVersion = NewPreviewResourceVersion();
+        }
+
+        private static string NewPreviewResourceVersion()
+        {
+            return Guid.NewGuid().ToString("N");
+        }
+
         private string? _filePath;
         public string? FilePath
         {

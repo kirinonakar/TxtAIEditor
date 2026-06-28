@@ -232,6 +232,7 @@ namespace TxtAIEditor.Controls
             tab.OriginalContent = originalContent;
             tab.OriginalLineEnding = model.LineEnding;
             tab.OriginalEncodingName = encodingName;
+            tab.RefreshPreviewResourceVersion();
         }
 
         private void CompleteEncodingReload(OpenedTab tab)

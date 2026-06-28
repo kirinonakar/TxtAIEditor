@@ -55,6 +55,7 @@ const state = {
     autocompleteWords: [],
     inlineLivePreviewEnabled: false,
     livePreviewBaseHref: '',
+    livePreviewLocalResourceVersion: '0',
     inlineLivePreviewSourceLine: null,
     inlineLivePreviewEditableBlock: null,
     dragStartPosition: null,

@@ -229,6 +229,7 @@ function createEditorRenderer({
             const livePreviewOptions = {
                 mode: 'markdown',
                 baseHref: state.livePreviewBaseHref || '',
+                localResourceVersion: state.livePreviewLocalResourceVersion || '0',
                 tabSize: state.tabSize || 4,
                 rangeEnd: renderEnd,
                 requireClosedFence: true,

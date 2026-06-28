@@ -43,6 +43,7 @@ export function createHostMessageHandler({
         case 'initModel':
             state.initialized = true;
             state.language = msg.language || 'plaintext';
+            state.livePreviewLocalResourceVersion = String(Date.now());
             applyOptions(msg);
             updateCsvLocalization(msg);
             setupModel(msg.lineCount || 1);
@@ -95,6 +96,7 @@ export function createHostMessageHandler({
                 setupModel(Math.max(1, lines.length));
                 lines.forEach((line, index) => state.cache.set(index + 1, line));
                 recomputeDirtyLines();
+                state.livePreviewLocalResourceVersion = String(Date.now());
                 queueRender(true);
                 if (msg.shouldFocus !== false) {
                     setTimeout(() => focusLine(targetLine, targetCol), 20);

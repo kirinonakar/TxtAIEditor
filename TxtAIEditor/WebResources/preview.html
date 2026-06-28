@@ -405,7 +405,8 @@
             tabSize: 4,
             renderedRange: null,
             lastUpdateFromEditor: 0,
-            staleLines: new Set()
+            staleLines: new Set(),
+            localResourceVersion: '0'
         };
 
         initializeMermaid('Dark');
@@ -780,6 +781,7 @@
                 state.rowHeights.clear();
             }
             state.cacheVersion++;
+            applyLocalResourceVersion(message);
             state.lastRangeKey = '';
             state.renderedRange = null;
             setHtmlMode(false);
@@ -856,7 +858,13 @@
                 lineNumber,
                 state.lineCount,
                 line => state.cache.has(line) ? state.cache.get(line) : undefined,
-                { mode: state.mode, baseHref: state.baseHref, tabSize: state.tabSize, rangeEnd },
+                {
+                    mode: state.mode,
+                    baseHref: state.baseHref,
+                    tabSize: state.tabSize,
+                    rangeEnd,
+                    localResourceVersion: state.localResourceVersion
+                },
                 skipUntilLineRef);
             if (renderedLine.pending) {
                 return { pending: true, extendRangeEnd: renderedLine.extendRangeEnd };
@@ -1004,6 +1012,14 @@
 
         const previewProcessedImages = new Set();
 
+        function applyLocalResourceVersion(message) {
+            const nextVersion = String(message.localResourceVersion ?? state.localResourceVersion ?? '0');
+            if (state.localResourceVersion !== nextVersion) {
+                state.localResourceVersion = nextVersion;
+                previewProcessedImages.clear();
+            }
+        }
+
         function watchRenderedImages() {
             viewport.querySelectorAll('img').forEach(img => {
                 const src = img.getAttribute('src');
@@ -1123,6 +1139,7 @@
                 state.staleLines.delete(ln);
             });
             state.cacheVersion++;
+            applyLocalResourceVersion(message);
             state.renderedRange = null;
             setHtmlMode(false);
             document.body.classList.remove('csv-mode');

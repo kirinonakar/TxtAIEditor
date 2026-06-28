@@ -134,20 +134,52 @@ function resolvePreviewResourceUrl(value, options = {}) {
     const raw = String(value || '').trim();
     const baseHref = options.baseHref || '';
     if (!raw || raw.startsWith('#') || !isSafeMediaUrl(raw)) return raw;
+    let resolved = raw;
     if (/^[A-Za-z]:[\\/]/.test(raw)) {
-        return `file:///${raw.replace(/\\/g, '/')}`;
+        resolved = `file:///${raw.replace(/\\/g, '/')}`;
+    } else if (/^\\\\/.test(raw)) {
+        resolved = `file:${raw.replace(/\\/g, '/')}`;
+    } else if (!baseHref) {
+        resolved = raw.replace(/\\/g, '/');
+    } else {
+        const normalized = /^[A-Za-z][A-Za-z0-9+.-]*:/.test(raw)
+            ? raw
+            : raw.replace(/\\/g, '/');
+        try {
+            resolved = new URL(normalized, baseHref).href;
+        } catch {
+            resolved = raw;
+        }
     }
-    if (/^\\\\/.test(raw)) {
-        return `file:${raw.replace(/\\/g, '/')}`;
-    }
-    if (!baseHref) return raw.replace(/\\/g, '/');
-    const normalized = /^[A-Za-z][A-Za-z0-9+.-]*:/.test(raw)
-        ? raw
-        : raw.replace(/\\/g, '/');
+
+    return withPreviewResourceVersion(resolved, options);
+}
+
+function withPreviewResourceVersion(value, options = {}) {
+    const version = String(options.localResourceVersion ?? '').trim();
+    if (!version) return value;
+
     try {
-        return new URL(normalized, baseHref).href;
+        const url = new URL(value, options.baseHref || document.baseURI);
+        if (!isLocalPreviewResourceUrl(url, options)) return value;
+        url.searchParams.set('txtaiPreview', version);
+        return url.href;
     } catch {
-        return raw;
+        return value;
+    }
+}
+
+function isLocalPreviewResourceUrl(url, options = {}) {
+    if (url.protocol === 'file:') return true;
+
+    const baseHref = options.baseHref || '';
+    if (!baseHref) return false;
+
+    try {
+        const baseUrl = new URL(baseHref, document.baseURI);
+        return url.origin === baseUrl.origin;
+    } catch {
+        return false;
     }
 }
 

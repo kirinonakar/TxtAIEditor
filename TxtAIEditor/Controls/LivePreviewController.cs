@@ -371,6 +371,7 @@ namespace TxtAIEditor.Controls
                         action = "renderHtmlPreview",
                         text = previewText,
                         baseHref = GetPreviewBaseHref(tab),
+                        localResourceVersion = tab.PreviewResourceVersion,
                         scrollSyncEnabled = _isScrollSyncEnabled()
                     };
 
@@ -387,6 +388,7 @@ namespace TxtAIEditor.Controls
                     initialLines = previewSession?.GetLines(1, InitialPreviewLineWarmupCount) ?? Array.Empty<string>(),
                     mode = mode,
                     baseHref = GetPreviewBaseHref(tab),
+                    localResourceVersion = tab.PreviewResourceVersion,
                     wordWrap = _settingsService.CurrentSettings.WordWrap,
                     tabSize = _settingsService.CurrentSettings.TabSize,
                     theme = _settingsService.CurrentSettings.Theme,
@@ -1169,7 +1171,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 var stream = new FileStream(targetPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                string headers = $"Content-Type: {PreviewWebResourceService.GetContentType(targetPath)}\r\nCache-Control: no-store";
+                string headers = $"Content-Type: {PreviewWebResourceService.GetContentType(targetPath)}\r\nCache-Control: no-store, no-cache, must-revalidate\r\nPragma: no-cache\r\nExpires: 0";
                 args.Response = sender.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK", headers);
             }
             catch (Exception ex)
