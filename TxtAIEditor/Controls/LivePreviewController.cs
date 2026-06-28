@@ -818,32 +818,8 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                string targetPath = tab.FilePath ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(targetPath) || !File.Exists(targetPath))
-                {
-                    string previewDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "OpenWithDefault");
-                    Directory.CreateDirectory(previewDir);
-                    string extension = Path.GetExtension(tab.FilePath) ?? ".md";
-                    if (string.IsNullOrWhiteSpace(extension))
-                    {
-                        extension = tab.Language?.ToLowerInvariant() switch
-                        {
-                            "html" => ".html",
-                            "csv" => ".csv",
-                            "latex" => ".tex",
-                            _ => ".md"
-                        };
-                    }
-                    targetPath = Path.Combine(previewDir, $"open-{tab.Id}{extension}");
-                    string content = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
-                    await File.WriteAllTextAsync(targetPath, content, Encoding.UTF8);
-                }
-
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = targetPath,
-                    UseShellExecute = true
-                });
+                string targetPath = await GetDefaultProgramTargetPathAsync(tab);
+                OpenWithDefaultProgram(targetPath);
             }
             catch (Exception ex)
             {
@@ -851,6 +827,59 @@ namespace TxtAIEditor.Controls
                     _getString("OpenWithDefaultProgramFailedTitle", "기본 프로그램으로 열기 실패"),
                     ex.Message);
             }
+        }
+
+        public Task OpenFileWithDefaultProgramAsync(string filePath)
+        {
+            try
+            {
+                OpenWithDefaultProgram(filePath);
+            }
+            catch (Exception ex)
+            {
+                _showErrorMessage(
+                    _getString("OpenWithDefaultProgramFailedTitle", "기본 프로그램으로 열기 실패"),
+                    ex.Message);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private async Task<string> GetDefaultProgramTargetPathAsync(OpenedTab tab)
+        {
+            string targetPath = tab.FilePath ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(targetPath) && File.Exists(targetPath))
+            {
+                return targetPath;
+            }
+
+            string previewDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "OpenWithDefault");
+            Directory.CreateDirectory(previewDir);
+            string extension = Path.GetExtension(tab.FilePath) ?? ".md";
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = tab.Language?.ToLowerInvariant() switch
+                {
+                    "html" => ".html",
+                    "csv" => ".csv",
+                    "latex" => ".tex",
+                    _ => ".md"
+                };
+            }
+
+            targetPath = Path.Combine(previewDir, $"open-{tab.Id}{extension}");
+            string content = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
+            await File.WriteAllTextAsync(targetPath, content, Encoding.UTF8);
+            return targetPath;
+        }
+
+        private static void OpenWithDefaultProgram(string targetPath)
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = targetPath,
+                UseShellExecute = true
+            });
         }
 
         private async Task OpenExternalViewerAsync()
@@ -864,28 +893,62 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var settings = _settingsService.CurrentSettings;
-            string viewerPath = settings.ExternalViewerPath?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(viewerPath))
+            if (!TryGetExternalViewerPath(out var settings, out string viewerPath))
             {
-                _showErrorMessage(
-                    _getString("ExternalViewerOpenTitle", "외부 뷰어 열기"),
-                    _getString("ExternalViewerPathMissing", "설정 > 편집에서 외부 뷰어 경로 또는 실행 별칭을 먼저 지정해 주세요."));
                 return;
             }
 
             try
             {
                 string targetPath = await GetExternalViewerTargetPathAsync(tab);
-                string arguments = BuildExternalViewerArguments(settings.ExternalViewerArguments, targetPath);
-                string workingDirectory = Path.GetDirectoryName(targetPath) ?? string.Empty;
-
-                StartExternalViewer(viewerPath, arguments, workingDirectory);
+                OpenFileInExternalViewer(targetPath, viewerPath, settings.ExternalViewerArguments);
             }
             catch (Exception ex)
             {
                 _showErrorMessage(_getString("ExternalViewerOpenFailedTitle", "외부 뷰어 열기 실패"), ex.Message);
             }
+        }
+
+        public Task OpenFileInExternalViewerAsync(string filePath)
+        {
+            if (!TryGetExternalViewerPath(out var settings, out string viewerPath))
+            {
+                return Task.CompletedTask;
+            }
+
+            try
+            {
+                OpenFileInExternalViewer(filePath, viewerPath, settings.ExternalViewerArguments);
+            }
+            catch (Exception ex)
+            {
+                _showErrorMessage(_getString("ExternalViewerOpenFailedTitle", "외부 뷰어 열기 실패"), ex.Message);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private bool TryGetExternalViewerPath(out EditorSettings settings, out string viewerPath)
+        {
+            settings = _settingsService.CurrentSettings;
+            viewerPath = settings.ExternalViewerPath?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(viewerPath))
+            {
+                return true;
+            }
+
+            _showErrorMessage(
+                _getString("ExternalViewerOpenTitle", "외부 뷰어 열기"),
+                _getString("ExternalViewerPathMissing", "설정 > 편집에서 외부 뷰어 경로 또는 실행 별칭을 먼저 지정해 주세요."));
+            return false;
+        }
+
+        private void OpenFileInExternalViewer(string targetPath, string viewerPath, string? argumentTemplate)
+        {
+            string arguments = BuildExternalViewerArguments(argumentTemplate, targetPath);
+            string workingDirectory = Path.GetDirectoryName(targetPath) ?? string.Empty;
+
+            StartExternalViewer(viewerPath, arguments, workingDirectory);
         }
 
         private void StartExternalViewer(string viewerPath, string arguments, string workingDirectory)

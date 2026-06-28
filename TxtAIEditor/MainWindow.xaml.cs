@@ -489,6 +489,8 @@ namespace TxtAIEditor
                     () => OpenNewTab(),
                     LoadDirectoryRoot,
                     LoadFileIntoTabAsync,
+                    _livePreviewController.OpenFileInExternalViewerAsync,
+                    _livePreviewController.OpenFileWithDefaultProgramAsync,
                     async (filePath, line) => await LoadFileIntoTabAsync(filePath, line),
                     NavigateExplorerToFolderAsync,
                     NavigateExplorerToFolderAndRevealAsync,

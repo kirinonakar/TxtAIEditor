@@ -23,6 +23,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Action<string> _loadDirectoryRoot;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
+        private readonly Func<string, Task> _openFileInExternalViewerAsync;
+        private readonly Func<string, Task> _openFileWithDefaultProgramAsync;
         private readonly Func<string, Task<bool>> _insertTextIntoActiveEditorAsync;
         private readonly Action<OpenedTab, TabViewItem> _closeTabAndCleanup;
         private readonly Func<XamlRoot> _xamlRootProvider;
@@ -43,6 +45,8 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> activeTabProvider,
             Action<string> loadDirectoryRoot,
             Func<string, Task> loadFileIntoTabAsync,
+            Func<string, Task> openFileInExternalViewerAsync,
+            Func<string, Task> openFileWithDefaultProgramAsync,
             Func<string, Task<bool>> insertTextIntoActiveEditorAsync,
             Action<OpenedTab, TabViewItem> closeTabAndCleanup,
             Func<XamlRoot> xamlRootProvider,
@@ -61,6 +65,8 @@ namespace TxtAIEditor.Controls
             _activeTabProvider = activeTabProvider;
             _loadDirectoryRoot = loadDirectoryRoot;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
+            _openFileInExternalViewerAsync = openFileInExternalViewerAsync;
+            _openFileWithDefaultProgramAsync = openFileWithDefaultProgramAsync;
             _insertTextIntoActiveEditorAsync = insertTextIntoActiveEditorAsync;
             _closeTabAndCleanup = closeTabAndCleanup;
             _xamlRootProvider = xamlRootProvider;
@@ -79,6 +85,8 @@ namespace TxtAIEditor.Controls
             _leftSidebar.FileListViewItemRightTapped += OnFileListViewItemRightTapped;
             _leftSidebar.CreateFolderClick += OnCreateFolderClick;
             _leftSidebar.InsertMarkdownImageClick += OnInsertMarkdownImageClick;
+            _leftSidebar.OpenExternalViewerClick += OnOpenExternalViewerClick;
+            _leftSidebar.OpenWithDefaultProgramClick += OnOpenWithDefaultProgramClick;
             _leftSidebar.CopyFileNameClick += OnCopyFileNameClick;
             _leftSidebar.CopyFilePathClick += OnCopyFilePathClick;
             _leftSidebar.CopyFolderPathClick += OnCopyFolderPathClick;
@@ -97,7 +105,7 @@ namespace TxtAIEditor.Controls
                 _leftSidebar.FileList.SelectedItem = item;
             }
 
-            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 10)
+            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 12)
             {
                 LocalizeContextFlyout(flyout);
                 ConfigureContextFlyout(flyout, _leftSidebar.FileList.SelectedItem as ExplorerItem);
@@ -204,11 +212,13 @@ namespace TxtAIEditor.Controls
             ((MenuFlyoutItem)flyout.Items[0]).Text = _getString("ExplorerAddToFavorites", "즐겨찾기에 추가");
             ((MenuFlyoutItem)flyout.Items[1]).Text = _getString("ExplorerAddFolderToFavorites", "폴더를 즐겨찾기에 추가");
             ((MenuFlyoutItem)flyout.Items[2]).Text = _getString("ExplorerInsertMarkdownImage", "마크다운 삽입");
-            ((MenuFlyoutItem)flyout.Items[4]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
-            ((MenuFlyoutItem)flyout.Items[5]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
-            ((MenuFlyoutItem)flyout.Items[6]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
-            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerRename", "이름 바꾸기");
-            ((MenuFlyoutItem)flyout.Items[9]).Text = _getString("ExplorerDelete", "삭제");
+            ((MenuFlyoutItem)flyout.Items[3]).Text = _getString("OpenExternalViewerTooltip", "외부 뷰어로 열기");
+            ((MenuFlyoutItem)flyout.Items[4]).Text = _getString("OpenWithDefaultProgramTooltip", "기본 프로그램으로 열기");
+            ((MenuFlyoutItem)flyout.Items[6]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
+            ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
+            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
+            ((MenuFlyoutItem)flyout.Items[10]).Text = _getString("ExplorerRename", "이름 바꾸기");
+            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerDelete", "삭제");
         }
 
         private static void ConfigureContextFlyout(MenuFlyout flyout, ExplorerItem? item)
@@ -218,6 +228,17 @@ namespace TxtAIEditor.Controls
                 markdownItem.Visibility = item != null && !item.IsFolder && IsSupportedImageFile(item.Path)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+            }
+
+            bool canOpenFile = CanOpenExplorerFile(item);
+            if (flyout.Items.Count > 3 && flyout.Items[3] is MenuFlyoutItem externalViewerItem)
+            {
+                externalViewerItem.Visibility = canOpenFile ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (flyout.Items.Count > 4 && flyout.Items[4] is MenuFlyoutItem defaultProgramItem)
+            {
+                defaultProgramItem.Visibility = canOpenFile ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
@@ -246,6 +267,28 @@ namespace TxtAIEditor.Controls
                     _getString("ExplorerInsertMarkdownImageErrorTitle", "마크다운 삽입 실패"),
                     ex.Message);
             }
+        }
+
+        private async void OnOpenExternalViewerClick(object sender, RoutedEventArgs e)
+        {
+            var item = GetExplorerItem(sender);
+            if (!CanOpenExplorerFile(item))
+            {
+                return;
+            }
+
+            await _openFileInExternalViewerAsync(item!.Path);
+        }
+
+        private async void OnOpenWithDefaultProgramClick(object sender, RoutedEventArgs e)
+        {
+            var item = GetExplorerItem(sender);
+            if (!CanOpenExplorerFile(item))
+            {
+                return;
+            }
+
+            await _openFileWithDefaultProgramAsync(item!.Path);
         }
 
         private string CreateMarkdownImageText(ExplorerItem item)
@@ -447,6 +490,14 @@ namespace TxtAIEditor.Controls
             }
 
             return _leftSidebar.FileList.SelectedItem as ExplorerItem;
+        }
+
+        private static bool CanOpenExplorerFile(ExplorerItem? item)
+        {
+            return item != null &&
+                   !item.IsFolder &&
+                   !string.IsNullOrWhiteSpace(item.Path) &&
+                   File.Exists(item.Path);
         }
 
         private async Task<ContentDialogResult> ShowDialogAsync(ContentDialog dialog)

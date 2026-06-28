@@ -66,6 +66,8 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? AddFileToFavoritesClick;
         public event RoutedEventHandler? AddFolderToFavoritesClick;
         public event RoutedEventHandler? InsertMarkdownImageClick;
+        public event RoutedEventHandler? OpenExternalViewerClick;
+        public event RoutedEventHandler? OpenWithDefaultProgramClick;
         public event RoutedEventHandler? CopyFileNameClick;
         public event RoutedEventHandler? CopyFilePathClick;
         public event RoutedEventHandler? CopyFolderPathClick;
@@ -326,6 +328,8 @@ namespace TxtAIEditor.Controls
         private void OnAddFileToFavoritesClick(object sender, RoutedEventArgs e) => AddFileToFavoritesClick?.Invoke(sender, e);
         private void OnAddFolderToFavoritesClick(object sender, RoutedEventArgs e) => AddFolderToFavoritesClick?.Invoke(sender, e);
         private void OnInsertMarkdownImageClick(object sender, RoutedEventArgs e) => InsertMarkdownImageClick?.Invoke(sender, e);
+        private void OnOpenExternalViewerClick(object sender, RoutedEventArgs e) => OpenExternalViewerClick?.Invoke(sender, e);
+        private void OnOpenWithDefaultProgramClick(object sender, RoutedEventArgs e) => OpenWithDefaultProgramClick?.Invoke(sender, e);
         private void OnCopyFileNameClick(object sender, RoutedEventArgs e) => CopyFileNameClick?.Invoke(sender, e);
         private void OnCopyFilePathClick(object sender, RoutedEventArgs e) => CopyFilePathClick?.Invoke(sender, e);
         private void OnCopyFolderPathClick(object sender, RoutedEventArgs e) => CopyFolderPathClick?.Invoke(sender, e);
