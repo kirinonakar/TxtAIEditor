@@ -704,9 +704,27 @@ namespace TxtAIEditor.Controls
                     }
                     return list;
                 }
+
+                if (arguments.TryGetProperty(name, out prop) && prop.ValueKind == JsonValueKind.String)
+                {
+                    return SplitStringArgumentIntoLines(prop.GetString() ?? string.Empty);
+                }
             }
 
             return null;
+        }
+
+        private static List<string> SplitStringArgumentIntoLines(string value)
+        {
+            string normalizedValue = value.Replace("\r\n", "\n").Replace('\r', '\n');
+            var lines = new List<string>(normalizedValue.Split('\n'));
+
+            if (lines.Count > 1 && lines[^1].Length == 0)
+            {
+                lines.RemoveAt(lines.Count - 1);
+            }
+
+            return lines;
         }
 
         private bool PathsReferToSameFile(string path, string selectionPath)
