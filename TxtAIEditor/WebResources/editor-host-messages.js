@@ -1,6 +1,7 @@
 import { findInput } from './editor-dom.js';
 import {
     applyOptions,
+    applyEditResultFromHost,
     clearMeasuredLineHeights,
     post,
     queueRender,
@@ -106,6 +107,16 @@ export function createHostMessageHandler({
         case 'updateLine':
             {
                 updateLineFromHost(msg.lineNumber || 1, msg.text || '', !!msg.isComposing);
+            }
+            break;
+        case 'applyEditResult':
+            {
+                applyEditResultFromHost(
+                    msg.startLine || 1,
+                    msg.oldLineCount || 0,
+                    msg.lines || [],
+                    msg.lineCount || state.lineCount,
+                    msg.caret || null);
             }
             break;
         case 'receiveLines':

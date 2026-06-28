@@ -144,7 +144,7 @@ namespace TxtAIEditor.Controls
             {
                 if (_editorSessions.TryGetValue(otherTab.Id, out var otherSession))
                 {
-                    otherSession.ReplaceLine(lineNumber, text);
+                    otherSession.ReplaceLine(lineNumber, text, trackUndo: !isComposing, isComposing: isComposing);
                     otherTab.Content = otherSession.GetText();
                 }
                 else

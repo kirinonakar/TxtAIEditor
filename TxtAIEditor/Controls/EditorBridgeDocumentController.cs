@@ -68,7 +68,7 @@ namespace TxtAIEditor.Controls
             string text,
             bool isComposing)
         {
-            session.ReplaceLine(lineNumber, text);
+            session.ReplaceLine(lineNumber, text, trackUndo: !isComposing, isComposing: isComposing);
 
             if (!isComposing)
             {

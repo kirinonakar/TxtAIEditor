@@ -241,6 +241,21 @@ namespace TxtAIEditor.Editor
             });
         }
 
+        public async Task ApplyEditResultAsync(UndoResult result)
+        {
+            await SendMessageAsync(new
+            {
+                action = "applyEditResult",
+                startLine = Math.Max(1, result.StartLine),
+                oldLineCount = Math.Max(0, result.OldLineCount),
+                lineCount = Math.Max(1, result.DocumentLineCount),
+                lines = result.LinesToRefresh,
+                caret = result.Caret is CaretState caret
+                    ? new { line = Math.Max(1, caret.LineNumber), column = Math.Max(1, caret.Column) }
+                    : null
+            });
+        }
+
         public async Task SendFindResultAsync(TextSearchResult? result, string query)
         {
             if (result == null)

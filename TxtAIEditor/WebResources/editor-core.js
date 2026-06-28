@@ -6,6 +6,7 @@ const PREFETCH_AHEAD = 200;
 
 const runtime = {
     drawEditableSelectionOverlays: () => { },
+    focusLine: () => { },
     getCaretOffset: () => 0,
     hasCustomSelection: () => false,
     isLineInColumnComposition: () => false,
@@ -541,6 +542,63 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
         queueRender();
     } else {
         runtime.drawEditableSelectionOverlays();
+    }
+
+    return true;
+}
+
+function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCount, caret = null) {
+    if (state.isComposing) {
+        return false;
+    }
+
+    const start = Math.max(1, Number(startLine || 1));
+    const removeCount = Math.max(0, Number(oldLineCount || 0));
+    const nextLines = Array.isArray(lines) ? lines.map(line => String(line ?? '')) : [];
+    const nextDocumentLineCount = Math.max(1, Number(documentLineCount || (state.lineCount + nextLines.length - removeCount)));
+
+    state.selection = null;
+    try {
+        window.getSelection()?.removeAllRanges();
+    } catch (e) { }
+    clearCustomSelectionVisuals();
+    syncCustomSelectionClass();
+
+    for (let line = start; line < start + removeCount; line++) {
+        state.cache.delete(line);
+        state.dirtyLines.delete(line);
+        deleteMeasuredLineHeight(line);
+    }
+
+    const delta = nextLines.length - removeCount;
+    if (delta !== 0) {
+        shiftCachedLines(start + removeCount, delta);
+    }
+
+    state.lineCount = nextDocumentLineCount;
+    for (let i = 0; i < nextLines.length; i++) {
+        const line = start + i;
+        state.cache.set(line, nextLines[i]);
+        deleteMeasuredLineHeight(line);
+        if (!cleanDirtyMarker(line)) {
+            markDirty(line, removeCount === 0 ? 'add' : 'mod');
+        }
+    }
+
+    state.cacheVersion++;
+    state.livePreviewLocalResourceVersion = String(Date.now());
+    setupVirtualHeight();
+
+    if (state.wordWrap) {
+        measureRenderedRows(false);
+    }
+
+    queueRender(true);
+
+    if (caret && Number(caret.line || 0) > 0) {
+        const caretLine = Math.min(state.lineCount, Math.max(1, Number(caret.line)));
+        const caretColumn = Math.max(0, Number(caret.column || 1) - 1);
+        setTimeout(() => runtime.focusLine(caretLine, caretColumn), 20);
     }
 
     return true;
@@ -1220,6 +1278,7 @@ function lineCommentSyntax() {
 export {
     MAX_RENDER_CHARS,
     applyOptions,
+    applyEditResultFromHost,
     activeEditableElement,
     cleanDirtyMarker,
     clearMeasuredLineHeights,

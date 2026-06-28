@@ -614,14 +614,8 @@ namespace TxtAIEditor.Editor
 
     public sealed class EditorDocumentSession
     {
-        private readonly List<string> _undoStack = new();
-        private readonly List<string> _redoStack = new();
-        private const int MaxUndoDepth = 200;
-
-        private DateTime _lastUndoPushTime = DateTime.MinValue;
-        private int _lastUndoLineNumber = -1;
-        private int _undoGroupDepth;
-        private bool _undoGroupHasSnapshot;
+        private readonly UndoManager _undoManager = new();
+        private readonly Dictionary<int, string> _compositionBeforeLines = new();
 
         public EditorDocumentSession(OpenedTab tab, ITextModel model)
         {
@@ -637,51 +631,75 @@ namespace TxtAIEditor.Editor
         public void UpdateContentFromSync(string text)
         {
             Model = LineArrayTextModel.FromText(text);
+            _undoManager.Clear();
+            _compositionBeforeLines.Clear();
             RefreshTabContentPreview();
         }
 
         public void BeginUndoGroup()
         {
-            if (_undoGroupDepth == 0)
-            {
-                _undoGroupHasSnapshot = false;
-            }
-
-            _undoGroupDepth++;
+            _undoManager.BeginTransaction("editor");
         }
 
         public void EndUndoGroup()
         {
-            if (_undoGroupDepth <= 0)
-            {
-                _undoGroupDepth = 0;
-                _undoGroupHasSnapshot = false;
-                return;
-            }
-
-            _undoGroupDepth--;
-            if (_undoGroupDepth == 0)
-            {
-                _undoGroupHasSnapshot = false;
-                _lastUndoPushTime = DateTime.MinValue;
-                _lastUndoLineNumber = -1;
-            }
+            _undoManager.EndTransaction();
         }
 
         public IReadOnlyList<string> GetLines(int startLine, int count) => Model.GetLines(startLine, count);
 
         public string GetText(int? maxChars = null) => Model.GetText(maxChars);
 
-        public void ReplaceLine(int lineNumber, string text)
+        public void ReplaceLine(int lineNumber, string text, bool trackUndo = true, bool isComposing = false)
         {
-            PushUndo(isStructural: false, lineNumber: lineNumber);
-            Model.ReplaceLine(lineNumber, text);
+            if (lineNumber < 1 || lineNumber > Model.LineCount)
+            {
+                return;
+            }
+
+            string before = Model.GetLine(lineNumber);
+            string after = NormalizeSingleLine(text);
+
+            if (isComposing)
+            {
+                if (!_compositionBeforeLines.ContainsKey(lineNumber))
+                {
+                    _compositionBeforeLines[lineNumber] = before;
+                }
+
+                Model.ReplaceLine(lineNumber, after);
+                RefreshTabContentPreview();
+                return;
+            }
+
+            if (_compositionBeforeLines.Remove(lineNumber, out string? compositionBefore))
+            {
+                before = compositionBefore;
+            }
+
+            if (trackUndo && !string.Equals(before, after, StringComparison.Ordinal))
+            {
+                _undoManager.AddEdit(new ReplaceLineEdit(lineNumber, before, after));
+            }
+
+            Model.ReplaceLine(lineNumber, after);
             RefreshTabContentPreview();
         }
 
         public int SplitLine(int lineNumber, string before, string after)
         {
-            PushUndo(isStructural: true);
+            if (lineNumber < 1 || lineNumber > Model.LineCount)
+            {
+                return Model.LineCount;
+            }
+
+            string original = Model.GetLine(lineNumber);
+            _undoManager.AddEdit(new SplitLineEdit(
+                lineNumber,
+                original,
+                NormalizeSingleLine(before),
+                NormalizeSingleLine(after)));
+            _compositionBeforeLines.Clear();
             Model.SplitLine(lineNumber, before, after);
             RefreshTabContentPreview();
             return Model.LineCount;
@@ -689,15 +707,27 @@ namespace TxtAIEditor.Editor
 
         public int InsertLine(int lineNumber, string text)
         {
-            PushUndo(isStructural: true);
-            Model.InsertLine(lineNumber, text);
+            int safeLineNumber = Math.Clamp(lineNumber, 1, Model.LineCount + 1);
+            string inserted = NormalizeSingleLine(text);
+            _undoManager.AddEdit(new InsertLineEdit(safeLineNumber, inserted));
+            _compositionBeforeLines.Clear();
+            Model.InsertLine(safeLineNumber, inserted);
             RefreshTabContentPreview();
             return Model.LineCount;
         }
 
         public int MergeLineWithPrevious(int lineNumber)
         {
-            PushUndo(isStructural: true);
+            if (lineNumber <= 1 || lineNumber > Model.LineCount)
+            {
+                return Model.LineCount;
+            }
+
+            _undoManager.AddEdit(new MergeLineEdit(
+                lineNumber,
+                Model.GetLine(lineNumber - 1),
+                Model.GetLine(lineNumber)));
+            _compositionBeforeLines.Clear();
             Model.MergeLineWithPrevious(lineNumber);
             RefreshTabContentPreview();
             return Model.LineCount;
@@ -705,44 +735,45 @@ namespace TxtAIEditor.Editor
 
         public int DeleteLine(int lineNumber)
         {
-            PushUndo(isStructural: true);
+            if (lineNumber < 1 || lineNumber > Model.LineCount)
+            {
+                return Model.LineCount;
+            }
+
+            _undoManager.AddEdit(new DeleteLineEdit(
+                lineNumber,
+                Model.GetLine(lineNumber),
+                Model.LineCount == 1));
+            _compositionBeforeLines.Clear();
             Model.DeleteLine(lineNumber);
             RefreshTabContentPreview();
             return Model.LineCount;
         }
 
-        public string? Undo()
+        public UndoResult? Undo()
         {
-            if (_undoStack.Count == 0) return null;
-            _redoStack.Add(Model.GetText());
-            var text = _undoStack[^1];
-            _undoStack.RemoveAt(_undoStack.Count - 1);
-            Model = LineArrayTextModel.FromText(text);
+            UndoResult? result = _undoManager.Undo(Model);
+            if (result == null)
+            {
+                return null;
+            }
+
+            _compositionBeforeLines.Clear();
             RefreshTabContentPreview();
-
-            _lastUndoPushTime = DateTime.MinValue;
-            _lastUndoLineNumber = -1;
-            _undoGroupDepth = 0;
-            _undoGroupHasSnapshot = false;
-
-            return text;
+            return result;
         }
 
-        public string? Redo()
+        public UndoResult? Redo()
         {
-            if (_redoStack.Count == 0) return null;
-            _undoStack.Add(Model.GetText());
-            var text = _redoStack[^1];
-            _redoStack.RemoveAt(_redoStack.Count - 1);
-            Model = LineArrayTextModel.FromText(text);
+            UndoResult? result = _undoManager.Redo(Model);
+            if (result == null)
+            {
+                return null;
+            }
+
+            _compositionBeforeLines.Clear();
             RefreshTabContentPreview();
-
-            _lastUndoPushTime = DateTime.MinValue;
-            _lastUndoLineNumber = -1;
-            _undoGroupDepth = 0;
-            _undoGroupHasSnapshot = false;
-
-            return text;
+            return result;
         }
 
         public TextSearchResult? Find(string query, int startLine, int startColumn, bool reverse, bool matchCase, bool isRegex = false)
@@ -757,7 +788,8 @@ namespace TxtAIEditor.Editor
 
         public void ReplaceAll(string query, string replace, bool matchCase, bool isRegex)
         {
-            PushUndo(isStructural: true);
+            _undoManager.BeginTransaction("replaceAll");
+            bool changed = false;
             if (isRegex)
             {
                 try
@@ -770,7 +802,9 @@ namespace TxtAIEditor.Editor
                         string nextText = regex.Replace(original, replace);
                         if (nextText != original)
                         {
+                            _undoManager.AddEdit(new ReplaceLineEdit(i, original, nextText));
                             Model.ReplaceLine(i, nextText);
+                            changed = true;
                         }
                     }
                 }
@@ -788,11 +822,19 @@ namespace TxtAIEditor.Editor
                     string nextText = ReplaceString(original, query, replace, comparison);
                     if (nextText != original)
                     {
+                        _undoManager.AddEdit(new ReplaceLineEdit(i, original, nextText));
                         Model.ReplaceLine(i, nextText);
+                        changed = true;
                     }
                 }
             }
-            RefreshTabContentPreview();
+
+            _undoManager.EndTransaction();
+            if (changed)
+            {
+                _compositionBeforeLines.Clear();
+                RefreshTabContentPreview();
+            }
         }
 
         private static string ReplaceString(string str, string oldValue, string newValue, StringComparison comparison)
@@ -821,47 +863,14 @@ namespace TxtAIEditor.Editor
             return Model.SaveAsync(filePath, encodingName, cancellationToken);
         }
 
-        private void PushUndo(bool isStructural = false, int lineNumber = -1)
-        {
-            if (_undoGroupDepth > 0)
-            {
-                if (!_undoGroupHasSnapshot)
-                {
-                    PushUndoSnapshot(lineNumber);
-                    _undoGroupHasSnapshot = true;
-                }
-
-                return;
-            }
-
-            var now = DateTime.UtcNow;
-            if (!isStructural && 
-                lineNumber == _lastUndoLineNumber && 
-                (now - _lastUndoPushTime).TotalMilliseconds < 1500)
-            {
-                _lastUndoPushTime = now;
-                return;
-            }
-
-            PushUndoSnapshot(lineNumber);
-            _lastUndoPushTime = now;
-            _lastUndoLineNumber = lineNumber;
-        }
-
-        private void PushUndoSnapshot(int lineNumber)
-        {
-            _redoStack.Clear();
-            _undoStack.Add(Model.GetText());
-            _lastUndoLineNumber = lineNumber;
-            if (_undoStack.Count > MaxUndoDepth)
-            {
-                _undoStack.RemoveAt(0);
-            }
-        }
-
         private void RefreshTabContentPreview()
         {
             Tab.Content = Model.GetText(120_000);
+        }
+
+        private static string NormalizeSingleLine(string text)
+        {
+            return (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
         }
     }
 }

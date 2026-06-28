@@ -50,6 +50,7 @@ const {
 
 configureEditorCoreRuntime({
     drawEditableSelectionOverlays,
+    focusLine: focusLineWithRetry,
     getCaretOffset,
     hasCustomSelection,
     isLineInColumnComposition,
