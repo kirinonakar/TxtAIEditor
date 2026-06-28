@@ -39,7 +39,7 @@ namespace TxtAIEditor.Core.Services
 
             _descText = new TextBlock
             {
-                Text = getString("SettingsAboutDescription", "강력하고 가벼운 텍스트 및 마크다운 에디터입니다.\n실시간 미리보기, 코드 및 수식 템플릿, 터미널 인터페이스, Git 통합, AI Assistant 등을 지원합니다."),
+                Text = getString("SettingsAboutDescription", "강력하고 가벼운 텍스트 및 마크다운 에디터입니다.\n실시간 미리보기, 코드 및 수식 템플릿, 터미널 인터페이스, Git 통합, AI Assistant & Agent 등을 지원합니다."),
                 FontSize = 11,
                 TextWrapping = TextWrapping.Wrap,
                 HorizontalAlignment = HorizontalAlignment.Center,
