@@ -999,7 +999,7 @@ Please check for any sensitive information or unintended token usage before send
   </data>
   <data name="SettingsAboutDescription" xml:space="preserve">
     <value>A powerful and lightweight text &amp; markdown editor.
-Supports live preview, code &amp; formula templates, terminal interface, Git integration, and AI Assistant & Agent.</value>
+Supports live preview, code &amp; formula templates, terminal interface, Git integration, and AI Assistant / Agent.</value>
   </data>
   <data name="SettingsAboutProjectGitHub" xml:space="preserve">
     <value>Project GitHub</value>

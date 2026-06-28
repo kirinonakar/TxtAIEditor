@@ -1000,7 +1000,7 @@
   </data>
   <data name="SettingsAboutDescription" xml:space="preserve">
     <value>強力で軽量なテキスト＆Markdownエディタです。
-リアルタイムプレビュー、コードと数式のテンプレート、ターミナル、Git、AIアシスタント&エーゼットなどの機能を備えています。</value>
+リアルタイムプレビュー、コードと数式のテンプレート、ターミナル、Git、AIアシスタント/エーゼットなどの機能を備えています。</value>
   </data>
   <data name="SettingsAboutProjectGitHub" xml:space="preserve">
     <value>Project GitHub</value>
