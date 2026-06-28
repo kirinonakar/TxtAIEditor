@@ -136,7 +136,10 @@ namespace TxtAIEditor.Controls
                     FileAccess.Read,
                     FileShare.ReadWrite | FileShare.Delete);
                 using var randomAccessStream = fileStream.AsRandomAccessStream();
-                var bitmap = new BitmapImage();
+                var bitmap = new BitmapImage
+                {
+                    CreateOptions = BitmapCreateOptions.IgnoreImageCache
+                };
                 await bitmap.SetSourceAsync(randomAccessStream);
                 image.Source = bitmap;
             }
@@ -144,6 +147,39 @@ namespace TxtAIEditor.Controls
             {
                 Debug.WriteLine($"Failed to load image viewer source: {ex.Message}");
             }
+        }
+
+        public static async Task ReloadImageAsync(TabViewItem tabItem, string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            Image? image = FindImageControl(tabItem.Content as FrameworkElement);
+            if (image == null)
+            {
+                return;
+            }
+
+            await LoadImageSourceAsync(image, filePath);
+        }
+
+        private static Image? FindImageControl(FrameworkElement? root)
+        {
+            if (root is Image img)
+                return img;
+
+            if (root is Panel panel)
+            {
+                foreach (var child in panel.Children)
+                {
+                    if (child is FrameworkElement fe && FindImageControl(fe) is Image found)
+                        return found;
+                }
+            }
+
+            return null;
         }
 
         public PdfViewerTabParts CreatePdfViewer(

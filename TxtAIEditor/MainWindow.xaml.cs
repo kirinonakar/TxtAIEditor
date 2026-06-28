@@ -1815,6 +1815,16 @@ namespace TxtAIEditor
 
         private async Task OnTabReloadAsync(OpenedTab tab, TabViewItem tabItem)
         {
+            if (tab.IsImageViewer)
+            {
+                await EditorTabViewItemFactory.ReloadImageAsync(tabItem, tab.FilePath);
+                _statusBarController.UpdateFileStats(tab);
+                _statusBarController.UpdateTotalLines(tab);
+                UpdateLanguageUI(tab);
+                UpdateWindowTitle();
+                return;
+            }
+
             if (_pdfViewerController.Reload(tab))
             {
                 _statusBarController.UpdateFileStats(tab);
