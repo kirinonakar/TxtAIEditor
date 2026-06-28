@@ -54,6 +54,357 @@ function getLineStartStack(lineNumber) {
     return currentStack;
 }
 
+const htmlNamePattern = /^[A-Za-z_][A-Za-z0-9:._-]*/;
+
+function createHtmlLineContext() {
+    return {
+        inTag: false,
+        tagNameSeen: false,
+        quote: null,
+        special: null
+    };
+}
+
+function cloneHtmlLineContext(context) {
+    return {
+        inTag: !!context?.inTag,
+        tagNameSeen: !!context?.tagNameSeen,
+        quote: context?.quote || null,
+        special: context?.special || null
+    };
+}
+
+function closeHtmlTagContext(context) {
+    context.inTag = false;
+    context.tagNameSeen = false;
+    context.quote = null;
+}
+
+function advanceHtmlContext(context, text) {
+    const next = cloneHtmlLineContext(context);
+    let i = 0;
+
+    while (i < text.length) {
+        if (next.special === 'comment') {
+            const end = text.indexOf('-->', i);
+            if (end < 0) return next;
+            next.special = null;
+            i = end + 3;
+            continue;
+        }
+
+        if (next.special === 'cdata') {
+            const end = text.indexOf(']]>', i);
+            if (end < 0) return next;
+            next.special = null;
+            i = end + 3;
+            continue;
+        }
+
+        if (next.special === 'declaration') {
+            const end = text.indexOf('>', i);
+            if (end < 0) return next;
+            next.special = null;
+            i = end + 1;
+            continue;
+        }
+
+        if (next.inTag) {
+            if (next.quote) {
+                const end = text.indexOf(next.quote, i);
+                if (end < 0) return next;
+                next.quote = null;
+                i = end + 1;
+                continue;
+            }
+
+            const ch = text[i];
+            if (ch === '"' || ch === "'") {
+                next.quote = ch;
+                i++;
+                continue;
+            }
+
+            if ((ch === '/' || ch === '?') && text[i + 1] === '>') {
+                closeHtmlTagContext(next);
+                i += 2;
+                continue;
+            }
+
+            if (ch === '>') {
+                closeHtmlTagContext(next);
+                i++;
+                continue;
+            }
+
+            if (!next.tagNameSeen) {
+                const nameMatch = htmlNamePattern.exec(text.slice(i));
+                if (nameMatch) {
+                    next.tagNameSeen = true;
+                    i += nameMatch[0].length;
+                    continue;
+                }
+            }
+
+            i++;
+            continue;
+        }
+
+        const tagStart = text.indexOf('<', i);
+        if (tagStart < 0) return next;
+
+        if (text.startsWith('<!--', tagStart)) {
+            next.special = 'comment';
+            i = tagStart + 4;
+            continue;
+        }
+
+        if (text.startsWith('<![CDATA[', tagStart)) {
+            next.special = 'cdata';
+            i = tagStart + 9;
+            continue;
+        }
+
+        if (text.startsWith('<!', tagStart)) {
+            next.special = 'declaration';
+            i = tagStart + 2;
+            continue;
+        }
+
+        next.inTag = true;
+        next.tagNameSeen = false;
+        next.quote = null;
+        i = tagStart + 1;
+        if (text[i] === '/' || text[i] === '?') {
+            i++;
+        }
+    }
+
+    return next;
+}
+
+function getHtmlLineStartContext(lineNumber) {
+    if (!lineNumber || lineNumber <= 1) return createHtmlLineContext();
+
+    if (!state.htmlLineEndContexts) {
+        state.htmlLineEndContexts = new Map();
+    }
+
+    const contexts = state.htmlLineEndContexts;
+    const previousLine = lineNumber - 1;
+    const previousContext = contexts.get(previousLine);
+    if (previousContext) return cloneHtmlLineContext(previousContext);
+
+    let context = createHtmlLineContext();
+    let scanStart = 1;
+    let anchor = previousLine;
+
+    while (anchor > 0) {
+        const anchorContext = contexts.get(anchor);
+        if (anchorContext) {
+            context = cloneHtmlLineContext(anchorContext);
+            scanStart = anchor + 1;
+            break;
+        }
+
+        if (!state.cache.has(anchor)) {
+            scanStart = anchor + 1;
+            break;
+        }
+
+        anchor--;
+    }
+
+    for (let line = scanStart; line < lineNumber; line++) {
+        if (!state.cache.has(line)) {
+            context = createHtmlLineContext();
+            continue;
+        }
+
+        context = advanceHtmlContext(context, state.cache.get(line) || '');
+        contexts.set(line, cloneHtmlLineContext(context));
+    }
+
+    return cloneHtmlLineContext(context);
+}
+
+function getHtmlContextAt(lineNumber, startCharIndex, fallbackText) {
+    let context = getHtmlLineStartContext(lineNumber);
+    if (lineNumber !== null && startCharIndex > 0) {
+        const fullLineText = state.cache.get(lineNumber) ?? fallbackText;
+        context = advanceHtmlContext(context, fullLineText.slice(0, startCharIndex));
+    }
+    return context;
+}
+
+function highlightHtmlLine(text, lineNumber, startCharIndex, stash) {
+    let context = getHtmlContextAt(lineNumber, startCharIndex, text);
+    let output = "";
+    let i = 0;
+
+    const emitPlain = value => {
+        output += value;
+    };
+    const emitToken = (className, value) => {
+        if (value.length > 0) {
+            output += stash(`<span class="${className}">${escapeHtml(value)}</span>`);
+        }
+    };
+    const emitPunctuation = value => emitToken('token-punctuation', value);
+
+    while (i < text.length) {
+        if (context.special === 'comment') {
+            const end = text.indexOf('-->', i);
+            const endIndex = end < 0 ? text.length : end + 3;
+            emitToken('token-comment', text.slice(i, endIndex));
+            i = endIndex;
+            if (end >= 0) {
+                context.special = null;
+            }
+            continue;
+        }
+
+        if (context.special === 'cdata') {
+            const end = text.indexOf(']]>', i);
+            const endIndex = end < 0 ? text.length : end + 3;
+            emitPunctuation(text.slice(i, endIndex));
+            i = endIndex;
+            if (end >= 0) {
+                context.special = null;
+            }
+            continue;
+        }
+
+        if (context.special === 'declaration') {
+            const end = text.indexOf('>', i);
+            const endIndex = end < 0 ? text.length : end + 1;
+            emitPunctuation(text.slice(i, endIndex));
+            i = endIndex;
+            if (end >= 0) {
+                context.special = null;
+            }
+            continue;
+        }
+
+        if (context.inTag) {
+            if (context.quote) {
+                const end = text.indexOf(context.quote, i);
+                const endIndex = end < 0 ? text.length : end + 1;
+                emitToken('token-string', text.slice(i, endIndex));
+                i = endIndex;
+                if (end >= 0) {
+                    context.quote = null;
+                }
+                continue;
+            }
+
+            const ch = text[i];
+            if (/\s/.test(ch)) {
+                const whitespace = /^\s+/.exec(text.slice(i))[0];
+                emitPlain(whitespace);
+                i += whitespace.length;
+                continue;
+            }
+
+            if ((ch === '/' || ch === '?') && text[i + 1] === '>') {
+                emitPunctuation(text.slice(i, i + 2));
+                i += 2;
+                closeHtmlTagContext(context);
+                continue;
+            }
+
+            if (ch === '>') {
+                emitPunctuation(ch);
+                i++;
+                closeHtmlTagContext(context);
+                continue;
+            }
+
+            if (ch === '/' || ch === '?') {
+                emitPunctuation(ch);
+                i++;
+                continue;
+            }
+
+            if (ch === '=') {
+                emitToken('token-operator', ch);
+                i++;
+                continue;
+            }
+
+            if (ch === '"' || ch === "'") {
+                const end = text.indexOf(ch, i + 1);
+                const endIndex = end < 0 ? text.length : end + 1;
+                emitToken('token-string', text.slice(i, endIndex));
+                i = endIndex;
+                context.quote = end < 0 ? ch : null;
+                continue;
+            }
+
+            const nameMatch = htmlNamePattern.exec(text.slice(i));
+            if (nameMatch) {
+                const className = context.tagNameSeen ? 'token-attr' : 'token-tag';
+                emitToken(className, nameMatch[0]);
+                context.tagNameSeen = true;
+                i += nameMatch[0].length;
+                continue;
+            }
+
+            emitPlain(ch);
+            i++;
+            continue;
+        }
+
+        const tagStart = text.indexOf('<', i);
+        if (tagStart < 0) {
+            emitPlain(text.slice(i));
+            break;
+        }
+
+        emitPlain(text.slice(i, tagStart));
+
+        if (text.startsWith('<!--', tagStart)) {
+            const end = text.indexOf('-->', tagStart + 4);
+            const endIndex = end < 0 ? text.length : end + 3;
+            emitToken('token-comment', text.slice(tagStart, endIndex));
+            i = endIndex;
+            context.special = end < 0 ? 'comment' : null;
+            continue;
+        }
+
+        if (text.startsWith('<![CDATA[', tagStart)) {
+            const end = text.indexOf(']]>', tagStart + 9);
+            const endIndex = end < 0 ? text.length : end + 3;
+            emitPunctuation(text.slice(tagStart, endIndex));
+            i = endIndex;
+            context.special = end < 0 ? 'cdata' : null;
+            continue;
+        }
+
+        if (text.startsWith('<!', tagStart)) {
+            const end = text.indexOf('>', tagStart + 2);
+            const endIndex = end < 0 ? text.length : end + 1;
+            emitPunctuation(text.slice(tagStart, endIndex));
+            i = endIndex;
+            context.special = end < 0 ? 'declaration' : null;
+            continue;
+        }
+
+        emitPunctuation('<');
+        i = tagStart + 1;
+        context.inTag = true;
+        context.tagNameSeen = false;
+        context.quote = null;
+
+        if (text[i] === '/' || text[i] === '?') {
+            emitPunctuation(text[i]);
+            i++;
+        }
+    }
+
+    return output;
+}
+
 function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
     if (!language || language === 'plaintext') {
         return escapeHtml(text);
@@ -112,32 +463,7 @@ function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
     const isReg = language === 'reg';
 
     if (isHtml) {
-        // 1. Comments
-        workingText = workingText.replace(/<!--[\s\S]*?-->/g, m => stash(`<span class="token-comment">${escapeHtml(m)}</span>`));
-            // 2. CDATA / DOCTYPE
-            workingText = workingText.replace(/<!DOCTYPE[^>]*>|<!\[CDATA\[.*?\]\]>/gi, m => stash(`<span class="token-punctuation">${escapeHtml(m)}</span>`));
-        // 3. Tags
-        workingText = workingText.replace(/<([^>]+)>/g, (match, tagContent) => {
-            let tagHtml = "";
-            let remainder = tagContent;
-            const tagNameMatch = /^([^\s/]+)/.exec(remainder);
-            if (tagNameMatch) {
-                const tagName = tagNameMatch[1];
-                tagHtml += `<span class="token-tag">${escapeHtml(tagName)}</span>`;
-                remainder = remainder.slice(tagName.length);
-            }
-            remainder = remainder.replace(/([a-zA-Z0-9:-]+)(\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/g, (attrMatch, attrName, attrVal) => {
-                let attrHtml = `<span class="token-attr">${escapeHtml(attrName)}</span>`;
-                if (attrVal) {
-                    const eqIndex = attrVal.indexOf('=');
-                    const valPart = attrVal.slice(eqIndex + 1);
-                    attrHtml += `<span class="token-operator">=</span><span class="token-string">${escapeHtml(valPart)}</span>`;
-                }
-                return ' ' + attrHtml;
-            });
-            tagHtml += remainder;
-            return stash(`<span class="token-punctuation">&lt;</span>${tagHtml}<span class="token-punctuation">&gt;</span>`);
-        });
+        workingText = highlightHtmlLine(workingText, lineNumber, startCharIndex, stash);
     }
     else if (isCss) {
         // 1. Comments

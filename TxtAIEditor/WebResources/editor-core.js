@@ -96,23 +96,27 @@ const state = {
 };
 
 state.lineEndStacks = new Map();
+state.htmlLineEndContexts = new Map();
 
 const originalSet = state.cache.set;
 state.cache.set = function(key, value) {
     originalSet.call(state.cache, key, value);
     invalidateLineEndStacks(key);
+    invalidateHtmlLineEndContexts(key);
     return this;
 };
 const originalDelete = state.cache.delete;
 state.cache.delete = function(key) {
     const res = originalDelete.call(state.cache, key);
     invalidateLineEndStacks(key);
+    invalidateHtmlLineEndContexts(key);
     return res;
 };
 const originalClear = state.cache.clear;
 state.cache.clear = function() {
     originalClear.call(state.cache);
     if (state.lineEndStacks) state.lineEndStacks.clear();
+    if (state.htmlLineEndContexts) state.htmlLineEndContexts.clear();
 };
 
 function invalidateLineEndStacks(startLine) {
@@ -124,6 +128,19 @@ function invalidateLineEndStacks(startLine) {
     for (const key of state.lineEndStacks.keys()) {
         if (key >= startLine) {
             state.lineEndStacks.delete(key);
+        }
+    }
+}
+
+function invalidateHtmlLineEndContexts(startLine) {
+    if (!state.htmlLineEndContexts || state.htmlLineEndContexts.size === 0) return;
+    if (startLine <= 1) {
+        state.htmlLineEndContexts.clear();
+        return;
+    }
+    for (const key of state.htmlLineEndContexts.keys()) {
+        if (key >= startLine) {
+            state.htmlLineEndContexts.delete(key);
         }
     }
 }
