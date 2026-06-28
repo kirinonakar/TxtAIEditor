@@ -97,6 +97,7 @@ namespace TxtAIEditor
                     _searchReplaceController?.CancelActiveSearch();
                     UpdateAutoSaveStatus();
                     UpdateAllTabWorkspaceIndicators();
+                    _gitStatusRefreshController?.QueueRefresh();
                 }
             }
         }
