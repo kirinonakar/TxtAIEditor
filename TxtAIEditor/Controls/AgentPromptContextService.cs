@@ -340,7 +340,7 @@ namespace TxtAIEditor.Controls
             string model = settings?.LlmModel ?? string.Empty;
 
             // These providers currently ignore the native tools argument; their text tool protocol is already counted in the system prompt.
-            if (provider is "gemini" or "lmstudio" or "ollama" or "ollamacloud")
+            if (provider is "gemini" or "lmstudio" or "ollama")
             {
                 return false;
             }

@@ -83,6 +83,24 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 payloadDict["max_tokens"] = outputLimit;
             }
+            if (_isCloud && tools != null && tools.Count > 0)
+            {
+                var toolsList = new List<object>();
+                foreach (var tool in tools)
+                {
+                    toolsList.Add(new
+                    {
+                        type = "function",
+                        function = new
+                        {
+                            name = tool.Name,
+                            description = tool.Description,
+                            parameters = tool.Parameters
+                        }
+                    });
+                }
+                payloadDict["tools"] = toolsList;
+            }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
@@ -109,6 +127,9 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     using (var reader = new System.IO.StreamReader(stream))
                     {
+                        var toolAccumulator = new StreamToolCallAccumulator();
+                        bool hasToolCalls = false;
+
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -128,14 +149,63 @@ namespace TxtAIEditor.Core.Services.LLM
                                     if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];
-                                        if (firstChoice.TryGetProperty("delta", out var delta) &&
-                                            delta.TryGetProperty("content", out var content))
+                                        if (firstChoice.TryGetProperty("delta", out var delta))
                                         {
-                                            string? text = content.GetString();
-                                            if (!string.IsNullOrEmpty(text))
+                                            if (delta.TryGetProperty("tool_calls", out var toolCalls) &&
+                                                toolCalls.ValueKind == JsonValueKind.Array &&
+                                                toolCalls.GetArrayLength() > 0)
                                             {
-                                                cancellationToken.ThrowIfCancellationRequested();
-                                                await onChunk(text);
+                                                hasToolCalls = true;
+                                                var tc = toolCalls[0];
+                                                if (tc.TryGetProperty("function", out var func))
+                                                {
+                                                    if (func.TryGetProperty("name", out var nameProp))
+                                                    {
+                                                        string nameChunk = nameProp.GetString() ?? string.Empty;
+                                                        if (!string.IsNullOrEmpty(nameChunk))
+                                                        {
+                                                            toolAccumulator.Name += nameChunk;
+                                                            if (!toolAccumulator.SentStartTag)
+                                                            {
+                                                                toolAccumulator.SentStartTag = true;
+                                                                await onChunk($"<tool_call>{{\"name\":\"{nameChunk}");
+                                                            }
+                                                            else
+                                                            {
+                                                                await onChunk(nameChunk);
+                                                            }
+                                                        }
+                                                    }
+                                                    if (func.TryGetProperty("arguments", out var argsProp))
+                                                    {
+                                                        string argsChunk = argsProp.GetString() ?? string.Empty;
+                                                        if (!string.IsNullOrEmpty(argsChunk))
+                                                        {
+                                                            toolAccumulator.Arguments.Append(argsChunk);
+                                                            if (!toolAccumulator.SentStartTag)
+                                                            {
+                                                                toolAccumulator.SentStartTag = true;
+                                                                await onChunk($"<tool_call>{{\"name\":\"\",\"arguments\":");
+                                                                toolAccumulator.SentArgumentsHeader = true;
+                                                            }
+                                                            else if (!toolAccumulator.SentArgumentsHeader)
+                                                            {
+                                                                toolAccumulator.SentArgumentsHeader = true;
+                                                                await onChunk($"\",\"arguments\":");
+                                                            }
+                                                            await onChunk(argsChunk);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            else if (delta.TryGetProperty("content", out var content))
+                                            {
+                                                string? text = content.GetString();
+                                                if (!string.IsNullOrEmpty(text))
+                                                {
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    await onChunk(text);
+                                                }
                                             }
                                         }
                                     }
@@ -144,6 +214,19 @@ namespace TxtAIEditor.Core.Services.LLM
                             catch (JsonException)
                             {
                             }
+                        }
+
+                        if (hasToolCalls)
+                        {
+                            if (!toolAccumulator.SentStartTag)
+                            {
+                                await onChunk($"<tool_call>{{\"name\":\"\",\"arguments\":{{}}");
+                            }
+                            else if (!toolAccumulator.SentArgumentsHeader)
+                            {
+                                await onChunk($"\",\"arguments\":{{}}");
+                            }
+                            await onChunk("}</tool_call>");
                         }
                     }
                 }
