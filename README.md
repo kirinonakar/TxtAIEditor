@@ -53,7 +53,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Password Management:** Right-click the tab or lock icon to encrypt a plain tab, change the password, or remove encryption. Password changes and removal require matching double-entry confirmation.
 
 ### 🖥️ Native Premium Windows UI
-*   **Mica Backdrop & Themes:** Themes (Dark, Light, Pastel Dark) with a high-fidelity Mica backdrop.
+*   **Mica Backdrop & Themes:** Themes (Light, Dark, Pastel Dark) with a high-fidelity Mica backdrop.
 *   **Multi-Pane Splitters:** Easily adjust sidebars, preview sections, and terminal panes via interactive C# split-controls.
 *   **Always on Top & Sticky Notes:** Pin your editor window or transform to sticky notes directly from the toolbar.
 
