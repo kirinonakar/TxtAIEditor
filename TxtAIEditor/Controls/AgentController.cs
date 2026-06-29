@@ -757,9 +757,12 @@ namespace TxtAIEditor.Controls
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + continuationNote);
                                 UpdateContextStatsImmediate(force: true);
                             });
-                            await _runOutputController.AppendRunActivityAsync(runContext, _getString(
+                            string truncationRetryMessage = _getString(
                                 "AgentActivityTruncatedRetry",
-                                "응답이 잘려 이어서 작성합니다."));
+                                "응답이 잘려 이어서 작성합니다.");
+                            await _runOutputController.AppendRunActivityAsync(runContext, truncationRetryMessage);
+                            AppendRunSessionHistoryLine($"[Truncated Response Retry]: {truncationRetryMessage}");
+                            AppendRunSessionHistoryLine();
                             continue;
                         }
                     }
@@ -781,9 +784,12 @@ namespace TxtAIEditor.Controls
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
                                 UpdateContextStatsImmediate(force: true);
                             });
-                            await _runOutputController.AppendRunActivityAsync(runContext, _getString(
+                            string emptyRetryMessage = _getString(
                                 "AgentActivityEmptyResponseRetry",
-                                "빈 응답을 수신해 다시 시도합니다."));
+                                "빈 응답을 수신해 다시 시도합니다.");
+                            await _runOutputController.AppendRunActivityAsync(runContext, emptyRetryMessage);
+                            AppendRunSessionHistoryLine($"[Empty Response Retry]: {emptyRetryMessage}");
+                            AppendRunSessionHistoryLine();
 
                             continue;
                         }
@@ -857,6 +863,12 @@ namespace TxtAIEditor.Controls
                                 "도구 호출 형식이 섞여 다시 요청합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
+                            AppendRunSessionHistoryLine($"[Tool Call Format Retry]: {retryMessage}");
+                            if (!string.IsNullOrWhiteSpace(response))
+                            {
+                                AppendRunSessionHistoryLine($"[Previous Tool Call]: {response.Trim()}");
+                            }
+                            AppendRunSessionHistoryLine();
                             if (_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
                                 UpdateContextStatsImmediate(force: true);
@@ -903,6 +915,12 @@ namespace TxtAIEditor.Controls
                                 "계획 모드에서는 make_plan 도구로 계획서를 저장해야 합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
+                            AppendRunSessionHistoryLine($"[Make Plan Retry]: {retryMessage}");
+                            if (!string.IsNullOrWhiteSpace(response))
+                            {
+                                AppendRunSessionHistoryLine($"[Previous Response]: {response.Trim()}");
+                            }
+                            AppendRunSessionHistoryLine();
                             if (_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
                                 UpdateContextStatsImmediate(force: true);
@@ -958,6 +976,12 @@ namespace TxtAIEditor.Controls
                                 "스킬을 호출하지 않고 설명만 했습니다. 도구 호출을 다시 시도합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
+                            AppendRunSessionHistoryLine($"[Skill Not Called Retry]: {retryMessage}");
+                            if (!string.IsNullOrWhiteSpace(response))
+                            {
+                                AppendRunSessionHistoryLine($"[Previous Response]: {response.Trim()}");
+                            }
+                            AppendRunSessionHistoryLine();
                             if (_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
                                 UpdateContextStatsImmediate(force: true);
