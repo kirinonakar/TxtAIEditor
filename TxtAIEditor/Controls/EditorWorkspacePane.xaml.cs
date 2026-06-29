@@ -34,18 +34,19 @@ namespace TxtAIEditor.Controls
         private bool _isDraggingTerminalSplitter = false;
         private double _terminalSplitterStartHeight = 0;
         private double _terminalSplitterStartPointerY = 0;
+        private bool _tabActionSpacerUpdateQueued;
 
         public EditorWorkspacePane()
         {
             InitializeComponent();
             SizeChanged += OnWorkspaceSizeChanged;
-            PrimaryTabActions.SizeChanged += (_, _) => UpdateTabActionSpacers();
-            SecondaryTabActions.SizeChanged += (_, _) => UpdateTabActionSpacers();
-            StickyNoteBar.RegisterPropertyChangedCallback(VisibilityProperty, (_, __) => UpdateTabActionSpacers());
+            PrimaryTabActions.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
+            SecondaryTabActions.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
+            StickyNoteBar.RegisterPropertyChangedCallback(VisibilityProperty, (_, __) => QueueTabActionSpacerUpdate());
             ActiveTabView = EditorTabView;
             Loaded += (_, __) => {
                 DisableTabItemTransitions();
-                UpdateTabActionSpacers();
+                QueueTabActionSpacerUpdate();
             };
         }
 
@@ -107,8 +108,8 @@ namespace TxtAIEditor.Controls
 
         private void UpdateTabActionSpacers()
         {
-            double primaryWidth = Math.Max(72, PrimaryTabActions.ActualWidth + 12);
-            double secondaryWidth = Math.Max(72, SecondaryTabActions.ActualWidth + 12);
+            double primaryWidth = Math.Max(72, GetVisibleTabActionsWidth(PrimaryTabActions) + 12);
+            double secondaryWidth = Math.Max(72, GetVisibleTabActionsWidth(SecondaryTabActions) + 12);
 
             PrimaryTabActionsSpacer.Width = primaryWidth;
             SecondaryTabActionsSpacer.Width = secondaryWidth;
@@ -125,6 +126,82 @@ namespace TxtAIEditor.Controls
             {
                 double availableWidth = EditorTabView2.ActualWidth - secondaryWidth - 44;
                 secondaryListView.MaxWidth = Math.Max(0, availableWidth);
+            }
+        }
+
+        private static double GetVisibleTabActionsWidth(StackPanel actionsPanel)
+        {
+            double width = 0;
+            int visibleChildCount = 0;
+
+            foreach (UIElement child in actionsPanel.Children)
+            {
+                if (child.Visibility != Visibility.Visible)
+                {
+                    continue;
+                }
+
+                if (visibleChildCount > 0)
+                {
+                    width += actionsPanel.Spacing;
+                }
+
+                width += GetElementWidth(child);
+                visibleChildCount++;
+            }
+
+            return width;
+        }
+
+        private static double GetElementWidth(UIElement element)
+        {
+            if (element is not FrameworkElement frameworkElement)
+            {
+                return Math.Max(0, element.DesiredSize.Width);
+            }
+
+            double width = frameworkElement.ActualWidth;
+            if (double.IsNaN(width) || width <= 0)
+            {
+                width = frameworkElement.DesiredSize.Width;
+            }
+
+            if ((double.IsNaN(width) || width <= 0) && !double.IsNaN(frameworkElement.Width))
+            {
+                width = frameworkElement.Width;
+            }
+
+            if (!double.IsNaN(frameworkElement.MinWidth) && frameworkElement.MinWidth > width)
+            {
+                width = frameworkElement.MinWidth;
+            }
+
+            if (double.IsNaN(width) || width < 0)
+            {
+                width = 0;
+            }
+
+            Thickness margin = frameworkElement.Margin;
+            return width + margin.Left + margin.Right;
+        }
+
+        private void QueueTabActionSpacerUpdate()
+        {
+            UpdateTabActionSpacers();
+
+            if (_tabActionSpacerUpdateQueued)
+            {
+                return;
+            }
+
+            _tabActionSpacerUpdateQueued = true;
+            if (!DispatcherQueue.TryEnqueue(() =>
+            {
+                _tabActionSpacerUpdateQueued = false;
+                UpdateTabActionSpacers();
+            }))
+            {
+                _tabActionSpacerUpdateQueued = false;
             }
         }
 
@@ -554,7 +631,7 @@ namespace TxtAIEditor.Controls
             {
                 _terminalPane?.QueueEmbeddedTerminalResize();
             }
-            UpdateTabActionSpacers();
+            QueueTabActionSpacerUpdate();
         }
 
         private void OnEditorSplitterPointerPressed(object sender, PointerRoutedEventArgs e)
