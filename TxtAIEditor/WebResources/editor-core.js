@@ -557,9 +557,17 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
     const nextLines = Array.isArray(lines) ? lines.map(line => String(line ?? '')) : [];
     const nextDocumentLineCount = Math.max(1, Number(documentLineCount || (state.lineCount + nextLines.length - removeCount)));
 
+    const hasExplicitCaret = caret && Number(caret.line || 0) > 0;
+    // Save current caret position before clearing selection so we can restore it
+    // when the host does not provide an explicit caret (e.g. undo/redo).
+    const savedCaretLine = state.currentLine;
+    const savedCaretColumn = state.currentColumn;
+
     state.selection = null;
     try {
-        window.getSelection()?.removeAllRanges();
+        if (hasExplicitCaret) {
+            window.getSelection()?.removeAllRanges();
+        }
     } catch (e) { }
     clearCustomSelectionVisuals();
     syncCustomSelectionClass();
@@ -598,6 +606,10 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
     if (caret && Number(caret.line || 0) > 0) {
         const caretLine = Math.min(state.lineCount, Math.max(1, Number(caret.line)));
         const caretColumn = Math.max(0, Number(caret.column || 1) - 1);
+        setTimeout(() => runtime.focusLine(caretLine, caretColumn), 20);
+    } else if (savedCaretLine > 0) {
+        const caretLine = Math.min(state.lineCount, Math.max(1, Number(savedCaretLine)));
+        const caretColumn = Math.max(0, Number(savedCaretColumn || 1) - 1);
         setTimeout(() => runtime.focusLine(caretLine, caretColumn), 20);
     }
 
