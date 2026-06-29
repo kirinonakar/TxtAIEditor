@@ -513,9 +513,20 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
             scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - ((viewTop + scrollMargin) - checkTop));
         }
     } else {
+        const lineH = lineHeightFor(lineNumber);
         if (wrappedTargetTop < scrollContainer.scrollTop ||
-            wrappedTargetTop > scrollContainer.scrollTop + scrollContainer.clientHeight - state.lineHeight) {
-            scrollContainer.scrollTop = Math.max(0, wrappedTargetTop - Math.floor(scrollContainer.clientHeight / 2));
+            wrappedTargetTop > scrollContainer.scrollTop + scrollContainer.clientHeight - lineH) {
+            const isFarAway = Math.abs(wrappedTargetTop - (scrollContainer.scrollTop + scrollContainer.clientHeight / 2)) > scrollContainer.clientHeight;
+            if (isFarAway) {
+                scrollContainer.scrollTop = Math.max(0, wrappedTargetTop - Math.floor(scrollContainer.clientHeight / 2));
+            } else {
+                if (wrappedTargetTop < scrollContainer.scrollTop) {
+                    scrollContainer.scrollTop = wrappedTargetTop;
+                } else {
+                    const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+                    scrollContainer.scrollTop = Math.min(maxScroll, wrappedTargetTop - scrollContainer.clientHeight + lineH);
+                }
+            }
         }
     }
 
