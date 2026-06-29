@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
@@ -177,8 +179,8 @@ namespace TxtAIEditor.Controls
         public TextBlock TokenCount => AgentTokenCountText;
         public CheckBox PlanningModeCheckBox => AgentPlanningModeCheckBox;
         public bool PlanningMode => AgentPlanningModeCheckBox.IsChecked == true;
-        public CheckBox StreamToTabCheckBox => AgentStreamToTabCheckBox;
-        public bool StreamToTab => AgentStreamToTabCheckBox.IsChecked == true;
+        public ToggleButton StreamToTabToggleButton => AgentStreamToTabToggleButton;
+        public bool StreamToTab => AgentStreamToTabToggleButton.IsChecked == true;
 
         public bool HideHtmlCodeBlocks
         {
@@ -259,7 +261,9 @@ namespace TxtAIEditor.Controls
 
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
             AgentPlanningModeCheckBox.Content = getString("AgentIncludeActiveFile", "계획 모드 (Planning mode)");
-            AgentStreamToTabCheckBox.Content = getString("AgentStreamToTab", "탭에 스트리밍");
+            string streamToTabText = getString("AgentStreamToTab", "탭에 스트리밍");
+            ToolTipService.SetToolTip(AgentStreamToTabToggleButton, streamToTabText);
+            AutomationProperties.SetName(AgentStreamToTabToggleButton, streamToTabText);
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentMcpButton, getString("AgentMcpButtonTooltip", "MCP 서버"));
             AgentAddMcpText.Text = getString("AgentMcpAddText", "MCP 추가");
@@ -327,7 +331,7 @@ namespace TxtAIEditor.Controls
             AgentDeleteHistoryButton.IsEnabled = !isBusy;
             AgentPromptInput.IsEnabled = !isBusy;
             AgentPlanningModeCheckBox.IsEnabled = !isBusy;
-            AgentStreamToTabCheckBox.IsEnabled = !isBusy;
+            AgentStreamToTabToggleButton.IsEnabled = !isBusy;
             AgentMcpButton.IsEnabled = !isBusy;
             AgentAddAttachmentButton.IsEnabled = !isBusy;
             AgentSkillButton.IsEnabled = !isBusy;

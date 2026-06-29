@@ -19,6 +19,15 @@
                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
             </Style>
+            <Style x:Key="AgentToggleButtonStyle" TargetType="ToggleButton">
+                <Setter Property="Background" Value="{ThemeResource AgentButtonBackground}"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource AgentButtonBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="CornerRadius" Value="4"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -158,10 +167,20 @@
         </ScrollViewer>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <CheckBox x:Name="AgentStreamToTabCheckBox"
-                      Content="탭에 스트리밍"
-                      IsChecked="False"
-                      VerticalAlignment="Center"/>
+            <ToggleButton x:Name="AgentStreamToTabToggleButton"
+                          Width="36"
+                          Height="32"
+                          IsChecked="False"
+                          VerticalAlignment="Center"
+                          ToolTipService.ToolTip="탭에 스트리밍"
+                          AutomationProperties.Name="탭에 스트리밍"
+                          Style="{StaticResource AgentToggleButtonStyle}">
+                <FontIcon Glyph="&#xE8A7;" FontSize="14" RenderTransformOrigin="0.5,0.5">
+                    <FontIcon.RenderTransform>
+                        <ScaleTransform ScaleX="-1"/>
+                    </FontIcon.RenderTransform>
+                </FontIcon>
+            </ToggleButton>
             <Button x:Name="AgentInsertOutputButton"
                     Content="마지막 답변"
                     HorizontalAlignment="Stretch"
