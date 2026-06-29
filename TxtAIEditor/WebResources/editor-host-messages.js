@@ -1,4 +1,4 @@
-import { findInput } from './editor-dom.js';
+import { findInput, scrollContainer } from './editor-dom.js';
 import {
     applyOptions,
     applyEditResultFromHost,
@@ -129,10 +129,15 @@ export function createHostMessageHandler({
             }
             break;
         case 'lineCountChanged':
-            state.lineCount = Math.max(1, Number(msg.lineCount || 1));
-            state.cacheVersion++;
-            setupVirtualHeight();
-            queueRender(true);
+            {
+                const savedScroll = scrollContainer.scrollTop;
+                state.lineCount = Math.max(1, Number(msg.lineCount || 1));
+                state.cacheVersion++;
+                setupVirtualHeight();
+                const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+                scrollContainer.scrollTop = Math.min(savedScroll, maxScroll);
+                queueRender(true);
+            }
             break;
         case 'setLanguage':
             {
