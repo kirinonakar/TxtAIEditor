@@ -66,5 +66,22 @@ namespace TxtAIEditor.Composition
                 _ = livePreviewController.InitializeAsync();
             }
         }
+
+        public static void ToggleMaximize(AppWindow appWindow)
+        {
+            if (appWindow.Presenter is not OverlappedPresenter presenter)
+            {
+                return;
+            }
+
+            if (presenter.State == OverlappedPresenterState.Maximized)
+            {
+                presenter.Restore();
+            }
+            else
+            {
+                presenter.Maximize();
+            }
+        }
     }
 }
