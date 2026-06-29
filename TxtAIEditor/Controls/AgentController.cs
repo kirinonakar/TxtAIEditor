@@ -821,7 +821,7 @@ namespace TxtAIEditor.Controls
                     bool responseHasToolSyntax = AgentToolCallParser.ContainsToolCallSyntax(response);
 
                     int endLength = cleanResponse.Length;
-                    if (!runContext.LlmSettings.LlmAgentVerbose)
+                    if (!runContext.LlmSettings.LlmAgentVerbose && responseHasToolSyntax)
                     {
                         int toolCallIndex = AgentToolCallParser.FindToolCallIndex(cleanResponse);
                         if (toolCallIndex >= 0)

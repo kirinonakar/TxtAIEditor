@@ -3,6 +3,7 @@ import {
     scrollContainer
 } from './editor-dom.js';
 import {
+    clearPreservedScrollTop,
     lineAt,
     lineTop,
     post,
@@ -80,6 +81,10 @@ export function bindEditorEvents({
     let lastProgrammaticScrollTime = 0;
     scrollContainer.addEventListener('scroll', () => {
         hideContextMenu();
+        if (state.preservedScrollTop !== null &&
+            Math.abs(scrollContainer.scrollTop - state.preservedScrollTop) > 1) {
+            clearPreservedScrollTop();
+        }
         syncCsvHeaderScroll();
         prefetchAround(scrollContainer.scrollTop);
         queueRender();

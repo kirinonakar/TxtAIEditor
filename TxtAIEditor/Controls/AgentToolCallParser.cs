@@ -22,11 +22,8 @@ namespace TxtAIEditor.Controls
             }
 
             string text = response.Trim();
-            return text.IndexOf("<tool_call", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("</invoke>", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                LooksLikeBareToolCallEnvelope(text) ||
+            return (TryParseMulti(text, out var parsedCalls) && parsedCalls.Count > 0) ||
+                LooksLikeMalformedToolCallSyntax(text) ||
                 TryExtractSupportedCommandFence(text, out _);
         }
 
@@ -216,6 +213,18 @@ namespace TxtAIEditor.Controls
 
                 if (trimmedPayload[index] == '{')
                 {
+                    if (TryReadJsonToolNameAt(trimmedPayload, index, out string candidateName) &&
+                        !IsValidToolName(candidateName))
+                    {
+                        int nextBrace = trimmedPayload.IndexOf('{', index + 1);
+                        if (nextBrace < 0)
+                        {
+                            break;
+                        }
+                        index = nextBrace;
+                        continue;
+                    }
+
                     int tempIndex = index;
                     if (TryExtractJsonToolCall(trimmedPayload, ref tempIndex, out var tc))
                     {
@@ -321,6 +330,10 @@ namespace TxtAIEditor.Controls
             }
 
             string toolName = DecodeLenientJsonString(nameMatch.Groups["name"].Value);
+            if (!IsValidToolName(toolName))
+            {
+                return false;
+            }
             
             int absoluteArgsMatchIndex = index + argsMatch.Index + argsMatch.Length;
             int openBraceIndex = payload.IndexOf('{', absoluteArgsMatchIndex);
@@ -353,8 +366,13 @@ namespace TxtAIEditor.Controls
                 if (root.TryGetProperty("name", out var nameProp))
                 {
                     toolName = nameProp.GetString() ?? string.Empty;
+                    if (!IsValidToolName(toolName))
+                    {
+                        return false;
+                    }
+
                     arguments = BuildArgumentsElement(root, stripNameProperty: true);
-                    return !string.IsNullOrWhiteSpace(toolName);
+                    return true;
                 }
             }
             catch
@@ -405,7 +423,7 @@ namespace TxtAIEditor.Controls
             if (openBraceIndex > 0)
             {
                 string possibleName = trimmedPayload.Substring(0, openBraceIndex).Trim();
-                if (Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$"))
+                if (IsValidToolName(possibleName))
                 {
                     toolName = possibleName;
                     string jsonPart = trimmedPayload.Substring(openBraceIndex);
@@ -440,9 +458,14 @@ namespace TxtAIEditor.Controls
                     if (root.TryGetProperty("name", out var nameProp))
                     {
                         toolName = nameProp.GetString() ?? string.Empty;
+                        if (!IsValidToolName(toolName))
+                        {
+                            return false;
+                        }
+
                         arguments = BuildArgumentsElement(root, stripNameProperty: true);
 
-                        return !string.IsNullOrWhiteSpace(toolName);
+                        return true;
                     }
                 }
                 catch
@@ -629,8 +652,13 @@ namespace TxtAIEditor.Controls
                 string repairedJson = JsonSerializer.Serialize(argumentValues);
                 using var argumentsDocument = JsonDocument.Parse(repairedJson);
                 toolName = DecodeLenientJsonString(name);
+                if (!IsValidToolName(toolName))
+                {
+                    return false;
+                }
+
                 arguments = argumentsDocument.RootElement.Clone();
-                return !string.IsNullOrWhiteSpace(toolName);
+                return true;
             }
             catch
             {
@@ -1079,7 +1107,7 @@ namespace TxtAIEditor.Controls
                 return document.RootElement.ValueKind == JsonValueKind.Object &&
                     document.RootElement.TryGetProperty("name", out var nameProperty) &&
                     nameProperty.ValueKind == JsonValueKind.String &&
-                    !string.IsNullOrWhiteSpace(nameProperty.GetString());
+                    IsValidToolName(nameProperty.GetString() ?? string.Empty);
             }
             catch
             {
@@ -1119,7 +1147,7 @@ namespace TxtAIEditor.Controls
             }
 
             string possibleName = trimmed.Substring(0, openBraceIndex).Trim();
-            if (!Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$"))
+            if (!IsValidToolName(possibleName))
             {
                 return TryExtractTrailingBareToolCallPayload(trimmed, out payload);
             }
@@ -1186,6 +1214,114 @@ namespace TxtAIEditor.Controls
             }
 
             return false;
+        }
+
+        private static bool LooksLikeMalformedToolCallSyntax(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            if (LooksLikeBareToolCallEnvelope(text))
+            {
+                return true;
+            }
+
+            int openIndex = FindToolCallIndex(text);
+            int closeIndex = FindLastToolCallCloseIndex(text);
+            if (openIndex < 0)
+            {
+                return closeIndex >= 0;
+            }
+
+            int tagEndIndex = text.IndexOf('>', openIndex);
+            if (tagEndIndex < 0)
+            {
+                return true;
+            }
+
+            string openTag = text.Substring(openIndex, tagEndIndex - openIndex + 1);
+            var xmlNameMatch = Regex.Match(
+                openTag,
+                @"<tool_call\s+name=[""']?(?<name>[a-zA-Z0-9_\-]+)[""']?\s*>",
+                RegexOptions.IgnoreCase);
+            if (xmlNameMatch.Success && IsValidToolName(xmlNameMatch.Groups["name"].Value))
+            {
+                return true;
+            }
+
+            int payloadStart = tagEndIndex + 1;
+            int payloadEnd = closeIndex > payloadStart ? closeIndex : text.Length;
+            string payload = text.Substring(payloadStart, Math.Max(0, payloadEnd - payloadStart));
+            return LooksLikeToolCallPayloadStart(payload);
+        }
+
+        private static bool LooksLikeToolCallPayloadStart(string payload)
+        {
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return true;
+            }
+
+            string trimmed = FixJsonCarriageReturnEscapes(payload).TrimStart();
+            while (trimmed.StartsWith(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase))
+            {
+                trimmed = trimmed.Substring(ToolCallOpenTag.Length).TrimStart();
+            }
+
+            if (trimmed.StartsWith("{", StringComparison.Ordinal))
+            {
+                foreach (Match match in Regex.Matches(
+                    trimmed,
+                    @"""name""\s*:\s*""(?<name>[^""\\]*(?:\\.[^""\\]*)*)""",
+                    RegexOptions.IgnoreCase))
+                {
+                    string toolName = DecodeLenientJsonString(match.Groups["name"].Value);
+                    if (IsValidToolName(toolName))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            int openBraceIndex = trimmed.IndexOf('{');
+            if (openBraceIndex <= 0)
+            {
+                return false;
+            }
+
+            string possibleName = trimmed.Substring(0, openBraceIndex).Trim();
+            return IsValidToolName(possibleName);
+        }
+
+        private static bool TryReadJsonToolNameAt(string payload, int index, out string toolName)
+        {
+            toolName = string.Empty;
+            if (index < 0 || index >= payload.Length)
+            {
+                return false;
+            }
+
+            var match = Regex.Match(
+                payload.Substring(index),
+                @"\A\s*\{\s*""name""\s*:\s*""(?<name>[^""\\]*(?:\\.[^""\\]*)*)""",
+                RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            toolName = DecodeLenientJsonString(match.Groups["name"].Value);
+            return true;
+        }
+
+        private static bool IsValidToolName(string toolName)
+        {
+            return !string.IsNullOrWhiteSpace(toolName) &&
+                Regex.IsMatch(toolName, @"^[a-zA-Z0-9_\-]+$");
         }
 
         public static int FindToolCallIndex(string text)

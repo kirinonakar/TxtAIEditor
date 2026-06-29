@@ -73,6 +73,7 @@ const state = {
     lastManualDeleteAt: 0,
     editingLine: null,
     lastDeleteKeyDown: null,
+    preservedScrollTop: null,
     repeatEdit: {
         lastRunAt: 0,
         timer: 0,
@@ -468,6 +469,7 @@ function setupModel(lineCount) {
     state.lineCount = Math.max(1, Number(lineCount || 1));
     state.cache.clear();
     state.pending.clear();
+    state.preservedScrollTop = null;
     clearMeasuredLineHeights();
     state.cacheVersion++;
     state.lastRangeKey = '';
@@ -618,11 +620,26 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 
 function setupVirtualHeight() {
     const savedScroll = scrollContainer.scrollTop;
-    virtualSpacer.style.height = `${totalVirtualHeight()}px`;
+    const preservedHeight = state.preservedScrollTop !== null
+        ? Math.max(0, Number(state.preservedScrollTop || 0)) + scrollContainer.clientHeight
+        : 0;
+    virtualSpacer.style.height = `${Math.max(totalVirtualHeight(), preservedHeight)}px`;
     const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
     if (savedScroll > maxScroll) {
         scrollContainer.scrollTop = maxScroll;
     }
+}
+
+function preserveScrollTop(scrollTop) {
+    const nextScrollTop = Math.max(0, Number(scrollTop || 0));
+    state.preservedScrollTop = Math.max(Number(state.preservedScrollTop ?? 0), nextScrollTop);
+    setupVirtualHeight();
+}
+
+function clearPreservedScrollTop() {
+    if (state.preservedScrollTop === null) return;
+    state.preservedScrollTop = null;
+    setupVirtualHeight();
 }
 
 function usesMeasuredLineHeights() {
@@ -1298,6 +1315,7 @@ export {
     applyEditResultFromHost,
     activeEditableElement,
     cleanDirtyMarker,
+    clearPreservedScrollTop,
     clearMeasuredLineHeights,
     clearCustomSelectionVisuals,
     comparePositions,
@@ -1320,6 +1338,7 @@ export {
     orderedRange,
     post,
     prefetchAround,
+    preserveScrollTop,
     queueRender,
     readClipboardText,
     receiveLineBlock,

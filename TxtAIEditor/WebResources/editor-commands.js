@@ -16,6 +16,7 @@ import {
     measureRenderedRows,
     orderedRange,
     post,
+    preserveScrollTop,
     queueRender,
     readClipboardText,
     reportCursorAndSelection,
@@ -60,6 +61,7 @@ import { createTextCommandActions } from './editor-text-command-actions.js';
 let verticalCaretVisualAnchor = null;
 let splitScrollRestoreToken = 0;
 let postEditFocusToken = 0;
+let scrollPreservingFocusToken = 0;
 
 function queuePostEditFocus(callback) {
     const token = ++postEditFocusToken;
@@ -73,6 +75,7 @@ function queuePostEditFocus(callback) {
 function cancelPendingRepeatFollowUps(key) {
     if (!key) return;
     postEditFocusToken++;
+    scrollPreservingFocusToken++;
     if (key === 'Enter') {
         splitScrollRestoreToken++;
     }
@@ -539,8 +542,44 @@ function captureSplitScrollAnchor(element, caretOffset) {
 }
 
 function clampScrollTop(scrollTop) {
-    const maxScrollTop = Math.max(0, totalVirtualHeight() - scrollContainer.clientHeight);
+    const preservedHeight = state.preservedScrollTop !== null
+        ? Math.max(0, Number(state.preservedScrollTop || 0)) + scrollContainer.clientHeight
+        : 0;
+    const maxScrollTop = Math.max(0, Math.max(totalVirtualHeight(), preservedHeight) - scrollContainer.clientHeight);
     return Math.min(maxScrollTop, Math.max(0, Number(scrollTop || 0)));
+}
+
+function restoreScrollTop(scrollTop) {
+    scrollContainer.scrollTop = clampScrollTop(scrollTop);
+}
+
+function queueFocusPreservingScroll(lineNumber, columnZeroBased, scrollTop) {
+    const token = ++scrollPreservingFocusToken;
+
+    function run(attempt = 0) {
+        if (token !== scrollPreservingFocusToken) return;
+
+        restoreScrollTop(scrollTop);
+        const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
+        if (element && element.getAttribute('contenteditable') === 'true') {
+            setCaret(element, columnZeroBased);
+            restoreScrollTop(scrollTop);
+            if (attempt < 2) {
+                requestAnimationFrame(() => run(attempt + 1));
+            }
+            return;
+        }
+
+        if (attempt < 8) {
+            requestAnimationFrame(() => run(attempt + 1));
+            return;
+        }
+
+        focusLine(lineNumber, columnZeroBased);
+        restoreScrollTop(scrollTop);
+    }
+
+    queuePostEditFocus(() => run());
 }
 
 function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, token, attempt = 0) {
@@ -1297,25 +1336,30 @@ function updateSingleLine(element, text, caretColumn) {
 }
 
 function applyMergeLineForward(lineNumber, text, nextText) {
+    const savedScrollTop = scrollContainer.scrollTop;
+    preserveScrollTop(savedScrollTop);
+
     if (state.cache.get(lineNumber) !== text) {
         post({ type: 'lineChanged', lineNumber, text });
     }
 
     shiftCachedLines(lineNumber + 1, -1);
     state.cache.set(lineNumber, text + nextText);
+    invalidateMeasuredLineHeightsAround(lineNumber);
     state.lineCount = Math.max(1, state.lineCount - 1);
     if (!cleanDirtyMarker(lineNumber)) {
         markDirty(lineNumber, 'mod');
     }
     state.dirtyLines.delete(lineNumber + 1);
     setupVirtualHeight();
+    restoreScrollTop(savedScrollTop);
     post({ type: 'mergeLineWithPrevious', lineNumber: lineNumber + 1 });
     post({ type: 'contentChanged' });
     state.selection = null;
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber, text.length);
     queueRender(true);
-    queuePostEditFocus(() => focusLine(lineNumber, text.length, 3 * state.lineHeight));
+    queueFocusPreservingScroll(lineNumber, text.length, savedScrollTop);
 }
 
 function applyMergeLineBackward(lineNumber, previous, current) {
@@ -1576,6 +1620,10 @@ function replaceSelectionWith(selection, text, editSelection = null) {
 
     const savedScrollTop = scrollContainer.scrollTop;
     const editLineTop = lineTop(start.line);
+    const shouldPreserveScrollTop = netLines < 0 && editLineTop >= savedScrollTop;
+    if (shouldPreserveScrollTop) {
+        preserveScrollTop(savedScrollTop);
+    }
 
     state.lineCount = Math.max(1, state.lineCount + netLines);
     setupVirtualHeight();
@@ -1584,6 +1632,8 @@ function replaceSelectionWith(selection, text, editSelection = null) {
     if (netLines < 0 && editLineTop < savedScrollTop) {
         const scrollAdjust = -netLines * state.lineHeight;
         scrollContainer.scrollTop = Math.max(0, savedScrollTop - scrollAdjust);
+    } else if (shouldPreserveScrollTop) {
+        restoreScrollTop(savedScrollTop);
     }
     beginEditTransaction();
     try {
@@ -1635,6 +1685,16 @@ function replaceSelectionWith(selection, text, editSelection = null) {
     }
 
     queueRender(true);
+    if (shouldPreserveScrollTop) {
+        const targetLine = state.currentLine;
+        const targetColumn = Math.max(0, state.currentColumn - 1);
+        queueFocusPreservingScroll(targetLine, targetColumn, savedScrollTop);
+        if (editSelection) {
+            setTimeout(() => reportCursorAndSelection(), 0);
+        }
+        return;
+    }
+
     setTimeout(() => {
         if (editSelection) {
             const targetLine = state.currentLine;
