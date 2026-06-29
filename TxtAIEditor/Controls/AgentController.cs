@@ -860,7 +860,7 @@ namespace TxtAIEditor.Controls
 
                             string retryMessage = _getString(
                                 "AgentToolCallFormatRetry",
-                                "도구 호출 형식이 섞여 다시 요청합니다.");
+                                "도구 호출을 해석하지 못해 다시 요청합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
                             AppendRunSessionHistoryLine($"[Tool Call Format Retry]: {retryMessage}");
