@@ -220,8 +220,7 @@ namespace TxtAIEditor.Controls
 
             if (normalizedToolName == "read_file")
             {
-                string path = GetStringArgument(arguments, "path");
-                return string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
+                return _getString("AgentVerboseReadFileOnly", "파일을 읽었습니다");
             }
 
             if (normalizedToolName == "run_powershell" && !verbose)
@@ -230,7 +229,7 @@ namespace TxtAIEditor.Controls
                 string? path = TryGetPathFromGetContent(command);
                 if (path != null)
                 {
-                    return string.Format(_getString("AgentVerboseReadFileOnly", "파일을 읽었습니다: {0}"), path);
+                    return _getString("AgentVerboseReadFileOnly", "파일을 읽었습니다");
                 }
                 return string.Format(
                     _getString("AgentVerboseRunPowerShellOnly", "PowerShell 명령을 실행했습니다: {0}"),
@@ -269,14 +268,12 @@ namespace TxtAIEditor.Controls
 
             if (normalizedToolName == "list_files")
             {
-                string glob = GetStringArgument(arguments, "glob");
-                return string.Format(_getString("AgentVerboseListFilesOnly", "폴더를 읽었습니다: {0}"), glob);
+                return _getString("AgentVerboseListFilesOnly", "폴더를 읽었습니다");
             }
 
             if (normalizedToolName == "search_text")
             {
-                string query = GetStringArgument(arguments, "query");
-                return string.Format(_getString("AgentVerboseSearchTextOnly", "텍스트 검색을 완료했습니다: {0}"), query);
+                return _getString("AgentVerboseSearchTextOnly", "텍스트 검색을 완료했습니다");
             }
 
             if (normalizedToolName == "run_rg")

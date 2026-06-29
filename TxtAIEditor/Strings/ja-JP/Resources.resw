@@ -2174,7 +2174,7 @@
     <value>[HTML コードブロック非表示 (詳細出力が無効)]</value>
   </data>
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
-    <value>ファイルを読み込みました: {0}</value>
+    <value>ファイルを読み込みました</value>
   </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
     <value>ファイルに内容を追加しました: {0}</value>
@@ -2186,10 +2186,10 @@
     <value>ファイルを分割しました: {0}</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
-    <value>フォルダを読み込みました: {0}</value>
+    <value>フォルダを読み込みました</value>
   </data>
   <data name="AgentVerboseSearchTextOnly" xml:space="preserve">
-    <value>テキスト検索を完了しました: {0}</value>
+    <value>テキスト検索を完了しました</value>
   </data>
   <data name="AgentVerboseRunRgOnly" xml:space="preserve">
     <value>Ripgrep 検索を完了しました: {0}</value>

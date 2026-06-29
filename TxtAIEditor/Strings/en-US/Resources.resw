@@ -2167,7 +2167,7 @@ Plan: {0}</value>
     <value>Auto-approve plan execution (Planning mode)</value>
   </data>
   <data name="AgentVerboseReadFileOnly" xml:space="preserve">
-    <value>Read file: {0}</value>
+    <value>Read file</value>
   </data>
   <data name="AgentVerboseReadSkillOnly" xml:space="preserve">
     <value>Referencing skill: {0}</value>
@@ -2185,10 +2185,10 @@ Plan: {0}</value>
     <value>Split file: {0}</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
-    <value>Read directory: {0}</value>
+    <value>Read directory</value>
   </data>
   <data name="AgentVerboseSearchTextOnly" xml:space="preserve">
-    <value>Completed text search for: {0}</value>
+    <value>Completed text search</value>
   </data>
   <data name="AgentVerboseRunRgOnly" xml:space="preserve">
     <value>Completed Ripgrep search: {0}</value>
