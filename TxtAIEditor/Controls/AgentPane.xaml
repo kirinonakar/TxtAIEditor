@@ -163,11 +163,11 @@
                       IsChecked="False"
                       VerticalAlignment="Center"/>
             <Button x:Name="AgentInsertOutputButton"
-                    Content="입력"
+                    Content="마지막 답변"
                     HorizontalAlignment="Stretch"
                     Height="32"
                     Click="OnInsertOutputClick"
-                    ToolTipService.ToolTip="Agent 응답을 현재 커서에 입력"
+                    ToolTipService.ToolTip="마지막 Agent 답변을 새 탭에 입력"
                     Style="{StaticResource AccentButtonStyle}"/>
             <Button x:Name="AgentInsertNewTabOutputButton"
                     HorizontalAlignment="Stretch"

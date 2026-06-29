@@ -2008,6 +2008,9 @@ Plan: {0}</value>
   <data name="AgentNoOutputToInsert" xml:space="preserve">
     <value>No Agent response to insert.</value>
   </data>
+  <data name="AgentNoLastAnswerToInsert" xml:space="preserve">
+    <value>No last Agent answer to insert in a new tab.</value>
+  </data>
   <data name="AgentNoActiveTab" xml:space="preserve">
     <value>No active tab</value>
   </data>
@@ -2076,6 +2079,12 @@ Plan: {0}</value>
   </data>
   <data name="AgentInsertOutputTooltip" xml:space="preserve">
     <value>Insert Agent response at current cursor (Selected part only, if selected)</value>
+  </data>
+  <data name="AgentLastAnswerButtonText" xml:space="preserve">
+    <value>Last Answer</value>
+  </data>
+  <data name="AgentLastAnswerNewTabTooltip" xml:space="preserve">
+    <value>Insert the last Agent answer in a new tab</value>
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k tokens</value>

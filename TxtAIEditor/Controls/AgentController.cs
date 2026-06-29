@@ -288,8 +288,8 @@ namespace TxtAIEditor.Controls
                 GetCurrentSessionSettings);
             _outputInsertController = new AgentOutputInsertController(
                 _agentPane,
-                insertIntoActiveEditorAsync,
                 openNewTabWithContent,
+                _openSessionController.GetCurrentLastAnswerText,
                 _showError,
                 _getString,
                 _displayText.IsOutputPlaceholder,
@@ -617,6 +617,7 @@ namespace TxtAIEditor.Controls
                 CurrentRunTranscriptTokens = 0,
                 Attachments = activeOpenSession.Attachments.ToList(),
                 SessionEdits = activeOpenSession.SessionEdits.ToList(),
+                LastAnswerText = activeOpenSession.LastAnswerText,
                 StreamToTab = _agentPane.StreamToTab,
                 WorkspaceRoot = activeOpenSession.WorkspaceRoot,
                 LlmSettings = runSettings,
@@ -970,6 +971,7 @@ namespace TxtAIEditor.Controls
                         }
 
                         toolCallFormatRetryCount = 0;
+                        runContext.LastAnswerText = BuildLastAnswerText(response, cleanResponse, runContext.LlmSettings.LlmAgentVerbose);
                         await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                         if (runContext.StreamToTab)
                         {
@@ -1313,6 +1315,7 @@ namespace TxtAIEditor.Controls
                 activeOpenSession.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
                 activeOpenSession.SessionEdits = runContext.SessionEdits.ToList();
                 activeOpenSession.Attachments = runContext.Attachments.ToList();
+                activeOpenSession.LastAnswerText = runContext.LastAnswerText;
                 activeOpenSession.WorkspaceRoot = runContext.WorkspaceRoot;
                 _openSessionController.ClearThinkingState(activeOpenSession);
                 if (_runOutputController.IsSessionVisible(runContext.SessionId))
@@ -1354,6 +1357,7 @@ namespace TxtAIEditor.Controls
                 session.OutputText = _displayText.OutputPlaceholder;
                 session.ActivityText = _displayText.ActivityIdle;
                 session.SessionHistoryText = string.Empty;
+                session.LastAnswerText = string.Empty;
                 session.SessionHistoryTokenCount = 0;
                 session.CurrentRunTranscriptTokens = 0;
                 session.Attachments.Clear();
@@ -1398,6 +1402,17 @@ namespace TxtAIEditor.Controls
             string modeText = _getString("AgentModeRun", "실행");
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             return $"{timestamp}  Agent {modeText}: {TruncateForActivity(instruction)}";
+        }
+
+        private static string BuildLastAnswerText(string response, string cleanResponse, bool verbose)
+        {
+            string answer = verbose ? response : cleanResponse;
+            if (string.IsNullOrWhiteSpace(answer))
+            {
+                answer = response;
+            }
+
+            return (answer ?? string.Empty).Trim();
         }
 
         private void AddCurrentRunImageToolAttachment(LlmMessageAttachment attachment)

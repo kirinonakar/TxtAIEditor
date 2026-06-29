@@ -120,6 +120,7 @@ namespace TxtAIEditor.Controls
                 ? _displayText.ActivityIdle
                 : snapshot.ActivityText;
             session.SessionHistoryText = snapshot.SessionHistoryText;
+            session.LastAnswerText = snapshot.LastAnswerText;
             session.SessionHistoryTokenCount = snapshot.SessionHistoryTokenCount;
             session.CurrentRunTranscriptTokens = snapshot.CurrentRunTranscriptTokens;
             session.Attachments = snapshot.CloneAttachments();
@@ -146,6 +147,7 @@ namespace TxtAIEditor.Controls
                 Timestamp = DateTime.Now,
                 Title = session.Title,
                 SessionHistoryText = session.SessionHistoryText,
+                LastAnswerText = session.LastAnswerText,
                 SessionHistoryTokenCount = session.SessionHistoryTokenCount,
                 SessionEdits = AgentSessionRewindSnapshot.CloneEdits(session.SessionEdits),
                 WorkspaceRoot = session.WorkspaceRoot

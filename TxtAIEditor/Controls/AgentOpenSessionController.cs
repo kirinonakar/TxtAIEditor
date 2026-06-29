@@ -133,6 +133,12 @@ namespace TxtAIEditor.Controls
             return session.LlmSettings;
         }
 
+        public string GetCurrentLastAnswerText()
+        {
+            var session = EnsureSession(_currentSessionIdProvider());
+            return session.LastAnswerText ?? string.Empty;
+        }
+
         public EditorSettings CreateSessionSettingsSnapshot()
         {
             return CloneSessionSettings(_settingsService.CurrentSettings);

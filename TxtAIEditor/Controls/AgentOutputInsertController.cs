@@ -7,8 +7,8 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentOutputInsertController
     {
         private readonly AgentPane _agentPane;
-        private readonly Func<string, Task<bool>> _insertIntoActiveEditorAsync;
         private readonly Func<string?, string, OpenedTab> _openNewTabWithContent;
+        private readonly Func<string> _getLastAnswerText;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly Func<string, bool> _isOutputPlaceholder;
@@ -16,16 +16,16 @@ namespace TxtAIEditor.Controls
 
         public AgentOutputInsertController(
             AgentPane agentPane,
-            Func<string, Task<bool>> insertIntoActiveEditorAsync,
             Func<string?, string, OpenedTab> openNewTabWithContent,
+            Func<string> getLastAnswerText,
             Action<string, string> showError,
             Func<string, string, string> getString,
             Func<string, bool> isOutputPlaceholder,
             Func<Task> yieldToUIAsync)
         {
             _agentPane = agentPane;
-            _insertIntoActiveEditorAsync = insertIntoActiveEditorAsync;
             _openNewTabWithContent = openNewTabWithContent;
+            _getLastAnswerText = getLastAnswerText;
             _showError = showError;
             _getString = getString;
             _isOutputPlaceholder = isOutputPlaceholder;
@@ -34,20 +34,26 @@ namespace TxtAIEditor.Controls
 
         public async Task InsertOutputAsync()
         {
-            string output = GetInsertableOutput();
-            if (!ValidateOutput(output))
+            string output = _getLastAnswerText();
+            if (!ValidateOutput(
+                    output,
+                    "AgentNoLastAnswerToInsert",
+                    "새 탭에 입력할 마지막 Agent 답변이 없습니다."))
             {
                 return;
             }
 
             await _yieldToUIAsync();
-            await _insertIntoActiveEditorAsync(output);
+            _openNewTabWithContent(null, output);
         }
 
         public async Task InsertNewTabOutputAsync()
         {
             string output = GetInsertableOutput();
-            if (!ValidateOutput(output))
+            if (!ValidateOutput(
+                    output,
+                    "AgentNoOutputToInsert",
+                    "입력할 Agent 응답이 없습니다."))
             {
                 return;
             }
@@ -65,7 +71,7 @@ namespace TxtAIEditor.Controls
                 : fullOutput;
         }
 
-        private bool ValidateOutput(string output)
+        private bool ValidateOutput(string output, string emptyMessageKey, string emptyMessageFallback)
         {
             if (!string.IsNullOrWhiteSpace(output) && !_isOutputPlaceholder(output))
             {
@@ -74,7 +80,7 @@ namespace TxtAIEditor.Controls
 
             _showError(
                 _getString("AgentInsertTitle", "Agent 응답 입력"),
-                _getString("AgentNoOutputToInsert", "입력할 Agent 응답이 없습니다."));
+                _getString(emptyMessageKey, emptyMessageFallback));
             return false;
         }
 

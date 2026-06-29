@@ -284,13 +284,13 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentHistoryButton, getString("AgentHistoryTooltip", "세션 히스토리"));
             AgentHistoryTitleText.Text = getString("AgentHistoryTitle", "세션 히스토리 (최근 20개)");
             ToolTipService.SetToolTip(AgentDeleteHistoryButton, getString("AgentDeleteHistoryTooltip", "히스토리 삭제"));
-            AgentInsertOutputButton.Content = getString("LlmInsertOutputButtonText", "입력");
+            AgentInsertOutputButton.Content = getString("AgentLastAnswerButtonText", "마지막 답변");
             AgentActivityHeaderText.Text = getString("AgentActivityHeader", "진행 상황");
             if (_displayText.IsActivityIdle(AgentActivityText.Text))
             {
                 AgentActivityText.Text = _displayText.ActivityIdle;
             }
-            ToolTipService.SetToolTip(AgentInsertOutputButton, getString("AgentInsertOutputTooltip", "Agent 응답을 현재 커서에 입력"));
+            ToolTipService.SetToolTip(AgentInsertOutputButton, getString("AgentLastAnswerNewTabTooltip", "마지막 Agent 답변을 새 탭에 입력"));
             AgentInsertNewTabOutputButton.Content = getString("AgentInsertNewTabOutputButtonText", "새 탭에 입력");
             ToolTipService.SetToolTip(AgentInsertNewTabOutputButton, getString("AgentInsertNewTabOutputTooltip", "Agent 응답을 새 탭에 입력 (선택한 경우 선택부위만)"));
             ToolTipService.SetToolTip(AgentSelectedPresetScrollLeftButton, getString("AgentSelectedChipsScrollLeftTooltip", "선택 칩 왼쪽으로 스크롤"));

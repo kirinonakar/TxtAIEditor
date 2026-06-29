@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
         public DateTime Timestamp { get; set; }
         public string Title { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
+        public string LastAnswerText { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
         public string WorkspaceRoot { get; set; } = string.Empty;
@@ -72,6 +73,7 @@ namespace TxtAIEditor.Controls
                 existing.Timestamp = session.Timestamp;
                 existing.Title = session.Title;
                 existing.SessionHistoryText = session.SessionHistoryText;
+                existing.LastAnswerText = session.LastAnswerText;
                 existing.SessionHistoryTokenCount = session.SessionHistoryTokenCount;
                 existing.SessionEdits = session.SessionEdits.ToList();
                 existing.WorkspaceRoot = session.WorkspaceRoot;
@@ -170,6 +172,47 @@ namespace TxtAIEditor.Controls
             }
 
             UpdateUI(currentSessionId);
+        }
+
+        public static string ExtractLastAgentResponse(string historyText)
+        {
+            if (string.IsNullOrEmpty(historyText))
+            {
+                return string.Empty;
+            }
+
+            var lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            int responseLineIndex = -1;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (lines[i].StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))
+                {
+                    responseLineIndex = i;
+                }
+            }
+
+            if (responseLineIndex < 0)
+            {
+                return string.Empty;
+            }
+
+            var result = new StringBuilder();
+            string firstLine = lines[responseLineIndex];
+            result.AppendLine(firstLine.Substring("[Agent Response]:".Length).TrimStart());
+            for (int i = responseLineIndex + 1; i < lines.Length; i++)
+            {
+                string line = lines[i];
+                if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                result.AppendLine(line);
+            }
+
+            return result.ToString().Trim();
         }
     }
 

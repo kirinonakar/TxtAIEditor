@@ -16,6 +16,7 @@ namespace TxtAIEditor.Controls
         public string OutputText { get; set; } = string.Empty;
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
+        public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
         public double CurrentRunTranscriptTokens { get; set; }
@@ -44,6 +45,7 @@ namespace TxtAIEditor.Controls
         public bool StreamToTabActive { get; set; }
         public bool StreamToTab { get; set; }
         public string? StreamToTabTargetTabId { get; set; }
+        public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
         public EditorSettings LlmSettings { get; set; } = new();
         public bool IsPlanningMode { get; set; }
@@ -60,6 +62,7 @@ namespace TxtAIEditor.Controls
         public string OutputText { get; set; } = string.Empty;
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
+        public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
         public double CurrentRunTranscriptTokens { get; set; }
@@ -75,6 +78,7 @@ namespace TxtAIEditor.Controls
                 OutputText = session.OutputText,
                 ActivityText = session.ActivityText,
                 SessionHistoryText = session.SessionHistoryText,
+                LastAnswerText = session.LastAnswerText,
                 WorkspaceRoot = session.WorkspaceRoot,
                 SessionHistoryTokenCount = session.SessionHistoryTokenCount,
                 CurrentRunTranscriptTokens = session.CurrentRunTranscriptTokens,

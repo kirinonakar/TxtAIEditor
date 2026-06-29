@@ -2009,6 +2009,9 @@
   <data name="AgentNoOutputToInsert" xml:space="preserve">
     <value>入力するAgentの応答がありません。</value>
   </data>
+  <data name="AgentNoLastAnswerToInsert" xml:space="preserve">
+    <value>新規タブに入力する最後のAgent回答がありません。</value>
+  </data>
   <data name="AgentNoActiveTab" xml:space="preserve">
     <value>アクティブなタブなし</value>
   </data>
@@ -2077,6 +2080,12 @@
   </data>
   <data name="AgentInsertOutputTooltip" xml:space="preserve">
     <value>Agentの応答を現在のカーソル位置に入力します (選択された場合は選択部分のみ)</value>
+  </data>
+  <data name="AgentLastAnswerButtonText" xml:space="preserve">
+    <value>最後の回答</value>
+  </data>
+  <data name="AgentLastAnswerNewTabTooltip" xml:space="preserve">
+    <value>最後のAgent回答を新規タブに入力</value>
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
     <value>{0:F1}k トークン</value>
