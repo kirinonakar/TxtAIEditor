@@ -975,7 +975,7 @@ namespace TxtAIEditor.Controls
                         await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                         if (runContext.StreamToTab)
                         {
-                            await _runOutputController.StreamTextToTabAsync(runContext, "\n");
+                            await _runOutputController.EndStreamedAnswerAsync(runContext);
                         }
 
                         AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");

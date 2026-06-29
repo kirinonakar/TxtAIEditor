@@ -107,6 +107,17 @@ namespace TxtAIEditor.Controls
             return Task.CompletedTask;
         }
 
+        public Task EndStreamedAnswerAsync(AgentRunContext context)
+        {
+            if (!context.StreamToTab)
+            {
+                return Task.CompletedTask;
+            }
+
+            QueueStreamedAnswerLineBreak(context);
+            return Task.CompletedTask;
+        }
+
         private async Task StreamTextToTabImmediateAsync(AgentRunContext context, string text)
         {
             if (!context.StreamToTabActive)
@@ -161,6 +172,34 @@ namespace TxtAIEditor.Controls
             {
                 StreamToTabBuffer buffer = GetOrCreateStreamToTabBuffer(context);
                 buffer.PendingText.Append(text);
+                buffer.HasAnswerText = true;
+                buffer.LastAnswerChar = text[^1];
+                if (buffer.FlushTask is { IsCompleted: false })
+                {
+                    return;
+                }
+
+                buffer.FlushTask = FlushStreamToTabLoopAsync(context);
+            }
+        }
+
+        private void QueueStreamedAnswerLineBreak(AgentRunContext context)
+        {
+            lock (_streamToTabBufferGate)
+            {
+                StreamToTabBuffer buffer = GetOrCreateStreamToTabBuffer(context);
+                if (!buffer.HasAnswerText)
+                {
+                    return;
+                }
+
+                if (!IsLineBreak(buffer.LastAnswerChar))
+                {
+                    buffer.PendingText.Append('\n');
+                    buffer.LastAnswerChar = '\n';
+                }
+
+                buffer.HasAnswerText = false;
                 if (buffer.FlushTask is { IsCompleted: false })
                 {
                     return;
@@ -272,6 +311,13 @@ namespace TxtAIEditor.Controls
         {
             public StringBuilder PendingText { get; } = new();
             public Task? FlushTask { get; set; }
+            public bool HasAnswerText { get; set; }
+            public char LastAnswerChar { get; set; }
+        }
+
+        private static bool IsLineBreak(char value)
+        {
+            return value == '\n' || value == '\r';
         }
     }
 }

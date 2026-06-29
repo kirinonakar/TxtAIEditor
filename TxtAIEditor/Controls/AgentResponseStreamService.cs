@@ -371,6 +371,11 @@ namespace TxtAIEditor.Controls
                                 printedLength = toolCallIndex;
                             }
 
+                            if (!suppressStreamingText)
+                            {
+                                await _runOutputController.EndStreamedAnswerAsync(runContext);
+                            }
+
                             if (!runContext.LlmSettings.LlmAgentVerbose)
                             {
                                 if (!toolCallPlaceholderShown)
