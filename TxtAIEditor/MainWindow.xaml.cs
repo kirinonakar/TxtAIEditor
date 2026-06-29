@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
 using WinRT.Interop;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Services;
@@ -24,64 +23,35 @@ namespace TxtAIEditor
         private readonly IGitService _gitService;
         private readonly ISnippetService _snippetService;
         private readonly ILocalizationService _localizationService;
-        private readonly ShellPanelLayoutService _shellPanelLayoutService;
-        private readonly TerminalShortcutService _terminalShortcutService;
-        private readonly FunctionKeyShortcutService _functionKeyShortcutService;
-        private readonly SearchReplaceController _searchReplaceController;
-        private readonly SearchReplaceTabSyncController _searchReplaceTabSyncController;
-        private readonly GitPanelController _gitPanelController;
-        private readonly GitStatusRefreshController _gitStatusRefreshController;
-        private readonly FavoritesRecentController _favoritesRecentController;
-        private readonly ExplorerFileActionsController _explorerFileActionsController;
-        private readonly TabContextMenuController _tabContextMenuController;
-        private readonly TabNavigationController _tabNavigationController;
-        private readonly TabEncryptionController _tabEncryptionController;
-        private readonly FileOpenDropController _fileOpenDropController;
-        private readonly RootKeyboardShortcutController _rootKeyboardShortcutController;
-        private readonly SnippetsController _snippetsController;
-        private readonly LlmAssistantController _llmAssistantController;
-        private readonly AgentController _agentController;
-        private readonly AgentFileWorkflowController _agentFileWorkflowController;
-        private readonly TocController _tocController;
-        private readonly ShellPaneController _shellPaneController;
-        private readonly MarkdownToolbarController _markdownToolbarController;
-        private readonly StickyNoteModeController _stickyNoteModeController;
-        private readonly StatusBarController _statusBarController;
-        private readonly TabReloadController _tabReloadController;
-        private readonly CompareTabController _compareTabController;
-        private readonly LivePreviewController _livePreviewController;
-        private readonly PdfViewerController _pdfViewerController;
-        private readonly OfficeDocumentViewerController _officeDocumentViewerController;
-        private readonly TabSelectionController _tabSelectionController;
-        private readonly EditorSplitLayoutController _editorSplitLayoutController;
-        private readonly EditorBridgeShortcutController _editorBridgeShortcutController;
-        private readonly EditorBridgeDocumentController _editorBridgeDocumentController;
-        private readonly EditorBridgeInteractionController _editorBridgeInteractionController;
-        private readonly EditorLinkNavigationController _editorLinkNavigationController;
-        private readonly EditorWebViewInitializationController _editorWebViewInitializationController;
-        private readonly EditorLineNavigationController _editorLineNavigationController;
-        private readonly EditorTabOpenController _editorTabOpenController;
-        private readonly ActiveEditorInsertionController _activeEditorInsertionController;
-        private readonly PreviewScrollSyncController _previewScrollSyncController;
-        private readonly TabTextContextProvider _tabTextContextProvider;
-        private readonly WebViewShortcutController _webViewShortcutController;
-        private readonly SplitImeSyncController _splitImeSyncController;
-        private readonly TabDirtyStateController _tabDirtyStateController;
-        private readonly TabSaveController _tabSaveController;
-        private readonly TabCloseController _tabCloseController;
-        private readonly TabMoveController _tabMoveController;
-        private readonly AutoSaveController _autoSaveController;
-        private readonly MainWindowStartupController _startupController;
-        private readonly MainWindowLifecycleController _lifecycleController;
-        private readonly MainWindowShellInteractionController _shellInteractionController;
-        private readonly FileTabLoadController _fileTabLoadController;
-        private readonly TerminalPanelController _terminalPanelController;
-        private readonly ExplorerNavigationController _explorerNavigationController;
-        private readonly WindowDialogController _dialogController;
-        private readonly WindowCloseController _windowCloseController;
-        private readonly WindowTitleController _windowTitleController;
-        private readonly MainWindowSettingsController _settingsController;
-        private MainWindowToolbarCommandController? _toolbarCommandController;
+        private readonly MainWindowControllers? _controllers;
+        private MainWindowControllers Controllers =>
+            _controllers ?? throw new InvalidOperationException("MainWindow controllers have not been composed.");
+        private ShellPanelLayoutService _shellPanelLayoutService => Controllers.ShellPanelLayout;
+        private SearchReplaceController _searchReplaceController => Controllers.SearchReplace;
+        private GitStatusRefreshController _gitStatusRefreshController => Controllers.GitStatusRefresh;
+        private TabNavigationController _tabNavigationController => Controllers.TabNavigation;
+        private LlmAssistantController _llmAssistantController => Controllers.LlmAssistant;
+        private AgentController _agentController => Controllers.Agent;
+        private ShellPaneController _shellPaneController => Controllers.ShellPane;
+        private StatusBarController _statusBarController => Controllers.StatusBar;
+        private TabReloadController _tabReloadController => Controllers.TabReload;
+        private LivePreviewController _livePreviewController => Controllers.LivePreview;
+        private PdfViewerController _pdfViewerController => Controllers.PdfViewer;
+        private OfficeDocumentViewerController _officeDocumentViewerController => Controllers.OfficeDocumentViewer;
+        private TabSelectionController _tabSelectionController => Controllers.TabSelection;
+        private EditorLineNavigationController _editorLineNavigationController => Controllers.EditorLineNavigation;
+        private EditorTabOpenController _editorTabOpenController => Controllers.EditorTabOpen;
+        private TabDirtyStateController _tabDirtyStateController => Controllers.TabDirtyState;
+        private TabSaveController _tabSaveController => Controllers.TabSave;
+        private TabCloseController _tabCloseController => Controllers.TabClose;
+        private AutoSaveController _autoSaveController => Controllers.AutoSave;
+        private MainWindowStartupController _startupController => Controllers.Startup;
+        private MainWindowLifecycleController _lifecycleController => Controllers.Lifecycle;
+        private FileTabLoadController _fileTabLoadController => Controllers.FileTabLoad;
+        private ExplorerNavigationController _explorerNavigationController => Controllers.ExplorerNavigation;
+        private WindowCloseController _windowCloseController => Controllers.WindowClose;
+        private WindowTitleController _windowTitleController => Controllers.WindowTitle;
+        private MainWindowSettingsController _settingsController => Controllers.Settings;
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private readonly MainWindowState _state = new MainWindowState();
         private bool _startupInitializationComplete;
@@ -146,8 +116,6 @@ namespace TxtAIEditor
 
         private const int InitialEditorLineWarmupCount = 120;
 
-        private readonly DispatcherTimer _gitAutoRefreshTimer;
-
         private ListView FileListView => LeftSidebarTabView.FileList;
         private TextBlock SelectionStatsText => PreviewGrid.SelectionStats;
         private TabView EditorTabView => EditorWorkspace.EditorTabViewControl;
@@ -195,225 +163,31 @@ namespace TxtAIEditor
             _gitService = services.GitService;
             _snippetService = services.SnippetService;
 
-            Task SaveUiLayoutSettingsAsync() =>
-                MainWindowLayoutOperations.SaveUiLayoutSettingsAsync(AppWindow, _settingsService, EditorWorkspace, _shellPanelLayoutService!);
-
-            Task SaveSidebarVisibilitySettingsAsync() =>
-                MainWindowLayoutOperations.SaveSidebarVisibilitySettingsAsync(_settingsService, _shellPanelLayoutService);
-
-            void ApplyLeftSidebarVisibility(bool show) =>
-                _shellPaneController!.ApplyLeftSidebarVisibility(show);
-
-            void ApplyPreviewVisibility(bool show) =>
-                MainWindowLayoutOperations.ApplyPreviewVisibility(show, _shellPaneController!, _startupInitializationComplete, _livePreviewController!);
-
-            void ApplySavedPanelWidths(EditorSettings settings) =>
-                _shellPanelLayoutService.ApplySavedPanelWidths(settings.LeftSidebarWidth, settings.RightSidebarWidth);
-
-            Task ToggleLeftPanelAsync() =>
-                _shellPaneController!.ToggleLeftPanelAsync();
-
-            Task ToggleRightPanelAsync() =>
-                _shellPaneController!.ToggleRightPanelAsync();
-
-            void TogglePreviewWidth() =>
-                _shellPanelLayoutService.TogglePreviewWidth();
-
-            void LoadDirectoryRoot(string folderPath) =>
-                _explorerNavigationController!.LoadDirectoryRoot(folderPath);
-
-            Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true) =>
-                _explorerNavigationController!.NavigateToFolderAsync(folderPath, revealInLeftPanel);
-
-            Task NavigateExplorerToFolderAndRevealAsync(string folderPath) =>
-                _explorerNavigationController!.NavigateToFolderAsync(folderPath, revealInLeftPanel: true);
-
-            Task RefreshGitStatusUIAsync() =>
-                MainWindowWorkspaceOperations.RefreshGitStatusUiAsync(
-                    _state,
-                    _gitService,
-                    _gitAutoRefreshTimer!,
-                    _tabNavigationController!,
-                    _gitStatusRefreshController!,
-                    _explorerNavigationController!,
-                    path => CurrentRepoPath = path);
-
-            void QueueGitStatusRefresh() =>
-                _gitStatusRefreshController!.QueueRefresh();
-
-            string GetCurrentRepoPathForGitRefresh() =>
-                MainWindowWorkspaceOperations.GetCurrentRepoPathForGitRefresh(
-                    _state,
-                    _gitService,
-                    _tabNavigationController!,
-                    path => CurrentRepoPath = path);
-
-            string GetSearchRoot() =>
-                MainWindowWorkspaceOperations.GetSearchRoot(_state);
-
-            long GetLargeFileThresholdBytes() =>
-                MainWindowWorkspaceOperations.GetLargeFileThresholdBytes(_settingsService);
-
-            bool QueuePendingSplitImeLineSyncIfNeeded(OpenedTab sourceTab, int lineNumber, string text) =>
-                _splitImeSyncController!.QueuePendingLineSyncIfNeeded(sourceTab, lineNumber, text);
-
-            bool SchedulePendingSplitImeCompletionSyncIfNeeded(OpenedTab sourceTab, int lineNumber, string text) =>
-                _splitImeSyncController!.ScheduleCompletionSyncIfNeeded(sourceTab, lineNumber, text);
-
-            bool ScheduleDeferredPendingSplitImeSyncIfNeeded(OpenedTab sourceTab) =>
-                _splitImeSyncController!.ScheduleDeferredSyncIfNeeded(sourceTab);
-
-            Task FlushPendingSplitImeSyncAsync(OpenedTab sourceTab) =>
-                _splitImeSyncController!.FlushAsync(sourceTab);
-
-            void ClearPendingSplitImeSync(string tabId) =>
-                _splitImeSyncController!.Clear(tabId);
-
-            Task SyncLineChangeToOtherTabsAsync(OpenedTab sourceTab, int lineNumber, string text, bool isComposing) =>
-                _splitImeSyncController!.SyncLineChangeToOtherTabsAsync(sourceTab, lineNumber, text, isComposing);
-
-            Task SyncEditsToOtherTabsAsync(OpenedTab sourceTab, bool updateUi = true) =>
-                _splitImeSyncController!.SyncEditsToOtherTabsAsync(sourceTab, updateUi);
-
-            void ApplyUiPersonalization(EditorSettings settings) =>
-                _settingsController!.ApplyUiPersonalization(settings);
-
-            void ApplyToolbarSettings(EditorSettings settings) =>
-                _settingsController!.ApplyToolbarSettings(settings);
-
-            void ApplyEditorSurfaceBackground(EditorSettings settings) =>
-                _settingsController!.ApplyEditorSurfaceBackground(settings);
-
-            var shellControllers = MainWindowShellComposition.Compose(
+            _controllers = MainWindowCompositionRoot.Compose(
                 this,
                 ui,
                 services,
                 _viewModel,
-                _state.TabBridges,
-                tabId => _state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
-                new MainWindowShellCompositionCallbacks(
-                    SaveUiLayoutSettingsAsync,
-                    () => _toolbarCommandController?.ToggleTerminal(),
+                _state,
+                InitialEditorLineWarmupCount,
+                new MainWindowCompositionRootCallbacks(
                     GetCurrentElementTheme,
                     GetLocalizedString,
                     UpdateWindowTitle,
-                    ApplyLeftSidebarVisibility,
-                    ApplyPreviewVisibility,
                     ReloadTabWithEncodingAsync,
                     MarkTabDirtyFromStatusBar,
-                    PerformLineNavigationAsync));
-            _shellPanelLayoutService = shellControllers.ShellPanelLayout;
-            _tabNavigationController = shellControllers.TabNavigation;
-            _terminalShortcutService = shellControllers.TerminalShortcut;
-            _dialogController = shellControllers.Dialog;
-            _windowTitleController = shellControllers.WindowTitle;
-            _tabEncryptionController = shellControllers.TabEncryption;
-            _stickyNoteModeController = shellControllers.StickyNoteMode;
-            _statusBarController = shellControllers.StatusBar;
-            var previewControllers = MainWindowPreviewComposition.Compose(
-                ui,
-                services,
-                _viewModel,
-                _state.TabBridges,
-                _tabNavigationController,
-                _stickyNoteModeController,
-                _dialogController,
-                tabId => _state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
-                new MainWindowPreviewCompositionCallbacks(
-                    () => _toolbarCommandController?.Find(),
-                    () => _toolbarCommandController?.ToggleLivePreview(),
-                    () => _toolbarCommandController?.ToggleTheme(),
+                    PerformLineNavigationAsync,
                     ToggleMaximize,
-                    () => _toolbarCommandController?.Print(),
-                    TogglePreviewWidth,
                     LoadFileIntoTabAsync,
-                    NormalizeWebMessageJson,
-                    () => _state.CurrentFolderPath,
-                    () => _state.CurrentRepoPath,
-                    () => _state.ScrollSyncEnabled,
+                    LoadFileIntoTabAsync,
+                    LoadFileIntoTabForAgentAsync,
                     UpdateRightPanelSelectionContext,
-                    NavigateExplorerToFolderAndRevealAsync,
-                    GetLocalizedString));
-            _webViewShortcutController = previewControllers.WebViewShortcut;
-            _previewScrollSyncController = previewControllers.PreviewScrollSync;
-            _compareTabController = previewControllers.CompareTab;
-            _livePreviewController = previewControllers.LivePreview;
-            _editorWebViewInitializationController = previewControllers.EditorWebViewInitialization;
-            _editorLineNavigationController = previewControllers.EditorLineNavigation;
-            _pdfViewerController = previewControllers.PdfViewer;
-            _officeDocumentViewerController = previewControllers.OfficeDocumentViewer;
-            _editorLinkNavigationController = previewControllers.EditorLinkNavigation;
-            var editorFoundationControllers = MainWindowEditorFoundationComposition.Compose(
-                ui,
-                services,
-                _viewModel,
-                _state.TabBridges,
-                _state.EditorSessions,
-                _tabNavigationController,
-                _tabEncryptionController,
-                _stickyNoteModeController,
-                _statusBarController,
-                _dialogController,
-                _terminalShortcutService,
-                _editorLineNavigationController,
-                InitialEditorLineWarmupCount,
-                tabId => _state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
-                new MainWindowEditorFoundationCallbacks(
-                    () => _toolbarCommandController?.ToggleLivePreview(),
-                    () => _toolbarCommandController?.ToggleTheme(),
-                    ToggleMaximize,
-                    ToggleLeftPanelAsync,
-                    ToggleRightPanelAsync,
-                    TogglePreviewWidth,
-                    () => OpenNewTab(),
-                    () => _toolbarCommandController?.SaveActive(),
-                    () => _toolbarCommandController?.OpenFile(),
-                    () => OnCloseActiveTabShortcutInvoked(null!, null!),
-                    () => _toolbarCommandController?.Print(),
-                    FocusSearchPanel,
                     UpdateLivePreview,
                     UpdateLanguageUI,
                     SchedulePreview,
-                    UpdateWindowTitle,
-                    tab => SyncEditsToOtherTabsAsync(tab),
-                    LoadFileIntoTabAsync,
-                    GetSearchRoot,
-                    GetLargeFileThresholdBytes,
-                    RefreshGitStatusUIAsync,
-                    GetLocalizedString));
-            _tabReloadController = editorFoundationControllers.TabReload;
-            _tabDirtyStateController = editorFoundationControllers.TabDirtyState;
-            _activeEditorInsertionController = editorFoundationControllers.ActiveEditorInsertion;
-            _tabTextContextProvider = editorFoundationControllers.TabTextContext;
-            _editorBridgeShortcutController = editorFoundationControllers.EditorBridgeShortcut;
-            _searchReplaceTabSyncController = editorFoundationControllers.SearchReplaceTabSync;
-            _searchReplaceController = editorFoundationControllers.SearchReplace;
-            _splitImeSyncController = editorFoundationControllers.SplitImeSync;
-            var workspaceControllers = MainWindowWorkspaceComposition.Compose(
-                this,
-                ui,
-                services,
-                _viewModel,
-                _state.TabBridges,
-                _tabEncryptionController,
-                _compareTabController,
-                _dialogController,
-                new MainWindowWorkspaceCompositionCallbacks(
-                    _stickyNoteModeController.ToggleTopMostFromShortcut,
-                    () => _toolbarCommandController?.ToggleTheme(),
-                    _stickyNoteModeController.ToggleMode,
-                    GetCurrentRepoPathForGitRefresh,
-                    () => _state.CurrentFolderPath,
-                    GetLocalizedString,
-                    () => _explorerNavigationController,
-                    path => CurrentRepoPath = path,
-                    path => CurrentFolderPath = path,
-                    RefreshGitStatusUIAsync,
+                    FocusSearchPanel,
                     EnsureLeftPanelVisible,
                     ShowLeftSidebarPage,
-                    LoadFileIntoTabAsync,
-                    InitializePickerWindow,
-                    NavigateExplorerToFolderAndRevealAsync,
                     request => OpenNewTab(
                         request.FilePath,
                         request.Content,
@@ -423,282 +197,28 @@ namespace TxtAIEditor
                         request.TextModel,
                         request.IsEncrypted,
                         request.EncryptionPassword),
+                    () => OpenNewTab(),
+                    content => OpenNewTab(null, content),
                     OpenImageTab,
                     OpenPdfTab,
                     OpenOfficeDocumentTab,
-                    QueueGitStatusRefresh));
-            _functionKeyShortcutService = workspaceControllers.FunctionKeyShortcut;
-            _gitAutoRefreshTimer = workspaceControllers.GitAutoRefreshTimer;
-            _gitPanelController = workspaceControllers.GitPanel;
-            _gitPanelController.FileRestored += OnGitFileRestored;
-            _gitStatusRefreshController = workspaceControllers.GitStatusRefresh;
-            _fileTabLoadController = workspaceControllers.FileTabLoad;
-            _explorerNavigationController = workspaceControllers.ExplorerNavigation;
-            _favoritesRecentController = workspaceControllers.FavoritesRecent;
-            var documentCommandControllers = MainWindowDocumentCommandComposition.Compose(
-                this,
-                ui,
-                services,
-                _viewModel,
-                _state.TabBridges,
-                _state.EditorSessions,
-                _statusBarController,
-                _tabNavigationController,
-                _livePreviewController,
-                _tabDirtyStateController,
-                _tabEncryptionController,
-                _favoritesRecentController,
-                _dialogController,
-                new MainWindowDocumentCommandCallbacks(
-                    FlushPendingSplitImeSyncAsync,
-                    UpdateLanguageUI,
-                    RefreshGitStatusUIAsync,
-                    UpdateWindowTitle,
-                    () => _state.CurrentFolderPath,
-                    LoadDirectoryRoot,
-                    GetSearchRoot,
-                    () => _state.CurrentRepoPath,
-                    ClearPendingSplitImeSync,
-                    () => OpenNewTab(),
-                    CloseReadOnlyViewer,
-                    SaveUiLayoutSettingsAsync,
-                    GetCurrentElementTheme,
-                    GetLocalizedString));
-            _tabSaveController = documentCommandControllers.TabSave;
-            _autoSaveController = documentCommandControllers.AutoSave;
-            _tabCloseController = documentCommandControllers.TabClose;
-            _tabMoveController = documentCommandControllers.TabMove;
-            _windowCloseController = documentCommandControllers.WindowClose;
-            var interactionControllers = MainWindowInteractionComposition.Compose(
-                this,
-                ui,
-                services,
-                _viewModel,
-                _shellPanelLayoutService,
-                _terminalShortcutService,
-                _tabNavigationController,
-                _tabEncryptionController,
-                _activeEditorInsertionController,
-                _favoritesRecentController,
-                _dialogController,
-                _pdfViewerController,
-                _officeDocumentViewerController,
-                new MainWindowInteractionCallbacks(
-                    () => _state.CurrentFolderPath,
-                    () => _state.CurrentRepoPath,
-                    () => OpenNewTab(),
-                    LoadDirectoryRoot,
-                    LoadFileIntoTabAsync,
-                    _livePreviewController.OpenFileInExternalViewerAsync,
-                    _livePreviewController.OpenFileWithDefaultProgramAsync,
-                    async (filePath, line) => await LoadFileIntoTabAsync(filePath, line),
-                    NavigateExplorerToFolderAsync,
-                    NavigateExplorerToFolderAndRevealAsync,
-                    () => FileListView.SelectedItem as ExplorerItem,
-                    ToggleLeftPanelAsync,
-                    ToggleRightPanelAsync,
-                    FocusSearchPanel,
                     () => OnCloseActiveTabShortcutInvoked(null!, null!),
-                    () => _toolbarCommandController?.SaveActive(),
-                    () => _toolbarCommandController?.SaveActiveAs(),
-                    () => _toolbarCommandController?.OpenFile(),
-                    () => _toolbarCommandController?.Find(),
-                    () => _toolbarCommandController?.Print(),
-                    () => _pdfViewerController.IsActiveViewer() || _officeDocumentViewerController.IsActiveViewer(),
-                    _stickyNoteModeController.ToggleTopMostFromShortcut,
-                    () => _toolbarCommandController?.ToggleTheme(),
-                    _stickyNoteModeController.ToggleMode,
-                    () => _toolbarCommandController?.ToggleLivePreview(),
-                    TogglePreviewWidth,
-                    ToggleMaximize,
-                    ShowLeftSidebarPage,
-                    CloseTabAndCleanup,
                     SyncSnippetsToOpenEditorsAsync,
                     InitializePickerWindow,
-                    GetLocalizedString,
-                    GetCurrentElementTheme,
-                    (tab, tabItem) => MainWindowTabOperations.ReloadAsync(
-                        tab,
-                        tabItem,
-                        _statusBarController,
-                        _pdfViewerController,
-                        _officeDocumentViewerController,
-                        _tabReloadController,
-                        UpdateLanguageUI,
-                        UpdateWindowTitle),
-                    (_, tabItem, tabView) => _tabCloseController.CloseRightTabs(tabItem, tabView),
-                    (_, tabItem, tabView) => _tabCloseController.CloseLeftTabs(tabItem, tabView),
-                    (_, tabItem, tabView) => _tabCloseController.CloseOtherTabs(tabItem, tabView)));
-            _explorerFileActionsController = interactionControllers.ExplorerFileActions;
-            _tabContextMenuController = interactionControllers.TabContextMenu;
-            _fileOpenDropController = interactionControllers.FileOpenDrop;
-            _rootKeyboardShortcutController = interactionControllers.RootKeyboardShortcut;
-            _terminalPanelController = interactionControllers.TerminalPanel;
-            _snippetsController = interactionControllers.Snippets;
-            var agentControllers = MainWindowAgentComposition.Compose(
-                this,
-                ui,
-                services,
-                _viewModel,
-                _state.TabBridges,
-                _state.EditorSessions,
-                _tabNavigationController,
-                _tabDirtyStateController,
-                _tabCloseController,
-                _searchReplaceTabSyncController,
-                _compareTabController,
-                _activeEditorInsertionController,
-                _tabTextContextProvider,
-                _dialogController,
-                new MainWindowAgentCompositionCallbacks(
-                    () => FileListView.SelectedItem as ExplorerItem,
-                    () => _state.CurrentFolderPath,
-                    () => _state.CurrentRepoPath,
-                    LoadDirectoryRoot,
-                    QueueGitStatusRefresh,
                     GetAgentSessionEdits,
-                    LoadFileIntoTabForAgentAsync,
-                    NavigateExplorerToFolderAndRevealAsync,
-                    content => OpenNewTab(null, content),
-                    SaveTabAsync,
-                    InitializePickerWindow,
-                    () => _explorerNavigationController.RefreshCurrentFolder(),
-                    GetLocalizedString,
-                    UpdateWindowTitle));
-            _llmAssistantController = agentControllers.LlmAssistant;
-            _agentFileWorkflowController = agentControllers.AgentFileWorkflow;
-            _agentController = agentControllers.Agent;
-            var editorRuntimeControllers = MainWindowEditorRuntimeComposition.Compose(
-                this,
-                ui,
-                services,
-                _viewModel,
-                _state.TabBridges,
-                _state.EditorSessions,
-                _statusBarController,
-                _tabNavigationController,
-                _tabDirtyStateController,
-                _tabEncryptionController,
-                _livePreviewController,
-                _pdfViewerController,
-                _officeDocumentViewerController,
-                _editorWebViewInitializationController,
-                _editorLineNavigationController,
-                _editorBridgeShortcutController,
-                _editorLinkNavigationController,
-                _activeEditorInsertionController,
-                _tabContextMenuController,
-                _favoritesRecentController,
-                _llmAssistantController,
-                _agentController,
-                _dialogController,
-                _shellPanelLayoutService,
-                InitialEditorLineWarmupCount,
-                new MainWindowEditorRuntimeCallbacks(
-                    SchedulePreview,
-                    UpdateLanguageUI,
-                    QueuePendingSplitImeLineSyncIfNeeded,
-                    SchedulePendingSplitImeCompletionSyncIfNeeded,
-                    ScheduleDeferredPendingSplitImeSyncIfNeeded,
-                    SyncLineChangeToOtherTabsAsync,
-                    tab => SyncEditsToOtherTabsAsync(tab),
-                    SaveSidebarVisibilitySettingsAsync,
-                    RefreshActivePreview,
-                    LoadFileIntoTabAsync,
-                    UpdateRightPanelSelectionContext,
-                    () => _state.ScrollSyncEnabled,
-                    async enabled =>
-                    {
-                        _state.ScrollSyncEnabled = enabled;
-                        var settings = _settingsService.CurrentSettings;
-                        if (settings.ScrollSyncEnabled != enabled)
-                        {
-                            settings.ScrollSyncEnabled = enabled;
-                            await _settingsService.SaveSettingsAsync(settings);
-                        }
-                    },
-                    () => _state.CurrentFolderPath,
-                    () => _toolbarCommandController?.LivePreviewEnabled == true,
-                    () => _toolbarCommandController?.CsvTableModeEnabled == true,
-                    GetPreviewBaseHref,
-                    GetLocalizedString,
-                    ApplyEditorSurfaceBackground,
-                    UpdateWindowTitle,
-                    () => OpenNewTab(),
-                    (filePath, content, isReadOnly, encodingName, encodingWasAutoDetected, isEncrypted, encryptionPassword) =>
-                        OpenNewTab(filePath, content, isReadOnly, encodingName, encodingWasAutoDetected, isEncrypted: isEncrypted, encryptionPassword: encryptionPassword),
                     CloseTabAndCleanup,
-                    (_, args) => _tabCloseController.CloseRequested(args)));
-            _tocController = editorRuntimeControllers.Toc;
-            _editorBridgeDocumentController = editorRuntimeControllers.EditorBridgeDocument;
-            _shellPaneController = editorRuntimeControllers.ShellPane;
-            _markdownToolbarController = editorRuntimeControllers.MarkdownToolbar;
-            _tabSelectionController = editorRuntimeControllers.TabSelection;
-            _editorBridgeInteractionController = editorRuntimeControllers.EditorBridgeInteraction;
-            _editorTabOpenController = editorRuntimeControllers.EditorTabOpen;
-            _editorSplitLayoutController = editorRuntimeControllers.EditorSplitLayout;
-            var startupControllers = MainWindowStartupComposition.Compose(
-                this,
-                ui,
-                services,
-                _viewModel,
-                _state.TabBridges,
-                _state.EditorSessions,
-                _terminalShortcutService,
-                _functionKeyShortcutService,
-                _autoSaveController,
-                _gitAutoRefreshTimer,
-                _splitImeSyncController,
-                _livePreviewController,
-                _pdfViewerController,
-                _officeDocumentViewerController,
-                _statusBarController,
-                _llmAssistantController,
-                _agentController,
-                _tabNavigationController,
-                _snippetsController,
-                _favoritesRecentController,
-                _fileOpenDropController,
-                _shellPanelLayoutService,
-                _rootKeyboardShortcutController,
-                _tabSaveController,
-                _terminalPanelController,
-                _stickyNoteModeController,
-                _shellPaneController,
-                _compareTabController,
-                _dialogController,
-                new MainWindowStartupCallbacks(
-                    () => _state.CurrentRepoPath,
-                    () => _state.CurrentFolderPath,
-                    NavigateExplorerToFolderAsync,
-                    LoadFileIntoTabAsync,
-                    () => OpenNewTab(),
-                    ApplyLeftSidebarVisibility,
-                    ApplyPreviewVisibility,
-                    ApplySavedPanelWidths,
-                    ApplyUiPersonalization,
+                    CloseReadOnlyViewer,
+                    SaveTabAsync,
+                    GetPreviewBaseHref,
+                    RefreshActivePreview,
                     LocalizeUi,
-                    ApplyToolbarSettings,
                     SyncAgentSettingsAfterLoad,
-                    RefreshGitStatusUIAsync,
                     UpdateAutoSaveStatus,
-                    GetLocalizedString,
-                    GetCurrentElementTheme,
-                    InitializePickerWindow,
-                    GetPreviewBaseHref));
-            _lifecycleController = startupControllers.Lifecycle;
-            _settingsController = startupControllers.Settings;
-            _startupController = startupControllers.Startup;
-            _shellInteractionController = startupControllers.ShellInteraction;
-            _toolbarCommandController = startupControllers.ToolbarCommand;
-            MainWindowEventBinder.Bind(
-                ui,
-                _searchReplaceController,
-                _tabMoveController,
-                _tabCloseController,
-                _toolbarCommandController,
-                () => OpenNewTab(),
-                SaveUiLayoutSettingsAsync);
+                    () => FileListView.SelectedItem as ExplorerItem,
+                    path => CurrentRepoPath = path,
+                    path => CurrentFolderPath = path,
+                    () => _startupInitializationComplete,
+                    OnGitFileRestored));
 
             // Load local configurations and boot initial states
             // Setup custom title bar
@@ -1057,29 +577,6 @@ namespace TxtAIEditor
             // WinUI 3 Window association wrapper for file pickers (required in WinAppSDK)
             IntPtr hwnd = WindowNative.GetWindowHandle(this);
             InitializeWithWindow.Initialize(picker, hwnd);
-        }
-
-        private static string NormalizeWebMessageJson(CoreWebView2WebMessageReceivedEventArgs args)
-        {
-            string json = args.WebMessageAsJson;
-            try
-            {
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.String)
-                {
-                    return doc.RootElement.GetString() ?? "{}";
-                }
-            }
-            catch
-            {
-                string? asString = args.TryGetWebMessageAsString();
-                if (!string.IsNullOrWhiteSpace(asString))
-                {
-                    return asString;
-                }
-            }
-
-            return json;
         }
 
         private void UpdateWindowTitle()
