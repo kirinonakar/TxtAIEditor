@@ -617,7 +617,12 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 }
 
 function setupVirtualHeight() {
+    const savedScroll = scrollContainer.scrollTop;
     virtualSpacer.style.height = `${totalVirtualHeight()}px`;
+    const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+    if (savedScroll > maxScroll) {
+        scrollContainer.scrollTop = maxScroll;
+    }
 }
 
 function usesMeasuredLineHeights() {
