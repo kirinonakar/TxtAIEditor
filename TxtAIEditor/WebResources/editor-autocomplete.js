@@ -84,6 +84,30 @@ function autocompleteReplaceStart(candidate, text, wordStart, caret = null) {
     return replaceStart;
 }
 
+function autocompleteReplaceEnd(candidate, text, replaceStart, caret, wordEnd) {
+    const safeCaret = Math.max(0, Math.min(Number(caret || 0), text.length));
+    const safeWordEnd = Math.max(safeCaret, Math.min(Number(wordEnd || safeCaret), text.length));
+    if (safeWordEnd <= safeCaret) return safeCaret;
+
+    const insertText = String(candidate.insertText || candidate.label || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+    const firstInsertedLine = insertText.split('\n')[0] || '';
+    const currentReplaceLength = Math.max(0, Math.min(safeCaret - replaceStart, firstInsertedLine.length));
+    const textAfterCaret = text.slice(safeCaret, safeWordEnd);
+    const maxOverlap = Math.min(textAfterCaret.length, firstInsertedLine.length - currentReplaceLength);
+
+    for (let length = maxOverlap; length > 0; length--) {
+        const existingPrefix = textAfterCaret.slice(0, length);
+        const insertSuffix = firstInsertedLine.slice(currentReplaceLength, currentReplaceLength + length);
+        if (normalizeAutocompleteComparisonText(existingPrefix) === normalizeAutocompleteComparisonText(insertSuffix)) {
+            return safeCaret + length;
+        }
+    }
+
+    return safeCaret;
+}
+
 function isAutocompleteSameAsInput(candidate, typedText) {
     const normalizedTypedText = normalizeAutocompleteComparisonText(typedText);
     if (!normalizedTypedText) return false;
@@ -413,16 +437,18 @@ function insertSelectedCandidate() {
         ? currentCaret
         : savedCaret;
     const { end: wordEnd } = getWordUnderCaret(text, caret);
-    let wordStart = autocompleteReplaceStart(candidate, text, autocompleteState.wordStart, caret);
+    const wordStart = autocompleteReplaceStart(candidate, text, autocompleteState.wordStart, caret);
+    const replaceEnd = autocompleteReplaceEnd(candidate, text, wordStart, caret, wordEnd);
 
-    replaceWordWithAutocompleteText(element, wordStart, wordEnd, candidate.insertText || candidate.label || '');
+    replaceWordWithAutocompleteText(element, wordStart, replaceEnd, candidate.insertText || candidate.label || '');
     hideAutocomplete();
 }
 
 function replaceWordWithAutocompleteText(element, wordStart, replaceEnd, insertText) {
     const text = lineTextFromElement(element);
     const normalized = String(insertText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    const safeReplaceEnd = Math.max(wordStart, Math.min(Number(replaceEnd || wordStart), text.length));
+    const requestedReplaceEnd = Number.isFinite(Number(replaceEnd)) ? Number(replaceEnd) : wordStart;
+    const safeReplaceEnd = Math.max(wordStart, Math.min(requestedReplaceEnd, text.length));
     if (!normalized.includes('\n')) {
         const nextText = text.slice(0, wordStart) + normalized + text.slice(safeReplaceEnd);
         const nextCaret = wordStart + normalized.length;
