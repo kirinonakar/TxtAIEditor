@@ -2204,10 +2204,10 @@
     <value>PdfToText 変換を完了しました: {0}</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
-    <value>ウェブ検索を完了しました: {0}</value>
+    <value>ウェブ検索を完了しました</value>
   </data>
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
-    <value>ウェブページを読み込みました: {0}</value>
+    <value>ウェブページを読み込みました</value>
   </data>
   <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
     <value>タブを保存しました: {0}</value>

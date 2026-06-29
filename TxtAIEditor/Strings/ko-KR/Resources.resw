@@ -2203,10 +2203,10 @@
     <value>PdfToText 변환을 완료했습니다: {0}</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
-    <value>웹 검색을 완료했습니다: {0}</value>
+    <value>웹 검색을 완료했습니다</value>
   </data>
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
-    <value>웹페이지를 읽었습니다: {0}</value>
+    <value>웹페이지를 읽었습니다</value>
   </data>
   <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
     <value>탭을 저장했습니다: {0}</value>

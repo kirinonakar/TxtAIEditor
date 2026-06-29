@@ -293,14 +293,12 @@ namespace TxtAIEditor.Controls
 
             if (normalizedToolName == "web_search_exa")
             {
-                string query = GetStringArgument(arguments, "query");
-                return string.Format(_getString("AgentVerboseWebSearchOnly", "웹 검색을 완료했습니다: {0}"), query);
+                return _getString("AgentVerboseWebSearchOnly", "웹 검색을 완료했습니다");
             }
 
             if (normalizedToolName == "web_fetch" || normalizedToolName == "web_fetch_exa")
             {
-                string[] urls = GetUrlsArgument(arguments);
-                return string.Format(_getString("AgentVerboseWebFetchOnly", "웹페이지를 읽었습니다: {0}"), string.Join(", ", urls));
+                return _getString("AgentVerboseWebFetchOnly", "웹페이지를 읽었습니다");
             }
 
             if (normalizedToolName == "open_file")

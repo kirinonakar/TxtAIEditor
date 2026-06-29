@@ -2203,10 +2203,10 @@ Plan: {0}</value>
     <value>Completed pdftotext conversion: {0}</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
-    <value>Completed web search for: {0}</value>
+    <value>Completed web search</value>
   </data>
   <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
-    <value>Read web page content: {0}</value>
+    <value>Read web page content</value>
   </data>
   <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
     <value>Saved tab: {0}</value>
