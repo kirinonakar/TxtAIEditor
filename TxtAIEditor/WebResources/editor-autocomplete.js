@@ -23,10 +23,11 @@ const autocompleteState = {
     caret: 0,
     word: '',
     textBeforeCaret: '',
-    suppressUntil: 0  // ESC로 닫은 후 compositionend 재오픈 방지용 타임스탬프
+    suppressUntil: 0
 };
 
 let autocompleteCaretRestoreToken = 0;
+const AUTOCOMPLETE_NAVIGATION_REFRESH_SUPPRESS_MS = 240;
 
 function getWordUnderCaret(text, caretOffset) {
     let start = caretOffset;
@@ -399,26 +400,14 @@ function scrollAutocompleteActiveIntoView() {
 
 function moveAutocompleteActiveIndex(delta) {
     if (!autocompleteState.isOpen || autocompleteState.candidates.length === 0) return;
+    autocompleteState.suppressUntil = Math.max(
+        autocompleteState.suppressUntil,
+        performance.now() + AUTOCOMPLETE_NAVIGATION_REFRESH_SUPPRESS_MS);
     autocompleteState.activeIndex = (
         autocompleteState.activeIndex + delta + autocompleteState.candidates.length
     ) % autocompleteState.candidates.length;
     renderAutocomplete();
     scrollAutocompleteActiveIntoView();
-    restoreAutocompleteInputCaret();
-}
-
-function restoreAutocompleteInputCaret() {
-    const element = autocompleteState.element;
-    if (!element || !element.isConnected || element.getAttribute('contenteditable') !== 'true') return;
-
-    const text = lineTextFromElement(element);
-    const caret = Math.max(0, Math.min(Number(autocompleteState.caret || 0), text.length));
-    if (text.slice(0, caret) !== (autocompleteState.textBeforeCaret || '')) return;
-
-    restoreAutocompleteCaretAfterCommit(
-        Number(element.dataset.line || 1),
-        caret,
-        text);
 }
 
 function insertSelectedCandidate() {

@@ -139,6 +139,26 @@ export function bindKeyboardEvents({ openFindPanel }) {
         extendSelection: false,
         timer: 0
     };
+    let autocompleteNavigationKey = '';
+    let autocompleteNavigationAt = 0;
+
+    function isDuplicateAutocompleteNavigationKey(event) {
+        if (event.repeat) return false;
+
+        const key = event.key || '';
+        const now = performance.now();
+        const isDuplicate = autocompleteNavigationKey === key && now - autocompleteNavigationAt < 80;
+        autocompleteNavigationKey = key;
+        autocompleteNavigationAt = now;
+        return isDuplicate;
+    }
+
+    function clearAutocompleteNavigationKey(key = '') {
+        if (!key || key === autocompleteNavigationKey) {
+            autocompleteNavigationKey = '';
+            autocompleteNavigationAt = 0;
+        }
+    }
 
     function clearKeyboardVerticalRepeatTimer() {
         if (keyboardVerticalRepeat.timer) {
@@ -241,17 +261,24 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
             if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                moveAutocompleteActiveIndex(1);
+                event.stopImmediatePropagation();
+                if (!isDuplicateAutocompleteNavigationKey(event)) {
+                    moveAutocompleteActiveIndex(1);
+                }
                 return;
             }
             if (event.key === 'ArrowUp') {
                 event.preventDefault();
-                moveAutocompleteActiveIndex(-1);
+                event.stopImmediatePropagation();
+                if (!isDuplicateAutocompleteNavigationKey(event)) {
+                    moveAutocompleteActiveIndex(-1);
+                }
                 return;
             }
             if (event.key === 'Enter') {
                 if (state.autocompleteOnEnter) {
                     event.preventDefault();
+                    event.stopImmediatePropagation();
                     insertSelectedCandidate();
                     return;
                 } else {
@@ -260,6 +287,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
             if (event.key === 'Tab' && state.autocompleteOnTab) {
                 event.preventDefault();
+                event.stopImmediatePropagation();
                 insertSelectedCandidate();
                 return;
             }
@@ -267,6 +295,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
             // suppressMs=300: compositionend 후 triggerAutocomplete 재호출로 팝업이 다시 열리는 것 방지
             if (event.key === 'Escape' || event.code === 'Escape') {
                 event.preventDefault();
+                event.stopImmediatePropagation();
                 hideAutocomplete(300);
                 return;
             }
@@ -544,6 +573,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
     viewport.addEventListener('keyup', event => {
         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             stopKeyboardVerticalRepeat(event.key);
+            clearAutocompleteNavigationKey(event.key);
         }
 
         if (isModelRepeatKey(event)) {
@@ -583,6 +613,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
 
         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             stopKeyboardVerticalRepeat(event.key);
+            clearAutocompleteNavigationKey(event.key);
         } else if (event.key === 'Shift' && keyboardVerticalRepeat.key) {
             keyboardVerticalRepeat.extendSelection = false;
         }
