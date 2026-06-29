@@ -229,14 +229,17 @@ namespace TxtAIEditor.Controls
                         {
                             list.Add(new ToolCallInfo { ToolName = tName, Arguments = args });
                         }
-                        else
-                        {
-                            return false;
-                        }
+                        // If JSON parsed but not a valid tool call, skip and continue
                     }
                     else
                     {
-                        return false;
+                        // Malformed JSON at current position; skip to next open brace
+                        int nextBrace = trimmedPayload.IndexOf('{', index + 1);
+                        if (nextBrace < 0)
+                        {
+                            break;
+                        }
+                        index = nextBrace;
                     }
                 }
                 else
@@ -254,24 +257,33 @@ namespace TxtAIEditor.Controls
                                 {
                                     list.Add(new ToolCallInfo { ToolName = possibleName, Arguments = args });
                                 }
-                                else
-                                {
-                                    return false;
-                                }
+                                // If bare arguments parse failed, skip and continue
                             }
                             else
                             {
-                                return false;
+                                // Malformed JSON; skip to next open brace
+                                int nextBrace = trimmedPayload.IndexOf('{', openBraceIndex + 1);
+                                if (nextBrace < 0)
+                                {
+                                    break;
+                                }
+                                index = nextBrace;
                             }
                         }
                         else
                         {
-                            return false;
+                            // Invalid tool name; skip to next open brace
+                            int nextBrace = trimmedPayload.IndexOf('{', openBraceIndex + 1);
+                            if (nextBrace < 0)
+                            {
+                                break;
+                            }
+                            index = nextBrace;
                         }
                     }
                     else
                     {
-                        return false;
+                        break;
                     }
                 }
             }
