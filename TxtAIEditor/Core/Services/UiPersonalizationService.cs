@@ -185,8 +185,13 @@ namespace TxtAIEditor.Core.Services
             SetBrush("CheckBoxForegroundPointerOver", textColor);
             SetBrush("CheckBoxForegroundPressed", textColor);
 
-            SetBrush("SliderTrackFill", mauveColor);
+            // Slider: filled (left) uses accent (mauve); unfilled track (right) stays neutral
+            SetBrush("SliderTrackFill", surface1Color);
+            SetBrush("SliderTrackFillPointerOver", surface2Color);
+            SetBrush("SliderTrackFillPressed", surface2Color);
             SetBrush("SliderThumbBackground", mauveColor);
+            SetBrush("SliderThumbBackgroundPointerOver", mauveColor);
+            SetBrush("SliderThumbBackgroundPressed", mauveColor);
 
             // System Control chrome backgrounds
             SetBrush("SystemControlBackgroundChromeMediumLowBrush", mantleColor);
@@ -242,7 +247,8 @@ namespace TxtAIEditor.Core.Services
                 "ComboBoxDropDownItemForegroundSelected",
                 "ButtonBackground", "ButtonBackgroundPointerOver", "ButtonBackgroundPressed", "ButtonForeground", "ButtonForegroundPointerOver", "ButtonForegroundPressed", "ButtonBorderBrush", "ButtonBorderBrushPointerOver",
                 "CheckBoxForeground", "CheckBoxForegroundPointerOver", "CheckBoxForegroundPressed",
-                "SliderTrackFill", "SliderThumbBackground",
+                "SliderTrackFill", "SliderTrackFillPointerOver", "SliderTrackFillPressed",
+                "SliderThumbBackground", "SliderThumbBackgroundPointerOver", "SliderThumbBackgroundPressed",
                 "SystemControlBackgroundChromeMediumLowBrush", "SystemControlBackgroundChromeMediumBrush", "SystemControlBackgroundAltHighBrush",
                 "SystemControlBackgroundBaseLowBrush", "SystemControlBackgroundBaseMediumBrush", "SystemControlBackgroundBaseMediumLowBrush",
                 "SystemControlBackgroundListLowBrush", "SystemControlBackgroundListMediumBrush", "SystemControlForegroundBaseHighBrush",
