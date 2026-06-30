@@ -379,11 +379,23 @@ namespace TxtAIEditor.Controls
                 Content = textBox,
                 PrimaryButtonText = _getString("RenameDialogOK", "확인"),
                 CloseButtonText = _getString("RenameDialogCancel", "취소"),
+                DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = _xamlRootProvider(),
                 RequestedTheme = _themeProvider()
             };
 
-            if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary)
+            bool confirmed = false;
+            textBox.KeyDown += (_, e) =>
+            {
+                if (e.Key == Windows.System.VirtualKey.Enter)
+                {
+                    confirmed = true;
+                    dialog.Hide();
+                }
+            };
+
+            ContentDialogResult result = await ShowDialogAsync(dialog);
+            if (result != ContentDialogResult.Primary && !confirmed)
             {
                 return;
             }

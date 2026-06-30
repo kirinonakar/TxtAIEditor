@@ -169,23 +169,47 @@ namespace TxtAIEditor.Controls
                 Content = panel,
                 PrimaryButtonText = primaryButtonText,
                 CloseButtonText = _getString("EncryptionCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = xamlRoot,
                 RequestedTheme = _getCurrentElementTheme()
             };
 
-            dialog.PrimaryButtonClick += (_, args) =>
+            bool confirmed = false;
+
+            bool Validate()
             {
                 if (string.IsNullOrWhiteSpace(passwordBox.Password))
                 {
-                    args.Cancel = true;
                     errorText.Text = _getString("EncryptionPasswordEmpty", "암호를 입력해 주세요.");
                     errorText.Visibility = Visibility.Visible;
+                    return false;
+                }
+                return true;
+            }
+
+            dialog.PrimaryButtonClick += (_, args) =>
+            {
+                if (!Validate())
+                {
+                    args.Cancel = true;
+                }
+                else
+                {
+                    confirmed = true;
                 }
             };
 
-            return await dialog.ShowAsync() == ContentDialogResult.Primary
-                ? passwordBox.Password
-                : null;
+            passwordBox.KeyDown += (_, e) =>
+            {
+                if (e.Key == Windows.System.VirtualKey.Enter && Validate())
+                {
+                    confirmed = true;
+                    dialog.Hide();
+                }
+            };
+
+            await dialog.ShowAsync();
+            return confirmed ? passwordBox.Password : null;
         }
 
         private async Task<string?> PromptConfirmedPasswordAsync(string title, string passwordLabel, string confirmLabel)
@@ -228,31 +252,58 @@ namespace TxtAIEditor.Controls
                 Content = panel,
                 PrimaryButtonText = _getString("EncryptionApplyButton", "적용"),
                 CloseButtonText = _getString("EncryptionCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = xamlRoot,
                 RequestedTheme = _getCurrentElementTheme()
             };
 
-            dialog.PrimaryButtonClick += (_, args) =>
+            bool confirmed = false;
+
+            bool Validate()
             {
                 if (string.IsNullOrWhiteSpace(passwordBox.Password))
                 {
-                    args.Cancel = true;
                     errorText.Text = _getString("EncryptionPasswordEmpty", "암호를 입력해 주세요.");
                     errorText.Visibility = Visibility.Visible;
-                    return;
+                    return false;
                 }
 
                 if (!string.Equals(passwordBox.Password, confirmBox.Password, StringComparison.Ordinal))
                 {
-                    args.Cancel = true;
                     errorText.Text = _getString("EncryptionPasswordMismatch", "입력한 암호가 일치하지 않습니다.");
                     errorText.Visibility = Visibility.Visible;
+                    return false;
+                }
+
+                return true;
+            }
+
+            dialog.PrimaryButtonClick += (_, args) =>
+            {
+                if (!Validate())
+                {
+                    args.Cancel = true;
+                }
+                else
+                {
+                    confirmed = true;
                 }
             };
 
-            return await dialog.ShowAsync() == ContentDialogResult.Primary
-                ? passwordBox.Password
-                : null;
+            void OnEnterKey(object _, KeyRoutedEventArgs e)
+            {
+                if (e.Key == Windows.System.VirtualKey.Enter && Validate())
+                {
+                    confirmed = true;
+                    dialog.Hide();
+                }
+            }
+
+            passwordBox.KeyDown += OnEnterKey;
+            confirmBox.KeyDown += OnEnterKey;
+
+            await dialog.ShowAsync();
+            return confirmed ? passwordBox.Password : null;
         }
 
         private static TextBlock CreateErrorTextBlock()
