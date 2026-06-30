@@ -523,13 +523,6 @@ namespace TxtAIEditor.Controls
                 return "replace_range failed: path is empty and no selected, recently read, or active file path could be inferred.";
             }
 
-            string canonicalPath = GetCanonicalPath(path);
-            RunFileToolState? state = _currentRunState.Value;
-            if (state != null && state.WrittenFiles.Contains(canonicalPath))
-            {
-                return $"replace_range failed: The file '{path}' has been modified since it was last read. You must call read_file to get the updated line numbers before making another replace_range edit on this file.";
-            }
-
             int startLine = GetReplaceRangeStartLineArgument(arguments, path);
             int endLine = GetReplaceRangeEndLineArgument(arguments, path);
             int lineCount = endLine - startLine + 1;
