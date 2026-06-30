@@ -301,6 +301,7 @@ namespace TxtAIEditor.Core.Services
                 "gemini" => new GeminiProvider(_localizationService, settings.LlmAgentVerbose, settings.LlmThinkingLevel, providerName),
                 "openai oauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
                 "openaioauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
+                "cerebras" => new CerebrasProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "openrouter" => new OpenRouterProvider(_localizationService, providerName),
                 "lm studio" => new LMStudioProvider(_localizationService),
                 "lmstudio" => new LMStudioProvider(_localizationService),

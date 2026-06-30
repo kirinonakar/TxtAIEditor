@@ -329,6 +329,13 @@ namespace TxtAIEditor.Core.Services
                 _modelStatusText.Text = _getString("SettingsLlmOpenRouterInfo", "OpenRouter는 https://openrouter.ai/api/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
+            else if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
+            {
+                _refreshModelsButton.Content = _getString("SettingsLlmLoadCerebrasModels", "Cerebras 모델 불러오기");
+                _refreshModelsButton.Visibility = Visibility.Visible;
+                _modelStatusText.Text = _getString("SettingsLlmCerebrasInfo", "Cerebras는 https://api.cerebras.ai/v1/models 에서 모델 목록을 불러옵니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
             else if (provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
             {
                 _refreshModelsButton.Content = _getString("SettingsLlmLoadOpenCodeGoModels", "OpenCode Go 모델 불러오기");

@@ -53,6 +53,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmModel { get; set; } = "gpt-5.5";
         public string LlmModelGemini { get; set; } = "gemini-flash-lite-latest";
         public string LlmModelOpenAI { get; set; } = "gpt-5.5";
+        public string LlmModelCerebras { get; set; } = "gemma-4-31b";
         public string LlmModelOpenRouter { get; set; } = "moonshotai/kimi-k2.6:free";
         public string LlmModelLmStudio { get; set; } = "";
         public string LlmModelOpenCodeGo { get; set; } = "";

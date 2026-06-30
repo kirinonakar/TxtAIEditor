@@ -383,6 +383,12 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouter는 https://openrouter.ai/api/v1/models 에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmLoadCerebrasModels" xml:space="preserve">
+    <value>Cerebras 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmCerebrasInfo" xml:space="preserve">
+    <value>Cerebras는 https://api.cerebras.ai/v1/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>
@@ -2519,6 +2525,12 @@
    </data>
    <data name="OpenRouterErrorStreamCallFailed" xml:space="preserve">
      <value>OpenRouter API 스트리밍 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="CerebrasErrorApiCallFailed" xml:space="preserve">
+     <value>Cerebras API 호출 실패 ({0}): {1}</value>
+   </data>
+   <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
+     <value>Cerebras API 스트리밍 호출 실패 ({0}): {1}</value>
    </data>
    <data name="GeminiErrorApiCallFailed" xml:space="preserve">
      <value>Google Gemini API 호출 실패 ({0}): {1}</value>

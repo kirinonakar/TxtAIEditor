@@ -383,6 +383,12 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouter loads the list of models from https://openrouter.ai/api/v1/models.</value>
   </data>
+  <data name="SettingsLlmLoadCerebrasModels" xml:space="preserve">
+    <value>Load Cerebras Models</value>
+  </data>
+  <data name="SettingsLlmCerebrasInfo" xml:space="preserve">
+    <value>Cerebras loads the list of models from https://api.cerebras.ai/v1/models.</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>
@@ -2519,6 +2525,12 @@ Plan: {0}</value>
    </data>
    <data name="OpenRouterErrorStreamCallFailed" xml:space="preserve">
      <value>OpenRouter API streaming call failed ({0}): {1}</value>
+   </data>
+   <data name="CerebrasErrorApiCallFailed" xml:space="preserve">
+     <value>Cerebras API call failed ({0}): {1}</value>
+   </data>
+   <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
+     <value>Cerebras API streaming call failed ({0}): {1}</value>
    </data>
    <data name="GeminiErrorApiCallFailed" xml:space="preserve">
      <value>Google Gemini API call failed ({0}): {1}</value>

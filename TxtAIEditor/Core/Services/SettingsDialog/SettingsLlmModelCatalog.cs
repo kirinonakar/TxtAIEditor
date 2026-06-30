@@ -11,6 +11,7 @@ namespace TxtAIEditor.Core.Services
             "Gemini",
             "OpenAI",
             "OpenAI OAuth",
+            "Cerebras",
             "OpenRouter",
             "LM Studio",
             "OpenCode Go",
@@ -30,6 +31,7 @@ namespace TxtAIEditor.Core.Services
         public static bool SupportsRemoteModelFetch(string provider)
         {
             return provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase) ||
@@ -44,6 +46,7 @@ namespace TxtAIEditor.Core.Services
                 provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase);
         }
 
@@ -62,6 +65,7 @@ namespace TxtAIEditor.Core.Services
             return string.IsNullOrWhiteSpace(endpoint) ||
                 endpoint.Equals("https://api.openai.com/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("http://127.0.0.1:10531/v1", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.Equals("https://api.cerebras.ai/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://openrouter.ai/api/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("http://localhost:1234/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
@@ -79,6 +83,7 @@ namespace TxtAIEditor.Core.Services
                 "LM Studio" => "http://localhost:1234/v1",
                 "OpenAI" => "https://api.openai.com/v1",
                 "OpenAI OAuth" => "http://127.0.0.1:10531/v1",
+                "Cerebras" => "https://api.cerebras.ai/v1",
                 "OpenRouter" => "https://openrouter.ai/api/v1",
                 "Gemini" => "https://generativelanguage.googleapis.com",
                 "OpenCode Go" => "https://opencode.ai/zen/go/v1",
@@ -106,6 +111,16 @@ namespace TxtAIEditor.Core.Services
             if (IsOpenAIProvider(provider))
             {
                 return new[] { "gpt-5.5" };
+            }
+
+            if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
+            {
+                return new[]
+                {
+                    "gemma-4-31b",
+                    "gpt-oss-120b",
+                    "zai-glm-4.7"
+                };
             }
 
             if (provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase))
@@ -251,6 +266,11 @@ namespace TxtAIEditor.Core.Services
                 return EnsureKnownModel(settings.LlmModelOpenAI, selectedModel, GetStaticModels(provider), "gpt-5.5");
             }
 
+            if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
+            {
+                return EnsureKnownModel(settings.LlmModelCerebras, selectedModel, GetStaticModels(provider), "gemma-4-31b");
+            }
+
             if (provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelOpenRouter) ? settings.LlmModelOpenRouter : selectedModel;
@@ -298,6 +318,11 @@ namespace TxtAIEditor.Core.Services
                 return !string.IsNullOrEmpty(settings.LlmModelOpenAI) ? settings.LlmModelOpenAI : "gpt-5.5";
             }
 
+            if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelCerebras) ? settings.LlmModelCerebras : "gemma-4-31b";
+            }
+
             if (provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelOpenRouter) ? settings.LlmModelOpenRouter : "meta-llama/llama-3.3-70b-instruct:free";
@@ -338,6 +363,11 @@ namespace TxtAIEditor.Core.Services
                 return !string.IsNullOrEmpty(settings.LlmModelLmStudio) ? settings.LlmModelLmStudio : settings.LlmModel;
             }
 
+            if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelCerebras) ? settings.LlmModelCerebras : settings.LlmModel;
+            }
+
             if (provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelOpenCodeGo) ? settings.LlmModelOpenCodeGo : settings.LlmModel;
@@ -374,6 +404,10 @@ namespace TxtAIEditor.Core.Services
             else if (settings.LlmProvider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase))
             {
                 settings.LlmModelOpenRouter = settings.LlmModel;
+            }
+            else if (settings.LlmProvider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmModelCerebras = settings.LlmModel;
             }
             else if (settings.LlmProvider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase))
             {

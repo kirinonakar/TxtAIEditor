@@ -383,6 +383,12 @@
   <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
     <value>OpenRouterは https://openrouter.ai/api/v1/models からモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmLoadCerebrasModels" xml:space="preserve">
+    <value>Cerebrasモデルを取得</value>
+  </data>
+  <data name="SettingsLlmCerebrasInfo" xml:space="preserve">
+    <value>Cerebrasは https://api.cerebras.ai/v1/models からモデルリストを取得します。</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>
@@ -2520,6 +2526,12 @@
    </data>
    <data name="OpenRouterErrorStreamCallFailed" xml:space="preserve">
      <value>OpenRouter API ストリーミング呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="CerebrasErrorApiCallFailed" xml:space="preserve">
+     <value>Cerebras API 呼び出し失敗 ({0}): {1}</value>
+   </data>
+   <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
+     <value>Cerebras API ストリーミング呼び出し失敗 ({0}): {1}</value>
    </data>
    <data name="GeminiErrorApiCallFailed" xml:space="preserve">
      <value>Google Gemini API 呼び出し失敗 ({0}): {1}</value>
