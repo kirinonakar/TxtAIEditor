@@ -8,9 +8,15 @@ namespace TxtAIEditor.Controls
 {
     public sealed partial class RightSidebarPane : UserControl
     {
+        private readonly RightSidebarPresetMenuController _presetMenuController;
+
         public RightSidebarPane()
         {
             InitializeComponent();
+            _presetMenuController = new RightSidebarPresetMenuController(
+                RightSidebarRoot.Resources,
+                LlmPresetListPanel,
+                LlmPresetFlyout);
         }
 
         public event SelectionChangedEventHandler? PreviewModeSelectionChanged;
@@ -156,7 +162,7 @@ namespace TxtAIEditor.Controls
                 LlmImportPresetText.Text = getString("PresetImportText", "가져오기");
             }
             _getString = getString;
-            RebuildPresetsMenu();
+            _presetMenuController.RebuildPresetsMenu();
         }
 
         private void OnPreviewModeComboSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -369,14 +375,6 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private List<string> _presetNames = new();
-        private Action? _onAddPresetClick;
-        private Action<string>? _onPresetSelected;
-        private Action<string>? _onPresetEdited;
-        private Action<string>? _onPresetDeleted;
-        private Action? _onExportPresetClick;
-        private Action? _onImportPresetClick;
-
         public void UpdatePresetsMenu(
             List<string> presetNames,
             Action onAddPresetClick,
@@ -387,104 +385,35 @@ namespace TxtAIEditor.Controls
             Action onImportPresetClick,
             Func<string, string, string> getString)
         {
-            _presetNames = presetNames;
-            _onAddPresetClick = onAddPresetClick;
-            _onPresetSelected = onPresetSelected;
-            _onPresetEdited = onPresetEdited;
-            _onPresetDeleted = onPresetDeleted;
-            _onExportPresetClick = onExportPresetClick;
-            _onImportPresetClick = onImportPresetClick;
             _getString = getString;
-
-            RebuildPresetsMenu();
+            _presetMenuController.UpdatePresetsMenu(
+                presetNames,
+                onAddPresetClick,
+                onPresetSelected,
+                onPresetEdited,
+                onPresetDeleted,
+                onExportPresetClick,
+                onImportPresetClick);
         }
 
         private void OnAddPresetClickInPanel(object sender, RoutedEventArgs e)
         {
-            _onAddPresetClick?.Invoke();
-            LlmPresetFlyout.Hide();
+            _presetMenuController.AddPreset();
         }
 
         private void OnExportPresetClickInPanel(object sender, RoutedEventArgs e)
         {
-            _onExportPresetClick?.Invoke();
-            LlmPresetFlyout.Hide();
+            _presetMenuController.ExportPresets();
         }
 
         private void OnImportPresetClickInPanel(object sender, RoutedEventArgs e)
         {
-            _onImportPresetClick?.Invoke();
-            LlmPresetFlyout.Hide();
+            _presetMenuController.ImportPresets();
         }
 
         private void OnPresetFlyoutOpened(object sender, object e)
         {
-            RebuildPresetsMenu();
-        }
-
-        private void RebuildPresetsMenu()
-        {
-            if (LlmPresetListPanel == null || _getString == null) return;
-            LlmPresetListPanel.Children.Clear();
-
-            var buttonStyle = RightSidebarRoot.Resources["RightSidebarButtonStyle"] as Style;
-
-            foreach (var presetName in _presetNames)
-            {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                var selectBtn = new Button
-                {
-                    Content = presetName,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Left,
-                    Height = 28,
-                    FontSize = 11,
-                    Padding = new Thickness(8, 0, 8, 0),
-                    Style = buttonStyle
-                };
-                string currentName = presetName;
-                selectBtn.Click += (s, e) => {
-                    _onPresetSelected?.Invoke(currentName);
-                    LlmPresetFlyout.Hide();
-                };
-                Grid.SetColumn(selectBtn, 0);
-                rowGrid.Children.Add(selectBtn);
-
-                var editBtn = new Button
-                {
-                    Content = new FontIcon { Glyph = "\uE70F", FontSize = 10 },
-                    Width = 28,
-                    Height = 28,
-                    Padding = new Thickness(0),
-                    Style = buttonStyle
-                };
-                editBtn.Click += (s, e) => {
-                    _onPresetEdited?.Invoke(currentName);
-                    LlmPresetFlyout.Hide();
-                };
-                Grid.SetColumn(editBtn, 1);
-                rowGrid.Children.Add(editBtn);
-
-                var deleteBtn = new Button
-                {
-                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
-                    Width = 28,
-                    Height = 28,
-                    Padding = new Thickness(0),
-                    Style = buttonStyle
-                };
-                deleteBtn.Click += (s, e) => {
-                    _onPresetDeleted?.Invoke(currentName);
-                };
-                Grid.SetColumn(deleteBtn, 2);
-                rowGrid.Children.Add(deleteBtn);
-
-                LlmPresetListPanel.Children.Add(rowGrid);
-            }
+            _presetMenuController.RebuildPresetsMenu();
         }
 
         private void OnRightTabViewSelectionChanged(object sender, SelectionChangedEventArgs e)

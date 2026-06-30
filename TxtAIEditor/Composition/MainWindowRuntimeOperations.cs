@@ -50,6 +50,51 @@ namespace TxtAIEditor.Composition
 
         private MainWindowControllers Controllers => _getControllers();
 
+        public MainWindowCompositionRootCallbacks CreateCompositionCallbacks()
+        {
+            return new MainWindowCompositionRootCallbacks(
+                GetCurrentElementTheme,
+                GetLocalizedString,
+                UpdateWindowTitle,
+                ReloadTabWithEncodingAsync,
+                MarkTabDirtyFromStatusBar,
+                PerformLineNavigationAsync,
+                ToggleMaximize,
+                LoadFileIntoTabAsync,
+                LoadFileIntoTabAsync,
+                LoadFileIntoTabForAgentAsync,
+                UpdateRightPanelSelectionContext,
+                UpdateLivePreview,
+                UpdateLanguageUi,
+                SchedulePreview,
+                FocusSearchPanel,
+                EnsureLeftPanelVisible,
+                ShowLeftSidebarPage,
+                request => OpenNewTab(request),
+                () => OpenNewTab(),
+                OpenGeneratedTab,
+                OpenImageTab,
+                OpenPdfTab,
+                OpenOfficeDocumentTab,
+                CloseActiveTab,
+                SyncSnippetsToOpenEditorsAsync,
+                InitializePickerWindow,
+                GetAgentSessionEdits,
+                CloseTabAndCleanup,
+                CloseReadOnlyViewer,
+                SaveTabAsync,
+                GetPreviewBaseHref,
+                RefreshActivePreview,
+                LocalizeUi,
+                SyncAgentSettingsAfterLoad,
+                UpdateAutoSaveStatus,
+                GetSelectedExplorerItem,
+                SetCurrentRepoPath,
+                SetCurrentFolderPath,
+                () => IsStartupInitializationComplete,
+                OnGitFileRestored);
+        }
+
         public async Task PrepareForInitialActivationAsync()
         {
             try
