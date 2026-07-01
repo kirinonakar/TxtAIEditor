@@ -200,17 +200,14 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (_mcpController.TryGetToolAlias(normalizedToolName, out var mcpAlias))
+            if (_mcpController.TryGetToolAlias(normalizedToolName, out _))
             {
                 if (verbose || toolResult.StartsWith("MCP tool failed:", StringComparison.OrdinalIgnoreCase))
                 {
                     return toolResult;
                 }
 
-                return string.Format(
-                    _getString("AgentVerboseMcpToolOnly", "MCP 도구를 실행했습니다: {0} ({1})"),
-                    mcpAlias.ToolName,
-                    mcpAlias.ServerName);
+                return _getString("AgentVerboseMcpToolOnly", "MCP 도구를 실행했습니다");
             }
 
             if (verbose || toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
@@ -231,39 +228,32 @@ namespace TxtAIEditor.Controls
                 {
                     return _getString("AgentVerboseReadFileOnly", "파일을 읽었습니다");
                 }
-                return string.Format(
-                    _getString("AgentVerboseRunPowerShellOnly", "PowerShell 명령을 실행했습니다: {0}"),
-                    TruncateForActivity(command));
+                return _getString("AgentVerboseRunPowerShellOnly", "PowerShell 명령을 실행했습니다");
             }
 
             if (normalizedToolName == "extract_document")
             {
-                string path = GetStringArgument(arguments, "path");
-                return string.Format(_getString("AgentVerboseExtractDocumentOnly", "문서 텍스트 추출을 완료했습니다: {0}"), path);
+                return _getString("AgentVerboseExtractDocumentOnly", "문서 텍스트 추출을 완료했습니다");
             }
 
             if (normalizedToolName == "append_to_file")
             {
-                string path = _fileToolController.GetEditPathArgument(arguments);
-                return string.Format(_getString("AgentVerboseAppendFileOnly", "파일에 내용을 덧붙였습니다: {0}"), path);
+                return _getString("AgentVerboseAppendFileOnly", "파일에 내용을 덧붙였습니다");
             }
 
             if (normalizedToolName == "search_replace")
             {
-                string path = _fileToolController.GetEditPathArgument(arguments);
-                return string.Format(_getString("AgentVerboseSearchReplaceOnly", "검색/치환을 완료했습니다: {0}"), path);
+                return _getString("AgentVerboseSearchReplaceOnly", "검색/치환을 완료했습니다");
             }
 
             if (normalizedToolName == "merge_files")
             {
-                string target = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
-                return string.Format(_getString("AgentVerboseMergeFilesOnly", "파일들을 합쳤습니다: {0}"), target);
+                return _getString("AgentVerboseMergeFilesOnly", "파일들을 합쳤습니다");
             }
 
             if (normalizedToolName == "split_file")
             {
-                string source = _fileToolController.GetEditPathArgument(arguments);
-                return string.Format(_getString("AgentVerboseSplitFileOnly", "파일을 분리했습니다: {0}"), source);
+                return _getString("AgentVerboseSplitFileOnly", "파일을 분리했습니다");
             }
 
             if (normalizedToolName == "list_files")
@@ -278,14 +268,12 @@ namespace TxtAIEditor.Controls
 
             if (normalizedToolName == "run_rg")
             {
-                string args = GetStringArgument(arguments, "arguments");
-                return string.Format(_getString("AgentVerboseRunRgOnly", "Ripgrep 검색을 완료했습니다: {0}"), args);
+                return _getString("AgentVerboseRunRgOnly", "Ripgrep 검색을 완료했습니다");
             }
 
             if (normalizedToolName == "run_rga")
             {
-                string args = GetStringArgument(arguments, "arguments");
-                return string.Format(_getString("AgentVerboseRunRgaOnly", "Ripgrep All 검색을 완료했습니다: {0}"), args);
+                return _getString("AgentVerboseRunRgaOnly", "Ripgrep All 검색을 완료했습니다");
             }
 
             if (normalizedToolName == "web_search_exa")
@@ -300,14 +288,13 @@ namespace TxtAIEditor.Controls
 
             if (normalizedToolName == "open_file")
             {
-                string path = GetStringArgument(arguments, "path");
                 string resourceKey = toolResult.StartsWith("open_file activated_existing:", StringComparison.OrdinalIgnoreCase)
                     ? "AgentVerboseOpenFileExistingOnly"
                     : "AgentVerboseOpenFileOnly";
                 string fallback = toolResult.StartsWith("open_file activated_existing:", StringComparison.OrdinalIgnoreCase)
-                    ? "이미 열려 있던 파일을 활성화했습니다: {0}"
-                    : "파일을 열었습니다: {0}";
-                return string.Format(_getString(resourceKey, fallback), path);
+                    ? "이미 열려 있던 파일을 활성화했습니다"
+                    : "파일을 열었습니다";
+                return _getString(resourceKey, fallback);
             }
 
             if (normalizedToolName == "make_plan")
@@ -319,18 +306,12 @@ namespace TxtAIEditor.Controls
 
             if (normalizedToolName == "save_tab")
             {
-                string path = GetFirstStringArgument(arguments, "path", "filePath", "file_path");
-                if (string.IsNullOrEmpty(path))
-                {
-                    path = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
-                }
-                return string.Format(_getString("AgentVerboseSaveTabOnly", "탭을 저장했습니다: {0}"), path);
+                return _getString("AgentVerboseSaveTabOnly", "탭을 저장했습니다");
             }
 
             if (normalizedToolName == "edit_tab")
             {
-                string path = GetFirstStringArgument(arguments, "title", "id", "tabId", "tab_id");
-                return string.Format(_getString("AgentVerboseEditTabOnly", "탭 내용을 수정했습니다: {0}"), path);
+                return _getString("AgentVerboseEditTabOnly", "탭 내용을 수정했습니다");
             }
 
             return toolResult;

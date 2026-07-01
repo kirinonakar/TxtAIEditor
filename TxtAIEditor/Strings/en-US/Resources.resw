@@ -1851,7 +1851,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Skipped duplicate tool call: {0}</value>
   </data>
   <data name="AgentActivityToolDoneFormat" xml:space="preserve">
-    <value>Tool completed: {0}</value>
+    <value>Tool completed</value>
   </data>
   <data name="AgentActivityToolCancelled" xml:space="preserve">
     <value>Tool execution cancelled</value>
@@ -2123,10 +2123,10 @@ Plan: {0}</value>
     <value>{0:N0} attachment</value>
   </data>
   <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
-    <value>대기 중...|Waiting...|待機中...</value>
+    <value>Waiting...</value>
   </data>
   <data name="AgentActivityIdleKnownValues" xml:space="preserve">
-    <value>대기 중|Idle|待機中</value>
+    <value>Idle</value>
   </data>
   <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
     <value>Confirm File Changes</value>
@@ -2194,13 +2194,16 @@ Plan: {0}</value>
     <value>[HTML Code Block Hidden (Verbose Disabled)]</value>
   </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
-    <value>Appended content to file: {0}</value>
+    <value>Appended content to file</value>
+  </data>
+  <data name="AgentVerboseSearchReplaceOnly" xml:space="preserve">
+    <value>Completed search/replace</value>
   </data>
   <data name="AgentVerboseMergeFilesOnly" xml:space="preserve">
-    <value>Merged files into: {0}</value>
+    <value>Merged files</value>
   </data>
   <data name="AgentVerboseSplitFileOnly" xml:space="preserve">
-    <value>Split file: {0}</value>
+    <value>Split file</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
     <value>Read directory</value>
@@ -2209,16 +2212,16 @@ Plan: {0}</value>
     <value>Completed text search</value>
   </data>
   <data name="AgentVerboseRunRgOnly" xml:space="preserve">
-    <value>Completed Ripgrep search: {0}</value>
+    <value>Completed Ripgrep search</value>
   </data>
   <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
-    <value>Completed Ripgrep All search: {0}</value>
+    <value>Completed Ripgrep All search</value>
   </data>
   <data name="AgentVerboseRunPowerShellOnly" xml:space="preserve">
-    <value>Completed PowerShell command: {0}</value>
+    <value>Completed PowerShell command</value>
   </data>
   <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
-    <value>Completed pdftotext conversion: {0}</value>
+    <value>Completed pdftotext conversion</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
     <value>Completed web search</value>
@@ -2227,16 +2230,16 @@ Plan: {0}</value>
     <value>Read web page content</value>
   </data>
   <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
-    <value>Saved tab: {0}</value>
+    <value>Saved tab</value>
   </data>
   <data name="AgentVerboseEditTabOnly" xml:space="preserve">
-    <value>Edited tab: {0}</value>
+    <value>Edited tab</value>
   </data>
   <data name="AgentVerboseOpenFileOnly" xml:space="preserve">
-    <value>Opened file: {0}</value>
+    <value>Opened file</value>
   </data>
   <data name="AgentVerboseOpenFileExistingOnly" xml:space="preserve">
-    <value>Activated already-open file: {0}</value>
+    <value>Activated already-open file</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
     <value>Modified Files (Click to compare)</value>
@@ -2608,7 +2611,7 @@ Plan: {0}</value>
      <value>Extracting document text: {0}</value>
    </data>
    <data name="AgentVerboseExtractDocumentOnly" xml:space="preserve">
-     <value>Document text extraction completed: {0}</value>
+     <value>Document text extraction completed</value>
    </data>
    <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
      <value>extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS, or PPT file path.</value>
@@ -2875,7 +2878,7 @@ Plan: {0}</value>
     <value>Running MCP tool: {0} ({1})</value>
   </data>
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
-    <value>Ran MCP tool: {0} ({1})</value>
+    <value>Ran MCP tool</value>
   </data>
   <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
     <value>Scroll selected chips left</value>
@@ -3055,6 +3058,6 @@ Plan: {0}</value>
     <value>Compare: {0} ↔ {1}</value>
   </data>
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
-    <value>[Tool completed: {0}]</value>
+    <value>[Tool completed]</value>
   </data>
 </root>

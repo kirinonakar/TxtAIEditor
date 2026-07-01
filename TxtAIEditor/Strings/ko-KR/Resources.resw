@@ -1851,7 +1851,7 @@
     <value>중복 도구 호출 건너뜀: {0}</value>
   </data>
   <data name="AgentActivityToolDoneFormat" xml:space="preserve">
-    <value>도구 완료: {0}</value>
+    <value>도구 완료</value>
   </data>
   <data name="AgentActivityToolCancelled" xml:space="preserve">
     <value>도구 실행 중단됨</value>
@@ -2123,10 +2123,10 @@
     <value>첨부 {0:N0}개</value>
   </data>
   <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
-    <value>대기 중...|Waiting...|待機中...</value>
+    <value>대기 중...</value>
   </data>
   <data name="AgentActivityIdleKnownValues" xml:space="preserve">
-    <value>대기 중|Idle|待機中</value>
+    <value>대기 중</value>
   </data>
   <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
     <value>파일 변경 확인</value>
@@ -2194,13 +2194,16 @@
     <value>[HTML 코드 블록 숨겨짐 (상세 출력 비활성화)]</value>
   </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
-    <value>파일에 내용을 덧붙였습니다: {0}</value>
+    <value>파일에 내용을 덧붙였습니다</value>
+  </data>
+  <data name="AgentVerboseSearchReplaceOnly" xml:space="preserve">
+    <value>검색/치환을 완료했습니다</value>
   </data>
   <data name="AgentVerboseMergeFilesOnly" xml:space="preserve">
-    <value>파일들을 합쳤습니다: {0}</value>
+    <value>파일들을 합쳤습니다</value>
   </data>
   <data name="AgentVerboseSplitFileOnly" xml:space="preserve">
-    <value>파일을 분리했습니다: {0}</value>
+    <value>파일을 분리했습니다</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
     <value>폴더를 읽었습니다</value>
@@ -2209,16 +2212,16 @@
     <value>텍스트 검색을 완료했습니다</value>
   </data>
   <data name="AgentVerboseRunRgOnly" xml:space="preserve">
-    <value>Ripgrep 검색을 완료했습니다: {0}</value>
+    <value>Ripgrep 검색을 완료했습니다</value>
   </data>
   <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
-    <value>Ripgrep All 검색을 완료했습니다: {0}</value>
+    <value>Ripgrep All 검색을 완료했습니다</value>
   </data>
   <data name="AgentVerboseRunPowerShellOnly" xml:space="preserve">
-    <value>PowerShell 명령을 실행했습니다: {0}</value>
+    <value>PowerShell 명령을 실행했습니다</value>
   </data>
   <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
-    <value>PdfToText 변환을 완료했습니다: {0}</value>
+    <value>PdfToText 변환을 완료했습니다</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
     <value>웹 검색을 완료했습니다</value>
@@ -2227,19 +2230,16 @@
     <value>웹페이지를 읽었습니다</value>
   </data>
   <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
-    <value>탭을 저장했습니다: {0}</value>
+    <value>탭을 저장했습니다</value>
   </data>
   <data name="AgentVerboseEditTabOnly" xml:space="preserve">
-    <value>탭 내용을 수정했습니다: {0}</value>
-  </data>
-  <data name="Ok" xml:space="preserve">
-    <value>확인</value>
+    <value>탭 내용을 수정했습니다</value>
   </data>
   <data name="AgentVerboseOpenFileOnly" xml:space="preserve">
-    <value>파일을 열었습니다: {0}</value>
+    <value>파일을 열었습니다</value>
   </data>
   <data name="AgentVerboseOpenFileExistingOnly" xml:space="preserve">
-    <value>이미 열려 있던 파일을 활성화했습니다: {0}</value>
+    <value>이미 열려 있던 파일을 활성화했습니다</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
     <value>변경됨 (클릭 시 비교)</value>
@@ -2520,6 +2520,9 @@
    <data name="SettingsBackupImportedMessage" xml:space="preserve">
      <value>전체 설정을 불러왔습니다. 현재 설정은 다시 로드했으며, 일부 항목은 재시작 후 반영될 수 있습니다.</value>
    </data>
+   <data name="Ok" xml:space="preserve">
+     <value>확인</value>
+   </data>
    <data name="LlmErrorInvalidApiKey" xml:space="preserve">
      <value>API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오.</value>
    </data>
@@ -2608,7 +2611,7 @@
      <value>문서 텍스트 추출 중: {0}</value>
    </data>
    <data name="AgentVerboseExtractDocumentOnly" xml:space="preserve">
-     <value>문서 텍스트 추출을 완료했습니다: {0}</value>
+     <value>문서 텍스트 추출을 완료했습니다</value>
    </data>
    <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
      <value>extract_document 실패: 경로가 비어 있습니다. PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS 또는 PPT 파일 경로를 입력해 주세요.</value>
@@ -2875,7 +2878,7 @@
     <value>MCP 도구 실행 중: {0} ({1})</value>
   </data>
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
-    <value>MCP 도구를 실행했습니다: {0} ({1})</value>
+    <value>MCP 도구를 실행했습니다</value>
   </data>
   <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
     <value>선택 칩 왼쪽으로 스크롤</value>
@@ -3055,6 +3058,6 @@
     <value>비교: {0} ↔ {1}</value>
   </data>
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
-    <value>[도구 실행 완료: {0}]</value>
+    <value>[도구 실행 완료]</value>
   </data>
 </root>

@@ -761,7 +761,6 @@
   <data name="SettingsToolbarReset" xml:space="preserve">
     <value>ツールバーの初期化</value>
   </data>
-
   <data name="StatusRightPanelTooltip" xml:space="preserve">
     <value>右パネル</value>
   </data>
@@ -1852,7 +1851,7 @@
     <value>重複したツール呼び出しをスキップ: {0}</value>
   </data>
   <data name="AgentActivityToolDoneFormat" xml:space="preserve">
-    <value>ツール完了: {0}</value>
+    <value>ツール完了</value>
   </data>
   <data name="AgentActivityToolCancelled" xml:space="preserve">
     <value>ツールの実行がキャンセルされました</value>
@@ -2124,10 +2123,10 @@
     <value>添付 {0:N0}件</value>
   </data>
   <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
-    <value>대기 중...|Waiting...|待機中...</value>
+    <value>待機中...</value>
   </data>
   <data name="AgentActivityIdleKnownValues" xml:space="preserve">
-    <value>대기 중|Idle|待機中</value>
+    <value>待機中</value>
   </data>
   <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
     <value>ファイル変更の確認</value>
@@ -2185,23 +2184,26 @@
   <data name="SettingsLlmAgentAutoApprovePlanning" xml:space="preserve">
     <value>計画実行を自動承認する (Planningモード)</value>
   </data>
+  <data name="AgentVerboseReadFileOnly" xml:space="preserve">
+    <value>ファイルを読み込みました</value>
+  </data>
   <data name="AgentVerboseReadSkillOnly" xml:space="preserve">
-    <value>{0}  スキルを参考にします。</value>
+    <value>スキルを参照中: {0}</value>
   </data>
   <data name="AgentHtmlCodeBlockHidden" xml:space="preserve">
     <value>[HTML コードブロック非表示 (詳細出力が無効)]</value>
   </data>
-  <data name="AgentVerboseReadFileOnly" xml:space="preserve">
-    <value>ファイルを読み込みました</value>
-  </data>
   <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
-    <value>ファイルに内容を追加しました: {0}</value>
+    <value>ファイルに内容を追加しました</value>
+  </data>
+  <data name="AgentVerboseSearchReplaceOnly" xml:space="preserve">
+    <value>検索/置換を完了しました</value>
   </data>
   <data name="AgentVerboseMergeFilesOnly" xml:space="preserve">
-    <value>ファイルを結合しました: {0}</value>
+    <value>ファイルを結合しました</value>
   </data>
   <data name="AgentVerboseSplitFileOnly" xml:space="preserve">
-    <value>ファイルを分割しました: {0}</value>
+    <value>ファイルを分割しました</value>
   </data>
   <data name="AgentVerboseListFilesOnly" xml:space="preserve">
     <value>フォルダを読み込みました</value>
@@ -2210,16 +2212,16 @@
     <value>テキスト検索を完了しました</value>
   </data>
   <data name="AgentVerboseRunRgOnly" xml:space="preserve">
-    <value>Ripgrep 検索を完了しました: {0}</value>
+    <value>Ripgrep 検索を完了しました</value>
   </data>
   <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
-    <value>Ripgrep All 検索を完了しました: {0}</value>
+    <value>Ripgrep All 検索を完了しました</value>
   </data>
   <data name="AgentVerboseRunPowerShellOnly" xml:space="preserve">
-    <value>PowerShell コマンドを実行しました: {0}</value>
+    <value>PowerShell コマンドを実行しました</value>
   </data>
   <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
-    <value>PdfToText 変換を完了しました: {0}</value>
+    <value>PdfToText 変換を完了しました</value>
   </data>
   <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
     <value>ウェブ検索を完了しました</value>
@@ -2228,16 +2230,16 @@
     <value>ウェブページを読み込みました</value>
   </data>
   <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
-    <value>タブを保存しました: {0}</value>
+    <value>タブを保存しました</value>
   </data>
   <data name="AgentVerboseEditTabOnly" xml:space="preserve">
-    <value>タブの内容を編集しました: {0}</value>
+    <value>タブの内容を編集しました</value>
   </data>
   <data name="AgentVerboseOpenFileOnly" xml:space="preserve">
-    <value>ファイルを開きました: {0}</value>
+    <value>ファイルを開きました</value>
   </data>
   <data name="AgentVerboseOpenFileExistingOnly" xml:space="preserve">
-    <value>すでに開いているファイルをアクティブにしました: {0}</value>
+    <value>すでに開いているファイルをアクティブにしました</value>
   </data>
   <data name="AgentModifiedFilesHeader" xml:space="preserve">
     <value>変更済み (クリックで比較)</value>
@@ -2609,7 +2611,7 @@
      <value>文書テキストを抽出中: {0}</value>
    </data>
    <data name="AgentVerboseExtractDocumentOnly" xml:space="preserve">
-     <value>文書テキストの抽出が完了しました: {0}</value>
+     <value>文書テキストの抽出が完了しました</value>
    </data>
    <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
      <value>extract_document 失敗: パスが空です。PDF、DOCX、PPTX、XLSX、HWPX、DOC、XLS、または PPT ファイルのパスを指定してください。</value>
@@ -2876,7 +2878,7 @@
     <value>MCP ツール実行中: {0} ({1})</value>
   </data>
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
-    <value>MCP ツールを実行しました: {0} ({1})</value>
+    <value>MCP ツールを実行しました</value>
   </data>
   <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
     <value>選択チップを左へスクロール</value>
@@ -3056,6 +3058,6 @@
     <value>比較: {0} ↔ {1}</value>
   </data>
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
-    <value>[ツール完了: {0}]</value>
+    <value>[ツール完了]</value>
   </data>
 </root>

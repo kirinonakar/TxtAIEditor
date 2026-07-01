@@ -62,14 +62,80 @@
   <data name="SaveAsFile" xml:space="preserve">
     <value>另存为</value>
   </data>
+  <data name="Compare" xml:space="preserve">
+    <value>比较</value>
+  </data>
   <data name="Terminal" xml:space="preserve">
     <value>终端</value>
+  </data>
+  <data name="TopMost" xml:space="preserve">
+    <value>置顶</value>
+  </data>
+  <data name="StickyNote" xml:space="preserve">
+    <value>粘性</value>
+  </data>
+  <data name="WordWrap" xml:space="preserve">
+    <value>自动换行</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>搜索</value>
+  </data>
+  <data name="Markdown" xml:space="preserve">
+    <value>Markdown</value>
+  </data>
+  <data name="CsvTable" xml:space="preserve">
+    <value>CSV Table</value>
+  </data>
+  <data name="CsvNameBoxPlaceholder" xml:space="preserve">
+    <value>细胞</value>
+  </data>
+  <data name="CsvFormulaPlaceholder" xml:space="preserve">
+    <value>选定的 CSV 单元格值</value>
+  </data>
+  <data name="Theme" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="Split" xml:space="preserve">
+    <value>斯普利特</value>
   </data>
   <data name="Settings" xml:space="preserve">
     <value>设置</value>
   </data>
-  <data name="Ok" xml:space="preserve">
-    <value>确定</value>
+  <data name="FolderSelect" xml:space="preserve">
+    <value>选择文件夹...</value>
+  </data>
+  <data name="NoFolderSelected" xml:space="preserve">
+    <value>请选择一个文件夹。</value>
+  </data>
+  <data name="ExplorerItemCountSingular" xml:space="preserve">
+    <value>{0:N0} 项目</value>
+  </data>
+  <data name="ExplorerItemCountPlural" xml:space="preserve">
+    <value>{0:N0} 项目</value>
+  </data>
+  <data name="FavoritesHeader" xml:space="preserve">
+    <value>收藏夹列表</value>
+  </data>
+  <data name="SnippetsHeader" xml:space="preserve">
+    <value>代码和公式模板</value>
+  </data>
+  <data name="AddSnippet" xml:space="preserve">
+    <value>添加片段...</value>
+  </data>
+  <data name="SplitNone" xml:space="preserve">
+    <value>无分割（单）</value>
+  </data>
+  <data name="SplitVertical" xml:space="preserve">
+    <value>垂直分割</value>
+  </data>
+  <data name="SplitHorizontal" xml:space="preserve">
+    <value>水平分割</value>
+  </data>
+  <data name="LanguageChangedTitle" xml:space="preserve">
+    <value>语言更改</value>
+  </data>
+  <data name="LanguageChangedMessage" xml:space="preserve">
+    <value>必须重启应用才能应用语言设置。是否立即重启？</value>
   </data>
   <data name="Yes" xml:space="preserve">
     <value>是</value>
@@ -79,12 +145,6 @@
   </data>
   <data name="Restart" xml:space="preserve">
     <value>重启</value>
-  </data>
-  <data name="LanguageChangedTitle" xml:space="preserve">
-    <value>语言更改</value>
-  </data>
-  <data name="LanguageChangedMessage" xml:space="preserve">
-    <value>必须重启应用才能应用语言设置。是否立即重启？</value>
   </data>
   <data name="LanguageDefault" xml:space="preserve">
     <value>默认（系统语言）</value>
@@ -104,6 +164,9 @@
   <data name="LanguageChineseTraditional" xml:space="preserve">
     <value>繁体中文</value>
   </data>
+  <data name="Print" xml:space="preserve">
+    <value>打印</value>
+  </data>
   <data name="Explorer" xml:space="preserve">
     <value>资源管理器</value>
   </data>
@@ -117,7 +180,70 @@
     <value>片段</value>
   </data>
   <data name="RecentFiles" xml:space="preserve">
-    <value>最近文件</value>
+    <value>最近使用的文件</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>标题</value>
+  </data>
+  <data name="Bold" xml:space="preserve">
+    <value>大胆</value>
+  </data>
+  <data name="Italic" xml:space="preserve">
+    <value>斜体</value>
+  </data>
+  <data name="Underline" xml:space="preserve">
+    <value>下划线</value>
+  </data>
+  <data name="Highlight" xml:space="preserve">
+    <value>High光</value>
+  </data>
+  <data name="UnorderedList" xml:space="preserve">
+    <value>无序列表</value>
+  </data>
+  <data name="CutLine" xml:space="preserve">
+    <value>切割线</value>
+  </data>
+  <data name="Quote" xml:space="preserve">
+    <value>报价</value>
+  </data>
+  <data name="Arrow" xml:space="preserve">
+    <value>箭头</value>
+  </data>
+  <data name="InlineCode" xml:space="preserve">
+    <value>内联代码</value>
+  </data>
+  <data name="Tasklist" xml:space="preserve">
+    <value>任务清单</value>
+  </data>
+  <data name="Table" xml:space="preserve">
+    <value>Table</value>
+  </data>
+  <data name="ConvertToTable" xml:space="preserve">
+    <value>转换为 Table</value>
+  </data>
+  <data name="FontIncrease" xml:space="preserve">
+    <value>字体增大</value>
+  </data>
+  <data name="FontDecrease" xml:space="preserve">
+    <value>字体缩小</value>
+  </data>
+  <data name="TextColor" xml:space="preserve">
+    <value>文本颜色（右键单击：选择颜色）</value>
+  </data>
+  <data name="Link" xml:space="preserve">
+    <value>链接</value>
+  </data>
+  <data name="Image" xml:space="preserve">
+    <value>图片</value>
+  </data>
+  <data name="CharMap" xml:space="preserve">
+    <value>字符映射表</value>
+  </data>
+  <data name="Emoji" xml:space="preserve">
+    <value>表情符号</value>
+  </data>
+  <data name="CurrentDate" xml:space="preserve">
+    <value>当前日期</value>
   </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>TxtAIEditor 设置</value>
@@ -137,17 +263,23 @@
   <data name="SettingsTerminal" xml:space="preserve">
     <value>终端</value>
   </data>
-  <data name="SettingsToolbarCustomization" xml:space="preserve">
-    <value>工具栏</value>
+  <data name="SettingsTerminalProfile" xml:space="preserve">
+    <value>终端外壳</value>
+  </data>
+  <data name="SettingsTerminalFontFamily" xml:space="preserve">
+    <value>终端字体系列</value>
+  </data>
+  <data name="SettingsTerminalFontSize" xml:space="preserve">
+    <value>终端字体大小</value>
+  </data>
+  <data name="SettingsTerminalProfileInfo" xml:space="preserve">
+    <value>PowerShell 安装时自动使用 PowerShell 7 (pwsh)。您还可以选择 CMD、Git Bash 或 WSL。新设置适用于新开放的终端。</value>
+  </data>
+  <data name="SettingsTerminalNotFound" xml:space="preserve">
+    <value>未安装</value>
   </data>
   <data name="SettingsLLM" xml:space="preserve">
     <value>LLM</value>
-  </data>
-  <data name="SettingsShortcuts" xml:space="preserve">
-    <value>快捷键</value>
-  </data>
-  <data name="SettingsAbout" xml:space="preserve">
-    <value>关于</value>
   </data>
   <data name="SettingsLanguage" xml:space="preserve">
     <value>应用语言</value>
@@ -170,18 +302,6 @@
   <data name="SettingsUseCustomFg" xml:space="preserve">
     <value>使用自定义编辑器前景色</value>
   </data>
-  <data name="SettingsPreviewFontFamily" xml:space="preserve">
-    <value>预览字体</value>
-  </data>
-  <data name="SettingsPreviewFontSize" xml:space="preserve">
-    <value>预览字号</value>
-  </data>
-  <data name="SettingsPreviewUseCustomBg" xml:space="preserve">
-    <value>使用自定义预览背景色</value>
-  </data>
-  <data name="SettingsPreviewUseCustomFg" xml:space="preserve">
-    <value>使用自定义预览前景色</value>
-  </data>
   <data name="SettingsWordWrap" xml:space="preserve">
     <value>默认启用自动换行</value>
   </data>
@@ -194,8 +314,14 @@
   <data name="SettingsAutocompleteTab" xml:space="preserve">
     <value>按 Tab 自动完成</value>
   </data>
+  <data name="SettingsAutocomplete" xml:space="preserve">
+    <value>启用自动完成</value>
+  </data>
   <data name="SettingsAutoSave" xml:space="preserve">
     <value>使用自动保存</value>
+  </data>
+  <data name="SettingsAutoSaveAllowNonGitFolders" xml:space="preserve">
+    <value>允许在 Git 文件夹外部自动保存</value>
   </data>
   <data name="SettingsLivePreview" xml:space="preserve">
     <value>默认启用预览</value>
@@ -205,6 +331,12 @@
   </data>
   <data name="SettingsToolbar" xml:space="preserve">
     <value>工具栏</value>
+  </data>
+  <data name="SettingsToolbarShowLabels" xml:space="preserve">
+    <value>显示工具栏按钮标签</value>
+  </data>
+  <data name="SettingsToolbarOrderHint" xml:space="preserve">
+    <value>拖动以重新排序按钮（设置按钮已修复）</value>
   </data>
   <data name="SettingsTabSize" xml:space="preserve">
     <value>Tab 大小</value>
@@ -218,6 +350,99 @@
   <data name="SettingsLlmModel" xml:space="preserve">
     <value>LLM 模型</value>
   </data>
+  <data name="SettingsLlmApiKey" xml:space="preserve">
+    <value>LLM API Key</value>
+  </data>
+  <data name="SettingsLlmLoadModels" xml:space="preserve">
+    <value>加载LM Studio型号</value>
+  </data>
+  <data name="SettingsLlmInfo" xml:space="preserve">
+    <value>当服务器运行时，LM Studio 从 http://localhost:1234/v1/models 加载模型列表。</value>
+  </data>
+  <data name="SettingsLlmSelectModel" xml:space="preserve">
+    <value>选择型号</value>
+  </data>
+  <data name="SettingsLlmApiKeyPlaceholder" xml:space="preserve">
+    <value>Enter API Key（留空以删除已保存的密钥）</value>
+  </data>
+  <data name="SettingsLlmEndpointPlaceholder" xml:space="preserve">
+    <value>例如，http://localhost:1234/v1</value>
+  </data>
+  <data name="SettingsLlmLoadModelsNotSupported" xml:space="preserve">
+    <value>该提供程序不支持加载模型。</value>
+  </data>
+  <data name="SettingsLlmLoadingModelsFormat" xml:space="preserve">
+    <value>正在加载 {0} 的型号列表...</value>
+  </data>
+  <data name="SettingsLlmModelsLoadedFormat" xml:space="preserve">
+    <value>已加载 {0} 型号。</value>
+  </data>
+  <data name="SettingsLlmNoModelsFoundFormat" xml:space="preserve">
+    <value>{0} 中未找到可用型号。</value>
+  </data>
+  <data name="SettingsLlmLoadModelsFailedFormat" xml:space="preserve">
+    <value>无法加载 {0} 的型号列表：{1}</value>
+  </data>
+  <data name="SettingsLlmLoadOpenRouterModels" xml:space="preserve">
+    <value>加载OpenRouter型号</value>
+  </data>
+  <data name="SettingsLlmOpenRouterInfo" xml:space="preserve">
+    <value>OpenRouter 从 https://openrouter.ai/api/v1/models. 加载模型列表</value>
+  </data>
+  <data name="SettingsLlmLoadCerebrasModels" xml:space="preserve">
+    <value>加载Cerebras型号</value>
+  </data>
+  <data name="SettingsLlmCerebrasInfo" xml:space="preserve">
+    <value>Cerebras 从 https://api.cerebras.ai/v1/models. 加载模型列表</value>
+  </data>
+  <data name="SettingsLlmThinkingLevel" xml:space="preserve">
+    <value>思维层面</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelDefault" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelDisabled" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelLow" xml:space="preserve">
+    <value>Low</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelMedium" xml:space="preserve">
+    <value>Medium</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelHigh" xml:space="preserve">
+    <value>High</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
+    <value>X-High</value>
+  </data>
+  <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
+    <value>加载 OpenCode Go 模型</value>
+  </data>
+  <data name="SettingsLlmOpenCodeGoInfo" xml:space="preserve">
+    <value>OpenCode Go 从 https://opencode.ai/zen/go/v1/models. 加载模型列表</value>
+  </data>
+  <data name="SettingsLlmLoadOpenCodeZenModels" xml:space="preserve">
+    <value>加载 OpenCode Zen 型号</value>
+  </data>
+  <data name="SettingsLlmOpenCodeZenInfo" xml:space="preserve">
+    <value>OpenCode Zen 加载 https://opencode.ai/zen/v1/models. 的型号列表</value>
+  </data>
+  <data name="SettingsLlmLoadOllamaModels" xml:space="preserve">
+    <value>加载Ollama型号</value>
+  </data>
+  <data name="SettingsLlmOllamaInfo" xml:space="preserve">
+    <value>当服务器运行时，Ollama 从 http://localhost:11434/v1/models 加载模型列表。</value>
+  </data>
+  <data name="SettingsLlmLoadOllamaCloudModels" xml:space="preserve">
+    <value>加载Ollama Cloud型号</value>
+  </data>
+  <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
+    <value>Ollama Cloud 从指定端点加载模型列表。</value>
+  </data>
+  <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
+    <value>API Key 存储在 Windows Credential Manager 中，而不是存储在设置文件中。</value>
+  </data>
   <data name="SettingsLlmCredential" xml:space="preserve">
     <value>API Key</value>
   </data>
@@ -227,23 +452,26 @@
   <data name="SettingsLlmCredentialInfo" xml:space="preserve">
     <value>API Key 不保存在设置文件中，而是存储在 Windows 凭据管理器。</value>
   </data>
+  <data name="SettingsLlmApiKeyName" xml:space="preserve">
+    <value>API Key</value>
+  </data>
+  <data name="SettingsLlmOAuthAccessTokenName" xml:space="preserve">
+    <value>OAuth 访问令牌</value>
+  </data>
+  <data name="SettingsLlmCredentialSavedFormat" xml:space="preserve">
+    <value>{0} {1} 已保存到 Windows Credential Manager。</value>
+  </data>
+  <data name="SettingsLlmCredentialDeletedFormat" xml:space="preserve">
+    <value>{0} {1} 已从 Windows Credential Manager 中删除。</value>
+  </data>
   <data name="SettingsLlmConfirmBeforeSending" xml:space="preserve">
     <value>发送前确认</value>
   </data>
-  <data name="SettingsLlmAgentVerbose" xml:space="preserve">
-    <value>启用 Agent 详细输出（Verbose）</value>
-  </data>
-  <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
-    <value>自动批准 Git 文件夹内的文件更改/创建</value>
-  </data>
-  <data name="SettingsLlmAgentAutoApprovePlanning" xml:space="preserve">
-    <value>自动批准计划执行</value>
+  <data name="SettingsLlmSourceLanguage" xml:space="preserve">
+    <value>源语言</value>
   </data>
   <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
     <value>最大工具调用次数（0 = 使用默认值）</value>
-  </data>
-  <data name="SettingsLlmSourceLanguage" xml:space="preserve">
-    <value>源语言</value>
   </data>
   <data name="SettingsLlmTargetLanguage" xml:space="preserve">
     <value>目标语言</value>
@@ -281,26 +509,344 @@
   <data name="LlmLangGerman" xml:space="preserve">
     <value>德语 (German)</value>
   </data>
+  <data name="SelectionNoneBlocked" xml:space="preserve">
+    <value>选择：无（对整个文件使用文件上下文）</value>
+  </data>
+  <data name="SelectionStats" xml:space="preserve">
+    <value>选择：{0} 个字符（大约 {1} 代币）</value>
+  </data>
+  <data name="SearchHeader" xml:space="preserve">
+    <value>在文件夹中搜索和替换</value>
+  </data>
+  <data name="SearchPlaceholder" xml:space="preserve">
+    <value>Enter 搜索词...</value>
+  </data>
+  <data name="ReplacePlaceholder" xml:space="preserve">
+    <value>Enter 替换...</value>
+  </data>
+  <data name="SearchMatchCaseTooltip" xml:space="preserve">
+    <value>火柴盒</value>
+  </data>
+  <data name="SearchWholeWordTooltip" xml:space="preserve">
+    <value>整个词</value>
+  </data>
+  <data name="SearchRegexTooltip" xml:space="preserve">
+    <value>Regex</value>
+  </data>
+  <data name="SearchAllFiles" xml:space="preserve">
+    <value>搜索全部</value>
+  </data>
+  <data name="ReplaceAllFiles" xml:space="preserve">
+    <value>全部替换</value>
+  </data>
+  <data name="RecentFilesHeader" xml:space="preserve">
+    <value>最近使用的文件（双击打开）</value>
+  </data>
+  <data name="GitRepoHeader" xml:space="preserve">
+    <value>Git 存储库</value>
+  </data>
+  <data name="GitRepoPathLabel" xml:space="preserve">
+    <value>路径</value>
+  </data>
+  <data name="GitRepoPathNone" xml:space="preserve">
+    <value>无根路径</value>
+  </data>
+  <data name="GitBranchPlaceholder" xml:space="preserve">
+    <value>分行列表</value>
+  </data>
+  <data name="GitCommitPlaceholder" xml:space="preserve">
+    <value>Enter 提交消息...</value>
+  </data>
+  <data name="GitCommit" xml:space="preserve">
+    <value>提交</value>
+  </data>
+  <data name="GitStageAll" xml:space="preserve">
+    <value>舞台全部</value>
+  </data>
+  <data name="GitRestoreAll" xml:space="preserve">
+    <value>全部恢复</value>
+  </data>
+  <data name="GitPush" xml:space="preserve">
+    <value>推</value>
+  </data>
+  <data name="GitPushMenuTooltip" xml:space="preserve">
+    <value>Git 行动</value>
+  </data>
+  <data name="GitPushSuccessTitle" xml:space="preserve">
+    <value>Git 推</value>
+  </data>
+  <data name="GitPushSuccessMessage" xml:space="preserve">
+    <value>推送完成。</value>
+  </data>
+  <data name="GitPushFailureTitle" xml:space="preserve">
+    <value>Git 推送失败</value>
+  </data>
+  <data name="GitPushFailureMessage" xml:space="preserve">
+    <value>推送失败。检查远程存储库、身份验证或上游设置。</value>
+  </data>
+  <data name="GitPull" xml:space="preserve">
+    <value>拉动</value>
+  </data>
+  <data name="GitRebase" xml:space="preserve">
+    <value>变基</value>
+  </data>
+  <data name="GitRemote" xml:space="preserve">
+    <value>远程</value>
+  </data>
+  <data name="GitScp" xml:space="preserve">
+    <value>S/C/P</value>
+  </data>
+  <data name="GitScpTooltip" xml:space="preserve">
+    <value>阶段/提交/推送</value>
+  </data>
+  <data name="GitPullSuccessTitle" xml:space="preserve">
+    <value>Git 拉</value>
+  </data>
+  <data name="GitPullSuccessMessage" xml:space="preserve">
+    <value>拉取完成。</value>
+  </data>
+  <data name="GitPullFailureTitle" xml:space="preserve">
+    <value>Git 拉取失败</value>
+  </data>
+  <data name="GitPullFailureMessage" xml:space="preserve">
+    <value>拉取失败。检查远程存储库、身份验证或冲突状态。</value>
+  </data>
+  <data name="GitRebaseSuccessTitle" xml:space="preserve">
+    <value>Git 重新基准</value>
+  </data>
+  <data name="GitRebaseSuccessMessage" xml:space="preserve">
+    <value>变基完成。</value>
+  </data>
+  <data name="GitRebaseFailureTitle" xml:space="preserve">
+    <value>Git 变基失败</value>
+  </data>
+  <data name="GitRebaseFailureMessage" xml:space="preserve">
+    <value>变基失败。检查远程存储库、身份验证或冲突状态。</value>
+  </data>
+  <data name="GitRemoteDialogTitle" xml:space="preserve">
+    <value>Git 远程</value>
+  </data>
+  <data name="GitRemoteDialogLabel" xml:space="preserve">
+    <value>原点远程 URL</value>
+  </data>
+  <data name="GitRemoteDialogConnect" xml:space="preserve">
+    <value>连接</value>
+  </data>
+  <data name="GitRemoteDialogCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="GitRemoteNoRepoMessage" xml:space="preserve">
+    <value>首先选择或创建 Git 存储库。</value>
+  </data>
+  <data name="GitRemoteInvalidUrlMessage" xml:space="preserve">
+    <value>Enter 有效的 GitHub 远程 URL。</value>
+  </data>
+  <data name="GitRemoteSuccessMessage" xml:space="preserve">
+    <value>原点遥控器已连接。</value>
+  </data>
+  <data name="GitRemoteFailureTitle" xml:space="preserve">
+    <value>Git 远程失败</value>
+  </data>
+  <data name="GitRemoteFailureMessage" xml:space="preserve">
+    <value>连接远程 URL 失败。</value>
+  </data>
+  <data name="GitRefresh" xml:space="preserve">
+    <value>刷新</value>
+  </data>
+  <data name="GitHistory" xml:space="preserve">
+    <value>历史</value>
+  </data>
+  <data name="GitRestoreFile" xml:space="preserve">
+    <value>恢复文件</value>
+  </data>
+  <data name="GitRestoreFileDialogTitle" xml:space="preserve">
+    <value>Git 恢复文件</value>
+  </data>
+  <data name="GitRestoreFileDialogContentFormat" xml:space="preserve">
+    <value>您确定要恢复 {0} 中的更改吗？未跟踪的文件将被删除。</value>
+  </data>
+  <data name="GitRestoreFileDialogConfirm" xml:space="preserve">
+    <value>恢复</value>
+  </data>
+  <data name="GitRestoreFileDialogCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="GitRestoreFailureTitle" xml:space="preserve">
+    <value>Git 恢复失败</value>
+  </data>
+  <data name="GitRestoreFileFailureMessage" xml:space="preserve">
+    <value>无法恢复文件。</value>
+  </data>
+  <data name="GitRestoreAllDialogTitle" xml:space="preserve">
+    <value>Git 全部恢复</value>
+  </data>
+  <data name="GitRestoreAllDialogContent" xml:space="preserve">
+    <value>您确定要恢复所有更改吗？未跟踪的文件将被删除。</value>
+  </data>
+  <data name="GitRestoreAllDialogConfirm" xml:space="preserve">
+    <value>全部恢复</value>
+  </data>
+  <data name="GitRestoreAllFailureMessage" xml:space="preserve">
+    <value>无法恢复所有更改。</value>
+  </data>
+  <data name="ExplorerUpTooltip" xml:space="preserve">
+    <value>父文件夹</value>
+  </data>
+  <data name="ExplorerSelectFolder" xml:space="preserve">
+    <value>选择文件夹...</value>
+  </data>
+  <data name="ExplorerOpenTerminalTooltip" xml:space="preserve">
+    <value>在这里打开终端</value>
+  </data>
+  <data name="ExplorerOpenInWindowsTooltip" xml:space="preserve">
+    <value>在 Windows 资源管理器中打开</value>
+  </data>
+  <data name="ExplorerAddToFavorites" xml:space="preserve">
+    <value>添加到收藏夹</value>
+  </data>
+  <data name="ExplorerAddFolderToFavorites" xml:space="preserve">
+    <value>将文件夹添加到收藏夹</value>
+  </data>
+  <data name="FavoritesFileTab" xml:space="preserve">
+    <value>文件</value>
+  </data>
+  <data name="FavoritesFolderTab" xml:space="preserve">
+    <value>文件夹</value>
+  </data>
+  <data name="FavoritesPinTooltip" xml:space="preserve">
+    <value>销</value>
+  </data>
+  <data name="GitCreateRepo" xml:space="preserve">
+    <value>初始化存储库</value>
+  </data>
+  <data name="GitCreateRepoTooltip" xml:space="preserve">
+    <value>初始化 Git 存储库</value>
+  </data>
+  <data name="GitNotDetected" xml:space="preserve">
+    <value>Git：未检测到</value>
+  </data>
+  <data name="TerminalTitle" xml:space="preserve">
+    <value>终端</value>
+  </data>
+  <data name="NewTerminal" xml:space="preserve">
+    <value>新航站楼</value>
+  </data>
+  <data name="CloseTerminal" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="TerminalPrompt" xml:space="preserve">
+    <value>输入命令并按 Enter</value>
+  </data>
+  <data name="SettingsToolbarCustomize" xml:space="preserve">
+    <value>按钮显示</value>
+  </data>
+  <data name="SettingsToolbarButtonVisibility" xml:space="preserve">
+    <value>显示/隐藏工具栏按钮</value>
+  </data>
+  <data name="SettingsToolbarDragHint" xml:space="preserve">
+    <value>在左/右列表中拖动以重新排序按钮，然后使用中间按钮在对齐方式之间移动所选按钮。设置按钮是固定的。</value>
+  </data>
+  <data name="SettingsToolbarLeftAligned" xml:space="preserve">
+    <value>左对齐</value>
+  </data>
+  <data name="SettingsToolbarRightAligned" xml:space="preserve">
+    <value>右对齐</value>
+  </data>
+  <data name="SettingsToolbarSettingsPinned" xml:space="preserve">
+    <value>设置按钮始终显示。</value>
+  </data>
+  <data name="SettingsToolbarCustomization" xml:space="preserve">
+    <value>工具栏</value>
+  </data>
+  <data name="SettingsToolbarReset" xml:space="preserve">
+    <value>重置工具栏</value>
+  </data>
+  <data name="StatusRightPanelTooltip" xml:space="preserve">
+    <value>右面板</value>
+  </data>
+  <data name="StatusColumnLabel" xml:space="preserve">
+    <value>上校</value>
+  </data>
+  <data name="StatusLeftPanelTooltip" xml:space="preserve">
+    <value>左面板</value>
+  </data>
+  <data name="StatusLineEndingTooltip" xml:space="preserve">
+    <value>单击以更改行结尾</value>
+  </data>
+  <data name="StatusGoToLineTooltip" xml:space="preserve">
+    <value>点击前往线路</value>
+  </data>
+  <data name="StatusFileSizeFormat" xml:space="preserve">
+    <value>大小：{0:N0} 字节</value>
+  </data>
+  <data name="StatusLineLabel" xml:space="preserve">
+    <value>熔点</value>
+  </data>
+  <data name="StatusEncodingTooltip" xml:space="preserve">
+    <value>选择文件编码</value>
+  </data>
+  <data name="StatusImageViewer" xml:space="preserve">
+    <value>图片</value>
+  </data>
+  <data name="EncodingChangeTitle" xml:space="preserve">
+    <value>编码变化</value>
+  </data>
+  <data name="EncodingChangeContentFormat" xml:space="preserve">
+    <value>将当前打开文件的编码更改为“{0}”？
+
+- 转换：保留当前文本并转换文件编码格式。
+- 重新打开：使用此编码重新加载保存的文件。{1}</value>
+  </data>
+  <data name="EncodingChangeConvert" xml:space="preserve">
+    <value>转换</value>
+  </data>
+  <data name="EncodingChangeReopen" xml:space="preserve">
+    <value>重新开放</value>
+  </data>
+  <data name="EncodingChangeCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="EncodingChangeDirtyWarning" xml:space="preserve">
+    <value>（注意：选择“重新打开”将丢失未保存的更改！）</value>
+  </data>
+  <data name="LineEndingChangeTitle" xml:space="preserve">
+    <value>行尾变化</value>
+  </data>
+  <data name="LineEndingChangeContentFormat" xml:space="preserve">
+    <value>将当前打开文件的行结尾转换为“{0}”？</value>
+  </data>
+  <data name="LineEndingChangeConvert" xml:space="preserve">
+    <value>转换</value>
+  </data>
+  <data name="LineEndingChangeCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
   <data name="LivePreviewTabHeader" xml:space="preserve">
     <value>预览</value>
   </data>
   <data name="AiAssistantTabHeader" xml:space="preserve">
     <value>AI 助手</value>
   </data>
-  <data name="AgentTabHeader" xml:space="preserve">
-    <value>Agent</value>
+  <data name="ComboItemMarkdown" xml:space="preserve">
+    <value>Markdown</value>
+  </data>
+  <data name="ComboItemHtml" xml:space="preserve">
+    <value>HTML 预览</value>
+  </data>
+  <data name="ComboItemLatex" xml:space="preserve">
+    <value>LaTeX 块</value>
+  </data>
+  <data name="ComboItemAozora" xml:space="preserve">
+    <value>Aozora</value>
+  </data>
+  <data name="ComboItemCsv" xml:space="preserve">
+    <value>CSV Table</value>
   </data>
   <data name="OpenInBrowserButtonText" xml:space="preserve">
     <value>浏览器</value>
   </data>
   <data name="OpenInBrowserTooltip" xml:space="preserve">
     <value>在浏览器中打开 HTML 预览</value>
-  </data>
-  <data name="OpenExternalViewerTooltip" xml:space="preserve">
-    <value>在外部查看器中打开</value>
-  </data>
-  <data name="OpenWithDefaultProgramTooltip" xml:space="preserve">
-    <value>用默认程序打开</value>
   </data>
   <data name="LlmOutputPlaceholder" xml:space="preserve">
     <value>等待中... 在编辑器中选择范围，然后使用下方 AI 工具。</value>
@@ -335,20 +881,890 @@
   <data name="LlmCustomRunButtonText" xml:space="preserve">
     <value>发送</value>
   </data>
+  <data name="LlmCustomCancelButtonText" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="LlmChunkProgressFormat" xml:space="preserve">
+    <value>{0} 正在进行中：{1}/{2} 块...</value>
+  </data>
+  <data name="LlmFileContextDisplayFormat" xml:space="preserve">
+    <value>{0} · 大约。 {1:N0} 代币</value>
+  </data>
+  <data name="LlmOperationCanceled" xml:space="preserve">
+    <value>操作已取消。</value>
+  </data>
   <data name="LlmInsertOutputButtonText" xml:space="preserve">
     <value>插入</value>
   </data>
-  <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
-    <value>新标签页</value>
+  <data name="LlmInsertOutputTooltip" xml:space="preserve">
+    <value>在当前光标处插入 AI 响应（仅限所选部分，如果选择）</value>
+  </data>
+  <data name="LlmErrorTitle" xml:space="preserve">
+    <value>人工智能错误</value>
+  </data>
+  <data name="LlmNoSelectionExplain" xml:space="preserve">
+    <value>未选择任何文本。请在编辑器中选择一个范围进行分析，然后重试。</value>
+  </data>
+  <data name="LlmNoSelectionSummarize" xml:space="preserve">
+    <value>未选择任何文本。请选择一个范围进行总结。</value>
+  </data>
+  <data name="LlmNoSelectionTranslate" xml:space="preserve">
+    <value>未选择任何文本。请选择要翻译的范围。</value>
+  </data>
+  <data name="LlmNoSelectionImprove" xml:space="preserve">
+    <value>未选择任何文本。请选择要改进的范围。</value>
+  </data>
+  <data name="LlmNoSelectionCustom" xml:space="preserve">
+    <value>没有选择或文件上下文。请选择文本或添加文件上下文。</value>
+  </data>
+  <data name="LlmEmptyCustomPrompt" xml:space="preserve">
+    <value>自定义指令输入为空。</value>
+  </data>
+  <data name="LlmFileContextTitle" xml:space="preserve">
+    <value>AI 文件上下文</value>
+  </data>
+  <data name="LlmNoActiveTabForFileContext" xml:space="preserve">
+    <value>没有活动选项卡可添加为文件上下文。</value>
+  </data>
+  <data name="LlmPdfFileContextExcluded" xml:space="preserve">
+    <value>PDF 选项卡不包含在文件上下文中。</value>
+  </data>
+  <data name="LlmInsertTitle" xml:space="preserve">
+    <value>插入人工智能响应</value>
+  </data>
+  <data name="LlmNoOutputToInsert" xml:space="preserve">
+    <value>没有可插入的 AI 响应。</value>
+  </data>
+  <data name="LlmActionExplain" xml:space="preserve">
+    <value>解释一下</value>
+  </data>
+  <data name="LlmActionSummarize" xml:space="preserve">
+    <value>总结</value>
+  </data>
+  <data name="LlmActionTranslate" xml:space="preserve">
+    <value>翻译</value>
+  </data>
+  <data name="LlmActionImprove" xml:space="preserve">
+    <value>改善</value>
+  </data>
+  <data name="LlmActionCustom" xml:space="preserve">
+    <value>定制发送</value>
+  </data>
+  <data name="LlmActionCustomPrompt" xml:space="preserve">
+    <value>自定义提示</value>
+  </data>
+  <data name="LlmActionProgressFormat" xml:space="preserve">
+    <value>[{0} 进行中...]</value>
+  </data>
+  <data name="LlmActionHeaderFormat" xml:space="preserve">
+    <value>[{0}]</value>
+  </data>
+  <data name="LlmSummarizeComplete" xml:space="preserve">
+    <value>{0} 完成。保存到 {1}。</value>
+  </data>
+  <data name="LlmTranslateComplete" xml:space="preserve">
+    <value>{0} 完成。保存到 {1}。</value>
+  </data>
+  <data name="LlmTranslateResuming" xml:space="preserve">
+    <value>{0} 继续翻译（来自块 {1}/{2}）...</value>
+  </data>
+  <data name="LlmTranslateCancelledWithSave" xml:space="preserve">
+    <value>操作已取消。截至目前已保存翻译内容：{0}</value>
+  </data>
+  <data name="LlmChunkErrorFormat" xml:space="preserve">
+    <value>块 {0} 处理错误：{1}</value>
+  </data>
+  <data name="LlmPreflightTitle" xml:space="preserve">
+    <value>人工智能飞行前检查</value>
+  </data>
+  <data name="LlmPreflightContentFormat" xml:space="preserve">
+    <value>行动：{0}
+
+人工智能提供商：{1} ({2})
+文本长度：{3:N0} 个字符（大约 {4:N0} 令牌）
+
+【内容预览】
+{5}
+
+请在发送前检查是否有任何敏感信息或意外的令牌使用。</value>
+  </data>
+  <data name="LlmPreflightApprove" xml:space="preserve">
+    <value>批准 API 发送</value>
+  </data>
+  <data name="LlmPreflightCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="LlmRunningMessage" xml:space="preserve">
+    <value>AI 分析和响应生成异步运行。请稍等...</value>
+  </data>
+  <data name="LlmExceptionFormat" xml:space="preserve">
+    <value>AI执行过程中出现异常：{0}</value>
+  </data>
+  <data name="LlmInstructionDefaultName" xml:space="preserve">
+    <value>说明</value>
   </data>
   <data name="LlmAddInstructionTooltip" xml:space="preserve">
     <value>添加新的自定义指令</value>
   </data>
+  <data name="MoveTabLeftTooltip" xml:space="preserve">
+    <value>移至左侧选项卡（Ctrl/Shift + 单击可移动选项卡位置）</value>
+  </data>
+  <data name="MoveTabRightTooltip" xml:space="preserve">
+    <value>移至右侧选项卡（Ctrl/Shift + 单击可移动选项卡位置）</value>
+  </data>
+  <data name="SettingsAbout" xml:space="preserve">
+    <value>关于</value>
+  </data>
+  <data name="SettingsAboutDescription" xml:space="preserve">
+    <value>一个强大且轻量级的文本和 Markdown 编辑器。
+支持实时预览、代码和公式模板、终端界面、Git 集成和 AI Assistant / Agent。</value>
+  </data>
+  <data name="SettingsAboutProjectGitHub" xml:space="preserve">
+    <value>项目 GitHub</value>
+  </data>
+  <data name="SettingsAboutThirdPartyNotices" xml:space="preserve">
+    <value>开源许可证（第三方声明）</value>
+  </data>
+  <data name="SettingsPreviewFontFamily" xml:space="preserve">
+    <value>预览字体</value>
+  </data>
+  <data name="SettingsPreviewUseCustomBg" xml:space="preserve">
+    <value>使用自定义预览背景色</value>
+  </data>
+  <data name="SettingsPreviewUseCustomFg" xml:space="preserve">
+    <value>使用自定义预览前景色</value>
+  </data>
+  <data name="SettingsPreviewFontSize" xml:space="preserve">
+    <value>预览字号</value>
+  </data>
+  <data name="SettingsShortcuts" xml:space="preserve">
+    <value>快捷键</value>
+  </data>
+  <data name="SettingsShortcutsHeaderKey" xml:space="preserve">
+    <value>快捷方式</value>
+  </data>
+  <data name="SettingsShortcutsHeaderDesc" xml:space="preserve">
+    <value>描述</value>
+  </data>
+  <data name="ShortcutDescNewTab" xml:space="preserve">
+    <value>新 Tab</value>
+  </data>
+  <data name="ShortcutDescSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="ShortcutDescOpen" xml:space="preserve">
+    <value>打开文件</value>
+  </data>
+  <data name="ShortcutDescFind" xml:space="preserve">
+    <value>查找</value>
+  </data>
+  <data name="ShortcutDescClose" xml:space="preserve">
+    <value>关闭 Tab</value>
+  </data>
+  <data name="ShortcutDescPrint" xml:space="preserve">
+    <value>打印</value>
+  </data>
+  <data name="ShortcutDescLeftPanel" xml:space="preserve">
+    <value>切换左侧面板</value>
+  </data>
+  <data name="ShortcutDescRightPanel" xml:space="preserve">
+    <value>切换右侧面板</value>
+  </data>
+  <data name="ShortcutDescTerminal" xml:space="preserve">
+    <value>切换终端</value>
+  </data>
+  <data name="ShortcutDescUndo" xml:space="preserve">
+    <value>撤消</value>
+  </data>
+  <data name="ShortcutDescRedo" xml:space="preserve">
+    <value>重做</value>
+  </data>
+  <data name="ShortcutDescCopy" xml:space="preserve">
+    <value>复制</value>
+  </data>
+  <data name="ShortcutDescPaste" xml:space="preserve">
+    <value>粘贴</value>
+  </data>
+  <data name="ShortcutDescCut" xml:space="preserve">
+    <value>切</value>
+  </data>
+  <data name="ShortcutDescAiPrompt" xml:space="preserve">
+    <value>发送 AI 提示</value>
+  </data>
+  <data name="ShortcutDescSaveAs" xml:space="preserve">
+    <value>另存为</value>
+  </data>
+  <data name="ShortcutDescTopMost" xml:space="preserve">
+    <value>永远在最前面</value>
+  </data>
+  <data name="ShortcutDescTheme" xml:space="preserve">
+    <value>切换主题</value>
+  </data>
+  <data name="ShortcutDescStickyNote" xml:space="preserve">
+    <value>便利贴</value>
+  </data>
+  <data name="ShortcutDescLivePreview" xml:space="preserve">
+    <value>切换实时预览</value>
+  </data>
+  <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
+    <value>展开右侧面板</value>
+  </data>
+  <data name="ShortcutDescMaximize" xml:space="preserve">
+    <value>切换最大化窗口</value>
+  </data>
+  <data name="EditorFindPlaceholder" xml:space="preserve">
+    <value>查找</value>
+  </data>
+  <data name="EditorReplacePlaceholder" xml:space="preserve">
+    <value>更换</value>
+  </data>
+  <data name="EditorReplaceButton" xml:space="preserve">
+    <value>更换</value>
+  </data>
+  <data name="EditorReplaceAllButton" xml:space="preserve">
+    <value>全部替换</value>
+  </data>
+  <data name="EditorFindClearTooltip" xml:space="preserve">
+    <value>清除</value>
+  </data>
+  <data name="EditorFindMatchCaseTooltip" xml:space="preserve">
+    <value>火柴盒 (Aa)</value>
+  </data>
+  <data name="EditorFindRegexTooltip" xml:space="preserve">
+    <value>使用正则表达式 (.*)</value>
+  </data>
+  <data name="EditorReplaceClearTooltip" xml:space="preserve">
+    <value>清除</value>
+  </data>
+  <data name="EditorFindPrevTooltip" xml:space="preserve">
+    <value>上一页</value>
+  </data>
+  <data name="EditorFindNextTooltip" xml:space="preserve">
+    <value>下一步</value>
+  </data>
+  <data name="EditorFindCloseTooltip" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="EditorLoadingText" xml:space="preserve">
+    <value>加载中...</value>
+  </data>
+  <data name="EditorLongLineProtectionFormat" xml:space="preserve">
+    <value>长线：{0} 字符，渲染保护</value>
+  </data>
+  <data name="StatusTotalLinesFormat" xml:space="preserve">
+    <value>总行数：{0}</value>
+  </data>
+  <data name="StatusSelectionStatsFormat" xml:space="preserve">
+    <value>选定：{0} 字符 / {1} 标记 / {2} 字 / {3} 行</value>
+  </data>
+  <data name="UnsavedChangesAppCloseTitle" xml:space="preserve">
+    <value>未保存的更改</value>
+  </data>
+  <data name="UnsavedChangesAppCloseMessage" xml:space="preserve">
+    <value>有 {0} 未保存的选项卡。退出前保存吗？</value>
+  </data>
+  <data name="UnsavedChangesAppCloseDiscard" xml:space="preserve">
+    <value>退出而不保存</value>
+  </data>
+  <data name="UnsavedChangesAppCloseSave" xml:space="preserve">
+    <value>保存并退出</value>
+  </data>
+  <data name="UnsavedChangesTabCloseTitle" xml:space="preserve">
+    <value>保存更改</value>
+  </data>
+  <data name="UnsavedChangesTabCloseMessage" xml:space="preserve">
+    <value>对“{0}”的更改未保存。您想关闭它吗？</value>
+  </data>
+  <data name="UnsavedChangesTabCloseDiscard" xml:space="preserve">
+    <value>关闭而不保存</value>
+  </data>
+  <data name="UnsavedChangesTabCloseSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="UnsavedChangesCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="GitHistoryItemDialogTitle" xml:space="preserve">
+    <value>提交信息 [{0}]</value>
+  </data>
+  <data name="GitHistoryItemClose" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="GitHistoryItemDialogHeader" xml:space="preserve">
+    <value>更改的文件（单击以打开差异）：</value>
+  </data>
+  <data name="GitCommitSuccessTitle" xml:space="preserve">
+    <value>Git 提交</value>
+  </data>
+  <data name="GitCommitSuccessMessage" xml:space="preserve">
+    <value>承诺成功！</value>
+  </data>
+  <data name="GitCommitEmptyMessage" xml:space="preserve">
+    <value>请填写提交信息。</value>
+  </data>
+  <data name="GitCommitFailureTitle" xml:space="preserve">
+    <value>Git 提交失败</value>
+  </data>
+  <data name="GitCommitFailureMessage" xml:space="preserve">
+    <value>提交期间发生错误。请验证是否存在分阶段更改。</value>
+  </data>
+  <data name="GitStageFailureTitle" xml:space="preserve">
+    <value>Git 阶段失败</value>
+  </data>
+  <data name="GitStageAllFailureMessage" xml:space="preserve">
+    <value>无法暂存所有更改。</value>
+  </data>
+  <data name="GitStageToggleFailureTitle" xml:space="preserve">
+    <value>Git 阶段变更失败</value>
+  </data>
+  <data name="GitStageToggleFailureMessage" xml:space="preserve">
+    <value>无法处理 Git CLI 命令。</value>
+  </data>
+  <data name="GitCommitDetailsFailureTitle" xml:space="preserve">
+    <value>无法检索提交详细信息</value>
+  </data>
+  <data name="GitInitTitle" xml:space="preserve">
+    <value>Git 初始化</value>
+  </data>
+  <data name="GitInitSelectFolderMessage" xml:space="preserve">
+    <value>请先在资源管理器中选择一个文件夹。</value>
+  </data>
+  <data name="GitInitFailureTitle" xml:space="preserve">
+    <value>Git 初始化失败</value>
+  </data>
+  <data name="GitInitFailureMessage" xml:space="preserve">
+    <value>无法创建 Git 存储库。</value>
+  </data>
+  <data name="UntitledNewTab" xml:space="preserve">
+    <value>无题</value>
+  </data>
+  <data name="GoToLinePlaceholder" xml:space="preserve">
+    <value>Enter 行号...</value>
+  </data>
+  <data name="GoToLineTitle" xml:space="preserve">
+    <value>前往线路</value>
+  </data>
+  <data name="GoToLineButton" xml:space="preserve">
+    <value>去</value>
+  </data>
+  <data name="GoToLineCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="SnippetInsertErrorTitle" xml:space="preserve">
+    <value>代码段插入错误</value>
+  </data>
+  <data name="SnippetInsertErrorMessage" xml:space="preserve">
+    <value>找不到活动的文本编辑器窗口。</value>
+  </data>
+  <data name="SnippetAddTitle" xml:space="preserve">
+    <value>添加新代码/公式片段</value>
+  </data>
+  <data name="SnippetAddButton" xml:space="preserve">
+    <value>添加</value>
+  </data>
+  <data name="SnippetEditTitle" xml:space="preserve">
+    <value>编辑片段</value>
+  </data>
+  <data name="SnippetEditSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="SnippetPlaceholderName" xml:space="preserve">
+    <value>代码段名称（例如 C# 循环）</value>
+  </data>
+  <data name="SnippetPlaceholderKeyword" xml:space="preserve">
+    <value>关键字（例如循环）</value>
+  </data>
+  <data name="SnippetPlaceholderDesc" xml:space="preserve">
+    <value>简要说明</value>
+  </data>
+  <data name="SnippetPlaceholderContent" xml:space="preserve">
+    <value>Enter 代码体...</value>
+  </data>
+  <data name="SnippetLabelName" xml:space="preserve">
+    <value>片段名称</value>
+  </data>
+  <data name="SnippetLabelKeyword" xml:space="preserve">
+    <value>自动完成关键字</value>
+  </data>
+  <data name="SnippetLabelDesc" xml:space="preserve">
+    <value>描述</value>
+  </data>
+  <data name="SnippetLabelContent" xml:space="preserve">
+    <value>模板内容</value>
+  </data>
+  <data name="SnippetCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="CompareSelectFromTab" xml:space="preserve">
+    <value>从选项卡中选择...</value>
+  </data>
+  <data name="CompareTabPrefix" xml:space="preserve">
+    <value>Tab</value>
+  </data>
+  <data name="CompareOriginalPathPlaceholder" xml:space="preserve">
+    <value>原文件路径...</value>
+  </data>
+  <data name="CompareBrowse" xml:space="preserve">
+    <value>浏览...</value>
+  </data>
+  <data name="CompareModifiedPathPlaceholder" xml:space="preserve">
+    <value>修改后的文件路径...</value>
+  </data>
+  <data name="CompareOriginalFileLabel" xml:space="preserve">
+    <value>原始文件（原始文件）</value>
+  </data>
+  <data name="CompareModifiedFileLabel" xml:space="preserve">
+    <value>修改后的文件（修改后的文件）</value>
+  </data>
+  <data name="CompareDialogTitle" xml:space="preserve">
+    <value>文件比较（文件比较）</value>
+  </data>
+  <data name="CompareDialogCompareButton" xml:space="preserve">
+    <value>比较</value>
+  </data>
+  <data name="CompareDialogCancelButton" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="TextColorPickerTitle" xml:space="preserve">
+    <value>选择文字颜色</value>
+  </data>
+  <data name="TextColorApplyButton" xml:space="preserve">
+    <value>申请</value>
+  </data>
+  <data name="TabMenuCopyFileName" xml:space="preserve">
+    <value>复制文件名</value>
+  </data>
+  <data name="TabMenuCopyFilePath" xml:space="preserve">
+    <value>复制文件路径</value>
+  </data>
+  <data name="TabMenuReload" xml:space="preserve">
+    <value>重新加载</value>
+  </data>
+  <data name="TabMenuEncrypt" xml:space="preserve">
+    <value>加密</value>
+  </data>
+  <data name="TabMenuChangeEncryptionPassword" xml:space="preserve">
+    <value>更改密码</value>
+  </data>
+  <data name="TabMenuRemoveEncryption" xml:space="preserve">
+    <value>删除密码</value>
+  </data>
+  <data name="EncryptedTabTooltip" xml:space="preserve">
+    <value>加密的</value>
+  </data>
+  <data name="EncryptionPasswordDialogTitle" xml:space="preserve">
+    <value>Enter 密码</value>
+  </data>
+  <data name="EncryptionSetPasswordTitle" xml:space="preserve">
+    <value>加密</value>
+  </data>
+  <data name="EncryptionChangePasswordTitle" xml:space="preserve">
+    <value>更改密码</value>
+  </data>
+  <data name="EncryptionRemoveTitle" xml:space="preserve">
+    <value>删除密码</value>
+  </data>
+  <data name="EncryptionPasswordLabel" xml:space="preserve">
+    <value>密码</value>
+  </data>
+  <data name="EncryptionConfirmPasswordLabel" xml:space="preserve">
+    <value>确认密码</value>
+  </data>
+  <data name="EncryptionCurrentPasswordLabel" xml:space="preserve">
+    <value>当前密码</value>
+  </data>
+  <data name="EncryptionOpenButton" xml:space="preserve">
+    <value>打开</value>
+  </data>
+  <data name="EncryptionApplyButton" xml:space="preserve">
+    <value>申请</value>
+  </data>
+  <data name="EncryptionCancelButton" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="EncryptionPasswordEmpty" xml:space="preserve">
+    <value>请输入密码。</value>
+  </data>
+  <data name="EncryptionPasswordMismatch" xml:space="preserve">
+    <value>输入的密码不匹配。</value>
+  </data>
+  <data name="EncryptionCurrentPasswordMismatch" xml:space="preserve">
+    <value>当前密码不正确。</value>
+  </data>
+  <data name="EncryptionDialogNotReady" xml:space="preserve">
+    <value>密码提示尚未准备好。请稍后重试。</value>
+  </data>
+  <data name="TabMenuLivePreview" xml:space="preserve">
+    <value>实时预览</value>
+  </data>
+  <data name="LivePreview" xml:space="preserve">
+    <value>直播</value>
+  </data>
+  <data name="LivePreviewTooltip" xml:space="preserve">
+    <value>实时预览</value>
+  </data>
+  <data name="TabMenuAddToFavorites" xml:space="preserve">
+    <value>添加到收藏夹</value>
+  </data>
+  <data name="TabMenuOpenFolder" xml:space="preserve">
+    <value>转到包含文件夹</value>
+  </data>
+  <data name="TabMenuCloseRight" xml:space="preserve">
+    <value>将 Tab 关闭到右侧</value>
+  </data>
+  <data name="TabMenuCloseLeft" xml:space="preserve">
+    <value>将 Tab 关闭到左侧</value>
+  </data>
+  <data name="TabMenuCloseOthers" xml:space="preserve">
+    <value>关闭其他 Tab</value>
+  </data>
+  <data name="EditorContextMenuCut" xml:space="preserve">
+    <value>切</value>
+  </data>
+  <data name="EditorContextMenuCopy" xml:space="preserve">
+    <value>复制</value>
+  </data>
+  <data name="EditorContextMenuPaste" xml:space="preserve">
+    <value>粘贴</value>
+  </data>
+  <data name="EditorContextMenuDelete" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="EditorContextMenuSelectAll" xml:space="preserve">
+    <value>选择全部</value>
+  </data>
+  <data name="EditorContextMenuToggleComment" xml:space="preserve">
+    <value>切换评论</value>
+  </data>
+  <data name="EditorContextMenuIndent" xml:space="preserve">
+    <value>缩进</value>
+  </data>
+  <data name="EditorContextMenuOutdent" xml:space="preserve">
+    <value>减少缩进</value>
+  </data>
+  <data name="EditorContextMenuLineCleanup" xml:space="preserve">
+    <value>线路清理</value>
+  </data>
+  <data name="EditorContextMenuSortAsc" xml:space="preserve">
+    <value>升序排序</value>
+  </data>
+  <data name="EditorContextMenuSortDesc" xml:space="preserve">
+    <value>降序排序</value>
+  </data>
+  <data name="EditorContextMenuRemoveDuplicates" xml:space="preserve">
+    <value>删除重复行</value>
+  </data>
+  <data name="EditorContextMenuRemoveEmptyLines" xml:space="preserve">
+    <value>删除空行</value>
+  </data>
+  <data name="EditorContextMenuCollapseConsecutiveEmptyLines" xml:space="preserve">
+    <value>折叠连续空行</value>
+  </data>
+  <data name="EditorContextMenuTrimSpaces" xml:space="preserve">
+    <value>修剪空间</value>
+  </data>
+  <data name="EditorContextMenuConvert" xml:space="preserve">
+    <value>转换</value>
+  </data>
+  <data name="EditorContextMenuToUpperCase" xml:space="preserve">
+    <value>转为大写</value>
+  </data>
+  <data name="EditorContextMenuToLowerCase" xml:space="preserve">
+    <value>至 Lowercase</value>
+  </data>
+  <data name="EditorContextMenuToSentenceCase" xml:space="preserve">
+    <value>句格</value>
+  </data>
+  <data name="EditorContextMenuToTitleCase" xml:space="preserve">
+    <value>标题案例</value>
+  </data>
+  <data name="EditorContextMenuUrlEncode" xml:space="preserve">
+    <value>URL 编码</value>
+  </data>
+  <data name="EditorContextMenuUrlDecode" xml:space="preserve">
+    <value>URL 解码</value>
+  </data>
+  <data name="EditorContextMenuBase64Encode" xml:space="preserve">
+    <value>Base64 编码</value>
+  </data>
+  <data name="EditorContextMenuBase64Decode" xml:space="preserve">
+    <value>Base64解码</value>
+  </data>
+  <data name="EditorContextMenuHexToDec" xml:space="preserve">
+    <value>十六进制 → 十进制</value>
+  </data>
+  <data name="EditorContextMenuDecToHex" xml:space="preserve">
+    <value>十进制 → 十六进制</value>
+  </data>
+  <data name="EditorContextMenuFormatText" xml:space="preserve">
+    <value>设置文本格式</value>
+  </data>
+  <data name="EditorContextMenuScrollSync" xml:space="preserve">
+    <value>滚动同步</value>
+  </data>
+  <data name="EditorAutocompleteSnippet" xml:space="preserve">
+    <value>片段</value>
+  </data>
+  <data name="EditorAutocompleteSnippetPrefix" xml:space="preserve">
+    <value>片段： </value>
+  </data>
+  <data name="DiffCompareToolTitle" xml:space="preserve">
+    <value>TxtAIEditor 文件比较工具（文件比较）</value>
+  </data>
+  <data name="DiffStatsGathering" xml:space="preserve">
+    <value>聚集...</value>
+  </data>
+  <data name="DiffOriginalFileLabel" xml:space="preserve">
+    <value>原始文件（原始）</value>
+  </data>
+  <data name="DiffModifiedFileLabel" xml:space="preserve">
+    <value>修改后的文件（已修改）</value>
+  </data>
+  <data name="DiffOriginalPrefix" xml:space="preserve">
+    <value>原文： </value>
+  </data>
+  <data name="DiffModifiedPrefix" xml:space="preserve">
+    <value>修改： </value>
+  </data>
+  <data name="DiffStatsFormat" xml:space="preserve">
+    <value>更改：{0} 添加，{1} 删除</value>
+  </data>
+  <data name="DiffOpenFileTooltip" xml:space="preserve">
+    <value>打开文件</value>
+  </data>
+  <data name="GitPreviousCommitFormat" xml:space="preserve">
+    <value>{0}（上一次提交）</value>
+  </data>
+  <data name="GitCommitHashFormat" xml:space="preserve">
+    <value>{0}（提交 {1}）</value>
+  </data>
+  <data name="GitCompareTitleFormat" xml:space="preserve">
+    <value>比较[{0}]：{1}</value>
+  </data>
+  <data name="GitCompareDiffTitleFormat" xml:space="preserve">
+    <value>Git 比较：{0}</value>
+  </data>
+  <data name="GitPreviousVersionFormat" xml:space="preserve">
+    <value>{0}（先前版本）</value>
+  </data>
+  <data name="GitCurrentChangesFormat" xml:space="preserve">
+    <value>{0}（当前更改）</value>
+  </data>
+  <data name="SearchReplaceOneTooltip" xml:space="preserve">
+    <value>仅替换此项目</value>
+  </data>
+  <data name="SnippetExport" xml:space="preserve">
+    <value>出口</value>
+  </data>
+  <data name="SnippetImport" xml:space="preserve">
+    <value>进口</value>
+  </data>
+  <data name="SnippetImportErrorTitle" xml:space="preserve">
+    <value>代码片段导入错误</value>
+  </data>
+  <data name="SnippetImportErrorMessage" xml:space="preserve">
+    <value>导入文件时出错：{0}</value>
+  </data>
+  <data name="SnippetReset" xml:space="preserve">
+    <value>重置</value>
+  </data>
+  <data name="SnippetResetTitle" xml:space="preserve">
+    <value>重置片段</value>
+  </data>
+  <data name="SnippetResetConfirm" xml:space="preserve">
+    <value>重置为默认片段？所有自定义片段都将被删除。</value>
+  </data>
+  <data name="SnippetResetConfirmButton" xml:space="preserve">
+    <value>重置</value>
+  </data>
+  <data name="TOC" xml:space="preserve">
+    <value>PHZZ0ZZ目录页</value>
+  </data>
+  <data name="TOCHeader" xml:space="preserve">
+    <value>PHZZ0ZZ目录页</value>
+  </data>
+  <data name="SnippetEditTooltip" xml:space="preserve">
+    <value>编辑</value>
+  </data>
+  <data name="SnippetDeleteTooltip" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="AutocompleteDict" xml:space="preserve">
+    <value>自动完成词典...</value>
+  </data>
+  <data name="AutocompleteDictTitle" xml:space="preserve">
+    <value>编辑自动完成词典</value>
+  </data>
+  <data name="AutocompleteDictSave" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="AutocompleteDictPlaceholder" xml:space="preserve">
+    <value>Enter 每行一个字...</value>
+  </data>
+  <data name="AutocompleteDictLabel" xml:space="preserve">
+    <value>自动完成单词列表</value>
+  </data>
+  <data name="AutocompleteDictHint" xml:space="preserve">
+    <value>一行中输入的每个单词都将在编辑器中显示为自动完成候选词。</value>
+  </data>
+  <data name="StickyNoteTitle" xml:space="preserve">
+    <value>便利贴</value>
+  </data>
+  <data name="ExitStickyNoteTooltip" xml:space="preserve">
+    <value>退出便签模式 (F12)</value>
+  </data>
+  <data name="ExitStickyNoteText" xml:space="preserve">
+    <value>退出</value>
+  </data>
+  <data name="TerminalExited" xml:space="preserve">
+    <value>终端已退出</value>
+  </data>
+  <data name="TerminalStartFailed" xml:space="preserve">
+    <value>无法启动终端</value>
+  </data>
+  <data name="TerminalHasExited" xml:space="preserve">
+    <value>终端已退出</value>
+  </data>
+  <data name="TerminalSendFailed" xml:space="preserve">
+    <value>发送命令失败</value>
+  </data>
+  <data name="ExplorerCopyFileName" xml:space="preserve">
+    <value>复制文件名</value>
+  </data>
+  <data name="ExplorerCopyFilePath" xml:space="preserve">
+    <value>复制文件路径</value>
+  </data>
+  <data name="ExplorerCreateFolderTooltip" xml:space="preserve">
+    <value>新建文件夹</value>
+  </data>
+  <data name="CreateFolderDialogTitle" xml:space="preserve">
+    <value>新建文件夹</value>
+  </data>
+  <data name="CreateFolderPlaceholder" xml:space="preserve">
+    <value>Enter 文件夹名称...</value>
+  </data>
+  <data name="CreateFolderDialogCreate" xml:space="preserve">
+    <value>创建</value>
+  </data>
+  <data name="CreateFolderDialogCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="CreateFolderErrorTitle" xml:space="preserve">
+    <value>新文件夹错误</value>
+  </data>
+  <data name="CreateFolderNoFolderSelected" xml:space="preserve">
+    <value>请先在资源管理器中选择一个文件夹。</value>
+  </data>
+  <data name="CreateFolderEmptyName" xml:space="preserve">
+    <value>请输入文件夹名称。</value>
+  </data>
+  <data name="CreateFolderInvalidName" xml:space="preserve">
+    <value>文件夹名称包含不能使用的字符。</value>
+  </data>
+  <data name="CreateFolderAlreadyExists" xml:space="preserve">
+    <value>“{0}”已存在。</value>
+  </data>
+  <data name="ExplorerRefreshTooltip" xml:space="preserve">
+    <value>刷新</value>
+  </data>
+  <data name="ExplorerCopyFolderPath" xml:space="preserve">
+    <value>复制文件夹路径</value>
+  </data>
+  <data name="ExplorerRename" xml:space="preserve">
+    <value>重命名</value>
+  </data>
+  <data name="ExplorerDelete" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="RenameDialogTitle" xml:space="preserve">
+    <value>重命名</value>
+  </data>
+  <data name="RenameDialogOK" xml:space="preserve">
+    <value>好的</value>
+  </data>
+  <data name="RenameDialogCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="RenameErrorTitle" xml:space="preserve">
+    <value>重命名错误</value>
+  </data>
+  <data name="DeleteConfirmTitle" xml:space="preserve">
+    <value>确认删除</value>
+  </data>
+  <data name="DeleteConfirmMessage" xml:space="preserve">
+    <value>将“{0}”移至回收站？</value>
+  </data>
+  <data name="DeleteConfirmOK" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="DeleteConfirmCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="DeleteErrorTitle" xml:space="preserve">
+    <value>删除错误</value>
+  </data>
   <data name="LlmPresetButtonText" xml:space="preserve">
     <value>预设</value>
   </data>
+  <data name="LlmPresetButtonTooltip" xml:space="preserve">
+    <value>指令预设列表</value>
+  </data>
   <data name="LlmPresetAddText" xml:space="preserve">
     <value>添加预设</value>
+  </data>
+  <data name="LlmPresetApplyText" xml:space="preserve">
+    <value>申请</value>
+  </data>
+  <data name="LlmPresetDeleteText" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="LlmPresetSaveTitle" xml:space="preserve">
+    <value>添加当前选项卡作为预设</value>
+  </data>
+  <data name="LlmPresetSavePlaceholder" xml:space="preserve">
+    <value>Enter 预设名称...</value>
+  </data>
+  <data name="LlmPresetSaveLabel" xml:space="preserve">
+    <value>预设名称</value>
+  </data>
+  <data name="LlmPresetSaveAddButton" xml:space="preserve">
+    <value>添加</value>
+  </data>
+  <data name="LlmPresetSaveCancelButton" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="LlmPresetNameEmptyTitle" xml:space="preserve">
+    <value>添加预设错误</value>
+  </data>
+  <data name="LlmPresetNameEmptyMessage" xml:space="preserve">
+    <value>请输入预设名称。</value>
+  </data>
+  <data name="LlmPresetDuplicateTitle" xml:space="preserve">
+    <value>重复预设</value>
+  </data>
+  <data name="LlmPresetDuplicateMessage" xml:space="preserve">
+    <value>具有此名称的预设已存在。您想覆盖它吗？</value>
+  </data>
+  <data name="LlmPresetContentLabel" xml:space="preserve">
+    <value>预设内容</value>
+  </data>
+  <data name="LlmPresetContentPlaceholder" xml:space="preserve">
+    <value>预设内容...</value>
+  </data>
+  <data name="LlmPresetEditTitle" xml:space="preserve">
+    <value>编辑预设</value>
+  </data>
+  <data name="LlmPresetEditSaveButton" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="ExpandPreviewTooltip" xml:space="preserve">
+    <value>展开预览</value>
+  </data>
+  <data name="LlmMaxInstructionsReached" xml:space="preserve">
+    <value>您最多可以创建 4 个说明选项卡。请删除现有选项卡并重试。</value>
+  </data>
+  <data name="LlmPresetPlaceholderFormat" xml:space="preserve">
+    <value>[{0}] 应用预设。 Enter 附加说明...</value>
   </data>
   <data name="PresetExportText" xml:space="preserve">
     <value>导出</value>
@@ -356,28 +1772,1292 @@
   <data name="PresetImportText" xml:space="preserve">
     <value>导入</value>
   </data>
+  <data name="PresetExportErrorTitle" xml:space="preserve">
+    <value>预设导出错误</value>
+  </data>
+  <data name="PresetExportErrorMessage" xml:space="preserve">
+    <value>导出预设时出错：{0}</value>
+  </data>
+  <data name="PresetImportErrorTitle" xml:space="preserve">
+    <value>预设导入错误</value>
+  </data>
+  <data name="PresetImportErrorMessage" xml:space="preserve">
+    <value>导入预设时出错：{0}</value>
+  </data>
+  <data name="PresetImportInvalidFile" xml:space="preserve">
+    <value>这不是可导入的预设 JSON 文件。</value>
+  </data>
+  <data name="AgentActivityThinkingStepFormat" xml:space="preserve">
+    <value>思考（步骤{0}/8）</value>
+  </data>
+  <data name="AgentErrorTitle" xml:space="preserve">
+    <value>Agent 错误</value>
+  </data>
+  <data name="AgentEmptyPrompt" xml:space="preserve">
+    <value>请输入 Agent 的任务。</value>
+  </data>
+  <data name="AgentActivityStarting" xml:space="preserve">
+    <value>开始</value>
+  </data>
+  <data name="AgentActivityCollectingContext" xml:space="preserve">
+    <value>收集上下文</value>
+  </data>
+  <data name="AgentActivityThinking" xml:space="preserve">
+    <value>思考</value>
+  </data>
+  <data name="AgentOutputPreparingTool" xml:space="preserve">
+    <value>准备工具调用</value>
+  </data>
+  <data name="AgentToolCallParseFailed" xml:space="preserve">
+    <value>无法解析工具调用，显示原始响应。</value>
+  </data>
+  <data name="AgentToolCallFormatRetry" xml:space="preserve">
+    <value>无法解析工具调用，因此 Agent 正在重试格式。</value>
+  </data>
+  <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
+    <value>工具调用格式重复出现错误，因此 Agent 执行被停止。请再次运行该任务。</value>
+  </data>
+  <data name="AgentSkillNotCalledRetry" xml:space="preserve">
+    <value>该模型描述了该技能，但没有调用它。重试工具调用。</value>
+  </data>
+  <data name="AgentActivityTruncatedRetry" xml:space="preserve">
+    <value>响应被截断；继续。</value>
+  </data>
+  <data name="AgentActivityFinalAnswer" xml:space="preserve">
+    <value>最终答案生成</value>
+  </data>
+  <data name="AgentToolRunning" xml:space="preserve">
+    <value>运行工具</value>
+  </data>
+  <data name="AgentDuplicateFailedToolSkippedFormat" xml:space="preserve">
+    <value>相同的 {0} 工具调用已经失败，因此不再运行。更改参数或根据当前结果写出最终答案。</value>
+  </data>
+  <data name="AgentDuplicateToolSkipped" xml:space="preserve">
+    <value>跳过重复的工具调用</value>
+  </data>
+  <data name="AgentDuplicateToolSkippedFormat" xml:space="preserve">
+    <value>相同的 {0} 工具调用已经成功，因此不再运行。使用之前的结果；如果没有必要的下一步，请写下最终答案。</value>
+  </data>
+  <data name="AgentDuplicateToolReused" xml:space="preserve">
+    <value>相同的工具调用已经成功，因此不再运行。再次提供缓存的结果。</value>
+  </data>
+  <data name="AgentLoopGuardStopped" xml:space="preserve">
+    <value>检测到重复的相同工具调用循环，因此 Agent 执行停止。检查输出并再次运行任务。</value>
+  </data>
+  <data name="AgentSelectedRangeEditComplete" xml:space="preserve">
+    <value>应用选定的范围更改。</value>
+  </data>
+  <data name="AgentActivityDuplicateToolSkippedFormat" xml:space="preserve">
+    <value>跳过重复的工具调用：{0}</value>
+  </data>
+  <data name="AgentActivityToolDoneFormat" xml:space="preserve">
+    <value>工具执行完成</value>
+  </data>
+  <data name="AgentActivityToolCancelled" xml:space="preserve">
+    <value>工具执行已取消</value>
+  </data>
+  <data name="AgentActivityToolFailedFormat" xml:space="preserve">
+    <value>工具失败：{0}</value>
+  </data>
+  <data name="AgentActivityStopRequested" xml:space="preserve">
+    <value>请求停止</value>
+  </data>
+  <data name="AgentOutputStopping" xml:space="preserve">
+    <value>正在停止 Agent 执行...</value>
+  </data>
+  <data name="AgentActivityStopped" xml:space="preserve">
+    <value>已停止</value>
+  </data>
+  <data name="AgentOutputStopped" xml:space="preserve">
+    <value>Agent 执行已停止。</value>
+  </data>
+  <data name="AgentExceptionFormat" xml:space="preserve">
+    <value>Agent执行期间发生异常：{0}</value>
+  </data>
+  <data name="AgentModeRun" xml:space="preserve">
+    <value>运行</value>
+  </data>
   <data name="AgentLanguageCode" xml:space="preserve">
     <value>zh-Hans</value>
+  </data>
+  <data name="AgentActivityListFilesFormat" xml:space="preserve">
+    <value>列表文件：{0}</value>
+  </data>
+  <data name="AgentActivitySearchTextFormat" xml:space="preserve">
+    <value>搜索文字：{0}</value>
+  </data>
+  <data name="AgentActivityRunRgFormat" xml:space="preserve">
+    <value>运行 rg：{0}</value>
+  </data>
+  <data name="AgentActivityRunRgaFormat" xml:space="preserve">
+    <value>运行 rga：{0}</value>
+  </data>
+  <data name="AgentActivityRunPdftotextFormat" xml:space="preserve">
+    <value>运行 pdftotext: {0}</value>
+  </data>
+  <data name="AgentActivityRunPowerShellFormat" xml:space="preserve">
+    <value>运行 PowerShell：{0}</value>
+  </data>
+  <data name="AgentActivityReadFileFormat" xml:space="preserve">
+    <value>读取文件：{0}（行{1}到{2}）</value>
+  </data>
+  <data name="AgentActivitySkillUseFormat" xml:space="preserve">
+    <value>参考技能：{0}</value>
+  </data>
+  <data name="AgentActivityCreateFileFormat" xml:space="preserve">
+    <value>创建文件：{0}</value>
+  </data>
+  <data name="AgentActivityReplaceFileFormat" xml:space="preserve">
+    <value>修改文件：{0}</value>
+  </data>
+  <data name="AgentActivityReplaceRangeFormat" xml:space="preserve">
+    <value>替换文件中的范围：{0}（行 {1} 到 {2}）</value>
+  </data>
+  <data name="AgentActivityInsertIntoFileFormat" xml:space="preserve">
+    <value>插入文件：{0}</value>
+  </data>
+  <data name="AgentActivityApplyPatchFormat" xml:space="preserve">
+    <value>将补丁应用到文件：{0}</value>
+  </data>
+  <data name="AgentActivityOverwriteFileFormat" xml:space="preserve">
+    <value>覆盖文件：{0}</value>
+  </data>
+  <data name="AgentActivityAppendFileFormat" xml:space="preserve">
+    <value>附加到文件：{0}</value>
+  </data>
+  <data name="AgentActivityMergeFilesFormat" xml:space="preserve">
+    <value>合并文件：{0}</value>
+  </data>
+  <data name="AgentActivitySplitFileFormat" xml:space="preserve">
+    <value>分割文件：{0}</value>
+  </data>
+  <data name="AgentActivityInsertText" xml:space="preserve">
+    <value>插入到当前编辑器中</value>
+  </data>
+  <data name="AgentActivityCreateTabFormat" xml:space="preserve">
+    <value>插入新选项卡：{0}</value>
+  </data>
+  <data name="AgentActivitySaveTabFormat" xml:space="preserve">
+    <value>保存选项卡：{0}</value>
+  </data>
+  <data name="AgentActivityEditTabFormat" xml:space="preserve">
+    <value>编辑选项卡：{0}</value>
+  </data>
+  <data name="AgentActivityUnknownToolFormat" xml:space="preserve">
+    <value>运行工具：{0}</value>
+  </data>
+  <data name="AgentActivityDiffReviewFormat" xml:space="preserve">
+    <value>等待文件更改批准：{0}</value>
+  </data>
+  <data name="AgentDiffDialogTitleFormat" xml:space="preserve">
+    <value>确认 Agent 文件更改：{0}</value>
+  </data>
+  <data name="AgentDiffApplyButton" xml:space="preserve">
+    <value>批准</value>
+  </data>
+  <data name="AgentDiffCancelButton" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="AgentActivityDiffAppliedFormat" xml:space="preserve">
+    <value>文件更改已批准：{0}</value>
+  </data>
+  <data name="AgentActivityDiffCancelledFormat" xml:space="preserve">
+    <value>文件更改已取消：{0}</value>
+  </data>
+  <data name="AgentActivityPlanApprovalPending" xml:space="preserve">
+    <value>等待计划执行批准</value>
+  </data>
+  <data name="AgentPlanApprovalHeader" xml:space="preserve">
+    <value>批准计划执行</value>
+  </data>
+  <data name="AgentPlanApprovalDescriptionFormat" xml:space="preserve">
+    <value>查看、编辑并保存打开的计划，然后批准在新会话中执行它。
+
+计划：{0}</value>
+  </data>
+  <data name="AgentActivityPlanApproved" xml:space="preserve">
+    <value>计划执行获批准</value>
+  </data>
+  <data name="AgentActivityPlanCancelled" xml:space="preserve">
+    <value>计划执行取消</value>
+  </data>
+  <data name="AgentActivityPlanSavedFormat" xml:space="preserve">
+    <value>已保存计划：{0}</value>
+  </data>
+  <data name="AgentActivityMakePlan" xml:space="preserve">
+    <value>储蓄计划</value>
+  </data>
+  <data name="AgentVerboseMakePlanOnly" xml:space="preserve">
+    <value>已保存并打开计划。</value>
+  </data>
+  <data name="AgentMakePlanRequired" xml:space="preserve">
+    <value>计划模式必须使用 make_plan 工具保存计划。</value>
+  </data>
+  <data name="AgentMakePlanRetryLimit" xml:space="preserve">
+    <value>没有生成 make_plan 工具调用，因此计划模式停止。请再次运行。</value>
+  </data>
+  <data name="AgentPlanPathMissing" xml:space="preserve">
+    <value>找不到保存的计划路径，因此未开始执行。</value>
+  </data>
+  <data name="AgentPlanSavedOutputFormat" xml:space="preserve">
+    <value>保存并打开计划：{0}</value>
+  </data>
+  <data name="AgentPlanOpenFailedFormat" xml:space="preserve">
+    <value>无法打开计划：{0}</value>
+  </data>
+  <data name="AgentPlanExecutionCancelledOutput" xml:space="preserve">
+    <value>计划执行被取消。</value>
+  </data>
+  <data name="AgentPlanSaveDirtyTabFailed" xml:space="preserve">
+    <value>无法保存编辑的计划选项卡，因此未开始执行。</value>
+  </data>
+  <data name="AgentPlanSaveErrorTitle" xml:space="preserve">
+    <value>计划保存错误</value>
+  </data>
+  <data name="AgentPlanSaveErrorMessage" xml:space="preserve">
+    <value>保存计划时出错：{0}</value>
+  </data>
+  <data name="AgentPlanExecutionSessionTitle" xml:space="preserve">
+    <value>执行计划</value>
+  </data>
+  <data name="AgentInsertTitle" xml:space="preserve">
+    <value>插入 Agent 响应</value>
+  </data>
+  <data name="AgentNoOutputToInsert" xml:space="preserve">
+    <value>插入时没有 Agent 响应。</value>
+  </data>
+  <data name="AgentNoLastAnswerToInsert" xml:space="preserve">
+    <value>没有最后一个 Agent 答案可插入新选项卡中。</value>
+  </data>
+  <data name="AgentNoActiveTab" xml:space="preserve">
+    <value>没有活动选项卡</value>
+  </data>
+  <data name="AgentNoSelection" xml:space="preserve">
+    <value>没有选择</value>
+  </data>
+  <data name="AgentSelectionStats" xml:space="preserve">
+    <value>选择 {0:N0} 字符</value>
+  </data>
+  <data name="AgentContextStatsFormat" xml:space="preserve">
+    <value>上下文：{0}·{1}</value>
+  </data>
+  <data name="AgentGitWarning" xml:space="preserve">
+    <value>警告：不是 Git 存储库</value>
+  </data>
+  <data name="AgentGitRequired" xml:space="preserve">
+    <value>Agent 只能在属于 Git 存储库的文件夹中使用。</value>
+  </data>
+  <data name="AgentNewSessionButton" xml:space="preserve">
+    <value>新会议</value>
+  </data>
+  <data name="AgentRewindSessionTooltip" xml:space="preserve">
+    <value>回到上一个提示之前</value>
+  </data>
+  <data name="AgentCreateDialogTitle" xml:space="preserve">
+    <value>确认 Agent 文件创建：{0}</value>
+  </data>
+  <data name="AgentEditDialogTitle" xml:space="preserve">
+    <value>确认Agent 文件修改：{0}</value>
+  </data>
+  <data name="AgentCreateSummaryFormat" xml:space="preserve">
+    <value>您想创建这个文件吗？路径：{0}</value>
+  </data>
+  <data name="AgentEditSummaryFormat" xml:space="preserve">
+    <value>您想修改这个文件吗？路径：{0}</value>
   </data>
   <data name="AgentOutputPlaceholder" xml:space="preserve">
     <value>等待中... 请输入 Agent 任务。</value>
   </data>
-  <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
-    <value>대기 중...|Waiting...|待機中...|等待中...</value>
+  <data name="AgentContextStatsDefault" xml:space="preserve">
+    <value>使用活动选项卡和选择作为上下文</value>
+  </data>
+  <data name="AgentModelFormat" xml:space="preserve">
+    <value>型号：{0}（{1}）</value>
+  </data>
+  <data name="AgentIncludeActiveFile" xml:space="preserve">
+    <value>规划模式</value>
+  </data>
+  <data name="AgentPdfActiveTabExcluded" xml:space="preserve">
+    <value>{0}（PDF 除外）</value>
+  </data>
+  <data name="AgentPromptPlaceholder" xml:space="preserve">
+    <value>输入 Agent 任务...</value>
+  </data>
+  <data name="AgentRunButton" xml:space="preserve">
+    <value>运行</value>
+  </data>
+  <data name="AgentStopButton" xml:space="preserve">
+    <value>停止</value>
+  </data>
+  <data name="AgentActivityHeader" xml:space="preserve">
+    <value>进展</value>
   </data>
   <data name="AgentActivityIdle" xml:space="preserve">
     <value>空闲</value>
   </data>
+  <data name="AgentInsertOutputTooltip" xml:space="preserve">
+    <value>在当前光标处插入 Agent 响应（仅限所选部分，如果选择）</value>
+  </data>
+  <data name="AgentLastAnswerButtonText" xml:space="preserve">
+    <value>最后的回答</value>
+  </data>
+  <data name="AgentLastAnswerNewTabTooltip" xml:space="preserve">
+    <value>在新选项卡中插入最后一个 Agent 答案</value>
+  </data>
+  <data name="AgentTokenCountFormat" xml:space="preserve">
+    <value>{0:F1}k 代币</value>
+  </data>
+  <data name="AgentTokenCountWithLimitFormat" xml:space="preserve">
+    <value>{0} / {1} 代币</value>
+  </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} 个 token</value>
   </data>
-  <data name="AgentAttachmentCountSingularFormat" xml:space="preserve">
-    <value>{0:N0} 个附件</value>
+  <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
   </data>
   <data name="AgentAttachmentCountFormat" xml:space="preserve">
     <value>{0:N0} 个附件</value>
   </data>
-  <data name="AgentPromptPlaceholder" xml:space="preserve">
-    <value>输入 Agent 任务...</value>
+  <data name="AgentAttachmentCountSingularFormat" xml:space="preserve">
+    <value>{0:N0} 个附件</value>
+  </data>
+  <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
+    <value>等待中...</value>
+  </data>
+  <data name="AgentActivityIdleKnownValues" xml:space="preserve">
+    <value>空闲</value>
+  </data>
+  <data name="AgentDiffConfirmHeaderDefault" xml:space="preserve">
+    <value>确认文件更改</value>
+  </data>
+  <data name="AgentDiffConfirmDescriptionDefault" xml:space="preserve">
+    <value>您想修改该文件吗？</value>
+  </data>
+  <data name="SettingsExaApiKey" xml:space="preserve">
+    <value>Exa API Key（用于网络搜索）</value>
+  </data>
+  <data name="SettingsExaApiKeyPlaceholder" xml:space="preserve">
+    <value>Enter Exa API Key（留空即可删除）</value>
+  </data>
+  <data name="SettingsExaApiKeyInfo" xml:space="preserve">
+    <value>Exa API Key 用于 Agent 的网络搜索 (Exa) 功能，并安全地存储在 Windows Credential Manager 中。</value>
+  </data>
+  <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
+    <value>Exa 网页搜索：{0}</value>
+  </data>
+  <data name="AgentActivityWebFetchFormat" xml:space="preserve">
+    <value>阅读网页：{0}</value>
+  </data>
+  <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
+    <value>Exa 获取网页内容：{0}</value>
+  </data>
+  <data name="SettingsExaEndpoint" xml:space="preserve">
+    <value>Exa 搜索 API / MCP 端点</value>
+  </data>
+  <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
+    <value>例如，https://mcp.exa.ai/mcp</value>
+  </data>
+  <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
+    <value>PowerShell 执行确认</value>
+  </data>
+  <data name="AgentPowerShellConfirmSummaryFormat" xml:space="preserve">
+    <value>您想运行以下命令吗？
+
+{0}</value>
+  </data>
+  <data name="AgentActivityPowerShellConfirmationPending" xml:space="preserve">
+    <value>等待 PowerShell 执行批准</value>
+  </data>
+  <data name="AgentActivityPowerShellApproved" xml:space="preserve">
+    <value>PowerShell 执行批准</value>
+  </data>
+  <data name="AgentActivityPowerShellCancelled" xml:space="preserve">
+    <value>PowerShell 执行已取消</value>
+  </data>
+  <data name="SettingsLlmAgentVerbose" xml:space="preserve">
+    <value>启用 Agent 详细输出（Verbose）</value>
+  </data>
+  <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
+    <value>自动批准 Git 文件夹内的文件更改/创建</value>
+  </data>
+  <data name="SettingsLlmAgentAutoApprovePlanning" xml:space="preserve">
+    <value>自动批准计划执行</value>
+  </data>
+  <data name="AgentVerboseReadFileOnly" xml:space="preserve">
+    <value>已读取文件</value>
+  </data>
+  <data name="AgentVerboseReadSkillOnly" xml:space="preserve">
+    <value>已参考 {0} 技能。</value>
+  </data>
+  <data name="AgentHtmlCodeBlockHidden" xml:space="preserve">
+    <value>[HTML 代码块隐藏 (Verbose Disabled)]</value>
+  </data>
+  <data name="AgentVerboseAppendFileOnly" xml:space="preserve">
+    <value>已向文件追加内容</value>
+  </data>
+  <data name="AgentVerboseSearchReplaceOnly" xml:space="preserve">
+    <value>已完成搜索/替换</value>
+  </data>
+  <data name="AgentVerboseMergeFilesOnly" xml:space="preserve">
+    <value>已合并文件</value>
+  </data>
+  <data name="AgentVerboseSplitFileOnly" xml:space="preserve">
+    <value>已拆分文件</value>
+  </data>
+  <data name="AgentVerboseListFilesOnly" xml:space="preserve">
+    <value>已读取文件夹</value>
+  </data>
+  <data name="AgentVerboseSearchTextOnly" xml:space="preserve">
+    <value>已完成文本搜索</value>
+  </data>
+  <data name="AgentVerboseRunRgOnly" xml:space="preserve">
+    <value>已完成 Ripgrep 搜索</value>
+  </data>
+  <data name="AgentVerboseRunRgaOnly" xml:space="preserve">
+    <value>已完成 Ripgrep All 搜索</value>
+  </data>
+  <data name="AgentVerboseRunPowerShellOnly" xml:space="preserve">
+    <value>已执行 PowerShell 命令</value>
+  </data>
+  <data name="AgentVerboseRunPdftotextOnly" xml:space="preserve">
+    <value>已完成 PdfToText 转换</value>
+  </data>
+  <data name="AgentVerboseWebSearchOnly" xml:space="preserve">
+    <value>已完成网页搜索</value>
+  </data>
+  <data name="AgentVerboseWebFetchOnly" xml:space="preserve">
+    <value>已读取网页</value>
+  </data>
+  <data name="AgentVerboseSaveTabOnly" xml:space="preserve">
+    <value>已保存标签页</value>
+  </data>
+  <data name="AgentVerboseEditTabOnly" xml:space="preserve">
+    <value>已编辑标签页内容</value>
+  </data>
+  <data name="AgentVerboseOpenFileOnly" xml:space="preserve">
+    <value>已打开文件</value>
+  </data>
+  <data name="AgentVerboseOpenFileExistingOnly" xml:space="preserve">
+    <value>已激活已打开的文件</value>
+  </data>
+  <data name="AgentModifiedFilesHeader" xml:space="preserve">
+    <value>修改文件（点击比较）</value>
+  </data>
+  <data name="AgentModifiedFilesDescription" xml:space="preserve">
+    <value>已修改文件的列表。单击右侧图标即可恢复。</value>
+  </data>
+  <data name="AgentActivityFileReverted" xml:space="preserve">
+    <value>恢复的文件更改：{0}</value>
+  </data>
+  <data name="AgentFileEditAlreadyComplete" xml:space="preserve">
+    <value>请求的任务已完成。</value>
+  </data>
+  <data name="AgentRevertErrorTitle" xml:space="preserve">
+    <value>恢复错误</value>
+  </data>
+  <data name="AgentRevertErrorFormat" xml:space="preserve">
+    <value>恢复文件时出错：{0}</value>
+  </data>
+  <data name="AgentSessionRewindErrorTitle" xml:space="preserve">
+    <value>会话倒带错误</value>
+  </data>
+  <data name="AgentSessionRewindErrorFormat" xml:space="preserve">
+    <value>回滚会话时发生错误：{0}</value>
+  </data>
+  <data name="AgentDiffTitle" xml:space="preserve">
+    <value>Agent 更改比较</value>
+  </data>
+  <data name="DiffOriginalLabel" xml:space="preserve">
+    <value>原创</value>
+  </data>
+  <data name="DiffModifiedLabel" xml:space="preserve">
+    <value>修改</value>
+  </data>
+  <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
+    <value>关闭列表</value>
+  </data>
+  <data name="AgentAddAttachmentTooltip" xml:space="preserve">
+    <value>添加图像或文件</value>
+  </data>
+  <data name="AgentRemoveAttachmentTooltip" xml:space="preserve">
+    <value>删除附件</value>
+  </data>
+  <data name="AgentAttachmentErrorTitle" xml:space="preserve">
+    <value>附件错误</value>
+  </data>
+  <data name="AgentAttachmentErrorFormat" xml:space="preserve">
+    <value>添加附件时出错：{0}</value>
+  </data>
+  <data name="AgentPdfAttachmentExcluded" xml:space="preserve">
+    <value>PDF 文件不作为附件包含在内。</value>
+  </data>
+  <data name="AgentAttachmentFileDetail" xml:space="preserve">
+    <value>文件，{0:N0} 字符</value>
+  </data>
+  <data name="AgentAttachmentFileTruncatedDetail" xml:space="preserve">
+    <value>文件，包含第一个 {0:N0} 字符</value>
+  </data>
+  <data name="AgentAttachmentDocumentPathOnlyDetail" xml:space="preserve">
+    <value>仅文档、路径</value>
+  </data>
+  <data name="AgentPresetButtonTooltip" xml:space="preserve">
+    <value>角色/指令预设</value>
+  </data>
+  <data name="AgentPresetAddText" xml:space="preserve">
+    <value>添加预设</value>
+  </data>
+  <data name="AgentPresetEditText" xml:space="preserve">
+    <value>编辑</value>
+  </data>
+  <data name="AgentPresetDeleteText" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="AgentPresetEmptyText" xml:space="preserve">
+    <value>无预设</value>
+  </data>
+  <data name="AgentPresetRemoveTooltip" xml:space="preserve">
+    <value>取消选择</value>
+  </data>
+  <data name="AgentPresetSavePlaceholder" xml:space="preserve">
+    <value>Enter 预设名称...</value>
+  </data>
+  <data name="AgentPresetContentPlaceholder" xml:space="preserve">
+    <value>角色/指令内容...</value>
+  </data>
+  <data name="AgentPresetSaveLabel" xml:space="preserve">
+    <value>预设名称</value>
+  </data>
+  <data name="AgentPresetContentLabel" xml:space="preserve">
+    <value>角色/说明</value>
+  </data>
+  <data name="AgentPresetSaveAddButton" xml:space="preserve">
+    <value>添加</value>
+  </data>
+  <data name="AgentPresetSaveCancelButton" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="AgentPresetEditTitle" xml:space="preserve">
+    <value>编辑预设</value>
+  </data>
+  <data name="AgentPresetEditSaveButton" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="AgentPresetNameEmptyTitle" xml:space="preserve">
+    <value>添加预设错误</value>
+  </data>
+  <data name="AgentPresetNameEmptyMessage" xml:space="preserve">
+    <value>请输入预设名称。</value>
+  </data>
+  <data name="AgentPresetDuplicateTitle" xml:space="preserve">
+    <value>重复预设</value>
+  </data>
+  <data name="AgentPresetDuplicateMessage" xml:space="preserve">
+    <value>具有此名称的预设已存在。您想覆盖它吗？</value>
+  </data>
+  <data name="AgentSkillButtonTooltip" xml:space="preserve">
+    <value>技能</value>
+  </data>
+  <data name="AgentSkillTitle" xml:space="preserve">
+    <value>技能</value>
+  </data>
+  <data name="AgentSkillEmptyText" xml:space="preserve">
+    <value>没有安装技能</value>
+  </data>
+  <data name="AgentSkillRemoveTooltip" xml:space="preserve">
+    <value>取消选择技能</value>
+  </data>
+  <data name="AgentSkillRefreshTooltip" xml:space="preserve">
+    <value>重新扫描技能目录</value>
+  </data>
+  <data name="AgentSkillOpenFolderTooltip" xml:space="preserve">
+    <value>打开技能文件夹</value>
+  </data>
+  <data name="AgentSkillChipPrefix" xml:space="preserve">
+    <value>技能： </value>
+  </data>
+  <data name="AgentSkillDisplayLabelFormat" xml:space="preserve">
+    <value>技能：{0}</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImage" xml:space="preserve">
+    <value>插入 Markdown</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImageErrorTitle" xml:space="preserve">
+    <value>Markdown 插入失败</value>
+  </data>
+  <data name="ExplorerInsertMarkdownImageNoEditor" xml:space="preserve">
+    <value>选择文本编辑器选项卡以插入 Markdown 图像。</value>
+  </data>
+  <data name="ExplorerSortName" xml:space="preserve">
+    <value>排序： 名称</value>
+  </data>
+  <data name="ExplorerSortNewest" xml:space="preserve">
+    <value>排序：最新修改</value>
+  </data>
+  <data name="ExplorerSortOldest" xml:space="preserve">
+    <value>排序：最旧的修改</value>
+  </data>
+  <data name="AgentHistoryTooltip" xml:space="preserve">
+    <value>会话历史记录</value>
+  </data>
+  <data name="AgentHistoryTitle" xml:space="preserve">
+    <value>会话历史记录（最近 20 个）</value>
+  </data>
+  <data name="AgentDeleteHistoryTooltip" xml:space="preserve">
+    <value>清除所有历史记录</value>
+  </data>
+  <data name="AgentHistoryDeleteText" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="AgentHistoryEmptyText" xml:space="preserve">
+    <value>没有历史记录</value>
+  </data>
+  <data name="AgentHistoryLoadedActivity" xml:space="preserve">
+    <value>会话历史记录已加载</value>
+  </data>
+  <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
+    <value>新标签页</value>
+  </data>
+  <data name="LlmInsertNewTabOutputTooltip" xml:space="preserve">
+    <value>在新选项卡中插入 AI 响应（仅限所选部分，如果选择）</value>
+  </data>
+  <data name="AgentInsertNewTabOutputButtonText" xml:space="preserve">
+    <value>新 Tab</value>
+  </data>
+  <data name="AgentInsertNewTabOutputTooltip" xml:space="preserve">
+    <value>在新选项卡中插入 Agent 响应（仅限所选部分，如果选择）</value>
+  </data>
+  <data name="SettingsHomeFolder" xml:space="preserve">
+    <value>主文件夹</value>
+  </data>
+   <data name="SettingsHomeFolderPlaceholder" xml:space="preserve">
+     <value>C:\用户\...\文档</value>
+   </data>
+   <data name="ExplorerHomeFolderTooltip" xml:space="preserve">
+     <value>转到主文件夹</value>
+   </data>
+   <data name="OpenExternalViewerTooltip" xml:space="preserve">
+     <value>在外部查看器中打开</value>
+    </data>
+    <data name="OpenWithDefaultProgramTooltip" xml:space="preserve">
+      <value>用默认程序打开</value>
+    </data>
+    <data name="OpenWithDefaultProgramFailedTitle" xml:space="preserve">
+      <value>无法使用 Default 程序打开</value>
+    </data>
+    <data name="OpenWithDefaultProgramNoActiveTab" xml:space="preserve">
+      <value>没有可用默认程序打开的活动选项卡。</value>
+    </data>
+    <data name="ExternalViewerOpenTitle" xml:space="preserve">
+     <value>打开外部查看器</value>
+   </data>
+   <data name="ExternalViewerOpenFailedTitle" xml:space="preserve">
+     <value>无法打开外部查看器</value>
+   </data>
+   <data name="ExternalViewerNoActiveTab" xml:space="preserve">
+     <value>外部查看器中没有可打开的活动选项卡。</value>
+   </data>
+   <data name="ExternalViewerPathMissing" xml:space="preserve">
+     <value>首先在“设置”&gt;“编辑器”中设置外部查看器路径或命令别名。</value>
+   </data>
+   <data name="ExternalViewerStartFailedFormat" xml:space="preserve">
+     <value>无法启动外部查看器：{0}{1}Shell 启动失败：{2}{1}直接启动失败：{3}</value>
+   </data>
+   <data name="SettingsExternalViewerPath" xml:space="preserve">
+     <value>外部查看器路径或命令别名</value>
+   </data>
+   <data name="SettingsExternalViewerPathPlaceholder" xml:space="preserve">
+     <value>uviewer 或 C:\Program Files\Viewer\viewer.exe</value>
+   </data>
+   <data name="SettingsExternalViewerArguments" xml:space="preserve">
+     <value>外部观察者的争论</value>
+   </data>
+   <data name="SettingsExternalViewerArgumentsPlaceholder" xml:space="preserve">
+     <value>例如，--open {file}</value>
+   </data>
+   <data name="SettingsExternalViewerArgumentsInfo" xml:space="preserve">
+     <value>在应插入当前文件路径的位置使用 {file}。如果省略 {file}，则将文件路径添加为最后一个参数。</value>
+   </data>
+   <data name="SettingsBackupTitle" xml:space="preserve">
+     <value>所有设置</value>
+   </data>
+   <data name="SettingsExportAllButton" xml:space="preserve">
+     <value>导出所有设置</value>
+   </data>
+   <data name="SettingsImportAllButton" xml:space="preserve">
+     <value>导入所有设置</value>
+   </data>
+   <data name="SettingsBackupDescription" xml:space="preserve">
+     <value>将整个 .TxtAIEditor 文件夹导出到 txtaieditor-setting.zip 或从 zip 文件导入。</value>
+   </data>
+   <data name="SettingsBackupPickerUnavailable" xml:space="preserve">
+     <value>无法打开文件选择器。</value>
+   </data>
+   <data name="SettingsBackupZipFileType" xml:space="preserve">
+     <value>ZIP 存档</value>
+   </data>
+   <data name="SettingsBackupExporting" xml:space="preserve">
+     <value>正在导出所有设置...</value>
+   </data>
+   <data name="SettingsBackupExportedFormat" xml:space="preserve">
+     <value>所有设置均已导出：{0}</value>
+   </data>
+   <data name="SettingsBackupExportFailedFormat" xml:space="preserve">
+     <value>无法导出所有设置：{0}</value>
+   </data>
+   <data name="SettingsBackupImporting" xml:space="preserve">
+     <value>正在导入所有设置...</value>
+   </data>
+   <data name="SettingsBackupImported" xml:space="preserve">
+     <value>所有设置均已导入。</value>
+   </data>
+   <data name="SettingsBackupImportFailedFormat" xml:space="preserve">
+     <value>无法导入所有设置：{0}</value>
+   </data>
+   <data name="SettingsBackupImportedTitle" xml:space="preserve">
+     <value>导入的设置</value>
+   </data>
+   <data name="SettingsBackupImportedMessage" xml:space="preserve">
+     <value>所有设置均已导入。当前设置已重新加载，某些项目可能需要重新启动。</value>
+   </data>
+   <data name="Ok" xml:space="preserve">
+     <value>确定</value>
+   </data>
+   <data name="LlmErrorInvalidApiKey" xml:space="preserve">
+     <value>API Key 无效。请先检查您的设置。</value>
+   </data>
+   <data name="LlmErrorInvalidApiCredential" xml:space="preserve">
+     <value>API Key 无效。请先检查您的设置。</value>
+   </data>
+   <data name="LlmErrorEmptyResponse" xml:space="preserve">
+     <value>收到 AI 的空回复。</value>
+   </data>
+   <data name="OpenAIErrorApiCallFailed" xml:space="preserve">
+     <value>OpenAI API 调用失败 ({0}): {1}</value>
+   </data>
+   <data name="OpenAIErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenAI API 流式调用失败 ({0})：{1}</value>
+   </data>
+   <data name="OpenRouterErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenRouter API 流式调用失败 ({0})：{1}</value>
+   </data>
+   <data name="CerebrasErrorApiCallFailed" xml:space="preserve">
+     <value>Cerebras API 调用失败 ({0}): {1}</value>
+   </data>
+   <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
+     <value>Cerebras API 流式调用失败 ({0})：{1}</value>
+   </data>
+   <data name="GeminiErrorApiCallFailed" xml:space="preserve">
+     <value>Google Gemini API 调用失败 ({0})：{1}</value>
+   </data>
+   <data name="GeminiErrorEmptyResponse" xml:space="preserve">
+     <value>收到来自 Gemini AI 的空响应。</value>
+   </data>
+   <data name="GeminiErrorStreamCallFailed" xml:space="preserve">
+     <value>Google Gemini API 流式调用失败 ({0})：{1}</value>
+   </data>
+   <data name="GeminiThinkingFormat" xml:space="preserve">
+     <value>【思考：{0}代币】</value>
+   </data>
+   <data name="LmStudioErrorNoModelSelected" xml:space="preserve">
+     <value>请先选择LM Studio型号。</value>
+   </data>
+   <data name="LmStudioErrorApiCallFailed" xml:space="preserve">
+     <value>LM Studio API 调用失败 ({0}): {1}</value>
+   </data>
+   <data name="LmStudioErrorEmptyResponse" xml:space="preserve">
+     <value>收到来自 LM Studio 的空响应。</value>
+   </data>
+   <data name="LmStudioErrorStreamCallFailed" xml:space="preserve">
+     <value>LM Studio API 流式调用失败 ({0})：{1}</value>
+   </data>
+    <data name="OllamaErrorNoModelSelected" xml:space="preserve">
+      <value>请先选择Ollama型号。</value>
+    </data>
+    <data name="OllamaErrorStreamCallFailed" xml:space="preserve">
+      <value>Ollama API 流式调用失败 ({0})：{1}</value>
+    </data>
+    <data name="OllamaCloudErrorNoModelSelected" xml:space="preserve">
+      <value>请先选择Ollama Cloud型号。</value>
+    </data>
+    <data name="OllamaCloudErrorStreamCallFailed" xml:space="preserve">
+      <value>Ollama Cloud API 流式调用失败 ({0})：{1}</value>
+    </data>
+   <data name="GoErrorApiCallFailed" xml:space="preserve">
+     <value>OpenCode Go API 调用失败 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorStreamCallFailed" xml:space="preserve">
+     <value>OpenCode Go API 流式调用失败 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorAnthropicApiCallFailed" xml:space="preserve">
+     <value>Anthropic API 调用失败 ({0}): {1}</value>
+   </data>
+   <data name="GoErrorAnthropicStreamCallFailed" xml:space="preserve">
+     <value>Anthropic API 流式调用失败 ({0})：{1}</value>
+   </data>
+   <data name="LlmErrorNoApiKey" xml:space="preserve">
+     <value>错误：对应的 LLM API Key 未在 Credential Manager 中注册。请先打开“设置”并保存您的 API Key。</value>
+   </data>
+   <data name="LlmErrorNoApiKeyOrToken" xml:space="preserve">
+     <value>错误：对应的 LLM API Key 未在 Credential Manager 中注册。请先打开“设置”并保存凭据。</value>
+   </data>
+   <data name="LlmErrorCommunicationPrefix" xml:space="preserve">
+     <value>AI通讯发生错误： </value>
+   </data>
+   <data name="AgentActivityExtractDocumentProgressFormat" xml:space="preserve">
+     <value>提取文档文本：{0}%</value>
+   </data>
+   <data name="AgentActivityExtractDocumentFormat" xml:space="preserve">
+     <value>提取文档文本：{0}</value>
+   </data>
+   <data name="AgentVerboseExtractDocumentOnly" xml:space="preserve">
+     <value>已完成文档文本提取</value>
+   </data>
+   <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
+     <value>extract_document 失败：路径为空。提供 PDF、DOCX、PPTX、XLSX、HWPX、DOC、XLS 或 PPT 文件路径。</value>
+   </data>
+   <data name="AgentExtractDocumentFailedFormat" xml:space="preserve">
+     <value>提取文档失败：{0}</value>
+   </data>
+   <data name="AgentExtractDocumentUnsupportedTypeFormat" xml:space="preserve">
+     <value>extract_document 失败：不支持的文件类型“{0}”。支持的类型：.pdf、.docx、.pptx、.xlsx、.hwpx、.doc、.xls、.ppt。</value>
+   </data>
+   <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
+     <value>extract_document 失败：无法从 {0} 中提取文本：{1}</value>
+   </data>
+   <data name="AgentExtractDocumentNoTextFormat" xml:space="preserve">
+     <value>extract_document：没有从 {0} 中提取文本。如果这是扫描的 PDF 或仅图像文档，可能需要 OCR。</value>
+   </data>
+   <data name="AgentExtractDocumentUnchangedPrefix" xml:space="preserve">
+     <value>extract_document 不变：</value>
+   </data>
+   <data name="AgentExtractDocumentUnchangedDetail" xml:space="preserve">
+     <value>输出文件已包含提取的文本。</value>
+   </data>
+   <data name="AgentExtractDocumentSavedPrefix" xml:space="preserve">
+     <value>extract_document 已保存：</value>
+   </data>
+   <data name="AgentExtractDocumentSourcePrefix" xml:space="preserve">
+     <value>来源：</value>
+   </data>
+   <data name="AgentExtractDocumentOutputExistsNoteFormat" xml:space="preserve">
+     <value>注意：请求的输出已存在，因此转换后的文本被保存到新文件而不是覆盖：{0}</value>
+  </data>
+  <data name="AgentStreamToTab" xml:space="preserve">
+    <value>串流至 Tab</value>
+  </data>
+  <data name="ExplorerFilterPlaceholder" xml:space="preserve">
+    <value>按名称过滤（包括子文件夹）...</value>
+  </data>
+  <data name="ExplorerFilterClearTooltip" xml:space="preserve">
+    <value>清除过滤器</value>
+  </data>
+  <data name="ExplorerFilterResultFormat" xml:space="preserve">
+    <value>{0:N0} 结果</value>
+  </data>
+  <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
+    <value>不受支持的 Office 文档。</value>
+  </data>
+  <data name="OfficeViewerDocxStructureError" xml:space="preserve">
+    <value>无法读取 DOCX 文档结构。</value>
+  </data>
+  <data name="OfficeViewerHwpxStructureError" xml:space="preserve">
+    <value>无法读取 HWPX 文档结构。</value>
+  </data>
+  <data name="OfficeViewerPptxStructureError" xml:space="preserve">
+    <value>无法读取 PPTX 演示结构。</value>
+  </data>
+  <data name="OfficeViewerNoBody" xml:space="preserve">
+    <value>没有可显示的文档正文。</value>
+  </data>
+  <data name="OfficeViewerNoContent" xml:space="preserve">
+    <value>没有可显示的内容。</value>
+  </data>
+  <data name="OfficeViewerNoSlides" xml:space="preserve">
+    <value>没有可显示的幻灯片。</value>
+  </data>
+  <data name="OfficeViewerSlideRenderError" xml:space="preserve">
+    <value>无法渲染任何幻灯片。</value>
+  </data>
+  <data name="OfficeViewerNoSheets" xml:space="preserve">
+    <value>没有可显示的工作表。</value>
+  </data>
+  <data name="OfficeViewerEmptySheet" xml:space="preserve">
+    <value>空表。</value>
+  </data>
+  <data name="OfficeViewerRowsLabel" xml:space="preserve">
+    <value>行</value>
+  </data>
+  <data name="OfficeViewerColumnsLabel" xml:space="preserve">
+    <value>列</value>
+  </data>
+  <data name="OfficeViewerFirstRowsShownFormat" xml:space="preserve">
+    <value>显示第一个 {0}</value>
+  </data>
+  <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
+    <value>板材</value>
+  </data>
+  <data name="AgentMcpButtonTooltip" xml:space="preserve">
+    <value>MCP 服务器</value>
+  </data>
+  <data name="AgentMcpAddText" xml:space="preserve">
+    <value>添加 MCP</value>
+  </data>
+  <data name="AgentMcpEmptyText" xml:space="preserve">
+    <value>没有 MCP 服务器</value>
+  </data>
+  <data name="AgentMcpDeleteText" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="AgentMcpEditText" xml:space="preserve">
+    <value>编辑</value>
+  </data>
+  <data name="AgentMcpRemoveTooltip" xml:space="preserve">
+    <value>Disable MCP</value>
+  </data>
+  <data name="AgentMcpChipPrefix" xml:space="preserve">
+    <value>MCP： </value>
+  </data>
+  <data name="AgentMcpDisplayLabelFormat" xml:space="preserve">
+    <value>MCP: {0}</value>
+  </data>
+  <data name="AgentMcpNamePlaceholder" xml:space="preserve">
+    <value>Enter MCP 名称...</value>
+  </data>
+  <data name="AgentMcpEndpointPlaceholder" xml:space="preserve">
+    <value>https://server.example/mcp</value>
+  </data>
+  <data name="AgentMcpNameLabel" xml:space="preserve">
+    <value>MCP 名称</value>
+  </data>
+  <data name="AgentMcpEndpointLabel" xml:space="preserve">
+    <value>MCP 地址</value>
+  </data>
+  <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
+    <value>API Key 标头名称</value>
+  </data>
+  <data name="AgentMcpHeaderNamePlaceholder" xml:space="preserve">
+    <value>授权</value>
+  </data>
+  <data name="AgentMcpApiKeyLabel" xml:space="preserve">
+    <value>API Key</value>
+  </data>
+  <data name="AgentMcpApiKeyPlaceholder" xml:space="preserve">
+    <value>Enter API Key...</value>
+  </data>
+  <data name="AgentMcpApiKeyInfo" xml:space="preserve">
+    <value>API 密钥存储在 Windows Credential Manager 中，而不是存储在 MCP 设置文件中。</value>
+  </data>
+  <data name="AgentMcpCredentialInfo" xml:space="preserve">
+    <value>API 密钥、OAuth 客户端密钥和 OAuth 令牌存储在 Windows Credential Manager 中，而不是存储在 MCP 设置文件中。</value>
+  </data>
+  <data name="AgentMcpAuthTypeLabel" xml:space="preserve">
+    <value>认证</value>
+  </data>
+  <data name="AgentMcpAuthTypeNone" xml:space="preserve">
+    <value>无</value>
+  </data>
+  <data name="AgentMcpAuthTypeApiKey" xml:space="preserve">
+    <value>API Key 标头</value>
+  </data>
+  <data name="AgentMcpAuthTypeOAuthBearer" xml:space="preserve">
+    <value>OAuth 访问令牌</value>
+  </data>
+  <data name="AgentMcpAuthTypeOAuthBrowser" xml:space="preserve">
+    <value>OAuth浏览器登录</value>
+  </data>
+  <data name="AgentMcpOAuthTokenLabel" xml:space="preserve">
+    <value>OAuth 访问令牌</value>
+  </data>
+  <data name="AgentMcpOAuthTokenPlaceholder" xml:space="preserve">
+    <value>Enter OAuth 访问令牌...</value>
+  </data>
+  <data name="AgentMcpOAuthClientIdLabel" xml:space="preserve">
+    <value>OAuth 客户端 ID</value>
+  </data>
+  <data name="AgentMcpOAuthClientIdPlaceholder" xml:space="preserve">
+    <value>Enter OAuth 客户端 ID...</value>
+  </data>
+  <data name="AgentMcpOAuthClientSecretLabel" xml:space="preserve">
+    <value>OAuth 客户端密码</value>
+  </data>
+  <data name="AgentMcpOAuthClientSecretPlaceholder" xml:space="preserve">
+    <value>Enter OAuth 客户端秘密...</value>
+  </data>
+  <data name="AgentMcpOAuthAuthorizationEndpointLabel" xml:space="preserve">
+    <value>授权URL</value>
+  </data>
+  <data name="AgentMcpOAuthAuthorizationEndpointPlaceholder" xml:space="preserve">
+    <value>https://auth.example.com/oauth/authorize</value>
+  </data>
+  <data name="AgentMcpOAuthTokenEndpointLabel" xml:space="preserve">
+    <value>代币 URL</value>
+  </data>
+  <data name="AgentMcpOAuthTokenEndpointPlaceholder" xml:space="preserve">
+    <value>https://auth.example.com/oauth/token</value>
+  </data>
+  <data name="AgentMcpOAuthScopesLabel" xml:space="preserve">
+    <value>OAuth 适用范围</value>
+  </data>
+  <data name="AgentMcpOAuthScopesPlaceholder" xml:space="preserve">
+    <value>范围1 范围2</value>
+  </data>
+  <data name="AgentMcpSaveAddButton" xml:space="preserve">
+    <value>添加</value>
+  </data>
+  <data name="AgentMcpEditTitle" xml:space="preserve">
+    <value>编辑 MCP</value>
+  </data>
+  <data name="AgentMcpEditSaveButton" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="AgentMcpAddErrorTitle" xml:space="preserve">
+    <value>添加 MCP 错误</value>
+  </data>
+  <data name="AgentMcpEditErrorTitle" xml:space="preserve">
+    <value>编辑 MCP 错误</value>
+  </data>
+  <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
+    <value>Enter MCP 名称和地址。</value>
+  </data>
+  <data name="AgentMcpEndpointInvalid" xml:space="preserve">
+    <value>MCP 地址必须是 http 或 https URL。</value>
+  </data>
+  <data name="AgentMcpHeaderPairRequired" xml:space="preserve">
+    <value>Enter 输入 API Key 时的标头名称。</value>
+  </data>
+  <data name="AgentMcpOAuthTokenRequired" xml:space="preserve">
+    <value>Enter OAuth 访问令牌。</value>
+  </data>
+  <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
+    <value>Enter、OAuth 客户端 ID、客户端密钥、授权 URL 和令牌 URL。</value>
+  </data>
+  <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
+    <value>OAuth 授权 URL 和令牌 URL 必须是 http 或 https URL。</value>
+  </data>
+  <data name="AgentMcpAuthTypeInvalid" xml:space="preserve">
+    <value>不支持此身份验证类型。</value>
+  </data>
+  <data name="AgentMcpOAuthLoginTimeout" xml:space="preserve">
+    <value>OAuth 浏览器登录超时。</value>
+  </data>
+  <data name="AgentMcpOAuthLoginInvalidResponse" xml:space="preserve">
+    <value>OAuth 登录响应无效。</value>
+  </data>
+  <data name="AgentMcpExportErrorTitle" xml:space="preserve">
+    <value>导出 MCP 错误</value>
+  </data>
+  <data name="AgentMcpExportErrorMessage" xml:space="preserve">
+    <value>导出 MCP 服务器时出错：{0}</value>
+  </data>
+  <data name="AgentMcpImportInvalidFile" xml:space="preserve">
+    <value>这不是可导入的 MCP JSON 文件。</value>
+  </data>
+  <data name="AgentMcpImportErrorTitle" xml:space="preserve">
+    <value>导入 MCP 错误</value>
+  </data>
+  <data name="AgentMcpImportErrorMessage" xml:space="preserve">
+    <value>导入 MCP 服务器时出错：{0}</value>
+  </data>
+  <data name="AgentMcpStatusConnecting" xml:space="preserve">
+    <value>正在连接</value>
+  </data>
+  <data name="AgentMcpStatusToolCount" xml:space="preserve">
+    <value>{0:N0} 工具</value>
+  </data>
+  <data name="AgentMcpStatusFailedFormat" xml:space="preserve">
+    <value>连接失败：{0}</value>
+  </data>
+  <data name="AgentMcpComfyUiDetail" xml:space="preserve">
+    <value>内置插件 - 从 API JSON/parameters 生成图像</value>
+  </data>
+  <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
+    <value>内置插件无法编辑或删除。</value>
+  </data>
+  <data name="AgentActivityMcpToolFormat" xml:space="preserve">
+    <value>运行 MCP 工具：{0} ({1})</value>
+  </data>
+  <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
+    <value>已执行 MCP 工具</value>
+  </data>
+  <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
+    <value>向左滚动选定的筹码</value>
+  </data>
+  <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
+    <value>向右滚动选定的筹码</value>
+  </data>
+  <data name="AgentOpenSessionsTooltip" xml:space="preserve">
+    <value>公开会议</value>
+  </data>
+  <data name="AgentOpenSessionsTitle" xml:space="preserve">
+    <value>公开会议</value>
+  </data>
+  <data name="AgentOpenSessionsEmptyText" xml:space="preserve">
+    <value>没有公开会议</value>
+  </data>
+  <data name="AgentOpenSessionCloseText" xml:space="preserve">
+    <value>结束会议</value>
+  </data>
+  <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
+    <value>跑步</value>
+  </data>
+  <data name="AgentOpenSessionUntitled" xml:space="preserve">
+    <value>新会话</value>
+  </data>
+  <data name="SearchReplaceReadOnlyTitle" xml:space="preserve">
+    <value>无法更换</value>
+  </data>
+  <data name="SearchReplaceReadOnlyContent" xml:space="preserve">
+    <value>文档搜索结果是只读的且无法替换。</value>
+  </data>
+  <data name="DragDropCopyRootCaption" xml:space="preserve">
+    <value>复制到资源管理器文件夹</value>
+  </data>
+  <data name="DragDropCopyItemCaptionFormat" xml:space="preserve">
+    <value>复制到“{0}”</value>
+  </data>
+  <data name="DragDropCopyItemCaption" xml:space="preserve">
+    <value>复制到此位置</value>
+  </data>
+  <data name="DragDropCopyErrorTitle" xml:space="preserve">
+    <value>拖放复制错误</value>
+  </data>
+  <data name="CopyOverwriteTitle" xml:space="preserve">
+    <value>确认覆盖</value>
+  </data>
+  <data name="CopyOverwriteMessage" xml:space="preserve">
+    <value>文件“{0}”已存在。您想覆盖它吗？</value>
+  </data>
+  <data name="CopyOverwriteFolderMessage" xml:space="preserve">
+    <value>文件夹“{0}”已存在。您想合并/覆盖它吗？ （现有文件将被保留或覆盖）</value>
+  </data>
+  <data name="CopyOverwriteOK" xml:space="preserve">
+    <value>覆盖</value>
+  </data>
+  <data name="CopyOverwriteCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="CopyFolderErrorTitle" xml:space="preserve">
+    <value>文件夹复制错误</value>
+  </data>
+  <data name="CopyFolderSelfParent" xml:space="preserve">
+    <value>无法将文件夹复制到其自身或其子文件夹中。</value>
+  </data>
+  <data name="DragDropOpenFileCaption" xml:space="preserve">
+    <value>打开文件</value>
+  </data>
+  <data name="DragDropErrorTitle" xml:space="preserve">
+    <value>拖放错误</value>
+  </data>
+  <data name="AgentAttachFileCaption" xml:space="preserve">
+    <value>附加文件</value>
+  </data>
+  <data name="SearchFailedTitle" xml:space="preserve">
+    <value>搜索失败</value>
+  </data>
+  <data name="SearchNoFolderSelectedMessage" xml:space="preserve">
+    <value>首先在资源管理器中选择一个文件夹。</value>
+  </data>
+  <data name="SearchInvalidRegexMessageFormat" xml:space="preserve">
+    <value>正则表达式无效。&#10;{0}</value>
+  </data>
+  <data name="SearchErrorMessageFormat" xml:space="preserve">
+    <value>搜索时发生错误。&#10;{0}</value>
+  </data>
+  <data name="SearchCompletedTitle" xml:space="preserve">
+    <value>搜索完成</value>
+  </data>
+  <data name="SearchNoResultsSkippedFormat" xml:space="preserve">
+    <value>没有找到结果。&#10;跳过不可读的文件：{0:N0}</value>
+  </data>
+  <data name="ReplaceFailedTitle" xml:space="preserve">
+    <value>替换失败</value>
+  </data>
+  <data name="ReplaceAllWarningTitle" xml:space="preserve">
+    <value>替换所有警告</value>
+  </data>
+  <data name="ReplaceAllWarningContentFormat" xml:space="preserve">
+    <value>将 {0:N0} 匹配项替换为“{1}”？</value>
+  </data>
+  <data name="ReplaceAllConfirmButton" xml:space="preserve">
+    <value>运行替换</value>
+  </data>
+  <data name="ReplaceCompletedTitle" xml:space="preserve">
+    <value>更换完成</value>
+  </data>
+  <data name="ReplaceCompletedMessage" xml:space="preserve">
+    <value>所有匹配的项目都已被替换。</value>
+  </data>
+  <data name="ReplaceOneFailureFormat" xml:space="preserve">
+    <value>更换失败：{0}</value>
+  </data>
+  <data name="CompareInvalidSelectionTitle" xml:space="preserve">
+    <value>比较错误</value>
+  </data>
+  <data name="CompareInvalidSelectionMessage" xml:space="preserve">
+    <value>选择两个有效的文件或选项卡。</value>
+  </data>
+  <data name="OpenInBrowserDialogTitle" xml:space="preserve">
+    <value>在浏览器中打开</value>
+  </data>
+  <data name="OpenInBrowserFailedTitle" xml:space="preserve">
+    <value>在浏览器中打开失败</value>
+  </data>
+  <data name="OpenInBrowserNoActiveTab" xml:space="preserve">
+    <value>浏览器中没有可打开的活动选项卡。</value>
+  </data>
+  <data name="CharacterMapOpenFailedTitle" xml:space="preserve">
+    <value>字符映射表启动失败</value>
+  </data>
+  <data name="EmojiFileOpenFailedTitle" xml:space="preserve">
+    <value>打开表情符号文件失败</value>
+  </data>
+  <data name="StartupOpenFailedTitle" xml:space="preserve">
+    <value>启动文件打开失败</value>
+  </data>
+  <data name="SaveFailedTitle" xml:space="preserve">
+    <value>保存失败</value>
+  </data>
+  <data name="EncryptedTabMissingPassword" xml:space="preserve">
+    <value>加密选项卡没有密码。重新打开文件并输入密码。</value>
+  </data>
+  <data name="EncodingChangeFailedTitle" xml:space="preserve">
+    <value>编码更改失败</value>
+  </data>
+  <data name="SaveDialogTextFileFilter" xml:space="preserve">
+    <value>文本文件</value>
+  </data>
+  <data name="SaveDialogMarkdownFileFilter" xml:space="preserve">
+    <value>Markdown 文件</value>
+  </data>
+  <data name="SaveDialogHtmlFileFilter" xml:space="preserve">
+    <value>HTML 文件</value>
+  </data>
+  <data name="SaveDialogLatexFileFilter" xml:space="preserve">
+    <value>LaTeX 文件</value>
+  </data>
+  <data name="PreviewCsvEmpty" xml:space="preserve">
+    <value>空 CSV 文件。</value>
+  </data>
+  <data name="StickyNotePlaceholder" xml:space="preserve">
+    <value>快速注意...</value>
+  </data>
+  <data name="StickyNoteCloseButton" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="FileLoadErrorTitle" xml:space="preserve">
+    <value>文件加载错误</value>
+  </data>
+  <data name="FileOpenFailedTitle" xml:space="preserve">
+    <value>打开文件失败</value>
+  </data>
+  <data name="RecentFileMissingMessageFormat" xml:space="preserve">
+    <value>最近使用的文件不存在:&#10;{0}</value>
+  </data>
+  <data name="CompareTabTitleFormat" xml:space="preserve">
+    <value>比较：{0} ↔ {1}</value>
+  </data>
+  <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
+    <value>[工具执行完成]</value>
   </data>
 </root>

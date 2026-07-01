@@ -6,6 +6,24 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentDisplayLocalizer
     {
+        private static readonly string[] LegacyOutputPlaceholderPrefixes =
+        {
+            "대기 중...",
+            "Waiting...",
+            "待機中...",
+            "等待中..."
+        };
+
+        private static readonly string[] LegacyActivityIdleValues =
+        {
+            "대기 중",
+            "Idle",
+            "待機中",
+            "空闲",
+            "闲置",
+            "閒置"
+        };
+
         private readonly Func<string, string, string> _getString;
 
         public AgentDisplayLocalizer(Func<string, string, string> getString)
@@ -91,6 +109,8 @@ namespace TxtAIEditor.Controls
         {
             string trimmed = (text ?? string.Empty).TrimStart();
             return GetDelimitedValues("AgentOutputPlaceholderKnownPrefixes", OutputPlaceholder)
+                .Concat(LegacyOutputPlaceholderPrefixes)
+                .Distinct(StringComparer.Ordinal)
                 .Any(prefix => trimmed.StartsWith(prefix, StringComparison.Ordinal));
         }
 
@@ -98,6 +118,8 @@ namespace TxtAIEditor.Controls
         {
             string trimmed = (text ?? string.Empty).Trim();
             return GetDelimitedValues("AgentActivityIdleKnownValues", ActivityIdle)
+                .Concat(LegacyActivityIdleValues)
+                .Distinct(StringComparer.Ordinal)
                 .Any(value => string.Equals(trimmed, value, StringComparison.Ordinal));
         }
 
