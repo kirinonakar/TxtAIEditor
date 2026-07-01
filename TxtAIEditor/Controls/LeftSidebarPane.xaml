@@ -498,7 +498,7 @@
                                         <ListView.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Padding="0,2,0,2">
-                                                    <TextBlock Text="{Binding}" FontSize="10" FontFamily="Consolas" TextWrapping="NoWrap" ToolTipService.ToolTip="{Binding}"/>
+                                                    <TextBlock Text="{Binding DisplayText}" FontSize="10" FontFamily="Consolas" TextWrapping="NoWrap" ToolTipService.ToolTip="{Binding DisplayText}"/>
                                                 </Grid>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>

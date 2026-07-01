@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -522,26 +523,71 @@ namespace TxtAIEditor.Core.Services
             return int.TryParse(output.Trim(), out int count) ? count : 0;
         }
 
-        public async Task<IReadOnlyList<string>> GetRecentHistoryAsync(string repoPath, int maxCount = 50)
+        public async Task<IReadOnlyList<GitHistoryItem>> GetRecentHistoryAsync(string repoPath, int maxCount = 50)
         {
             if (string.IsNullOrEmpty(repoPath))
-                return Array.Empty<string>();
+                return Array.Empty<GitHistoryItem>();
 
-            // Include all refs so branch connections are visible in the sidebar graph.
-            string output = await RunGitCommandAsync(repoPath, $"log --graph --all --decorate=short --pretty=format:\"(%h)%d %s - %cd\" --date=format:\"%Y-%m-%d %H:%M\" -n {Math.Max(1, maxCount)}");
+            // Keep the hash for actions, but do not include it in the sidebar display text.
+            string output = await RunGitCommandAsync(repoPath, $"log --graph --all --decorate=short --pretty=format:\"%H%x1f%d %s - %cd\" --date=format:\"%Y-%m-%d %H:%M\" -n {Math.Max(1, maxCount)}");
             if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
-                return Array.Empty<string>();
+                return Array.Empty<GitHistoryItem>();
 
-            string[] lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var historyItems = output
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(ParseHistoryLine)
+                .Where(item => !string.IsNullOrWhiteSpace(item.DisplayText))
+                .ToArray();
             var unpushedHashes = await GetUnpushedCommitShortHashesAsync(repoPath, maxCount);
             if (unpushedHashes.Count == 0)
             {
-                return lines;
+                return historyItems;
             }
 
-            return lines
-                .Select(line => MarkUnpushedHistoryLine(line, unpushedHashes))
+            return historyItems
+                .Select(item => MarkUnpushedHistoryItem(item, unpushedHashes))
                 .ToArray();
+        }
+
+        private static GitHistoryItem ParseHistoryLine(string line)
+        {
+            int separatorIndex = line.IndexOf('\u001f');
+            if (separatorIndex < 0)
+            {
+                return new GitHistoryItem { DisplayText = line };
+            }
+
+            string hashSegment = line.Substring(0, separatorIndex);
+            string commitHash = FindFullCommitHash(hashSegment);
+            string graphPrefix = string.IsNullOrEmpty(commitHash)
+                ? hashSegment
+                : hashSegment.Replace(commitHash, string.Empty, StringComparison.Ordinal).TrimEnd();
+            string commitText = line.Substring(separatorIndex + 1).TrimStart();
+
+            string displayText = string.IsNullOrEmpty(graphPrefix)
+                ? commitText
+                : $"{graphPrefix} {commitText}".TrimEnd();
+
+            return new GitHistoryItem
+            {
+                CommitHash = commitHash,
+                DisplayText = displayText
+            };
+        }
+
+        private static string FindFullCommitHash(string value)
+        {
+            const int FullHashLength = 40;
+            for (int i = 0; i <= value.Length - FullHashLength; i++)
+            {
+                string candidate = value.Substring(i, FullHashLength);
+                if (candidate.All(IsHexCharacter))
+                {
+                    return candidate;
+                }
+            }
+
+            return string.Empty;
         }
 
         private async Task<HashSet<string>> GetUnpushedCommitShortHashesAsync(string repoPath, int maxCount)
@@ -581,26 +627,35 @@ namespace TxtAIEditor.Core.Services
             return !string.IsNullOrWhiteSpace(output) && !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string MarkUnpushedHistoryLine(string line, HashSet<string> unpushedHashes)
+        private static GitHistoryItem MarkUnpushedHistoryItem(GitHistoryItem item, HashSet<string> unpushedHashes)
         {
-            bool isUnpushed = unpushedHashes.Any(hash => line.Contains($"({hash})", StringComparison.OrdinalIgnoreCase));
+            bool isUnpushed = unpushedHashes.Any(hash => item.CommitHash.StartsWith(hash, StringComparison.OrdinalIgnoreCase));
             if (!isUnpushed)
             {
-                return line;
+                return item;
             }
 
             int insertIndex = 0;
-            while (insertIndex < line.Length && IsGitGraphCharacter(line[insertIndex]))
+            while (insertIndex < item.DisplayText.Length && IsGitGraphCharacter(item.DisplayText[insertIndex]))
             {
                 insertIndex++;
             }
 
-            return line.Insert(insertIndex, "\u2191 ");
+            return new GitHistoryItem
+            {
+                CommitHash = item.CommitHash,
+                DisplayText = item.DisplayText.Insert(insertIndex, "\u2191 ")
+            };
         }
 
         private static bool IsGitGraphCharacter(char value)
         {
             return value is ' ' or '*' or '|' or '/' or '\\' or '_' or '-';
+        }
+
+        private static bool IsHexCharacter(char value)
+        {
+            return value is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
         }
 
         public async Task<bool> InitRepositoryAsync(string repoPath)

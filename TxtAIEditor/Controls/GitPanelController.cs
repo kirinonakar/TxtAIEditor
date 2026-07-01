@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -602,18 +601,14 @@ namespace TxtAIEditor.Controls
 
         public async Task ShowHistoryItemAsync(string repoPath)
         {
-            if (_leftSidebar.GitHistory.SelectedItem is not string historyItem || string.IsNullOrEmpty(repoPath))
+            if (_leftSidebar.GitHistory.SelectedItem is not GitHistoryItem historyItem ||
+                string.IsNullOrEmpty(repoPath) ||
+                string.IsNullOrEmpty(historyItem.CommitHash))
             {
                 return;
             }
 
-            var match = Regex.Match(historyItem, @"\b[0-9a-fA-F]{7,40}\b");
-            if (!match.Success)
-            {
-                return;
-            }
-
-            string hash = match.Value;
+            string hash = historyItem.CommitHash;
             try
             {
                 string commitInfo = await _gitService.RunGitCommandAsync(repoPath, $"show --quiet --format=fuller {hash}");

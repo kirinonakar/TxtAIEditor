@@ -9,7 +9,7 @@ namespace TxtAIEditor.Core.Interfaces
         public bool IsRepoDetected { get; set; }
         public string Branch { get; set; } = string.Empty;
         public IReadOnlyList<string> Branches { get; set; } = new List<string>();
-        public IReadOnlyList<string> History { get; set; } = new List<string>();
+        public IReadOnlyList<GitHistoryItem> History { get; set; } = new List<GitHistoryItem>();
         public IReadOnlyList<GitFileItem> Files { get; set; } = new List<GitFileItem>();
     }
 
