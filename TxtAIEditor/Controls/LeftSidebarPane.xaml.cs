@@ -379,6 +379,26 @@ namespace TxtAIEditor.Controls
             {
                 _gitHistoryScrollViewer.ViewChanged += OnGitHistoryScrollViewerViewChanged;
             }
+            else
+            {
+                GitHistoryList.LayoutUpdated += OnGitHistoryListLayoutUpdated;
+            }
+        }
+
+        private void OnGitHistoryListLayoutUpdated(object? sender, object e)
+        {
+            if (_gitHistoryScrollViewer != null)
+            {
+                GitHistoryList.LayoutUpdated -= OnGitHistoryListLayoutUpdated;
+                return;
+            }
+
+            _gitHistoryScrollViewer = FindVisualChild<ScrollViewer>(GitHistoryList);
+            if (_gitHistoryScrollViewer != null)
+            {
+                GitHistoryList.LayoutUpdated -= OnGitHistoryListLayoutUpdated;
+                _gitHistoryScrollViewer.ViewChanged += OnGitHistoryScrollViewerViewChanged;
+            }
         }
 
         private void OnGitHistoryScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
