@@ -150,9 +150,19 @@ namespace TxtAIEditor.Core.Services
             {
                 if (lang.StartsWith("ko", StringComparison.OrdinalIgnoreCase)) return "ko-KR";
                 if (lang.StartsWith("ja", StringComparison.OrdinalIgnoreCase)) return "ja-JP";
+                if (IsTraditionalChinese(lang)) return "zh-Hant";
+                if (lang.StartsWith("zh", StringComparison.OrdinalIgnoreCase)) return "zh-Hans";
             }
 
             return "en-US";
+        }
+
+        private static bool IsTraditionalChinese(string language)
+        {
+            return language.StartsWith("zh-Hant", StringComparison.OrdinalIgnoreCase) ||
+                language.StartsWith("zh-TW", StringComparison.OrdinalIgnoreCase) ||
+                language.StartsWith("zh-HK", StringComparison.OrdinalIgnoreCase) ||
+                language.StartsWith("zh-MO", StringComparison.OrdinalIgnoreCase);
         }
 
         private void EnsureResourceContext()

@@ -115,6 +115,8 @@ namespace TxtAIEditor.Core.Services
                 1 => "ko-KR",
                 2 => "en-US",
                 3 => "ja-JP",
+                4 => "zh-Hans",
+                5 => "zh-Hant",
                 _ => "Default"
             };
             settings.Theme = _themeCombo.SelectedIndex switch
@@ -142,11 +144,20 @@ namespace TxtAIEditor.Core.Services
             languageCombo.Items.Add(getString("LanguageKorean", "한국어"));
             languageCombo.Items.Add(getString("LanguageEnglish", "English"));
             languageCombo.Items.Add(getString("LanguageJapanese", "日本語"));
+            languageCombo.Items.Add(getString("LanguageChineseSimplified", "简体中文"));
+            languageCombo.Items.Add(getString("LanguageChineseTraditional", "繁體中文"));
             languageCombo.SelectedIndex = settings.Language switch
             {
                 "ko-KR" => 1,
                 "en-US" => 2,
                 "ja-JP" => 3,
+                "zh-Hans" => 4,
+                "zh-CN" => 4,
+                "zh-SG" => 4,
+                "zh-Hant" => 5,
+                "zh-TW" => 5,
+                "zh-HK" => 5,
+                "zh-MO" => 5,
                 _ => 0
             };
             return languageCombo;

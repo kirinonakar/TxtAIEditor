@@ -9,6 +9,8 @@ namespace TxtAIEditor.Core.Services.LLM
             string outputLanguage = languageCode switch
             {
                 "ja-JP" => "Japanese",
+                "zh-Hans" => "Simplified Chinese",
+                "zh-Hant" => "Traditional Chinese",
                 "en-US" => "English",
                 _ => "Korean"
             };

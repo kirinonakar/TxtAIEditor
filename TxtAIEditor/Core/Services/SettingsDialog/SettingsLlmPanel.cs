@@ -110,10 +110,11 @@ namespace TxtAIEditor.Core.Services
                 1 => "Korean",
                 2 => "English",
                 3 => "Japanese",
-                4 => "Chinese",
-                5 => "French",
-                6 => "Spanish",
-                7 => "German",
+                4 => "Chinese Simplified",
+                5 => "Chinese Traditional",
+                6 => "French",
+                7 => "Spanish",
+                8 => "German",
                 _ => "Auto"
             };
             settings.LlmTargetLanguage = _targetLangCombo.SelectedIndex switch
@@ -121,10 +122,11 @@ namespace TxtAIEditor.Core.Services
                 1 => "Korean",
                 2 => "English",
                 3 => "Japanese",
-                4 => "Chinese",
-                5 => "French",
-                6 => "Spanish",
-                7 => "German",
+                4 => "Chinese Simplified",
+                5 => "Chinese Traditional",
+                6 => "French",
+                7 => "Spanish",
+                8 => "German",
                 _ => "Default"
             };
             SettingsLlmModelCatalog.SaveProviderModel(settings);
@@ -390,7 +392,8 @@ namespace TxtAIEditor.Core.Services
             comboBox.Items.Add(getString("LlmLangKorean", "한국어 (Korean)"));
             comboBox.Items.Add(getString("LlmLangEnglish", "영어 (English)"));
             comboBox.Items.Add(getString("LlmLangJapanese", "일본어 (Japanese)"));
-            comboBox.Items.Add(getString("LlmLangChinese", "중국어 (Chinese)"));
+            comboBox.Items.Add(getString("LlmLangChineseSimplified", "중국어 간체 (Simplified Chinese)"));
+            comboBox.Items.Add(getString("LlmLangChineseTraditional", "중국어 번체 (Traditional Chinese)"));
             comboBox.Items.Add(getString("LlmLangFrench", "프랑스어 (French)"));
             comboBox.Items.Add(getString("LlmLangSpanish", "스페인어 (Spanish)"));
             comboBox.Items.Add(getString("LlmLangGerman", "독일어 (German)"));
@@ -400,9 +403,11 @@ namespace TxtAIEditor.Core.Services
                 "English" => 2,
                 "Japanese" => 3,
                 "Chinese" => 4,
-                "French" => 5,
-                "Spanish" => 6,
-                "German" => 7,
+                "Chinese Simplified" => 4,
+                "Chinese Traditional" => 5,
+                "French" => 6,
+                "Spanish" => 7,
+                "German" => 8,
                 _ => 0
             };
             return comboBox;
@@ -415,7 +420,8 @@ namespace TxtAIEditor.Core.Services
             comboBox.Items.Add(getString("LlmLangKorean", "한국어 (Korean)"));
             comboBox.Items.Add(getString("LlmLangEnglish", "영어 (English)"));
             comboBox.Items.Add(getString("LlmLangJapanese", "일본어 (Japanese)"));
-            comboBox.Items.Add(getString("LlmLangChinese", "중국어 (Chinese)"));
+            comboBox.Items.Add(getString("LlmLangChineseSimplified", "중국어 간체 (Simplified Chinese)"));
+            comboBox.Items.Add(getString("LlmLangChineseTraditional", "중국어 번체 (Traditional Chinese)"));
             comboBox.Items.Add(getString("LlmLangFrench", "프랑스어 (French)"));
             comboBox.Items.Add(getString("LlmLangSpanish", "스페인어 (Spanish)"));
             comboBox.Items.Add(getString("LlmLangGerman", "독일어 (German)"));
@@ -425,9 +431,11 @@ namespace TxtAIEditor.Core.Services
                 "English" => 2,
                 "Japanese" => 3,
                 "Chinese" => 4,
-                "French" => 5,
-                "Spanish" => 6,
-                "German" => 7,
+                "Chinese Simplified" => 4,
+                "Chinese Traditional" => 5,
+                "French" => 6,
+                "Spanish" => 7,
+                "German" => 8,
                 _ => 0
             };
             return comboBox;

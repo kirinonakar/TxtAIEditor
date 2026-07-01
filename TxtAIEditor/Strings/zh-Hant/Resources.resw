@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="0" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" msdata:Ordinal="2" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppTitle" xml:space="preserve">
+    <value>TxtAIEditor</value>
+  </data>
+  <data name="OpenFile" xml:space="preserve">
+    <value>開啟檔案</value>
+  </data>
+  <data name="SaveFile" xml:space="preserve">
+    <value>儲存</value>
+  </data>
+  <data name="SaveAsFile" xml:space="preserve">
+    <value>另存新檔</value>
+  </data>
+  <data name="Terminal" xml:space="preserve">
+    <value>終端機</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="Ok" xml:space="preserve">
+    <value>確定</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>是</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>否</value>
+  </data>
+  <data name="Restart" xml:space="preserve">
+    <value>重新啟動</value>
+  </data>
+  <data name="LanguageChangedTitle" xml:space="preserve">
+    <value>語言變更</value>
+  </data>
+  <data name="LanguageChangedMessage" xml:space="preserve">
+    <value>必須重新啟動應用程式才能套用語言設定。是否立即重新啟動？</value>
+  </data>
+  <data name="LanguageDefault" xml:space="preserve">
+    <value>預設（系統語言）</value>
+  </data>
+  <data name="LanguageKorean" xml:space="preserve">
+    <value>韓文</value>
+  </data>
+  <data name="LanguageEnglish" xml:space="preserve">
+    <value>英文</value>
+  </data>
+  <data name="LanguageJapanese" xml:space="preserve">
+    <value>日文</value>
+  </data>
+  <data name="LanguageChineseSimplified" xml:space="preserve">
+    <value>簡體中文</value>
+  </data>
+  <data name="LanguageChineseTraditional" xml:space="preserve">
+    <value>繁體中文</value>
+  </data>
+  <data name="Explorer" xml:space="preserve">
+    <value>檔案總管</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>我的最愛</value>
+  </data>
+  <data name="Git" xml:space="preserve">
+    <value>Git</value>
+  </data>
+  <data name="Snippets" xml:space="preserve">
+    <value>片段</value>
+  </data>
+  <data name="RecentFiles" xml:space="preserve">
+    <value>最近檔案</value>
+  </data>
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>TxtAIEditor 設定</value>
+  </data>
+  <data name="SettingsSave" xml:space="preserve">
+    <value>儲存並套用</value>
+  </data>
+  <data name="SettingsCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="SettingsAppearance" xml:space="preserve">
+    <value>外觀</value>
+  </data>
+  <data name="SettingsEditing" xml:space="preserve">
+    <value>編輯</value>
+  </data>
+  <data name="SettingsTerminal" xml:space="preserve">
+    <value>終端機</value>
+  </data>
+  <data name="SettingsToolbarCustomization" xml:space="preserve">
+    <value>工具列</value>
+  </data>
+  <data name="SettingsLLM" xml:space="preserve">
+    <value>LLM</value>
+  </data>
+  <data name="SettingsShortcuts" xml:space="preserve">
+    <value>快速鍵</value>
+  </data>
+  <data name="SettingsAbout" xml:space="preserve">
+    <value>關於</value>
+  </data>
+  <data name="SettingsLanguage" xml:space="preserve">
+    <value>應用程式語言</value>
+  </data>
+  <data name="SettingsTheme" xml:space="preserve">
+    <value>應用程式與編輯器佈景主題</value>
+  </data>
+  <data name="SettingsFontSize" xml:space="preserve">
+    <value>編輯器字級</value>
+  </data>
+  <data name="SettingsFontFamily" xml:space="preserve">
+    <value>編輯器字型</value>
+  </data>
+  <data name="SettingsUiFontFamily" xml:space="preserve">
+    <value>介面字型</value>
+  </data>
+  <data name="SettingsUseCustomBg" xml:space="preserve">
+    <value>使用自訂編輯器背景色</value>
+  </data>
+  <data name="SettingsUseCustomFg" xml:space="preserve">
+    <value>使用自訂編輯器前景色</value>
+  </data>
+  <data name="SettingsPreviewFontFamily" xml:space="preserve">
+    <value>預覽字型</value>
+  </data>
+  <data name="SettingsPreviewFontSize" xml:space="preserve">
+    <value>預覽字級</value>
+  </data>
+  <data name="SettingsPreviewUseCustomBg" xml:space="preserve">
+    <value>使用自訂預覽背景色</value>
+  </data>
+  <data name="SettingsPreviewUseCustomFg" xml:space="preserve">
+    <value>使用自訂預覽前景色</value>
+  </data>
+  <data name="SettingsWordWrap" xml:space="preserve">
+    <value>預設啟用自動換行</value>
+  </data>
+  <data name="SettingsBracketPair" xml:space="preserve">
+    <value>括號配對著色</value>
+  </data>
+  <data name="SettingsAutocompleteEnter" xml:space="preserve">
+    <value>按 Enter 自動完成</value>
+  </data>
+  <data name="SettingsAutocompleteTab" xml:space="preserve">
+    <value>按 Tab 自動完成</value>
+  </data>
+  <data name="SettingsAutoSave" xml:space="preserve">
+    <value>使用自動儲存</value>
+  </data>
+  <data name="SettingsLivePreview" xml:space="preserve">
+    <value>預設啟用預覽</value>
+  </data>
+  <data name="SettingsMarkdownToolbar" xml:space="preserve">
+    <value>預設啟用 Markdown 工具列</value>
+  </data>
+  <data name="SettingsToolbar" xml:space="preserve">
+    <value>工具列</value>
+  </data>
+  <data name="SettingsTabSize" xml:space="preserve">
+    <value>Tab 大小</value>
+  </data>
+  <data name="SettingsLlmProvider" xml:space="preserve">
+    <value>LLM 提供者</value>
+  </data>
+  <data name="SettingsLlmEndpoint" xml:space="preserve">
+    <value>LLM API 端點</value>
+  </data>
+  <data name="SettingsLlmModel" xml:space="preserve">
+    <value>LLM 模型</value>
+  </data>
+  <data name="SettingsLlmCredential" xml:space="preserve">
+    <value>API Key</value>
+  </data>
+  <data name="SettingsLlmCredentialPlaceholder" xml:space="preserve">
+    <value>輸入 API Key（留空將刪除已儲存的憑證）</value>
+  </data>
+  <data name="SettingsLlmCredentialInfo" xml:space="preserve">
+    <value>API Key 不會儲存在設定檔，而是存放於 Windows 認證管理員。</value>
+  </data>
+  <data name="SettingsLlmConfirmBeforeSending" xml:space="preserve">
+    <value>傳送前確認</value>
+  </data>
+  <data name="SettingsLlmAgentVerbose" xml:space="preserve">
+    <value>啟用 Agent 詳細輸出（Verbose）</value>
+  </data>
+  <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
+    <value>自動核准 Git 資料夾內的檔案變更/建立</value>
+  </data>
+  <data name="SettingsLlmAgentAutoApprovePlanning" xml:space="preserve">
+    <value>自動核准計畫執行</value>
+  </data>
+  <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
+    <value>最大工具呼叫次數（0 = 使用預設值）</value>
+  </data>
+  <data name="SettingsLlmSourceLanguage" xml:space="preserve">
+    <value>來源語言</value>
+  </data>
+  <data name="SettingsLlmTargetLanguage" xml:space="preserve">
+    <value>目標語言</value>
+  </data>
+  <data name="LlmTargetLanguageDefault" xml:space="preserve">
+    <value>預設（介面語言）</value>
+  </data>
+  <data name="LlmLangAutoDetect" xml:space="preserve">
+    <value>自動偵測</value>
+  </data>
+  <data name="LlmLangKorean" xml:space="preserve">
+    <value>韓文 (Korean)</value>
+  </data>
+  <data name="LlmLangEnglish" xml:space="preserve">
+    <value>英文 (English)</value>
+  </data>
+  <data name="LlmLangJapanese" xml:space="preserve">
+    <value>日文 (Japanese)</value>
+  </data>
+  <data name="LlmLangChinese" xml:space="preserve">
+    <value>中文 (Chinese)</value>
+  </data>
+  <data name="LlmLangChineseSimplified" xml:space="preserve">
+    <value>簡體中文 (Simplified Chinese)</value>
+  </data>
+  <data name="LlmLangChineseTraditional" xml:space="preserve">
+    <value>繁體中文 (Traditional Chinese)</value>
+  </data>
+  <data name="LlmLangFrench" xml:space="preserve">
+    <value>法文 (French)</value>
+  </data>
+  <data name="LlmLangSpanish" xml:space="preserve">
+    <value>西班牙文 (Spanish)</value>
+  </data>
+  <data name="LlmLangGerman" xml:space="preserve">
+    <value>德文 (German)</value>
+  </data>
+  <data name="LivePreviewTabHeader" xml:space="preserve">
+    <value>預覽</value>
+  </data>
+  <data name="AiAssistantTabHeader" xml:space="preserve">
+    <value>AI 助手</value>
+  </data>
+  <data name="AgentTabHeader" xml:space="preserve">
+    <value>Agent</value>
+  </data>
+  <data name="OpenInBrowserButtonText" xml:space="preserve">
+    <value>瀏覽器</value>
+  </data>
+  <data name="OpenInBrowserTooltip" xml:space="preserve">
+    <value>在瀏覽器中開啟 HTML 預覽</value>
+  </data>
+  <data name="OpenExternalViewerTooltip" xml:space="preserve">
+    <value>在外部檢視器中開啟</value>
+  </data>
+  <data name="OpenWithDefaultProgramTooltip" xml:space="preserve">
+    <value>用預設程式開啟</value>
+  </data>
+  <data name="LlmOutputPlaceholder" xml:space="preserve">
+    <value>等待中... 在編輯器中選取範圍，然後使用下方 AI 工具。</value>
+  </data>
+  <data name="SelectionStatsPlaceholder" xml:space="preserve">
+    <value>選取：無（整份檔案請使用新增檔案）</value>
+  </data>
+  <data name="LlmFileContextPlaceholder" xml:space="preserve">
+    <value>無檔案上下文</value>
+  </data>
+  <data name="LlmAddFileContextButtonText" xml:space="preserve">
+    <value>新增檔案上下文</value>
+  </data>
+  <data name="LlmRemoveFileContextButtonText" xml:space="preserve">
+    <value>刪除</value>
+  </data>
+  <data name="LlmExplainButtonText" xml:space="preserve">
+    <value>說明</value>
+  </data>
+  <data name="LlmSummarizeButtonText" xml:space="preserve">
+    <value>總結</value>
+  </data>
+  <data name="LlmTranslateButtonText" xml:space="preserve">
+    <value>翻譯</value>
+  </data>
+  <data name="LlmImproveButtonText" xml:space="preserve">
+    <value>改進</value>
+  </data>
+  <data name="LlmCustomPromptPlaceholder" xml:space="preserve">
+    <value>輸入問題或自訂指令...</value>
+  </data>
+  <data name="LlmCustomRunButtonText" xml:space="preserve">
+    <value>傳送</value>
+  </data>
+  <data name="LlmInsertOutputButtonText" xml:space="preserve">
+    <value>插入</value>
+  </data>
+  <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
+    <value>新分頁</value>
+  </data>
+  <data name="LlmAddInstructionTooltip" xml:space="preserve">
+    <value>新增自訂指令</value>
+  </data>
+  <data name="LlmPresetButtonText" xml:space="preserve">
+    <value>預設</value>
+  </data>
+  <data name="LlmPresetAddText" xml:space="preserve">
+    <value>新增預設</value>
+  </data>
+  <data name="PresetExportText" xml:space="preserve">
+    <value>匯出</value>
+  </data>
+  <data name="PresetImportText" xml:space="preserve">
+    <value>匯入</value>
+  </data>
+  <data name="AgentLanguageCode" xml:space="preserve">
+    <value>zh-Hant</value>
+  </data>
+  <data name="AgentOutputPlaceholder" xml:space="preserve">
+    <value>等待中... 請輸入 Agent 任務。</value>
+  </data>
+  <data name="AgentOutputPlaceholderKnownPrefixes" xml:space="preserve">
+    <value>대기 중...|Waiting...|待機中...|等待中...</value>
+  </data>
+  <data name="AgentActivityIdle" xml:space="preserve">
+    <value>閒置</value>
+  </data>
+  <data name="AgentInlineTokenCountFormat" xml:space="preserve">
+    <value>{0:N0} 個 token</value>
+  </data>
+  <data name="AgentAttachmentCountSingularFormat" xml:space="preserve">
+    <value>{0:N0} 個附件</value>
+  </data>
+  <data name="AgentAttachmentCountFormat" xml:space="preserve">
+    <value>{0:N0} 個附件</value>
+  </data>
+  <data name="AgentPromptPlaceholder" xml:space="preserve">
+    <value>輸入 Agent 任務...</value>
+  </data>
+</root>

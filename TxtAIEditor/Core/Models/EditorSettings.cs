@@ -113,6 +113,14 @@ namespace TxtAIEditor.Core.Models
                 {
                     if (lang.StartsWith("ko", StringComparison.OrdinalIgnoreCase)) return "Korean";
                     if (lang.StartsWith("ja", StringComparison.OrdinalIgnoreCase)) return "Japanese";
+                    if (lang.StartsWith("zh-Hant", StringComparison.OrdinalIgnoreCase) ||
+                        lang.StartsWith("zh-TW", StringComparison.OrdinalIgnoreCase) ||
+                        lang.StartsWith("zh-HK", StringComparison.OrdinalIgnoreCase) ||
+                        lang.StartsWith("zh-MO", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return "Chinese Traditional";
+                    }
+                    if (lang.StartsWith("zh", StringComparison.OrdinalIgnoreCase)) return "Chinese Simplified";
                 }
                 return "English";
             }

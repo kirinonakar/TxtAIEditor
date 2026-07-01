@@ -78,7 +78,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ### 🤖 AI Assistant
 *   **Multi-Provider:** Connect with Gemini, OpenAI, OpenRouter, OpenCode Go/Zen, Ollama/Ollama Cloud, Cerebras or local LM Studio endpoints.
 *   **Secure Storage:** API keys are securely saved via native Windows Credential Manager.
-*   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Chinese, French, Spanish, German, etc.  *(When translating with file context, it automatically performs chunk processing).*
+*   **AI Translation:** Fast translation of selected text to/from Korean, English, Japanese, Simplified Chinese, Traditional Chinese, French, Spanish, German, etc.  *(When translating with file context, it automatically performs chunk processing).*
 *   **Context Actions:** Quick AI actions (Explain, Summarize, Refine) on selected text. *(When summarizing with file context, it automatically performs chunk processing to handle large documents).*
 *   **AI Custom Commands:** Ask questions or give instructions to the AI.
     *   **Direct Input:** Type a short prompt in the input box and press Send.
@@ -113,7 +113,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Interactive Jump:** Double-clicking any outline item instantly scrolls the viewport to focus the target line.
 
 ### 🌐 Multilingual Support
-* Native support for English (`en-US`), Korean (`ko-KR`), and Japanese (`ja-JP`). The user interface automatically adapts to your system language or preferred settings for a fully localized desktop experience.
+* Native support for English, Korean, Japanese, Simplified Chinese, and Traditional Chinese. The user interface automatically adapts to your system language or preferred settings for a fully localized desktop experience.
 
 ## ⌨️ Keyboard Shortcuts & Special Features
 
@@ -158,7 +158,7 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 *   **Custom Text Color Selector:**
     *   **Right-Click** on the `TextColor` button to summon the native **Color Picker** dialog, allowing you to select and configure custom text colors precisely.
 *   **AI Translation Target Language Selector:**
-    *   **Right-Click** on the translate button to open a context menu enabling you to switch target translation languages (Korean, English, Japanese, Chinese, French, Spanish, German) instantly.
+    *   **Right-Click** on the translate button to open a context menu enabling you to switch target translation languages (Korean, English, Japanese, Simplified Chinese, Traditional Chinese, French, Spanish, German) instantly.
 *   **Add to Favorites:**
     *   **Right-Click** any file or folder in the Explorer panel and choose **"Add to Favorites"** to instantly pin it to your Favorites sidebar for quick access.
 

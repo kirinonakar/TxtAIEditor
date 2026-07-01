@@ -134,7 +134,8 @@ namespace TxtAIEditor.Controls
             LlmTargetLangKorean.Text = getString("LlmLangKorean", "한국어 (Korean)");
             LlmTargetLangEnglish.Text = getString("LlmLangEnglish", "영어 (English)");
             LlmTargetLangJapanese.Text = getString("LlmLangJapanese", "일본어 (Japanese)");
-            LlmTargetLangChinese.Text = getString("LlmLangChinese", "중국어 (Chinese)");
+            LlmTargetLangChineseSimplified.Text = getString("LlmLangChineseSimplified", "중국어 간체 (Simplified Chinese)");
+            LlmTargetLangChineseTraditional.Text = getString("LlmLangChineseTraditional", "중국어 번체 (Traditional Chinese)");
             LlmTargetLangFrench.Text = getString("LlmLangFrench", "프랑스어 (French)");
             LlmTargetLangSpanish.Text = getString("LlmLangSpanish", "스페인어 (Spanish)");
             LlmTargetLangGerman.Text = getString("LlmLangGerman", "독일어 (German)");
@@ -279,6 +280,8 @@ namespace TxtAIEditor.Controls
                 "English" => "EN",
                 "Japanese" => "JP",
                 "Chinese" => "ZH",
+                "Chinese Simplified" => "ZH-HANS",
+                "Chinese Traditional" => "ZH-HANT",
                 "French" => "FR",
                 "Spanish" => "ES",
                 "German" => "DE",

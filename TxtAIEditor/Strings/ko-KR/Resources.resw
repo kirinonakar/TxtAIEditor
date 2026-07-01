@@ -158,6 +158,12 @@
   <data name="LanguageJapanese" xml:space="preserve">
     <value>日本語</value>
   </data>
+  <data name="LanguageChineseSimplified" xml:space="preserve">
+    <value>简体中文</value>
+  </data>
+  <data name="LanguageChineseTraditional" xml:space="preserve">
+    <value>繁體中文</value>
+  </data>
   <data name="Print" xml:space="preserve">
     <value>인쇄</value>
   </data>
@@ -487,6 +493,12 @@
   </data>
   <data name="LlmLangChinese" xml:space="preserve">
     <value>중국어 (Chinese)</value>
+  </data>
+  <data name="LlmLangChineseSimplified" xml:space="preserve">
+    <value>중국어 간체 (Simplified Chinese)</value>
+  </data>
+  <data name="LlmLangChineseTraditional" xml:space="preserve">
+    <value>중국어 번체 (Traditional Chinese)</value>
   </data>
   <data name="LlmLangFrench" xml:space="preserve">
     <value>프랑스어 (French)</value>
