@@ -252,7 +252,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" x:Name="FavoritesHeaderText" Text="즐겨찾기 목록" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,8"/>
+                                <TextBlock Grid.Row="0" x:Name="FavoritesHeaderText" Text="즐겨찾기 목록" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="10,0,0,8"/>
                                 <Grid Grid.Row="1" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -300,7 +300,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <TextBlock x:Name="RecentFilesHeaderText" Grid.Row="0" Text="최근 파일" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="RecentFilesHeaderText" Grid.Row="0" Text="최근 파일" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="10,0,0,10"/>
                             <ListView x:Name="RecentFilesListView" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnRecentFileItemClick">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
@@ -560,7 +560,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <TextBlock x:Name="TocHeaderText" Grid.Row="0" Text="목차 (TOC)" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="TocHeaderText" Grid.Row="0" Text="목차 (TOC)" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="10,0,0,10"/>
                             <ListView x:Name="TocListView" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnTocItemClick">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
