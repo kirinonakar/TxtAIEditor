@@ -25,7 +25,7 @@ namespace TxtAIEditor.Core.Interfaces
         Task<bool> SetRemoteUrlAsync(string repoPath, string remoteUrl, string remoteName = "origin");
         Task<bool> LinkCurrentBranchToRemoteAsync(string repoPath, string remoteName = "origin");
         Task<int> GetUnpushedCommitCountAsync(string repoPath);
-        Task<IReadOnlyList<GitHistoryItem>> GetRecentHistoryAsync(string repoPath, int maxCount = 50);
+        Task<IReadOnlyList<GitHistoryItem>> GetRecentHistoryAsync(string repoPath, int maxCount = 50, int skipCount = 0);
         Task<IReadOnlyList<string>> GetBranchesAsync(string repoPath);
         Task<bool> InitRepositoryAsync(string repoPath);
         Task<string> RunGitCommandAsync(string workingDir, string arguments);

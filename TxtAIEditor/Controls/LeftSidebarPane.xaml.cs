@@ -3,12 +3,15 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
     public sealed partial class LeftSidebarPane : UserControl
     {
+        private ScrollViewer? _gitHistoryScrollViewer;
+
         public static readonly DependencyProperty ReplaceOneTooltipProperty =
             DependencyProperty.Register(
                 nameof(ReplaceOneTooltip),
@@ -52,6 +55,7 @@ namespace TxtAIEditor.Controls
         {
             InitializeComponent();
             GitBranchesCombo.SelectionChanged += OnGitBranchSelectionChanged;
+            GitHistoryList.Loaded += OnGitHistoryListLoaded;
         }
 
         public event RoutedEventHandler? LeftActivityClick;
@@ -99,6 +103,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? GitScpClick;
         public event RoutedEventHandler? GitRefreshClick;
         public event SelectionChangedEventHandler? GitBranchSelectionChanged;
+        public event EventHandler? GitHistoryScrolledToEnd;
         public event ItemClickEventHandler? GitHistoryItemClick;
         public event RoutedEventHandler? GitInitRepoClick;
         public event KeyEventHandler? SearchQueryInputKeyDown;
@@ -362,6 +367,34 @@ namespace TxtAIEditor.Controls
         private void OnGitScpClick(object sender, RoutedEventArgs e) => GitScpClick?.Invoke(sender, e);
         private void OnGitRefreshClick(object sender, RoutedEventArgs e) => GitRefreshClick?.Invoke(sender, e);
         private void OnGitBranchSelectionChanged(object sender, SelectionChangedEventArgs e) => GitBranchSelectionChanged?.Invoke(sender, e);
+        private void OnGitHistoryListLoaded(object sender, RoutedEventArgs e)
+        {
+            if (_gitHistoryScrollViewer != null)
+            {
+                return;
+            }
+
+            _gitHistoryScrollViewer = FindVisualChild<ScrollViewer>(GitHistoryList);
+            if (_gitHistoryScrollViewer != null)
+            {
+                _gitHistoryScrollViewer.ViewChanged += OnGitHistoryScrollViewerViewChanged;
+            }
+        }
+
+        private void OnGitHistoryScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+        {
+            if (sender is not ScrollViewer scrollViewer || scrollViewer.ScrollableHeight <= 0)
+            {
+                return;
+            }
+
+            const double BottomLoadThreshold = 24;
+            if (scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - BottomLoadThreshold)
+            {
+                GitHistoryScrolledToEnd?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
         private void OnGitHistoryItemClick(object sender, ItemClickEventArgs e) => GitHistoryItemClick?.Invoke(sender, e);
         private void OnGitInitRepoClick(object sender, RoutedEventArgs e) => GitInitRepoClick?.Invoke(sender, e);
         private void OnSearchQueryInputKeyDown(object sender, KeyRoutedEventArgs e) => SearchQueryInputKeyDown?.Invoke(sender, e);
@@ -377,6 +410,28 @@ namespace TxtAIEditor.Controls
         private void OnFileListViewDrop(object sender, DragEventArgs e) => FileListViewDrop?.Invoke(sender, e);
         private void OnFileListViewItemDragOver(object sender, DragEventArgs e) => FileListViewItemDragOver?.Invoke(sender, e);
         private void OnFileListViewItemDrop(object sender, DragEventArgs e) => FileListViewItemDrop?.Invoke(sender, e);
+
+        private static T? FindVisualChild<T>(DependencyObject parent)
+            where T : DependencyObject
+        {
+            int childCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < childCount; i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T typedChild)
+                {
+                    return typedChild;
+                }
+
+                T? descendant = FindVisualChild<T>(child);
+                if (descendant != null)
+                {
+                    return descendant;
+                }
+            }
+
+            return null;
+        }
     }
 
     public class LocalizationBridge : System.ComponentModel.INotifyPropertyChanged

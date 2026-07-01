@@ -15,6 +15,8 @@ namespace TxtAIEditor.Controls
 {
     public sealed class GitPanelController
     {
+        private const int GitHistoryBatchSize = 50;
+
         public event EventHandler<string>? FileRestored;
 
         private readonly IGitService _gitService;
@@ -34,6 +36,10 @@ namespace TxtAIEditor.Controls
         private readonly Func<Task>? _refreshExplorerGitStatus;
         private bool _isRefreshingBranchList;
         private bool _isCheckingOutBranch;
+        private bool _isLoadingMoreGitHistory;
+        private bool _hasMoreGitHistory;
+        private int _loadedGitHistoryCount;
+        private string _gitHistoryRepoPath = string.Empty;
 
         public GitPanelController(
             IGitService gitService,
@@ -102,6 +108,7 @@ namespace TxtAIEditor.Controls
                     _isRefreshingBranchList = false;
                 }
                 _leftSidebar.GitHistory.Items.Clear();
+                ResetGitHistoryPaging();
                 return;
             }
 
@@ -111,7 +118,7 @@ namespace TxtAIEditor.Controls
 
             // Fetch everything asynchronously first to avoid race conditions and UI flickering
             var branchesTask = _gitService.GetBranchesAsync(repoPath);
-            var historyTask = _gitService.GetRecentHistoryAsync(repoPath);
+            var historyTask = _gitService.GetRecentHistoryAsync(repoPath, GitHistoryBatchSize);
             var fileStatusesTask = _gitService.GetFileStatusesAsync(repoPath);
             var unpushedCountTask = _gitService.GetUnpushedCommitCountAsync(repoPath);
 
@@ -171,6 +178,9 @@ namespace TxtAIEditor.Controls
             {
                 _leftSidebar.GitHistory.Items.Add(history);
             }
+            _gitHistoryRepoPath = repoPath;
+            _loadedGitHistoryCount = historyList.Count;
+            _hasMoreGitHistory = historyList.Count >= GitHistoryBatchSize;
 
             _viewModel.GitFiles.Clear();
             foreach (var kvp in fileStatuses)
@@ -185,6 +195,44 @@ namespace TxtAIEditor.Controls
             if (_refreshExplorerGitStatus != null)
             {
                 await _refreshExplorerGitStatus();
+            }
+        }
+
+        public async Task LoadMoreHistoryAsync(string repoPath)
+        {
+            if (_isLoadingMoreGitHistory ||
+                !_hasMoreGitHistory ||
+                string.IsNullOrEmpty(repoPath) ||
+                !string.Equals(repoPath, _gitHistoryRepoPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _isLoadingMoreGitHistory = true;
+            try
+            {
+                var moreHistory = await _gitService.GetRecentHistoryAsync(
+                    repoPath,
+                    GitHistoryBatchSize,
+                    _loadedGitHistoryCount);
+
+                if (moreHistory.Count == 0)
+                {
+                    _hasMoreGitHistory = false;
+                    return;
+                }
+
+                foreach (var history in moreHistory)
+                {
+                    _leftSidebar.GitHistory.Items.Add(history);
+                }
+
+                _loadedGitHistoryCount += moreHistory.Count;
+                _hasMoreGitHistory = moreHistory.Count >= GitHistoryBatchSize;
+            }
+            finally
+            {
+                _isLoadingMoreGitHistory = false;
             }
         }
 
@@ -859,6 +907,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitScpClick += OnGitScpClick;
             _leftSidebar.GitRefreshClick += OnGitRefreshClick;
             _leftSidebar.GitBranchSelectionChanged += OnGitBranchSelectionChanged;
+            _leftSidebar.GitHistoryScrolledToEnd += OnGitHistoryScrolledToEnd;
             _leftSidebar.GitHistoryItemClick += OnGitHistoryItemClick;
             _leftSidebar.GitInitRepoClick += OnGitInitRepoClick;
         }
@@ -946,6 +995,11 @@ namespace TxtAIEditor.Controls
             await CheckoutBranchAsync(_repoPathProvider(), branchName);
         }
 
+        private async void OnGitHistoryScrolledToEnd(object? sender, EventArgs e)
+        {
+            await LoadMoreHistoryAsync(_repoPathProvider());
+        }
+
         private async void OnGitHistoryItemClick(object sender, ItemClickEventArgs e)
         {
             _leftSidebar.GitHistory.SelectedItem = e.ClickedItem;
@@ -963,6 +1017,14 @@ namespace TxtAIEditor.Controls
             return trimmed.StartsWith("*", StringComparison.Ordinal)
                 ? trimmed.Substring(1).Trim()
                 : trimmed;
+        }
+
+        private void ResetGitHistoryPaging()
+        {
+            _gitHistoryRepoPath = string.Empty;
+            _loadedGitHistoryCount = 0;
+            _hasMoreGitHistory = false;
+            _isLoadingMoreGitHistory = false;
         }
 
         private async void OnGitInitRepoClick(object sender, RoutedEventArgs e)

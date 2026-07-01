@@ -523,13 +523,15 @@ namespace TxtAIEditor.Core.Services
             return int.TryParse(output.Trim(), out int count) ? count : 0;
         }
 
-        public async Task<IReadOnlyList<GitHistoryItem>> GetRecentHistoryAsync(string repoPath, int maxCount = 50)
+        public async Task<IReadOnlyList<GitHistoryItem>> GetRecentHistoryAsync(string repoPath, int maxCount = 50, int skipCount = 0)
         {
             if (string.IsNullOrEmpty(repoPath))
                 return Array.Empty<GitHistoryItem>();
 
             // Keep the hash for actions, but do not include it in the sidebar display text.
-            string output = await RunGitCommandAsync(repoPath, $"log --graph --all --decorate=short --pretty=format:\"%H%x1f%d %s - %cd\" --date=format:\"%Y-%m-%d %H:%M\" -n {Math.Max(1, maxCount)}");
+            int safeMaxCount = Math.Max(1, maxCount);
+            int safeSkipCount = Math.Max(0, skipCount);
+            string output = await RunGitCommandAsync(repoPath, $"log --graph --all --decorate=short --pretty=format:\"%H%x1f%d %s - %cd\" --date=format:\"%Y-%m-%d %H:%M\" --skip={safeSkipCount} -n {safeMaxCount}");
             if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                 return Array.Empty<GitHistoryItem>();
 
@@ -538,7 +540,7 @@ namespace TxtAIEditor.Core.Services
                 .Select(ParseHistoryLine)
                 .Where(item => !string.IsNullOrWhiteSpace(item.DisplayText))
                 .ToArray();
-            var unpushedHashes = await GetUnpushedCommitShortHashesAsync(repoPath, maxCount);
+            var unpushedHashes = await GetUnpushedCommitShortHashesAsync(repoPath, safeSkipCount + safeMaxCount);
             if (unpushedHashes.Count == 0)
             {
                 return historyItems;
