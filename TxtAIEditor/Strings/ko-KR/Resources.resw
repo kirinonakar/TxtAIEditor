@@ -623,6 +623,12 @@
   <data name="GitRebaseFailureMessage" xml:space="preserve">
     <value>Rebase 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오.</value>
   </data>
+  <data name="GitCheckoutFailureTitle" xml:space="preserve">
+    <value>Git 브랜치 이동 실패</value>
+  </data>
+  <data name="GitCheckoutFailureMessage" xml:space="preserve">
+    <value>브랜치 이동에 실패했습니다. 커밋되지 않은 변경 사항이나 충돌 상태를 확인하십시오.</value>
+  </data>
   <data name="GitRemoteDialogTitle" xml:space="preserve">
     <value>Git Remote</value>
   </data>

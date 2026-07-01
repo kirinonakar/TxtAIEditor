@@ -623,6 +623,12 @@
   <data name="GitRebaseFailureMessage" xml:space="preserve">
     <value>Rebase に失敗しました。リモートリポジトリ、認証、または競合状態を確認してください。</value>
   </data>
+  <data name="GitCheckoutFailureTitle" xml:space="preserve">
+    <value>Git ブランチ切り替え失敗</value>
+  </data>
+  <data name="GitCheckoutFailureMessage" xml:space="preserve">
+    <value>ブランチの切り替えに失敗しました。未コミットの変更や競合状態を確認してください。</value>
+  </data>
   <data name="GitRemoteDialogTitle" xml:space="preserve">
     <value>Git Remote</value>
   </data>

@@ -33,6 +33,8 @@ namespace TxtAIEditor.Controls
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
         private readonly Func<Task>? _refreshExplorerGitStatus;
+        private bool _isRefreshingBranchList;
+        private bool _isCheckingOutBranch;
 
         public GitPanelController(
             IGitService gitService,
@@ -91,7 +93,15 @@ namespace TxtAIEditor.Controls
                 _leftSidebar.GitRepoPath.Text = _getString("GitRepoPathNone", "Root 경로없음");
                 UpdateInitButtonState(null);
                 _viewModel.GitFiles.Clear();
-                _leftSidebar.GitBranches.Items.Clear();
+                _isRefreshingBranchList = true;
+                try
+                {
+                    _leftSidebar.GitBranches.Items.Clear();
+                }
+                finally
+                {
+                    _isRefreshingBranchList = false;
+                }
                 _leftSidebar.GitHistory.Items.Clear();
                 return;
             }
@@ -131,22 +141,30 @@ namespace TxtAIEditor.Controls
             UpdateInitButtonState(isGitNotDetected ? null : repoPath);
             _startAutoRefresh();
 
-            _leftSidebar.GitBranches.Items.Clear();
-            int selectedIndex = -1;
-            int i = 0;
-            foreach (var branchName in branches)
+            _isRefreshingBranchList = true;
+            try
             {
-                string cleanedBranchName = branchName.Trim();
-                _leftSidebar.GitBranches.Items.Add(cleanedBranchName);
-                if (cleanedBranchName.StartsWith("*"))
+                _leftSidebar.GitBranches.Items.Clear();
+                int selectedIndex = -1;
+                int i = 0;
+                foreach (var branchName in branches)
                 {
-                    selectedIndex = i;
+                    string cleanedBranchName = branchName.Trim();
+                    _leftSidebar.GitBranches.Items.Add(cleanedBranchName);
+                    if (cleanedBranchName.StartsWith("*", StringComparison.Ordinal))
+                    {
+                        selectedIndex = i;
+                    }
+                    i++;
                 }
-                i++;
+                if (selectedIndex >= 0)
+                {
+                    _leftSidebar.GitBranches.SelectedIndex = selectedIndex;
+                }
             }
-            if (selectedIndex >= 0)
+            finally
             {
-                _leftSidebar.GitBranches.SelectedIndex = selectedIndex;
+                _isRefreshingBranchList = false;
             }
 
             _leftSidebar.GitHistory.Items.Clear();
@@ -419,6 +437,40 @@ namespace TxtAIEditor.Controls
                 _showError(
                     _getString("GitRebaseFailureTitle", "Git Rebase 실패"),
                     _getString("GitRebaseFailureMessage", "Rebase 처리에 실패했습니다. 원격 저장소/인증/충돌 상태를 확인하십시오."));
+            }
+        }
+
+        public async Task CheckoutBranchAsync(string repoPath, string branchName)
+        {
+            if (string.IsNullOrEmpty(repoPath) || string.IsNullOrWhiteSpace(branchName))
+            {
+                return;
+            }
+
+            _isCheckingOutBranch = true;
+            bool wasEnabled = _leftSidebar.GitBranches.IsEnabled;
+            _leftSidebar.GitBranches.IsEnabled = false;
+            try
+            {
+                bool success = await _gitService.CheckoutBranchAsync(repoPath, branchName);
+                if (!success)
+                {
+                    _showError(
+                        _getString("GitCheckoutFailureTitle", "Git 브랜치 이동 실패"),
+                        _getString("GitCheckoutFailureMessage", "브랜치 이동에 실패했습니다. 커밋되지 않은 변경 사항이나 충돌 상태를 확인하십시오."));
+                }
+            }
+            finally
+            {
+                try
+                {
+                    await RefreshAsync(repoPath);
+                }
+                finally
+                {
+                    _leftSidebar.GitBranches.IsEnabled = wasEnabled;
+                    _isCheckingOutBranch = false;
+                }
             }
         }
 
@@ -811,6 +863,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitRemoteClick += OnGitRemoteClick;
             _leftSidebar.GitScpClick += OnGitScpClick;
             _leftSidebar.GitRefreshClick += OnGitRefreshClick;
+            _leftSidebar.GitBranchSelectionChanged += OnGitBranchSelectionChanged;
             _leftSidebar.GitHistoryItemClick += OnGitHistoryItemClick;
             _leftSidebar.GitInitRepoClick += OnGitInitRepoClick;
         }
@@ -876,10 +929,45 @@ namespace TxtAIEditor.Controls
             await RefreshAsync();
         }
 
+        private async void OnGitBranchSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isRefreshingBranchList || _isCheckingOutBranch)
+            {
+                return;
+            }
+
+            if (_leftSidebar.GitBranches.SelectedItem is not string branchDisplay ||
+                IsCurrentBranchDisplay(branchDisplay))
+            {
+                return;
+            }
+
+            string branchName = GetBranchNameFromDisplay(branchDisplay);
+            if (string.IsNullOrEmpty(branchName))
+            {
+                return;
+            }
+
+            await CheckoutBranchAsync(_repoPathProvider(), branchName);
+        }
+
         private async void OnGitHistoryItemClick(object sender, ItemClickEventArgs e)
         {
             _leftSidebar.GitHistory.SelectedItem = e.ClickedItem;
             await ShowHistoryItemAsync(_repoPathProvider());
+        }
+
+        private static bool IsCurrentBranchDisplay(string branchDisplay)
+        {
+            return branchDisplay.TrimStart().StartsWith("*", StringComparison.Ordinal);
+        }
+
+        private static string GetBranchNameFromDisplay(string branchDisplay)
+        {
+            string trimmed = branchDisplay.Trim();
+            return trimmed.StartsWith("*", StringComparison.Ordinal)
+                ? trimmed.Substring(1).Trim()
+                : trimmed;
         }
 
         private async void OnGitInitRepoClick(object sender, RoutedEventArgs e)

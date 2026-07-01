@@ -51,6 +51,7 @@ namespace TxtAIEditor.Controls
         public LeftSidebarPane()
         {
             InitializeComponent();
+            GitBranchesCombo.SelectionChanged += OnGitBranchSelectionChanged;
         }
 
         public event RoutedEventHandler? LeftActivityClick;
@@ -97,6 +98,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? GitRemoteClick;
         public event RoutedEventHandler? GitScpClick;
         public event RoutedEventHandler? GitRefreshClick;
+        public event SelectionChangedEventHandler? GitBranchSelectionChanged;
         public event ItemClickEventHandler? GitHistoryItemClick;
         public event RoutedEventHandler? GitInitRepoClick;
         public event KeyEventHandler? SearchQueryInputKeyDown;
@@ -359,6 +361,7 @@ namespace TxtAIEditor.Controls
         private void OnGitRemoteClick(object sender, RoutedEventArgs e) => GitRemoteClick?.Invoke(sender, e);
         private void OnGitScpClick(object sender, RoutedEventArgs e) => GitScpClick?.Invoke(sender, e);
         private void OnGitRefreshClick(object sender, RoutedEventArgs e) => GitRefreshClick?.Invoke(sender, e);
+        private void OnGitBranchSelectionChanged(object sender, SelectionChangedEventArgs e) => GitBranchSelectionChanged?.Invoke(sender, e);
         private void OnGitHistoryItemClick(object sender, ItemClickEventArgs e) => GitHistoryItemClick?.Invoke(sender, e);
         private void OnGitInitRepoClick(object sender, RoutedEventArgs e) => GitInitRepoClick?.Invoke(sender, e);
         private void OnSearchQueryInputKeyDown(object sender, KeyRoutedEventArgs e) => SearchQueryInputKeyDown?.Invoke(sender, e);

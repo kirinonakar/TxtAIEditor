@@ -409,6 +409,15 @@ namespace TxtAIEditor.Core.Services
             return !output.StartsWith("fatal:");
         }
 
+        public async Task<bool> CheckoutBranchAsync(string repoPath, string branchName)
+        {
+            if (string.IsNullOrEmpty(repoPath) || string.IsNullOrWhiteSpace(branchName))
+                return false;
+
+            string output = await RunGitCommandAsync(repoPath, $"checkout \"{QuotePath(branchName.Trim())}\"");
+            return !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+        }
+
         public async Task<string> GetRemoteUrlAsync(string repoPath, string remoteName = "origin")
         {
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(remoteName))
@@ -518,8 +527,8 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath))
                 return Array.Empty<string>();
 
-            // Use --graph flag with custom pretty format showing abbreviated hash, commit date/time, subject, and ref decorations
-            string output = await RunGitCommandAsync(repoPath, $"log --graph --pretty=format:\"%s - %cd %d (%h)\" --date=format:\"%Y-%m-%d %H:%M\" -n {Math.Max(1, maxCount)}");
+            // Include all refs so branch connections are visible in the sidebar graph.
+            string output = await RunGitCommandAsync(repoPath, $"log --graph --all --decorate=short --pretty=format:\"(%h)%d %s - %cd\" --date=format:\"%Y-%m-%d %H:%M\" -n {Math.Max(1, maxCount)}");
             if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                 return Array.Empty<string>();
 

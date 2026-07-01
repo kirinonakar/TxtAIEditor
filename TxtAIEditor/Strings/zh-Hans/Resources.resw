@@ -623,6 +623,12 @@
   <data name="GitRebaseFailureMessage" xml:space="preserve">
     <value>变基失败。检查远程存储库、身份验证或冲突状态。</value>
   </data>
+  <data name="GitCheckoutFailureTitle" xml:space="preserve">
+    <value>Git 分支切换失败</value>
+  </data>
+  <data name="GitCheckoutFailureMessage" xml:space="preserve">
+    <value>分支切换失败。请检查未提交的更改或冲突状态。</value>
+  </data>
   <data name="GitRemoteDialogTitle" xml:space="preserve">
     <value>Git 远程</value>
   </data>
