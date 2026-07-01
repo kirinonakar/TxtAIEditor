@@ -19,6 +19,7 @@ namespace TxtAIEditor.Controls
         public event SelectionChangedEventHandler? EncodingSelectionChanged;
         public event RoutedEventHandler? LineNumberClick;
         public event RoutedEventHandler? LineEndingClick;
+        public event RoutedEventHandler? LanguageClick;
 
         public ToggleButton LeftPanelToggleButton => LeftPanelToggle;
         public ToggleButton RightPanelToggleButton => RightPanelToggle;
@@ -32,6 +33,7 @@ namespace TxtAIEditor.Controls
         public TextBlock FileStatsText => StatusFileStats;
         public TextBlock GitBranchText => StatusGitBranch;
         public TextBlock LanguageText => StatusLanguage;
+        public Button LanguageButtonControl => LanguageButton;
         public ComboBox EncodingCombo => StatusEncodingCombo;
         public TextBlock LineEndingText => StatusLineEnding;
         public Button LineNumberButtonControl => LineNumberButton;
@@ -51,6 +53,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(ExpandPreviewButton, getString("ExpandPreviewTooltip", "프리뷰 늘리기") + " (Ctrl+3)");
             ToolTipService.SetToolTip(LineNumberButton, getString("StatusGoToLineTooltip", "클릭하여 줄 이동"));
             ToolTipService.SetToolTip(LineEndingButton, getString("StatusLineEndingTooltip", "클릭하여 줄 끝 방식 변경"));
+            ToolTipService.SetToolTip(LanguageButton, getString("StatusLanguageTooltip", "파일 유형 변경"));
             ToolTipService.SetToolTip(StatusEncodingCombo, getString("StatusEncodingTooltip", "파일 인코딩 선택"));
         }
 
@@ -82,6 +85,11 @@ namespace TxtAIEditor.Controls
         private void HandleLineEndingClick(object sender, RoutedEventArgs e)
         {
             LineEndingClick?.Invoke(sender, e);
+        }
+
+        private void HandleLanguageClick(object sender, RoutedEventArgs e)
+        {
+            LanguageClick?.Invoke(sender, e);
         }
     }
 }

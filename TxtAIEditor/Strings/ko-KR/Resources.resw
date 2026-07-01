@@ -785,6 +785,9 @@
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>파일 인코딩 선택</value>
   </data>
+  <data name="StatusLanguageTooltip" xml:space="preserve">
+    <value>파일 유형 변경</value>
+  </data>
   <data name="StatusImageViewer" xml:space="preserve">
     <value>이미지</value>
   </data>

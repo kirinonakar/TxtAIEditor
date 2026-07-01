@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab, string, Task> _reloadTabWithEncodingAsync;
         private readonly Action<OpenedTab> _markTabDirty;
         private readonly Func<string, int, Task> _revealLineAsync;
+        private readonly Action<OpenedTab> _updateLivePreview;
 
         private bool _isSyncingEncodingCombo;
 
@@ -46,7 +47,8 @@ namespace TxtAIEditor.Controls
             Action resumeTerminal,
             Func<OpenedTab, string, Task> reloadTabWithEncodingAsync,
             Action<OpenedTab> markTabDirty,
-            Func<string, int, Task> revealLineAsync)
+            Func<string, int, Task> revealLineAsync,
+            Action<OpenedTab> updateLivePreview)
         {
             _statusBar = statusBar;
             _activeTabProvider = activeTabProvider;
@@ -63,10 +65,12 @@ namespace TxtAIEditor.Controls
             _reloadTabWithEncodingAsync = reloadTabWithEncodingAsync;
             _markTabDirty = markTabDirty;
             _revealLineAsync = revealLineAsync;
+            _updateLivePreview = updateLivePreview;
 
             _statusBar.EncodingSelectionChanged += OnEncodingSelectionChanged;
             _statusBar.LineNumberClick += OnLineNumberClick;
             _statusBar.LineEndingClick += OnLineEndingClick;
+            _statusBar.LanguageClick += OnLanguageClick;
         }
 
         public void InitializeEncodings(IEnumerable<string> encodingNames, string selectedEncoding)
@@ -424,6 +428,51 @@ namespace TxtAIEditor.Controls
             {
                 flyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
             }
+        }
+
+        private void OnLanguageClick(object sender, RoutedEventArgs e)
+        {
+            var tab = _activeTabProvider();
+            if (tab == null || tab.IsReadOnlyViewer)
+            {
+                return;
+            }
+
+            string currentLanguage = string.IsNullOrWhiteSpace(tab.Language) ? "plaintext" : tab.Language;
+            if (!string.Equals(currentLanguage, "plaintext", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var flyout = new MenuFlyout();
+            var markdownItem = new MenuFlyoutItem { Text = _getString("Markdown", "Markdown") };
+
+            markdownItem.Click += async (_, _) => await ChangeLanguageAsync(tab, "markdown");
+
+            flyout.Items.Add(markdownItem);
+            if (sender is Button button)
+            {
+                flyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
+            }
+        }
+
+        private async Task ChangeLanguageAsync(OpenedTab tab, string targetLanguage)
+        {
+            if (tab.IsReadOnlyViewer ||
+                string.Equals(tab.Language, targetLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            tab.Language = targetLanguage;
+            _statusBar.LanguageText.Text = targetLanguage.ToUpperInvariant();
+
+            if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+            {
+                await bridgeGroup.Bridge.SetLanguageAsync(targetLanguage);
+            }
+
+            _updateLivePreview(tab);
         }
 
         private async Task ChangeLineEndingWithPopupAsync(OpenedTab tab, string targetEnding)

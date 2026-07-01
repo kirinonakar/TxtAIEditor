@@ -193,7 +193,8 @@ namespace TxtAIEditor.Composition
                     ApplyPreviewVisibility,
                     callbacks.ReloadTabWithEncodingAsync,
                     callbacks.MarkTabDirtyFromStatusBar,
-                    callbacks.PerformLineNavigationAsync));
+                    callbacks.PerformLineNavigationAsync,
+                    callbacks.UpdateLivePreview));
             shellPanelLayoutService = shellControllers.ShellPanelLayout;
             tabNavigationController = shellControllers.TabNavigation;
             terminalShortcutService = shellControllers.TerminalShortcut;

@@ -785,6 +785,9 @@
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>选择文件编码</value>
   </data>
+  <data name="StatusLanguageTooltip" xml:space="preserve">
+    <value>更改文件类型</value>
+  </data>
   <data name="StatusImageViewer" xml:space="preserve">
     <value>图片</value>
   </data>

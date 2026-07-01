@@ -136,7 +136,9 @@
 
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="15" VerticalAlignment="Center">
                 <TextBlock x:Name="StatusGitBranch" Text="" Tag="GitNotDetected" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock x:Name="StatusLanguage" Text="PLAINTEXT" FontSize="11" VerticalAlignment="Center"/>
+                <Button x:Name="LanguageButton" MinWidth="68" HorizontalContentAlignment="Left" Padding="4,0" Background="Transparent" BorderBrush="Transparent" Click="HandleLanguageClick">
+                    <TextBlock x:Name="StatusLanguage" Text="PLAINTEXT" FontSize="11" VerticalAlignment="Center"/>
+                </Button>
                 <ComboBox x:Name="StatusEncodingCombo"
                           Width="100"
                           Height="20"

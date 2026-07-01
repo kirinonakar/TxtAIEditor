@@ -785,6 +785,9 @@
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>ファイルエンコーディングを選択</value>
   </data>
+  <data name="StatusLanguageTooltip" xml:space="preserve">
+    <value>ファイルの種類を変更</value>
+  </data>
   <data name="StatusImageViewer" xml:space="preserve">
     <value>画像</value>
   </data>

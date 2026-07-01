@@ -22,7 +22,8 @@ namespace TxtAIEditor.Composition
         Action<bool> ApplyPreviewVisibility,
         Func<OpenedTab, string, Task> ReloadTabWithEncodingAsync,
         Action<OpenedTab> MarkTabDirtyFromStatusBar,
-        Func<string, int, Task> PerformLineNavigationAsync);
+        Func<string, int, Task> PerformLineNavigationAsync,
+        Action<OpenedTab> UpdateLivePreview);
 
     internal sealed record MainWindowShellControllers(
         ShellPanelLayoutService ShellPanelLayout,
@@ -113,7 +114,8 @@ namespace TxtAIEditor.Composition
                 () => ui.TerminalPane.ResumeNativeWindows(),
                 callbacks.ReloadTabWithEncodingAsync,
                 callbacks.MarkTabDirtyFromStatusBar,
-                callbacks.PerformLineNavigationAsync);
+                callbacks.PerformLineNavigationAsync,
+                callbacks.UpdateLivePreview);
 
             return new MainWindowShellControllers(
                 shellPanelLayout,
