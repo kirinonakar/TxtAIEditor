@@ -763,7 +763,7 @@ function finishColumnComposition(element, lineNumber) {
 
     function focusImeBypassTextarea() {
         const selection = normalizeSelection();
-        if (selection && selection.start.line !== selection.end.line && !state.isSelecting) {
+        if (selection && selection.start.line !== selection.end.line && !selection.isColumn && !state.isSelecting) {
             const textarea = getOrCreateBypassTextarea();
             if (document.activeElement !== textarea) {
                 bypassSelection = cloneEditorSelection(selection);
