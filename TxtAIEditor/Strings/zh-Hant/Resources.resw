@@ -590,6 +590,60 @@
   <data name="GitRebase" xml:space="preserve">
     <value>變基</value>
   </data>
+  <data name="GitCreateBranch" xml:space="preserve">
+    <value>建立分支</value>
+  </data>
+  <data name="GitMerge" xml:space="preserve">
+    <value>合併</value>
+  </data>
+  <data name="GitCreateBranchTitle" xml:space="preserve">
+    <value>建立新分支</value>
+  </data>
+  <data name="GitCreateBranchPlaceholder" xml:space="preserve">
+    <value>輸入分支名稱...</value>
+  </data>
+  <data name="GitCreateBranchConfirm" xml:space="preserve">
+    <value>建立</value>
+  </data>
+  <data name="GitCreateBranchSuccessTitle" xml:space="preserve">
+    <value>分支建立成功</value>
+  </data>
+  <data name="GitCreateBranchSuccessMessage" xml:space="preserve">
+    <value>分支 '{0}' 已建立並切換。</value>
+  </data>
+  <data name="GitCreateBranchFailureTitle" xml:space="preserve">
+    <value>分支建立失敗</value>
+  </data>
+  <data name="GitCreateBranchFailureMessage" xml:space="preserve">
+    <value>無法建立分支。錯誤: {0}</value>
+  </data>
+  <data name="GitMergeTitle" xml:space="preserve">
+    <value>合併分支</value>
+  </data>
+  <data name="GitMergeLabel" xml:space="preserve">
+    <value>選擇要合併到目前分支的分支：</value>
+  </data>
+  <data name="GitMergeConfirm" xml:space="preserve">
+    <value>合併</value>
+  </data>
+  <data name="GitMergeCancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="GitMergeSuccessTitle" xml:space="preserve">
+    <value>合併成功</value>
+  </data>
+  <data name="GitMergeSuccessMessage" xml:space="preserve">
+    <value>分支 '{0}' 已成功合併。</value>
+  </data>
+  <data name="GitMergeFailureTitle" xml:space="preserve">
+    <value>合併失敗</value>
+  </data>
+  <data name="GitMergeFailureMessage" xml:space="preserve">
+    <value>合併過程中發生錯誤或存在衝突。{0}</value>
+  </data>
+  <data name="GitMergeNoBranchesMessage" xml:space="preserve">
+    <value>沒有其他可合併的分支。</value>
+  </data>
   <data name="GitRemote" xml:space="preserve">
     <value>遠端</value>
   </data>

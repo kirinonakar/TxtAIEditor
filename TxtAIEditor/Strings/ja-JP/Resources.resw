@@ -590,6 +590,60 @@
   <data name="GitRebase" xml:space="preserve">
     <value>Rebase</value>
   </data>
+  <data name="GitCreateBranch" xml:space="preserve">
+    <value>ブランチ作成</value>
+  </data>
+  <data name="GitMerge" xml:space="preserve">
+    <value>マージ</value>
+  </data>
+  <data name="GitCreateBranchTitle" xml:space="preserve">
+    <value>新しいブランチの作成</value>
+  </data>
+  <data name="GitCreateBranchPlaceholder" xml:space="preserve">
+    <value>ブランチ名を入力してください...</value>
+  </data>
+  <data name="GitCreateBranchConfirm" xml:space="preserve">
+    <value>作成</value>
+  </data>
+  <data name="GitCreateBranchSuccessTitle" xml:space="preserve">
+    <value>ブランチ作成に成功しました</value>
+  </data>
+  <data name="GitCreateBranchSuccessMessage" xml:space="preserve">
+    <value>ブランチ '{0}' が作成され、チェックアウトされました。</value>
+  </data>
+  <data name="GitCreateBranchFailureTitle" xml:space="preserve">
+    <value>ブランチ作成失敗</value>
+  </data>
+  <data name="GitCreateBranchFailureMessage" xml:space="preserve">
+    <value>ブランチの作成に失敗しました。エラー: {0}</value>
+  </data>
+  <data name="GitMergeTitle" xml:space="preserve">
+    <value>ブランチの合流 (マージ)</value>
+  </data>
+  <data name="GitMergeLabel" xml:space="preserve">
+    <value>現在のブランチにマージするブランチを選択してください:</value>
+  </data>
+  <data name="GitMergeConfirm" xml:space="preserve">
+    <value>マージ</value>
+  </data>
+  <data name="GitMergeCancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="GitMergeSuccessTitle" xml:space="preserve">
+    <value>マージ成功</value>
+  </data>
+  <data name="GitMergeSuccessMessage" xml:space="preserve">
+    <value>ブランチ '{0}' が正常にマージされました。</value>
+  </data>
+  <data name="GitMergeFailureTitle" xml:space="preserve">
+    <value>マージ失敗</value>
+  </data>
+  <data name="GitMergeFailureMessage" xml:space="preserve">
+    <value>マージ中にエラーが発生したか、衝突があります。{0}</value>
+  </data>
+  <data name="GitMergeNoBranchesMessage" xml:space="preserve">
+    <value>マージする他のブランチがありません。</value>
+  </data>
   <data name="GitRemote" xml:space="preserve">
     <value>Remote</value>
   </data>

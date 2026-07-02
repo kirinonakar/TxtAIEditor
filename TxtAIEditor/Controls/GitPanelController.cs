@@ -487,6 +487,177 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public async Task CreateBranchAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+            {
+                _showError(
+                    _getString("GitCreateBranchTitle", "새 브랜치 생성"),
+                    _getString("GitRemoteNoRepoMessage", "Git 저장소를 먼저 선택하거나 생성하세요."));
+                return;
+            }
+
+            ElementTheme dialogTheme = GetCurrentDialogTheme();
+            var nameInput = new TextBox
+            {
+                PlaceholderText = _getString("GitCreateBranchPlaceholder", "Enter branch name..."),
+                Width = 300,
+                FontSize = 12,
+                RequestedTheme = dialogTheme,
+                IsSpellCheckEnabled = false,
+                IsTextPredictionEnabled = false
+            };
+
+            var content = new StackPanel
+            {
+                Spacing = 8,
+                Width = 300,
+                RequestedTheme = dialogTheme
+            };
+            content.Children.Add(new TextBlock
+            {
+                Text = _getString("GitCreateBranchPlaceholder", "Enter branch name..."),
+                FontSize = 11,
+                RequestedTheme = dialogTheme,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            content.Children.Add(nameInput);
+
+            _beforeDialog?.Invoke();
+            var dialog = new ContentDialog
+            {
+                Title = _getString("GitCreateBranchTitle", "새 브랜치 생성"),
+                Content = content,
+                PrimaryButtonText = _getString("GitCreateBranchConfirm", "생성"),
+                CloseButtonText = _getString("GitRemoteDialogCancel", "취소"),
+                XamlRoot = _xamlRootProvider(),
+                RequestedTheme = dialogTheme
+            };
+
+            var result = await dialog.ShowAsync();
+            _afterDialog?.Invoke();
+
+            if (result == ContentDialogResult.Primary)
+            {
+                string branchName = nameInput.Text.Trim();
+                if (string.IsNullOrEmpty(branchName))
+                {
+                    return;
+                }
+
+                string output = await _gitService.RunGitCommandAsync(repoPath, $"checkout -b \"{branchName}\"");
+                bool success = !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+                if (success)
+                {
+                    await RefreshAsync(repoPath);
+                    _showError(
+                        _getString("GitCreateBranchSuccessTitle", "브랜치 생성 성공"),
+                        string.Format(_getString("GitCreateBranchSuccessMessage", "'{0}' 브랜치가 생성되고 이동되었습니다."), branchName));
+                }
+                else
+                {
+                    _showError(
+                        _getString("GitCreateBranchFailureTitle", "브랜치 생성 실패"),
+                        string.Format(_getString("GitCreateBranchFailureMessage", "브랜치 생성에 실패했습니다. 오류 메시지: {0}"), output.Trim()));
+                }
+            }
+        }
+
+        public async Task MergeBranchAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+            {
+                _showError(
+                    _getString("GitMergeTitle", "브랜치 병합 (Merge)"),
+                    _getString("GitRemoteNoRepoMessage", "Git 저장소를 먼저 선택하거나 생성하세요."));
+                return;
+            }
+
+            var branches = await _gitService.GetBranchesAsync(repoPath);
+            var mergeableBranches = new System.Collections.Generic.List<string>();
+            foreach (var b in branches)
+            {
+                string cleaned = b.Trim();
+                if (cleaned.StartsWith("*", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                else
+                {
+                    mergeableBranches.Add(cleaned);
+                }
+            }
+
+            if (mergeableBranches.Count == 0)
+            {
+                _showError(
+                    _getString("GitMergeTitle", "브랜치 병합 (Merge)"),
+                    _getString("GitMergeNoBranchesMessage", "병합할 다른 브랜치가 없습니다."));
+                return;
+            }
+
+            ElementTheme dialogTheme = GetCurrentDialogTheme();
+            var combo = new ComboBox
+            {
+                Width = 300,
+                RequestedTheme = dialogTheme
+            };
+            foreach (var mb in mergeableBranches)
+            {
+                combo.Items.Add(mb);
+            }
+            combo.SelectedIndex = 0;
+
+            var content = new StackPanel
+            {
+                Spacing = 8,
+                Width = 300,
+                RequestedTheme = dialogTheme
+            };
+            content.Children.Add(new TextBlock
+            {
+                Text = _getString("GitMergeLabel", "현재 브랜치로 병합할 브랜치를 선택하세요:"),
+                FontSize = 11,
+                RequestedTheme = dialogTheme,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            content.Children.Add(combo);
+
+            _beforeDialog?.Invoke();
+            var dialog = new ContentDialog
+            {
+                Title = _getString("GitMergeTitle", "브랜치 병합 (Merge)"),
+                Content = content,
+                PrimaryButtonText = _getString("GitMergeConfirm", "병합"),
+                CloseButtonText = _getString("GitMergeCancel", "취소"),
+                XamlRoot = _xamlRootProvider(),
+                RequestedTheme = dialogTheme
+            };
+
+            var result = await dialog.ShowAsync();
+            _afterDialog?.Invoke();
+
+            if (result == ContentDialogResult.Primary && combo.SelectedItem is string selectedBranch)
+            {
+                string output = await _gitService.RunGitCommandAsync(repoPath, $"merge \"{selectedBranch}\"");
+                bool success = !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase) && !output.Contains("CONFLICT");
+                if (success)
+                {
+                    await RefreshAsync(repoPath);
+                    _showError(
+                        _getString("GitMergeSuccessTitle", "브랜치 병합 성공"),
+                        string.Format(_getString("GitMergeSuccessMessage", "'{0}' 브랜치가 성공적으로 병합되었습니다."), selectedBranch));
+                }
+                else
+                {
+                    await RefreshAsync(repoPath);
+                    _showError(
+                        _getString("GitMergeFailureTitle", "브랜치 병합 실패"),
+                        string.Format(_getString("GitMergeFailureMessage", "병합 중 오류가 발생했거나 충돌이 있습니다. {0}"), output.Trim()));
+                }
+            }
+        }
+
         public async Task CheckoutBranchAsync(string repoPath, string branchName)
         {
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrWhiteSpace(branchName))
@@ -903,6 +1074,8 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitPushClick += OnGitPushClick;
             _leftSidebar.GitPullClick += OnGitPullClick;
             _leftSidebar.GitRebaseClick += OnGitRebaseClick;
+            _leftSidebar.GitCreateBranchClick += OnGitCreateBranchClick;
+            _leftSidebar.GitMergeClick += OnGitMergeClick;
             _leftSidebar.GitRemoteClick += OnGitRemoteClick;
             _leftSidebar.GitScpClick += OnGitScpClick;
             _leftSidebar.GitRefreshClick += OnGitRefreshClick;
@@ -951,6 +1124,16 @@ namespace TxtAIEditor.Controls
         private async void OnGitRebaseClick(object sender, RoutedEventArgs e)
         {
             await RebaseAsync(_repoPathProvider());
+        }
+
+        private async void OnGitCreateBranchClick(object sender, RoutedEventArgs e)
+        {
+            await CreateBranchAsync(_repoPathProvider());
+        }
+
+        private async void OnGitMergeClick(object sender, RoutedEventArgs e)
+        {
+            await MergeBranchAsync(_repoPathProvider());
         }
 
         private async void OnGitRemoteClick(object sender, RoutedEventArgs e)

@@ -590,6 +590,60 @@
   <data name="GitRebase" xml:space="preserve">
     <value>Rebase</value>
   </data>
+  <data name="GitCreateBranch" xml:space="preserve">
+    <value>Create Branch</value>
+  </data>
+  <data name="GitMerge" xml:space="preserve">
+    <value>Merge</value>
+  </data>
+  <data name="GitCreateBranchTitle" xml:space="preserve">
+    <value>Create New Branch</value>
+  </data>
+  <data name="GitCreateBranchPlaceholder" xml:space="preserve">
+    <value>Enter branch name...</value>
+  </data>
+  <data name="GitCreateBranchConfirm" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="GitCreateBranchSuccessTitle" xml:space="preserve">
+    <value>Branch Created Successfully</value>
+  </data>
+  <data name="GitCreateBranchSuccessMessage" xml:space="preserve">
+    <value>Branch '{0}' has been created and checked out.</value>
+  </data>
+  <data name="GitCreateBranchFailureTitle" xml:space="preserve">
+    <value>Branch Creation Failed</value>
+  </data>
+  <data name="GitCreateBranchFailureMessage" xml:space="preserve">
+    <value>Failed to create branch. Error: {0}</value>
+  </data>
+  <data name="GitMergeTitle" xml:space="preserve">
+    <value>Merge Branch</value>
+  </data>
+  <data name="GitMergeLabel" xml:space="preserve">
+    <value>Select a branch to merge into current branch:</value>
+  </data>
+  <data name="GitMergeConfirm" xml:space="preserve">
+    <value>Merge</value>
+  </data>
+  <data name="GitMergeCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="GitMergeSuccessTitle" xml:space="preserve">
+    <value>Merge Successful</value>
+  </data>
+  <data name="GitMergeSuccessMessage" xml:space="preserve">
+    <value>Branch '{0}' has been successfully merged.</value>
+  </data>
+  <data name="GitMergeFailureTitle" xml:space="preserve">
+    <value>Merge Failed</value>
+  </data>
+  <data name="GitMergeFailureMessage" xml:space="preserve">
+    <value>An error occurred during merge or there are conflicts. {0}</value>
+  </data>
+  <data name="GitMergeNoBranchesMessage" xml:space="preserve">
+    <value>There are no other branches to merge.</value>
+  </data>
   <data name="GitRemote" xml:space="preserve">
     <value>Remote</value>
   </data>

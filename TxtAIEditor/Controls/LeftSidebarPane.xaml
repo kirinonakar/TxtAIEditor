@@ -485,6 +485,8 @@
                                                 <MenuFlyout>
                                                     <MenuFlyoutItem x:Name="GitPullMenuItem" Text="Pull" Click="OnGitPullClick"/>
                                                     <MenuFlyoutItem x:Name="GitRebaseMenuItem" Text="Rebase" Click="OnGitRebaseClick"/>
+                                                    <MenuFlyoutItem x:Name="GitCreateBranchMenuItem" Text="Create Branch" Click="OnGitCreateBranchClick"/>
+                                                    <MenuFlyoutItem x:Name="GitMergeMenuItem" Text="Merge" Click="OnGitMergeClick"/>
                                                 </MenuFlyout>
                                             </SplitButton.Flyout>
                                         </SplitButton>
