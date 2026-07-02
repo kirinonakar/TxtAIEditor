@@ -574,6 +574,22 @@ namespace TxtAIEditor.Controls
             }
 
             var branches = await _gitService.GetBranchesAsync(repoPath);
+
+            string mergedOutput = await _gitService.RunGitCommandAsync(repoPath, "branch --no-color --merged");
+            var mergedBranches = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(mergedOutput) && !mergedOutput.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                var lines = mergedOutput.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    string cleanedLine = line.TrimStart('*', ' ').Trim();
+                    if (!string.IsNullOrEmpty(cleanedLine))
+                    {
+                        mergedBranches.Add(cleanedLine);
+                    }
+                }
+            }
+
             var mergeableBranches = new System.Collections.Generic.List<string>();
             foreach (var b in branches)
             {
@@ -582,10 +598,13 @@ namespace TxtAIEditor.Controls
                 {
                     continue;
                 }
-                else
+
+                if (mergedBranches.Contains(cleaned))
                 {
-                    mergeableBranches.Add(cleaned);
+                    continue;
                 }
+
+                mergeableBranches.Add(cleaned);
             }
 
             if (mergeableBranches.Count == 0)
