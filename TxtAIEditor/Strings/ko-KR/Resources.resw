@@ -2958,6 +2958,9 @@
   <data name="AgentMcpComfyUiBrowseButton" xml:space="preserve">
     <value>찾아보기</value>
   </data>
+  <data name="AgentMcpComfyUiOpenFolderTooltip" xml:space="preserve">
+    <value>Windows 탐색기에서 열기</value>
+  </data>
   <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
     <value>ComfyUI 플러그인을 활성화하면 실행 파일 경로로 서버를 자동 실행하고, 지정한 API 워크플로우 폴더의 JSON 목록을 Agent에게 제공합니다.</value>
   </data>

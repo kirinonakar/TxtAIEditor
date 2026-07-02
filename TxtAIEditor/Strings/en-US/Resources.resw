@@ -2958,6 +2958,9 @@ Plan: {0}</value>
   <data name="AgentMcpComfyUiBrowseButton" xml:space="preserve">
     <value>Browse</value>
   </data>
+  <data name="AgentMcpComfyUiOpenFolderTooltip" xml:space="preserve">
+    <value>Open in Windows Explorer</value>
+  </data>
   <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
     <value>When the ComfyUI plugin is enabled, TxtAIEditor starts the server from the launch file path and provides the Agent with the JSON list from the selected API workflow folder.</value>
   </data>

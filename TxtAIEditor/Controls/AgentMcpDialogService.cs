@@ -112,11 +112,13 @@ namespace TxtAIEditor.Controls
                 }
             };
 
+            var workflowExplorerButton = CreateExplorerButton(workflowDirectoryBox);
+
             var stack = new StackPanel { Spacing = 10, Width = 460 };
             stack.Children.Add(CreateLabel(_getString("AgentMcpComfyUiLaunchPathLabel", "ComfyUI 실행 파일")));
             stack.Children.Add(CreatePickerRow(launchPathBox, launchBrowseButton));
             stack.Children.Add(CreateLabel(_getString("AgentMcpComfyUiWorkflowDirectoryLabel", "워크플로우(API) 폴더")));
-            stack.Children.Add(CreatePickerRow(workflowDirectoryBox, workflowBrowseButton));
+            stack.Children.Add(CreatePickerRow(workflowDirectoryBox, workflowBrowseButton, workflowExplorerButton));
             stack.Children.Add(CreateInfoText(_getString(
                 "AgentMcpComfyUiSettingsInfo",
                 "ComfyUI 플러그인을 활성화하면 실행 파일 경로로 서버를 자동 실행하고, 지정한 API 워크플로우 폴더의 JSON 목록을 Agent에게 제공합니다.")));
@@ -400,15 +402,61 @@ namespace TxtAIEditor.Controls
             return button;
         }
 
-        private static Grid CreatePickerRow(TextBox pathBox, Button browseButton)
+        private Button CreateExplorerButton(TextBox pathBox)
+        {
+            var button = new Button
+            {
+                Content = new FontIcon { Glyph = "\uE8DA", FontSize = 12 },
+                Width = 34,
+                Height = 32,
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            ToolTipService.SetToolTip(button, _getString("AgentMcpComfyUiOpenFolderTooltip", "Windows 탐색기에서 열기"));
+            button.Click += (_, _) =>
+            {
+                string path = pathBox.Text?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(path) || !System.IO.Directory.Exists(path))
+                {
+                    return;
+                }
+
+                try
+                {
+                    var startInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        UseShellExecute = false
+                    };
+                    startInfo.ArgumentList.Add(path);
+                    System.Diagnostics.Process.Start(startInfo);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to open directory: {ex.Message}");
+                }
+            };
+            return button;
+        }
+
+        private static Grid CreatePickerRow(TextBox pathBox, Button browseButton, Button? actionButton = null)
         {
             var grid = new Grid { ColumnSpacing = 6 };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            if (actionButton != null)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            }
             Grid.SetColumn(pathBox, 0);
             Grid.SetColumn(browseButton, 1);
             grid.Children.Add(pathBox);
             grid.Children.Add(browseButton);
+            if (actionButton != null)
+            {
+                Grid.SetColumn(actionButton, 2);
+                grid.Children.Add(actionButton);
+            }
             return grid;
         }
 

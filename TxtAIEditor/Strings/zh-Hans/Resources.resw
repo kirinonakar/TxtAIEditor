@@ -2958,6 +2958,9 @@
   <data name="AgentMcpComfyUiBrowseButton" xml:space="preserve">
     <value>浏览</value>
   </data>
+  <data name="AgentMcpComfyUiOpenFolderTooltip" xml:space="preserve">
+    <value>在资源管理器中打开</value>
+  </data>
   <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
     <value>启用 ComfyUI 插件时，会通过启动文件路径自动启动服务器，并将指定 API 工作流文件夹中的 JSON 列表提供给 Agent。</value>
   </data>

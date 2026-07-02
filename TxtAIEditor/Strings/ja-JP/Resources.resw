@@ -2958,6 +2958,9 @@
   <data name="AgentMcpComfyUiBrowseButton" xml:space="preserve">
     <value>参照</value>
   </data>
+  <data name="AgentMcpComfyUiOpenFolderTooltip" xml:space="preserve">
+    <value>エクスプローラーで開く</value>
+  </data>
   <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
     <value>ComfyUI プラグインを有効にすると、起動ファイルのパスでサーバーを自動起動し、指定した API ワークフローフォルダーの JSON 一覧を Agent に提供します。</value>
   </data>
