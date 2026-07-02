@@ -199,24 +199,68 @@ namespace TxtAIEditor.Controls
                 }
                 else if (c == '/')
                 {
+                    double x1, x2;
+                    int col1, col2;
+                    if (i % 2 == 1)
+                    {
+                        x1 = x + cellWidth;
+                        x2 = x - cellWidth;
+                        col1 = i + 1;
+                        col2 = i - 1;
+                    }
+                    else
+                    {
+                        x1 = x;
+                        x2 = Math.Max(cellWidth / 2, x - 2 * cellWidth);
+                        col1 = i;
+                        col2 = i - 2;
+                    }
+
+                    bool topHasCommit = col1 >= 0 && col1 < graphStr.Length && graphStr[col1] == '*';
+                    bool bottomHasCommit = col2 >= 0 && col2 < graphStr.Length && graphStr[col2] == '*';
+                    double y1 = topHasCommit ? (itemHeight / 2.0) : yTop;
+                    double y2 = bottomHasCommit ? (itemHeight / 2.0) : yBottom;
+
                     canvas.Children.Add(new Line
                     {
-                        X1 = x + cellWidth,
-                        Y1 = yTop,
-                        X2 = x,
-                        Y2 = yBottom,
+                        X1 = x1,
+                        Y1 = y1,
+                        X2 = x2,
+                        Y2 = y2,
                         Stroke = brush,
                         StrokeThickness = 2.0
                     });
                 }
                 else if (c == '\\')
                 {
+                    double x1, x2;
+                    int col1, col2;
+                    if (i % 2 == 1)
+                    {
+                        x1 = x - cellWidth;
+                        x2 = x + cellWidth;
+                        col1 = i - 1;
+                        col2 = i + 1;
+                    }
+                    else
+                    {
+                        x1 = Math.Max(cellWidth / 2, x - 2 * cellWidth);
+                        x2 = x;
+                        col1 = i - 2;
+                        col2 = i;
+                    }
+
+                    bool topHasCommit = col1 >= 0 && col1 < graphStr.Length && graphStr[col1] == '*';
+                    bool bottomHasCommit = col2 >= 0 && col2 < graphStr.Length && graphStr[col2] == '*';
+                    double y1 = topHasCommit ? (itemHeight / 2.0) : yTop;
+                    double y2 = bottomHasCommit ? (itemHeight / 2.0) : yBottom;
+
                     canvas.Children.Add(new Line
                     {
-                        X1 = x,
-                        Y1 = yTop,
-                        X2 = x + cellWidth,
-                        Y2 = yBottom,
+                        X1 = x1,
+                        Y1 = y1,
+                        X2 = x2,
+                        Y2 = y2,
                         Stroke = brush,
                         StrokeThickness = 2.0
                     });
