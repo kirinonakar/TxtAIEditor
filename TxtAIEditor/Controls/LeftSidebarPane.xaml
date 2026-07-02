@@ -495,11 +495,19 @@
                                 <StackPanel Grid.Row="4" Spacing="4" Margin="10,8,10,0">
                                     <TextBlock x:Name="GitHistoryHeader" Text="과거 기록" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
                                     <ListView x:Name="GitHistoryList" Height="160" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnGitHistoryItemClick" ScrollViewer.HorizontalScrollMode="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="MinHeight" Value="18"/>
+                                                <Setter Property="Height" Value="18"/>
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="0"/>
+                                                <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Padding="0,2,0,2">
-                                                    <TextBlock Text="{Binding DisplayText}" FontSize="10" FontFamily="Consolas" TextWrapping="NoWrap" ToolTipService.ToolTip="{Binding DisplayText}"/>
-                                                </Grid>
+                                                <Grid local:TextBlockExtensions.GitHistoryItem="{Binding}" Padding="0"/>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
                                     </ListView>
