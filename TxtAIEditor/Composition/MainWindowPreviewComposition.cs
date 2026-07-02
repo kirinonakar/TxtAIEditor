@@ -109,6 +109,7 @@ namespace TxtAIEditor.Composition
             var officeDocumentViewer = new OfficeDocumentViewerController(
                 services.SettingsService,
                 tabNavigation.GetActiveTab,
+                webViewShortcut.Handle,
                 callbacks.GetLocalizedString);
 
             var editorLinkNavigation = new EditorLinkNavigationController(

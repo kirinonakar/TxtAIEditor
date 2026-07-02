@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
@@ -16,6 +18,7 @@ namespace TxtAIEditor.Controls
     {
         private readonly ISettingsService _settingsService;
         private readonly Func<OpenedTab?> _activeTabProvider;
+        private readonly Action<string> _shortcutHandler;
         private readonly OfficeDocumentViewerService _viewerService;
         private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
         private readonly Dictionary<string, string> _viewerHtmlPaths = new Dictionary<string, string>();
@@ -23,10 +26,12 @@ namespace TxtAIEditor.Controls
         public OfficeDocumentViewerController(
             ISettingsService settingsService,
             Func<OpenedTab?> activeTabProvider,
+            Action<string> shortcutHandler,
             Func<string, string, string> getString)
         {
             _settingsService = settingsService;
             _activeTabProvider = activeTabProvider;
+            _shortcutHandler = shortcutHandler;
             _viewerService = new OfficeDocumentViewerService(getString);
         }
 
@@ -114,7 +119,7 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                Configure(webView);
+                await ConfigureAsync(webView);
                 await NavigateAsync(tab, webView);
             }
             catch
@@ -122,18 +127,62 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void Configure(WebView2 webView)
+        private async Task ConfigureAsync(WebView2 webView)
         {
             if (webView.CoreWebView2 == null)
             {
                 return;
             }
 
+            webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = true;
             webView.CoreWebView2.Settings.IsScriptEnabled = true;
+            webView.WebMessageReceived += OnWebMessageReceived;
             WebViewAppearanceService.ApplyPreferredColorScheme(webView.CoreWebView2, _settingsService.CurrentSettings.Theme);
+            await InstallShortcutBridgeAsync(webView);
+        }
+
+        private void OnWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(args.WebMessageAsJson);
+                var root = document.RootElement;
+                if (!root.TryGetProperty("type", out var typeProp) ||
+                    !string.Equals(typeProp.GetString(), "shortcut", StringComparison.Ordinal) ||
+                    !root.TryGetProperty("name", out var nameProp))
+                {
+                    return;
+                }
+
+                string name = nameProp.GetString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    sender.DispatcherQueue.TryEnqueue(() => _shortcutHandler(name));
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static async Task InstallShortcutBridgeAsync(WebView2 webView)
+        {
+            if (webView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(ShortcutBridgeScript);
+                await webView.CoreWebView2.ExecuteScriptAsync(ShortcutBridgeScript);
+            }
+            catch
+            {
+            }
         }
 
         private async Task NavigateAsync(OpenedTab tab, WebView2 webView)
@@ -205,5 +254,48 @@ namespace TxtAIEditor.Controls
             {
             }
         }
+
+        private const string ShortcutBridgeScript = @"
+(() => {
+    if (window.__txtAiEditorOfficeShortcutBridge) return;
+    window.__txtAiEditorOfficeShortcutBridge = true;
+
+    function post(name) {
+        try {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage({ type: 'shortcut', name });
+            }
+        } catch {}
+    }
+
+    document.addEventListener('keydown', event => {
+        let name = '';
+        if (event.key === 'F4') {
+            name = 'f4';
+        } else if (event.key === 'F9') {
+            name = 'f9';
+        } else if (event.key === 'F10') {
+            name = 'f10';
+        } else if (event.key === 'F11') {
+            name = 'f11';
+        } else if (event.key === 'F12') {
+            name = 'f12';
+        } else {
+            const ctrl = event.ctrlKey || event.metaKey;
+            const key = event.key ? event.key.toLowerCase() : '';
+            if (ctrl && key === '3') {
+                name = 'expandRightPanel';
+            } else if (ctrl && key === 'p') {
+                name = 'print';
+            }
+        }
+
+        if (!name) return;
+        event.preventDefault();
+        event.stopPropagation();
+        post(name);
+    }, true);
+})();
+";
     }
 }
