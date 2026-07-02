@@ -1,6 +1,7 @@
 export function createEditorCompositionHandlers({
     activeColumnSelection,
     activeEditableElement,
+    caretRectForOffset,
     cleanDirtyMarker,
     clearCustomSelectionVisuals,
     cloneEditorSelection,
@@ -99,18 +100,20 @@ function syncRenderedRowsAfterCompositionSelectionCollapse(startLine, endLine, n
             }
             const column = Math.max(0, Math.min(Number(caretColumn || 0), textElement.textContent.length));
             const textNode = textElement.firstChild;
-            textElement.focus({ preventScroll: true });
-            const range = document.createRange();
-            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                range.setStart(textNode, column);
-            } else {
-                range.setStart(textElement, 0);
-            }
-            range.collapse(true);
-            const selection = window.getSelection();
-            if (selection) {
-                selection.removeAllRanges();
-                selection.addRange(range);
+            if (!state.textareaImeBypassActive) {
+                textElement.focus({ preventScroll: true });
+                const range = document.createRange();
+                if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                    range.setStart(textNode, column);
+                } else {
+                    range.setStart(textElement, 0);
+                }
+                range.collapse(true);
+                const selection = window.getSelection();
+                if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
             }
         }
     }
@@ -526,8 +529,279 @@ function finishColumnComposition(element, lineNumber) {
     return true;
 }
 
+    let textareaBypassNode = null;
+    let bypassSelection = null;
+    let bypassPrefix = '';
+    let bypassSuffix = '';
+    let bypassStartLine = 1;
+    let bypassStartColumn = 0;
+    let isBypassCompositionActive = false;
+
+    function getOrCreateBypassTextarea() {
+        if (!textareaBypassNode) {
+            textareaBypassNode = document.createElement('textarea');
+            textareaBypassNode.id = 'ime-bypass-textarea';
+            textareaBypassNode.style.cssText = `
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                opacity: 0;
+                pointer-events: none;
+                border: none;
+                padding: 0;
+                margin: 0;
+                outline: none;
+                resize: none;
+                overflow: hidden;
+                background: transparent;
+                color: transparent;
+                z-index: -1000;
+            `;
+            const host = document.getElementById('editor-host') || document.body;
+            host.appendChild(textareaBypassNode);
+
+            textareaBypassNode.addEventListener('compositionstart', onBypassCompositionStart);
+            textareaBypassNode.addEventListener('compositionupdate', onBypassCompositionUpdate);
+            textareaBypassNode.addEventListener('compositionend', onBypassCompositionEnd);
+            textareaBypassNode.addEventListener('input', onBypassInput);
+            textareaBypassNode.addEventListener('keydown', onBypassKeyDown);
+            textareaBypassNode.addEventListener('blur', onBypassBlur);
+        }
+        return textareaBypassNode;
+    }
+
+    function collapseEditorSelectionForBypass() {
+        if (!bypassSelection) return;
+
+        const { start, end } = bypassSelection;
+        const prefix = bypassPrefix;
+        const suffix = bypassSuffix;
+        const nextText = prefix + suffix;
+        const removedLineCount = Math.max(0, end.line - start.line);
+        const caretColumn = Math.max(0, Math.min(start.column, nextText.length));
+
+        state.selection = null;
+        state.selectionAnchor = { line: start.line, column: caretColumn };
+        state.currentLine = start.line;
+        state.currentColumn = caretColumn + 1;
+        state.editingLine = start.line;
+
+        state.cache.set(start.line, nextText);
+        for (let line = start.line + 1; line <= end.line; line++) {
+            state.cache.delete(line);
+        }
+        if (removedLineCount > 0) {
+            shiftCachedLines(end.line + 1, -removedLineCount);
+            state.lineCount = Math.max(1, state.lineCount - removedLineCount);
+            setupVirtualHeight();
+        }
+        state.cacheVersion++;
+
+        if (!cleanDirtyMarker(start.line)) {
+            markDirty(start.line, 'mod');
+        }
+
+        post({ type: 'lineChanged', lineNumber: start.line, text: nextText });
+        for (let line = end.line; line > start.line; line--) {
+            post({ type: 'deleteLine', lineNumber: line });
+        }
+        post({ type: 'contentChanged' });
+
+        const row = viewport.querySelector(`.line-row[data-line="${start.line}"]`);
+        const element = row ? row.querySelector('.line-text') : null;
+
+        syncRenderedRowsAfterCompositionSelectionCollapse(
+            start.line,
+            end.line,
+            nextText,
+            caretColumn,
+            element
+        );
+
+        state.lastRangeKey = '';
+        if (state.wordWrap) {
+            measureRenderedRows(false);
+        }
+
+        bypassSelection = null;
+    }
+
+    function onBypassCompositionStart(e) {
+        state.isComposing = true;
+        state.compositionLine = bypassStartLine;
+        state.editingLine = bypassStartLine;
+        isBypassCompositionActive = true;
+        collapseEditorSelectionForBypass();
+    }
+
+    function onBypassCompositionUpdate(e) {
+        state.isComposing = true;
+        const val = e.data || '';
+        updateEditorText(val, true);
+    }
+
+    function onBypassInput(e) {
+        if (bypassSelection) {
+            collapseEditorSelectionForBypass();
+        }
+        const val = textareaBypassNode.value;
+        updateEditorText(val, true);
+    }
+
+    function onBypassCompositionEnd(e) {
+        state.isComposing = false;
+        isBypassCompositionActive = false;
+        const val = e.data !== undefined ? (textareaBypassNode.value || e.data) : textareaBypassNode.value;
+        updateEditorText(val, false);
+    }
+
+    function onBypassKeyDown(e) {
+        if (!isBypassCompositionActive) {
+            const val = textareaBypassNode.value;
+            state.textareaImeBypassActive = false;
+            state.bypassStartLine = null;
+            
+            if (bypassSelection) {
+                bypassSelection = null;
+                const activeLine = viewport.querySelector(`.line-text[data-line="${state.currentLine}"]`);
+                if (activeLine) {
+                    activeLine.focus({ preventScroll: true });
+                }
+            } else {
+                updateEditorText(val, false);
+                const newCaretCol = bypassStartColumn + val.length;
+                focusLine(bypassStartLine, newCaretCol);
+            }
+            
+            const active = document.activeElement;
+            if (active && active !== textareaBypassNode) {
+                const initOpts = {
+                    key: e.key,
+                    code: e.code,
+                    keyCode: e.keyCode,
+                    which: e.which,
+                    ctrlKey: e.ctrlKey,
+                    shiftKey: e.shiftKey,
+                    altKey: e.altKey,
+                    metaKey: e.metaKey,
+                    bubbles: true,
+                    cancelable: true
+                };
+                active.dispatchEvent(new KeyboardEvent('keydown', initOpts));
+            }
+            e.preventDefault();
+        }
+    }
+ 
+    function onBypassBlur(e) {
+        if (state.textareaImeBypassActive) {
+            const val = textareaBypassNode.value;
+            state.textareaImeBypassActive = false;
+            state.bypassStartLine = null;
+            if (bypassSelection) {
+                bypassSelection = null;
+            } else {
+                updateEditorText(val, false);
+            }
+        }
+    }
+
+    function updateEditorText(val, isComposing) {
+        const nextText = bypassPrefix + val + bypassSuffix;
+        state.cache.set(bypassStartLine, nextText);
+        state.cacheVersion++;
+        
+        post({
+            type: 'lineChanged',
+            lineNumber: bypassStartLine,
+            text: nextText,
+            isComposing: isComposing
+        });
+        post({ type: 'contentChanged', isComposing: isComposing });
+        
+        const element = viewport.querySelector(`.line-text[data-line="${bypassStartLine}"]`);
+        if (element) {
+            element.innerHTML = renderLineContent(bypassStartLine, nextText);
+            clearCustomSelectionVisuals();
+            drawCustomCursorForBypass(element, bypassStartColumn + val.length);
+            
+            if (isComposing) {
+                const rect = caretRectForOffset(element, bypassStartColumn + val.length);
+                const host = document.getElementById('editor-host') || document.body;
+                const hostRect = host.getBoundingClientRect();
+                if (rect) {
+                    textareaBypassNode.style.left = `${rect.left - hostRect.left}px`;
+                    textareaBypassNode.style.top = `${rect.top - hostRect.top}px`;
+                    textareaBypassNode.style.height = `${rect.height}px`;
+                }
+            }
+        }
+        
+        if (state.wordWrap) {
+            measureRenderedRows(false);
+        }
+    }
+
+    function drawCustomCursorForBypass(element, column) {
+        const row = element.closest('.line-row');
+        if (!row) return;
+
+        const rowRect = row.getBoundingClientRect();
+        const textLength = (element.textContent || '').replace(/\u00a0/g, ' ').length;
+        const safeColumn = Math.max(0, Math.min(column, textLength));
+        const rect = caretRectForOffset(element, safeColumn);
+        if (rect && rect.height > 0) {
+            const overlay = document.createElement('div');
+            overlay.className = 'editable-selection-overlay column-cursor-overlay';
+            overlay.style.left = `${Math.max(0, rect.left - rowRect.left)}px`;
+            overlay.style.top = `${Math.max(0, rect.top - rowRect.top)}px`;
+            overlay.style.width = '2px';
+            overlay.style.height = `${rect.height}px`;
+            row.appendChild(overlay);
+        }
+    }
+
+    function focusImeBypassTextarea() {
+        const selection = normalizeSelection();
+        if (selection && selection.start.line !== selection.end.line && !state.isSelecting) {
+            const textarea = getOrCreateBypassTextarea();
+            if (document.activeElement !== textarea) {
+                bypassSelection = cloneEditorSelection(selection);
+                bypassStartLine = selection.start.line;
+                bypassStartColumn = selection.start.column;
+                
+                const prefix = (state.cache.get(bypassStartLine) ?? '').slice(0, bypassStartColumn);
+                const suffix = (state.cache.get(selection.end.line) ?? '').slice(selection.end.column);
+                bypassPrefix = prefix;
+                bypassSuffix = suffix;
+                
+                textarea.value = '';
+                state.textareaImeBypassActive = true;
+                state.bypassStartLine = bypassStartLine;
+                
+                const row = viewport.querySelector(`.line-row[data-line="${bypassStartLine}"]`);
+                if (row) {
+                    const textElement = row.querySelector('.line-text');
+                    if (textElement) {
+                        const rect = caretRectForOffset(textElement, bypassStartColumn);
+                        const host = document.getElementById('editor-host') || document.body;
+                        const hostRect = host.getBoundingClientRect();
+                        if (rect) {
+                            textarea.style.left = `${rect.left - hostRect.left}px`;
+                            textarea.style.top = `${rect.top - hostRect.top}px`;
+                            textarea.style.height = `${rect.height}px`;
+                        }
+                    }
+                }
+                
+                textarea.focus();
+            }
+        }
+    }
+
     return {
         beginColumnComposition,
+        focusImeBypassTextarea,
         changedTextBetween,
         clearPendingImeSelectionCollapse,
         finishColumnComposition,

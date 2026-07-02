@@ -1745,6 +1745,7 @@ function deleteCurrentLine(element) {
 
 const {
     beginColumnComposition,
+    focusImeBypassTextarea,
     changedTextBetween,
     clearPendingImeSelectionCollapse,
     finishColumnComposition,
@@ -1756,6 +1757,7 @@ const {
 } = createEditorCompositionHandlers({
     activeColumnSelection,
     activeEditableElement,
+    caretRectForOffset,
     cleanDirtyMarker,
     clearCustomSelectionVisuals,
     cloneEditorSelection,
@@ -1903,6 +1905,7 @@ export {
     applyMarkdownCommand,
     beginColumnComposition,
     beginHostStreamInsert,
+    focusImeBypassTextarea,
     clearPendingImeSelectionCollapse,
     clearPendingRepeatEdit,
     commitLine,

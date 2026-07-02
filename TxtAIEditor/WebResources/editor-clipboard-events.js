@@ -15,7 +15,7 @@ export function bindClipboardEvents() {
     let suppressNativePasteUntil = 0;
     document.addEventListener('copy', event => {
         if (event.target && (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.closest('#find-panel'))) {
-            return;
+            if (event.target.id !== 'ime-bypass-textarea') return;
         }
         const text = selectedText();
         if (text) {
@@ -26,7 +26,7 @@ export function bindClipboardEvents() {
 
     document.addEventListener('cut', event => {
         if (event.target && (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.closest('#find-panel'))) {
-            return;
+            if (event.target.id !== 'ime-bypass-textarea') return;
         }
         const text = selectedText();
         if (!text) return;
@@ -51,7 +51,7 @@ export function bindClipboardEvents() {
 
     document.addEventListener('paste', event => {
         if (event.target && (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.closest('#find-panel'))) {
-            return;
+            if (event.target.id !== 'ime-bypass-textarea') return;
         }
         if (performance.now() < suppressNativePasteUntil) {
             event.preventDefault();
@@ -59,7 +59,10 @@ export function bindClipboardEvents() {
         }
         event.preventDefault();
         const clipboardText = (event.clipboardData?.getData('text/plain') || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const element = document.activeElement?.closest?.('.line-text');
+        let element = document.activeElement?.closest?.('.line-text');
+        if (!element && document.activeElement?.id === 'ime-bypass-textarea') {
+            element = activeEditableElement();
+        }
         if (!element || element.getAttribute('contenteditable') !== 'true') return;
 
         // Ctrl+V 붙여넣기 시 자동완성 팝업이 뜨지 않도록 억제

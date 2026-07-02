@@ -20,6 +20,7 @@ import {
     normalizeSelection
 } from './editor-selection.js';
 import {
+    focusImeBypassTextarea,
     changeLineIndent,
     clearPendingRepeatEdit,
     commitLine,
@@ -312,9 +313,20 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 const imeElement = lineElementFromEvent(event) || activeEditableElement();
                 const pendingSelection = compositionSelectionRange();
                 if (imeElement && pendingSelection && !pendingSelection.isColumn) {
-                    const replacedElement = replaceSelectionForCompositionStart(imeElement, true) || imeElement;
-                    state.compositionLine = Number(replacedElement.dataset.line || state.currentLine || 1);
-                    state.editingLine = state.compositionLine;
+                    if (pendingSelection.start.line !== pendingSelection.end.line) {
+                        focusImeBypassTextarea();
+                    } else {
+                        const isCollapsed = pendingSelection.start.line === pendingSelection.end.line &&
+                                            pendingSelection.start.column === pendingSelection.end.column;
+                        if (!isCollapsed) {
+                            const replacedElement = replaceSelectionForCompositionStart(imeElement, true) || imeElement;
+                            state.compositionLine = Number(replacedElement.dataset.line || state.currentLine || 1);
+                            state.editingLine = state.compositionLine;
+                        } else {
+                            state.compositionLine = Number(imeElement.dataset.line || state.currentLine || 1);
+                            state.editingLine = state.compositionLine;
+                        }
+                    }
                 }
             }
             return;

@@ -6,6 +6,7 @@ const PREFETCH_AHEAD = 200;
 
 const runtime = {
     drawEditableSelectionOverlays: () => { },
+    focusImeBypassTextarea: () => { },
     focusLine: () => { },
     getCaretOffset: () => 0,
     hasCustomSelection: () => false,
@@ -69,6 +70,8 @@ const state = {
     compositionLine: null,
     columnComposition: null,
     pendingImeSelectionCollapse: null,
+    textareaImeBypassActive: false,
+    bypassStartLine: null,
     suppressNextBeforeInputType: null,
     lastManualDeleteAt: 0,
     editingLine: null,
@@ -512,6 +515,7 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
     if (!line || line < 1) return false;
 
     if ((state.isComposing && (!state.compositionLine || state.compositionLine === line)) ||
+        (state.textareaImeBypassActive && state.bypassStartLine === line) ||
         (state.isComposing && runtime.isLineInColumnComposition(line)) ||
         (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine === line)) {
         return false;
@@ -550,7 +554,7 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
 }
 
 function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCount, caret = null) {
-    if (state.isComposing) {
+    if (state.isComposing || state.textareaImeBypassActive) {
         return false;
     }
 
@@ -608,11 +612,19 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
     if (caret && Number(caret.line || 0) > 0) {
         const caretLine = Math.min(state.lineCount, Math.max(1, Number(caret.line)));
         const caretColumn = Math.max(0, Number(caret.column || 1) - 1);
-        setTimeout(() => runtime.focusLine(caretLine, caretColumn), 20);
+        setTimeout(() => {
+            if (!state.isComposing && !state.textareaImeBypassActive) {
+                runtime.focusLine(caretLine, caretColumn);
+            }
+        }, 20);
     } else if (savedCaretLine > 0) {
         const caretLine = Math.min(state.lineCount, Math.max(1, Number(savedCaretLine)));
         const caretColumn = Math.max(0, Number(savedCaretColumn || 1) - 1);
-        setTimeout(() => runtime.focusLine(caretLine, caretColumn), 20);
+        setTimeout(() => {
+            if (!state.isComposing && !state.textareaImeBypassActive) {
+                runtime.focusLine(caretLine, caretColumn);
+            }
+        }, 20);
     }
 
     return true;
@@ -1164,7 +1176,11 @@ function isHangulImeKeyEvent(event) {
 }
 
 function syncCustomSelectionClass() {
-    document.body.classList.toggle('custom-selection-active', runtime.hasCustomSelection());
+    const hasSelection = runtime.hasCustomSelection();
+    document.body.classList.toggle('custom-selection-active', hasSelection);
+    if (hasSelection) {
+        runtime.focusImeBypassTextarea();
+    }
 }
 
 function clearCustomSelectionVisuals() {

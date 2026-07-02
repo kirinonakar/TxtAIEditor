@@ -23,6 +23,7 @@ import {
     normalizeSelection
 } from './editor-selection.js';
 import {
+    focusImeBypassTextarea,
     getCaretOffset,
     isLineInColumnComposition,
     setCaret
@@ -50,6 +51,7 @@ const {
 
 configureEditorCoreRuntime({
     drawEditableSelectionOverlays,
+    focusImeBypassTextarea,
     focusLine: focusLineWithRetry,
     getCaretOffset,
     hasCustomSelection,

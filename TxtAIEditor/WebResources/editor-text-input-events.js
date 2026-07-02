@@ -90,8 +90,12 @@ export function bindTextInputEvents({ renderer }) {
         let collapsedSelectionForComposition = false;
 
         if (pendingCompositionSelection && !pendingCompositionSelection.isColumn) {
-            element = replaceSelectionForCompositionStart(element) || element;
-            collapsedSelectionForComposition = true;
+            const isCollapsed = pendingCompositionSelection.start.line === pendingCompositionSelection.end.line &&
+                                pendingCompositionSelection.start.column === pendingCompositionSelection.end.column;
+            if (!isCollapsed) {
+                element = replaceSelectionForCompositionStart(element) || element;
+                collapsedSelectionForComposition = true;
+            }
         }
 
         if (isPendingImeSelectionCollapseFor(element)) {

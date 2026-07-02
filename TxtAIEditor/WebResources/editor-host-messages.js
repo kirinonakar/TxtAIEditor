@@ -100,7 +100,11 @@ export function createHostMessageHandler({
                 state.livePreviewLocalResourceVersion = String(Date.now());
                 queueRender(true);
                 if (msg.shouldFocus !== false) {
-                    setTimeout(() => focusLine(targetLine, targetCol), 20);
+                    setTimeout(() => {
+                        if (!state.isComposing && !state.textareaImeBypassActive) {
+                            focusLine(targetLine, targetCol);
+                        }
+                    }, 20);
                 }
             }
             break;
