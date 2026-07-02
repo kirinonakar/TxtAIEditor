@@ -128,20 +128,20 @@ namespace TxtAIEditor.Controls
             canvas.Width = graphStr.Length * cellWidth;
             canvas.Height = itemHeight;
 
-            // Curated colorful palette with Blue at index 0 for the main branch lane
+            // Curated colorful palette with Blue at index 0 and Red at index 1 & 2 to unify branch colors
             Color[] graphLineColors = isDark ? new Color[]
             {
-                Color.FromArgb(255, 66, 165, 245),  // Blue
-                Color.FromArgb(255, 239, 83, 80),   // Red
-                Color.FromArgb(255, 102, 187, 106), // Green
+                Color.FromArgb(255, 66, 165, 245),  // Blue (index 0 - Main branch)
+                Color.FromArgb(255, 239, 83, 80),   // Red (index 1)
+                Color.FromArgb(255, 239, 83, 80),   // Red (index 2 - Unified with index 1 to prevent branch color shifts)
                 Color.FromArgb(255, 255, 202, 40),  // Yellow
                 Color.FromArgb(255, 171, 71, 188),  // Purple
                 Color.FromArgb(255, 38, 166, 154)   // Teal
             } : new Color[]
             {
-                Color.FromArgb(255, 25, 118, 210),  // Blue
-                Color.FromArgb(255, 211, 47, 47),   // Red
-                Color.FromArgb(255, 56, 142, 60),   // Green
+                Color.FromArgb(255, 25, 118, 210),  // Blue (index 0 - Main branch)
+                Color.FromArgb(255, 211, 47, 47),   // Red (index 1)
+                Color.FromArgb(255, 211, 47, 47),   // Red (index 2 - Unified with index 1 to prevent branch color shifts)
                 Color.FromArgb(255, 230, 124, 0),   // Orange
                 Color.FromArgb(255, 123, 31, 162),  // Purple
                 Color.FromArgb(255, 0, 121, 107)    // Teal
