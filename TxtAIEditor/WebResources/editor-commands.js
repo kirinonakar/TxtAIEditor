@@ -1579,11 +1579,26 @@ function replaceSelectionWith(selection, text, editSelection = null) {
         replaceColumnSelectionWith(selection, text);
         return;
     }
-    const { start, end } = selection;
+    let start = selection.start;
+    let end = selection.end;
+    const replacementText = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    // 여러 줄 또는 한 줄 전체를 선택하고 삭제할 때 줄바꿈도 함께 삭제되도록 처리
+    const endLineLength = (state.cache.get(end.line) || '').length;
+    const isFullLineSelection = start.column === 0 && end.column >= endLineLength;
+
+    if (isFullLineSelection && replacementText === '' && state.lineCount > 1) {
+        if (end.line < state.lineCount) {
+            end = { line: end.line + 1, column: 0 };
+        } else if (start.line > 1) {
+            const prevLineLength = (state.cache.get(start.line - 1) || '').length;
+            start = { line: start.line - 1, column: prevLineLength };
+        }
+    }
+
     const prefix = (state.cache.get(start.line) || '').slice(0, start.column);
     const suffix = (state.cache.get(end.line) || '').slice(end.column);
     const linesToRemove = end.line - start.line;
-    const replacementText = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const parts = replacementText.split('\n');
     const newLines = [];
 
