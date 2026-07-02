@@ -419,55 +419,51 @@ namespace TxtAIEditor.Controls
             int lineCount = endLine - startLine + 1;
             if (lineCount >= 5)
             {
-                // Boundary verification
+                if (!string.IsNullOrWhiteSpace(expectedSnippet))
+                {
+                    if (!TryValidateExpectedSnippet(expectedSnippet, targetText))
+                    {
+                        return $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).";
+                    }
+                }
+                else
+                {
+                    // Boundary verification
 
-                // expectedStartLines
-                if (expectedStartLines == null || expectedStartLines.Count != 2)
-                {
-                    return "replace_range failed: expectedStartLines is required and must have exactly 2 elements.";
-                }
-                if (!LinesMatch(lines[startLine - 1], expectedStartLines[0]))
-                {
-                    return $"replace_range failed: expectedStartLines[0] did not match line {startLine} of the file.";
-                }
-                if (!LinesMatch(lines[startLine], expectedStartLines[1]))
-                {
-                    return $"replace_range failed: expectedStartLines[1] did not match line {startLine + 1} of the file.";
-                }
+                    // expectedStartLines
+                    if (expectedStartLines == null || expectedStartLines.Count != 2)
+                    {
+                        return "replace_range failed: expectedStartLines is required and must have exactly 2 elements.";
+                    }
+                    if (!LinesMatch(lines[startLine - 1], expectedStartLines[0]))
+                    {
+                        return $"replace_range failed: expectedStartLines[0] did not match line {startLine} of the file.";
+                    }
+                    if (!LinesMatch(lines[startLine], expectedStartLines[1]))
+                    {
+                        return $"replace_range failed: expectedStartLines[1] did not match line {startLine + 1} of the file.";
+                    }
 
-                // expectedEndLines
-                if (expectedEndLines == null || expectedEndLines.Count != 2)
-                {
-                    return "replace_range failed: expectedEndLines is required and must have exactly 2 elements.";
-                }
-                if (!LinesMatch(lines[endLine - 2], expectedEndLines[0]))
-                {
-                    return $"replace_range failed: expectedEndLines[0] did not match line {endLine - 1} of the file.";
-                }
-                if (!LinesMatch(lines[endLine - 1], expectedEndLines[1]))
-                {
-                    return $"replace_range failed: expectedEndLines[1] did not match line {endLine} of the file.";
+                    // expectedEndLines
+                    if (expectedEndLines == null || expectedEndLines.Count != 2)
+                    {
+                        return "replace_range failed: expectedEndLines is required and must have exactly 2 elements.";
+                    }
+                    if (!LinesMatch(lines[endLine - 2], expectedEndLines[0]))
+                    {
+                        return $"replace_range failed: expectedEndLines[0] did not match line {endLine - 1} of the file.";
+                    }
+                    if (!LinesMatch(lines[endLine - 1], expectedEndLines[1]))
+                    {
+                        return $"replace_range failed: expectedEndLines[1] did not match line {endLine} of the file.";
+                    }
                 }
             }
             else
             {
-                if (!string.IsNullOrEmpty(expectedSnippet))
+                if (!TryValidateExpectedSnippet(expectedSnippet, targetText))
                 {
-                    string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
-                    if (!string.IsNullOrEmpty(normalizedExpected))
-                    {
-                        bool expectedMatchesFullRange =
-                            string.Equals(targetText, normalizedExpected, StringComparison.Ordinal) ||
-                            string.Equals(
-                                NormalizeWhitespaceForSnippetComparison(targetText),
-                                NormalizeWhitespaceForSnippetComparison(normalizedExpected),
-                                StringComparison.Ordinal);
-
-                        if (!expectedMatchesFullRange)
-                        {
-                            return $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).";
-                        }
-                    }
+                    return $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).";
                 }
             }
 
@@ -507,6 +503,26 @@ namespace TxtAIEditor.Controls
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"modified: {_workspace.RelativePath(fullPath)}{rangeAdjustmentNote}";
+        }
+
+        private static bool TryValidateExpectedSnippet(string? expectedSnippet, string targetText)
+        {
+            if (string.IsNullOrEmpty(expectedSnippet))
+            {
+                return false;
+            }
+
+            string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
+            if (string.IsNullOrEmpty(normalizedExpected))
+            {
+                return false;
+            }
+
+            return string.Equals(targetText, normalizedExpected, StringComparison.Ordinal) ||
+                string.Equals(
+                    NormalizeWhitespaceForSnippetComparison(targetText),
+                    NormalizeWhitespaceForSnippetComparison(normalizedExpected),
+                    StringComparison.Ordinal);
         }
 
         public async Task<string> ApplyPatchAsync(string path, string patchText)

@@ -531,6 +531,7 @@ namespace TxtAIEditor.Controls
             List<string>? expectedStartLines = null;
             List<string>? expectedEndLines = null;
 
+            expectedSnippet = GetReplaceRangeExpectedSnippetArgument(arguments, path);
             if (lineCount >= 5)
             {
                 expectedStartLines = GetStringListArgument(arguments, "expectedStartLines", "expected_start_lines");
@@ -538,7 +539,6 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                expectedSnippet = GetReplaceRangeExpectedSnippetArgument(arguments, path);
                 if (string.IsNullOrWhiteSpace(expectedSnippet))
                 {
                     return "replace_range failed: expectedSnippet is required for replace_range edits to ensure edit safety.";
