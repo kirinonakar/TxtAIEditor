@@ -275,7 +275,7 @@ namespace TxtAIEditor.Controls
                     string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
                     string completedFormat = getString?.Invoke(
                         "AgentHistoryToolCompletedFormat",
-                        "[도구 실행 완료: {0}]") ?? "[도구 실행 완료: {0}]";
+                        "[도구 실행]: {0}") ?? "[도구 실행]: {0}";
                     result.AppendLine(string.Format(completedFormat, toolName));
                     continue;
                 }

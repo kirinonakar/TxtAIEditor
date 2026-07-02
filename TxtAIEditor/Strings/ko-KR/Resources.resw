@@ -3169,6 +3169,6 @@
     <value>비교: {0} ↔ {1}</value>
   </data>
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
-    <value>[도구 실행 완료]</value>
+    <value>[도구 실행]: {0}</value>
   </data>
 </root>

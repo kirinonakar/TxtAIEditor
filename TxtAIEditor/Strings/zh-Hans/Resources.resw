@@ -3169,6 +3169,6 @@
     <value>比较：{0} ↔ {1}</value>
   </data>
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
-    <value>[工具执行完成]</value>
+    <value>[工具执行]: {0}</value>
   </data>
 </root>
