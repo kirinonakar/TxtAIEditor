@@ -2883,6 +2883,51 @@ Plan: {0}</value>
   <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
     <value>Built-in plugins cannot be edited or deleted.</value>
   </data>
+  <data name="AgentMcpBuiltInSettingsTooltip" xml:space="preserve">
+    <value>Built-in plugin settings</value>
+  </data>
+  <data name="AgentMcpComfyUiSettingsTitle" xml:space="preserve">
+    <value>ComfyUI Settings</value>
+  </data>
+  <data name="AgentMcpComfyUiLaunchPathLabel" xml:space="preserve">
+    <value>ComfyUI launch file</value>
+  </data>
+  <data name="AgentMcpComfyUiLaunchPathPlaceholder" xml:space="preserve">
+    <value>Path to run_nvidia_gpu.bat</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryLabel" xml:space="preserve">
+    <value>Workflow (API) folder</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryPlaceholder" xml:space="preserve">
+    <value>ComfyUI API workflow folder</value>
+  </data>
+  <data name="AgentMcpComfyUiBrowseButton" xml:space="preserve">
+    <value>Browse</value>
+  </data>
+  <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
+    <value>When the ComfyUI plugin is enabled, TxtAIEditor starts the server from the launch file path and provides the Agent with the JSON list from the selected API workflow folder.</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusRunning" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusLaunchPathMissing" xml:space="preserve">
+    <value>Launch file path required</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusLaunchPathNotFound" xml:space="preserve">
+    <value>Launch file not found: {0}</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusFailedFormat" xml:space="preserve">
+    <value>Launch failed: {0}</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusStarting" xml:space="preserve">
+    <value>Starting</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusStarted" xml:space="preserve">
+    <value>Started</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryErrorFormat" xml:space="preserve">
+    <value>Workflow folder cannot be used: {0}</value>
+  </data>
   <data name="AgentActivityMcpToolFormat" xml:space="preserve">
     <value>Running MCP tool: {0} ({1})</value>
   </data>

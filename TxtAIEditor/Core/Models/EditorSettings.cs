@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace TxtAIEditor.Core.Models
 {
@@ -72,6 +73,10 @@ namespace TxtAIEditor.Core.Models
         // Exa Config
         public string ExaEndpoint { get; set; } = "https://mcp.exa.ai/mcp";
 
+        // ComfyUI built-in MCP plugin
+        public string ComfyUiLaunchPath { get; set; } = string.Empty;
+        public string ComfyUiWorkflowDirectory { get; set; } = GetDefaultComfyUiWorkflowDirectory();
+
         // Git Config
         public bool AutoGitDetect { get; set; } = true;
 
@@ -90,6 +95,12 @@ namespace TxtAIEditor.Core.Models
 
         // Language
         public string Language { get; set; } = "Default";
+
+        public static string GetDefaultComfyUiWorkflowDirectory()
+        {
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return Path.Combine(userProfile, ".TxtAIEditor", "ComfyUI_API_workflow");
+        }
 
         public string ResolveTargetLanguage()
         {

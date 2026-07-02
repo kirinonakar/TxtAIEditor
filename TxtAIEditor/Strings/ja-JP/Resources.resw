@@ -2883,6 +2883,51 @@
   <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
     <value>組み込みプラグインは編集または削除できません。</value>
   </data>
+  <data name="AgentMcpBuiltInSettingsTooltip" xml:space="preserve">
+    <value>組み込みプラグイン設定</value>
+  </data>
+  <data name="AgentMcpComfyUiSettingsTitle" xml:space="preserve">
+    <value>ComfyUI 設定</value>
+  </data>
+  <data name="AgentMcpComfyUiLaunchPathLabel" xml:space="preserve">
+    <value>ComfyUI 起動ファイル</value>
+  </data>
+  <data name="AgentMcpComfyUiLaunchPathPlaceholder" xml:space="preserve">
+    <value>run_nvidia_gpu.bat のパス</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryLabel" xml:space="preserve">
+    <value>ワークフロー(API)フォルダー</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryPlaceholder" xml:space="preserve">
+    <value>ComfyUI API workflow フォルダー</value>
+  </data>
+  <data name="AgentMcpComfyUiBrowseButton" xml:space="preserve">
+    <value>参照</value>
+  </data>
+  <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
+    <value>ComfyUI プラグインを有効にすると、起動ファイルのパスでサーバーを自動起動し、指定した API ワークフローフォルダーの JSON 一覧を Agent に提供します。</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusRunning" xml:space="preserve">
+    <value>実行中</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusLaunchPathMissing" xml:space="preserve">
+    <value>起動ファイルのパスが必要</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusLaunchPathNotFound" xml:space="preserve">
+    <value>起動ファイルが見つかりません: {0}</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusFailedFormat" xml:space="preserve">
+    <value>起動に失敗しました: {0}</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusStarting" xml:space="preserve">
+    <value>起動中</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusStarted" xml:space="preserve">
+    <value>起動しました</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryErrorFormat" xml:space="preserve">
+    <value>ワークフローフォルダーを使用できません: {0}</value>
+  </data>
   <data name="AgentActivityMcpToolFormat" xml:space="preserve">
     <value>MCP ツール実行中: {0} ({1})</value>
   </data>

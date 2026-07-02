@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -9,25 +10,42 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
+    internal enum ComfyUiLaunchFailure
+    {
+        None,
+        MissingPath,
+        FileNotFound,
+        Error
+    }
+
     internal sealed class AgentMcpComfyUiTool
     {
         private const string BuiltInComfyUiId = "builtin-comfyui";
         private const string BuiltInComfyUiName = "ComfyUI";
-        private const string BuiltInComfyUiAlias = "mcp_comfyui_generate_image";
-        private const string BuiltInComfyUiToolName = "generate_image";
+        private const string BuiltInComfyUiGenerateAlias = "mcp_comfyui_generate_image";
+        private const string BuiltInComfyUiReadWorkflowAlias = "mcp_comfyui_read_workflow";
+        private const string BuiltInComfyUiGenerateToolName = "generate_image";
+        private const string BuiltInComfyUiReadWorkflowToolName = "read_workflow";
         private const string DefaultComfyUiEndpoint = "http://127.0.0.1:8188";
         private const int DefaultComfyUiTimeoutSeconds = 300;
         private const int DefaultComfyUiPollIntervalMs = 1000;
+        private const int WorkflowContextLimit = 50;
+        private const int ReadWorkflowCharacterLimit = 200_000;
         private const string BuiltInComfyUiInputSchemaJson = """
         {
           "type": "object",
           "properties": {
             "apiJson": {
               "type": "string",
-              "description": "ComfyUI workflow API JSON. Pass either a raw workflow object or a /prompt payload. IMPORTANT: DO NOT write local file paths (e.g. D:\\path\\img.png) inside LoadImage nodes in apiJson. Instead, pass local paths to 'inputImagePath' or 'inputImages', and set the target 'image' values inside apiJson to empty string (\"\"). The system uploads files and automatically maps them to empty LoadImage nodes in order."
+              "description": "ComfyUI workflow API JSON. Pass either apiJson or workflowFile. IMPORTANT: DO NOT write local file paths (e.g. D:\\path\\img.png) inside LoadImage nodes in apiJson. Instead, pass local paths to 'inputImagePath' or 'inputImages', and set the target 'image' values inside apiJson to empty string (\"\"). The system uploads files and automatically maps them to empty LoadImage nodes in order."
+            },
+            "workflowFile": {
+              "type": "string",
+              "description": "Optional ComfyUI API workflow JSON file. Relative paths resolve under the configured ComfyUI API workflow folder shown in the MCP context. Use this when choosing from the provided workflow list."
             },
             "parameters": {
               "type": "object",
@@ -63,7 +81,19 @@ namespace TxtAIEditor.Controls
               "description": "Optional ComfyUI output node id to prefer when several image outputs exist."
             }
           },
-          "required": ["apiJson", "outputFileName"]
+          "required": ["outputFileName"]
+        }
+        """;
+        private const string BuiltInComfyUiReadWorkflowInputSchemaJson = """
+        {
+          "type": "object",
+          "properties": {
+            "workflowFile": {
+              "type": "string",
+              "description": "ComfyUI API workflow JSON file to read. Relative paths resolve under the configured ComfyUI API workflow folder."
+            }
+          },
+          "required": ["workflowFile"]
         }
         """;
 
@@ -73,13 +103,16 @@ namespace TxtAIEditor.Controls
         };
 
         private readonly Func<string> _workspaceRootProvider;
+        private readonly Func<EditorSettings> _settingsProvider;
         private readonly Func<string, Task>? _fileModifiedAsync;
 
         public AgentMcpComfyUiTool(
             Func<string> workspaceRootProvider,
+            Func<EditorSettings> settingsProvider,
             Func<string, Task>? fileModifiedAsync)
         {
             _workspaceRootProvider = workspaceRootProvider;
+            _settingsProvider = settingsProvider;
             _fileModifiedAsync = fileModifiedAsync;
         }
 
@@ -99,30 +132,60 @@ namespace TxtAIEditor.Controls
 
         public bool CanHandleAlias(AgentMcpToolAlias alias)
         {
-            return alias.Alias.Equals(BuiltInComfyUiAlias, StringComparison.OrdinalIgnoreCase);
+            return alias.Alias.Equals(BuiltInComfyUiGenerateAlias, StringComparison.OrdinalIgnoreCase) ||
+                alias.Alias.Equals(BuiltInComfyUiReadWorkflowAlias, StringComparison.OrdinalIgnoreCase);
         }
 
-        public AgentMcpToolAlias CreateAlias()
+        public IReadOnlyList<AgentMcpToolAlias> CreateAliases()
+        {
+            return new[]
+            {
+                CreateGenerateAlias(),
+                CreateReadWorkflowAlias()
+            };
+        }
+
+        public AgentMcpToolAlias CreateGenerateAlias()
         {
             return new AgentMcpToolAlias
             {
-                Alias = BuiltInComfyUiAlias,
+                Alias = BuiltInComfyUiGenerateAlias,
                 ServerId = BuiltInComfyUiId,
                 ServerName = BuiltInComfyUiName,
-                ToolName = BuiltInComfyUiToolName,
-                Description = "Generate an image through a local or remote ComfyUI HTTP API workflow, then download and save the produced image file. IMPORTANT for image inputs: if input images are used, do NOT modify apiJson directly to include local absolute paths. Instead, set the target image properties inside apiJson (or via parameters replacement) to \"\" and pass local image paths through inputImagePath or inputImages so the tool can upload and map them automatically.",
+                ToolName = BuiltInComfyUiGenerateToolName,
+                Description = "Generate an image through a local or remote ComfyUI HTTP API workflow, then download and save the produced image file. Pass either apiJson or workflowFile. IMPORTANT for image inputs: if input images are used, do NOT modify apiJson directly to include local absolute paths. Instead, set the target image properties inside apiJson (or via parameters replacement) to \"\" and pass local image paths through inputImagePath or inputImages so the tool can upload and map them automatically.",
                 InputSchemaJson = BuiltInComfyUiInputSchemaJson,
                 IsBuiltIn = true
             };
         }
 
-        public AgentMcpItem CreateMenuItem(bool isSelected, Func<string, string, string> getString)
+        public AgentMcpToolAlias CreateReadWorkflowAlias()
         {
+            return new AgentMcpToolAlias
+            {
+                Alias = BuiltInComfyUiReadWorkflowAlias,
+                ServerId = BuiltInComfyUiId,
+                ServerName = BuiltInComfyUiName,
+                ToolName = BuiltInComfyUiReadWorkflowToolName,
+                Description = "Read a configured ComfyUI API workflow JSON file so you can inspect node ids, inputs, placeholders, and parameter paths before calling mcp_comfyui_generate_image.",
+                InputSchemaJson = BuiltInComfyUiReadWorkflowInputSchemaJson,
+                IsBuiltIn = true
+            };
+        }
+
+        public AgentMcpItem CreateMenuItem(bool isSelected, Func<string, string, string> getString, string status)
+        {
+            string detail = getString("AgentMcpComfyUiDetail", "내장 플러그인 - API JSON/파라미터로 이미지 생성");
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                detail += " - " + status;
+            }
+
             return new AgentMcpItem
             {
                 Name = BuiltInComfyUiName,
                 Endpoint = DefaultComfyUiEndpoint,
-                Detail = getString("AgentMcpComfyUiDetail", "내장 플러그인 - API JSON/파라미터로 이미지 생성"),
+                Detail = detail,
                 IsSelected = isSelected,
                 IsBuiltIn = true,
                 CanEdit = false,
@@ -130,12 +193,43 @@ namespace TxtAIEditor.Controls
             };
         }
 
-        public async Task<string> ExecuteAsync(JsonElement arguments, CancellationToken cancellationToken)
+        public async Task<string> ExecuteAsync(
+            AgentMcpToolAlias alias,
+            JsonElement arguments,
+            CancellationToken cancellationToken)
+        {
+            if (alias.Alias.Equals(BuiltInComfyUiReadWorkflowAlias, StringComparison.OrdinalIgnoreCase))
+            {
+                return await ExecuteReadWorkflowAsync(arguments, cancellationToken);
+            }
+
+            return await ExecuteGenerateImageAsync(arguments, cancellationToken);
+        }
+
+        private async Task<string> ExecuteGenerateImageAsync(JsonElement arguments, CancellationToken cancellationToken)
         {
             string apiJson = GetJsonArgument(arguments, "apiJson", "api_json", "workflowJson", "workflow_json", "promptJson", "prompt_json");
+            string workflowFile = AgentToolHelpers.GetFirstStringArgument(
+                arguments,
+                "workflowFile",
+                "workflow_file",
+                "workflowPath",
+                "workflow_path",
+                "apiWorkflowFile",
+                "api_workflow_file",
+                "apiWorkflowPath",
+                "api_workflow_path");
+            string workflowDisplayPath = string.Empty;
             if (string.IsNullOrWhiteSpace(apiJson))
             {
-                return "MCP tool failed: ComfyUI apiJson is empty.";
+                if (string.IsNullOrWhiteSpace(workflowFile))
+                {
+                    return "MCP tool failed: pass either ComfyUI apiJson or workflowFile.";
+                }
+
+                string workflowPath = ResolveComfyWorkflowPath(workflowFile);
+                apiJson = await File.ReadAllTextAsync(workflowPath, cancellationToken);
+                workflowDisplayPath = GetComfyWorkflowDisplayPath(workflowPath);
             }
 
             string outputPath = AgentToolHelpers.GetFirstStringArgument(
@@ -156,6 +250,7 @@ namespace TxtAIEditor.Controls
 
             string endpoint = AgentToolHelpers.GetFirstStringArgument(arguments, "endpoint", "baseUrl", "base_url", "server", "url");
             endpoint = NormalizeComfyEndpoint(endpoint);
+            await EnsureDefaultEndpointStartedForExecutionAsync(endpoint, cancellationToken);
             string outputNodeId = AgentToolHelpers.GetFirstStringArgument(arguments, "outputNodeId", "output_node_id", "nodeId", "node_id");
             string promptText = AgentToolHelpers.GetFirstStringArgument(
                 arguments,
@@ -213,7 +308,340 @@ namespace TxtAIEditor.Controls
             string uploadedText = inputImages.Count == 0
                 ? string.Empty
                 : "\ninput_images: " + string.Join(", ", inputImages.Select(item => item.FileName));
-            return $"MCP tool result: ComfyUI image saved: {displayPath}\nprompt_id: {promptId}\nsource_image: {image.FileName}{uploadedText}";
+            string workflowText = string.IsNullOrWhiteSpace(workflowDisplayPath)
+                ? string.Empty
+                : $"\nworkflow: {workflowDisplayPath}";
+            return $"MCP tool result: ComfyUI image saved: {displayPath}\nprompt_id: {promptId}\nsource_image: {image.FileName}{workflowText}{uploadedText}";
+        }
+
+        private async Task<string> ExecuteReadWorkflowAsync(JsonElement arguments, CancellationToken cancellationToken)
+        {
+            string workflowFile = AgentToolHelpers.GetFirstStringArgument(
+                arguments,
+                "workflowFile",
+                "workflow_file",
+                "workflowPath",
+                "workflow_path",
+                "apiWorkflowFile",
+                "api_workflow_file",
+                "apiWorkflowPath",
+                "api_workflow_path",
+                "path",
+                "file");
+            if (string.IsNullOrWhiteSpace(workflowFile))
+            {
+                return "MCP tool failed: ComfyUI workflowFile is empty.";
+            }
+
+            string workflowPath = ResolveComfyWorkflowPath(workflowFile);
+            string content = await File.ReadAllTextAsync(workflowPath, cancellationToken);
+            bool truncated = content.Length > ReadWorkflowCharacterLimit;
+            if (truncated)
+            {
+                content = content.Substring(0, ReadWorkflowCharacterLimit);
+            }
+
+            string truncatedNote = truncated
+                ? $"\n[truncated after {ReadWorkflowCharacterLimit:N0} characters]"
+                : string.Empty;
+            return $"MCP tool result: ComfyUI workflow JSON: {GetComfyWorkflowDisplayPath(workflowPath)}\n{content}{truncatedNote}";
+        }
+
+        public void AppendWorkflowContext(StringBuilder builder)
+        {
+            string workflowDirectory;
+            try
+            {
+                workflowDirectory = ResolveComfyWorkflowDirectory(createIfMissing: true);
+            }
+            catch (Exception ex)
+            {
+                builder.AppendLine($"ComfyUI API workflow folder: unavailable ({ex.Message})");
+                builder.AppendLine();
+                return;
+            }
+
+            builder.AppendLine($"ComfyUI API workflow folder: {workflowDirectory}");
+            builder.AppendLine("Use mcp_comfyui_read_workflow with workflowFile to inspect a listed JSON file, then call mcp_comfyui_generate_image with either workflowFile or apiJson.");
+
+            IReadOnlyList<ComfyWorkflowFile> workflows = GetWorkflowFiles(workflowDirectory, out bool hasMore, out string error);
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                builder.AppendLine($"Workflow list unavailable: {error}");
+                builder.AppendLine();
+                return;
+            }
+
+            if (workflows.Count == 0)
+            {
+                builder.AppendLine("Available workflow API JSON files: none found.");
+                builder.AppendLine();
+                return;
+            }
+
+            builder.AppendLine("Available workflow API JSON files:");
+            foreach (var workflow in workflows)
+            {
+                builder.AppendLine($"- {workflow.RelativePath} ({FormatByteSize(workflow.SizeBytes)}, modified {workflow.ModifiedAt:yyyy-MM-dd HH:mm})");
+            }
+
+            if (hasMore)
+            {
+                builder.AppendLine($"- ... more than {WorkflowContextLimit:N0} workflow files; ask the user to narrow the folder or use a specific relative path.");
+            }
+
+            builder.AppendLine();
+        }
+
+        public async Task<bool> IsServerRunningAsync(CancellationToken cancellationToken)
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(2));
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, BuildComfyUrl(DefaultComfyUiEndpoint, "system_stats"));
+                using HttpResponseMessage response = await HttpClient.SendAsync(request, timeout.Token);
+                return response.IsSuccessStatusCode;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+            catch (HttpRequestException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> WaitForServerRunningAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            DateTimeOffset deadline = DateTimeOffset.UtcNow.Add(timeout);
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (await IsServerRunningAsync(cancellationToken))
+                {
+                    return true;
+                }
+
+                await Task.Delay(1000, cancellationToken);
+            }
+
+            return false;
+        }
+
+        public bool TryStartConfiguredComfyUi(out ComfyUiLaunchFailure failure, out string detail)
+        {
+            failure = ComfyUiLaunchFailure.None;
+            detail = string.Empty;
+            string launchPath = GetSettings().ComfyUiLaunchPath?.Trim().Trim('"') ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(launchPath))
+            {
+                failure = ComfyUiLaunchFailure.MissingPath;
+                return false;
+            }
+
+            try
+            {
+                string fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(launchPath));
+                if (!File.Exists(fullPath))
+                {
+                    failure = ComfyUiLaunchFailure.FileNotFound;
+                    detail = fullPath;
+                    return false;
+                }
+
+                string? workingDirectory = Path.GetDirectoryName(fullPath);
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = fullPath,
+                    WorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? Environment.CurrentDirectory : workingDirectory,
+                    UseShellExecute = true,
+                    WindowStyle = ProcessWindowStyle.Minimized
+                };
+
+                Process? process = Process.Start(startInfo);
+                if (process == null)
+                {
+                    failure = ComfyUiLaunchFailure.Error;
+                    detail = "Process.Start returned null.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                failure = ComfyUiLaunchFailure.Error;
+                detail = ex.Message;
+                return false;
+            }
+        }
+
+        private async Task EnsureDefaultEndpointStartedForExecutionAsync(string endpoint, CancellationToken cancellationToken)
+        {
+            if (!NormalizeComfyEndpoint(endpoint).Equals(DefaultComfyUiEndpoint, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (await IsServerRunningAsync(cancellationToken))
+            {
+                return;
+            }
+
+            if (!TryStartConfiguredComfyUi(out ComfyUiLaunchFailure failure, out string detail))
+            {
+                string message = failure switch
+                {
+                    ComfyUiLaunchFailure.MissingPath => "ComfyUI is not running and no ComfyUI launch path is configured.",
+                    ComfyUiLaunchFailure.FileNotFound => $"ComfyUI is not running and the configured launch file was not found: {detail}",
+                    _ => $"ComfyUI is not running and automatic launch failed: {detail}"
+                };
+                throw new InvalidOperationException(message);
+            }
+
+            if (!await WaitForServerRunningAsync(TimeSpan.FromSeconds(45), cancellationToken))
+            {
+                throw new TimeoutException("ComfyUI was launched but did not become reachable at http://127.0.0.1:8188 within 45 seconds.");
+            }
+        }
+
+        private EditorSettings GetSettings()
+        {
+            try
+            {
+                return _settingsProvider() ?? new EditorSettings();
+            }
+            catch
+            {
+                return new EditorSettings();
+            }
+        }
+
+        private string ResolveComfyWorkflowDirectory(bool createIfMissing)
+        {
+            string directory = GetSettings().ComfyUiWorkflowDirectory;
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                directory = EditorSettings.GetDefaultComfyUiWorkflowDirectory();
+            }
+
+            string fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(directory.Trim().Trim('"')))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (createIfMissing)
+            {
+                Directory.CreateDirectory(fullPath);
+            }
+
+            return fullPath;
+        }
+
+        private string ResolveComfyWorkflowPath(string requestedPath)
+        {
+            if (string.IsNullOrWhiteSpace(requestedPath))
+            {
+                throw new InvalidOperationException("ComfyUI workflowFile is empty.");
+            }
+
+            string root = ResolveComfyWorkflowDirectory(createIfMissing: true);
+            string path = requestedPath.Trim().Trim('"');
+            string fullPath = Path.IsPathRooted(path)
+                ? Path.GetFullPath(Environment.ExpandEnvironmentVariables(path))
+                : Path.GetFullPath(Path.Combine(root, path));
+
+            if (!File.Exists(fullPath) && string.IsNullOrWhiteSpace(Path.GetExtension(fullPath)))
+            {
+                string jsonPath = fullPath + ".json";
+                if (File.Exists(jsonPath))
+                {
+                    fullPath = jsonPath;
+                }
+            }
+
+            if (!AgentWorkspaceFileResolver.IsInsideRoot(root, fullPath))
+            {
+                throw new InvalidOperationException("ComfyUI workflowFile must stay inside the configured workflow API folder.");
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                throw new FileNotFoundException("ComfyUI workflow file was not found.", requestedPath);
+            }
+
+            return fullPath;
+        }
+
+        private string GetComfyWorkflowDisplayPath(string workflowPath)
+        {
+            string root = ResolveComfyWorkflowDirectory(createIfMissing: false);
+            return AgentWorkspaceFileResolver.IsInsideRoot(root, workflowPath)
+                ? Path.GetRelativePath(root, workflowPath)
+                : workflowPath;
+        }
+
+        private static IReadOnlyList<ComfyWorkflowFile> GetWorkflowFiles(
+            string workflowDirectory,
+            out bool hasMore,
+            out string error)
+        {
+            hasMore = false;
+            error = string.Empty;
+            try
+            {
+                if (!Directory.Exists(workflowDirectory))
+                {
+                    return Array.Empty<ComfyWorkflowFile>();
+                }
+
+                var files = Directory
+                    .EnumerateFiles(workflowDirectory, "*.json", SearchOption.AllDirectories)
+                    .OrderBy(path => Path.GetRelativePath(workflowDirectory, path), StringComparer.OrdinalIgnoreCase)
+                    .Take(WorkflowContextLimit + 1)
+                    .ToList();
+                hasMore = files.Count > WorkflowContextLimit;
+                if (hasMore)
+                {
+                    files.RemoveAt(files.Count - 1);
+                }
+
+                return files.Select(path =>
+                {
+                    var info = new FileInfo(path);
+                    return new ComfyWorkflowFile
+                    {
+                        RelativePath = Path.GetRelativePath(workflowDirectory, path),
+                        SizeBytes = info.Length,
+                        ModifiedAt = info.LastWriteTime
+                    };
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return Array.Empty<ComfyWorkflowFile>();
+            }
+        }
+
+        private static string FormatByteSize(long bytes)
+        {
+            if (bytes < 1024)
+            {
+                return bytes.ToString(System.Globalization.CultureInfo.InvariantCulture) + " B";
+            }
+
+            double value = bytes / 1024.0;
+            if (value < 1024)
+            {
+                return value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " KB";
+            }
+
+            value /= 1024.0;
+            return value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " MB";
         }
 
         private static string GetJsonArgument(JsonElement arguments, params string[] names)
@@ -1193,6 +1621,13 @@ namespace TxtAIEditor.Controls
             public string LocalPath { get; set; } = string.Empty;
             public string Subfolder { get; set; } = string.Empty;
             public string Type { get; set; } = "input";
+        }
+
+        private sealed class ComfyWorkflowFile
+        {
+            public string RelativePath { get; set; } = string.Empty;
+            public long SizeBytes { get; set; }
+            public DateTime ModifiedAt { get; set; }
         }
     }
 }

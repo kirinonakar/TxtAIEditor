@@ -53,6 +53,11 @@ namespace TxtAIEditor.Core.Services
             {
                 settings.ExternalViewerPath = EditorSettings.DefaultExternalViewerPath;
             }
+
+            if (string.IsNullOrWhiteSpace(settings.ComfyUiWorkflowDirectory))
+            {
+                settings.ComfyUiWorkflowDirectory = EditorSettings.GetDefaultComfyUiWorkflowDirectory();
+            }
         }
 
         public async Task SaveSettingsAsync(EditorSettings settings)

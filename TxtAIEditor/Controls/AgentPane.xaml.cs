@@ -153,6 +153,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? AgentMcpImportRequested;
         public event EventHandler<string>? AgentMcpToggled;
         public event EventHandler<string>? AgentMcpEdited;
+        public event EventHandler<string>? AgentMcpSettingsRequested;
         public event EventHandler<string>? AgentMcpDeleted;
         public event EventHandler<string>? AgentMcpRemoved;
         public event RoutedEventHandler? DiffApproved;
@@ -1444,17 +1445,22 @@ namespace TxtAIEditor.Controls
 
                 if (!item.CanEdit && !item.CanDelete)
                 {
-                    var lockIcon = new FontIcon
+                    var settingsBtn = new Button
                     {
-                        Glyph = "\uE72E",
-                        FontSize = 10,
-                        Foreground = CreateMcpSecondaryTextBrush(),
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center
+                        Content = new FontIcon { Glyph = "\uE713", FontSize = 10 },
+                        Width = 28,
+                        Height = 34,
+                        Padding = new Thickness(0),
+                        Style = buttonStyle
                     };
-                    ToolTipService.SetToolTip(lockIcon, getString("AgentMcpBuiltInLockedTooltip", "내장 플러그인은 수정하거나 삭제할 수 없습니다."));
-                    Grid.SetColumn(lockIcon, 1);
-                    rowGrid.Children.Add(lockIcon);
+                    ToolTipService.SetToolTip(settingsBtn, getString("AgentMcpBuiltInSettingsTooltip", "내장 플러그인 설정"));
+                    settingsBtn.Click += (_, _) =>
+                    {
+                        AgentMcpSettingsRequested?.Invoke(this, currentName);
+                        AgentMcpFlyout.Hide();
+                    };
+                    Grid.SetColumn(settingsBtn, 1);
+                    rowGrid.Children.Add(settingsBtn);
                     AgentMcpListPanel.Children.Add(rowGrid);
                     continue;
                 }

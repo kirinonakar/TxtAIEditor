@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.Storage.Pickers;
 using static TxtAIEditor.Controls.AgentMcpAuthTypes;
 
 namespace TxtAIEditor.Controls
@@ -23,20 +24,29 @@ namespace TxtAIEditor.Controls
         public string OAuthScopes { get; set; } = string.Empty;
     }
 
+    internal sealed class AgentMcpComfyUiSettingsInput
+    {
+        public string LaunchPath { get; set; } = string.Empty;
+        public string WorkflowDirectory { get; set; } = string.Empty;
+    }
+
     internal sealed class AgentMcpDialogService
     {
         private readonly AgentPane _agentPane;
+        private readonly Action<object> _initializePickerWindow;
         private readonly Func<string, string, string> _getString;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
 
         public AgentMcpDialogService(
             AgentPane agentPane,
+            Action<object> initializePickerWindow,
             Func<string, string, string> getString,
             Action? beforeDialog,
             Action? afterDialog)
         {
             _agentPane = agentPane;
+            _initializePickerWindow = initializePickerWindow;
             _getString = getString;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
@@ -56,6 +66,83 @@ namespace TxtAIEditor.Controls
                 initial,
                 _getString("AgentMcpEditTitle", "MCP 수정"),
                 _getString("AgentMcpEditSaveButton", "저장"));
+        }
+
+        public async Task<AgentMcpComfyUiSettingsInput?> ShowComfyUiSettingsAsync(AgentMcpComfyUiSettingsInput initial)
+        {
+            var launchPathBox = CreateTextBox(_getString("AgentMcpComfyUiLaunchPathPlaceholder", "run_nvidia_gpu.bat 경로"));
+            launchPathBox.Text = initial.LaunchPath;
+            var workflowDirectoryBox = CreateTextBox(_getString("AgentMcpComfyUiWorkflowDirectoryPlaceholder", "ComfyUI API workflow 폴더"));
+            workflowDirectoryBox.Text = initial.WorkflowDirectory;
+
+            var launchBrowseButton = CreateBrowseButton();
+            launchBrowseButton.Click += async (_, _) =>
+            {
+                var picker = new FileOpenPicker
+                {
+                    ViewMode = PickerViewMode.List,
+                    SuggestedStartLocation = PickerLocationId.Desktop
+                };
+                _initializePickerWindow(picker);
+                picker.FileTypeFilter.Add(".bat");
+                picker.FileTypeFilter.Add(".cmd");
+                picker.FileTypeFilter.Add(".exe");
+
+                var file = await picker.PickSingleFileAsync();
+                if (file != null)
+                {
+                    launchPathBox.Text = file.Path;
+                }
+            };
+
+            var workflowBrowseButton = CreateBrowseButton();
+            workflowBrowseButton.Click += async (_, _) =>
+            {
+                var picker = new FolderPicker
+                {
+                    SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+                };
+                _initializePickerWindow(picker);
+                picker.FileTypeFilter.Add("*");
+
+                var folder = await picker.PickSingleFolderAsync();
+                if (folder != null)
+                {
+                    workflowDirectoryBox.Text = folder.Path;
+                }
+            };
+
+            var stack = new StackPanel { Spacing = 10, Width = 460 };
+            stack.Children.Add(CreateLabel(_getString("AgentMcpComfyUiLaunchPathLabel", "ComfyUI 실행 파일")));
+            stack.Children.Add(CreatePickerRow(launchPathBox, launchBrowseButton));
+            stack.Children.Add(CreateLabel(_getString("AgentMcpComfyUiWorkflowDirectoryLabel", "워크플로우(API) 폴더")));
+            stack.Children.Add(CreatePickerRow(workflowDirectoryBox, workflowBrowseButton));
+            stack.Children.Add(CreateInfoText(_getString(
+                "AgentMcpComfyUiSettingsInfo",
+                "ComfyUI 플러그인을 활성화하면 실행 파일 경로로 서버를 자동 실행하고, 지정한 API 워크플로우 폴더의 JSON 목록을 Agent에게 제공합니다.")));
+
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AgentMcpComfyUiSettingsTitle", "ComfyUI 설정"),
+                Content = stack,
+                PrimaryButtonText = _getString("SettingsSave", "저장"),
+                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.None,
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+
+            var result = await ShowDialogAsync(dialog);
+            if (result != ContentDialogResult.Primary)
+            {
+                return null;
+            }
+
+            return new AgentMcpComfyUiSettingsInput
+            {
+                LaunchPath = launchPathBox.Text?.Trim() ?? string.Empty,
+                WorkflowDirectory = workflowDirectoryBox.Text?.Trim() ?? string.Empty
+            };
         }
 
         private async Task<AgentMcpDialogInput?> ShowAsync(
@@ -297,6 +384,32 @@ namespace TxtAIEditor.Controls
                 FontFamily = new FontFamily("Segoe UI, Malgun Gothic"),
                 VerticalContentAlignment = VerticalAlignment.Center
             };
+        }
+
+        private Button CreateBrowseButton()
+        {
+            var button = new Button
+            {
+                Content = new FontIcon { Glyph = "\uE8B7", FontSize = 12 },
+                Width = 34,
+                Height = 32,
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            ToolTipService.SetToolTip(button, _getString("AgentMcpComfyUiBrowseButton", "찾아보기"));
+            return button;
+        }
+
+        private static Grid CreatePickerRow(TextBox pathBox, Button browseButton)
+        {
+            var grid = new Grid { ColumnSpacing = 6 };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(pathBox, 0);
+            Grid.SetColumn(browseButton, 1);
+            grid.Children.Add(pathBox);
+            grid.Children.Add(browseButton);
+            return grid;
         }
 
         private static PasswordBox CreatePasswordBox(string placeholder)

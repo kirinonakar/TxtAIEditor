@@ -2883,6 +2883,51 @@
   <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
     <value>内置插件无法编辑或删除。</value>
   </data>
+  <data name="AgentMcpBuiltInSettingsTooltip" xml:space="preserve">
+    <value>内置插件设置</value>
+  </data>
+  <data name="AgentMcpComfyUiSettingsTitle" xml:space="preserve">
+    <value>ComfyUI 设置</value>
+  </data>
+  <data name="AgentMcpComfyUiLaunchPathLabel" xml:space="preserve">
+    <value>ComfyUI 启动文件</value>
+  </data>
+  <data name="AgentMcpComfyUiLaunchPathPlaceholder" xml:space="preserve">
+    <value>run_nvidia_gpu.bat 路径</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryLabel" xml:space="preserve">
+    <value>工作流(API)文件夹</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryPlaceholder" xml:space="preserve">
+    <value>ComfyUI API workflow 文件夹</value>
+  </data>
+  <data name="AgentMcpComfyUiBrowseButton" xml:space="preserve">
+    <value>浏览</value>
+  </data>
+  <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
+    <value>启用 ComfyUI 插件时，会通过启动文件路径自动启动服务器，并将指定 API 工作流文件夹中的 JSON 列表提供给 Agent。</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusRunning" xml:space="preserve">
+    <value>运行中</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusLaunchPathMissing" xml:space="preserve">
+    <value>需要启动文件路径</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusLaunchPathNotFound" xml:space="preserve">
+    <value>找不到启动文件: {0}</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusFailedFormat" xml:space="preserve">
+    <value>启动失败: {0}</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusStarting" xml:space="preserve">
+    <value>正在启动</value>
+  </data>
+  <data name="AgentMcpComfyUiStartStatusStarted" xml:space="preserve">
+    <value>已启动</value>
+  </data>
+  <data name="AgentMcpComfyUiWorkflowDirectoryErrorFormat" xml:space="preserve">
+    <value>无法使用工作流文件夹: {0}</value>
+  </data>
   <data name="AgentActivityMcpToolFormat" xml:space="preserve">
     <value>运行 MCP 工具：{0} ({1})</value>
   </data>

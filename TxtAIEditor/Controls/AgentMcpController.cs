@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
+using TxtAIEditor.Core.Models;
 using Windows.Storage.Pickers;
 using static TxtAIEditor.Controls.AgentMcpAuthTypes;
 
@@ -64,6 +65,7 @@ namespace TxtAIEditor.Controls
 
         private readonly AgentPane _agentPane;
         private readonly Action<object> _initializePickerWindow;
+        private readonly ISettingsService _settingsService;
         private readonly AgentMcpCredentialStore _credentialStore;
         private readonly AgentMcpOAuthService _oauthService;
         private readonly AgentMcpDialogService _dialogService;
@@ -79,10 +81,12 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, AgentMcpSession> _sessions = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AgentMcpToolAlias> _toolAliases = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _serverStatus = new(StringComparer.OrdinalIgnoreCase);
+        private string _comfyUiStatus = string.Empty;
 
         public AgentMcpController(
             AgentPane agentPane,
             Action<object> initializePickerWindow,
+            ISettingsService settingsService,
             ICredentialService credentialService,
             Action<string, string> showError,
             Func<string, string, string> getString,
@@ -94,6 +98,7 @@ namespace TxtAIEditor.Controls
         {
             _agentPane = agentPane;
             _initializePickerWindow = initializePickerWindow;
+            _settingsService = settingsService;
             _showError = showError;
             _getString = getString;
             _credentialStore = new AgentMcpCredentialStore(credentialService);
@@ -101,8 +106,8 @@ namespace TxtAIEditor.Controls
             _contextChanged = contextChanged;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
-            _dialogService = new AgentMcpDialogService(_agentPane, _getString, _beforeDialog, _afterDialog);
-            _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, fileModifiedAsync);
+            _dialogService = new AgentMcpDialogService(_agentPane, _initializePickerWindow, _getString, _beforeDialog, _afterDialog);
+            _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, () => _settingsService.CurrentSettings, fileModifiedAsync);
 
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
@@ -372,6 +377,50 @@ namespace TxtAIEditor.Controls
             await _oauthService.RunInitialLoginIfNeededAsync(server, _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"), _showError);
         }
 
+        public async Task ConfigureBuiltInMcpAsync(string serverName)
+        {
+            if (!_comfyUiTool.IsServerName(serverName))
+            {
+                return;
+            }
+
+            var settings = _settingsService.CurrentSettings;
+            string initialWorkflowDirectory = string.IsNullOrWhiteSpace(settings.ComfyUiWorkflowDirectory)
+                ? EditorSettings.GetDefaultComfyUiWorkflowDirectory()
+                : settings.ComfyUiWorkflowDirectory;
+            var input = await _dialogService.ShowComfyUiSettingsAsync(new AgentMcpComfyUiSettingsInput
+            {
+                LaunchPath = settings.ComfyUiLaunchPath,
+                WorkflowDirectory = initialWorkflowDirectory
+            });
+            if (input == null)
+            {
+                return;
+            }
+
+            if (!TryNormalizeOptionalExistingFilePath(input.LaunchPath, out string launchPath, out string launchError))
+            {
+                _showError(
+                    _getString("AgentMcpComfyUiSettingsTitle", "ComfyUI 설정"),
+                    launchError);
+                return;
+            }
+
+            if (!TryNormalizeDirectoryPath(input.WorkflowDirectory, out string workflowDirectory, out string workflowError))
+            {
+                _showError(
+                    _getString("AgentMcpComfyUiSettingsTitle", "ComfyUI 설정"),
+                    workflowError);
+                return;
+            }
+
+            settings.ComfyUiLaunchPath = launchPath;
+            settings.ComfyUiWorkflowDirectory = workflowDirectory;
+            await _settingsService.SaveSettingsAsync(settings);
+            RebuildAliases();
+            UpdateUI();
+        }
+
         public async Task ImportMcpAsync()
         {
             var picker = new FileOpenPicker
@@ -444,13 +493,19 @@ namespace TxtAIEditor.Controls
         {
             if (_comfyUiTool.IsServerName(serverName))
             {
-                if (!_selectedServerIds.Add(_comfyUiTool.ServerId))
+                if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
                 {
                     _selectedServerIds.Remove(_comfyUiTool.ServerId);
+                    _comfyUiStatus = string.Empty;
+                    RebuildAliases();
+                    UpdateUI();
+                    return;
                 }
 
+                _selectedServerIds.Add(_comfyUiTool.ServerId);
                 RebuildAliases();
                 UpdateUI();
+                await EnsureBuiltInComfyUiReadyAsync(CancellationToken.None);
                 return;
             }
 
@@ -538,6 +593,11 @@ namespace TxtAIEditor.Controls
         public async Task EnsureActiveToolsAsync(CancellationToken cancellationToken)
         {
             RebuildAliases();
+            if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
+            {
+                await EnsureBuiltInComfyUiReadyAsync(cancellationToken);
+            }
+
             foreach (var server in GetSelectedServers())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -567,6 +627,7 @@ namespace TxtAIEditor.Controls
             if (hasComfyUi)
             {
                 AppendMcpAliasSection(builder, _comfyUiTool.ServerName, _comfyUiTool.ServerId);
+                _comfyUiTool.AppendWorkflowContext(builder);
             }
 
             foreach (var server in selectedServers)
@@ -671,7 +732,7 @@ namespace TxtAIEditor.Controls
         {
             if (_comfyUiTool.CanHandleAlias(alias))
             {
-                return await _comfyUiTool.ExecuteAsync(arguments, cancellationToken);
+                return await _comfyUiTool.ExecuteAsync(alias, arguments, cancellationToken);
             }
 
             return $"MCP tool failed: unknown built-in MCP tool alias: {alias.Alias}";
@@ -927,9 +988,11 @@ namespace TxtAIEditor.Controls
             var usedAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
             {
-                AgentMcpToolAlias alias = _comfyUiTool.CreateAlias();
-                usedAliases.Add(alias.Alias);
-                _toolAliases[alias.Alias] = alias;
+                foreach (AgentMcpToolAlias alias in _comfyUiTool.CreateAliases())
+                {
+                    usedAliases.Add(alias.Alias);
+                    _toolAliases[alias.Alias] = alias;
+                }
             }
 
             foreach (var server in GetSelectedServers())
@@ -968,7 +1031,7 @@ namespace TxtAIEditor.Controls
         {
             var items = new List<AgentMcpItem>
             {
-                _comfyUiTool.CreateMenuItem(_selectedServerIds.Contains(_comfyUiTool.ServerId), _getString)
+                _comfyUiTool.CreateMenuItem(_selectedServerIds.Contains(_comfyUiTool.ServerId), _getString, _comfyUiStatus)
             };
 
             items.AddRange(_servers
@@ -1030,6 +1093,108 @@ namespace TxtAIEditor.Controls
             }
 
             _contextChanged();
+        }
+
+        private async Task EnsureBuiltInComfyUiReadyAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (await _comfyUiTool.IsServerRunningAsync(cancellationToken))
+                {
+                    _comfyUiStatus = _getString("AgentMcpComfyUiStartStatusRunning", "실행 중");
+                    UpdateUI();
+                    return;
+                }
+
+                if (!_comfyUiTool.TryStartConfiguredComfyUi(out ComfyUiLaunchFailure failure, out string detail))
+                {
+                    _comfyUiStatus = failure switch
+                    {
+                        ComfyUiLaunchFailure.MissingPath => _getString("AgentMcpComfyUiStartStatusLaunchPathMissing", "실행 파일 경로 필요"),
+                        ComfyUiLaunchFailure.FileNotFound => string.Format(
+                            _getString("AgentMcpComfyUiStartStatusLaunchPathNotFound", "실행 파일 없음: {0}"),
+                            detail),
+                        _ => string.Format(
+                            _getString("AgentMcpComfyUiStartStatusFailedFormat", "실행 실패: {0}"),
+                            detail)
+                    };
+                    UpdateUI();
+                    return;
+                }
+
+                _comfyUiStatus = _getString("AgentMcpComfyUiStartStatusStarting", "실행 시작 중");
+                UpdateUI();
+                bool becameReady = await _comfyUiTool.WaitForServerRunningAsync(TimeSpan.FromSeconds(12), cancellationToken);
+                _comfyUiStatus = becameReady
+                    ? _getString("AgentMcpComfyUiStartStatusRunning", "실행 중")
+                    : _getString("AgentMcpComfyUiStartStatusStarted", "실행 시작됨");
+                UpdateUI();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _comfyUiStatus = string.Format(
+                    _getString("AgentMcpComfyUiStartStatusFailedFormat", "실행 실패: {0}"),
+                    ex.Message);
+                UpdateUI();
+            }
+        }
+
+        private bool TryNormalizeOptionalExistingFilePath(string path, out string normalizedPath, out string error)
+        {
+            normalizedPath = string.Empty;
+            error = string.Empty;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return true;
+            }
+
+            try
+            {
+                normalizedPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(path.Trim().Trim('"')));
+                if (File.Exists(normalizedPath))
+                {
+                    return true;
+                }
+
+                error = string.Format(
+                    _getString("AgentMcpComfyUiStartStatusLaunchPathNotFound", "실행 파일 없음: {0}"),
+                    normalizedPath);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = string.Format(
+                    _getString("AgentMcpComfyUiStartStatusFailedFormat", "실행 실패: {0}"),
+                    ex.Message);
+                return false;
+            }
+        }
+
+        private bool TryNormalizeDirectoryPath(string path, out string normalizedPath, out string error)
+        {
+            normalizedPath = string.Empty;
+            error = string.Empty;
+            try
+            {
+                string requestedPath = string.IsNullOrWhiteSpace(path)
+                    ? EditorSettings.GetDefaultComfyUiWorkflowDirectory()
+                    : path.Trim().Trim('"');
+                normalizedPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(requestedPath));
+                Directory.CreateDirectory(normalizedPath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = string.Format(
+                    _getString("AgentMcpComfyUiWorkflowDirectoryErrorFormat", "워크플로우 폴더를 사용할 수 없습니다: {0}"),
+                    ex.Message);
+                return false;
+            }
         }
 
         private async Task SaveAsync()
