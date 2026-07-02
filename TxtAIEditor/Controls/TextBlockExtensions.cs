@@ -121,22 +121,26 @@ namespace TxtAIEditor.Controls
             double cellWidth = 10.0;
             double itemHeight = 18.0;
 
+            // Overlap Y-coordinates to avoid subpixel antialiasing gaps between list items
+            double yTop = -1.0;
+            double yBottom = 19.0;
+
             canvas.Width = graphStr.Length * cellWidth;
             canvas.Height = itemHeight;
 
-            // Curated colorful palette for distinct branch lanes
+            // Curated colorful palette with Blue at index 0 for the main branch lane
             Color[] graphLineColors = isDark ? new Color[]
             {
-                Color.FromArgb(255, 239, 83, 80),   // Red
                 Color.FromArgb(255, 66, 165, 245),  // Blue
+                Color.FromArgb(255, 239, 83, 80),   // Red
                 Color.FromArgb(255, 102, 187, 106), // Green
                 Color.FromArgb(255, 255, 202, 40),  // Yellow
                 Color.FromArgb(255, 171, 71, 188),  // Purple
                 Color.FromArgb(255, 38, 166, 154)   // Teal
             } : new Color[]
             {
-                Color.FromArgb(255, 211, 47, 47),   // Red
                 Color.FromArgb(255, 25, 118, 210),  // Blue
+                Color.FromArgb(255, 211, 47, 47),   // Red
                 Color.FromArgb(255, 56, 142, 60),   // Green
                 Color.FromArgb(255, 230, 124, 0),   // Orange
                 Color.FromArgb(255, 123, 31, 162),  // Purple
@@ -162,9 +166,9 @@ namespace TxtAIEditor.Controls
                     canvas.Children.Add(new Line
                     {
                         X1 = x,
-                        Y1 = 0,
+                        Y1 = yTop,
                         X2 = x,
-                        Y2 = itemHeight,
+                        Y2 = yBottom,
                         Stroke = brush,
                         StrokeThickness = 2.0
                     });
@@ -175,9 +179,9 @@ namespace TxtAIEditor.Controls
                     canvas.Children.Add(new Line
                     {
                         X1 = x,
-                        Y1 = 0,
+                        Y1 = yTop,
                         X2 = x,
-                        Y2 = itemHeight,
+                        Y2 = yBottom,
                         Stroke = brush,
                         StrokeThickness = 2.0
                     });
@@ -198,9 +202,9 @@ namespace TxtAIEditor.Controls
                     canvas.Children.Add(new Line
                     {
                         X1 = x + cellWidth,
-                        Y1 = 0,
+                        Y1 = yTop,
                         X2 = x,
-                        Y2 = itemHeight,
+                        Y2 = yBottom,
                         Stroke = brush,
                         StrokeThickness = 2.0
                     });
@@ -210,9 +214,9 @@ namespace TxtAIEditor.Controls
                     canvas.Children.Add(new Line
                     {
                         X1 = x,
-                        Y1 = 0,
+                        Y1 = yTop,
                         X2 = x + cellWidth,
-                        Y2 = itemHeight,
+                        Y2 = yBottom,
                         Stroke = brush,
                         StrokeThickness = 2.0
                     });
@@ -235,9 +239,9 @@ namespace TxtAIEditor.Controls
                     canvas.Children.Add(new Line
                     {
                         X1 = x,
-                        Y1 = 0,
+                        Y1 = yTop,
                         X2 = x,
-                        Y2 = itemHeight,
+                        Y2 = yBottom,
                         Stroke = unpushedBrush,
                         StrokeThickness = 2.0
                     });

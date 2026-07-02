@@ -503,6 +503,17 @@
                                                 <Setter Property="Margin" Value="0"/>
                                                 <Setter Property="VerticalContentAlignment" Value="Stretch"/>
                                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListViewItem">
+                                                            <ContentPresenter 
+                                                                Content="{TemplateBinding Content}"
+                                                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                                HorizontalAlignment="Stretch"
+                                                                VerticalAlignment="Stretch"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
                                             </Style>
                                         </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
