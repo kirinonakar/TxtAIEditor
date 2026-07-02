@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
         private readonly FrameworkElement _resourceOwner;
         private readonly Action<string> _explicitSelectionChanged;
         private readonly List<string> _renderedLines = new List<string>();
+        private bool _lineBlocksMatchRenderedLines = true;
         private Func<string, string, string>? _getString;
 
         public AgentOutputRenderer(
@@ -77,6 +78,7 @@ namespace TxtAIEditor.Controls
 
             _renderedLines.Clear();
             _renderedLines.AddRange(displayLines);
+            _lineBlocksMatchRenderedLines = !RequiresGroupedRendering(displayLines, 0);
 
             RenderDisplayLinesToBlocks(displayLines);
         }
@@ -88,6 +90,7 @@ namespace TxtAIEditor.Controls
 
             EnsureRenderedLineExists();
 
+            int firstChangedLineIndex = _renderedLines.Count - 1;
             int lastIndex = _renderedLines.Count - 1;
             _renderedLines[lastIndex] = _renderedLines[lastIndex] + parts[0];
 
@@ -96,8 +99,15 @@ namespace TxtAIEditor.Controls
                 _renderedLines.Add(parts[i]);
             }
 
-            string raw = string.Join("\n", _renderedLines);
-            UpdateRichText(raw);
+            if (HideHtmlCodeBlocks ||
+                !_lineBlocksMatchRenderedLines ||
+                RequiresGroupedRendering(_renderedLines, Math.Max(0, firstChangedLineIndex - 1)))
+            {
+                UpdateRichText(string.Join("\n", _renderedLines));
+                return;
+            }
+
+            PatchRenderedRegularLines(firstChangedLineIndex);
         }
 
         public bool TrySetLastLine(string line)
@@ -115,6 +125,27 @@ namespace TxtAIEditor.Controls
         {
             _outputText.Blocks.Clear();
             RenderLinesToBlocksInternal(displayLines);
+        }
+
+        private void PatchRenderedRegularLines(int firstChangedLineIndex)
+        {
+            firstChangedLineIndex = Math.Max(0, firstChangedLineIndex);
+            if (!_lineBlocksMatchRenderedLines ||
+                _outputText.Blocks.Count < firstChangedLineIndex)
+            {
+                UpdateRichText(string.Join("\n", _renderedLines));
+                return;
+            }
+
+            while (_outputText.Blocks.Count > firstChangedLineIndex)
+            {
+                _outputText.Blocks.RemoveAt(_outputText.Blocks.Count - 1);
+            }
+
+            for (int i = firstChangedLineIndex; i < _renderedLines.Count; i++)
+            {
+                _outputText.Blocks.Add(RenderRegularLine(_renderedLines[i]));
+            }
         }
 
         private void RenderLinesToBlocksInternal(List<string> lines)
@@ -241,6 +272,34 @@ namespace TxtAIEditor.Controls
                 }
             }
             return true;
+        }
+
+        private static bool RequiresGroupedRendering(IReadOnlyList<string> lines, int startIndex)
+        {
+            startIndex = Math.Max(0, startIndex);
+            for (int i = startIndex; i < lines.Count; i++)
+            {
+                if (lines[i].Trim().StartsWith("```", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                if (IsTableRow(lines[i]) &&
+                    i + 1 < lines.Count &&
+                    IsTableSeparatorRow(lines[i + 1]))
+                {
+                    return true;
+                }
+
+                if (IsTableSeparatorRow(lines[i]) &&
+                    i > 0 &&
+                    IsTableRow(lines[i - 1]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static List<string> ParseTableRow(string line)

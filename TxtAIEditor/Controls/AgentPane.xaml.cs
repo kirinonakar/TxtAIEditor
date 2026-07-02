@@ -64,6 +64,7 @@ namespace TxtAIEditor.Controls
         private readonly StringBuilder _pendingOutputText = new StringBuilder();
         private readonly AgentOutputRenderer _outputRenderer;
         private bool _outputScrollQueued;
+        private bool _outputFlushQueued;
         private bool _userScrolledUp;
         private double _lastVerticalOffset;
         private DispatcherTimer? _outputFlushTimer;
@@ -203,7 +204,8 @@ namespace TxtAIEditor.Controls
         private string _thinkingLineTimestamp = string.Empty;
         private string? _pendingThinkingLabel;
         private DateTimeOffset _lastThinkingLabelRender = DateTimeOffset.MinValue;
-        private const int MaxOutputFlushChars = 4_000;
+        private const int MaxOutputFlushChars = 12_000;
+        private const int OutputFlushIntervalMs = 100;
         private const int ThinkingLabelMinIntervalMs = 200;
         private const double SelectedChipScrollStep = 160;
 
@@ -573,14 +575,44 @@ namespace TxtAIEditor.Controls
         {
             var timer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(50)
+                Interval = TimeSpan.FromMilliseconds(OutputFlushIntervalMs)
             };
-            timer.Tick += (_, _) => FlushPendingOutputText();
+            timer.Tick += (_, _) => QueuePendingOutputFlush();
             return timer;
+        }
+
+        private void QueuePendingOutputFlush()
+        {
+            if (_outputFlushQueued)
+            {
+                return;
+            }
+
+            if (_pendingOutputText.Length == 0)
+            {
+                _outputFlushTimer?.Stop();
+                return;
+            }
+
+            _outputFlushQueued = true;
+            if (DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () =>
+                {
+                    _outputFlushQueued = false;
+                    FlushPendingOutputText();
+                }))
+            {
+                return;
+            }
+
+            _outputFlushQueued = false;
+            FlushPendingOutputText();
         }
 
         private void FlushPendingOutputText()
         {
+            _outputFlushQueued = false;
             if (_pendingOutputText.Length == 0)
             {
                 _outputFlushTimer?.Stop();
@@ -611,6 +643,7 @@ namespace TxtAIEditor.Controls
         private void ClearPendingOutputText()
         {
             _pendingOutputText.Clear();
+            _outputFlushQueued = false;
             _outputFlushTimer?.Stop();
         }
 
