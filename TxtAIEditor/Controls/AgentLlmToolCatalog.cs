@@ -104,7 +104,7 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "skill_use",
-                    Description = "Read the full SKILL.md for an enabled skill by name or path.",
+                    Description = "Read the full SKILL.md for an enabled skill by name or path. The result includes the SKILL.md path and Skill directory; relative scripts/assets in the skill are rooted there.",
                     Parameters = new
                     {
                         type = "object",

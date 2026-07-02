@@ -69,10 +69,12 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- You may read surrounding lines for context, but do not edit outside the requested scope.");
             builder.AppendLine();
             builder.AppendLine("Skills:");
-            builder.AppendLine("- If [Enabled agent skills] is present, even inside [User task], it is skill metadata listing user-enabled skills by name, description, and SKILL.md path.");
+            builder.AppendLine("- If [Enabled agent skills] is present, even inside [User task], it is skill metadata listing user-enabled skills by name and description.");
             builder.AppendLine("- Skill descriptions are routing summaries only. Do not treat a description as the full skill instructions, and do not infer missing skill rules from it.");
             builder.AppendLine("- If an enabled skill is relevant to the task, call skill_use with the skill name before applying the skill, and treat the returned SKILL.md as the full skill instructions.");
-            builder.AppendLine("- If SKILL.md references relative instruction files, resolve them relative to the SKILL.md directory and read only the files required for the current task before applying those instructions.");
+            builder.AppendLine("- After skill_use returns a skill's SKILL.md path and Skill directory, resolve relative instruction files, scripts, assets, schemas, or other paths from that Skill directory unless the skill says otherwise.");
+            builder.AppendLine("- Before running a skill script, use an absolute script path under the returned Skill directory or set PowerShell's location to that directory before invoking it. Do not assume scripts/ is under the workspace.");
+            builder.AppendLine("- If a skill script imports sibling modules or data, set location to the returned Skill directory first and pass workspace/user files as absolute paths.");
             builder.AppendLine("- If an enabled skill is not relevant, ignore it. If [Enabled agent skills] is absent, do not invent or search for skills unless the user explicitly asks.");
             builder.AppendLine("- If a skill file cannot be read, state that briefly and continue with the best fallback.");
             builder.AppendLine("- If [Enabled MCP servers] is present, use only the listed mcp_* aliases. Do not invent MCP tools that are not listed.");

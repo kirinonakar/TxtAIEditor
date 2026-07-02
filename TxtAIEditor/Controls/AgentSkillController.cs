@@ -120,7 +120,6 @@ namespace TxtAIEditor.Controls
             {
                 builder.AppendLine($"## {skill.Name}");
                 builder.AppendLine($"Description: {GetDescriptionForPrompt(skill)}");
-                builder.AppendLine($"SKILL.md: {skill.SkillFilePath}");
                 builder.AppendLine($"Use tool: skill_use {{\"name\":\"{skill.Name}\"}} to read the full SKILL.md before applying this skill.");
                 builder.AppendLine();
             }
@@ -158,6 +157,10 @@ namespace TxtAIEditor.Controls
             var builder = new StringBuilder();
             builder.AppendLine($"[Skill: {skill.Name}]");
             builder.AppendLine($"SKILL.md: {skill.SkillFilePath}");
+            builder.AppendLine($"Skill directory: {GetSkillDirectory(skill)}");
+            builder.AppendLine("Path guidance: Resolve relative files and scripts from the Skill directory unless the skill says otherwise. For example, scripts/recalc.py means Skill directory/scripts/recalc.py.");
+            builder.AppendLine("When running a skill script that imports sibling modules or data, set PowerShell's location to the Skill directory first, or use absolute paths for both the script and workspace files.");
+            builder.AppendLine("Example command shape: python \"<Skill directory>\\scripts\\recalc.py\" \"<absolute workspace file>\".");
             builder.AppendLine();
             builder.Append(content);
             return builder.ToString();
@@ -475,6 +478,11 @@ namespace TxtAIEditor.Controls
             return string.IsNullOrWhiteSpace(skill.Description)
                 ? "(No description found.)"
                 : skill.Description;
+        }
+
+        private static string GetSkillDirectory(AgentSkill skill)
+        {
+            return Path.GetDirectoryName(skill.SkillFilePath) ?? string.Empty;
         }
     }
 }
