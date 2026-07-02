@@ -182,6 +182,11 @@ namespace TxtAIEditor.Controls
             return string.Join(", ", GetSelectedSkills().Select(skill => skill.Name));
         }
 
+        public bool HasSelectedSkills()
+        {
+            return _skills.Any(skill => _selectedSkillNames.Contains(skill.Name));
+        }
+
         public void ToggleSkill(string skillName)
         {
             if (FindSkill(skillName) == null)

@@ -530,6 +530,11 @@ namespace TxtAIEditor.Controls
             return string.Join(", ", labels);
         }
 
+        public bool HasSelectedMcpServers()
+        {
+            return _selectedServerIds.Contains(_comfyUiTool.ServerId) || GetSelectedServers().Count > 0;
+        }
+
         public async Task EnsureActiveToolsAsync(CancellationToken cancellationToken)
         {
             RebuildAliases();

@@ -285,6 +285,8 @@ namespace TxtAIEditor.Controls
                 _getString,
                 _modelContextLimits,
                 _promptContextService.EstimateToolCatalogTokens,
+                _skillController.HasSelectedSkills,
+                _mcpController.HasSelectedMcpServers,
                 GetCurrentSessionSettings);
             _outputInsertController = new AgentOutputInsertController(
                 _agentPane,
@@ -622,6 +624,8 @@ namespace TxtAIEditor.Controls
                 WorkspaceRoot = activeOpenSession.WorkspaceRoot,
                 LlmSettings = runSettings,
                 IsPlanningMode = requestedPlanningMode,
+                HasEnabledSkills = _skillController.HasSelectedSkills(),
+                HasEnabledMcp = _mcpController.HasSelectedMcpServers(),
                 OriginalUserInstruction = userInstruction
             };
             runContext.SessionHistory.Append(activeOpenSession.SessionHistoryText ?? string.Empty);
@@ -727,7 +731,10 @@ namespace TxtAIEditor.Controls
                         currentTranscript,
                         runSelectionContext,
                         planningMode,
-                        _llmToolCatalog.Build(planningMode, _mcpController.GetActiveToolAliases()),
+                        _llmToolCatalog.Build(
+                            planningMode,
+                            _mcpController.GetActiveToolAliases(),
+                            runContext.HasEnabledSkills),
                         _promptContextService.GetImageAttachmentsForRun(runContext),
                         cancellationToken);
 

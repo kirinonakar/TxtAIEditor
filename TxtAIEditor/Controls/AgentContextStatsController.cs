@@ -26,6 +26,8 @@ namespace TxtAIEditor.Controls
         private readonly AgentModelContextLimitProvider _modelContextLimits;
         private readonly Func<EditorSettings> _settingsProvider;
         private readonly Func<double> _toolCatalogTokensProvider;
+        private readonly Func<bool> _hasEnabledSkillsProvider;
+        private readonly Func<bool> _hasEnabledMcpProvider;
 
         public AgentContextStatsController(
             ISettingsService settingsService,
@@ -44,6 +46,8 @@ namespace TxtAIEditor.Controls
             Func<string, string, string> getString,
             AgentModelContextLimitProvider modelContextLimits,
             Func<double> toolCatalogTokensProvider,
+            Func<bool> hasEnabledSkillsProvider,
+            Func<bool> hasEnabledMcpProvider,
             Func<EditorSettings>? settingsProvider = null)
         {
             _settingsService = settingsService;
@@ -62,6 +66,8 @@ namespace TxtAIEditor.Controls
             _getString = getString;
             _modelContextLimits = modelContextLimits;
             _toolCatalogTokensProvider = toolCatalogTokensProvider;
+            _hasEnabledSkillsProvider = hasEnabledSkillsProvider;
+            _hasEnabledMcpProvider = hasEnabledMcpProvider;
             _settingsProvider = settingsProvider ?? (() => _settingsService.CurrentSettings);
         }
 
@@ -159,7 +165,12 @@ namespace TxtAIEditor.Controls
         {
             string langCode = _displayText.LanguageCode;
             string targetLanguage = _settingsProvider()?.ResolveTargetLanguage() ?? "Korean";
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, _agentPane.PlanningMode, targetLanguage);
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(
+                langCode,
+                _agentPane.PlanningMode,
+                targetLanguage,
+                _hasEnabledSkillsProvider(),
+                _hasEnabledMcpProvider());
 
             string instruction = _buildAgentInstruction(_agentPane.Prompt.Text?.Trim() ?? string.Empty);
             string workspaceContext = _buildWorkspaceContext(instruction);

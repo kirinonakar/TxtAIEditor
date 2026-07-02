@@ -6,7 +6,10 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentLlmToolCatalog
     {
-        public IReadOnlyList<LlmTool> Build(bool planningMode, IReadOnlyList<AgentMcpToolAlias> mcpAliases)
+        public IReadOnlyList<LlmTool> Build(
+            bool planningMode,
+            IReadOnlyList<AgentMcpToolAlias> mcpAliases,
+            bool hasEnabledSkills = false)
         {
             var tools = new List<LlmTool>
             {
@@ -99,20 +102,6 @@ namespace TxtAIEditor.Controls
                             lineCount = new { type = "integer", description = "Number of lines to read (default: 160)" }
                         },
                         required = new[] { "path" }
-                    }
-                },
-                new LlmTool
-                {
-                    Name = "skill_use",
-                    Description = "Read the full SKILL.md for an enabled skill by name or path. The result includes the SKILL.md path and Skill directory; relative scripts/assets in the skill are rooted there.",
-                    Parameters = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            name = new { type = "string", description = "Name of the skill, e.g., skill-name" }
-                        },
-                        required = new[] { "name" }
                     }
                 },
                 new LlmTool
@@ -392,6 +381,24 @@ namespace TxtAIEditor.Controls
                     }
                 }
             };
+
+            if (hasEnabledSkills)
+            {
+                tools.Add(new LlmTool
+                {
+                    Name = "skill_use",
+                    Description = "Read the full SKILL.md for an enabled skill by name or path. The result includes the SKILL.md path and Skill directory; relative scripts/assets in the skill are rooted there.",
+                    Parameters = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            name = new { type = "string", description = "Name of the skill, e.g., skill-name" }
+                        },
+                        required = new[] { "name" }
+                    }
+                });
+            }
 
             if (planningMode)
             {

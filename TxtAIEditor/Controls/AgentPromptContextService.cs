@@ -330,7 +330,10 @@ namespace TxtAIEditor.Controls
             }
 
             var mcpAliases = _mcpController.GetActiveToolAliases();
-            var tools = new AgentLlmToolCatalog().Build(_agentPane.PlanningMode, mcpAliases);
+            var tools = new AgentLlmToolCatalog().Build(
+                _agentPane.PlanningMode,
+                mcpAliases,
+                _skillController.HasSelectedSkills());
             return AgentTokenEstimator.EstimateToolsTokens(tools);
         }
 
@@ -366,7 +369,10 @@ namespace TxtAIEditor.Controls
             string selectedText)
         {
             string languageCode = _displayText.LanguageCode;
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(languageCode);
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(
+                languageCode,
+                hasEnabledSkills: _skillController.HasSelectedSkills(),
+                hasEnabledMcp: _mcpController.HasSelectedMcpServers());
             string userContent = AgentPromptBuilder.BuildUserContent(
                 instruction,
                 workspaceContext,

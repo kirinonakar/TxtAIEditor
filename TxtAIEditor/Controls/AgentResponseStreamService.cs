@@ -431,7 +431,9 @@ namespace TxtAIEditor.Controls
                     imageAttachments,
                     planningMode,
                     onReasoning,
-                    agentToolsList);
+                    agentToolsList,
+                    runContext.HasEnabledSkills,
+                    runContext.HasEnabledMcp);
             }
             catch (ResponseTruncatedException)
             {

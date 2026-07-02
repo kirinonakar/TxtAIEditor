@@ -49,6 +49,8 @@ namespace TxtAIEditor.Controls
         public string WorkspaceRoot { get; set; } = string.Empty;
         public EditorSettings LlmSettings { get; set; } = new();
         public bool IsPlanningMode { get; set; }
+        public bool HasEnabledSkills { get; set; }
+        public bool HasEnabledMcp { get; set; }
         public string OriginalUserInstruction { get; set; } = string.Empty;
         public string PlanWorkspaceContext { get; set; } = string.Empty;
         public string PlanSelectionContext { get; set; } = string.Empty;
