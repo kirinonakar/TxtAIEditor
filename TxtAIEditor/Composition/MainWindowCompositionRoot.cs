@@ -27,7 +27,6 @@ namespace TxtAIEditor.Composition
             GitPanelController? gitPanelController = null;
             GitStatusRefreshController? gitStatusRefreshController = null;
             FavoritesRecentController? favoritesRecentController = null;
-            ExplorerFileActionsController? explorerFileActionsController = null;
             TabContextMenuController? tabContextMenuController = null;
             TabNavigationController? tabNavigationController = null;
             TabEncryptionController? tabEncryptionController = null;
@@ -36,10 +35,7 @@ namespace TxtAIEditor.Composition
             SnippetsController? snippetsController = null;
             LlmAssistantController? llmAssistantController = null;
             AgentController? agentController = null;
-            AgentFileWorkflowController? agentFileWorkflowController = null;
-            TocController? tocController = null;
             ShellPaneController? shellPaneController = null;
-            MarkdownToolbarController? markdownToolbarController = null;
             StickyNoteModeController? stickyNoteModeController = null;
             StatusBarController? statusBarController = null;
             TabReloadController? tabReloadController = null;
@@ -47,34 +43,21 @@ namespace TxtAIEditor.Composition
             LivePreviewController? livePreviewController = null;
             PdfViewerController? pdfViewerController = null;
             OfficeDocumentViewerController? officeDocumentViewerController = null;
-            TabSelectionController? tabSelectionController = null;
-            EditorSplitLayoutController? editorSplitLayoutController = null;
             EditorBridgeShortcutController? editorBridgeShortcutController = null;
-            EditorBridgeDocumentController? editorBridgeDocumentController = null;
-            EditorBridgeInteractionController? editorBridgeInteractionController = null;
             EditorLinkNavigationController? editorLinkNavigationController = null;
             EditorWebViewInitializationController? editorWebViewInitializationController = null;
             EditorLineNavigationController? editorLineNavigationController = null;
-            EditorTabOpenController? editorTabOpenController = null;
             ActiveEditorInsertionController? activeEditorInsertionController = null;
-            PreviewScrollSyncController? previewScrollSyncController = null;
             TabTextContextProvider? tabTextContextProvider = null;
-            WebViewShortcutController? webViewShortcutController = null;
             SplitImeSyncController? splitImeSyncController = null;
             TabDirtyStateController? tabDirtyStateController = null;
             TabSaveController? tabSaveController = null;
             TabCloseController? tabCloseController = null;
             TabMoveController? tabMoveController = null;
             AutoSaveController? autoSaveController = null;
-            MainWindowStartupController? startupController = null;
-            MainWindowLifecycleController? lifecycleController = null;
-            MainWindowShellInteractionController? shellInteractionController = null;
-            FileTabLoadController? fileTabLoadController = null;
             TerminalPanelController? terminalPanelController = null;
             ExplorerNavigationController? explorerNavigationController = null;
             WindowDialogController? dialogController = null;
-            WindowCloseController? windowCloseController = null;
-            WindowTitleController? windowTitleController = null;
             MainWindowSettingsController? settingsController = null;
             MainWindowToolbarCommandController? toolbarCommandController = null;
             DispatcherTimer? gitAutoRefreshTimer = null;
@@ -199,7 +182,6 @@ namespace TxtAIEditor.Composition
             tabNavigationController = shellControllers.TabNavigation;
             terminalShortcutService = shellControllers.TerminalShortcut;
             dialogController = shellControllers.Dialog;
-            windowTitleController = shellControllers.WindowTitle;
             tabEncryptionController = shellControllers.TabEncryption;
             stickyNoteModeController = shellControllers.StickyNoteMode;
             statusBarController = shellControllers.StatusBar;
@@ -228,8 +210,6 @@ namespace TxtAIEditor.Composition
                     callbacks.UpdateRightPanelSelectionContext,
                     NavigateExplorerToFolderAndRevealAsync,
                     callbacks.GetLocalizedString));
-            webViewShortcutController = previewControllers.WebViewShortcut;
-            previewScrollSyncController = previewControllers.PreviewScrollSync;
             compareTabController = previewControllers.CompareTab;
             livePreviewController = previewControllers.LivePreview;
             editorWebViewInitializationController = previewControllers.EditorWebViewInitialization;
@@ -320,7 +300,6 @@ namespace TxtAIEditor.Composition
             gitPanelController = workspaceControllers.GitPanel;
             gitPanelController.FileRestored += callbacks.GitFileRestored;
             gitStatusRefreshController = workspaceControllers.GitStatusRefresh;
-            fileTabLoadController = workspaceControllers.FileTabLoad;
             explorerNavigationController = workspaceControllers.ExplorerNavigation;
             favoritesRecentController = workspaceControllers.FavoritesRecent;
 
@@ -357,7 +336,6 @@ namespace TxtAIEditor.Composition
             autoSaveController = documentCommandControllers.AutoSave;
             tabCloseController = documentCommandControllers.TabClose;
             tabMoveController = documentCommandControllers.TabMove;
-            windowCloseController = documentCommandControllers.WindowClose;
 
             var interactionControllers = MainWindowInteractionComposition.Compose(
                 window,
@@ -419,7 +397,6 @@ namespace TxtAIEditor.Composition
                     (_, tabItem, tabView) => tabCloseController.CloseRightTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseLeftTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseOtherTabs(tabItem, tabView)));
-            explorerFileActionsController = interactionControllers.ExplorerFileActions;
             tabContextMenuController = interactionControllers.TabContextMenu;
             fileOpenDropController = interactionControllers.FileOpenDrop;
             rootKeyboardShortcutController = interactionControllers.RootKeyboardShortcut;
@@ -457,7 +434,6 @@ namespace TxtAIEditor.Composition
                     callbacks.GetLocalizedString,
                     callbacks.UpdateWindowTitle));
             llmAssistantController = agentControllers.LlmAssistant;
-            agentFileWorkflowController = agentControllers.AgentFileWorkflow;
             agentController = agentControllers.Agent;
 
             var editorRuntimeControllers = MainWindowEditorRuntimeComposition.Compose(
@@ -530,14 +506,7 @@ namespace TxtAIEditor.Composition
                         }),
                     callbacks.CloseTabAndCleanup,
                     (_, args) => tabCloseController.CloseRequested(args)));
-            tocController = editorRuntimeControllers.Toc;
-            editorBridgeDocumentController = editorRuntimeControllers.EditorBridgeDocument;
             shellPaneController = editorRuntimeControllers.ShellPane;
-            markdownToolbarController = editorRuntimeControllers.MarkdownToolbar;
-            tabSelectionController = editorRuntimeControllers.TabSelection;
-            editorBridgeInteractionController = editorRuntimeControllers.EditorBridgeInteraction;
-            editorTabOpenController = editorRuntimeControllers.EditorTabOpen;
-            editorSplitLayoutController = editorRuntimeControllers.EditorSplitLayout;
 
             var startupControllers = MainWindowStartupComposition.Compose(
                 window,
@@ -588,10 +557,7 @@ namespace TxtAIEditor.Composition
                     callbacks.GetCurrentElementTheme,
                     callbacks.InitializePickerWindow,
                     callbacks.GetPreviewBaseHref));
-            lifecycleController = startupControllers.Lifecycle;
             settingsController = startupControllers.Settings;
-            startupController = startupControllers.Startup;
-            shellInteractionController = startupControllers.ShellInteraction;
             toolbarCommandController = startupControllers.ToolbarCommand;
 
             MainWindowEventBinder.Bind(
@@ -604,65 +570,13 @@ namespace TxtAIEditor.Composition
                 SaveUiLayoutSettingsAsync);
 
             return new MainWindowControllers(
-                shellPanelLayoutService,
-                terminalShortcutService,
-                functionKeyShortcutService,
-                searchReplaceController,
-                searchReplaceTabSyncController,
-                gitPanelController,
-                gitStatusRefreshController,
-                favoritesRecentController,
-                explorerFileActionsController,
-                tabContextMenuController,
-                tabNavigationController,
-                tabEncryptionController,
-                fileOpenDropController,
-                rootKeyboardShortcutController,
-                snippetsController,
-                llmAssistantController,
-                agentController,
-                agentFileWorkflowController,
-                tocController,
-                shellPaneController,
-                markdownToolbarController,
-                stickyNoteModeController,
-                statusBarController,
-                tabReloadController,
-                compareTabController,
-                livePreviewController,
-                pdfViewerController,
-                officeDocumentViewerController,
-                tabSelectionController,
-                editorSplitLayoutController,
-                editorBridgeShortcutController,
-                editorBridgeDocumentController,
-                editorBridgeInteractionController,
-                editorLinkNavigationController,
-                editorWebViewInitializationController,
-                editorLineNavigationController,
-                editorTabOpenController,
-                activeEditorInsertionController,
-                previewScrollSyncController,
-                tabTextContextProvider,
-                webViewShortcutController,
-                splitImeSyncController,
-                tabDirtyStateController,
-                tabSaveController,
-                tabCloseController,
-                tabMoveController,
-                autoSaveController,
-                startupController,
-                lifecycleController,
-                shellInteractionController,
-                fileTabLoadController,
-                terminalPanelController,
-                explorerNavigationController,
-                dialogController,
-                windowCloseController,
-                windowTitleController,
-                settingsController,
-                toolbarCommandController,
-                gitAutoRefreshTimer);
+                new ShellControllers(shellControllers, interactionControllers),
+                new EditorControllers(editorFoundationControllers, editorRuntimeControllers),
+                DocumentControllers.From(documentCommandControllers),
+                previewControllers,
+                agentControllers,
+                workspaceControllers,
+                LifecycleControllers.From(startupControllers));
         }
     }
 }

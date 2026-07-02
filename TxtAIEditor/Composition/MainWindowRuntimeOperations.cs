@@ -117,7 +117,7 @@ namespace TxtAIEditor.Composition
         {
             try
             {
-                await Controllers.Startup.InitializeAsync();
+                await Controllers.Lifecycle.Startup.InitializeAsync();
             }
             finally
             {
@@ -133,10 +133,10 @@ namespace TxtAIEditor.Composition
             }
 
             _state.CurrentFolderPath = folderPath;
-            Controllers.SearchReplace.CancelActiveSearch();
+            Controllers.Editor.Foundation.SearchReplace.CancelActiveSearch();
             UpdateAutoSaveStatus();
             UpdateAllTabWorkspaceIndicators();
-            Controllers.GitStatusRefresh.QueueRefresh();
+            Controllers.Workspace.GitStatusRefresh.QueueRefresh();
         }
 
         public void SetCurrentRepoPath(string repoPath)
@@ -160,7 +160,7 @@ namespace TxtAIEditor.Composition
             bool isEncrypted = false,
             string? encryptionPassword = null)
         {
-            return Controllers.EditorTabOpen.OpenNewTab(
+            return Controllers.Editor.Runtime.EditorTabOpen.OpenNewTab(
                 filePath,
                 content,
                 isReadOnly,
@@ -186,23 +186,23 @@ namespace TxtAIEditor.Composition
 
         public OpenedTab OpenGeneratedTab(string content) => OpenNewTab(null, content);
 
-        public OpenedTab OpenPdfTab(string filePath) => Controllers.EditorTabOpen.OpenPdfTab(filePath);
+        public OpenedTab OpenPdfTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenPdfTab(filePath);
 
-        public OpenedTab OpenOfficeDocumentTab(string filePath) => Controllers.EditorTabOpen.OpenOfficeDocumentTab(filePath);
+        public OpenedTab OpenOfficeDocumentTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenOfficeDocumentTab(filePath);
 
-        public OpenedTab OpenImageTab(string filePath) => Controllers.EditorTabOpen.OpenImageTab(filePath);
+        public OpenedTab OpenImageTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenImageTab(filePath);
 
-        public void SchedulePreview(OpenedTab tab) => Controllers.LivePreview.Schedule(tab);
+        public void SchedulePreview(OpenedTab tab) => Controllers.Preview.LivePreview.Schedule(tab);
 
-        public void UpdateLivePreview(OpenedTab tab) => Controllers.LivePreview.Render(tab);
+        public void UpdateLivePreview(OpenedTab tab) => Controllers.Preview.LivePreview.Render(tab);
 
-        public string GetPreviewBaseHref(OpenedTab tab) => Controllers.LivePreview.GetPreviewBaseHref(tab);
+        public string GetPreviewBaseHref(OpenedTab tab) => Controllers.Preview.LivePreview.GetPreviewBaseHref(tab);
 
         public Task LoadFileIntoTabAsync(string filePath) => LoadFileIntoTabAsync(filePath, 0);
 
         public async Task LoadFileIntoTabAsync(string filePath, int lineNumber)
         {
-            var loadedTab = await Controllers.FileTabLoad.LoadAsync(filePath);
+            var loadedTab = await Controllers.Workspace.FileTabLoad.LoadAsync(filePath);
             if (loadedTab != null)
             {
                 ActivateLoadedTab(loadedTab);
@@ -211,13 +211,13 @@ namespace TxtAIEditor.Composition
             if (lineNumber >= 1)
             {
                 await Task.Delay(250);
-                await Controllers.EditorLineNavigation.RevealFileLineAsync(filePath, lineNumber);
+                await Controllers.Preview.EditorLineNavigation.RevealFileLineAsync(filePath, lineNumber);
             }
         }
 
         public async Task<AgentOpenFileResult> LoadFileIntoTabForAgentAsync(string filePath)
         {
-            var loadResult = await Controllers.FileTabLoad.LoadWithResultAsync(filePath);
+            var loadResult = await Controllers.Workspace.FileTabLoad.LoadWithResultAsync(filePath);
             if (!loadResult.Success || loadResult.Tab == null)
             {
                 return AgentOpenFileResult.Failed(
@@ -236,8 +236,8 @@ namespace TxtAIEditor.Composition
 
         public void UpdateRightPanelSelectionContext(string selectedText, OpenedTab tab, int startLine, int endLine)
         {
-            Controllers.LlmAssistant.SetSelectionText(selectedText);
-            Controllers.Agent.SetSelectionText(selectedText, tab, startLine, endLine);
+            Controllers.Agents.LlmAssistant.SetSelectionText(selectedText);
+            Controllers.Agents.Agent.SetSelectionText(selectedText, tab, startLine, endLine);
             if (string.IsNullOrEmpty(selectedText))
             {
                 _ui.PreviewGrid.SelectionStats.Text = GetLocalizedString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");
@@ -248,14 +248,14 @@ namespace TxtAIEditor.Composition
                 _ui.PreviewGrid.SelectionStats.Text = string.Format(fmt, selectedText.Length.ToString("N0"), StatusBarController.EstimateTokenCount(selectedText).ToString("N0"));
             }
 
-            Controllers.StatusBar.UpdateSelectionStats(selectedText);
+            Controllers.Shell.Core.StatusBar.UpdateSelectionStats(selectedText);
         }
 
-        public void ShowLeftSidebarPage(int index) => Controllers.ShellPane.ShowLeftSidebarPage(index);
+        public void ShowLeftSidebarPage(int index) => Controllers.Editor.Runtime.ShellPane.ShowLeftSidebarPage(index);
 
-        public void EnsureLeftPanelVisible() => Controllers.ShellPane.EnsureLeftPanelVisible();
+        public void EnsureLeftPanelVisible() => Controllers.Editor.Runtime.ShellPane.EnsureLeftPanelVisible();
 
-        public void FocusSearchPanel() => Controllers.ShellPane.FocusSearchPanel();
+        public void FocusSearchPanel() => Controllers.Editor.Runtime.ShellPane.FocusSearchPanel();
 
         public void ToggleMaximize() => MainWindowLayoutOperations.ToggleMaximize(_window.AppWindow);
 
@@ -264,7 +264,7 @@ namespace TxtAIEditor.Composition
             return _services.LocalizationService.GetString(key, fallback);
         }
 
-        public void LocalizeUi() => Controllers.Settings.LocalizeUi();
+        public void LocalizeUi() => Controllers.Lifecycle.Settings.LocalizeUi();
 
         public async Task SyncSnippetsToOpenEditorsAsync()
         {
@@ -279,31 +279,31 @@ namespace TxtAIEditor.Composition
             }
         }
 
-        public void RefreshActivePreview() => Controllers.LivePreview.EnsureVisiblePreviewRendered();
+        public void RefreshActivePreview() => Controllers.Preview.LivePreview.EnsureVisiblePreviewRendered();
 
         public Task OpenShellPathAsync(string path)
         {
             return MainWindowWorkspaceOperations.OpenShellPathAsync(
                 path,
-                Controllers.ShellPanelLayout,
-                Controllers.ExplorerNavigation,
+                Controllers.Shell.Core.ShellPanelLayout,
+                Controllers.Workspace.ExplorerNavigation,
                 LoadFileIntoTabAsync);
         }
 
         public IReadOnlyList<AgentFileEditPreview> GetAgentSessionEdits()
         {
-            return Controllers.Agent.SessionEdits;
+            return Controllers.Agents.Agent.SessionEdits;
         }
 
         public void CloseTabAndCleanup(OpenedTab tab, TabViewItem tabItem)
         {
-            Controllers.TabClose.CloseAndCleanup(tab, tabItem);
+            Controllers.Documents.TabClose.CloseAndCleanup(tab, tabItem);
         }
 
         public void CloseReadOnlyViewer(string tabId)
         {
-            Controllers.PdfViewer.Close(tabId);
-            Controllers.OfficeDocumentViewer.Close(tabId);
+            Controllers.Preview.PdfViewer.Close(tabId);
+            Controllers.Preview.OfficeDocumentViewer.Close(tabId);
         }
 
         public void MarkTabDirtyFromStatusBar(OpenedTab tab)
@@ -312,7 +312,7 @@ namespace TxtAIEditor.Composition
                        ?? _ui.EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
             if (tabItem != null)
             {
-                Controllers.TabDirtyState.MarkTabDirty(tab, tabItem);
+                Controllers.Editor.Foundation.TabDirtyState.MarkTabDirty(tab, tabItem);
             }
             else
             {
@@ -324,15 +324,15 @@ namespace TxtAIEditor.Composition
         {
             if (tab.IsReadOnlyViewer)
             {
-                Controllers.StatusBar.UpdateFileStats(tab);
-                Controllers.StatusBar.UpdateTotalLines(tab);
-                Controllers.StatusBar.SyncLineEndingText(tab);
+                Controllers.Shell.Core.StatusBar.UpdateFileStats(tab);
+                Controllers.Shell.Core.StatusBar.UpdateTotalLines(tab);
+                Controllers.Shell.Core.StatusBar.SyncLineEndingText(tab);
                 UpdateLanguageUi(tab);
                 UpdateWindowTitle();
                 return;
             }
 
-            await Controllers.TabReload.ReloadWithEncodingAsync(tab, encodingName);
+            await Controllers.Editor.Foundation.TabReload.ReloadWithEncodingAsync(tab, encodingName);
         }
 
         public void OnGitFileRestored(object? sender, string filePath)
@@ -366,7 +366,7 @@ namespace TxtAIEditor.Composition
 
                 if (!string.IsNullOrEmpty(_state.CurrentFolderPath) && Directory.Exists(_state.CurrentFolderPath))
                 {
-                    Controllers.ExplorerNavigation.LoadDirectoryRoot(_state.CurrentFolderPath);
+                    Controllers.Workspace.ExplorerNavigation.LoadDirectoryRoot(_state.CurrentFolderPath);
                 }
             });
         }
@@ -377,18 +377,18 @@ namespace TxtAIEditor.Composition
             InitializeWithWindow.Initialize(picker, hwnd);
         }
 
-        public void UpdateWindowTitle() => Controllers.WindowTitle.Update();
+        public void UpdateWindowTitle() => Controllers.Shell.Core.WindowTitle.Update();
 
-        public Task<bool> SaveTabAsync(OpenedTab tab) => Controllers.TabSave.SaveAsync(tab);
+        public Task<bool> SaveTabAsync(OpenedTab tab) => Controllers.Documents.TabSave.SaveAsync(tab);
 
         public void CloseActiveTab()
         {
-            Controllers.TabClose.CloseActive(Controllers.TabNavigation.GetCurrentActiveTabView());
+            Controllers.Documents.TabClose.CloseActive(Controllers.Shell.Core.TabNavigation.GetCurrentActiveTabView());
         }
 
         public async Task HandleAppWindowClosingAsync(Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
-            await Controllers.WindowClose.HandleClosingAsync(args);
+            await Controllers.Documents.WindowClose.HandleClosingAsync(args);
         }
 
         public ElementTheme GetCurrentElementTheme()
@@ -408,22 +408,22 @@ namespace TxtAIEditor.Composition
                 : ElementTheme.Default;
         }
 
-        public void UpdateLanguageUi(OpenedTab tab) => Controllers.StatusBar.UpdateLanguage(tab);
+        public void UpdateLanguageUi(OpenedTab tab) => Controllers.Shell.Core.StatusBar.UpdateLanguage(tab);
 
         public async Task PerformLineNavigationAsync(string tabId, int targetLine)
         {
-            await Controllers.EditorLineNavigation.RevealTabLineAsync(tabId, targetLine);
+            await Controllers.Preview.EditorLineNavigation.RevealTabLineAsync(tabId, targetLine);
         }
 
         public void SyncAgentSettingsAfterLoad()
         {
-            Controllers.Agent.UpdateModelDisplay(true);
-            Controllers.Agent.UpdateContextStats();
+            Controllers.Agents.Agent.UpdateModelDisplay(true);
+            Controllers.Agents.Agent.UpdateContextStats();
         }
 
         public void UpdateAutoSaveStatus()
         {
-            Controllers.AutoSave.UpdateStatus();
+            Controllers.Documents.AutoSave.UpdateStatus();
         }
 
         public ExplorerItem? GetSelectedExplorerItem()
@@ -433,7 +433,7 @@ namespace TxtAIEditor.Composition
 
         private void ActivateLoadedTab(OpenedTab tab)
         {
-            var tabView = Controllers.TabNavigation.GetTabView(tab);
+            var tabView = Controllers.Shell.Core.TabNavigation.GetTabView(tab);
             var tabItem = tabView != null ? TabNavigationController.FindItem(tabView, tab.Id) : null;
 
             if (tabView != null && tabItem != null)
@@ -444,10 +444,10 @@ namespace TxtAIEditor.Composition
                     tabView.SelectedItem = tabItem;
                 }
 
-                Controllers.TabSelection.QueueChanged(tabView, tabItem);
+                Controllers.Editor.Runtime.TabSelection.QueueChanged(tabView, tabItem);
             }
 
-            Controllers.LivePreview.Render(tab);
+            Controllers.Preview.LivePreview.Render(tab);
         }
 
         private void UpdateAllTabWorkspaceIndicators()

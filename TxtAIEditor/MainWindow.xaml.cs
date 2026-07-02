@@ -91,13 +91,13 @@ namespace TxtAIEditor
 
             // Load local configurations and boot initial states
             // Setup custom title bar
-            Controllers.Lifecycle.InitializeTitleBar();
+            Controllers.Lifecycle.Window.InitializeTitleBar();
 
             this.Activated += OnWindowActivated;
-            this.Activated += Controllers.Lifecycle.HandleActivationChanged;
-            this.Closed += Controllers.Lifecycle.HandleWindowClosed;
+            this.Activated += Controllers.Lifecycle.Window.HandleActivationChanged;
+            this.Closed += Controllers.Lifecycle.Window.HandleWindowClosed;
             this.AppWindow.Closing += OnAppWindowClosing;
-            Controllers.Lifecycle.StartShortcuts();
+            Controllers.Lifecycle.Window.StartShortcuts();
 
         }
 

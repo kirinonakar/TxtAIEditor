@@ -1,67 +1,53 @@
-using Microsoft.UI.Xaml;
 using TxtAIEditor.Controls;
-using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Composition
 {
-    internal sealed record MainWindowControllers(
-        ShellPanelLayoutService ShellPanelLayout,
-        TerminalShortcutService TerminalShortcut,
-        FunctionKeyShortcutService FunctionKeyShortcut,
-        SearchReplaceController SearchReplace,
-        SearchReplaceTabSyncController SearchReplaceTabSync,
-        GitPanelController GitPanel,
-        GitStatusRefreshController GitStatusRefresh,
-        FavoritesRecentController FavoritesRecent,
-        ExplorerFileActionsController ExplorerFileActions,
-        TabContextMenuController TabContextMenu,
-        TabNavigationController TabNavigation,
-        TabEncryptionController TabEncryption,
-        FileOpenDropController FileOpenDrop,
-        RootKeyboardShortcutController RootKeyboardShortcut,
-        SnippetsController Snippets,
-        LlmAssistantController LlmAssistant,
-        AgentController Agent,
-        AgentFileWorkflowController AgentFileWorkflow,
-        TocController Toc,
-        ShellPaneController ShellPane,
-        MarkdownToolbarController MarkdownToolbar,
-        StickyNoteModeController StickyNoteMode,
-        StatusBarController StatusBar,
-        TabReloadController TabReload,
-        CompareTabController CompareTab,
-        LivePreviewController LivePreview,
-        PdfViewerController PdfViewer,
-        OfficeDocumentViewerController OfficeDocumentViewer,
-        TabSelectionController TabSelection,
-        EditorSplitLayoutController EditorSplitLayout,
-        EditorBridgeShortcutController EditorBridgeShortcut,
-        EditorBridgeDocumentController EditorBridgeDocument,
-        EditorBridgeInteractionController EditorBridgeInteraction,
-        EditorLinkNavigationController EditorLinkNavigation,
-        EditorWebViewInitializationController EditorWebViewInitialization,
-        EditorLineNavigationController EditorLineNavigation,
-        EditorTabOpenController EditorTabOpen,
-        ActiveEditorInsertionController ActiveEditorInsertion,
-        PreviewScrollSyncController PreviewScrollSync,
-        TabTextContextProvider TabTextContext,
-        WebViewShortcutController WebViewShortcut,
-        SplitImeSyncController SplitImeSync,
-        TabDirtyStateController TabDirtyState,
+    internal sealed record ShellControllers(
+        MainWindowShellControllers Core,
+        MainWindowInteractionControllers Interaction);
+
+    internal sealed record EditorControllers(
+        MainWindowEditorFoundationControllers Foundation,
+        MainWindowEditorRuntimeControllers Runtime);
+
+    internal sealed record DocumentControllers(
         TabSaveController TabSave,
+        AutoSaveController AutoSave,
         TabCloseController TabClose,
         TabMoveController TabMove,
-        AutoSaveController AutoSave,
-        MainWindowStartupController Startup,
-        MainWindowLifecycleController Lifecycle,
-        MainWindowShellInteractionController ShellInteraction,
-        FileTabLoadController FileTabLoad,
-        TerminalPanelController TerminalPanel,
-        ExplorerNavigationController ExplorerNavigation,
-        WindowDialogController Dialog,
-        WindowCloseController WindowClose,
-        WindowTitleController WindowTitle,
+        WindowCloseController WindowClose)
+    {
+        public static DocumentControllers From(MainWindowDocumentCommandControllers controllers) =>
+            new(
+                controllers.TabSave,
+                controllers.AutoSave,
+                controllers.TabClose,
+                controllers.TabMove,
+                controllers.WindowClose);
+    }
+
+    internal sealed record LifecycleControllers(
+        MainWindowLifecycleController Window,
         MainWindowSettingsController Settings,
-        MainWindowToolbarCommandController ToolbarCommand,
-        DispatcherTimer GitAutoRefreshTimer);
+        MainWindowStartupController Startup,
+        MainWindowShellInteractionController ShellInteraction,
+        MainWindowToolbarCommandController ToolbarCommand)
+    {
+        public static LifecycleControllers From(MainWindowStartupControllers controllers) =>
+            new(
+                controllers.Lifecycle,
+                controllers.Settings,
+                controllers.Startup,
+                controllers.ShellInteraction,
+                controllers.ToolbarCommand);
+    }
+
+    internal sealed record MainWindowControllers(
+        ShellControllers Shell,
+        EditorControllers Editor,
+        DocumentControllers Documents,
+        MainWindowPreviewControllers Preview,
+        MainWindowAgentControllers Agents,
+        MainWindowWorkspaceControllers Workspace,
+        LifecycleControllers Lifecycle);
 }
