@@ -241,8 +241,8 @@ namespace TxtAIEditor.Controls
                             endLine = new { type = "integer", description = "End line number to replace" },
                             newText = new { type = "string", description = "New text to insert" },
                             expectedSnippet = new { type = "string", description = "The exact full text expected at the range to verify correctness. Required for ranges < 5 lines; for ranges >= 5 lines, provide either this full-range snippet or expectedStartLines plus expectedEndLines." },
-                            expectedStartLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "For ranges >= 5 lines, the exact content of the first 2 lines inside the range. Pass as a string array or as a newline-separated string when expectedSnippet is not provided." },
-                            expectedEndLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "For ranges >= 5 lines, the exact content of the last 2 lines inside the range. Pass as a string array or as a newline-separated string when expectedSnippet is not provided." }
+                            expectedStartLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "For ranges >= 5 lines, the exact content of the first 2 or more lines inside the range. Pass as a string array or as a newline-separated string when expectedSnippet is not provided." },
+                            expectedEndLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "For ranges >= 5 lines, the exact content of the last 2 or more lines inside the range. Pass as a string array or as a newline-separated string when expectedSnippet is not provided." }
                         },
                         required = new[] { "path", "startLine", "endLine", "newText" }
                     }

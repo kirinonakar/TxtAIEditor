@@ -431,31 +431,40 @@ namespace TxtAIEditor.Controls
                     // Boundary verification
 
                     // expectedStartLines
-                    if (expectedStartLines == null || expectedStartLines.Count != 2)
+                    if (expectedStartLines == null || expectedStartLines.Count < 2)
                     {
-                        return "replace_range failed: expectedStartLines is required and must have exactly 2 elements.";
+                        return "replace_range failed: expectedStartLines is required and must have at least 2 elements.";
                     }
-                    if (!LinesMatch(lines[startLine - 1], expectedStartLines[0]))
+                    if (expectedStartLines.Count > lineCount)
                     {
-                        return $"replace_range failed: expectedStartLines[0] did not match line {startLine} of the file.";
+                        return $"replace_range failed: expectedStartLines has {expectedStartLines.Count} elements, but the requested range only has {lineCount} lines.";
                     }
-                    if (!LinesMatch(lines[startLine], expectedStartLines[1]))
+                    for (int i = 0; i < expectedStartLines.Count; i++)
                     {
-                        return $"replace_range failed: expectedStartLines[1] did not match line {startLine + 1} of the file.";
+                        int fileLineIndex = startLine - 1 + i;
+                        if (!LinesMatch(lines[fileLineIndex], expectedStartLines[i]))
+                        {
+                            return $"replace_range failed: expectedStartLines[{i}] did not match line {fileLineIndex + 1} of the file.";
+                        }
                     }
 
                     // expectedEndLines
-                    if (expectedEndLines == null || expectedEndLines.Count != 2)
+                    if (expectedEndLines == null || expectedEndLines.Count < 2)
                     {
-                        return "replace_range failed: expectedEndLines is required and must have exactly 2 elements.";
+                        return "replace_range failed: expectedEndLines is required and must have at least 2 elements.";
                     }
-                    if (!LinesMatch(lines[endLine - 2], expectedEndLines[0]))
+                    if (expectedEndLines.Count > lineCount)
                     {
-                        return $"replace_range failed: expectedEndLines[0] did not match line {endLine - 1} of the file.";
+                        return $"replace_range failed: expectedEndLines has {expectedEndLines.Count} elements, but the requested range only has {lineCount} lines.";
                     }
-                    if (!LinesMatch(lines[endLine - 1], expectedEndLines[1]))
+                    int expectedEndStartIndex = endLine - expectedEndLines.Count;
+                    for (int i = 0; i < expectedEndLines.Count; i++)
                     {
-                        return $"replace_range failed: expectedEndLines[1] did not match line {endLine} of the file.";
+                        int fileLineIndex = expectedEndStartIndex + i;
+                        if (!LinesMatch(lines[fileLineIndex], expectedEndLines[i]))
+                        {
+                            return $"replace_range failed: expectedEndLines[{i}] did not match line {fileLineIndex + 1} of the file.";
+                        }
                     }
                 }
             }
