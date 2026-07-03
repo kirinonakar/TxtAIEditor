@@ -213,7 +213,8 @@ namespace TxtAIEditor.Controls
             }
 
             string detected = tab.Language;
-            if (detected == "plaintext" || string.IsNullOrEmpty(detected))
+            if (!tab.IsLanguageManuallySelected &&
+                (detected == "plaintext" || string.IsNullOrEmpty(detected)))
             {
                 string content = tab.Content;
                 if (_sessionProvider(tab.Id) is { } session)
@@ -439,17 +440,24 @@ namespace TxtAIEditor.Controls
             }
 
             string currentLanguage = string.IsNullOrWhiteSpace(tab.Language) ? "plaintext" : tab.Language;
-            if (!string.Equals(currentLanguage, "plaintext", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(currentLanguage, "plaintext", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(currentLanguage, "markdown", StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
             var flyout = new MenuFlyout();
-            var markdownItem = new MenuFlyoutItem { Text = _getString("Markdown", "Markdown") };
+            string targetLanguage = string.Equals(currentLanguage, "markdown", StringComparison.OrdinalIgnoreCase)
+                ? "plaintext"
+                : "markdown";
+            string targetLanguageText = targetLanguage == "plaintext"
+                ? "PLAINTEXT"
+                : _getString("Markdown", "Markdown");
+            var languageItem = new MenuFlyoutItem { Text = targetLanguageText };
 
-            markdownItem.Click += async (_, _) => await ChangeLanguageAsync(tab, "markdown");
+            languageItem.Click += async (_, _) => await ChangeLanguageAsync(tab, targetLanguage);
 
-            flyout.Items.Add(markdownItem);
+            flyout.Items.Add(languageItem);
             if (sender is Button button)
             {
                 flyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
@@ -465,6 +473,7 @@ namespace TxtAIEditor.Controls
             }
 
             tab.Language = targetLanguage;
+            tab.IsLanguageManuallySelected = true;
             _statusBar.LanguageText.Text = targetLanguage.ToUpperInvariant();
 
             if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)

@@ -123,6 +123,7 @@ namespace TxtAIEditor.Core.Models
         }
 
         public string Language { get; set; } = "plaintext";
+        public bool IsLanguageManuallySelected { get; set; } = false;
         public string EncodingName { get; set; } = "UTF-8";
         public bool EncodingWasAutoDetected { get; set; } = true;
         public bool InlineLivePreviewEnabled { get; set; } = false;

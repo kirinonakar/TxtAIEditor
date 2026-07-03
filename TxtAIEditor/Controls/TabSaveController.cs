@@ -184,6 +184,7 @@ namespace TxtAIEditor.Controls
             tab.FilePath = selectedPath;
             tab.Title = Path.GetFileName(selectedPath);
             tab.Language = _languageDetectionService.GetMonacoLanguageName(selectedPath);
+            tab.IsLanguageManuallySelected = false;
             if (string.IsNullOrWhiteSpace(tab.EncodingName))
             {
                 tab.EncodingName = "UTF-8";
