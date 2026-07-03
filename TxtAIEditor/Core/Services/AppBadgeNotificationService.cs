@@ -385,7 +385,7 @@ namespace TxtAIEditor.Core.Services
         }
 
         [ComImport]
-        [Guid("EA1AFB91-9E28-4B86-90E9-9E9F8A5EE775")]
+        [Guid("ea1afb91-9e28-4b86-90e9-9e9f8a5eefaf")]
         [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
         private interface ITaskbarList3
         {

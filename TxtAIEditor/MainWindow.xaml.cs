@@ -65,7 +65,6 @@ namespace TxtAIEditor
         {
             this.InitializeComponent();
             WindowPlacementService.SetWindowIcon(AppWindow);
-            AppBadgeNotificationService.Initialize(WinRT.Interop.WindowNative.GetWindowHandle(this));
 
             // Start pre-warming the shared WebView2 environment in the background
             _ = TxtAIEditor.Editor.MonacoBridge.GetSharedEnvironmentAsync();
@@ -107,6 +106,7 @@ namespace TxtAIEditor
         private async void OnWindowActivated(object sender, WindowActivatedEventArgs e)
         {
             this.Activated -= OnWindowActivated;
+            AppBadgeNotificationService.Initialize(WinRT.Interop.WindowNative.GetWindowHandle(this));
             await Operations.InitializeStartupAsync();
         }
 

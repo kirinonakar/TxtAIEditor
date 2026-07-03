@@ -62,7 +62,7 @@ namespace TxtAIEditor.Composition
                 ui.EditorTabView,
                 ui.EditorTabView2);
 
-            var terminalShortcut = new TerminalShortcutService(WindowNative.GetWindowHandle(window));
+            var terminalShortcut = new TerminalShortcutService(() => WindowNative.GetWindowHandle(window));
             terminalShortcut.ToggleRequested += (_, _) => callbacks.ToggleTerminalRequested();
 
             var dialog = new WindowDialogController(

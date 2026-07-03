@@ -12,16 +12,16 @@ namespace TxtAIEditor.Core.Services
         private const short KeyDownMask = unchecked((short)0x8000);
 
         private readonly DispatcherTimer _pollTimer;
-        private readonly IntPtr _ownerHwnd;
+        private readonly Func<IntPtr> _getOwnerHwnd;
 #pragma warning disable CS0414
         private bool _f9WasDown;
         private bool _f10WasDown;
         private bool _f12WasDown;
 #pragma warning restore CS0414
 
-        public FunctionKeyShortcutService(IntPtr ownerHwnd)
+        public FunctionKeyShortcutService(Func<IntPtr> getOwnerHwnd)
         {
-            _ownerHwnd = ownerHwnd;
+            _getOwnerHwnd = getOwnerHwnd;
             _pollTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(50)
@@ -95,13 +95,14 @@ namespace TxtAIEditor.Core.Services
 
         private bool IsAppForeground()
         {
-            if (_ownerHwnd == IntPtr.Zero)
+            IntPtr ownerHwnd = _getOwnerHwnd();
+            if (ownerHwnd == IntPtr.Zero)
             {
                 return false;
             }
 
             IntPtr foregroundHwnd = GetForegroundWindow();
-            return foregroundHwnd == _ownerHwnd || IsChild(_ownerHwnd, foregroundHwnd);
+            return foregroundHwnd == ownerHwnd || IsChild(ownerHwnd, foregroundHwnd);
         }
 
         private static bool IsAsyncKeyDown(int virtualKey)

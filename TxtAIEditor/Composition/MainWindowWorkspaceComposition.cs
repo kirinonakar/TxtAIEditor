@@ -56,7 +56,7 @@ namespace TxtAIEditor.Composition
             WindowDialogController dialog,
             MainWindowWorkspaceCompositionCallbacks callbacks)
         {
-            var functionKeyShortcut = new FunctionKeyShortcutService(WindowNative.GetWindowHandle(window));
+            var functionKeyShortcut = new FunctionKeyShortcutService(() => WindowNative.GetWindowHandle(window));
             functionKeyShortcut.TopMostRequested += (_, _) => callbacks.TopMostRequested();
             functionKeyShortcut.ThemeRequested += (_, _) => callbacks.ThemeRequested();
             functionKeyShortcut.StickyNoteRequested += (_, _) => callbacks.StickyNoteRequested();
