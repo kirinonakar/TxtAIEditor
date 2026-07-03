@@ -46,32 +46,19 @@ namespace TxtAIEditor.Core.Services
 
         public static void UpdateBadge(int count)
         {
-            UpdatePackagedBadge(count);
+            ClearPackagedBadge();
             UpdateShellOverlayBadge(count);
         }
 
-        private static void UpdatePackagedBadge(int count)
+        private static void ClearPackagedBadge()
         {
             try
             {
-                BadgeUpdater updater = BadgeUpdateManager.CreateBadgeUpdaterForApplication();
-                if (count <= 0)
-                {
-                    updater.Clear();
-                    return;
-                }
-
-                int badgeValue = Math.Min(99, Math.Max(1, count));
-                var xml = new XmlDocument();
-                xml.LoadXml(string.Format(
-                    CultureInfo.InvariantCulture,
-                    "<badge value=\"{0}\"/>",
-                    badgeValue));
-                updater.Update(new BadgeNotification(xml));
+                BadgeUpdateManager.CreateBadgeUpdaterForApplication().Clear();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to update app badge: {ex.Message}");
+                Debug.WriteLine($"Failed to clear app badge: {ex.Message}");
             }
         }
 
