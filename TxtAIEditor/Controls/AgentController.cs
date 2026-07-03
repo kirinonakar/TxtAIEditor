@@ -195,7 +195,8 @@ namespace TxtAIEditor.Controls
                 _closeTabById,
                 AppendActivity,
                 _showError,
-                _getString);
+                _getString,
+                () => _currentSessionId);
             _openSessionController = new AgentOpenSessionController(
                 _settingsService,
                 _agentPane,
@@ -1011,7 +1012,7 @@ namespace TxtAIEditor.Controls
                                 _activeToolRunContext.Value = runContext;
                                 await _uiDispatcher.RunAsync(() =>
                                 {
-                                    _sessionEditController.Replace(runContext.SessionEdits);
+                                    _sessionEditController.Replace(runContext.SessionEdits, runContext.SessionId);
                                 });
                                 toolResult = await _toolExecutionController.ExecuteAsync(currentToolName, currentArguments, cancellationToken);
                                 runContext.SessionEdits = _sessionEditController.SessionEdits.ToList();
@@ -1021,7 +1022,7 @@ namespace TxtAIEditor.Controls
                                     await _uiDispatcher.RunAsync(() =>
                                     {
                                         var visibleSession = _openSessionController.EnsureSession(_currentSessionId);
-                                        _sessionEditController.Replace(visibleSession.SessionEdits);
+                                        _sessionEditController.Replace(visibleSession.SessionEdits, _currentSessionId);
                                     });
                                 }
                             }

@@ -102,7 +102,7 @@ namespace TxtAIEditor.Controls
                 await _sessionEditController.RevertAsync(currentEdits[i]);
             }
 
-            _sessionEditController.Replace(targetEdits);
+            _sessionEditController.Replace(targetEdits, _currentSessionIdProvider());
         }
 
         private void RestoreOpenSessionFromSnapshot(

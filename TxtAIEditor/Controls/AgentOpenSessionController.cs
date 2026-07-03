@@ -246,12 +246,12 @@ namespace TxtAIEditor.Controls
                 if (isRunningSession && runContext != null)
                 {
                     _attachmentController.Replace(runContext.Attachments);
-                    _sessionEditController.Replace(runContext.SessionEdits);
+                    _sessionEditController.Replace(runContext.SessionEdits, runContext.SessionId);
                 }
                 else
                 {
                     _attachmentController.Replace(session.Attachments);
-                    _sessionEditController.Replace(session.SessionEdits);
+                    _sessionEditController.Replace(session.SessionEdits, session.Id);
                 }
                 _historyController.UpdateUI(_currentSessionIdProvider());
                 RestoreWorkspaceRoot(session);

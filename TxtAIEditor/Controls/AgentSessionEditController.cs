@@ -18,6 +18,9 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly List<AgentFileEditPreview> _sessionEdits = new();
+        private readonly Func<string> _currentSessionIdProvider;
+
+        public string? CurrentSessionId { get; set; }
 
         public AgentSessionEditController(
             AgentPane agentPane,
@@ -27,7 +30,8 @@ namespace TxtAIEditor.Controls
             Action<string>? closeTabById,
             Action<string> appendActivity,
             Action<string, string> showError,
-            Func<string, string, string> getString)
+            Func<string, string, string> getString,
+            Func<string> currentSessionIdProvider)
         {
             _agentPane = agentPane;
             _runOnUIThreadAsync = runOnUIThreadAsync;
@@ -37,6 +41,8 @@ namespace TxtAIEditor.Controls
             _appendActivity = appendActivity;
             _showError = showError;
             _getString = getString;
+            _currentSessionIdProvider = currentSessionIdProvider;
+            CurrentSessionId = currentSessionIdProvider();
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
@@ -61,8 +67,9 @@ namespace TxtAIEditor.Controls
             UpdateModifiedFilesList();
         }
 
-        public void Replace(IEnumerable<AgentFileEditPreview>? edits)
+        public void Replace(IEnumerable<AgentFileEditPreview>? edits, string sessionId)
         {
+            CurrentSessionId = sessionId;
             _sessionEdits.Clear();
             if (edits != null)
             {
@@ -254,6 +261,11 @@ namespace TxtAIEditor.Controls
 
         private void UpdateModifiedFilesList()
         {
+            if (!string.Equals(CurrentSessionId, _currentSessionIdProvider(), StringComparison.Ordinal))
+            {
+                return;
+            }
+
             var displayEdits = GetLatestEditsForDisplay();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
