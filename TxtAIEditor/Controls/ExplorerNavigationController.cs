@@ -70,6 +70,7 @@ namespace TxtAIEditor.Controls
             UpdateSortButtonVisuals();
             _leftSidebar.ActualThemeChanged += (sender, args) =>
             {
+                RefreshExplorerItemThemeColors();
                 _ = UpdateGitStatusesAsync();
             };
         }
@@ -118,6 +119,16 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrEmpty(CurrentFolderPath) && Directory.Exists(CurrentFolderPath))
             {
                 LoadDirectoryRoot(CurrentFolderPath);
+            }
+        }
+
+        private void RefreshExplorerItemThemeColors()
+        {
+            bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+            foreach (var item in _viewModel.ExplorerItems)
+            {
+                item.IsDark = isDark;
+                item.RefreshThemeColors();
             }
         }
 

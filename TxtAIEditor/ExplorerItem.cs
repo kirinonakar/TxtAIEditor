@@ -73,9 +73,15 @@ namespace TxtAIEditor
                 {
                     _isDark = value;
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(ForegroundColor));
+                    RefreshThemeColors();
                 }
             }
+        }
+
+        public void RefreshThemeColors()
+        {
+            OnPropertyChanged(nameof(ForegroundColor));
+            OnPropertyChanged(nameof(IconColor));
         }
 
         public Microsoft.UI.Xaml.Media.Brush ForegroundColor
