@@ -20,18 +20,9 @@ namespace TxtAIEditor.Core.Services
 
         public static void InitializeProcessAppUserModelId()
         {
-            try
-            {
-                int hr = SetCurrentProcessExplicitAppUserModelID(DirectRunAppUserModelId);
-                if (hr < 0)
-                {
-                    Debug.WriteLine($"Failed to set process AppUserModelID: 0x{hr:X8}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to initialize process AppUserModelID: {ex.Message}");
-            }
+            // Do nothing. Setting an explicit AppUserModelID here breaks the taskbar jump list
+            // (Recent Items) for both packaged and unpackaged executions because it mismatches
+            // the AUMID that Windows Shell uses to track file associations.
         }
 
         public static void Initialize(IntPtr windowHandle)

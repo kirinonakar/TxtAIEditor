@@ -61,7 +61,6 @@ namespace TxtAIEditor
         {
             ApplyLanguageSettings();
             Environment.SetEnvironmentVariable("MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
-            AppBadgeNotificationService.InitializeProcessAppUserModelId();
             InitializeComponent();
             _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
