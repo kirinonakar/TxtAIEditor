@@ -293,13 +293,15 @@ export function bindPointerSelectionEvents({
             state.dragDropPosition = null;
             const clickPos = event ? positionFromPointer(event) : null;
             if (clickPos) {
+                const clickColumn = Math.max(0, clickPos.column);
                 state.selection = null;
-                state.selectionAnchor = { line: clickPos.line, column: clickPos.column };
+                state.selectionAnchor = { line: clickPos.line, column: clickColumn };
                 state.currentLine = clickPos.line;
-                state.currentColumn = clickPos.column + 1;
+                state.currentColumn = clickColumn + 1;
                 keepEditablePreviewBlockFromElement(clickPos.element);
                 syncCustomSelectionClass();
                 queueRender(true);
+                setTimeout(() => focusLine(clickPos.line, clickColumn), 0);
                 reportCursorAndSelection(clickPos.element || document.activeElement);
             } else if (hasCustomSelection()) {
                 state.selection = null;
