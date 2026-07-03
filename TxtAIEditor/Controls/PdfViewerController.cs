@@ -15,12 +15,23 @@ namespace TxtAIEditor.Controls
 {
     public sealed class PdfViewerController
     {
+        private const int FindVirtualKey = 0x46;
+        private const int ControlVirtualKey = 0x11;
+        private const int LeftControlVirtualKey = 0xA2;
+        private const int RightControlVirtualKey = 0xA3;
+        private const int KeyboardHookType = 2;
+        private const int KeyTransitionStateMask = unchecked((int)0x80000000);
+        private const short KeyDownMask = unchecked((short)0x8000);
+
         private readonly ISettingsService _settingsService;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Action<string, OpenedTab, int, int> _selectionContextUpdater;
         private readonly Func<string, string, string> _getString;
+        private readonly HookProc _findShortcutHookProc;
         private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
         private readonly Dictionary<string, PdfFindControl> _findControls = new Dictionary<string, PdfFindControl>();
+        private IntPtr _findShortcutHook;
+        private bool _findShortcutWasDown;
 
         public PdfViewerController(
             ISettingsService settingsService,
@@ -32,6 +43,21 @@ namespace TxtAIEditor.Controls
             _activeTabProvider = activeTabProvider;
             _selectionContextUpdater = selectionContextUpdater;
             _getString = getString;
+            _findShortcutHookProc = OnFindShortcutHook;
+            _findShortcutHook = SetWindowsHookEx(
+                KeyboardHookType,
+                _findShortcutHookProc,
+                IntPtr.Zero,
+                GetCurrentThreadId());
+        }
+
+        ~PdfViewerController()
+        {
+            if (_findShortcutHook != IntPtr.Zero)
+            {
+                UnhookWindowsHookEx(_findShortcutHook);
+                _findShortcutHook = IntPtr.Zero;
+            }
         }
 
         public IReadOnlyDictionary<string, WebView2> ViewerWebViews => _viewerWebViews;
@@ -177,7 +203,7 @@ namespace TxtAIEditor.Controls
             }
 
             pdfWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
-            pdfWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
+            pdfWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
             pdfWebView.CoreWebView2.Settings.IsStatusBarEnabled = true;
             pdfWebView.CoreWebView2.WebMessageReceived += (_, args) => OnWebMessageReceived(tab, pdfWebView, args);
 
@@ -187,6 +213,84 @@ namespace TxtAIEditor.Controls
             findControl.Initialize(pdfWebView, _getString);
             _ = InstallPdfFindBridgeAsync(pdfWebView, BuildPdfFindBridgeScript());
         }
+
+        private IntPtr OnFindShortcutHook(int code, IntPtr wParam, IntPtr lParam)
+        {
+            if (code >= 0 && TryHandleFindShortcutMessage((int)wParam, lParam))
+            {
+                return new IntPtr(1);
+            }
+
+            return CallNextHookEx(_findShortcutHook, code, wParam, lParam);
+        }
+
+        private bool TryHandleFindShortcutMessage(int virtualKey, IntPtr lParam)
+        {
+            if (virtualKey != FindVirtualKey)
+            {
+                return false;
+            }
+
+            bool isKeyUp = (((int)lParam) & KeyTransitionStateMask) != 0;
+            if (isKeyUp)
+            {
+                _findShortcutWasDown = false;
+                return false;
+            }
+
+            if (!IsCtrlDown() || _activeTabProvider()?.IsPdfViewer != true)
+            {
+                return false;
+            }
+
+            if (_findShortcutWasDown)
+            {
+                return true;
+            }
+
+            var activeTab = _activeTabProvider();
+            if (activeTab == null || !_findControls.TryGetValue(activeTab.Id, out var findControl))
+            {
+                return false;
+            }
+
+            _findShortcutWasDown = true;
+            findControl.DispatcherQueue.TryEnqueue(() => findControl.ShowAndFocus());
+            return true;
+        }
+
+        private static bool IsCtrlDown()
+        {
+            return IsAsyncKeyDown(ControlVirtualKey) ||
+                IsAsyncKeyDown(LeftControlVirtualKey) ||
+                IsAsyncKeyDown(RightControlVirtualKey);
+        }
+
+        private static bool IsAsyncKeyDown(int virtualKey)
+        {
+            return (GetAsyncKeyState(virtualKey) & KeyDownMask) != 0;
+        }
+
+        private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SetWindowsHookEx(
+            int idHook,
+            HookProc lpfn,
+            IntPtr hmod,
+            int dwThreadId);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern int GetCurrentThreadId();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
 
         private static async Task InstallSelectionBridgeAsync(WebView2 pdfWebView)
         {
@@ -280,19 +384,27 @@ namespace TxtAIEditor.Controls
     if (window.__txtAiEditorPdfFindShortcuts) return;
     window.__txtAiEditorPdfFindShortcuts = true;
 
-    document.addEventListener('keydown', event => {
+    function handleKeyDown(event) {
         const ctrl = event.ctrlKey || event.metaKey;
         const key = event.key ? event.key.toLowerCase() : '';
         if (ctrl && key === 'f') {
             event.preventDefault();
             event.stopPropagation();
-            chrome.webview.postMessage({ type: 'pdfFindTrigger' });
+            event.stopImmediatePropagation?.();
+            try {
+                chrome.webview.postMessage({ type: 'pdfFindTrigger' });
+            } catch {}
             return;
         }
         if (key === 'escape') {
-            chrome.webview.postMessage({ type: 'pdfFindEscape' });
+            try {
+                chrome.webview.postMessage({ type: 'pdfFindEscape' });
+            } catch {}
         }
-    }, true);
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown, true);
 })();
 ";
         }
