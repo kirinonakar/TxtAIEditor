@@ -19,27 +19,13 @@ namespace TxtAIEditor.Controls
         private const int DefaultContextStatsDelayMs = 250;
         private const int SlowContextStatsDelayMs = 900;
 
-        private readonly ILLMService _llmService;
         private readonly ISettingsService _settingsService;
-        private readonly ICredentialService _credentialService;
         private readonly AgentPane _agentPane;
         private readonly AgentUiDispatcher _uiDispatcher;
-        private readonly Func<OpenedTab?> _activeTabProvider;
-        private readonly Func<IReadOnlyList<OpenedTab>> _openTabsProvider;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly AgentFileToolService _fileTools;
-        private readonly Action<object> _initializePickerWindow;
-        private readonly Func<string, bool> _isGitRepoProvider;
-        private readonly Func<string, Task>? _fileModifiedAsync;
-        private readonly Func<string, Task<AgentOpenFileResult>>? _openFileInEditorAsync;
         private readonly Func<AgentFileEditPreview, Task> _openDiffViewAsync;
-        private readonly Action? _beforeDialog;
-        private readonly Action? _afterDialog;
-        private readonly Func<string, string, bool, Task>? _revertTabOrFileAsync;
-        private readonly Action<string>? _closeTabById;
-        private readonly Func<string, Task>? _navigateToFolderAsync;
-        private readonly Func<OpenedTab, string?, Task<bool>>? _saveTabAsync;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentPresetController _presetController;
@@ -111,251 +97,92 @@ namespace TxtAIEditor.Controls
             Func<string?, string, Task<bool>>? streamTextIntoActiveEditorAsync = null,
             Func<string?, Task>? endStreamIntoActiveEditorAsync = null)
         {
-            _llmService = llmService;
             _settingsService = settingsService;
-            _credentialService = credentialService;
             _agentPane = agentPane;
-            _uiDispatcher = new AgentUiDispatcher(_agentPane.DispatcherQueue);
-            _activeTabProvider = activeTabProvider;
-            _openTabsProvider = openTabsProvider;
             _showError = showError;
             _getString = getString;
             _fileTools = fileTools;
-            _fileTools.WorkspaceRootOverrideProvider = GetActiveRunWorkspaceRoot;
-            _runWorkspaceResolver = new AgentRunWorkspaceResolver(() => _fileTools.WorkspaceRoot);
-            _initializePickerWindow = initializePickerWindow;
-            _isGitRepoProvider = isGitRepoProvider;
             _openDiffViewAsync = openDiffViewAsync;
-            _fileModifiedAsync = fileModifiedAsync;
-            _openFileInEditorAsync = openFileInEditorAsync;
-            _beforeDialog = beforeDialog;
-            _afterDialog = afterDialog;
-            _revertTabOrFileAsync = revertTabOrFileAsync;
-            _closeTabById = closeTabById;
-            _navigateToFolderAsync = navigateToFolderAsync;
-            _saveTabAsync = saveTabAsync;
-            _displayText = new AgentDisplayLocalizer(_getString);
-            _runTextFormatter = new AgentRunTextFormatter(_getString);
-            _attachmentController = new AgentAttachmentController(
-                _agentPane,
-                _initializePickerWindow,
-                _showError,
-                _getString,
-                _displayText,
-                IsCurrentSessionRunning,
-                UpdateContextStats,
-                AgentTokenEstimator.Estimate,
-                pdfTextExtractionService,
-                _beforeDialog,
-                _afterDialog);
-            _selectionContextController = new AgentSelectionContextController(
-                _activeTabProvider,
-                () => _fileTools.WorkspaceRoot);
-            _fileToolController = new AgentFileToolController(
-                _fileTools,
-                _selectionContextController,
-                GetActiveTabForContext,
-                () => _isRunning,
-                _getString,
-                _openFileInEditorAsync);
-            _presetController = new AgentPresetController(
-                _agentPane,
-                _initializePickerWindow,
-                _showError,
-                _getString,
-                () => UpdateContextStatsSlow(),
-                _beforeDialog,
-                _afterDialog);
-            _skillController = new AgentSkillController(
-                _agentPane,
-                _getString,
-                () => UpdateContextStatsSlow());
-            _mcpController = new AgentMcpController(
-                _agentPane,
-                _initializePickerWindow,
+
+            var composition = AgentControllerComposition.Create(
+                llmService,
                 _settingsService,
-                _credentialService,
-                _showError,
-                _getString,
-                () => UpdateContextStatsSlow(),
-                () => _fileTools.WorkspaceRoot,
-                _fileModifiedAsync,
-                _beforeDialog,
-                _afterDialog);
-            _historyController = new AgentHistoryController(_agentPane);
-            _sessionEditController = new AgentSessionEditController(
+                credentialService,
                 _agentPane,
-                async action => await _uiDispatcher.RunAsync<bool>(async () =>
-                {
-                    await action();
-                    return true;
-                }),
-                _fileModifiedAsync,
-                _revertTabOrFileAsync,
-                _closeTabById,
-                AppendActivity,
-                _showError,
-                _getString,
-                () => _currentSessionId);
-            _openSessionController = new AgentOpenSessionController(
-                _settingsService,
-                _agentPane,
-                _fileTools,
-                _attachmentController,
-                _sessionEditController,
-                _historyController,
-                _displayText,
-                _runningSessions,
-                () => _currentSessionId,
-                value => _currentSessionId = value,
-                () => _sessionHistory.ToString(),
-                () => _sessionHistoryTokenCount,
-                GetCurrentRunTranscriptTokens,
-                RestoreSessionHistoryState,
-                StopAgent,
-                () => UpdateContextStatsImmediate(),
-                AppBadgeNotificationService.UpdateBadge,
-                _getString,
-                _navigateToFolderAsync);
-            _sessionHistoryCoordinator = new AgentSessionHistoryCoordinator(
-                _agentPane,
-                _settingsService,
-                _historyController,
-                _openSessionController,
-                IsCurrentSessionRunning,
-                () => _currentSessionId,
-                _getString);
-            _runOutputController = new AgentRunOutputController(
-                _openSessionController,
-                insertIntoActiveEditorAsync,
-                beginStreamIntoActiveEditorAsync,
-                streamTextIntoActiveEditorAsync,
-                endStreamIntoActiveEditorAsync);
-            _responseStreamService = new AgentResponseStreamService(
-                _llmService,
-                _agentPane,
-                _uiDispatcher,
-                _runOutputController,
-                _openSessionController,
-                _displayText,
-                _responseInspector,
-                force => UpdateContextStatsImmediate(force),
-                _getString);
-            _sessionRewindController = new AgentSessionRewindController(
-                IsCurrentSessionRunning,
-                _toolExecutionSessionGate,
-                () => _currentSessionId,
-                _openSessionController.SaveActiveFromUI,
-                _openSessionController.EnsureSession,
-                _openSessionController.RestoreSession,
-                _openSessionController.ClearThinkingState,
-                _sessionEditController,
-                _historyController,
-                _displayText,
-                _showError,
-                _getString);
-            var workspaceContextBuilder = new AgentWorkspaceContextBuilder(
-                () => _fileTools.WorkspaceRoot,
-                openTabsProvider,
-                _attachmentController);
-            _promptContextService = new AgentPromptContextService(
-                _agentPane,
-                _fileTools,
-                _presetController,
-                _skillController,
-                _mcpController,
-                workspaceContextBuilder,
-                _attachmentController,
-                _displayText,
-                _modelContextLimits,
-                GetActiveTabForContext,
-                CaptureActiveSelectionSnapshot,
-                GetCurrentSessionSettings,
-                () => _sessionHistory.ToString(),
-                () => UpdateContextStatsImmediate(force: true),
-                _getString);
-            _contextStatsController = new AgentContextStatsController(
-                _settingsService,
-                _agentPane,
-                _displayText,
-                _attachmentController,
-                IsCurrentSessionRunning,
-                GetActiveTabForContext,
-                GetActiveSelectionText,
-                BuildActiveSelectionContext,
-                _promptContextService.BuildAgentInstruction,
-                _promptContextService.BuildWorkspaceContext,
-                _promptContextService.BuildSessionHistoryForPrompt,
-                GetCurrentRunTranscriptTokens,
-                _sessionHistoryCoordinator.RefreshOutputDisplay,
-                _getString,
-                _modelContextLimits,
-                _promptContextService.EstimateToolCatalogTokens,
-                _skillController.HasSelectedSkills,
-                _mcpController.HasSelectedMcpServers,
-                GetCurrentSessionSettings);
-            _outputInsertController = new AgentOutputInsertController(
-                _agentPane,
-                openNewTabWithContent,
-                _openSessionController.GetCurrentLastAnswerText,
-                _showError,
-                _getString,
-                _displayText.IsOutputPlaceholder,
-                () => _uiDispatcher.RunAsync(() => { }));
-            _tabToolController = new AgentTabToolController(
-                GetActiveTabForContext,
-                _activeTabProvider,
+                activeTabProvider,
                 openTabsProvider,
                 getTabText,
                 insertIntoActiveEditorAsync,
                 openNewTabWithContent,
+                _showError,
+                _getString,
+                _fileTools,
+                pdfTextExtractionService,
+                initializePickerWindow,
+                isGitRepoProvider,
+                _runningSessions,
+                _toolExecutionSessionGate,
+                () => _currentSessionId,
+                value => _currentSessionId = value,
+                () => _sessionHistory.ToString(),
+                () => _sessionHistoryTokenCount,
+                fileModifiedAsync,
+                openFileInEditorAsync,
+                beforeDialog,
+                afterDialog,
+                revertTabOrFileAsync,
+                closeTabById,
+                navigateToFolderAsync,
                 saveTabAsync,
                 editTabAsync,
-                _fileTools,
-                _sessionEditController,
-                action => _uiDispatcher.RunAsync(action),
-                action => _uiDispatcher.RunAsync(action),
-                action => _uiDispatcher.RunAsync(action));
-            _confirmationController = new AgentConfirmationController(
-                _settingsService,
-                _agentPane,
-                _fileTools,
-                _isGitRepoProvider,
-                async action => await _uiDispatcher.RunAsync(action),
-                AppendActivity,
-                _getString);
-            _planController = new AgentPlanController(
-                () => _activeToolRunContext.Value ?? _activeWorkspaceRunContext.Value,
-                _confirmationController,
-                _openTabsProvider,
-                _openFileInEditorAsync,
-                _saveTabAsync,
-                action => _uiDispatcher.RunAsync(action),
-                async action => await _uiDispatcher.RunAsync(action),
-                async action => await _uiDispatcher.RunAsync(action),
-                _runOutputController.AppendRunActivityAsync,
-                _runOutputController.AppendRunOutputLineAsync,
-                _showError,
-                _getString);
-            _toolExecutionController = new AgentToolExecutionController(
-                _llmService,
-                _fileTools,
-                _fileToolController,
-                _tabToolController,
-                _skillController,
-                _mcpController,
-                AddCurrentRunImageToolAttachment,
-                _planController.MakePlanAsync,
-                AppendActivity,
-                _getString);
-            _fileTools.ConfirmFileEditAsync = _confirmationController.ConfirmFileEditAsync;
-            _fileTools.ConfirmPowerShellAsync = _confirmationController.ConfirmPowerShellAsync;
-            _fileTools.FileEditCommittedAsync = preview => _uiDispatcher.RunAsync(() => _sessionEditController.Track(preview));
-            _fileTools.ActivityReporter = AppendActivity;
-            if (_fileModifiedAsync != null)
-            {
-                _fileTools.FileModifiedAsync = _fileModifiedAsync;
-            }
+                beginStreamIntoActiveEditorAsync,
+                streamTextIntoActiveEditorAsync,
+                endStreamIntoActiveEditorAsync,
+                new AgentControllerCompositionCallbacks(
+                    IsCurrentSessionRunning,
+                    UpdateContextStats,
+                    UpdateContextStatsSlow,
+                    force => UpdateContextStatsImmediate(force),
+                    GetActiveRunWorkspaceRoot,
+                    GetActiveTabForContext,
+                    GetActiveSelectionText,
+                    BuildActiveSelectionContext,
+                    CaptureActiveSelectionSnapshot,
+                    GetCurrentSessionSettings,
+                    GetCurrentRunTranscriptTokens,
+                    RestoreSessionHistoryState,
+                    StopAgent,
+                    AddCurrentRunImageToolAttachment,
+                    AppendActivity,
+                    () => _activeToolRunContext.Value ?? _activeWorkspaceRunContext.Value));
+
+            _uiDispatcher = composition.UiDispatcher;
+            _displayText = composition.DisplayText;
+            _attachmentController = composition.AttachmentController;
+            _presetController = composition.PresetController;
+            _skillController = composition.SkillController;
+            _mcpController = composition.McpController;
+            _historyController = composition.HistoryController;
+            _sessionEditController = composition.SessionEditController;
+            _openSessionController = composition.OpenSessionController;
+            _promptContextService = composition.PromptContextService;
+            _outputInsertController = composition.OutputInsertController;
+            _confirmationController = composition.ConfirmationController;
+            _tabToolController = composition.TabToolController;
+            _selectionContextController = composition.SelectionContextController;
+            _fileToolController = composition.FileToolController;
+            _toolExecutionController = composition.ToolExecutionController;
+            _contextStatsController = composition.ContextStatsController;
+            _planController = composition.PlanController;
+            _sessionRewindController = composition.SessionRewindController;
+            _runOutputController = composition.RunOutputController;
+            _runWorkspaceResolver = composition.RunWorkspaceResolver;
+            _runTextFormatter = composition.RunTextFormatter;
+            _modelContextLimits = composition.ModelContextLimits;
+            _llmToolCatalog = composition.LlmToolCatalog;
+            _responseInspector = composition.ResponseInspector;
+            _responseStreamService = composition.ResponseStreamService;
+            _sessionHistoryCoordinator = composition.SessionHistoryCoordinator;
 
             _statsDebounceTimer = new DispatcherTimer
             {
@@ -575,8 +402,7 @@ namespace TxtAIEditor.Controls
             string approvedPlanWorkspaceRoot = activeOpenSession.WorkspaceRoot;
             void AppendRunSessionHistoryLine(string line = "")
             {
-                runContext.SessionHistory.AppendLine(line);
-                runContext.SessionHistoryTokenCount += AgentTokenEstimator.Estimate(line + Environment.NewLine);
+                AgentRunTranscriptRecorder.AppendLine(runContext, line);
             }
 
             Task PersistRunSessionToHistoryAsync()
@@ -730,14 +556,12 @@ namespace TxtAIEditor.Controls
                             await _runOutputController.AppendRunActivityAsync(runContext, emptyResponseMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, emptyResponseMessage);
 
-                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                        string emptyRunTranscript = transcript.Substring(initialTranscript.Length);
-                        if (!string.IsNullOrWhiteSpace(emptyRunTranscript))
-                        {
-                            AppendRunSessionHistoryLine(emptyRunTranscript.Trim());
-                        }
-                        AppendRunSessionHistoryLine($"[Agent Response]: {emptyResponseMessage}");
-                        AppendRunSessionHistoryLine();
+                        AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                            runContext,
+                            instruction,
+                            transcript,
+                            initialTranscript,
+                            $"[Agent Response]: {emptyResponseMessage}");
                         _ = PersistRunSessionToHistoryAsync();
 
                         runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(emptyResponseMessage);
@@ -811,14 +635,12 @@ namespace TxtAIEditor.Controls
                                 await _runOutputController.AppendRunActivityAsync(runContext, limitMessage);
                                 await _runOutputController.AppendRunOutputLineAsync(runContext, limitMessage);
 
-                                AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                                string formatRunTranscript = transcript.Substring(initialTranscript.Length);
-                                if (!string.IsNullOrWhiteSpace(formatRunTranscript))
-                                {
-                                    AppendRunSessionHistoryLine(formatRunTranscript.Trim());
-                                }
-                                AppendRunSessionHistoryLine($"[Agent Response]: {limitMessage}");
-                                AppendRunSessionHistoryLine();
+                                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                                    runContext,
+                                    instruction,
+                                    transcript,
+                                    initialTranscript,
+                                    $"[Agent Response]: {limitMessage}");
                                 _ = PersistRunSessionToHistoryAsync();
 
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(limitMessage);
@@ -863,14 +685,12 @@ namespace TxtAIEditor.Controls
                                 await _runOutputController.AppendRunActivityAsync(runContext, limitMessage);
                                 await _runOutputController.AppendRunOutputLineAsync(runContext, limitMessage);
 
-                                AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                                string failedPlanTranscript = transcript.Substring(initialTranscript.Length);
-                                if (!string.IsNullOrWhiteSpace(failedPlanTranscript))
-                                {
-                                    AppendRunSessionHistoryLine(failedPlanTranscript.Trim());
-                                }
-                                AppendRunSessionHistoryLine($"[Agent Response]: {limitMessage}");
-                                AppendRunSessionHistoryLine();
+                                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                                    runContext,
+                                    instruction,
+                                    transcript,
+                                    initialTranscript,
+                                    $"[Agent Response]: {limitMessage}");
                                 _ = PersistRunSessionToHistoryAsync();
 
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(limitMessage);
@@ -931,14 +751,12 @@ namespace TxtAIEditor.Controls
                             await _runOutputController.EndStreamedAnswerAsync(runContext);
                         }
 
-                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                        string runTranscript = transcript.Substring(initialTranscript.Length);
-                        if (!string.IsNullOrWhiteSpace(runTranscript))
-                        {
-                            AppendRunSessionHistoryLine(runTranscript.Trim());
-                        }
-                        AppendRunSessionHistoryLine($"[Agent Response]: {response.Trim()}");
-                        AppendRunSessionHistoryLine();
+                        AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                            runContext,
+                            instruction,
+                            transcript,
+                            initialTranscript,
+                            $"[Agent Response]: {response.Trim()}");
                         _ = PersistRunSessionToHistoryAsync();
 
                         runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response);
@@ -1137,14 +955,12 @@ namespace TxtAIEditor.Controls
                             approvedPlanWorkspaceRoot = runContext.WorkspaceRoot;
                         }
 
-                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                        string makePlanRunTranscript = transcript.Substring(initialTranscript.Length);
-                        if (!string.IsNullOrWhiteSpace(makePlanRunTranscript))
-                        {
-                            AppendRunSessionHistoryLine(makePlanRunTranscript.Trim());
-                        }
-                        AppendRunSessionHistoryLine("[Agent Response]: Plan saved for user review.");
-                        AppendRunSessionHistoryLine();
+                        AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                            runContext,
+                            instruction,
+                            transcript,
+                            initialTranscript,
+                            "[Agent Response]: Plan saved for user review.");
                         _ = PersistRunSessionToHistoryAsync();
 
                         completed = true;
@@ -1159,14 +975,12 @@ namespace TxtAIEditor.Controls
                         await _runOutputController.AppendRunActivityAsync(runContext, loopMessage);
                         await _runOutputController.AppendRunOutputLineAsync(runContext, loopMessage);
 
-                        AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                        string loopRunTranscript = transcript.Substring(initialTranscript.Length);
-                        if (!string.IsNullOrWhiteSpace(loopRunTranscript))
-                        {
-                            AppendRunSessionHistoryLine(loopRunTranscript.Trim());
-                        }
-                        AppendRunSessionHistoryLine($"[Agent Response]: {loopMessage}");
-                        AppendRunSessionHistoryLine();
+                        AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                            runContext,
+                            instruction,
+                            transcript,
+                            initialTranscript,
+                            $"[Agent Response]: {loopMessage}");
                         _ = PersistRunSessionToHistoryAsync();
 
                         completed = true;
@@ -1187,13 +1001,11 @@ namespace TxtAIEditor.Controls
 
                             await _runOutputController.AppendRunOutputLineAsync(runContext, completeMsg);
 
-                            AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                            string unchangedRunTranscript = transcript.Substring(initialTranscript.Length);
-                            if (!string.IsNullOrWhiteSpace(unchangedRunTranscript))
-                            {
-                                AppendRunSessionHistoryLine(unchangedRunTranscript.Trim());
-                            }
-                            AppendRunSessionHistoryLine();
+                            AgentRunTranscriptRecorder.AppendPromptTranscript(
+                                runContext,
+                                instruction,
+                                transcript,
+                                initialTranscript);
                             _ = PersistRunSessionToHistoryAsync();
 
                             completed = true;
@@ -1216,14 +1028,12 @@ namespace TxtAIEditor.Controls
                     await _runOutputController.AppendRunActivityAsync(runContext, limitMsg);
                     await _runOutputController.AppendRunOutputLineAsync(runContext, limitMsg);
 
-                    AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                    string runTranscript = transcript.Substring(initialTranscript.Length);
-                    if (!string.IsNullOrWhiteSpace(runTranscript))
-                    {
-                        AppendRunSessionHistoryLine(runTranscript.Trim());
-                    }
-                    AppendRunSessionHistoryLine("[Agent Response]: Tool step limit reached before a final answer.");
-                    AppendRunSessionHistoryLine();
+                    AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                        runContext,
+                        instruction,
+                        transcript,
+                        initialTranscript,
+                        "[Agent Response]: Tool step limit reached before a final answer.");
                     _ = PersistRunSessionToHistoryAsync();
                 }
             }
@@ -1232,14 +1042,12 @@ namespace TxtAIEditor.Controls
                 await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityStopped", "중단됨"));
                 await _runOutputController.AppendRunOutputLineAsync(runContext, _getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
 
-                AppendRunSessionHistoryLine($"[User Prompt]: {instruction}");
-                string runTranscript = transcript.Substring(initialTranscript.Length);
-                if (!string.IsNullOrWhiteSpace(runTranscript))
-                {
-                    AppendRunSessionHistoryLine(runTranscript.Trim());
-                }
-                AppendRunSessionHistoryLine("[Agent Response]: Agent execution was interrupted by the user.");
-                AppendRunSessionHistoryLine();
+                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                    runContext,
+                    instruction,
+                    transcript,
+                    initialTranscript,
+                    "[Agent Response]: Agent execution was interrupted by the user.");
                 _ = PersistRunSessionToHistoryAsync();
             }
             catch (Exception ex)
