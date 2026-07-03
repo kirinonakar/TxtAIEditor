@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, double, double> _restoreSessionHistoryState;
         private readonly Action<string> _stopAgent;
         private readonly Action _updateContextStatsImmediate;
+        private readonly Action<int>? _completedNotificationCountChanged;
         private readonly Func<string, string, string> _getString;
         private readonly Func<string, Task>? _navigateToFolderAsync;
         private readonly List<AgentOpenSessionState> _openSessions = new();
@@ -49,6 +50,7 @@ namespace TxtAIEditor.Controls
             Action<string, double, double> restoreSessionHistoryState,
             Action<string> stopAgent,
             Action updateContextStatsImmediate,
+            Action<int>? completedNotificationCountChanged,
             Func<string, string, string> getString,
             Func<string, Task>? navigateToFolderAsync)
         {
@@ -68,6 +70,7 @@ namespace TxtAIEditor.Controls
             _restoreSessionHistoryState = restoreSessionHistoryState;
             _stopAgent = stopAgent;
             _updateContextStatsImmediate = updateContextStatsImmediate;
+            _completedNotificationCountChanged = completedNotificationCountChanged;
             _getString = getString;
             _navigateToFolderAsync = navigateToFolderAsync;
         }
@@ -203,6 +206,7 @@ namespace TxtAIEditor.Controls
             try
             {
                 _setCurrentSessionId(session.Id);
+                session.CompletedNotificationCount = 0;
                 bool isRunningSession = _runningSessions.TryGetValue(session.Id, out AgentRunContext? runContext);
                 string sessionHistory = isRunningSession
                     ? runContext?.SessionHistory.ToString() ?? string.Empty
@@ -382,16 +386,31 @@ namespace TxtAIEditor.Controls
                         Title = $"{prefix}{rawTitle}",
                         IsSelected = isSelected,
                         IsRunning = isRunning,
+                        CompletedNotificationCount = session.CompletedNotificationCount,
                         CanSelect = true,
                         CanClose = true
                     };
                 })
                 .ToList();
 
+            _completedNotificationCountChanged?.Invoke(items.Sum(item => Math.Max(0, item.CompletedNotificationCount)));
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 _agentPane.UpdateOpenSessionItems(items, currentSessionId);
             });
+        }
+
+        public void MarkBackgroundSessionCompleted(string sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId) || IsSessionVisible(sessionId))
+            {
+                return;
+            }
+
+            var session = EnsureSession(sessionId);
+            session.CompletedNotificationCount++;
+            session.UpdatedAt = DateTime.Now;
+            UpdateUI();
         }
 
         public void UpdateSessionTitle(AgentOpenSessionState session, string prompt)

@@ -3012,6 +3012,9 @@
   <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
     <value>実行中</value>
   </data>
+  <data name="AgentCompletedSessionsBadgeTooltip" xml:space="preserve">
+    <value>完了したバックグラウンド セッション {0:N0} 件</value>
+  </data>
   <data name="AgentOpenSessionUntitled" xml:space="preserve">
     <value>新規セッション</value>
   </data>

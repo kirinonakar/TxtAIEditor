@@ -3012,6 +3012,9 @@ Plan: {0}</value>
   <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
     <value>Running</value>
   </data>
+  <data name="AgentCompletedSessionsBadgeTooltip" xml:space="preserve">
+    <value>{0:N0} background session(s) completed</value>
+  </data>
   <data name="AgentOpenSessionUntitled" xml:space="preserve">
     <value>New session</value>
   </data>

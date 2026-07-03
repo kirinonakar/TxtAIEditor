@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -47,6 +48,7 @@ namespace TxtAIEditor.Controls
         public string Title { get; set; } = string.Empty;
         public bool IsSelected { get; set; }
         public bool IsRunning { get; set; }
+        public int CompletedNotificationCount { get; set; }
         public bool CanSelect { get; set; } = true;
         public bool CanClose { get; set; } = true;
     }
@@ -213,6 +215,8 @@ namespace TxtAIEditor.Controls
 
         private bool _isBusy;
         private bool _canRewindSession;
+        private int _completedSessionNotificationCount;
+        private string _newSessionButtonText = string.Empty;
         private string _runButtonText = string.Empty;
         private string _stopButtonText = string.Empty;
         private const string OutputLineBreak = "\r\n";
@@ -304,7 +308,8 @@ namespace TxtAIEditor.Controls
             _runButtonText = getString("AgentRunButton", "실행");
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
-            AgentNewSessionButton.Content = getString("AgentNewSessionButton", "새 세션");
+            _newSessionButtonText = getString("AgentNewSessionButton", "새 세션");
+            AgentNewSessionButton.Content = _newSessionButtonText;
             ToolTipService.SetToolTip(AgentRewindSessionButton, getString("AgentRewindSessionTooltip", "이전 프롬프트 입력 전으로 되감기"));
             ToolTipService.SetToolTip(AgentOpenSessionsButton, getString("AgentOpenSessionsTooltip", "열린 세션"));
             AgentOpenSessionsTitleText.Text = getString("AgentOpenSessionsTitle", "열린 세션");
@@ -1493,6 +1498,7 @@ namespace TxtAIEditor.Controls
         {
             _openSessionItems = items;
             _selectedOpenSessionId = selectedId;
+            _completedSessionNotificationCount = _openSessionItems.Sum(item => Math.Max(0, item.CompletedNotificationCount));
             UpdateOpenSessionButtonChrome();
             RebuildOpenSessionMenu();
         }
@@ -1501,6 +1507,23 @@ namespace TxtAIEditor.Controls
         {
             bool showSessionList = _openSessionItems.Count > 1;
             AgentOpenSessionsButton.Visibility = showSessionList ? Visibility.Visible : Visibility.Collapsed;
+            string newSessionText = string.IsNullOrWhiteSpace(_newSessionButtonText)
+                ? "새 세션"
+                : _newSessionButtonText;
+            if (_completedSessionNotificationCount > 0)
+            {
+                newSessionText += " " + FormatCompletionBadgeText(_completedSessionNotificationCount);
+            }
+
+            AgentNewSessionButton.Content = newSessionText;
+            AutomationProperties.SetName(AgentNewSessionButton, newSessionText);
+            Func<string, string, string> getString = _getString ?? _displayText.GetString;
+            string? completionTooltip = _completedSessionNotificationCount > 0
+                ? string.Format(
+                    getString("AgentCompletedSessionsBadgeTooltip", "{0:N0} background session(s) completed"),
+                    _completedSessionNotificationCount)
+                : null;
+            ToolTipService.SetToolTip(AgentNewSessionButton, completionTooltip);
             AgentNewSessionButton.CornerRadius = showSessionList
                 ? new CornerRadius(4, 0, 0, 4)
                 : new CornerRadius(4);
@@ -1575,6 +1598,11 @@ namespace TxtAIEditor.Controls
                     VerticalAlignment = VerticalAlignment.Center
                 });
 
+                if (item.CompletedNotificationCount > 0)
+                {
+                    titlePanel.Children.Add(CreateCompletionBadge(item.CompletedNotificationCount, getString));
+                }
+
                 var selectBtn = new Button
                 {
                     Content = titlePanel,
@@ -1618,6 +1646,51 @@ namespace TxtAIEditor.Controls
 
                 AgentOpenSessionsListPanel.Children.Add(rowGrid);
             }
+        }
+
+        private static Border CreateCompletionBadge(int count, Func<string, string, string> getString)
+        {
+            var text = new TextBlock
+            {
+                Text = FormatCompletionBadgeText(count),
+                FontSize = 11,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var badge = new Border
+            {
+                MinWidth = 18,
+                Height = 18,
+                Padding = new Thickness(4, 0, 4, 1),
+                CornerRadius = new CornerRadius(9),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 220, 38, 38)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = text
+            };
+            ToolTipService.SetToolTip(
+                badge,
+                string.Format(
+                    getString("AgentCompletedSessionsBadgeTooltip", "{0:N0} background session(s) completed"),
+                    Math.Max(0, count)));
+            return badge;
+        }
+
+        private static string FormatCompletionBadgeText(int count)
+        {
+            if (count <= 0)
+            {
+                return string.Empty;
+            }
+
+            if (count <= 20)
+            {
+                return char.ConvertFromUtf32(0x2460 + count - 1);
+            }
+
+            return "20+";
         }
 
         private void RebuildHistoryMenu()

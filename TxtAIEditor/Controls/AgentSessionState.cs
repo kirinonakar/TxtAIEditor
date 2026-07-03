@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
         public List<AgentSessionRewindSnapshot> RewindSnapshots { get; set; } = new();
         public bool IsRunning { get; set; }
+        public int CompletedNotificationCount { get; set; }
         public bool ThinkingLineActive { get; set; }
         public int ThinkingLineStart { get; set; }
         public string ThinkingLineTimestamp { get; set; } = string.Empty;

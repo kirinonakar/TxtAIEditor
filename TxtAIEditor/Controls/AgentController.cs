@@ -213,6 +213,7 @@ namespace TxtAIEditor.Controls
                 RestoreSessionHistoryState,
                 StopAgent,
                 () => UpdateContextStatsImmediate(),
+                AppBadgeNotificationService.UpdateBadge,
                 _getString,
                 _navigateToFolderAsync);
             _sessionHistoryCoordinator = new AgentSessionHistoryCoordinator(
@@ -1269,6 +1270,7 @@ namespace TxtAIEditor.Controls
                 activeOpenSession.LastAnswerText = runContext.LastAnswerText;
                 activeOpenSession.WorkspaceRoot = runContext.WorkspaceRoot;
                 _openSessionController.ClearThinkingState(activeOpenSession);
+                bool completedInBackground = !_runOutputController.IsSessionVisible(runContext.SessionId);
                 if (_runOutputController.IsSessionVisible(runContext.SessionId))
                 {
                     RestoreSessionHistoryState(
@@ -1286,7 +1288,14 @@ namespace TxtAIEditor.Controls
                 else
                 {
                     UpdateContextStatsImmediate();
-                    _openSessionController.UpdateUI();
+                    if (completedInBackground)
+                    {
+                        _openSessionController.MarkBackgroundSessionCompleted(runContext.SessionId);
+                    }
+                    else
+                    {
+                        _openSessionController.UpdateUI();
+                    }
                 }
             }
 

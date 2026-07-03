@@ -3012,6 +3012,9 @@
   <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
     <value>실행 중</value>
   </data>
+  <data name="AgentCompletedSessionsBadgeTooltip" xml:space="preserve">
+    <value>완료된 백그라운드 세션 {0:N0}개</value>
+  </data>
   <data name="AgentOpenSessionUntitled" xml:space="preserve">
     <value>새 세션</value>
   </data>

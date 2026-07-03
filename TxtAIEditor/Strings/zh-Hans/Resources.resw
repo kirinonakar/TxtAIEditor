@@ -3012,6 +3012,9 @@
   <data name="AgentOpenSessionRunningSuffix" xml:space="preserve">
     <value>跑步</value>
   </data>
+  <data name="AgentCompletedSessionsBadgeTooltip" xml:space="preserve">
+    <value>已完成 {0:N0} 个后台会话</value>
+  </data>
   <data name="AgentOpenSessionUntitled" xml:space="preserve">
     <value>新会话</value>
   </data>
