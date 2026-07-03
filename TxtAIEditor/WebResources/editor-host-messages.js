@@ -31,6 +31,40 @@ import {
     setCsvTableMode,
     updateCsvLocalization
 } from './editor-csv-table.js';
+
+function findSearchMatchIndexFromPosition(matches, line, column, reverse) {
+    if (!Array.isArray(matches) || matches.length === 0) {
+        return -1;
+    }
+
+    const safeLine = Math.max(1, Number(line || 1));
+    const safeColumn = Math.max(1, Number(column || 1));
+
+    if (reverse) {
+        for (let i = matches.length - 1; i >= 0; i--) {
+            const match = matches[i];
+            const matchLine = Number(match.lineNumber || 1);
+            const matchColumn = Number(match.indexOfMatch || 0) + 1;
+            if (matchLine < safeLine || (matchLine === safeLine && matchColumn < safeColumn)) {
+                return i;
+            }
+        }
+
+        return matches.length - 1;
+    }
+
+    for (let i = 0; i < matches.length; i++) {
+        const match = matches[i];
+        const matchLine = Number(match.lineNumber || 1);
+        const matchColumn = Number(match.indexOfMatch || 0) + 1;
+        if (matchLine > safeLine || (matchLine === safeLine && matchColumn >= safeColumn)) {
+            return i;
+        }
+    }
+
+    return 0;
+}
+
 export function createHostMessageHandler({
     revealLine,
     openFindPanel,
@@ -209,22 +243,49 @@ export function createHostMessageHandler({
             revealLine(msg.lineNumber || 1, msg.indexOfMatch || 0, msg.matchLength || 0, msg.query || '');
             break;
         case 'findAllResult':
-            state.searchQuery = msg.query || '';
-            state.searchMatches = msg.matches || [];
-            state.searchIndex = state.searchMatches.length > 0 ? 0 : -1;
-            state.activeSearch = null;
-            if (state.searchIndex >= 0) {
-                const match = state.searchMatches[0];
-                state.activeSearch = {
-                    lineNumber: match.lineNumber,
-                    indexOfMatch: match.indexOfMatch,
-                    matchLength: match.matchLength,
-                    query: state.searchQuery
-                };
-                revealLine(match.lineNumber, match.indexOfMatch, match.matchLength, state.searchQuery, true);
+            {
+                const resultQuery = msg.query || '';
+                if (findInput.value !== resultQuery) {
+                    if (state.pendingSearchNavigation?.query === resultQuery) {
+                        state.pendingSearchNavigation = null;
+                    }
+                    break;
+                }
+
+                state.searchQuery = resultQuery;
+                state.searchMatches = msg.matches || [];
+                state.searchDocumentVersion = state.documentVersion;
+
+                const pendingNavigation = state.pendingSearchNavigation;
+                const usePendingNavigation = pendingNavigation && pendingNavigation.query === state.searchQuery;
+                if (pendingNavigation && !usePendingNavigation) {
+                    state.pendingSearchNavigation = null;
+                }
+
+                state.searchIndex = usePendingNavigation
+                    ? findSearchMatchIndexFromPosition(
+                        state.searchMatches,
+                        pendingNavigation.line,
+                        pendingNavigation.column,
+                        pendingNavigation.reverse)
+                    : (state.searchMatches.length > 0 ? 0 : -1);
+                state.activeSearch = null;
+                if (state.searchIndex >= 0) {
+                    const match = state.searchMatches[state.searchIndex];
+                    state.activeSearch = {
+                        lineNumber: match.lineNumber,
+                        indexOfMatch: match.indexOfMatch,
+                        matchLength: match.matchLength,
+                        query: state.searchQuery
+                    };
+                    revealLine(match.lineNumber, match.indexOfMatch, match.matchLength, state.searchQuery, true);
+                }
+                if (usePendingNavigation) {
+                    state.pendingSearchNavigation = null;
+                }
+                queueRender(true);
+                break;
             }
-            queueRender(true);
-            break;
         case 'findResult':
             if (msg.found) {
                 revealLine(msg.lineNumber, msg.indexOfMatch || 0, msg.matchLength || 0, msg.query || findInput.value, true);

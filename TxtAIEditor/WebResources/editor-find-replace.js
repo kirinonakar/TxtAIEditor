@@ -123,6 +123,8 @@ function requestFindAll() {
         state.searchMatches = [];
         state.searchIndex = -1;
         state.activeSearch = null;
+        state.searchDocumentVersion = state.documentVersion;
+        state.pendingSearchNavigation = null;
         queueRender(true);
         return;
     }
@@ -132,7 +134,20 @@ function requestFindAll() {
 
 function requestFind(reverse = false) {
     const query = findInput.value;
-    if (!query || state.searchMatches.length === 0) return;
+    if (!query) return;
+
+    if (state.searchQuery !== query || state.searchDocumentVersion !== state.documentVersion) {
+        state.pendingSearchNavigation = {
+            query,
+            reverse,
+            line: state.currentLine,
+            column: state.currentColumn
+        };
+        requestFindAll();
+        return;
+    }
+
+    if (state.searchMatches.length === 0) return;
 
     if (state.searchIndex < 0) state.searchIndex = 0;
 

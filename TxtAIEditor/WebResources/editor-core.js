@@ -47,6 +47,9 @@ const state = {
     initialized: false,
     lastRangeKey: '',
     cacheVersion: 0,
+    documentVersion: 0,
+    searchDocumentVersion: -1,
+    pendingSearchNavigation: null,
     renderQueued: false,
     clipboardRequests: new Map(),
     pendingLineActions: [],
@@ -153,6 +156,11 @@ function invalidateHtmlLineEndContexts(startLine) {
 }
 
 function post(msg) {
+    if (msg?.type === 'contentChanged') {
+        state.documentVersion++;
+        state.searchDocumentVersion = -1;
+    }
+
     if (window.chrome && window.chrome.webview) {
         window.chrome.webview.postMessage(msg);
     }
@@ -476,6 +484,9 @@ function setupModel(lineCount) {
     state.preservedScrollTop = null;
     clearMeasuredLineHeights();
     state.cacheVersion++;
+    state.documentVersion++;
+    state.searchDocumentVersion = -1;
+    state.pendingSearchNavigation = null;
     state.lastRangeKey = '';
     state.dirtyLines.clear();
     setupVirtualHeight();
@@ -530,6 +541,8 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
     const nextText = String(text ?? '');
     state.cache.set(line, nextText);
     state.cacheVersion++;
+    state.documentVersion++;
+    state.searchDocumentVersion = -1;
     invalidateMeasuredLineHeightsAround(line);
 
     if (!cleanDirtyMarker(line)) {
@@ -601,6 +614,8 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
     }
 
     state.cacheVersion++;
+    state.documentVersion++;
+    state.searchDocumentVersion = -1;
     state.livePreviewLocalResourceVersion = String(Date.now());
     setupVirtualHeight();
 
