@@ -104,7 +104,8 @@ namespace TxtAIEditor.Composition
             var pdfViewer = new PdfViewerController(
                 services.SettingsService,
                 tabNavigation.GetActiveTab,
-                callbacks.UpdateRightPanelSelectionContext);
+                callbacks.UpdateRightPanelSelectionContext,
+                callbacks.GetLocalizedString);
 
             var officeDocumentViewer = new OfficeDocumentViewerController(
                 services.SettingsService,
