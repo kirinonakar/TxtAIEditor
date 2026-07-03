@@ -298,77 +298,124 @@ namespace TxtAIEditor.Core.Services
 
         private static void DrawLabel(int[] pixels, string label)
         {
-            int scale = label.Length <= 1 ? 5 : label.Length <= 2 ? 3 : 2;
-            int glyphWidth = 3;
-            int glyphHeight = 5;
-            int spacing = scale;
-            int labelWidth = (label.Length * glyphWidth * scale) + ((label.Length - 1) * spacing);
-            int labelHeight = glyphHeight * scale;
-            int startX = Math.Max(0, (IconSize - labelWidth) / 2);
-            int startY = Math.Max(0, (IconSize - labelHeight) / 2);
-            int cursorX = startX;
+            IntPtr screenDc = GetDC(IntPtr.Zero);
+            IntPtr textDc = CreateCompatibleDC(screenDc);
+            IntPtr textBitmap = IntPtr.Zero;
+            IntPtr oldBitmap = IntPtr.Zero;
+            IntPtr font = IntPtr.Zero;
+            IntPtr oldFont = IntPtr.Zero;
 
-            foreach (char ch in label)
+            try
             {
-                DrawGlyph(pixels, ch, cursorX, startY, scale, PackColor(255, 255, 255, 255));
-                cursorX += (glyphWidth * scale) + spacing;
-            }
-        }
-
-        private static void DrawGlyph(int[] pixels, char ch, int x, int y, int scale, int color)
-        {
-            string[] rows = GetGlyphRows(ch);
-            for (int row = 0; row < rows.Length; row++)
-            {
-                string rowText = rows[row];
-                for (int col = 0; col < rowText.Length; col++)
+                var bitmapInfo = new BITMAPINFO
                 {
-                    if (rowText[col] != '1')
+                    bmiHeader = new BITMAPINFOHEADER
                     {
-                        continue;
+                        biSize = (uint)Marshal.SizeOf<BITMAPINFOHEADER>(),
+                        biWidth = IconSize,
+                        biHeight = -IconSize,
+                        biPlanes = 1,
+                        biBitCount = 32,
+                        biCompression = BI_RGB
                     }
+                };
 
-                    FillRect(pixels, x + (col * scale), y + (row * scale), scale, scale, color);
-                }
-            }
-        }
+                textBitmap = CreateDIBSection(
+                    screenDc,
+                    ref bitmapInfo,
+                    DIB_RGB_COLORS,
+                    out IntPtr bits,
+                    IntPtr.Zero,
+                    0);
 
-        private static string[] GetGlyphRows(char ch)
-        {
-            return ch switch
-            {
-                '0' => new[] { "111", "101", "101", "101", "111" },
-                '1' => new[] { "010", "110", "010", "010", "111" },
-                '2' => new[] { "111", "001", "111", "100", "111" },
-                '3' => new[] { "111", "001", "111", "001", "111" },
-                '4' => new[] { "101", "101", "111", "001", "001" },
-                '5' => new[] { "111", "100", "111", "001", "111" },
-                '6' => new[] { "111", "100", "111", "101", "111" },
-                '7' => new[] { "111", "001", "010", "010", "010" },
-                '8' => new[] { "111", "101", "111", "101", "111" },
-                '9' => new[] { "111", "101", "111", "001", "111" },
-                '+' => new[] { "000", "010", "111", "010", "000" },
-                _ => new[] { "000", "000", "000", "000", "000" }
-            };
-        }
-
-        private static void FillRect(int[] pixels, int x, int y, int width, int height, int color)
-        {
-            for (int yy = y; yy < y + height; yy++)
-            {
-                if (yy < 0 || yy >= IconSize)
+                if (textBitmap == IntPtr.Zero || bits == IntPtr.Zero)
                 {
-                    continue;
+                    return;
                 }
 
-                for (int xx = x; xx < x + width; xx++)
-                {
-                    if (xx < 0 || xx >= IconSize)
-                    {
-                        continue;
-                    }
+                oldBitmap = SelectObject(textDc, textBitmap);
 
-                    pixels[(yy * IconSize) + xx] = color;
+                int pixelCount = IconSize * IconSize;
+                int[] blackPixels = new int[pixelCount];
+                Marshal.Copy(blackPixels, 0, bits, pixelCount);
+
+                SetBkMode(textDc, TRANSPARENT);
+                SetTextColor(textDc, 0x00FFFFFF);
+
+                int fontHeight = label.Length <= 1 ? -20 : label.Length <= 2 ? -15 : -11;
+                font = CreateFontW(
+                    fontHeight,
+                    0, 0, 0,
+                    FW_BOLD,
+                    0, 0, 0,
+                    DEFAULT_CHARSET,
+                    OUT_DEFAULT_PRECIS,
+                    CLIP_DEFAULT_PRECIS,
+                    ANTIALIASED_QUALITY,
+                    DEFAULT_PITCH | FF_DONTCARE,
+                    "Segoe UI");
+
+                if (font != IntPtr.Zero)
+                {
+                    oldFont = SelectObject(textDc, font);
+                }
+
+                var rect = new RECT { left = 0, top = 0, right = IconSize, bottom = IconSize };
+                DrawTextW(textDc, label, -1, ref rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+                int[] textPixelArray = new int[pixelCount];
+                Marshal.Copy(bits, textPixelArray, 0, pixelCount);
+
+                for (int i = 0; i < pixelCount; i++)
+                {
+                    int textPixel = textPixelArray[i];
+                    byte L = (byte)(textPixel & 0xFF);
+                    if (L > 0)
+                    {
+                        int origPixel = pixels[i];
+                        byte aOrig = (byte)((origPixel >> 24) & 0xFF);
+                        byte rOrig = (byte)((origPixel >> 16) & 0xFF);
+                        byte gOrig = (byte)((origPixel >> 8) & 0xFF);
+                        byte bOrig = (byte)(origPixel & 0xFF);
+
+                        int rNew = rOrig + ((255 - rOrig) * L) / 255;
+                        int gNew = gOrig + ((255 - gOrig) * L) / 255;
+                        int bNew = bOrig + ((255 - bOrig) * L) / 255;
+                        int aNew = Math.Max(aOrig, L);
+
+                        pixels[i] = PackColor((byte)aNew, (byte)rNew, (byte)gNew, (byte)bNew);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to draw badge label: {ex.Message}");
+            }
+            finally
+            {
+                if (oldFont != IntPtr.Zero)
+                {
+                    SelectObject(textDc, oldFont);
+                }
+                if (font != IntPtr.Zero)
+                {
+                    DeleteObject(font);
+                }
+                if (oldBitmap != IntPtr.Zero)
+                {
+                    SelectObject(textDc, oldBitmap);
+                }
+                if (textBitmap != IntPtr.Zero)
+                {
+                    DeleteObject(textBitmap);
+                }
+                if (textDc != IntPtr.Zero)
+                {
+                    DeleteDC(textDc);
+                }
+                if (screenDc != IntPtr.Zero)
+                {
+                    ReleaseDC(IntPtr.Zero, screenDc);
                 }
             }
         }
@@ -515,5 +562,68 @@ namespace TxtAIEditor.Core.Services
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
         private static extern int SetCurrentProcessExplicitAppUserModelID(
             [MarshalAs(UnmanagedType.LPWStr)] string appId);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr CreateFontW(
+            int nHeight,
+            int nWidth,
+            int nEscapement,
+            int nOrientation,
+            int fnWeight,
+            uint fdwItalic,
+            uint fdwUnderline,
+            uint fdwStrikeOut,
+            uint fdwCharSet,
+            uint fdwOutputPrecision,
+            uint fdwClipPrecision,
+            uint fdwQuality,
+            uint fdwPitchAndFamily,
+            string lpszFace);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern int DrawTextW(
+            IntPtr hDC,
+            string lpchText,
+            int nCount,
+            ref RECT lpRect,
+            uint uFormat);
+
+        [DllImport("gdi32.dll")]
+        private static extern uint SetTextColor(IntPtr hdc, uint crColor);
+
+        [DllImport("gdi32.dll")]
+        private static extern int SetBkMode(IntPtr hdc, int iBkMode);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int left;
+            public int top;
+            public int right;
+            public int bottom;
+        }
+
+        private const int FW_BOLD = 700;
+        private const uint DEFAULT_CHARSET = 1;
+        private const uint OUT_DEFAULT_PRECIS = 0;
+        private const uint CLIP_DEFAULT_PRECIS = 0;
+        private const uint ANTIALIASED_QUALITY = 4;
+        private const uint DEFAULT_PITCH = 0;
+        private const uint FF_DONTCARE = 0;
+        private const int TRANSPARENT = 1;
+
+        private const uint DT_CENTER = 0x00000001;
+        private const uint DT_VCENTER = 0x00000004;
+        private const uint DT_SINGLELINE = 0x00000020;
     }
 }
