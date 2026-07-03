@@ -309,7 +309,7 @@ namespace TxtAIEditor.Controls
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
             _newSessionButtonText = getString("AgentNewSessionButton", "새 세션");
-            AgentNewSessionButton.Content = _newSessionButtonText;
+            AgentNewSessionButtonText.Text = _newSessionButtonText;
             ToolTipService.SetToolTip(AgentRewindSessionButton, getString("AgentRewindSessionTooltip", "이전 프롬프트 입력 전으로 되감기"));
             ToolTipService.SetToolTip(AgentOpenSessionsButton, getString("AgentOpenSessionsTooltip", "열린 세션"));
             AgentOpenSessionsTitleText.Text = getString("AgentOpenSessionsTitle", "열린 세션");
@@ -1510,13 +1510,24 @@ namespace TxtAIEditor.Controls
             string newSessionText = string.IsNullOrWhiteSpace(_newSessionButtonText)
                 ? "새 세션"
                 : _newSessionButtonText;
+            AgentNewSessionButtonText.Text = newSessionText;
+
             if (_completedSessionNotificationCount > 0)
             {
-                newSessionText += " " + FormatCompletionBadgeText(_completedSessionNotificationCount);
+                AgentNewSessionBadgeText.Text = FormatCompletionBadgeText(_completedSessionNotificationCount);
+                AgentNewSessionBadge.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                AgentNewSessionBadge.Visibility = Visibility.Collapsed;
             }
 
-            AgentNewSessionButton.Content = newSessionText;
-            AutomationProperties.SetName(AgentNewSessionButton, newSessionText);
+            string automationName = newSessionText;
+            if (_completedSessionNotificationCount > 0)
+            {
+                automationName += " " + FormatCompletionBadgeText(_completedSessionNotificationCount);
+            }
+            AutomationProperties.SetName(AgentNewSessionButton, automationName);
             Func<string, string, string> getString = _getString ?? _displayText.GetString;
             string? completionTooltip = _completedSessionNotificationCount > 0
                 ? string.Format(
@@ -1572,9 +1583,11 @@ namespace TxtAIEditor.Controls
                 {
                     Width = 7,
                     Height = 7,
-                    Fill = new SolidColorBrush(item.IsRunning
-                        ? Windows.UI.Color.FromArgb(255, 34, 197, 94)
-                        : Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                    Fill = new SolidColorBrush(item.CompletedNotificationCount > 0
+                        ? Windows.UI.Color.FromArgb(255, 220, 38, 38)
+                        : (item.IsRunning
+                            ? Windows.UI.Color.FromArgb(255, 34, 197, 94)
+                            : Windows.UI.Color.FromArgb(255, 156, 163, 175))),
                     VerticalAlignment = VerticalAlignment.Center
                 });
 
@@ -1598,10 +1611,7 @@ namespace TxtAIEditor.Controls
                     VerticalAlignment = VerticalAlignment.Center
                 });
 
-                if (item.CompletedNotificationCount > 0)
-                {
-                    titlePanel.Children.Add(CreateCompletionBadge(item.CompletedNotificationCount, getString));
-                }
+
 
                 var selectBtn = new Button
                 {

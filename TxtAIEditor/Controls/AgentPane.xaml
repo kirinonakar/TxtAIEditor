@@ -57,10 +57,28 @@
                 <Button x:Name="AgentNewSessionButton"
                         Grid.Column="0"
                         Height="32"
-                        Content="새 세션"
                         HorizontalAlignment="Stretch"
                         Click="OnNewSessionClick"
-                        Style="{StaticResource AgentButtonStyle}"/>
+                        Style="{StaticResource AgentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <TextBlock x:Name="AgentNewSessionButtonText" Text="새 세션" VerticalAlignment="Center"/>
+                        <Border x:Name="AgentNewSessionBadge"
+                                MinWidth="18"
+                                Height="18"
+                                Padding="4,0,4,1"
+                                CornerRadius="9"
+                                Background="#DC2626"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                            <TextBlock x:Name="AgentNewSessionBadgeText"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </Button>
                 <Button x:Name="AgentOpenSessionsButton"
                         Grid.Column="1"
                         Width="34"
