@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Threading.Tasks;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -83,7 +84,7 @@ namespace TxtAIEditor.Controls
             StartFind();
         }
 
-        private void OnFindTextBoxKeyDown(object sender, KeyRoutedEventArgs e)
+        private async void OnFindTextBoxKeyDown(object sender, KeyRoutedEventArgs e)
         {
             if (e.Key == VirtualKey.Enter)
             {
@@ -100,6 +101,8 @@ namespace TxtAIEditor.Controls
                     {
                         _webView.CoreWebView2.Find.FindNext();
                     }
+                    await Task.Delay(100);
+                    UpdateStatusText();
                 }
             }
             else if (e.Key == VirtualKey.Escape)
@@ -114,19 +117,23 @@ namespace TxtAIEditor.Controls
             StartFind();
         }
 
-        private void OnPrevClick(object sender, RoutedEventArgs e)
+        private async void OnPrevClick(object sender, RoutedEventArgs e)
         {
             if (_webView?.CoreWebView2 != null)
             {
                 _webView.CoreWebView2.Find.FindPrevious();
+                await Task.Delay(100);
+                UpdateStatusText();
             }
         }
 
-        private void OnNextClick(object sender, RoutedEventArgs e)
+        private async void OnNextClick(object sender, RoutedEventArgs e)
         {
             if (_webView?.CoreWebView2 != null)
             {
                 _webView.CoreWebView2.Find.FindNext();
+                await Task.Delay(100);
+                UpdateStatusText();
             }
         }
 
@@ -135,7 +142,7 @@ namespace TxtAIEditor.Controls
             HideAndStop();
         }
 
-        private void StartFind()
+        private async void StartFind()
         {
             if (_webView?.CoreWebView2 == null) return;
 
@@ -158,8 +165,16 @@ namespace TxtAIEditor.Controls
             options.ShouldMatchWord = false;
             options.SuppressDefaultFindDialog = true;
 
-            find.Stop();
-            _ = find.StartAsync(options);
+            try
+            {
+                find.Stop();
+                await find.StartAsync(options);
+                await Task.Delay(100);
+                UpdateStatusText();
+            }
+            catch
+            {
+            }
         }
 
         private void OnMatchCountChanged(CoreWebView2Find sender, object args)
