@@ -37,13 +37,13 @@
         const theme = urlParams.get('theme') || 'Dark';
         const bg = urlParams.get('customBg') || (theme === 'PastelDark' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e'));
         const fg = urlParams.get('customFg') || (theme === 'PastelDark' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
-        
+
         // Instantly style the root element before body is parsed to prevent FOUC (flicker)
         document.documentElement.style.background = bg;
         document.documentElement.style.color = fg;
         document.documentElement.style.setProperty('--bg', bg);
         document.documentElement.style.setProperty('--fg', fg);
-        
+
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = `editor.css?v=${version}`;
@@ -66,11 +66,11 @@
             <div id="viewport"></div>
         </div>
         <div id="find-panel" hidden>
-            <div style="display: flex; gap: 8px; width: 100%;">
-                <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+            <div class="find-panel-content">
+                <div class="find-input-column">
                     <div class="find-input-wrap">
                         <input id="find-input" type="text" placeholder="찾기" autocomplete="off" spellcheck="false"
-                            style="width: 100%; padding-right: 84px;">
+                            style="padding-right: 84px;">
                         <div class="find-input-actions">
                             <button id="find-clear" class="find-clear-btn" type="button" title="지우기">×</button>
                             <button id="find-match-case" class="find-option-btn" type="button" title="대소문자 구분 (Aa)">Aa</button>
@@ -79,7 +79,7 @@
                     </div>
                     <div id="replace-row" class="find-input-wrap">
                         <input id="replace-input" type="text" placeholder="바꾸기" autocomplete="off" spellcheck="false"
-                            style="width: 100%; padding-right: 32px;">
+                            style="padding-right: 32px;">
                         <button id="replace-clear" class="find-clear-btn find-clear-btn-single" type="button" title="지우기">×</button>
                     </div>
                 </div>

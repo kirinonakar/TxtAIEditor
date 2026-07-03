@@ -133,7 +133,7 @@ namespace TxtAIEditor.Core.Services
     display: flex;
     align-items: center;
     gap: 6px;
-    max-width: min(420px, calc(100vw - 24px));
+    max-width: min(388px, calc(100vw - 24px));
     padding: 6px;
     border: 1px solid color-mix(in srgb, CanvasText 35%, transparent);
     border-radius: 4px;
@@ -148,8 +148,8 @@ namespace TxtAIEditor.Core.Services
     position: relative;
     display: flex;
     align-items: center;
-    min-width: 180px;
-    width: min(260px, calc(100vw - 156px));
+    min-width: 168px;
+    width: min(228px, calc(100vw - 156px));
 }
 #txt-office-find-input {
     width: 100%;

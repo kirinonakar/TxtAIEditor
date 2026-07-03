@@ -772,6 +772,20 @@ mark.active-match {
     display: none;
 }
 
+.find-panel-content {
+    display: flex;
+    gap: 8px;
+    width: max-content;
+}
+
+.find-input-column {
+    display: flex;
+    flex: 0 0 208px;
+    flex-direction: column;
+    gap: 6px;
+    width: 208px;
+}
+
 #context-menu {
     position: fixed;
     z-index: 50;
@@ -951,7 +965,8 @@ mark.active-match {
 
 #find-input,
 #replace-input {
-    width: 180px;
+    flex: 0 0 auto;
+    width: 208px;
     height: 28px;
     border: 1px solid rgba(127, 127, 127, 0.45);
     border-radius: 3px;
@@ -975,7 +990,7 @@ mark.active-match {
     position: relative;
     display: flex;
     align-items: center;
-    width: 100%;
+    width: 208px;
 }
 
 .find-input-actions {
