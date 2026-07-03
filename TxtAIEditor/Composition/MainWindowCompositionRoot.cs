@@ -381,7 +381,6 @@ namespace TxtAIEditor.Composition
                     () => toolbarCommandController?.OpenFile(),
                     () => toolbarCommandController?.Find(),
                     () => toolbarCommandController?.Print(),
-                    () => pdfViewerController.IsActiveViewer() || officeDocumentViewerController.IsActiveViewer(),
                     stickyNoteModeController.ToggleTopMostFromShortcut,
                     () => toolbarCommandController?.ToggleTheme(),
                     stickyNoteModeController.ToggleMode,

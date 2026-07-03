@@ -54,7 +54,7 @@ namespace TxtAIEditor.Controls
             }
 
             webView.Focus(FocusState.Programmatic);
-            await TryTriggerFindAsync(webView);
+            await TriggerViewerFindAsync(webView);
             return true;
         }
 
@@ -235,7 +235,30 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static async Task TryTriggerFindAsync(WebView2 webView)
+        private static async Task TriggerViewerFindAsync(WebView2 webView)
+        {
+            if (webView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string result = await webView.CoreWebView2.ExecuteScriptAsync(
+                    "Boolean(window.__txtAiEditorOfficeFind && window.__txtAiEditorOfficeFind.open && window.__txtAiEditorOfficeFind.open())");
+                if (string.Equals(result, "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+            catch
+            {
+            }
+
+            await TryTriggerNativeFindAsync(webView);
+        }
+
+        private static async Task TryTriggerNativeFindAsync(WebView2 webView)
         {
             if (webView.CoreWebView2 == null)
             {
@@ -285,6 +308,8 @@ namespace TxtAIEditor.Controls
             const key = event.key ? event.key.toLowerCase() : '';
             if (ctrl && key === '3') {
                 name = 'expandRightPanel';
+            } else if (ctrl && key === 'f') {
+                name = 'find';
             } else if (ctrl && key === 'p') {
                 name = 'print';
             }
