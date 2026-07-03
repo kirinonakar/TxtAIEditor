@@ -27,6 +27,8 @@ import {
     compositionSelectionRange,
     focusLine,
     getCaretOffset,
+    copySelectionToClipboard,
+    cutSelectionToClipboard,
     insertPlainTextByModel,
     isModelRepeatKey,
     lineElementFromEvent,
@@ -36,6 +38,7 @@ import {
     normalizedModelRepeatKey,
     replaceSelectionForCompositionStart,
     replaceSelectionWith,
+    pasteFromClipboard,
     scheduleModelRepeatEdit,
     selectAll,
     splitCurrentLine
@@ -362,6 +365,28 @@ export function bindKeyboardEvents({ openFindPanel }) {
         const key = event.key ? event.key.toLowerCase() : '';
 
         if (ctrl) {
+            if (key === 'c' || key === 'x' || key === 'v') {
+                const target = event.target;
+                const isNativeInputTarget = target && (
+                    target.closest?.('#find-panel') ||
+                    target.tagName === 'INPUT' ||
+                    target.tagName === 'TEXTAREA'
+                );
+                if (isNativeInputTarget && target.id !== 'ime-bypass-textarea') {
+                    return;
+                }
+
+                event.preventDefault();
+                if (key === 'c') {
+                    copySelectionToClipboard();
+                } else if (key === 'x') {
+                    cutSelectionToClipboard();
+                } else {
+                    hideAutocomplete(500);
+                    pasteFromClipboard();
+                }
+                return;
+            }
             if (key === '1') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'toggleLeftPanel' });
