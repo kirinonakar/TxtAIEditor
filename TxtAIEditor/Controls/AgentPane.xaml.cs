@@ -69,17 +69,11 @@ namespace TxtAIEditor.Controls
         private double _lastVerticalOffset;
         private DispatcherTimer? _outputFlushTimer;
         private AgentDisplayLocalizer _displayText = AgentDisplayLocalizer.CreateWithResourceLoader();
+        private readonly AgentPaneMenuCoordinator _menuCoordinator;
         private string _explicitSelectedOutputText = string.Empty;
         private Windows.Foundation.Point? _outputPointerDownPoint;
         private bool _outputPointerSelectionGesture;
         private bool _hasExplicitOutputSelection;
-        private List<string> _agentPresetNames = new List<string>();
-        private HashSet<string> _selectedAgentPresetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private List<AgentSkillItem> _agentSkillItems = new List<AgentSkillItem>();
-        private HashSet<string> _selectedAgentSkillNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, Button> _agentSkillButtons = new Dictionary<string, Button>(StringComparer.OrdinalIgnoreCase);
-        private List<AgentMcpItem> _agentMcpItems = new List<AgentMcpItem>();
-        private HashSet<string> _selectedAgentMcpNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Func<string, string, string>? _getString;
 
         public string RawOutputText => GetRawOutputText();
@@ -99,6 +93,32 @@ namespace TxtAIEditor.Controls
         public AgentPane()
         {
             InitializeComponent();
+            _menuCoordinator = new AgentPaneMenuCoordinator(
+                this,
+                AgentMcpListPanel,
+                AgentMcpFlyout,
+                AgentSkillListPanel,
+                AgentPresetListPanel,
+                AgentPresetFlyout,
+                AgentSelectedPresetScrollViewer,
+                AgentSelectedPresetPanel,
+                AgentSelectedPresetScrollButtons,
+                AgentSelectedPresetScrollLeftButton,
+                AgentSelectedPresetScrollRightButton,
+                new AgentPaneMenuCallbacks
+                {
+                    AgentPresetToggled = name => AgentPresetToggled?.Invoke(this, name),
+                    AgentPresetEdited = name => AgentPresetEdited?.Invoke(this, name),
+                    AgentPresetDeleted = name => AgentPresetDeleted?.Invoke(this, name),
+                    AgentPresetRemoved = name => AgentPresetRemoved?.Invoke(this, name),
+                    AgentSkillToggled = name => AgentSkillToggled?.Invoke(this, name),
+                    AgentSkillRemoved = name => AgentSkillRemoved?.Invoke(this, name),
+                    AgentMcpToggled = name => AgentMcpToggled?.Invoke(this, name),
+                    AgentMcpEdited = name => AgentMcpEdited?.Invoke(this, name),
+                    AgentMcpSettingsRequested = name => AgentMcpSettingsRequested?.Invoke(this, name),
+                    AgentMcpDeleted = name => AgentMcpDeleted?.Invoke(this, name),
+                    AgentMcpRemoved = name => AgentMcpRemoved?.Invoke(this, name)
+                });
             _outputRenderer = new AgentOutputRenderer(
                 AgentOutputText,
                 this,
@@ -208,7 +228,6 @@ namespace TxtAIEditor.Controls
         private const int MaxOutputFlushChars = 12_000;
         private const int OutputFlushIntervalMs = 100;
         private const int ThinkingLabelMinIntervalMs = 200;
-        private const double SelectedChipScrollStep = 160;
 
         private void AppendText(string text)
         {
@@ -255,6 +274,7 @@ namespace TxtAIEditor.Controls
         {
             _getString = getString;
             _displayText = new AgentDisplayLocalizer(getString);
+            _menuCoordinator.Localize(getString);
             _outputRenderer.Localize(getString);
             string outputText = _rawOutputText.TrimStart();
             if (_displayText.IsOutputPlaceholder(outputText))
@@ -310,10 +330,7 @@ namespace TxtAIEditor.Controls
             AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (클릭 시 비교)");
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
             ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
-            RebuildAgentMcpMenu();
-            RebuildAgentSkillMenu();
-            RebuildAgentPresetMenu();
-            RebuildSelectedAgentPresetChips();
+            _menuCoordinator.RebuildAll();
             RebuildOpenSessionMenu();
         }
 
@@ -1211,18 +1228,18 @@ namespace TxtAIEditor.Controls
         private void OnAgentMcpFlyoutOpened(object sender, object e)
         {
             AgentMcpFlyoutOpened?.Invoke(this, EventArgs.Empty);
-            RebuildAgentMcpMenu();
+            _menuCoordinator.RebuildAgentMcpMenu();
         }
 
         private void OnAgentPresetFlyoutOpened(object sender, object e)
         {
-            RebuildAgentPresetMenu();
+            _menuCoordinator.RebuildAgentPresetMenu();
         }
 
         private void OnAgentSkillFlyoutOpened(object sender, object e)
         {
             AgentSkillFlyoutOpened?.Invoke(this, EventArgs.Empty);
-            RebuildAgentSkillMenu();
+            _menuCoordinator.RebuildAgentSkillMenu();
         }
 
         private void OnAgentSkillRefreshClick(object sender, TappedRoutedEventArgs e)
@@ -1339,11 +1356,7 @@ namespace TxtAIEditor.Controls
             IReadOnlyCollection<string> selectedPresetNames,
             Func<string, string, string> getString)
         {
-            _getString = getString;
-            _agentPresetNames = new List<string>(presetNames);
-            _selectedAgentPresetNames = new HashSet<string>(selectedPresetNames, StringComparer.OrdinalIgnoreCase);
-            RebuildAgentPresetMenu();
-            RebuildSelectedAgentPresetChips();
+            _menuCoordinator.UpdateAgentPresetsMenu(presetNames, selectedPresetNames, getString);
         }
 
         public void UpdateAgentSkillsMenu(
@@ -1351,21 +1364,14 @@ namespace TxtAIEditor.Controls
             IReadOnlyCollection<string> selectedSkillNames,
             Func<string, string, string> getString)
         {
-            _getString = getString;
-            _agentSkillItems = new List<AgentSkillItem>(skills);
-            _selectedAgentSkillNames = new HashSet<string>(selectedSkillNames, StringComparer.OrdinalIgnoreCase);
-            RebuildAgentSkillMenu();
-            RebuildSelectedAgentPresetChips();
+            _menuCoordinator.UpdateAgentSkillsMenu(skills, selectedSkillNames, getString);
         }
 
         public void UpdateAgentSkillSelection(
             IReadOnlyCollection<string> selectedSkillNames,
             Func<string, string, string> getString)
         {
-            _getString = getString;
-            _selectedAgentSkillNames = new HashSet<string>(selectedSkillNames, StringComparer.OrdinalIgnoreCase);
-            UpdateAgentSkillButtonStates();
-            RebuildSelectedAgentPresetChips();
+            _menuCoordinator.UpdateAgentSkillSelection(selectedSkillNames, getString);
         }
 
         public void UpdateAgentMcpMenu(
@@ -1373,447 +1379,32 @@ namespace TxtAIEditor.Controls
             IReadOnlyCollection<string> selectedMcpNames,
             Func<string, string, string> getString)
         {
-            _getString = getString;
-            _agentMcpItems = new List<AgentMcpItem>(mcpItems);
-            _selectedAgentMcpNames = new HashSet<string>(selectedMcpNames, StringComparer.OrdinalIgnoreCase);
-            RebuildAgentMcpMenu();
-            RebuildSelectedAgentPresetChips();
-        }
-
-        private void RebuildAgentMcpMenu()
-        {
-            if (AgentMcpListPanel == null)
-            {
-                return;
-            }
-
-            AgentMcpListPanel.Children.Clear();
-            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
-            Func<string, string, string> getString = _getString ?? _displayText.GetString;
-
-            if (_agentMcpItems.Count == 0)
-            {
-                AgentMcpListPanel.Children.Add(new TextBlock
-                {
-                    Text = getString("AgentMcpEmptyText", "등록된 MCP 없음"),
-                    FontSize = 11,
-                    Foreground = CreateMcpEmptyTextBrush(),
-                    Margin = new Thickness(4, 2, 4, 2)
-                });
-                return;
-            }
-
-            foreach (var item in _agentMcpItems)
-            {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                bool isSelected = _selectedAgentMcpNames.Contains(item.Name);
-                var selectBtn = new Button
-                {
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Left,
-                    MinHeight = 34,
-                    Padding = new Thickness(8, 3, 8, 3),
-                    Style = buttonStyle
-                };
-
-                var textStack = new StackPanel { Spacing = 1 };
-                textStack.Children.Add(new TextBlock
-                {
-                    Text = isSelected ? $"✓ {item.Name}" : item.Name,
-                    FontSize = 11,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    TextWrapping = TextWrapping.NoWrap
-                });
-                textStack.Children.Add(new TextBlock
-                {
-                    Text = item.Detail,
-                    FontSize = 10,
-                    Foreground = CreateMcpSecondaryTextBrush(),
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    TextWrapping = TextWrapping.NoWrap
-                });
-                selectBtn.Content = textStack;
-
-                string currentName = item.Name;
-                selectBtn.Click += (_, _) => AgentMcpToggled?.Invoke(this, currentName);
-                Grid.SetColumn(selectBtn, 0);
-                rowGrid.Children.Add(selectBtn);
-
-                if (!item.CanEdit && !item.CanDelete)
-                {
-                    var settingsBtn = new Button
-                    {
-                        Content = new FontIcon { Glyph = "\uE713", FontSize = 10 },
-                        Width = 28,
-                        Height = 34,
-                        Padding = new Thickness(0),
-                        Style = buttonStyle
-                    };
-                    ToolTipService.SetToolTip(settingsBtn, getString("AgentMcpBuiltInSettingsTooltip", "내장 플러그인 설정"));
-                    settingsBtn.Click += (_, _) =>
-                    {
-                        AgentMcpSettingsRequested?.Invoke(this, currentName);
-                        AgentMcpFlyout.Hide();
-                    };
-                    Grid.SetColumn(settingsBtn, 1);
-                    rowGrid.Children.Add(settingsBtn);
-                    AgentMcpListPanel.Children.Add(rowGrid);
-                    continue;
-                }
-
-                var editBtn = new Button
-                {
-                    Content = new FontIcon { Glyph = "\uE70F", FontSize = 10 },
-                    Width = 28,
-                    Height = 34,
-                    Padding = new Thickness(0),
-                    Style = buttonStyle
-                };
-                ToolTipService.SetToolTip(editBtn, getString("AgentMcpEditText", "수정"));
-                editBtn.IsEnabled = item.CanEdit;
-                editBtn.Click += (_, _) =>
-                {
-                    AgentMcpEdited?.Invoke(this, currentName);
-                    AgentMcpFlyout.Hide();
-                };
-                Grid.SetColumn(editBtn, 1);
-                rowGrid.Children.Add(editBtn);
-
-                var deleteBtn = new Button
-                {
-                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
-                    Width = 28,
-                    Height = 34,
-                    Padding = new Thickness(0),
-                    Style = buttonStyle
-                };
-                ToolTipService.SetToolTip(deleteBtn, getString("AgentMcpDeleteText", "삭제"));
-                deleteBtn.IsEnabled = item.CanDelete;
-                deleteBtn.Click += (_, _) => AgentMcpDeleted?.Invoke(this, currentName);
-                Grid.SetColumn(deleteBtn, 2);
-                rowGrid.Children.Add(deleteBtn);
-
-                AgentMcpListPanel.Children.Add(rowGrid);
-            }
-        }
-
-        private Brush CreateMcpEmptyTextBrush()
-        {
-            return CreateMcpSecondaryTextBrush();
-        }
-
-        private Brush CreateMcpSecondaryTextBrush()
-        {
-            bool isLightTheme = ActualTheme == ElementTheme.Light ||
-                (ActualTheme == ElementTheme.Default && Application.Current.RequestedTheme == ApplicationTheme.Light);
-
-            return new SolidColorBrush(isLightTheme
-                ? Windows.UI.Color.FromArgb(255, 75, 85, 99)
-                : Windows.UI.Color.FromArgb(255, 229, 231, 235));
-        }
-
-        private void RebuildAgentSkillMenu()
-        {
-            if (AgentSkillListPanel == null)
-            {
-                return;
-            }
-
-            AgentSkillListPanel.Children.Clear();
-            _agentSkillButtons.Clear();
-            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
-            Func<string, string, string> getString = _getString ?? _displayText.GetString;
-
-            if (_agentSkillItems.Count == 0)
-            {
-                AgentSkillListPanel.Children.Add(new TextBlock
-                {
-                    Text = getString("AgentSkillEmptyText", "설치된 스킬 없음"),
-                    FontSize = 11,
-                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
-                    Margin = new Thickness(4, 2, 4, 2)
-                });
-                return;
-            }
-
-            foreach (var skill in _agentSkillItems)
-            {
-                bool isSelected = _selectedAgentSkillNames.Contains(skill.Name);
-                var selectBtn = new Button
-                {
-                    Content = isSelected ? $"✓ {skill.Name}" : skill.Name,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Left,
-                    Height = 28,
-                    FontSize = 11,
-                    Padding = new Thickness(8, 0, 8, 0),
-                    Style = buttonStyle
-                };
-                string currentName = skill.Name;
-                selectBtn.Click += (_, _) => AgentSkillToggled?.Invoke(this, currentName);
-                _agentSkillButtons[currentName] = selectBtn;
-                AgentSkillListPanel.Children.Add(selectBtn);
-            }
-        }
-
-        private void UpdateAgentSkillButtonStates()
-        {
-            foreach (var pair in _agentSkillButtons)
-            {
-                bool isSelected = _selectedAgentSkillNames.Contains(pair.Key);
-                pair.Value.Content = isSelected ? $"✓ {pair.Key}" : pair.Key;
-            }
-        }
-
-        private void RebuildAgentPresetMenu()
-        {
-            if (AgentPresetListPanel == null)
-            {
-                return;
-            }
-
-            AgentPresetListPanel.Children.Clear();
-            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
-            Func<string, string, string> getString = _getString ?? _displayText.GetString;
-
-            if (_agentPresetNames.Count == 0)
-            {
-                AgentPresetListPanel.Children.Add(new TextBlock
-                {
-                    Text = getString("AgentPresetEmptyText", "프리셋 없음"),
-                    FontSize = 11,
-                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
-                    Margin = new Thickness(4, 2, 4, 2)
-                });
-                return;
-            }
-
-            foreach (string presetName in _agentPresetNames)
-            {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                bool isSelected = _selectedAgentPresetNames.Contains(presetName);
-                var selectBtn = new Button
-                {
-                    Content = isSelected ? $"✓ {presetName}" : presetName,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Left,
-                    Height = 28,
-                    FontSize = 11,
-                    Padding = new Thickness(8, 0, 8, 0),
-                    Style = buttonStyle
-                };
-                string currentName = presetName;
-                selectBtn.Click += (_, _) => AgentPresetToggled?.Invoke(this, currentName);
-                Grid.SetColumn(selectBtn, 0);
-                rowGrid.Children.Add(selectBtn);
-
-                var editBtn = new Button
-                {
-                    Content = new FontIcon { Glyph = "\uE70F", FontSize = 10 },
-                    Width = 28,
-                    Height = 28,
-                    Padding = new Thickness(0),
-                    Style = buttonStyle
-                };
-                ToolTipService.SetToolTip(editBtn, getString("AgentPresetEditText", "수정"));
-                editBtn.Click += (_, _) =>
-                {
-                    AgentPresetEdited?.Invoke(this, currentName);
-                    AgentPresetFlyout.Hide();
-                };
-                Grid.SetColumn(editBtn, 1);
-                rowGrid.Children.Add(editBtn);
-
-                var deleteBtn = new Button
-                {
-                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
-                    Width = 28,
-                    Height = 28,
-                    Padding = new Thickness(0),
-                    Style = buttonStyle
-                };
-                ToolTipService.SetToolTip(deleteBtn, getString("AgentPresetDeleteText", "삭제"));
-                deleteBtn.Click += (_, _) => AgentPresetDeleted?.Invoke(this, currentName);
-                Grid.SetColumn(deleteBtn, 2);
-                rowGrid.Children.Add(deleteBtn);
-
-                AgentPresetListPanel.Children.Add(rowGrid);
-            }
-        }
-
-        private void RebuildSelectedAgentPresetChips()
-        {
-            if (AgentSelectedPresetPanel == null)
-            {
-                return;
-            }
-
-            AgentSelectedPresetPanel.Children.Clear();
-            Func<string, string, string> getString = _getString ?? _displayText.GetString;
-
-            foreach (string presetName in _agentPresetNames)
-            {
-                if (!_selectedAgentPresetNames.Contains(presetName))
-                {
-                    continue;
-                }
-
-                AgentSelectedPresetPanel.Children.Add(CreateSelectedChip(
-                    presetName,
-                    getString("AgentPresetRemoveTooltip", "선택 해제"),
-                    () => AgentPresetRemoved?.Invoke(this, presetName)));
-            }
-
-            string mcpPrefix = getString("AgentMcpChipPrefix", "MCP: ");
-            foreach (var mcp in _agentMcpItems)
-            {
-                if (!_selectedAgentMcpNames.Contains(mcp.Name))
-                {
-                    continue;
-                }
-
-                string currentName = mcp.Name;
-                AgentSelectedPresetPanel.Children.Add(CreateSelectedChip(
-                    mcpPrefix + mcp.Name,
-                    getString("AgentMcpRemoveTooltip", "MCP 선택 해제"),
-                    () => AgentMcpRemoved?.Invoke(this, currentName)));
-            }
-
-            string skillPrefix = getString("AgentSkillChipPrefix", "Skill: ");
-            var selectedSkillNames = new List<string>(_selectedAgentSkillNames);
-            selectedSkillNames.Sort(StringComparer.CurrentCultureIgnoreCase);
-            foreach (string skillName in selectedSkillNames)
-            {
-                string currentName = skillName;
-                AgentSelectedPresetPanel.Children.Add(CreateSelectedChip(
-                    skillPrefix + skillName,
-                    getString("AgentSkillRemoveTooltip", "스킬 선택 해제"),
-                    () => AgentSkillRemoved?.Invoke(this, currentName)));
-            }
-
-            AgentSelectedPresetScrollViewer.Visibility =
-                AgentSelectedPresetPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            QueueSelectedChipScrollButtonsUpdate();
+            _menuCoordinator.UpdateAgentMcpMenu(mcpItems, selectedMcpNames, getString);
         }
 
         private void OnSelectedPresetScrollViewerViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
         {
-            UpdateSelectedChipScrollButtons();
+            _menuCoordinator.OnSelectedPresetScrollViewerViewChanged();
         }
 
         private void OnSelectedPresetScrollViewerSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            QueueSelectedChipScrollButtonsUpdate();
+            _menuCoordinator.OnSelectedPresetScrollViewerSizeChanged();
         }
 
         private void OnSelectedPresetPanelSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            QueueSelectedChipScrollButtonsUpdate();
+            _menuCoordinator.OnSelectedPresetPanelSizeChanged();
         }
 
         private void OnSelectedPresetScrollLeftClick(object sender, RoutedEventArgs e)
         {
-            ScrollSelectedChips(-SelectedChipScrollStep);
+            _menuCoordinator.OnSelectedPresetScrollLeftClick();
         }
 
         private void OnSelectedPresetScrollRightClick(object sender, RoutedEventArgs e)
         {
-            ScrollSelectedChips(SelectedChipScrollStep);
-        }
-
-        private void ScrollSelectedChips(double delta)
-        {
-            if (AgentSelectedPresetScrollViewer.Visibility != Visibility.Visible)
-            {
-                return;
-            }
-
-            double targetOffset = Math.Clamp(
-                AgentSelectedPresetScrollViewer.HorizontalOffset + delta,
-                0,
-                AgentSelectedPresetScrollViewer.ScrollableWidth);
-            AgentSelectedPresetScrollViewer.ChangeView(targetOffset, null, null, false);
-            UpdateSelectedChipScrollButtons();
-        }
-
-        private void QueueSelectedChipScrollButtonsUpdate()
-        {
-            if (DispatcherQueue?.TryEnqueue(UpdateSelectedChipScrollButtons) == true)
-            {
-                return;
-            }
-
-            UpdateSelectedChipScrollButtons();
-        }
-
-        private void UpdateSelectedChipScrollButtons()
-        {
-            bool hasOverflow =
-                AgentSelectedPresetScrollViewer.Visibility == Visibility.Visible &&
-                AgentSelectedPresetPanel.Children.Count > 0 &&
-                AgentSelectedPresetScrollViewer.ScrollableWidth > 0.5;
-
-            AgentSelectedPresetScrollButtons.Visibility = hasOverflow ? Visibility.Visible : Visibility.Collapsed;
-            if (!hasOverflow)
-            {
-                return;
-            }
-
-            AgentSelectedPresetScrollLeftButton.IsEnabled = AgentSelectedPresetScrollViewer.HorizontalOffset > 0.5;
-            AgentSelectedPresetScrollRightButton.IsEnabled =
-                AgentSelectedPresetScrollViewer.HorizontalOffset < AgentSelectedPresetScrollViewer.ScrollableWidth - 0.5;
-        }
-
-        private Border CreateSelectedChip(string text, string tooltip, Action removeAction)
-        {
-            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
-            var chip = new Border
-            {
-                Background = (Brush)Application.Current.Resources["SystemControlBackgroundAltMediumLowBrush"],
-                BorderBrush = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(6, 2, 2, 2)
-            };
-
-            var chipContent = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 4,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            chipContent.Children.Add(new TextBlock
-            {
-                Text = text,
-                FontSize = 11,
-                MaxWidth = 140,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                VerticalAlignment = VerticalAlignment.Center
-            });
-
-            var removeBtn = new Button
-            {
-                Content = "x",
-                Width = 20,
-                Height = 20,
-                Padding = new Thickness(0),
-                FontSize = 10,
-                Style = buttonStyle
-            };
-            ToolTipService.SetToolTip(removeBtn, tooltip);
-            removeBtn.Click += (_, _) => removeAction();
-            chipContent.Children.Add(removeBtn);
-
-            chip.Child = chipContent;
-            return chip;
+            _menuCoordinator.OnSelectedPresetScrollRightClick();
         }
 
         public void ShowDiffConfirm(string header, string description)

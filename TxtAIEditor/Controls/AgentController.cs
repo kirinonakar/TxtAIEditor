@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -61,6 +60,8 @@ namespace TxtAIEditor.Controls
         private readonly AgentSessionRewindController _sessionRewindController;
         private readonly AgentRunOutputController _runOutputController;
         private readonly AgentRunTranscriptService _runTranscriptService = new();
+        private readonly AgentRunWorkspaceResolver _runWorkspaceResolver;
+        private readonly AgentRunTextFormatter _runTextFormatter;
         private readonly AgentModelContextLimitProvider _modelContextLimits = new();
         private readonly AgentLlmToolCatalog _llmToolCatalog = new();
         private readonly AgentResponseInspector _responseInspector = new();
@@ -121,6 +122,7 @@ namespace TxtAIEditor.Controls
             _getString = getString;
             _fileTools = fileTools;
             _fileTools.WorkspaceRootOverrideProvider = GetActiveRunWorkspaceRoot;
+            _runWorkspaceResolver = new AgentRunWorkspaceResolver(() => _fileTools.WorkspaceRoot);
             _initializePickerWindow = initializePickerWindow;
             _isGitRepoProvider = isGitRepoProvider;
             _openDiffViewAsync = openDiffViewAsync;
@@ -133,6 +135,7 @@ namespace TxtAIEditor.Controls
             _navigateToFolderAsync = navigateToFolderAsync;
             _saveTabAsync = saveTabAsync;
             _displayText = new AgentDisplayLocalizer(_getString);
+            _runTextFormatter = new AgentRunTextFormatter(_getString);
             _attachmentController = new AgentAttachmentController(
                 _agentPane,
                 _initializePickerWindow,
@@ -363,7 +366,22 @@ namespace TxtAIEditor.Controls
             };
 
             _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
-            WireEvents();
+            AgentControllerEventBinder.Wire(
+                _agentPane,
+                RunAgentAsync,
+                StopAgent,
+                _openSessionController,
+                _sessionRewindController,
+                _sessionHistoryCoordinator,
+                _outputInsertController,
+                _attachmentController,
+                _presetController,
+                _mcpController,
+                _skillController,
+                _sessionEditController,
+                _confirmationController,
+                _openDiffViewAsync,
+                UpdateContextStats);
             _openSessionController.EnsureSession(_currentSessionId);
             _openSessionController.UpdateUI();
             UpdateContextStatsImmediate();
@@ -438,47 +456,6 @@ namespace TxtAIEditor.Controls
                 : context.WorkspaceRoot;
         }
 
-        private string ResolveWorkspaceRootForRun(
-            string preservedWorkspaceRoot,
-            string capturedWorkspaceRoot,
-            string userInstruction)
-        {
-            if (IsApprovedPlanExecutionPrompt(userInstruction) &&
-                IsExistingDirectory(preservedWorkspaceRoot))
-            {
-                return NormalizeDirectoryPath(preservedWorkspaceRoot);
-            }
-
-            if (IsExistingDirectory(capturedWorkspaceRoot))
-            {
-                return NormalizeDirectoryPath(capturedWorkspaceRoot);
-            }
-
-            if (IsExistingDirectory(preservedWorkspaceRoot))
-            {
-                return NormalizeDirectoryPath(preservedWorkspaceRoot);
-            }
-
-            return _fileTools.WorkspaceRoot;
-        }
-
-        private static bool IsApprovedPlanExecutionPrompt(string userInstruction)
-        {
-            return (userInstruction ?? string.Empty)
-                .TrimStart()
-                .StartsWith("[Approved plan execution]", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsExistingDirectory(string path)
-        {
-            return !string.IsNullOrWhiteSpace(path) && Directory.Exists(path);
-        }
-
-        private static string NormalizeDirectoryPath(string path)
-        {
-            return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        }
-
         private EditorSettings GetCurrentSessionSettings()
         {
             return _openSessionController.GetCurrentSessionSettings();
@@ -509,65 +486,6 @@ namespace TxtAIEditor.Controls
             return _selectionContextController.CaptureActiveSelectionSnapshot(IsCurrentSessionRunning());
         }
 
-        private void WireEvents()
-        {
-            _agentPane.RunRequested += async (_, _) => await RunAgentAsync();
-            _agentPane.StopRequested += (_, _) => StopAgent();
-            _agentPane.NewSessionRequested += (_, _) =>
-            {
-                _agentPane.PlanningModeCheckBox.IsChecked = false;
-                _openSessionController.CreateNewSession();
-            };
-            _agentPane.RewindSessionRequested += async (_, _) => await _sessionRewindController.RewindCurrentSessionAsync();
-            _agentPane.OpenSessionsFlyoutOpened += (_, _) =>
-            {
-                _openSessionController.SavePromptTitleFromUI();
-                _openSessionController.UpdateUI();
-            };
-            _agentPane.OpenSessionSelected += (_, sessionId) => _openSessionController.SwitchSession(sessionId);
-            _agentPane.OpenSessionClosed += (_, sessionId) => _openSessionController.CloseSession(sessionId);
-            _agentPane.HistorySelected += (_, historyId) => _sessionHistoryCoordinator.LoadHistorySession(historyId);
-            _agentPane.HistoryDeleted += async (_, historyId) => await _sessionHistoryCoordinator.DeleteHistorySessionAsync(historyId);
-            _agentPane.HistoryToolbarDeleteClicked += async (_, _) => await _sessionHistoryCoordinator.ClearAllHistoryAsync();
-            _agentPane.InsertOutputRequested += async (_, _) => await _outputInsertController.InsertOutputAsync();
-            _agentPane.InsertNewTabOutputRequested += async (_, _) => await _outputInsertController.InsertNewTabOutputAsync();
-            _agentPane.AddAttachmentRequested += async (_, _) => await _attachmentController.AddAttachmentsAsync();
-            _agentPane.FilesDropped += async (_, filePaths) => await _attachmentController.AddDroppedFilesAsync(filePaths);
-            _agentPane.RemoveAttachmentRequested += (_, attachment) => _attachmentController.RemoveAttachment(attachment.Id);
-            _agentPane.AgentPresetAddRequested += async (_, _) => await _presetController.AddPresetAsync();
-            _agentPane.AgentPresetToggled += (_, presetName) => _presetController.TogglePreset(presetName);
-            _agentPane.AgentPresetEdited += async (_, presetName) => await _presetController.EditPresetAsync(presetName);
-            _agentPane.AgentPresetDeleted += async (_, presetName) => await _presetController.DeletePresetAsync(presetName);
-            _agentPane.AgentPresetRemoved += (_, presetName) => _presetController.RemoveSelectedPreset(presetName);
-            _agentPane.AgentPresetExportRequested += async (_, _) => await _presetController.ExportPresetsAsync();
-            _agentPane.AgentPresetImportRequested += async (_, _) => await _presetController.ImportPresetsAsync();
-            _agentPane.AgentMcpFlyoutOpened += async (_, _) => await _mcpController.LoadAsync();
-            _agentPane.AgentMcpAddRequested += async (_, _) => await _mcpController.AddMcpAsync();
-            _agentPane.AgentMcpExportRequested += async (_, _) => await _mcpController.ExportMcpAsync();
-            _agentPane.AgentMcpImportRequested += async (_, _) => await _mcpController.ImportMcpAsync();
-            _agentPane.AgentMcpToggled += async (_, serverName) => await _mcpController.ToggleMcpAsync(serverName);
-            _agentPane.AgentMcpEdited += async (_, serverName) => await _mcpController.EditMcpAsync(serverName);
-            _agentPane.AgentMcpSettingsRequested += async (_, serverName) => await _mcpController.ConfigureBuiltInMcpAsync(serverName);
-            _agentPane.AgentMcpDeleted += async (_, serverName) => await _mcpController.DeleteMcpAsync(serverName);
-            _agentPane.AgentMcpRemoved += (_, serverName) => _mcpController.RemoveSelectedMcp(serverName);
-            _agentPane.AgentSkillFlyoutOpened += async (_, _) => await _skillController.LoadIfNeededAsync();
-            _agentPane.AgentSkillToggled += (_, skillName) => _skillController.ToggleSkill(skillName);
-            _agentPane.AgentSkillRefreshRequested += async (_, _) => await _skillController.LoadAsync();
-            _agentPane.AgentSkillRemoved += (_, skillName) => _skillController.RemoveSelectedSkill(skillName);
-            _agentPane.Prompt.TextChanged += (_, _) =>
-            {
-                _openSessionController.SavePromptTitleFromUI();
-                UpdateContextStats();
-            };
-            _agentPane.PlanningModeCheckBox.Checked += (_, _) => UpdateContextStats();
-            _agentPane.PlanningModeCheckBox.Unchecked += (_, _) => UpdateContextStats();
-
-            _agentPane.DiffApproved += (_, _) => _confirmationController.ApprovePending();
-            _agentPane.DiffCancelled += (_, _) => _confirmationController.CancelPending();
-            _agentPane.FileRevertRequested += async (_, preview) => await _sessionEditController.RevertAsync(preview);
-            _agentPane.FileDiffRequested += async (_, preview) => await _openDiffViewAsync(preview);
-        }
- 
         private async Task RunAgentAsync()
         {
             if (_runningSessions.ContainsKey(_currentSessionId))
@@ -608,7 +526,7 @@ namespace TxtAIEditor.Controls
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             activeOpenSession.UpdatedAt = DateTime.Now;
             activeOpenSession.IsRunning = true;
-            activeOpenSession.WorkspaceRoot = ResolveWorkspaceRootForRun(
+            activeOpenSession.WorkspaceRoot = _runWorkspaceResolver.Resolve(
                 preservedWorkspaceRoot,
                 activeOpenSession.WorkspaceRoot,
                 userInstruction);
@@ -646,7 +564,7 @@ namespace TxtAIEditor.Controls
             CancellationToken cancellationToken = cancellationSource.Token;
             _openSessionController.UpdateActiveSessionBusyState();
             await _runOutputController.ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
-            await _runOutputController.BeginRunOutputBlockAsync(runContext, BuildRunHeader(_promptContextService.BuildInstructionDisplay(userInstruction)));
+            await _runOutputController.BeginRunOutputBlockAsync(runContext, _runTextFormatter.BuildRunHeader(_promptContextService.BuildInstructionDisplay(userInstruction)));
             await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
 
             string initialTranscript = string.Empty;
@@ -1004,7 +922,7 @@ namespace TxtAIEditor.Controls
                         }
 
                         toolCallFormatRetryCount = 0;
-                        runContext.LastAnswerText = BuildLastAnswerText(response, cleanResponse, runContext.LlmSettings.LlmAgentVerbose);
+                        runContext.LastAnswerText = AgentRunTextFormatter.BuildLastAnswerText(response, cleanResponse, runContext.LlmSettings.LlmAgentVerbose);
                         await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                         if (runContext.StreamToTab)
                         {
@@ -1428,24 +1346,6 @@ namespace TxtAIEditor.Controls
 
             context.Cancellation?.Cancel();
             _confirmationController.CancelPending();
-        }
-
-        private string BuildRunHeader(string instruction)
-        {
-            string modeText = _getString("AgentModeRun", "실행");
-            string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            return $"{timestamp}  Agent {modeText}: {TruncateForActivity(instruction)}";
-        }
-
-        private static string BuildLastAnswerText(string response, string cleanResponse, bool verbose)
-        {
-            string answer = verbose ? response : cleanResponse;
-            if (string.IsNullOrWhiteSpace(answer))
-            {
-                answer = response;
-            }
-
-            return (answer ?? string.Empty).Trim();
         }
 
         private void AddCurrentRunImageToolAttachment(LlmMessageAttachment attachment)
