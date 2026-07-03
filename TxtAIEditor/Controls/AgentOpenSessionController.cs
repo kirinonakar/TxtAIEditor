@@ -393,9 +393,10 @@ namespace TxtAIEditor.Controls
                 })
                 .ToList();
 
-            _completedNotificationCountChanged?.Invoke(items.Sum(item => Math.Max(0, item.CompletedNotificationCount)));
+            int completedNotificationCount = items.Sum(item => Math.Max(0, item.CompletedNotificationCount));
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
+                _completedNotificationCountChanged?.Invoke(completedNotificationCount);
                 _agentPane.UpdateOpenSessionItems(items, currentSessionId);
             });
         }
