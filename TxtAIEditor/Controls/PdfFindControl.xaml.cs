@@ -15,6 +15,9 @@ namespace TxtAIEditor.Controls
     {
         private WebView2? _webView;
         private Func<string, string, string>? _getString;
+        private bool _findSessionActive;
+        private int _findRequestVersion;
+        private Task<bool>? _startFindTask;
 
         public PdfFindControl()
         {
@@ -67,6 +70,7 @@ namespace TxtAIEditor.Controls
             Visibility = Visibility.Visible;
             FindTextBox.Focus(FocusState.Programmatic);
             FindTextBox.SelectAll();
+            _ = EnsureFindSessionAsync();
         }
 
         public void HideAndStop()
@@ -74,14 +78,16 @@ namespace TxtAIEditor.Controls
             Visibility = Visibility.Collapsed;
             if (_webView?.CoreWebView2 != null)
             {
+                _findRequestVersion++;
                 _webView.CoreWebView2.Find.Stop();
+                _findSessionActive = false;
             }
             _webView?.Focus(FocusState.Programmatic);
         }
 
         private void OnFindTextChanged(object sender, TextChangedEventArgs e)
         {
-            StartFind();
+            _ = StartFindAsync();
         }
 
         private async void OnFindTextBoxKeyDown(object sender, KeyRoutedEventArgs e)
@@ -91,6 +97,11 @@ namespace TxtAIEditor.Controls
                 e.Handled = true;
                 if (_webView?.CoreWebView2 != null)
                 {
+                    if (!await EnsureFindSessionAsync())
+                    {
+                        return;
+                    }
+
                     var shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
                     bool isShiftDown = (shiftState & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
                     if (isShiftDown)
@@ -114,13 +125,18 @@ namespace TxtAIEditor.Controls
 
         private void OnMatchCaseClick(object sender, RoutedEventArgs e)
         {
-            StartFind();
+            _ = StartFindAsync();
         }
 
         private async void OnPrevClick(object sender, RoutedEventArgs e)
         {
             if (_webView?.CoreWebView2 != null)
             {
+                if (!await EnsureFindSessionAsync())
+                {
+                    return;
+                }
+
                 _webView.CoreWebView2.Find.FindPrevious();
                 await Task.Delay(100);
                 UpdateStatusText();
@@ -131,6 +147,11 @@ namespace TxtAIEditor.Controls
         {
             if (_webView?.CoreWebView2 != null)
             {
+                if (!await EnsureFindSessionAsync())
+                {
+                    return;
+                }
+
                 _webView.CoreWebView2.Find.FindNext();
                 await Task.Delay(100);
                 UpdateStatusText();
@@ -142,9 +163,45 @@ namespace TxtAIEditor.Controls
             HideAndStop();
         }
 
-        private async void StartFind()
+        private Task<bool> EnsureFindSessionAsync()
         {
-            if (_webView?.CoreWebView2 == null) return;
+            if (_findSessionActive)
+            {
+                return Task.FromResult(true);
+            }
+
+            if (_startFindTask != null && !_startFindTask.IsCompleted)
+            {
+                return _startFindTask;
+            }
+
+            return StartFindAsync();
+        }
+
+        private Task<bool> StartFindAsync()
+        {
+            int version = ++_findRequestVersion;
+            _findSessionActive = false;
+            _startFindTask = StartFindCoreAsync(version);
+            return _startFindTask;
+        }
+
+        private async Task<bool> StartFindCoreAsync(int version)
+        {
+            if (version != _findRequestVersion)
+            {
+                return false;
+            }
+
+            if (_webView?.CoreWebView2 == null)
+            {
+                if (version == _findRequestVersion)
+                {
+                    _findSessionActive = false;
+                }
+
+                return false;
+            }
 
             string query = FindTextBox.Text;
             var find = _webView.CoreWebView2.Find;
@@ -152,8 +209,13 @@ namespace TxtAIEditor.Controls
             if (string.IsNullOrEmpty(query))
             {
                 find.Stop();
-                StatusText.Text = "0/0";
-                return;
+                if (version == _findRequestVersion)
+                {
+                    _findSessionActive = false;
+                    StatusText.Text = "0/0";
+                }
+
+                return false;
             }
 
             bool matchCase = MatchCaseButton.IsChecked == true;
@@ -168,12 +230,30 @@ namespace TxtAIEditor.Controls
             try
             {
                 find.Stop();
+                if (version == _findRequestVersion)
+                {
+                    _findSessionActive = false;
+                }
+
                 await find.StartAsync(options);
                 await Task.Delay(100);
+                if (version != _findRequestVersion)
+                {
+                    return false;
+                }
+
+                _findSessionActive = true;
                 UpdateStatusText();
+                return true;
             }
             catch
             {
+                if (version == _findRequestVersion)
+                {
+                    _findSessionActive = false;
+                }
+
+                return false;
             }
         }
 
