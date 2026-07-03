@@ -211,7 +211,7 @@ namespace TxtAIEditor.Controls
                 (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
                 _getCurrentFolderPath());
 
-            _pdfViewerController.Register(tab, tabParts.WebView);
+            _pdfViewerController.Register(tab, tabParts.WebView, tabParts.FindControl!);
 
             AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
             UpdateTabStatus(tab, updateLanguageUi: true);

@@ -20,6 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, OpenedTab, int, int> _selectionContextUpdater;
         private readonly Func<string, string, string> _getString;
         private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
+        private readonly Dictionary<string, PdfFindControl> _findControls = new Dictionary<string, PdfFindControl>();
 
         public PdfViewerController(
             ISettingsService settingsService,
@@ -35,10 +36,11 @@ namespace TxtAIEditor.Controls
 
         public IReadOnlyDictionary<string, WebView2> ViewerWebViews => _viewerWebViews;
 
-        public void Register(OpenedTab tab, WebView2 pdfWebView)
+        public void Register(OpenedTab tab, WebView2 pdfWebView, PdfFindControl findControl)
         {
             _viewerWebViews[tab.Id] = pdfWebView;
-            _ = InitializeAsync(tab, pdfWebView);
+            _findControls[tab.Id] = findControl;
+            _ = InitializeAsync(tab, pdfWebView, findControl);
         }
 
         public bool IsActiveViewer()
@@ -48,14 +50,19 @@ namespace TxtAIEditor.Controls
 
         public async Task<bool> FocusFindInActiveViewerAsync()
         {
-            if (!TryGetActiveViewer(out var pdfWebView))
+            var activeTab = _activeTabProvider();
+            if (activeTab == null || !activeTab.IsPdfViewer)
             {
                 return false;
             }
 
-            pdfWebView.Focus(FocusState.Programmatic);
-            await TriggerPdfFindPanelAsync(pdfWebView);
-            return true;
+            if (_findControls.TryGetValue(activeTab.Id, out var findControl))
+            {
+                findControl.ShowAndFocus();
+                return true;
+            }
+
+            return false;
         }
 
         public bool Reload(OpenedTab tab)
@@ -105,6 +112,10 @@ namespace TxtAIEditor.Controls
                 pdfWebView.Close();
                 _viewerWebViews.Remove(tabId);
             }
+            if (_findControls.TryGetValue(tabId, out var findControl))
+            {
+                _findControls.Remove(tabId);
+            }
         }
 
         public void ApplyPreferredColorScheme(string theme)
@@ -133,7 +144,7 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
-        private async Task InitializeAsync(OpenedTab tab, WebView2 pdfWebView)
+        private async Task InitializeAsync(OpenedTab tab, WebView2 pdfWebView, PdfFindControl findControl)
         {
             try
             {
@@ -146,7 +157,7 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                Configure(tab, pdfWebView);
+                Configure(tab, pdfWebView, findControl);
 
                 if (!string.IsNullOrEmpty(tab.FilePath))
                 {
@@ -158,7 +169,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void Configure(OpenedTab tab, WebView2 pdfWebView)
+        private void Configure(OpenedTab tab, WebView2 pdfWebView, PdfFindControl findControl)
         {
             if (pdfWebView.CoreWebView2 == null)
             {
@@ -173,6 +184,7 @@ namespace TxtAIEditor.Controls
             WebViewAppearanceService.ApplyPreferredColorScheme(pdfWebView.CoreWebView2, _settingsService.CurrentSettings.Theme);
 
             _ = InstallSelectionBridgeAsync(pdfWebView);
+            findControl.Initialize(pdfWebView, _getString);
             _ = InstallPdfFindBridgeAsync(pdfWebView, BuildPdfFindBridgeScript());
         }
 
@@ -205,18 +217,21 @@ namespace TxtAIEditor.Controls
                 }
 
                 string type = typeProp.GetString() ?? string.Empty;
-                if (string.Equals(type, "pdfFind", StringComparison.Ordinal))
+                if (string.Equals(type, "pdfFindTrigger", StringComparison.Ordinal))
                 {
-                    string action = root.TryGetProperty("action", out var actionProp)
-                        ? actionProp.GetString() ?? string.Empty
-                        : string.Empty;
-                    string query = root.TryGetProperty("query", out var queryProp)
-                        ? queryProp.GetString() ?? string.Empty
-                        : string.Empty;
-                    bool matchCase = root.TryGetProperty("matchCase", out var matchCaseProp) &&
-                        matchCaseProp.ValueKind == JsonValueKind.True;
+                    if (_findControls.TryGetValue(tab.Id, out var findControl))
+                    {
+                        pdfWebView.DispatcherQueue.TryEnqueue(() => findControl.ShowAndFocus());
+                    }
+                    return;
+                }
 
-                    _ = HandlePdfFindMessageAsync(pdfWebView, action, query, matchCase);
+                if (string.Equals(type, "pdfFindEscape", StringComparison.Ordinal))
+                {
+                    if (_findControls.TryGetValue(tab.Id, out var findControl))
+                    {
+                        pdfWebView.DispatcherQueue.TryEnqueue(() => findControl.HideAndStop());
+                    }
                     return;
                 }
 
@@ -239,29 +254,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task TriggerPdfFindPanelAsync(WebView2 pdfWebView)
-        {
-            if (pdfWebView.CoreWebView2 == null)
-            {
-                return;
-            }
 
-            try
-            {
-                await InstallPdfFindBridgeAsync(pdfWebView, BuildPdfFindBridgeScript());
-                string result = await pdfWebView.CoreWebView2.ExecuteScriptAsync(
-                    "Boolean(window.__txtAiEditorPdfFind && window.__txtAiEditorPdfFind.open && window.__txtAiEditorPdfFind.open())");
-                if (string.Equals(result, "true", StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-            }
-            catch
-            {
-            }
-
-            await TryTriggerNativeFindAsync(pdfWebView);
-        }
 
         private static async Task InstallPdfFindBridgeAsync(WebView2 pdfWebView, string script)
         {
@@ -280,382 +273,12 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task HandlePdfFindMessageAsync(
-            WebView2 pdfWebView,
-            string action,
-            string query,
-            bool matchCase)
-        {
-            if (pdfWebView.CoreWebView2 == null)
-            {
-                return;
-            }
-
-            try
-            {
-                var find = pdfWebView.CoreWebView2.Find;
-                switch (action)
-                {
-                    case "start":
-                        if (string.IsNullOrEmpty(query))
-                        {
-                            find.Stop();
-                            await SendPdfFindStateAsync(pdfWebView);
-                            return;
-                        }
-
-                        var options = pdfWebView.CoreWebView2.Environment.CreateFindOptions();
-                        options.FindTerm = query;
-                        options.IsCaseSensitive = matchCase;
-                        options.ShouldHighlightAllMatches = true;
-                        options.ShouldMatchWord = false;
-                        options.SuppressDefaultFindDialog = true;
-                        find.Stop();
-                        await find.StartAsync(options);
-                        await RefocusFindInputAsync(pdfWebView);
-                        break;
-                    case "next":
-                        find.FindNext();
-                        await Task.Delay(60);
-                        break;
-                    case "previous":
-                        find.FindPrevious();
-                        await Task.Delay(60);
-                        break;
-                    case "close":
-                        find.Stop();
-                        break;
-                }
-
-                await SendPdfFindStateAsync(pdfWebView);
-            }
-            catch
-            {
-            }
-        }
-
-        private static async Task SendPdfFindStateAsync(WebView2 pdfWebView)
-        {
-            if (pdfWebView.CoreWebView2 == null)
-            {
-                return;
-            }
-
-            try
-            {
-                int matchCount = pdfWebView.CoreWebView2.Find.MatchCount;
-                int activeMatchIndex = pdfWebView.CoreWebView2.Find.ActiveMatchIndex;
-                string script = "window.__txtAiEditorPdfFind && window.__txtAiEditorPdfFind.update(" +
-                    matchCount.ToString(CultureInfo.InvariantCulture) +
-                    "," +
-                    activeMatchIndex.ToString(CultureInfo.InvariantCulture) +
-                    ")";
-                await pdfWebView.CoreWebView2.ExecuteScriptAsync(script);
-            }
-            catch
-            {
-            }
-        }
-
-        private static async Task RefocusFindInputAsync(WebView2 pdfWebView)
-        {
-            if (pdfWebView.CoreWebView2 == null)
-            {
-                return;
-            }
-
-            try
-            {
-                await pdfWebView.CoreWebView2.ExecuteScriptAsync(
-                    "document.getElementById('txt-pdf-find-input')?.focus()");
-            }
-            catch
-            {
-            }
-        }
-
         private string BuildPdfFindBridgeScript()
         {
-            string optionsJson = JsonSerializer.Serialize(new
-            {
-                findPlaceholder = _getString("EditorFindPlaceholder", "찾기"),
-                findClearTooltip = _getString("EditorFindClearTooltip", "지우기"),
-                findMatchCaseTooltip = _getString("EditorFindMatchCaseTooltip", "대소문자 구분 (Aa)"),
-                findPrevTooltip = _getString("EditorFindPrevTooltip", "이전"),
-                findNextTooltip = _getString("EditorFindNextTooltip", "다음"),
-                findCloseTooltip = _getString("EditorFindCloseTooltip", "닫기")
-            });
-
-            return $$"""
+            return @"
 (() => {
-    if (window.__txtAiEditorPdfFind) return;
-
-    const options = {{optionsJson}};
-    let panel = null;
-    let input = null;
-    let clearButton = null;
-    let matchCaseButton = null;
-    let previousButton = null;
-    let nextButton = null;
-    let closeButton = null;
-    let status = null;
-    let matchCase = false;
-    let lastSearchedQuery = null;
-    let lastSearchedCase = false;
-
-    function post(action, payload = {}) {
-        try {
-            chrome.webview.postMessage({ type: 'pdfFind', action, ...payload });
-        } catch {}
-    }
-
-    function ensureStyle() {
-        if (document.getElementById('txt-pdf-find-style')) return;
-        const style = document.createElement('style');
-        style.id = 'txt-pdf-find-style';
-        style.textContent = `
-#txt-pdf-find-panel {
-    position: fixed;
-    top: 10px;
-    right: 18px;
-    z-index: 2147483647;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    max-width: min(388px, calc(100vw - 24px));
-    padding: 6px;
-    border: 1px solid color-mix(in srgb, CanvasText 35%, transparent);
-    border-radius: 4px;
-    background: color-mix(in srgb, Canvas 92%, CanvasText 8%);
-    color: CanvasText;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
-    font: 12px/1.2 system-ui, "Segoe UI", sans-serif;
-}
-#txt-pdf-find-panel[hidden] { display: none; }
-#txt-pdf-find-panel * { box-sizing: border-box; }
-#txt-pdf-find-input-wrap {
-    position: relative;
-    display: flex;
-    align-items: center;
-    min-width: 168px;
-    width: min(228px, calc(100vw - 156px));
-}
-#txt-pdf-find-input {
-    width: 100%;
-    height: 28px;
-    border: 1px solid color-mix(in srgb, CanvasText 45%, transparent);
-    border-radius: 3px;
-    padding: 4px 36px 4px 8px;
-    outline: 0;
-    background: Canvas;
-    color: CanvasText;
-    font: inherit;
-}
-#txt-pdf-find-input:focus {
-    border-color: rgba(0, 120, 212, .75);
-    box-shadow: 0 0 0 1px rgba(0, 120, 212, .45);
-}
-#txt-pdf-find-input-actions {
-    position: absolute;
-    right: 5px;
-    z-index: 1;
-    display: flex;
-    gap: 2px;
-    align-items: center;
-}
-.txt-pdf-find-clear,
-.txt-pdf-find-option,
-.txt-pdf-find-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 20px;
-    border-radius: 3px;
-    background: transparent;
-    color: CanvasText;
-    cursor: pointer;
-    font: inherit;
-}
-.txt-pdf-find-clear,
-.txt-pdf-find-option {
-    min-width: 20px;
-    padding: 0 4px;
-    border: 1px solid transparent;
-    opacity: .5;
-    font-weight: 700;
-}
-.txt-pdf-find-clear {
-    width: 20px;
-    padding: 0;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1;
-}
-.txt-pdf-find-button {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: 1px solid color-mix(in srgb, CanvasText 28%, transparent);
-    font-size: 13px;
-    line-height: 1;
-}
-.txt-pdf-find-clear:hover,
-.txt-pdf-find-option:hover,
-.txt-pdf-find-button:hover {
-    background: color-mix(in srgb, CanvasText 16%, transparent);
-    opacity: .85;
-}
-.txt-pdf-find-option.active {
-    border-color: rgba(0, 120, 212, .4);
-    background: rgba(0, 120, 212, .25);
-    opacity: 1;
-}
-.txt-pdf-find-clear:focus,
-.txt-pdf-find-option:focus,
-.txt-pdf-find-button:focus {
-    outline: none;
-    box-shadow: none;
-}
-#txt-pdf-find-status {
-    min-width: 42px;
-    color: color-mix(in srgb, CanvasText 64%, transparent);
-    text-align: center;
-    white-space: nowrap;
-}
-#txt-pdf-find-close {
-    position: relative;
-    overflow: hidden;
-    color: transparent;
-}
-#txt-pdf-find-close::before,
-#txt-pdf-find-close::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 13px;
-    height: 1.5px;
-    border-radius: 1px;
-    background: CanvasText;
-    transform-origin: center;
-}
-#txt-pdf-find-close::before { transform: translate(-50%, -50%) rotate(45deg); }
-#txt-pdf-find-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
-@media (max-width: 520px) {
-    #txt-pdf-find-panel {
-        left: 8px;
-        right: 8px;
-        max-width: none;
-    }
-    #txt-pdf-find-input-wrap {
-        min-width: 0;
-        width: 100%;
-    }
-}`;
-        (document.head || document.documentElement).appendChild(style);
-    }
-
-    function ensurePanel() {
-        ensureStyle();
-        panel = document.getElementById('txt-pdf-find-panel');
-        if (!panel) {
-            panel = document.createElement('div');
-            panel.id = 'txt-pdf-find-panel';
-            panel.hidden = true;
-            panel.innerHTML = `
-<div id="txt-pdf-find-input-wrap">
-    <input id="txt-pdf-find-input" type="text" autocomplete="off" spellcheck="false">
-    <div id="txt-pdf-find-input-actions">
-        <button id="txt-pdf-find-clear" class="txt-pdf-find-clear" type="button">×</button>
-        <button id="txt-pdf-find-match-case" class="txt-pdf-find-option" type="button">Aa</button>
-    </div>
-</div>
-<span id="txt-pdf-find-status">0/0</span>
-<button id="txt-pdf-find-prev" class="txt-pdf-find-button" type="button">↑</button>
-<button id="txt-pdf-find-next" class="txt-pdf-find-button" type="button">↓</button>
-<button id="txt-pdf-find-close" class="txt-pdf-find-button" type="button">×</button>`;
-            document.body.appendChild(panel);
-
-            input = document.getElementById('txt-pdf-find-input');
-            clearButton = document.getElementById('txt-pdf-find-clear');
-            matchCaseButton = document.getElementById('txt-pdf-find-match-case');
-            previousButton = document.getElementById('txt-pdf-find-prev');
-            nextButton = document.getElementById('txt-pdf-find-next');
-            closeButton = document.getElementById('txt-pdf-find-close');
-            status = document.getElementById('txt-pdf-find-status');
-
-            input.placeholder = options.findPlaceholder || '';
-            clearButton.title = options.findClearTooltip || '';
-            matchCaseButton.title = options.findMatchCaseTooltip || '';
-            previousButton.title = options.findPrevTooltip || '';
-            nextButton.title = options.findNextTooltip || '';
-            closeButton.title = options.findCloseTooltip || '';
-
-            input.addEventListener('keydown', event => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    handleFindEnter(event.shiftKey);
-                } else if (event.key === 'Escape') {
-                    event.preventDefault();
-                    close();
-                }
-            });
-            clearButton.addEventListener('click', () => {
-                input.value = '';
-                input.focus();
-                start();
-            });
-            matchCaseButton.addEventListener('click', () => {
-                matchCase = !matchCase;
-                matchCaseButton.classList.toggle('active', matchCase);
-                start();
-            });
-            previousButton.addEventListener('click', () => post('previous'));
-            nextButton.addEventListener('click', () => post('next'));
-            closeButton.addEventListener('click', close);
-        }
-    }
-
-    function handleFindEnter(shiftKey) {
-        ensurePanel();
-        const q = input ? (input.value || '') : '';
-        if (!q) return;
-        if (q !== lastSearchedQuery || matchCase !== lastSearchedCase) {
-            start();
-        } else {
-            post(shiftKey ? 'previous' : 'next');
-        }
-        setTimeout(() => { if (input) input.focus(); }, 120);
-    }
-
-    function start() {
-        ensurePanel();
-        lastSearchedQuery = input.value || '';
-        lastSearchedCase = matchCase;
-        post('start', { query: lastSearchedQuery, matchCase });
-    }
-
-    function open() {
-        ensurePanel();
-        panel.hidden = false;
-        input.focus();
-        input.select();
-        return true;
-    }
-
-    function close() {
-        ensurePanel();
-        panel.hidden = true;
-        lastSearchedQuery = null;
-        post('close');
-    }
-
-    function update(matchCount, activeMatchIndex) {
-        ensurePanel();
-        const count = Number(matchCount || 0);
-        const index = Number(activeMatchIndex || -1);
-        status.textContent = count > 0 && index > 0 ? `${index}/${count}` : `0/${count}`;
-    }
+    if (window.__txtAiEditorPdfFindShortcuts) return;
+    window.__txtAiEditorPdfFindShortcuts = true;
 
     document.addEventListener('keydown', event => {
         const ctrl = event.ctrlKey || event.metaKey;
@@ -663,24 +286,15 @@ namespace TxtAIEditor.Controls
         if (ctrl && key === 'f') {
             event.preventDefault();
             event.stopPropagation();
-            open();
+            chrome.webview.postMessage({ type: 'pdfFindTrigger' });
             return;
         }
-        if (panel && !panel.hidden) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                handleFindEnter(event.shiftKey);
-            } else if (event.key === 'Escape') {
-                event.preventDefault();
-                close();
-            }
+        if (key === 'escape') {
+            chrome.webview.postMessage({ type: 'pdfFindEscape' });
         }
     }, true);
-
-    window.__txtAiEditorPdfFind = { open, close, update };
-    ensurePanel();
 })();
-""";
+";
         }
 
         private static async Task TryTriggerNativeFindAsync(WebView2 pdfWebView)

@@ -231,11 +231,19 @@ namespace TxtAIEditor.Controls
                 UseSystemFocusVisuals = false
             };
 
+            var findControl = new PdfFindControl
+            {
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Visibility = Visibility.Collapsed
+            };
+
             var pdfHost = new Grid
             {
                 Background = new SolidColorBrush(editorBackgroundColor)
             };
             pdfHost.Children.Add(pdfWebView);
+            pdfHost.Children.Add(findControl);
 
             var tabHeader = new TabHeaderControl();
             tabHeader.Configure(tab, encryptedTooltip, workspaceFolderPath);
@@ -254,7 +262,7 @@ namespace TxtAIEditor.Controls
             tabItem.RightTapped += (_, args) => showTabContextMenu(tabItem, args);
             ApplyUiFont(tabItem, uiFontFamily);
 
-            return new PdfViewerTabParts(tabItem, pdfWebView);
+            return new PdfViewerTabParts(tabItem, pdfWebView, findControl);
         }
 
         public PdfViewerTabParts CreateOfficeDocumentViewer(
@@ -337,13 +345,15 @@ namespace TxtAIEditor.Controls
 
     public sealed class PdfViewerTabParts
     {
-        public PdfViewerTabParts(TabViewItem tabItem, WebView2 webView)
+        public PdfViewerTabParts(TabViewItem tabItem, WebView2 webView, PdfFindControl? findControl = null)
         {
             TabItem = tabItem;
             WebView = webView;
+            FindControl = findControl;
         }
 
         public TabViewItem TabItem { get; }
         public WebView2 WebView { get; }
+        public PdfFindControl? FindControl { get; }
     }
 }
