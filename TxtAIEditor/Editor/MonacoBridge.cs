@@ -32,7 +32,7 @@ namespace TxtAIEditor.Editor
         public event Action<int, string>? LineInsertRequested;
         public event Action<int, string, string>? LineSplitRequested;
         public event Action<int>? MergeLineWithPreviousRequested;
-        public event Action<int>? DeleteLineRequested;
+        public event Action<int, bool>? DeleteLineRequested;
         public event Action? EditTransactionStarted;
         public event Action? EditTransactionEnded;
         public event Action<string, int, int, bool, bool, bool>? FindRequested;
@@ -717,7 +717,9 @@ namespace TxtAIEditor.Editor
                         case "deleteLine":
                             if (root.TryGetProperty("lineNumber", out JsonElement deleteLineProp))
                             {
-                                DeleteLineRequested?.Invoke(deleteLineProp.GetInt32());
+                                bool isComposing = root.TryGetProperty("isComposing", out JsonElement delComposingProp) &&
+                                    delComposingProp.ValueKind == JsonValueKind.True;
+                                DeleteLineRequested?.Invoke(deleteLineProp.GetInt32(), isComposing);
                             }
                             break;
 

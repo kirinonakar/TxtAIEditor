@@ -66,7 +66,7 @@ namespace TxtAIEditor.Controls
             }
 
             state.Lines[lineNumber] = text;
-            if (!state.IsColumnEdit && state.Lines.Count <= 1)
+            if (!state.HasStructuralEdit && !state.IsColumnEdit && state.Lines.Count <= 1)
             {
                 Clear(sourceTab.Id);
                 return false;
@@ -84,7 +84,7 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (!state.IsColumnEdit && state.Lines.Count <= 1)
+            if (!state.HasStructuralEdit && !state.IsColumnEdit && state.Lines.Count <= 1)
             {
                 Clear(sourceTab.Id);
                 return false;
@@ -100,13 +100,21 @@ namespace TxtAIEditor.Controls
             if (!_pendingStates.TryGetValue(sourceTab.Id, out var state)) return;
 
             StopPendingTimer(state);
+            bool hasStructural = state.HasStructuralEdit;
             var pendingLineNumbers = state.Lines.Keys.OrderBy(line => line).ToList();
             Clear(sourceTab.Id);
 
-            foreach (int lineNumber in pendingLineNumbers)
+            if (hasStructural)
             {
-                string lineText = GetCurrentLineText(sourceTab, lineNumber, string.Empty);
-                await SyncLineChangeToOtherTabsAsync(sourceTab, lineNumber, lineText, isComposing: false);
+                await SyncEditsToOtherTabsAsync(sourceTab, updateUi: true);
+            }
+            else
+            {
+                foreach (int lineNumber in pendingLineNumbers)
+                {
+                    string lineText = GetCurrentLineText(sourceTab, lineNumber, string.Empty);
+                    await SyncLineChangeToOtherTabsAsync(sourceTab, lineNumber, lineText, isComposing: false);
+                }
             }
         }
 
@@ -125,6 +133,34 @@ namespace TxtAIEditor.Controls
             foreach (var tabId in _pendingStates.Keys.ToList())
             {
                 Clear(tabId);
+            }
+        }
+
+        public void RecordStructuralEdit(OpenedTab sourceTab)
+        {
+            if (string.IsNullOrEmpty(sourceTab.FilePath)) return;
+            if (!HasOtherTabForSameFile(sourceTab)) return;
+
+            if (!_pendingStates.TryGetValue(sourceTab.Id, out var state))
+            {
+                state = new PendingSplitImeSyncState();
+                _pendingStates[sourceTab.Id] = state;
+            }
+            state.HasStructuralEdit = true;
+        }
+
+        public async Task FlushOtherTabsPendingSyncsAsync(OpenedTab sourceTab)
+        {
+            if (string.IsNullOrEmpty(sourceTab.FilePath)) return;
+            if (!HasOtherTabForSameFile(sourceTab)) return;
+
+            var otherPendingTabIds = _pendingStates.Keys.Where(id => id != sourceTab.Id).ToList();
+            foreach (var otherTabId in otherPendingTabIds)
+            {
+                if (_editorSessions.TryGetValue(otherTabId, out var session))
+                {
+                    await FlushAsync(session.Tab);
+                }
             }
         }
 
@@ -228,7 +264,7 @@ namespace TxtAIEditor.Controls
             timer.Start();
         }
 
-        private bool HasOtherTabForSameFile(OpenedTab sourceTab)
+        public bool HasOtherTabForSameFile(OpenedTab sourceTab)
         {
             if (string.IsNullOrEmpty(sourceTab.FilePath)) return false;
             return _getTabsForSameFile(sourceTab).Any(tab => tab.Id != sourceTab.Id);
@@ -258,6 +294,7 @@ namespace TxtAIEditor.Controls
             public Dictionary<int, string> Lines { get; } = new Dictionary<int, string>();
             public DispatcherTimer? DeferredSyncTimer { get; set; }
             public bool IsColumnEdit { get; set; }
+            public bool HasStructuralEdit { get; set; }
         }
     }
 }

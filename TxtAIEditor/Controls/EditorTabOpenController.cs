@@ -487,14 +487,15 @@ namespace TxtAIEditor.Controls
                     lineNumber);
             };
 
-            bridge.DeleteLineRequested += async lineNumber =>
+            bridge.DeleteLineRequested += async (lineNumber, isComposing) =>
             {
                 await _editorBridgeDocumentController.HandleDeleteLineRequestedAsync(
                     bridge,
                     tab,
                     tabItem,
                     getSession(),
-                    lineNumber);
+                    lineNumber,
+                    isComposing);
             };
 
             bridge.EditTransactionStarted += () =>

@@ -19,6 +19,9 @@ namespace TxtAIEditor.Composition
         Func<OpenedTab, bool> ScheduleDeferredPendingSplitImeSyncIfNeeded,
         Func<OpenedTab, int, string, bool, Task> SyncLineChangeToOtherTabsAsync,
         Func<OpenedTab, Task> SyncEditsToOtherTabsAsync,
+        Action<OpenedTab> RecordPendingSplitImeStructuralEdit,
+        Func<OpenedTab, bool> HasOtherTabForSameFile,
+        Func<OpenedTab, Task> FlushOtherTabsPendingSyncsAsync,
         Func<Task> SaveSidebarVisibilitySettingsAsync,
         Action RefreshActivePreview,
         Func<string, Task> LoadFileIntoTabAsync,
@@ -110,7 +113,10 @@ namespace TxtAIEditor.Composition
                 callbacks.SchedulePendingSplitImeCompletionSyncIfNeeded,
                 tab => callbacks.ScheduleDeferredPendingSplitImeSyncIfNeeded(tab),
                 callbacks.SyncLineChangeToOtherTabsAsync,
-                tab => callbacks.SyncEditsToOtherTabsAsync(tab));
+                tab => callbacks.SyncEditsToOtherTabsAsync(tab),
+                callbacks.RecordPendingSplitImeStructuralEdit,
+                callbacks.HasOtherTabForSameFile,
+                callbacks.FlushOtherTabsPendingSyncsAsync);
 
             var shellPane = new ShellPaneController(
                 ui.LeftSidebar,

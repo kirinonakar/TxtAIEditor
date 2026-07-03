@@ -150,6 +150,15 @@ namespace TxtAIEditor.Composition
             Task SyncEditsToOtherTabsAsync(OpenedTab sourceTab, bool updateUi = true) =>
                 splitImeSyncController!.SyncEditsToOtherTabsAsync(sourceTab, updateUi);
 
+            void RecordPendingSplitImeStructuralEdit(OpenedTab sourceTab) =>
+                splitImeSyncController!.RecordStructuralEdit(sourceTab);
+
+            bool HasOtherTabForSameFile(OpenedTab sourceTab) =>
+                splitImeSyncController!.HasOtherTabForSameFile(sourceTab);
+
+            Task FlushOtherTabsPendingSyncsAsync(OpenedTab sourceTab) =>
+                splitImeSyncController!.FlushOtherTabsPendingSyncsAsync(sourceTab);
+
             void ApplyUiPersonalization(EditorSettings settings) =>
                 settingsController!.ApplyUiPersonalization(settings);
 
@@ -470,6 +479,9 @@ namespace TxtAIEditor.Composition
                     ScheduleDeferredPendingSplitImeSyncIfNeeded,
                     SyncLineChangeToOtherTabsAsync,
                     tab => SyncEditsToOtherTabsAsync(tab),
+                    RecordPendingSplitImeStructuralEdit,
+                    HasOtherTabForSameFile,
+                    FlushOtherTabsPendingSyncsAsync,
                     SaveSidebarVisibilitySettingsAsync,
                     callbacks.RefreshActivePreview,
                     callbacks.LoadFileIntoTabAsync,

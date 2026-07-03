@@ -601,11 +601,11 @@ function finishColumnComposition(element, lineNumber) {
             markDirty(start.line, 'mod');
         }
 
-        post({ type: 'lineChanged', lineNumber: start.line, text: nextText });
+        post({ type: 'lineChanged', lineNumber: start.line, text: nextText, isComposing: true });
         for (let line = end.line; line > start.line; line--) {
-            post({ type: 'deleteLine', lineNumber: line });
+            post({ type: 'deleteLine', lineNumber: line, isComposing: true });
         }
-        post({ type: 'contentChanged' });
+        post({ type: 'contentChanged', isComposing: true });
 
         const row = viewport.querySelector(`.line-row[data-line="${start.line}"]`);
         const element = row ? row.querySelector('.line-text') : null;
