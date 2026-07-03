@@ -336,6 +336,25 @@ namespace TxtAIEditor.Controls
             {
                 WebViewAppearanceService.ApplyEditorHostBackground(grp.WebView, editorBgColor);
             }
+
+            ApplyImageViewerBackgroundToOpenTabs(editorBgColor);
+        }
+
+        private void ApplyImageViewerBackgroundToOpenTabs(Windows.UI.Color editorBgColor)
+        {
+            ApplyImageViewerBackgroundToTabView(_editorWorkspace.EditorTabViewControl, editorBgColor);
+            ApplyImageViewerBackgroundToTabView(_editorWorkspace.EditorTabView2Control, editorBgColor);
+        }
+
+        private static void ApplyImageViewerBackgroundToTabView(TabView tabView, Windows.UI.Color editorBgColor)
+        {
+            foreach (var item in tabView.TabItems)
+            {
+                if (item is TabViewItem tabItem)
+                {
+                    EditorTabViewItemFactory.ApplyImageViewerBackground(tabItem, editorBgColor);
+                }
+            }
         }
 
         private void RefreshAllSplitters()

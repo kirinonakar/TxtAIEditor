@@ -97,7 +97,8 @@ namespace TxtAIEditor.Controls
 
             var imageHost = new Grid
             {
-                Background = new SolidColorBrush(editorBackgroundColor)
+                Background = new SolidColorBrush(editorBackgroundColor),
+                Tag = "ImageViewerHost"
             };
             imageHost.Children.Add(image);
 
@@ -163,6 +164,37 @@ namespace TxtAIEditor.Controls
             }
 
             await LoadImageSourceAsync(image, filePath);
+        }
+
+        public static void ApplyImageViewerBackground(TabViewItem tabItem, Windows.UI.Color backgroundColor)
+        {
+            if (FindImageViewerHost(tabItem.Content as FrameworkElement) is Panel imageHost)
+            {
+                imageHost.Background = new SolidColorBrush(backgroundColor);
+            }
+        }
+
+        private static FrameworkElement? FindImageViewerHost(FrameworkElement? root)
+        {
+            if (root is FrameworkElement fe &&
+                string.Equals(fe.Tag as string, "ImageViewerHost", StringComparison.Ordinal))
+            {
+                return fe;
+            }
+
+            if (root is Panel panel)
+            {
+                foreach (var child in panel.Children)
+                {
+                    if (child is FrameworkElement childElement &&
+                        FindImageViewerHost(childElement) is FrameworkElement found)
+                    {
+                        return found;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static Image? FindImageControl(FrameworkElement? root)
