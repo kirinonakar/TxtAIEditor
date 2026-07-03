@@ -294,6 +294,8 @@ export function bindPointerSelectionEvents({
             const clickPos = event ? positionFromPointer(event) : null;
             if (clickPos) {
                 const clickColumn = Math.max(0, clickPos.column);
+                const clickScrollTop = scrollContainer.scrollTop;
+                const clickScrollLeft = scrollContainer.scrollLeft;
                 state.selection = null;
                 state.selectionAnchor = { line: clickPos.line, column: clickColumn };
                 state.currentLine = clickPos.line;
@@ -301,7 +303,11 @@ export function bindPointerSelectionEvents({
                 keepEditablePreviewBlockFromElement(clickPos.element);
                 syncCustomSelectionClass();
                 queueRender(true);
-                setTimeout(() => focusLine(clickPos.line, clickColumn), 0);
+                setTimeout(() => {
+                    focusLine(clickPos.line, clickColumn);
+                    scrollContainer.scrollTop = clickScrollTop;
+                    scrollContainer.scrollLeft = clickScrollLeft;
+                }, 0);
                 reportCursorAndSelection(clickPos.element || document.activeElement);
             } else if (hasCustomSelection()) {
                 state.selection = null;
