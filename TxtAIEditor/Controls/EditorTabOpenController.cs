@@ -164,6 +164,7 @@ namespace TxtAIEditor.Controls
                 (tabItem, args) => _showTabContextMenu(tab, tabItem, targetTabView, tabItem, args),
                 _getCurrentFolderPath());
             _tabBridges[tab.Id] = (tabParts.WebView, tabParts.Bridge);
+            _ = tabParts.Bridge.SetSplitViewAsync(_editorWorkspace.CurrentSplitMode != EditorSplitMode.None);
 
             WireEditorBridge(
                 tabParts.Bridge,
@@ -405,6 +406,7 @@ namespace TxtAIEditor.Controls
             bridge.EditorReady += async () =>
             {
                 var currentSession = getSession();
+                await bridge.SetSplitViewAsync(_editorWorkspace.CurrentSplitMode != EditorSplitMode.None);
                 await bridge.InitializeModelAsync(
                     currentSession.Model.LineCount,
                     tab.Language,

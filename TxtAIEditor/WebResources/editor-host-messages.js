@@ -44,6 +44,7 @@ export function createHostMessageHandler({
         case 'initModel':
             state.initialized = true;
             state.language = msg.language || 'plaintext';
+            state.isSplitView = !!msg.isSplitView;
             state.livePreviewLocalResourceVersion = String(Date.now());
             applyOptions(msg);
             updateCsvLocalization(msg);
@@ -156,6 +157,9 @@ export function createHostMessageHandler({
         case 'updateOptions':
             applyOptions(msg);
             updateCsvLocalization(msg);
+            break;
+        case 'setSplitView':
+            state.isSplitView = !!msg.enabled;
             break;
         case 'setCsvTableMode':
             setCsvTableMode(!!msg.enabled, msg);

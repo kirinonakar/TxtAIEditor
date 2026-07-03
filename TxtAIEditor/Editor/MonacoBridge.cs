@@ -18,6 +18,7 @@ namespace TxtAIEditor.Editor
         private bool _isReady = false;
         private string? _pendingText = null;
         private bool _pendingSetTextShouldFocus = true;
+        private bool _isSplitView = false;
         private readonly object _flushLock = new object();
         private readonly Dictionary<int, TaskCompletionSource<bool>> _pendingFlushRequests = new Dictionary<int, TaskCompletionSource<bool>>();
         private int _flushRequestSeq = 0;
@@ -164,6 +165,7 @@ namespace TxtAIEditor.Editor
                 autocompleteOnEnter = settings.AutocompleteOnEnter,
                 autocompleteOnTab = settings.AutocompleteOnTab,
                 readOnly = isReadOnly,
+                isSplitView = _isSplitView,
                 findPlaceholder = _localizationService?.GetString("EditorFindPlaceholder", "찾기") ?? "찾기",
                 replacePlaceholder = _localizationService?.GetString("EditorReplacePlaceholder", "바꾸기") ?? "바꾸기",
                 replaceButton = _localizationService?.GetString("EditorReplaceButton", "바꾸기") ?? "바꾸기",
@@ -238,6 +240,16 @@ namespace TxtAIEditor.Editor
                 lineNumber = Math.Max(1, lineNumber),
                 text = text ?? string.Empty,
                 isComposing = isComposing
+            });
+        }
+
+        public async Task SetSplitViewAsync(bool enabled)
+        {
+            _isSplitView = enabled;
+            await SendMessageAsync(new
+            {
+                action = "setSplitView",
+                enabled = enabled
             });
         }
 
@@ -645,6 +657,7 @@ namespace TxtAIEditor.Editor
                         case "ready":
                             _isReady = true;
                             EditorReady?.Invoke();
+                            _ = SetSplitViewAsync(_isSplitView);
                             if (_pendingText != null)
                             {
                                 _ = SetTextAsync(_pendingText, _pendingSetTextShouldFocus);

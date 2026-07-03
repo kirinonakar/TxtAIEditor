@@ -765,7 +765,8 @@ function finishColumnComposition(element, lineNumber) {
         const selection = normalizeSelection();
         if (selection && selection.start.line !== selection.end.line && !selection.isColumn && !state.isSelecting) {
             const textarea = getOrCreateBypassTextarea();
-            if (document.activeElement !== textarea) {
+            const shouldRefreshBypass = state.isSplitView || document.activeElement !== textarea;
+            if (shouldRefreshBypass) {
                 bypassSelection = cloneEditorSelection(selection);
                 bypassStartLine = selection.start.line;
                 bypassStartColumn = selection.start.column;
@@ -794,9 +795,14 @@ function finishColumnComposition(element, lineNumber) {
                     }
                 }
                 
-                textarea.focus();
+                if (document.activeElement !== textarea) {
+                    textarea.focus();
+                }
+                return true;
             }
         }
+
+        return false;
     }
 
     return {

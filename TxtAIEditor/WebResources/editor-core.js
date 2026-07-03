@@ -72,6 +72,7 @@ const state = {
     pendingImeSelectionCollapse: null,
     textareaImeBypassActive: false,
     bypassStartLine: null,
+    isSplitView: false,
     suppressNextBeforeInputType: null,
     lastManualDeleteAt: 0,
     editingLine: null,

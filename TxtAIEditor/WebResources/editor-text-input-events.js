@@ -19,6 +19,7 @@ import {
     compositionSelectionRange,
     finishColumnComposition,
     finishRangeComposition,
+    focusImeBypassTextarea,
     getCaretOffset,
     inputRangeInElement,
     isPendingImeSelectionCollapseFor,
@@ -37,6 +38,14 @@ import { triggerAutocomplete } from './editor-autocomplete.js';
 
 export function bindTextInputEvents({ renderer }) {
     const { clearPendingInlineLivePreviewFocusForLine } = renderer;
+
+    function isSplitMultilineCompositionSelection(selection) {
+        return !!state.isSplitView &&
+            !!selection &&
+            !selection.isColumn &&
+            selection.start.line !== selection.end.line;
+    }
+
     viewport.addEventListener('input', event => {
         if (shouldSuppressNativeBeforeInput(event)) {
             return;
@@ -88,6 +97,12 @@ export function bindTextInputEvents({ renderer }) {
         let element = lineElementFromEvent(event) || activeEditableElement();
         const pendingCompositionSelection = compositionSelectionRange();
         let collapsedSelectionForComposition = false;
+
+        if (isSplitMultilineCompositionSelection(pendingCompositionSelection)) {
+            focusImeBypassTextarea();
+            state.columnComposition = null;
+            return;
+        }
 
         if (pendingCompositionSelection && !pendingCompositionSelection.isColumn) {
             const isCollapsed = pendingCompositionSelection.start.line === pendingCompositionSelection.end.line &&
@@ -161,6 +176,14 @@ export function bindTextInputEvents({ renderer }) {
             event.inputType === 'insertCompositionText' ||
             event.inputType === 'deleteCompositionText') {
             const pendingCompositionSelection = compositionSelectionRange(!state.isComposing);
+            if (isSplitMultilineCompositionSelection(pendingCompositionSelection)) {
+                if (focusImeBypassTextarea()) {
+                    event.preventDefault();
+                }
+                state.columnComposition = null;
+                return;
+            }
+
             if (pendingCompositionSelection && !pendingCompositionSelection.isColumn) {
                 const replacedElement = replaceSelectionForCompositionStart(element || activeEditableElement());
                 if (replacedElement) {

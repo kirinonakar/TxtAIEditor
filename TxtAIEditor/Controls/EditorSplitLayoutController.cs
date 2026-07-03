@@ -151,6 +151,7 @@ namespace TxtAIEditor.Controls
             }
 
             _editorWorkspace.SetSplitMode(EditorSplitMode.None, () => _openBlankTab());
+            UpdateEditorSplitViewState();
             MergeDuplicateFileTabsAfterUnsplit(preferredTab?.Id);
         }
 
@@ -158,12 +159,26 @@ namespace TxtAIEditor.Controls
         {
             var sourceTab = _getActiveTab();
             _editorWorkspace.SetSplitMode(EditorSplitMode.Vertical, () => OpenSplitNewTab(sourceTab));
+            UpdateEditorSplitViewState();
         }
 
         private void OnSplitHorizontalClick(object sender, RoutedEventArgs e)
         {
             var sourceTab = _getActiveTab();
             _editorWorkspace.SetSplitMode(EditorSplitMode.Horizontal, () => OpenSplitNewTab(sourceTab));
+            UpdateEditorSplitViewState();
+        }
+
+        private void UpdateEditorSplitViewState()
+        {
+            bool isSplitView = _editorWorkspace.CurrentSplitMode != EditorSplitMode.None;
+            foreach (var bridgeGroup in _tabBridges.Values)
+            {
+                if (bridgeGroup.Bridge != null)
+                {
+                    _ = bridgeGroup.Bridge.SetSplitViewAsync(isSplitView);
+                }
+            }
         }
 
         private void MergeDuplicateFileTabsAfterUnsplit(string? preferredTabId)
@@ -230,6 +245,7 @@ namespace TxtAIEditor.Controls
         {
             _editorWorkspace.ActiveTabView = sender;
             _openBlankTab();
+            UpdateEditorSplitViewState();
         }
 
         private void OnEditorTabView2TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
