@@ -312,6 +312,7 @@ namespace TxtAIEditor.Controls
                         options.SuppressDefaultFindDialog = true;
                         find.Stop();
                         await find.StartAsync(options);
+                        await RefocusFindInputAsync(pdfWebView);
                         break;
                     case "next":
                         find.FindNext();
@@ -356,6 +357,23 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private static async Task RefocusFindInputAsync(WebView2 pdfWebView)
+        {
+            if (pdfWebView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await pdfWebView.CoreWebView2.ExecuteScriptAsync(
+                    "document.getElementById('txt-pdf-find-input')?.focus()");
+            }
+            catch
+            {
+            }
+        }
+
         private string BuildPdfFindBridgeScript()
         {
             string optionsJson = JsonSerializer.Serialize(new
@@ -382,7 +400,8 @@ namespace TxtAIEditor.Controls
     let closeButton = null;
     let status = null;
     let matchCase = false;
-    let debounceTimer = 0;
+    let lastSearchedQuery = null;
+    let lastSearchedCase = false;
 
     function post(action, payload = {}) {
         try {
@@ -572,14 +591,10 @@ namespace TxtAIEditor.Controls
             nextButton.title = options.findNextTooltip || '';
             closeButton.title = options.findCloseTooltip || '';
 
-            input.addEventListener('input', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(start, 180);
-            });
             input.addEventListener('keydown', event => {
                 if (event.key === 'Enter') {
                     event.preventDefault();
-                    post(event.shiftKey ? 'previous' : 'next');
+                    handleFindEnter(event.shiftKey);
                 } else if (event.key === 'Escape') {
                     event.preventDefault();
                     close();
@@ -601,9 +616,23 @@ namespace TxtAIEditor.Controls
         }
     }
 
+    function handleFindEnter(shiftKey) {
+        ensurePanel();
+        const q = input ? (input.value || '') : '';
+        if (!q) return;
+        if (q !== lastSearchedQuery || matchCase !== lastSearchedCase) {
+            start();
+        } else {
+            post(shiftKey ? 'previous' : 'next');
+        }
+        setTimeout(() => { if (input) input.focus(); }, 120);
+    }
+
     function start() {
         ensurePanel();
-        post('start', { query: input.value || '', matchCase });
+        lastSearchedQuery = input.value || '';
+        lastSearchedCase = matchCase;
+        post('start', { query: lastSearchedQuery, matchCase });
     }
 
     function open() {
@@ -611,13 +640,13 @@ namespace TxtAIEditor.Controls
         panel.hidden = false;
         input.focus();
         input.select();
-        start();
         return true;
     }
 
     function close() {
         ensurePanel();
         panel.hidden = true;
+        lastSearchedQuery = null;
         post('close');
     }
 
@@ -635,6 +664,16 @@ namespace TxtAIEditor.Controls
             event.preventDefault();
             event.stopPropagation();
             open();
+            return;
+        }
+        if (panel && !panel.hidden) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                handleFindEnter(event.shiftKey);
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                close();
+            }
         }
     }, true);
 
