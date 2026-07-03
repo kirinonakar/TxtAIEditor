@@ -69,10 +69,49 @@ export function bindPointerSelectionEvents({
 
     let lastPointerDownTime = 0;
     let lastPointerDownPosition = null;
+    let activeSelectionPointerId = null;
+
+    function captureSelectionPointer(event) {
+        activeSelectionPointerId = event.pointerId;
+        try {
+            scrollContainer.setPointerCapture?.(event.pointerId);
+        } catch (e) { }
+    }
+
+    function releaseSelectionPointer(event = null) {
+        const pointerId = event?.pointerId ?? activeSelectionPointerId;
+        activeSelectionPointerId = null;
+        if (pointerId === null || pointerId === undefined) return;
+
+        try {
+            if (!scrollContainer.hasPointerCapture || scrollContainer.hasPointerCapture(pointerId)) {
+                scrollContainer.releasePointerCapture?.(pointerId);
+            }
+        } catch (e) { }
+    }
+
+    function cancelActiveSelectionInteraction({ render = true } = {}) {
+        const wasActive = state.isSelecting || state.isLineSelecting || state.isDragPotential || state.isDragMoving;
+        if (!wasActive) return;
+
+        stopSelectionAutoScroll();
+        releaseSelectionPointer();
+        state.isSelecting = false;
+        state.isLineSelecting = false;
+        state.dragStartPosition = null;
+        cleanupDragState();
+        document.body.classList.remove('selecting');
+        syncCustomSelectionClass();
+        if (render) {
+            queueRender(true);
+            reportCursorAndSelection(document.activeElement);
+        }
+    }
 
     scrollContainer.addEventListener('pointerdown', event => {
         if (state.csvTableEnabled) return;
         if (event.button !== 0 || findPanel.contains(event.target)) return;
+        cancelActiveSelectionInteraction({ render: false });
 
         if (event.ctrlKey) {
             const position = positionFromPointer(event);
@@ -110,7 +149,7 @@ export function bindPointerSelectionEvents({
                 const lineLength = text.length;
 
                 event.preventDefault();
-                scrollContainer.setPointerCapture?.(event.pointerId);
+                captureSelectionPointer(event);
 
                 state.selectionAnchor = { line: line, column: 0 };
                 state.selection = { start: { line: line, column: 0 }, end: { line: line, column: lineLength || 1 } };
@@ -174,7 +213,7 @@ export function bindPointerSelectionEvents({
             state.currentColumn = precisePos.column + 1;
             beginInlineLivePreviewEdit(precisePos.line, precisePos.column);
         } else {
-            scrollContainer.setPointerCapture?.(event.pointerId);
+            captureSelectionPointer(event);
 
             const hadSelection = hasCustomSelection();
             const positionText = state.cache.get(position.line) ?? lineTextFromElement(position.element);
@@ -259,11 +298,7 @@ export function bindPointerSelectionEvents({
             state.isSelecting = false;
             state.isLineSelecting = false;
             document.body.classList.remove('selecting');
-            if (event && event.pointerId !== undefined) {
-                try {
-                    scrollContainer.releasePointerCapture?.(event.pointerId);
-                } catch (e) { }
-            }
+            releaseSelectionPointer(event);
             state.dragStartPosition = null;
 
             if (dropPos && hasCustomSelection() && dragData.text) {
@@ -323,11 +358,7 @@ export function bindPointerSelectionEvents({
         state.isLineSelecting = false;
         document.body.classList.remove('selecting');
         syncCustomSelectionClass();
-        if (event && event.pointerId !== undefined) {
-            try {
-                scrollContainer.releasePointerCapture?.(event.pointerId);
-            } catch (e) { }
-        }
+        releaseSelectionPointer(event);
         state.dragStartPosition = null;
         const hadSelection = hasCustomSelection();
         const selection = normalizeSelection();
@@ -586,19 +617,37 @@ export function bindPointerSelectionEvents({
         updateHoveredLineFromCoordinates(event.clientX, event.clientY);
     });
 
+    scrollContainer.addEventListener('lostpointercapture', event => {
+        if (activeSelectionPointerId === event.pointerId &&
+            (state.isSelecting || state.isDragPotential || state.isDragMoving)) {
+            cancelActiveSelectionInteraction();
+        }
+        if (activeSelectionPointerId === event.pointerId) {
+            activeSelectionPointerId = null;
+        }
+    });
+
+    scrollContainer.addEventListener('wheel', () => {
+        cancelActiveSelectionInteraction({ render: false });
+    }, { capture: true });
+
     window.addEventListener('pointerup', event => {
         endSelection(event);
     });
 
     window.addEventListener('pointercancel', event => {
         if (!state.isSelecting) return;
-        stopSelectionAutoScroll();
-        state.isSelecting = false;
-        state.isLineSelecting = false;
-        document.body.classList.remove('selecting');
-        syncCustomSelectionClass();
-        queueRender(true);
-        reportCursorAndSelection(document.activeElement);
+        cancelActiveSelectionInteraction();
+    });
+
+    window.addEventListener('blur', () => {
+        cancelActiveSelectionInteraction();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            cancelActiveSelectionInteraction();
+        }
     });
 
     viewport.addEventListener('click', event => {

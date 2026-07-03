@@ -37,12 +37,15 @@ namespace TxtAIEditor.Controls
         private void WireEvents()
         {
             _root.DragOver += OnRootDragOver;
+            _root.DragLeave += OnRootDragLeave;
             _root.Drop += OnRootDrop;
             _root.KeyDown += OnRootKeyDown;
 
             _dragOverlay.DragOver += OnDragOverlayOver;
             _dragOverlay.Drop += OnDragOverlayDrop;
             _dragOverlay.DragLeave += OnDragOverlayLeave;
+            _dragOverlay.PointerPressed += OnDragOverlayPointerInput;
+            _dragOverlay.PointerWheelChanged += OnDragOverlayPointerInput;
 
             _leftSplitter.PointerPressed += OnLeftSplitterPointerPressed;
             _leftSplitter.PointerMoved += OnLeftSplitterPointerMoved;
@@ -63,6 +66,11 @@ namespace TxtAIEditor.Controls
             await _fileOpenDropController.HandleRootDropAsync(e);
         }
 
+        private void OnRootDragLeave(object sender, DragEventArgs e)
+        {
+            _fileOpenDropController.HandleDragOverlayLeave();
+        }
+
         private void OnDragOverlayOver(object sender, DragEventArgs e)
         {
             _fileOpenDropController.HandleDragOverlayOver(e);
@@ -74,6 +82,11 @@ namespace TxtAIEditor.Controls
         }
 
         private void OnDragOverlayLeave(object sender, DragEventArgs e)
+        {
+            _fileOpenDropController.HandleDragOverlayLeave();
+        }
+
+        private void OnDragOverlayPointerInput(object sender, PointerRoutedEventArgs e)
         {
             _fileOpenDropController.HandleDragOverlayLeave();
         }
