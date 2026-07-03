@@ -901,7 +901,7 @@ namespace TxtAIEditor.Controls
                 {
                     Text = commitInfo,
                     FontFamily = new FontFamily("Consolas"),
-                    FontSize = 11,
+                    FontSize = 13,
                     TextWrapping = TextWrapping.Wrap
                 }
             });
