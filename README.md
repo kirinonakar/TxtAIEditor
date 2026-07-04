@@ -65,8 +65,8 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Document Preview:** Preview PDF, DOCX, PPTX, HWPX, and XLSX files directly inside TxtAIEditor without leaving the workspace.
 *   **Unified Viewer Workflow:** Open supported office documents from the Explorer or editor tabs and inspect their contents alongside the rest of your project files.
 
-### 📊 Interactive CSV Table Mode
-*   **Grid Editor Shell:** Automatically renders `.csv` files into a premium, highly responsive interactive spreadsheet-like grid instead of raw comma-separated text.
+### 📊 Interactive CSV/JSON Table Mode
+*   **Grid Editor Shell:** Automatically renders `.csv` and `.json` files into a premium, highly responsive interactive spreadsheet-like grid/table instead of raw text (decodes and displays JSON objects/arrays in a structured table layout).
 *   **Column & Row Multi-Select:** Click row numbers or column headers to select entire rows/columns, with support for range dragging and multi-selection using `Ctrl` and `Shift` keys.
 *   **Formula Bar & Name Box:** Built-in toolbar at the top showing the current active cell coordinates (e.g., `A1`, `D12`) along with an editable formula bar for writing and viewing values.
 *   **Dynamic Column Resizing:** Drag the border of any column header to resize column widths in real-time.
