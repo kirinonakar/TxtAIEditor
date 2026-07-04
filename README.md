@@ -67,7 +67,6 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 🔍 Read-Only Hex Viewer
 *   **Binary Inspection:** View raw binary content in a side-by-side layout (Offset, Hex bytes, and ASCII representation).
-*   **Lightweight Streaming:** Streams parts of large files on-demand to maintain responsiveness without high memory usage.
 *   **Easy Access & UI Integration:** Right-click any open tab and select **"Hex View"**. Cursor offset and selections are shown in hex format on the status bar.
 
 ### 📊 Interactive CSV/JSON Table Mode
