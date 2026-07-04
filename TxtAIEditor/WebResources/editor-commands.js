@@ -55,6 +55,10 @@ import {
     normalizeSelection
 } from './editor-selection.js';
 import { createEditorCompositionHandlers } from './editor-composition.js';
+import {
+    copyCsvSelectionToClipboard,
+    cutCsvSelectionToClipboard
+} from './editor-csv-table.js';
 import { createMarkdownCommandHandlers } from './editor-markdown-commands.js';
 import { createTextCommandActions } from './editor-text-command-actions.js';
 
@@ -1869,6 +1873,10 @@ function deleteSelectionOrForward() {
 }
 
 async function cutSelectionToClipboard() {
+    if (state.csvTableEnabled) {
+        return await cutCsvSelectionToClipboard();
+    }
+
     const text = selectedText();
     if (!text) return false;
     const copied = await writeClipboardText(text);
@@ -1891,6 +1899,10 @@ async function cutSelectionToClipboard() {
 }
 
 async function copySelectionToClipboard() {
+    if (state.csvTableEnabled) {
+        return await copyCsvSelectionToClipboard();
+    }
+
     const text = selectedText();
     if (!text) return false;
     return await writeClipboardText(text);

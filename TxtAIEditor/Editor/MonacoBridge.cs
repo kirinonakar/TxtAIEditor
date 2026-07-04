@@ -210,7 +210,9 @@ namespace TxtAIEditor.Editor
                 autocompleteSnippet = _localizationService?.GetString("EditorAutocompleteSnippet", "스니펫") ?? "스니펫",
                 autocompleteSnippetPrefix = _localizationService?.GetString("EditorAutocompleteSnippetPrefix", "스니펫:") ?? "스니펫:",
                 csvNameBoxPlaceholder = _localizationService?.GetString("CsvNameBoxPlaceholder", "셀") ?? "셀",
-                csvFormulaPlaceholder = _localizationService?.GetString("CsvFormulaPlaceholder", "선택한 CSV 셀 값") ?? "선택한 CSV 셀 값"
+                csvFormulaPlaceholder = _localizationService?.GetString("CsvFormulaPlaceholder", "선택한 CSV 셀 값") ?? "선택한 CSV 셀 값",
+                csvJsonKeyHeader = _localizationService?.GetString("CsvJsonKeyHeader", "키") ?? "키",
+                csvJsonValueHeader = _localizationService?.GetString("CsvJsonValueHeader", "값") ?? "값"
             };
             await SendMessageAsync(msg);
         }
@@ -456,7 +458,9 @@ namespace TxtAIEditor.Editor
                 autocompleteSnippet = _localizationService?.GetString("EditorAutocompleteSnippet", "스니펫") ?? "스니펫",
                 autocompleteSnippetPrefix = _localizationService?.GetString("EditorAutocompleteSnippetPrefix", "스니펫:") ?? "스니펫:",
                 csvNameBoxPlaceholder = _localizationService?.GetString("CsvNameBoxPlaceholder", "셀") ?? "셀",
-                csvFormulaPlaceholder = _localizationService?.GetString("CsvFormulaPlaceholder", "선택한 CSV 셀 값") ?? "선택한 CSV 셀 값"
+                csvFormulaPlaceholder = _localizationService?.GetString("CsvFormulaPlaceholder", "선택한 CSV 셀 값") ?? "선택한 CSV 셀 값",
+                csvJsonKeyHeader = _localizationService?.GetString("CsvJsonKeyHeader", "키") ?? "키",
+                csvJsonValueHeader = _localizationService?.GetString("CsvJsonValueHeader", "값") ?? "값"
             };
             await SendMessageAsync(msg);
         }
@@ -584,7 +588,9 @@ namespace TxtAIEditor.Editor
                 action = "setCsvTableMode",
                 enabled = enabled,
                 csvNameBoxPlaceholder = _localizationService?.GetString("CsvNameBoxPlaceholder", "셀") ?? "셀",
-                csvFormulaPlaceholder = _localizationService?.GetString("CsvFormulaPlaceholder", "선택한 CSV 셀 값") ?? "선택한 CSV 셀 값"
+                csvFormulaPlaceholder = _localizationService?.GetString("CsvFormulaPlaceholder", "선택한 CSV 셀 값") ?? "선택한 CSV 셀 값",
+                csvJsonKeyHeader = _localizationService?.GetString("CsvJsonKeyHeader", "키") ?? "키",
+                csvJsonValueHeader = _localizationService?.GetString("CsvJsonValueHeader", "값") ?? "값"
             };
             await SendMessageAsync(msg);
         }

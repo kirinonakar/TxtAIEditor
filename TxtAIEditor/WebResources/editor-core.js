@@ -102,6 +102,7 @@ const state = {
     },
     originalLines: [],
     dirtyLines: new Map(),
+    csvVirtualLineCount: 0,
     longLineProtectionFormat: 'Long line: {0} chars, render protection'
 };
 
@@ -479,6 +480,7 @@ function applyOptions(msg) {
 
 function setupModel(lineCount) {
     state.lineCount = Math.max(1, Number(lineCount || 1));
+    state.csvVirtualLineCount = 0;
     state.cache.clear();
     state.pending.clear();
     state.preservedScrollTop = null;
@@ -786,7 +788,7 @@ function shiftMeasuredLineHeights(fromLine, delta) {
 }
 
 function totalVirtualHeight() {
-    let total = Math.max(1, state.lineCount) * state.lineHeight;
+    let total = effectiveLineCount() * state.lineHeight;
     if (usesMeasuredLineHeights()) {
         ensureLineHeightIndex();
         total += state.lineHeightIndex.totalDelta;
@@ -801,13 +803,14 @@ function lineTop(lineNumber) {
 }
 
 function lineAt(scrollTop) {
+    const lineCount = effectiveLineCount();
     if (!usesMeasuredLineHeights() || state.lineHeights.size === 0) {
-        return Math.min(state.lineCount, Math.max(1, Math.floor(scrollTop / state.lineHeight) + 1));
+        return Math.min(lineCount, Math.max(1, Math.floor(scrollTop / state.lineHeight) + 1));
     }
 
     const targetTop = Math.max(0, Number(scrollTop || 0));
     let low = 1;
-    let high = state.lineCount;
+    let high = lineCount;
     let result = 1;
     while (low <= high) {
         const mid = Math.floor((low + high) / 2);
@@ -818,16 +821,25 @@ function lineAt(scrollTop) {
             high = mid - 1;
         }
     }
-    return Math.min(state.lineCount, Math.max(1, result));
+    return Math.min(lineCount, Math.max(1, result));
 }
 
 function visibleRange() {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
+    const lineCount = effectiveLineCount();
     const firstVisible = lineAt(scrollContainer.scrollTop);
     const lastVisible = lineAt(scrollContainer.scrollTop + viewHeight);
     const start = Math.max(1, firstVisible - state.overscan);
-    const end = Math.min(state.lineCount, lastVisible + state.overscan);
+    const end = Math.min(lineCount, lastVisible + state.overscan);
     return { start, end, count: Math.max(0, end - start + 1) };
+}
+
+function effectiveLineCount() {
+    if (state.csvTableEnabled && Number(state.csvVirtualLineCount || 0) > 0) {
+        return Math.max(1, Number(state.csvVirtualLineCount || 1));
+    }
+
+    return Math.max(1, state.lineCount);
 }
 
 function requestLines(start, count) {
@@ -844,6 +856,12 @@ function requestLines(start, count) {
 }
 
 function requestMissingLines(start, end) {
+    const sourceLineCount = Math.max(1, Number(state.lineCount || 1));
+    if (Number(start || 1) > sourceLineCount) return;
+
+    start = Math.max(1, Number(start || 1));
+    end = Math.min(sourceLineCount, Math.max(start, Number(end || start)));
+
     let missingStart = 0;
     let missingCount = 0;
     for (let line = start; line <= end; line++) {

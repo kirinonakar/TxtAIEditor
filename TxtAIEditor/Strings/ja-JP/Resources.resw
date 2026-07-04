@@ -92,6 +92,12 @@
   <data name="CsvFormulaPlaceholder" xml:space="preserve">
     <value>選択したCSVセルの値</value>
   </data>
+  <data name="CsvJsonKeyHeader" xml:space="preserve">
+    <value>キー</value>
+  </data>
+  <data name="CsvJsonValueHeader" xml:space="preserve">
+    <value>値</value>
+  </data>
   <data name="Theme" xml:space="preserve">
     <value>テーマ</value>
   </data>

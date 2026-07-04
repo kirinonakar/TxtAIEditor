@@ -92,6 +92,12 @@
   <data name="CsvFormulaPlaceholder" xml:space="preserve">
     <value>選定的 CSV 單元格值</value>
   </data>
+  <data name="CsvJsonKeyHeader" xml:space="preserve">
+    <value>鍵</value>
+  </data>
+  <data name="CsvJsonValueHeader" xml:space="preserve">
+    <value>值</value>
+  </data>
   <data name="Theme" xml:space="preserve">
     <value>主題</value>
   </data>

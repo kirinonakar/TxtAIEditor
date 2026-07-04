@@ -19,6 +19,8 @@ import {
     selectionBoundsForLine
 } from './editor-selection.js';
 import {
+    isJsonCsvTableMode,
+    prepareCsvTableRenderModel,
     renderCsvTableRows,
     restoreCsvFocusAfterRender
 } from './editor-csv-table.js';
@@ -102,6 +104,7 @@ function createEditorRenderer({
 
         syncCustomSelectionClass();
 
+        const csvTableLineCount = state.csvTableEnabled ? prepareCsvTableRenderModel() : 0;
         const range = visibleRange();
         const livePreviewContextLines = state.inlineLivePreviewEnabled ? 120 : 0;
         let renderStart = Math.max(1, range.start - livePreviewContextLines);
@@ -111,7 +114,7 @@ function createEditorRenderer({
             const firstVisibleCsvLine = lineAt(scrollContainer.scrollTop);
             const lastVisibleCsvLine = lineAt(scrollContainer.scrollTop + Math.max(scrollContainer.clientHeight, state.lineHeight));
             renderStart = Math.max(1, firstVisibleCsvLine - csvOverscan);
-            renderEnd = Math.min(state.lineCount, lastVisibleCsvLine + csvOverscan);
+            renderEnd = Math.min(Math.max(1, csvTableLineCount || state.lineCount), lastVisibleCsvLine + csvOverscan);
         }
         const activeEl = document.activeElement;
         const isFocused = activeEl && activeEl.closest('.line-text') && activeEl.getAttribute('contenteditable') === 'true';
@@ -138,9 +141,11 @@ function createEditorRenderer({
         const editablePreviewBlockKey = editablePreviewBlock
             ? `${editablePreviewBlock.kind}:${editablePreviewBlock.startLine}:${editablePreviewBlock.endLine}`
             : '';
-        const csvModeKey = state.csvTableEnabled ? `${state.csvTableVersion || 0}:${state.csvTableColumnCount || 0}:${state.csvSelectedLine || 0}:${state.csvSelectedColumn || 0}` : '0';
+        const csvModeKey = state.csvTableEnabled ? `${state.csvTableVersion || 0}:${state.csvTableColumnCount || 0}:${state.csvSelectedLine || 0}:${state.csvSelectedColumn || 0}:${state.csvVirtualLineCount || 0}` : '0';
         const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${scrollContainer.scrollLeft}:${state.wordWrap}:${totalVirtualHeight()}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${activeLine || 0}:${state.editingLine || 0}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
-        requestMissingLines(renderStart, renderEnd);
+        if (!state.csvTableEnabled || !isJsonCsvTableMode()) {
+            requestMissingLines(renderStart, renderEnd);
+        }
         if (rangeKey === state.lastRangeKey) return;
         state.lastRangeKey = rangeKey;
 
