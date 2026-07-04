@@ -782,6 +782,12 @@
   <data name="FavoritesFolderTab" xml:space="preserve">
     <value>폴더</value>
   </data>
+  <data name="RecentFileTab" xml:space="preserve">
+    <value>파일</value>
+  </data>
+  <data name="RecentFolderTab" xml:space="preserve">
+    <value>폴더</value>
+  </data>
   <data name="FavoritesPinTooltip" xml:space="preserve">
     <value>고정</value>
   </data>
@@ -3176,6 +3182,12 @@
   </data>
   <data name="RecentFileMissingMessageFormat" xml:space="preserve">
     <value>최근 파일이 존재하지 않습니다:&#10;{0}</value>
+  </data>
+  <data name="FolderOpenFailedTitle" xml:space="preserve">
+    <value>폴더 열기 실패</value>
+  </data>
+  <data name="RecentFolderMissingMessageFormat" xml:space="preserve">
+    <value>최근 폴더가 존재하지 않습니다:&#10;{0}</value>
   </data>
   <data name="CompareTabTitleFormat" xml:space="preserve">
     <value>비교: {0} ↔ {1}</value>

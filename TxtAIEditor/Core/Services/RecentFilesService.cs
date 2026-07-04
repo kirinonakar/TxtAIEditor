@@ -31,7 +31,7 @@ namespace TxtAIEditor.Core.Services
             _recentFilesFilePath = recentFilesFilePath;
         }
 
-        public void LoadInto(ObservableCollection<RecentFileItem> recentFiles)
+        public void LoadInto(List<RecentFileItem> recentFiles)
         {
             try
             {
@@ -54,7 +54,16 @@ namespace TxtAIEditor.Core.Services
                     {
                         if (string.IsNullOrWhiteSpace(item.Name))
                         {
-                            item.Name = Path.GetFileName(item.Path);
+                            if (item.IsFolder)
+                            {
+                                string displayPath = item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                                string name = Path.GetFileName(displayPath);
+                                item.Name = string.IsNullOrWhiteSpace(name) ? displayPath : name;
+                            }
+                            else
+                            {
+                                item.Name = Path.GetFileName(item.Path);
+                            }
                         }
 
                         recentFiles.Add(item);
@@ -121,12 +130,13 @@ namespace TxtAIEditor.Core.Services
                 {
                     Name = item.Name,
                     Path = item.Path,
-                    LastOpenedText = item.LastOpenedText
+                    LastOpenedText = item.LastOpenedText,
+                    IsFolder = item.IsFolder
                 })
                 .ToList();
         }
 
-        public void Add(ObservableCollection<RecentFileItem> recentFiles, string filePath)
+        public void Add(List<RecentFileItem> recentFiles, string filePath, bool isFolder)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -142,16 +152,43 @@ namespace TxtAIEditor.Core.Services
                     recentFiles.Remove(existing);
                 }
 
+                string displayName;
+                if (isFolder)
+                {
+                    string displayPath = fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    string name = Path.GetFileName(displayPath);
+                    displayName = string.IsNullOrWhiteSpace(name) ? displayPath : name;
+                }
+                else
+                {
+                    displayName = Path.GetFileName(fullPath);
+                }
+
                 recentFiles.Insert(0, new RecentFileItem
                 {
-                    Name = Path.GetFileName(fullPath),
+                    Name = displayName,
                     Path = fullPath,
+                    IsFolder = isFolder,
                     LastOpenedText = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 });
 
-                while (recentFiles.Count > MaxRecentFiles)
+                // Separate capacity limits
+                var files = recentFiles.Where(f => !f.IsFolder).ToList();
+                var folders = recentFiles.Where(f => f.IsFolder).ToList();
+
+                if (files.Count > MaxRecentFiles)
                 {
-                    recentFiles.RemoveAt(recentFiles.Count - 1);
+                    foreach (var item in files.Skip(MaxRecentFiles))
+                    {
+                        recentFiles.Remove(item);
+                    }
+                }
+                if (folders.Count > MaxRecentFiles)
+                {
+                    foreach (var item in folders.Skip(MaxRecentFiles))
+                    {
+                        recentFiles.Remove(item);
+                    }
                 }
 
                 SaveLater(CreateSnapshot(recentFiles));
@@ -162,7 +199,7 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        public bool Remove(ObservableCollection<RecentFileItem> recentFiles, string path)
+        public bool Remove(List<RecentFileItem> recentFiles, string path)
         {
             var existing = recentFiles.FirstOrDefault(f => f.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
             if (existing == null)

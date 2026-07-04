@@ -137,6 +137,11 @@ namespace TxtAIEditor.Composition
             UpdateAutoSaveStatus();
             UpdateAllTabWorkspaceIndicators();
             Controllers.Workspace.GitStatusRefresh.QueueRefresh();
+
+            if (Controllers?.Workspace?.FavoritesRecent != null && !string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+            {
+                Controllers.Workspace.FavoritesRecent.AddRecentFolder(folderPath);
+            }
         }
 
         public void SetCurrentRepoPath(string repoPath)

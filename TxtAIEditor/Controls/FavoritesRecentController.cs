@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly Dictionary<string, bool> _favoriteFolderHints = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<RecentFileItem> _allRecentItems = new();
 
         public FavoritesRecentController(
             ISettingsService settingsService,
@@ -54,12 +55,40 @@ namespace TxtAIEditor.Controls
 
         public void LoadRecentFiles()
         {
-            _recentFilesService.LoadInto(_viewModel.RecentFiles);
+            _allRecentItems.Clear();
+            _recentFilesService.LoadInto(_allRecentItems);
+            bool showFiles = _leftSidebar.RecentFileTabButton.IsChecked == true;
+            RefreshRecentFiles(showFiles);
+        }
+
+        public void RefreshRecentFiles(bool filterFiles)
+        {
+            _viewModel.RecentFiles.Clear();
+            var filtered = _allRecentItems.Where(i => i.IsFolder == !filterFiles).ToList();
+            foreach (var item in filtered)
+            {
+                _viewModel.RecentFiles.Add(item);
+            }
         }
 
         public void AddRecentFile(string filePath)
         {
-            _enqueueOnUiThread(() => _recentFilesService.Add(_viewModel.RecentFiles, filePath));
+            _enqueueOnUiThread(() =>
+            {
+                _recentFilesService.Add(_allRecentItems, filePath, isFolder: false);
+                bool showFiles = _leftSidebar.RecentFileTabButton.IsChecked == true;
+                RefreshRecentFiles(showFiles);
+            });
+        }
+
+        public void AddRecentFolder(string folderPath)
+        {
+            _enqueueOnUiThread(() =>
+            {
+                _recentFilesService.Add(_allRecentItems, folderPath, isFolder: true);
+                bool showFiles = _leftSidebar.RecentFileTabButton.IsChecked == true;
+                RefreshRecentFiles(showFiles);
+            });
         }
 
         public Task AddFavoritePathAsync(string path)
@@ -136,6 +165,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.FavoritesTabClick += OnFavoritesTabClick;
             _leftSidebar.RecentFileItemClick += OnRecentFileItemClick;
             _leftSidebar.RemoveRecentFileClick += OnRemoveRecentFileClick;
+            _leftSidebar.RecentTabClick += OnRecentTabClick;
         }
 
         private async void OnAddFolderToFavoritesClick(object sender, RoutedEventArgs e)
@@ -319,11 +349,26 @@ namespace TxtAIEditor.Controls
             RefreshFavorites(showFiles);
         }
 
+        private void OnRecentTabClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not ToggleButton button)
+            {
+                return;
+            }
+
+            bool showFiles = button == _leftSidebar.RecentFileTabButton;
+            _leftSidebar.RecentFileTabButton.IsChecked = showFiles;
+            _leftSidebar.RecentFolderTabButton.IsChecked = !showFiles;
+            RefreshRecentFiles(showFiles);
+        }
+
         private void OnRemoveRecentFileClick(object sender, RoutedEventArgs e)
         {
             if (sender is Button { Tag: string path })
             {
-                _recentFilesService.Remove(_viewModel.RecentFiles, path);
+                _recentFilesService.Remove(_allRecentItems, path);
+                bool showFiles = _leftSidebar.RecentFileTabButton.IsChecked == true;
+                RefreshRecentFiles(showFiles);
             }
         }
 
@@ -333,6 +378,20 @@ namespace TxtAIEditor.Controls
                 ?? _leftSidebar.RecentFilesList.SelectedItem as RecentFileItem;
             if (item == null)
             {
+                return;
+            }
+
+            if (item.IsFolder)
+            {
+                if (!Directory.Exists(item.Path))
+                {
+                    _showError(
+                        _getString("FolderOpenFailedTitle", "폴더 열기 실패"),
+                        string.Format(_getString("RecentFolderMissingMessageFormat", "최근 폴더가 존재하지 않습니다:\n{0}"), item.Path));
+                    return;
+                }
+
+                await _navigateExplorerToFolderAsync(item.Path);
                 return;
             }
 

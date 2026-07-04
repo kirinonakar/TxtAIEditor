@@ -782,6 +782,12 @@
   <data name="FavoritesFolderTab" xml:space="preserve">
     <value>資料夾</value>
   </data>
+  <data name="RecentFileTab" xml:space="preserve">
+    <value>檔案</value>
+  </data>
+  <data name="RecentFolderTab" xml:space="preserve">
+    <value>資料夾</value>
+  </data>
   <data name="FavoritesPinTooltip" xml:space="preserve">
     <value>插銷</value>
   </data>
@@ -3176,6 +3182,12 @@
   </data>
   <data name="RecentFileMissingMessageFormat" xml:space="preserve">
     <value>最近使用的檔案不存在:&#10;{0}</value>
+  </data>
+  <data name="FolderOpenFailedTitle" xml:space="preserve">
+    <value>開啟資料夾失敗</value>
+  </data>
+  <data name="RecentFolderMissingMessageFormat" xml:space="preserve">
+    <value>最近使用的資料夾不存在:&#10;{0}</value>
   </data>
   <data name="CompareTabTitleFormat" xml:space="preserve">
     <value>比較：{0} ↔ {1}</value>

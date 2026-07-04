@@ -82,6 +82,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? RemoveFavoriteClick;
         public event RoutedEventHandler? FavoritePinClick;
         public event RoutedEventHandler? FavoritesTabClick;
+        public event RoutedEventHandler? RecentTabClick;
         public event DoubleTappedEventHandler? SnippetItemDoubleTapped;
         public event RoutedEventHandler? DeleteSnippetClick;
         public event RoutedEventHandler? EditSnippetClick;
@@ -192,6 +193,8 @@ namespace TxtAIEditor.Controls
 
         public ToggleButton FavoritesFileTabButton => FavoritesFileTab;
         public ToggleButton FavoritesFolderTabButton => FavoritesFolderTab;
+        public ToggleButton RecentFileTabButton => RecentFileTab;
+        public ToggleButton RecentFolderTabButton => RecentFolderTab;
 
         public void Localize(Func<string, string, string> getString, bool updateEmptyFolderStatus)
         {
@@ -238,6 +241,8 @@ namespace TxtAIEditor.Controls
 
             FavoritesFileTab.Content = getString("FavoritesFileTab", "파일");
             FavoritesFolderTab.Content = getString("FavoritesFolderTab", "폴더");
+            RecentFileTab.Content = getString("RecentFileTab", "파일");
+            RecentFolderTab.Content = getString("RecentFolderTab", "폴더");
 
             RecentFilesHeaderText.Text = getString("RecentFilesHeader", "최근 파일");
 
@@ -350,6 +355,7 @@ namespace TxtAIEditor.Controls
         private void OnRemoveFavoriteClick(object sender, RoutedEventArgs e) => RemoveFavoriteClick?.Invoke(sender, e);
         private void OnFavoritePinClick(object sender, RoutedEventArgs e) => FavoritePinClick?.Invoke(sender, e);
         private void OnFavoritesTabClick(object sender, RoutedEventArgs e) => FavoritesTabClick?.Invoke(sender, e);
+        private void OnRecentTabClick(object sender, RoutedEventArgs e) => RecentTabClick?.Invoke(sender, e);
         private void OnSnippetItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => SnippetItemDoubleTapped?.Invoke(sender, e);
         private void OnDeleteSnippetClick(object sender, RoutedEventArgs e) => DeleteSnippetClick?.Invoke(sender, e);
         private void OnEditSnippetClick(object sender, RoutedEventArgs e) => EditSnippetClick?.Invoke(sender, e);

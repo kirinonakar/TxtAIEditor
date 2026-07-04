@@ -782,6 +782,12 @@
   <data name="FavoritesFolderTab" xml:space="preserve">
     <value>Folders</value>
   </data>
+  <data name="RecentFileTab" xml:space="preserve">
+    <value>Files</value>
+  </data>
+  <data name="RecentFolderTab" xml:space="preserve">
+    <value>Folders</value>
+  </data>
   <data name="FavoritesPinTooltip" xml:space="preserve">
     <value>Pin</value>
   </data>
@@ -3176,6 +3182,12 @@ Plan: {0}</value>
   </data>
   <data name="RecentFileMissingMessageFormat" xml:space="preserve">
     <value>Recent file does not exist:&#10;{0}</value>
+  </data>
+  <data name="FolderOpenFailedTitle" xml:space="preserve">
+    <value>Open Folder Failed</value>
+  </data>
+  <data name="RecentFolderMissingMessageFormat" xml:space="preserve">
+    <value>Recent folder does not exist:&#10;{0}</value>
   </data>
   <data name="CompareTabTitleFormat" xml:space="preserve">
     <value>Compare: {0} ↔ {1}</value>

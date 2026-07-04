@@ -782,6 +782,12 @@
   <data name="FavoritesFolderTab" xml:space="preserve">
     <value>フォルダ</value>
   </data>
+  <data name="RecentFileTab" xml:space="preserve">
+    <value>ファイル</value>
+  </data>
+  <data name="RecentFolderTab" xml:space="preserve">
+    <value>フォルダ</value>
+  </data>
   <data name="FavoritesPinTooltip" xml:space="preserve">
     <value>固定</value>
   </data>
@@ -3176,6 +3182,12 @@
   </data>
   <data name="RecentFileMissingMessageFormat" xml:space="preserve">
     <value>最近使ったファイルが存在しません:&#10;{0}</value>
+  </data>
+  <data name="FolderOpenFailedTitle" xml:space="preserve">
+    <value>フォルダーを開くのに失敗しました</value>
+  </data>
+  <data name="RecentFolderMissingMessageFormat" xml:space="preserve">
+    <value>最近使ったフォルダーが存在しません:&#10;{0}</value>
   </data>
   <data name="CompareTabTitleFormat" xml:space="preserve">
     <value>比較: {0} ↔ {1}</value>
