@@ -65,6 +65,11 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Document Preview:** Preview PDF, DOCX, PPTX, HWPX, and XLSX files directly inside TxtAIEditor without leaving the workspace.
 *   **Unified Viewer Workflow:** Open supported office documents from the Explorer or editor tabs and inspect their contents alongside the rest of your project files.
 
+### 🔍 Read-Only Hex Viewer
+*   **Binary Inspection:** View raw binary content in a side-by-side layout (Offset, Hex bytes, and ASCII representation).
+*   **Lightweight Streaming:** Streams parts of large files on-demand to maintain responsiveness without high memory usage.
+*   **Easy Access & UI Integration:** Right-click any open tab and select **"Hex View"**. Cursor offset and selections are shown in hex format on the status bar.
+
 ### 📊 Interactive CSV/JSON Table Mode
 *   **Grid Editor Shell:** Automatically renders `.csv` and `.json` files into a premium, highly responsive interactive spreadsheet-like grid/table instead of raw text (decodes and displays JSON objects/arrays in a structured table layout).
 *   **Column & Row Multi-Select:** Click row numbers or column headers to select entire rows/columns, with support for range dragging and multi-selection using `Ctrl` and `Shift` keys.
