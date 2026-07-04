@@ -71,6 +71,7 @@ function findSearchMatchIndexFromPosition(matches, line, column, reverse) {
 
 export function createHostMessageHandler({
     revealLine,
+    revealHexOffset,
     openFindPanel,
     suppressNativePaste,
     syncHostScroll,
@@ -247,6 +248,11 @@ export function createHostMessageHandler({
             break;
         case 'revealLine':
             revealLine(msg.lineNumber || 1, msg.indexOfMatch || 0, msg.matchLength || 0, msg.query || '');
+            break;
+        case 'revealHexOffset':
+            if (typeof revealHexOffset === 'function') {
+                revealHexOffset(msg.offset || 0);
+            }
             break;
         case 'findAllResult':
             {

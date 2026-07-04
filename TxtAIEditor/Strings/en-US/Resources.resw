@@ -851,6 +851,9 @@
   <data name="StatusGoToLineTooltip" xml:space="preserve">
     <value>Click to go to line</value>
   </data>
+  <data name="StatusGoToOffsetTooltip" xml:space="preserve">
+    <value>Click to go to offset</value>
+  </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
     <value>Size: {0:N0} bytes</value>
   </data>
@@ -860,6 +863,9 @@
   <data name="StatusHexOffsetLabel" xml:space="preserve">
     <value>Offset</value>
   </data>
+  <data name="StatusHexSelectionFormat" xml:space="preserve">
+    <value>Selected: Offset {0} / Length {1:N0} bytes</value>
+  </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>Select file encoding</value>
   </data>
@@ -868,6 +874,12 @@
   </data>
   <data name="StatusImageViewer" xml:space="preserve">
     <value>Image</value>
+  </data>
+  <data name="GoToOffsetTitle" xml:space="preserve">
+    <value>Go to Offset</value>
+  </data>
+  <data name="GoToOffsetPlaceholder" xml:space="preserve">
+    <value>Enter offset...</value>
   </data>
   <data name="EncodingChangeTitle" xml:space="preserve">
     <value>Encoding Change</value>

@@ -113,6 +113,10 @@ body.dragging-selection .line-row.row-drop-target {
     line-height: var(--line-height);
 }
 
+body.no-horizontal-overflow #scroll-container {
+    overflow-x: hidden;
+}
+
 #virtual-spacer {
     width: 1px;
     height: var(--line-height);
@@ -456,7 +460,7 @@ body.csv-table-mode .line-row {
 .line-text {
     position: relative;
     z-index: 1;
-    min-width: calc(100vw - var(--gutter-width));
+    min-width: calc(100% - var(--gutter-width));
     min-height: var(--line-height);
     padding: 0 4px;
     overflow: hidden;
@@ -472,7 +476,7 @@ body.csv-table-mode .line-row {
 
 body:not(.wrap-enabled) .line-text {
     width: max-content;
-    min-width: calc(100vw - var(--gutter-width));
+    min-width: calc(100% - var(--gutter-width));
     overflow: visible;
 }
 
@@ -532,6 +536,12 @@ body.hex-view-mode #hex-sticky-header {
 
 .hex-data-odd {
     color: var(--hex-data-odd);
+}
+
+.hex-selected {
+    background: var(--selection);
+    color: #ffffff;
+    border-radius: 2px;
 }
 
 .line-text[contenteditable="true"]:focus {

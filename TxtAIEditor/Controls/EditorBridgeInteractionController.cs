@@ -73,12 +73,20 @@ namespace TxtAIEditor.Controls
             OpenedTab tab,
             string selectedText,
             int selectionStartLine,
-            int selectionEndLine)
+            int selectionEndLine,
+            long? hexOffset,
+            long? hexLength)
         {
             ActivateOwnerTab(tab);
 
             if (_activeTabProvider() == tab)
             {
+                if (tab.IsHexViewer)
+                {
+                    _statusBarController.UpdateHexSelectionStats(tab, hexOffset, hexLength);
+                    return;
+                }
+
                 _selectionContextUpdater(selectedText, tab, selectionStartLine, selectionEndLine);
             }
         }

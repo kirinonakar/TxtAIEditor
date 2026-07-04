@@ -42,6 +42,10 @@ const state = {
     findRegex: false,
     selection: null,
     selectionAnchor: null,
+    hexSelection: null,
+    hexSelectionAnchorOffset: null,
+    hexSelectionPane: 'hex',
+    hexCursorOffset: 0,
     isSelecting: false,
     isLineSelecting: false,
     initialized: false,
@@ -498,6 +502,9 @@ function setupModel(lineCount) {
     state.documentVersion++;
     state.searchDocumentVersion = -1;
     state.pendingSearchNavigation = null;
+    state.hexSelection = null;
+    state.hexSelectionAnchorOffset = null;
+    state.hexCursorOffset = 0;
     state.lastRangeKey = '';
     state.dirtyLines.clear();
     setupVirtualHeight();
@@ -595,6 +602,9 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
     const savedCaretColumn = state.currentColumn;
 
     state.selection = null;
+    state.hexSelection = null;
+    state.hexSelectionAnchorOffset = null;
+    state.hexCursorOffset = 0;
     try {
         if (hasExplicitCaret) {
             window.getSelection()?.removeAllRanges();
@@ -1100,10 +1110,21 @@ function reportCursorAndSelection(element = document.activeElement) {
 
     post({ type: 'cursorChanged', line: state.currentLine, column: state.currentColumn });
     const selInfo = selectionInfo();
-    post({ type: 'selectionResult', text: selInfo.text, startLine: selInfo.startLine, endLine: selInfo.endLine });
+    post({
+        type: 'selectionResult',
+        text: selInfo.text,
+        startLine: selInfo.startLine,
+        endLine: selInfo.endLine,
+        hexOffset: selInfo.hexOffset,
+        hexLength: selInfo.hexLength
+    });
 }
 
 function selectionInfo() {
+    if (state.language === 'hex') {
+        return hexSelectionInfo();
+    }
+
     const selection = runtime.normalizeSelection();
     if (selection && runtime.hasCustomSelection()) {
         return selectionTextFromModel(selection);
@@ -1113,12 +1134,71 @@ function selectionInfo() {
 }
 
 function selectedText() {
+    if (state.language === 'hex') {
+        return hexSelectedText();
+    }
+
     const selection = runtime.normalizeSelection();
     if (selection && runtime.hasCustomSelection()) {
         return selectionTextFromModel(selection).text;
     }
 
     return nativeSelectionTextFromModel()?.text ?? window.getSelection()?.toString() ?? '';
+}
+
+function hexSelectionInfo() {
+    const selection = normalizedHexSelection();
+    if (!selection) {
+        return { text: '', startLine: 0, endLine: 0, hexOffset: null, hexLength: 0 };
+    }
+
+    return {
+        text: hexSelectedText(selection),
+        startLine: 0,
+        endLine: 0,
+        hexOffset: selection.startOffset,
+        hexLength: selection.endOffset - selection.startOffset
+    };
+}
+
+function normalizedHexSelection(selection = state.hexSelection) {
+    if (!selection) return null;
+    const startOffset = Math.max(0, Math.min(Number(selection.startOffset || 0), Number(selection.endOffset || 0)));
+    const endOffset = Math.max(startOffset, Math.max(Number(selection.startOffset || 0), Number(selection.endOffset || 0)));
+    if (endOffset <= startOffset) return null;
+    return { startOffset, endOffset };
+}
+
+function hexSelectedText(selection = normalizedHexSelection()) {
+    if (!selection) return '';
+
+    const parts = [];
+    for (let offset = selection.startOffset; offset < selection.endOffset; offset++) {
+        const line = Math.floor(offset / 16) + 2;
+        const byteIndex = offset % 16;
+        const text = state.cache.get(line);
+        if (!text) continue;
+
+        const pair = hexPairAtByteIndex(text, byteIndex);
+        if (pair) {
+            parts.push(pair);
+        }
+    }
+
+    return parts.join(' ');
+}
+
+function hexPairAtByteIndex(text, byteIndex) {
+    const layout = hexLayoutFromLine(text);
+    const start = layout.hexStart + (byteIndex * 3) + (byteIndex >= 8 ? 1 : 0);
+    const pair = text.slice(start, start + 2);
+    return /^[0-9A-F]{2}$/i.test(pair) ? pair.toUpperCase() : '';
+}
+
+function hexLayoutFromLine(text) {
+    const firstPipe = String(text ?? '').indexOf('|');
+    const hexStart = Math.max(0, firstPipe > 0 ? firstPipe - 50 : 11);
+    return { hexStart };
 }
 
 function selectionTextFromModel(selection) {

@@ -851,6 +851,9 @@
   <data name="StatusGoToLineTooltip" xml:space="preserve">
     <value>クリックして行へ移動</value>
   </data>
+  <data name="StatusGoToOffsetTooltip" xml:space="preserve">
+    <value>クリックしてオフセットへ移動</value>
+  </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
     <value>サイズ: {0:N0} bytes</value>
   </data>
@@ -860,6 +863,9 @@
   <data name="StatusHexOffsetLabel" xml:space="preserve">
     <value>オフセット</value>
   </data>
+  <data name="StatusHexSelectionFormat" xml:space="preserve">
+    <value>選択: Offset {0} / 長さ {1:N0} bytes</value>
+  </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>ファイルエンコーディングを選択</value>
   </data>
@@ -868,6 +874,12 @@
   </data>
   <data name="StatusImageViewer" xml:space="preserve">
     <value>画像</value>
+  </data>
+  <data name="GoToOffsetTitle" xml:space="preserve">
+    <value>オフセットへ移動</value>
+  </data>
+  <data name="GoToOffsetPlaceholder" xml:space="preserve">
+    <value>移動先 offset を入力...</value>
   </data>
   <data name="EncodingChangeTitle" xml:space="preserve">
     <value>エンコーディング変更</value>

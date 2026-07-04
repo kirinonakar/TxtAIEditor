@@ -38,6 +38,7 @@ function createEditorRenderer({
     let pendingInlineLivePreviewFocus = null;
     let inlineLivePreviewFocusSeq = 0;
     let hexStickyHeader = null;
+    let horizontalOverflowFrame = 0;
     const livePreviewProcessedImages = new Set();
 
     function ensureHexStickyHeader() {
@@ -74,6 +75,25 @@ function createEditorRenderer({
         }
 
         textElement.innerHTML = renderLineContent(1, headerText);
+    }
+
+    function syncHorizontalOverflow() {
+        if (horizontalOverflowFrame) {
+            cancelAnimationFrame(horizontalOverflowFrame);
+        }
+
+        horizontalOverflowFrame = requestAnimationFrame(() => {
+            horizontalOverflowFrame = 0;
+            const contentWidth = Math.ceil(Math.max(
+                viewport.scrollWidth || 0,
+                viewport.getBoundingClientRect().width || 0,
+                hexStickyHeader && !hexStickyHeader.hidden ? hexStickyHeader.scrollWidth || 0 : 0));
+            const hasOverflow = contentWidth > Math.ceil(scrollContainer.clientWidth) + 1;
+            document.body.classList.toggle('no-horizontal-overflow', !hasOverflow);
+            if (!hasOverflow && scrollContainer.scrollLeft !== 0) {
+                scrollContainer.scrollLeft = 0;
+            }
+        });
     }
 
     function setHoveredLineNumber(lineNumber) {
@@ -213,6 +233,7 @@ function createEditorRenderer({
             viewport.innerHTML = renderCsvTableRows(renderStart, renderEnd, hoveredLineNumber).join('');
             refreshHoveredLineFromLastPointer();
             restoreCsvFocusAfterRender();
+            syncHorizontalOverflow();
             return;
         }
 
@@ -330,6 +351,7 @@ function createEditorRenderer({
         }
 
         viewport.innerHTML = rows.join('');
+        syncHorizontalOverflow();
 
         if (composingRow) {
             const placeholder = viewport.querySelector(`.line-row-placeholder[data-line="${state.compositionLine}"]`);

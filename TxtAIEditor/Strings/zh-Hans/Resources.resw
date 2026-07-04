@@ -851,6 +851,9 @@
   <data name="StatusGoToLineTooltip" xml:space="preserve">
     <value>点击前往线路</value>
   </data>
+  <data name="StatusGoToOffsetTooltip" xml:space="preserve">
+    <value>单击以转到偏移</value>
+  </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
     <value>大小：{0:N0} 字节</value>
   </data>
@@ -860,6 +863,9 @@
   <data name="StatusHexOffsetLabel" xml:space="preserve">
     <value>偏移</value>
   </data>
+  <data name="StatusHexSelectionFormat" xml:space="preserve">
+    <value>已选择：Offset {0} / 长度 {1:N0} bytes</value>
+  </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>选择文件编码</value>
   </data>
@@ -868,6 +874,12 @@
   </data>
   <data name="StatusImageViewer" xml:space="preserve">
     <value>图片</value>
+  </data>
+  <data name="GoToOffsetTitle" xml:space="preserve">
+    <value>转到偏移</value>
+  </data>
+  <data name="GoToOffsetPlaceholder" xml:space="preserve">
+    <value>输入 offset...</value>
   </data>
   <data name="EncodingChangeTitle" xml:space="preserve">
     <value>编码变化</value>

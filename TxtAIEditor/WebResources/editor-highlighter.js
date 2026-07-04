@@ -465,15 +465,20 @@ function highlightHexLine(text, lineNumber = null, startCharIndex = 0) {
     }
 
     const hexEnd = Math.max(hexStart, firstPipe - 1);
+    const rowOffset = lineNumber !== null && lineNumber >= 2
+        ? (lineNumber - 2) * 16
+        : 0;
+    const selection = normalizedHexSelection();
     let byteIndex = 0;
     let pos = hexStart;
     while (pos < hexEnd) {
         const pair = /^[0-9A-F]{2}/.exec(fullText.slice(pos));
         if (pair) {
+            const selected = isHexByteSelected(selection, rowOffset + byteIndex);
             tokens.push({
                 start: pos,
                 end: pos + 2,
-                className: byteIndex % 2 === 0 ? 'hex-data-even' : 'hex-data-odd'
+                className: `${byteIndex % 2 === 0 ? 'hex-data-even' : 'hex-data-odd'}${selected ? ' hex-selected' : ''}`
             });
             pos += 2;
             byteIndex++;
@@ -487,15 +492,33 @@ function highlightHexLine(text, lineNumber = null, startCharIndex = 0) {
     const asciiEnd = lastPipe;
     for (let i = asciiStart; i < asciiEnd; i++) {
         const asciiIndex = i - asciiStart;
+        const selected = isHexByteSelected(selection, rowOffset + asciiIndex);
         tokens.push({
             start: i,
             end: i + 1,
-            className: asciiIndex % 2 === 0 ? 'hex-data-even' : 'hex-data-odd'
+            className: `${asciiIndex % 2 === 0 ? 'hex-data-even' : 'hex-data-odd'}${selected ? ' hex-selected' : ''}`
         });
     }
 
     tokens.sort((a, b) => a.start - b.start);
     return renderTokenizedSegment(fullText, segmentStart, segmentLength, tokens);
+}
+
+function normalizedHexSelection() {
+    const selection = state.hexSelection;
+    if (!selection) return null;
+
+    const startOffset = Math.max(0, Math.min(Number(selection.startOffset || 0), Number(selection.endOffset || 0)));
+    const endOffset = Math.max(startOffset, Math.max(Number(selection.startOffset || 0), Number(selection.endOffset || 0)));
+    return endOffset > startOffset
+        ? { startOffset, endOffset }
+        : null;
+}
+
+function isHexByteSelected(selection, byteOffset) {
+    return !!selection &&
+        byteOffset >= selection.startOffset &&
+        byteOffset < selection.endOffset;
 }
 
 function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {

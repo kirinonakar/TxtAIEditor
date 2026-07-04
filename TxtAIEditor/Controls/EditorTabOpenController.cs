@@ -590,13 +590,15 @@ namespace TxtAIEditor.Controls
                 _editorBridgeInteractionController.HandleCursorChanged(bridge, tab, line, col);
             };
 
-            bridge.SelectionReceived += (selectedText, selStartLine, selEndLine) =>
+            bridge.SelectionReceived += (selectedText, selStartLine, selEndLine, hexOffset, hexLength) =>
             {
                 _editorBridgeInteractionController.HandleSelectionReceived(
                     tab,
                     selectedText,
                     selStartLine,
-                    selEndLine);
+                    selEndLine,
+                    hexOffset,
+                    hexLength);
             };
 
             bridge.ScrollChanged += (firstLine, offset) =>

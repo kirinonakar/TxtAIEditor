@@ -27,7 +27,7 @@ namespace TxtAIEditor.Editor
         private int _flushRequestSeq = 0;
 
         public event Action<bool>? ContentChanged;
-        public event Action<string, int, int>? SelectionReceived;
+        public event Action<string, int, int, long?, long?>? SelectionReceived;
         public event Action<int, int>? CursorChanged;
         public event Action? EditorReady;
         public event Action<string>? ShortcutPressed;
@@ -544,6 +544,12 @@ namespace TxtAIEditor.Editor
             await SendMessageAsync(msg);
         }
 
+        public async Task RevealHexOffsetAsync(long offset)
+        {
+            var msg = new { action = "revealHexOffset", offset = Math.Max(0, offset) };
+            await SendMessageAsync(msg);
+        }
+
         public async Task InsertTextAsync(string text)
         {
             var msg = new { action = "insertText", text = text };
@@ -834,7 +840,9 @@ namespace TxtAIEditor.Editor
                             {
                                 int selStartLine = root.TryGetProperty("startLine", out JsonElement selStartProp) && selStartProp.TryGetInt32(out int sl) ? sl : 0;
                                 int selEndLine = root.TryGetProperty("endLine", out JsonElement selEndProp) && selEndProp.TryGetInt32(out int el) ? el : 0;
-                                SelectionReceived?.Invoke(selectionProp.GetString() ?? string.Empty, selStartLine, selEndLine);
+                                long? hexOffset = TryGetInt64(root, "hexOffset");
+                                long? hexLength = TryGetInt64(root, "hexLength");
+                                SelectionReceived?.Invoke(selectionProp.GetString() ?? string.Empty, selStartLine, selEndLine, hexOffset, hexLength);
                             }
                             break;
 
@@ -931,6 +939,18 @@ namespace TxtAIEditor.Editor
             }
 
             return json;
+        }
+
+        private static long? TryGetInt64(JsonElement root, string propertyName)
+        {
+            if (!root.TryGetProperty(propertyName, out JsonElement value) ||
+                value.ValueKind != JsonValueKind.Number ||
+                !value.TryGetInt64(out long result))
+            {
+                return null;
+            }
+
+            return result;
         }
 
         private static void WriteClipboardText(string text)

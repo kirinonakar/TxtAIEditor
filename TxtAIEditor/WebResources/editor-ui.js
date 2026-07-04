@@ -80,6 +80,7 @@ const editorEvents = bindEditorEvents({
 
 const handleCsharpMessage = createHostMessageHandler({
     revealLine,
+    revealHexOffset,
     openFindPanel,
     suppressNativePaste: editorEvents.suppressNativePaste,
     syncHostScroll: editorEvents.syncHostScroll,
@@ -90,6 +91,8 @@ const handleCsharpMessage = createHostMessageHandler({
 const REVEAL_SCROLL_TOLERANCE = 1;
 const REVEAL_SCROLL_RETRY_DELAY_MS = 40;
 const REVEAL_SCROLL_MAX_RETRIES = 8;
+const HEX_BYTES_PER_ROW = 16;
+const HEX_WIDE_LINE_COUNT_THRESHOLD = 268435457;
 let revealScrollToken = 0;
 
 function maxScrollTop() {
@@ -170,9 +173,33 @@ function revealLine(lineNumber, indexOfMatch = 0, matchLength = 0, query = '', p
     requestLines(Math.max(1, safeLine - state.overscan), state.overscan * 2 + 1);
     queueRender(true);
     scheduleRevealLineAlignment(safeLine, ++revealScrollToken);
-    if (!preventFocus) {
+    if (!preventFocus && state.language !== 'hex') {
         focusLineWithRetry(safeLine, Math.max(0, indexOfMatch || 0));
     }
+}
+
+function revealHexOffset(offset) {
+    const safeOffset = Math.max(0, Math.floor(Number(offset || 0)));
+    const lineNumber = Math.min(state.lineCount, Math.floor(safeOffset / HEX_BYTES_PER_ROW) + 2);
+    const byteIndex = safeOffset % HEX_BYTES_PER_ROW;
+    const column = hexColumnForByteIndex(byteIndex);
+
+    state.hexSelection = null;
+    state.hexSelectionAnchorOffset = safeOffset;
+    state.hexCursorOffset = safeOffset;
+    state.currentLine = lineNumber;
+    state.currentColumn = column + 1;
+
+    revealLine(lineNumber, column, 0, '', true);
+    queueRender(true);
+    post({ type: 'cursorChanged', line: state.currentLine, column: state.currentColumn });
+    post({ type: 'selectionResult', text: '', startLine: 0, endLine: 0, hexOffset: null, hexLength: 0 });
+}
+
+function hexColumnForByteIndex(byteIndex) {
+    const offsetWidth = state.lineCount > HEX_WIDE_LINE_COUNT_THRESHOLD ? 16 : 8;
+    const safeByteIndex = Math.max(0, Math.min(Number(byteIndex || 0), HEX_BYTES_PER_ROW - 1));
+    return offsetWidth + 2 + (safeByteIndex * 3) + (safeByteIndex >= 8 ? 1 : 0);
 }
 
 if (window.chrome && window.chrome.webview) {

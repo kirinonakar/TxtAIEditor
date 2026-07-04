@@ -27,6 +27,8 @@ import {
 } from './editor-commands.js';
 import { showContextMenu } from './editor-context-menu.js';
 
+const HEX_BYTES_PER_ROW = 16;
+
 export function bindPointerSelectionEvents({
     getPreciseLivePreviewPosition,
     renderer
@@ -65,6 +67,178 @@ export function bindPointerSelectionEvents({
 
         if (start >= end) return null;
         return value.slice(start, end).trim();
+    }
+
+    function isHexView() {
+        return state.language === 'hex';
+    }
+
+    function hexLineInfo(line, element = null) {
+        if (line < 2) return null;
+
+        const text = state.cache.get(line) ?? (element ? lineTextFromElement(element) : '');
+        const offsetMatch = /^(\s*[0-9A-F]{8,16})(\s{2})/.exec(text);
+        if (!offsetMatch) return null;
+
+        const hexStart = offsetMatch[0].length;
+        const firstPipe = text.indexOf('|', hexStart);
+        const lastPipe = text.lastIndexOf('|');
+        if (firstPipe < 0 || lastPipe <= firstPipe) return null;
+
+        let byteCount = 0;
+        for (let i = 0; i < HEX_BYTES_PER_ROW; i++) {
+            const byteStart = hexStart + (i * 3) + (i >= 8 ? 1 : 0);
+            const pair = text.slice(byteStart, byteStart + 2);
+            if (/^[0-9A-F]{2}$/i.test(pair)) {
+                byteCount++;
+            }
+        }
+        if (byteCount <= 0) return null;
+
+        return {
+            text,
+            rowOffset: (line - 2) * HEX_BYTES_PER_ROW,
+            hexStart,
+            asciiStart: firstPipe + 1,
+            byteCount
+        };
+    }
+
+    function hexPaneFromColumn(info, column) {
+        return column >= info.asciiStart ? 'ascii' : 'hex';
+    }
+
+    function hexColumnForByte(info, byteIndex, pane) {
+        const safeByteIndex = Math.max(0, Math.min(byteIndex, info.byteCount - 1));
+        return pane === 'ascii'
+            ? info.asciiStart + safeByteIndex
+            : info.hexStart + (safeByteIndex * 3) + (safeByteIndex >= 8 ? 1 : 0);
+    }
+
+    function hexByteIndexFromColumn(info, column, pane) {
+        if (pane === 'ascii') {
+            return Math.max(0, Math.min(column - info.asciiStart, info.byteCount - 1));
+        }
+
+        if (column <= info.hexStart) {
+            return 0;
+        }
+
+        let previousByteIndex = 0;
+        for (let i = 0; i < info.byteCount; i++) {
+            const byteStart = hexColumnForByte(info, i, 'hex');
+            if (column < byteStart) {
+                return previousByteIndex;
+            }
+
+            if (column <= byteStart + 2) {
+                return i;
+            }
+
+            previousByteIndex = i;
+        }
+
+        return previousByteIndex;
+    }
+
+    function hexPositionFromPointer(event) {
+        const position = positionFromPointer(event);
+        if (!position) return null;
+
+        const info = hexLineInfo(position.line, position.element);
+        if (!info) return null;
+
+        const pane = hexPaneFromColumn(info, position.column);
+        const byteIndex = hexByteIndexFromColumn(info, position.column, pane);
+        const column = hexColumnForByte(info, byteIndex, pane);
+
+        return {
+            line: position.line,
+            column,
+            offset: info.rowOffset + byteIndex,
+            pane,
+            element: position.element
+        };
+    }
+
+    function clearNativeSelection() {
+        try {
+            window.getSelection()?.removeAllRanges();
+        } catch (e) { }
+    }
+
+    function setHexCursor(position) {
+        state.hexCursorOffset = position.offset;
+        state.hexSelectionPane = position.pane;
+        state.currentLine = position.line;
+        state.currentColumn = position.column + 1;
+    }
+
+    function setHexSelectionFromOffsets(anchorOffset, cursorOffset) {
+        const startOffset = Math.min(anchorOffset, cursorOffset);
+        const endOffset = Math.max(anchorOffset, cursorOffset) + 1;
+        state.hexSelection = endOffset > startOffset + 1 || anchorOffset !== cursorOffset
+            ? { startOffset, endOffset }
+            : null;
+    }
+
+    function beginHexSelection(event) {
+        const position = hexPositionFromPointer(event);
+        if (!position) return false;
+
+        event.preventDefault();
+        captureSelectionPointer(event);
+        clearNativeSelection();
+
+        const anchorOffset = event.shiftKey && state.hexSelectionAnchorOffset !== null
+            ? state.hexSelectionAnchorOffset
+            : position.offset;
+        state.hexSelectionAnchorOffset = anchorOffset;
+        state.selection = null;
+        setHexCursor(position);
+        setHexSelectionFromOffsets(anchorOffset, position.offset);
+        syncCustomSelectionClass();
+        state.isSelecting = true;
+        state.isLineSelecting = false;
+        state.isDragPotential = false;
+        state.isDragMoving = false;
+        state.dragSelectionData = null;
+        state.dragDropPosition = null;
+        state.dragStartPosition = null;
+        document.body.classList.add('selecting');
+
+        queueRender(true);
+        reportCursorAndSelection(position.element);
+        return true;
+    }
+
+    function updateHexSelectionFromPointer(event) {
+        const position = hexPositionFromPointer(event);
+        if (!position) return false;
+
+        clearNativeSelection();
+        const anchorOffset = state.hexSelectionAnchorOffset ?? position.offset;
+        setHexCursor(position);
+        setHexSelectionFromOffsets(anchorOffset, position.offset);
+        queueRender(true);
+        reportCursorAndSelection(position.element);
+        return true;
+    }
+
+    function endHexSelection(event) {
+        stopSelectionAutoScroll();
+        releaseSelectionPointer(event);
+        state.isSelecting = false;
+        state.isLineSelecting = false;
+        state.isDragPotential = false;
+        state.isDragMoving = false;
+        state.dragStartPosition = null;
+        cleanupDragState();
+        clearNativeSelection();
+        document.body.classList.remove('selecting');
+        syncCustomSelectionClass();
+        queueRender(true);
+        reportCursorAndSelection(document.activeElement);
     }
 
     let lastPointerDownTime = 0;
@@ -112,6 +286,12 @@ export function bindPointerSelectionEvents({
         if (state.csvTableEnabled) return;
         if (event.button !== 0 || findPanel.contains(event.target)) return;
         cancelActiveSelectionInteraction({ render: false });
+
+        if (isHexView()) {
+            if (beginHexSelection(event)) {
+                return;
+            }
+        }
 
         if (event.ctrlKey) {
             const position = positionFromPointer(event);
@@ -289,6 +469,11 @@ export function bindPointerSelectionEvents({
     }
 
     function endSelection(event) {
+        if (isHexView() && state.isSelecting) {
+            endHexSelection(event);
+            return;
+        }
+
         stopSelectionAutoScroll();
 
         if (state.isDragMoving && state.dragSelectionData) {
@@ -571,6 +756,18 @@ export function bindPointerSelectionEvents({
         if (state.csvTableEnabled) return;
         updateHoveredLineFromPointer(event);
 
+        if (isHexView()) {
+            if (!state.isSelecting) return;
+            if ((event.buttons & 1) === 0) {
+                endHexSelection(event);
+                return;
+            }
+
+            event.preventDefault();
+            updateHexSelectionFromPointer(event);
+            return;
+        }
+
         if (state.isDragPotential || state.isDragMoving) {
             if ((event.buttons & 1) === 0) {
                 endSelection(event);
@@ -651,6 +848,11 @@ export function bindPointerSelectionEvents({
     });
 
     viewport.addEventListener('click', event => {
+        if (isHexView()) {
+            reportCursorAndSelection(document.activeElement);
+            return;
+        }
+
         const element = lineElementFromEvent(event);
         if (state.inlineLivePreviewEnabled && element && element.getAttribute('contenteditable') !== 'true') {
             const lineNumber = Number(element.dataset.line || state.currentLine || 1);
@@ -669,6 +871,11 @@ export function bindPointerSelectionEvents({
 
     viewport.addEventListener('dblclick', event => {
         if (findPanel.contains(event.target)) return;
+        if (isHexView()) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
         if (event.target.closest?.('.line-number')) return;
         if (selectWordAtPointer(event)) {
             event.preventDefault();
@@ -679,6 +886,11 @@ export function bindPointerSelectionEvents({
     viewport.addEventListener('contextmenu', event => {
         if (findPanel.contains(event.target)) return;
         event.preventDefault();
+
+        if (isHexView()) {
+            showContextMenu(event.clientX, event.clientY);
+            return;
+        }
 
         const position = positionFromPointer(event);
         const keepSelection = hasCustomSelection() && isPositionInsideSelection(position);

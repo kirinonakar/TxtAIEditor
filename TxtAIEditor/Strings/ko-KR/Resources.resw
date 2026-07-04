@@ -851,6 +851,9 @@
   <data name="StatusGoToLineTooltip" xml:space="preserve">
     <value>클릭하여 줄 이동</value>
   </data>
+  <data name="StatusGoToOffsetTooltip" xml:space="preserve">
+    <value>클릭하여 오프셋 이동</value>
+  </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
     <value>크기: {0:N0} bytes</value>
   </data>
@@ -860,6 +863,9 @@
   <data name="StatusHexOffsetLabel" xml:space="preserve">
     <value>오프셋</value>
   </data>
+  <data name="StatusHexSelectionFormat" xml:space="preserve">
+    <value>선택됨: Offset {0} / 길이 {1:N0} bytes</value>
+  </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>파일 인코딩 선택</value>
   </data>
@@ -868,6 +874,12 @@
   </data>
   <data name="StatusImageViewer" xml:space="preserve">
     <value>이미지</value>
+  </data>
+  <data name="GoToOffsetTitle" xml:space="preserve">
+    <value>오프셋 이동</value>
+  </data>
+  <data name="GoToOffsetPlaceholder" xml:space="preserve">
+    <value>이동할 offset 입력...</value>
   </data>
   <data name="EncodingChangeTitle" xml:space="preserve">
     <value>인코딩 변경</value>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -109,6 +110,9 @@ namespace TxtAIEditor.Controls
             if (tab.IsHexViewer)
             {
                 _statusBar.TotalLinesText.Text = "HEX";
+                ToolTipService.SetToolTip(
+                    _statusBar.LineNumberButtonControl,
+                    _getString("StatusGoToOffsetTooltip", "클릭하여 오프셋 이동"));
                 SetHexCursorPosition(tab, line: 2, column: 1);
                 return;
             }
@@ -192,6 +196,24 @@ namespace TxtAIEditor.Controls
             _statusBar.LineColumnSeparatorText.Visibility = Visibility.Collapsed;
             _statusBar.ColumnLabelText.Visibility = Visibility.Collapsed;
             _statusBar.ColumnText.Visibility = Visibility.Collapsed;
+        }
+
+        public void UpdateHexSelectionStats(OpenedTab tab, long? offset, long? length)
+        {
+            if (!offset.HasValue || !length.HasValue || length.Value <= 0)
+            {
+                _statusBar.StatusSelectionStatsText.Visibility = Visibility.Collapsed;
+                _statusBar.StatusSelectionStatsText.Text = string.Empty;
+                return;
+            }
+
+            string format = _getString("StatusHexSelectionFormat", "선택됨: Offset {0} / 길이 {1:N0} bytes");
+            _statusBar.StatusSelectionStatsText.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                format,
+                FormatHexOffset(tab, offset.Value),
+                length.Value);
+            _statusBar.StatusSelectionStatsText.Visibility = Visibility.Visible;
         }
 
         public void SyncLineEndingText(OpenedTab tab)
@@ -355,6 +377,12 @@ namespace TxtAIEditor.Controls
             var activeTab = _activeTabProvider();
             if (activeTab == null)
             {
+                return;
+            }
+
+            if (activeTab.IsHexViewer)
+            {
+                await ShowGoToHexOffsetDialogAsync(activeTab);
                 return;
             }
 
@@ -605,6 +633,9 @@ namespace TxtAIEditor.Controls
             _statusBar.LineColumnSeparatorText.Visibility = Visibility.Visible;
             _statusBar.ColumnLabelText.Visibility = Visibility.Visible;
             _statusBar.ColumnText.Visibility = Visibility.Visible;
+            ToolTipService.SetToolTip(
+                _statusBar.LineNumberButtonControl,
+                _getString("StatusGoToLineTooltip", "클릭하여 줄 이동"));
         }
 
         private static (long Offset, bool UseWideOffset) CalculateHexOffset(OpenedTab tab, int line, int column)
@@ -677,6 +708,122 @@ namespace TxtAIEditor.Controls
             }
 
             return 0;
+        }
+
+        private async Task ShowGoToHexOffsetDialogAsync(OpenedTab tab)
+        {
+            var offsetBox = new TextBox
+            {
+                PlaceholderText = _getString("GoToOffsetPlaceholder", "이동할 offset 입력..."),
+                Width = 220,
+                Text = _statusBar.LineText.Text
+            };
+
+            bool terminalWasVisible = _isTerminalVisible();
+            if (terminalWasVisible)
+            {
+                _suspendTerminal();
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = _getString("GoToOffsetTitle", "오프셋 이동"),
+                Content = offsetBox,
+                PrimaryButtonText = _getString("GoToLineButton", "이동"),
+                CloseButtonText = _getString("GoToLineCancel", "취소"),
+                XamlRoot = _xamlRootProvider(),
+                RequestedTheme = _themeProvider()
+            };
+
+            offsetBox.KeyDown += async (_, args) =>
+            {
+                if (args.Key == Windows.System.VirtualKey.Enter)
+                {
+                    args.Handled = true;
+                    if (TryParseHexOffset(offsetBox.Text, out long targetOffset))
+                    {
+                        dialog.Hide();
+                        if (terminalWasVisible)
+                        {
+                            _resumeTerminal();
+                        }
+
+                        await RevealHexOffsetAsync(tab, targetOffset);
+                    }
+                }
+            };
+
+            var result = await dialog.ShowAsync();
+            if (terminalWasVisible)
+            {
+                _resumeTerminal();
+            }
+
+            if (result == ContentDialogResult.Primary &&
+                TryParseHexOffset(offsetBox.Text, out long clickedOffset))
+            {
+                await RevealHexOffsetAsync(tab, clickedOffset);
+            }
+        }
+
+        private async Task RevealHexOffsetAsync(OpenedTab tab, long offset)
+        {
+            long fileLength = GetHexSourceLength(tab);
+            long safeOffset = Math.Max(0, offset);
+            if (fileLength > 0)
+            {
+                safeOffset = Math.Min(safeOffset, fileLength - 1);
+            }
+
+            int line = (int)Math.Min(int.MaxValue, (safeOffset / HexBytesPerRow) + 2);
+            int column = GetHexColumnForByteIndex(fileLength > uint.MaxValue, (int)(safeOffset % HexBytesPerRow));
+            if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+            {
+                await bridgeGroup.Bridge.RevealHexOffsetAsync(safeOffset);
+            }
+            else
+            {
+                await _revealLineAsync(tab.Id, line);
+            }
+
+            SetHexCursorPosition(tab, line, column);
+            UpdateHexSelectionStats(tab, null, null);
+        }
+
+        private static bool TryParseHexOffset(string? text, out long offset)
+        {
+            offset = 0;
+            string value = (text ?? string.Empty).Trim();
+            if (value.Length == 0)
+            {
+                return false;
+            }
+
+            if (value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                value = value[2..];
+            }
+
+            value = value.Replace("_", string.Empty).Replace(" ", string.Empty);
+            if (long.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out long hexOffset))
+            {
+                offset = hexOffset;
+                return true;
+            }
+
+            return long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out offset);
+        }
+
+        private static int GetHexColumnForByteIndex(bool useWideOffset, int byteIndex)
+        {
+            int offsetWidth = Math.Max(HexHeaderOffsetLabel.Length, useWideOffset ? 16 : 8);
+            int safeByteIndex = Math.Clamp(byteIndex, 0, HexBytesPerRow - 1);
+            return offsetWidth + 3 + (safeByteIndex * 3) + (safeByteIndex >= 8 ? 1 : 0);
+        }
+
+        private static string FormatHexOffset(OpenedTab tab, long offset)
+        {
+            return "0x" + Math.Max(0, offset).ToString(GetHexSourceLength(tab) > uint.MaxValue ? "X16" : "X8");
         }
     }
 }
