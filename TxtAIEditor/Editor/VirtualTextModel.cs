@@ -621,7 +621,7 @@ namespace TxtAIEditor.Editor
         {
             Tab = tab;
             Model = model;
-            Tab.Content = model.GetText(120_000);
+            Tab.Content = model is HexDumpTextModel ? string.Empty : model.GetText(120_000);
         }
 
         public OpenedTab Tab { get; }
@@ -873,7 +873,7 @@ namespace TxtAIEditor.Editor
 
         private void RefreshTabContentPreview()
         {
-            Tab.Content = Model.GetText(120_000);
+            Tab.Content = Model is HexDumpTextModel ? string.Empty : Model.GetText(120_000);
         }
 
         private static string NormalizeSingleLine(string text)

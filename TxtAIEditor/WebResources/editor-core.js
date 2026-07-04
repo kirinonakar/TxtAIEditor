@@ -3,6 +3,9 @@ import { contextMenu, scrollContainer, viewport, virtualSpacer } from './editor-
 const MAX_RENDER_CHARS = 20000;
 const MIN_BATCH_SIZE = 100;
 const PREFETCH_AHEAD = 200;
+const HEX_BROWSER_SCROLL_HEIGHT_LIMIT = 24000000;
+const HEX_CACHE_RETAIN_LINES = 900;
+const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
 
 const runtime = {
     drawEditableSelectionOverlays: () => { },
@@ -807,6 +810,16 @@ function shiftMeasuredLineHeights(fromLine, delta) {
 }
 
 function totalVirtualHeight() {
+    const total = rawTotalVirtualHeight();
+    if (usesCompressedHexScroll()) {
+        const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
+        return Math.max(viewHeight + state.lineHeight, Math.min(total, HEX_BROWSER_SCROLL_HEIGHT_LIMIT));
+    }
+
+    return total;
+}
+
+function rawTotalVirtualHeight() {
     let total = effectiveLineCount() * state.lineHeight;
     if (usesMeasuredLineHeights()) {
         ensureLineHeightIndex();
@@ -816,6 +829,13 @@ function totalVirtualHeight() {
 }
 
 function lineTop(lineNumber) {
+    if (usesCompressedHexScroll()) {
+        const metrics = compressedHexScrollMetrics();
+        if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 0;
+        const line = Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(Number(lineNumber || 1))));
+        return ((line - 1) / (metrics.maxFirstLine - 1)) * metrics.maxScrollTop;
+    }
+
     let top = (Math.max(1, lineNumber) - 1) * state.lineHeight;
     top += measuredLineHeightDeltaBefore(lineNumber);
     return Math.max(0, top);
@@ -823,6 +843,13 @@ function lineTop(lineNumber) {
 
 function lineAt(scrollTop) {
     const lineCount = effectiveLineCount();
+    if (usesCompressedHexScroll()) {
+        const metrics = compressedHexScrollMetrics();
+        if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 1;
+        const ratio = Math.max(0, Math.min(1, Number(scrollTop || 0) / metrics.maxScrollTop));
+        return Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(ratio * (metrics.maxFirstLine - 1)) + 1));
+    }
+
     if (!usesMeasuredLineHeights() || state.lineHeights.size === 0) {
         return Math.min(lineCount, Math.max(1, Math.floor(scrollTop / state.lineHeight) + 1));
     }
@@ -847,10 +874,52 @@ function visibleRange() {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const lineCount = effectiveLineCount();
     const firstVisible = lineAt(scrollContainer.scrollTop);
+    if (usesCompressedHexScroll()) {
+        const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
+        const start = Math.max(1, firstVisible - state.overscan);
+        const end = Math.min(lineCount, firstVisible + visibleRows + state.overscan);
+        return { start, end, count: Math.max(0, end - start + 1) };
+    }
+
     const lastVisible = lineAt(scrollContainer.scrollTop + viewHeight);
     const start = Math.max(1, firstVisible - state.overscan);
     const end = Math.min(lineCount, lastVisible + state.overscan);
     return { start, end, count: Math.max(0, end - start + 1) };
+}
+
+function usesCompressedHexScroll() {
+    return state.language === 'hex' &&
+        !usesMeasuredLineHeights() &&
+        rawTotalVirtualHeight() > HEX_BROWSER_SCROLL_HEIGHT_LIMIT;
+}
+
+function compressedHexScrollMetrics() {
+    const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
+    const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight));
+    const lineCount = effectiveLineCount();
+    const maxFirstLine = Math.max(1, lineCount - visibleRows + 1);
+    const virtualHeight = totalVirtualHeight();
+    const maxScrollTop = Math.max(0, virtualHeight - viewHeight);
+    return { lineCount, maxFirstLine, maxScrollTop, visibleRows, viewHeight };
+}
+
+function viewportTopForLine(startLine) {
+    if (!usesCompressedHexScroll()) {
+        return lineTop(startLine);
+    }
+
+    const metrics = compressedHexScrollMetrics();
+    const firstVisible = lineAt(scrollContainer.scrollTop);
+    const firstVisibleTop = lineTop(firstVisible);
+    const nextVisibleTop = firstVisible < metrics.maxFirstLine
+        ? lineTop(firstVisible + 1)
+        : firstVisibleTop + state.lineHeight;
+    const virtualLineSpan = Math.max(0.0001, nextVisibleTop - firstVisibleTop);
+    const scrollOffset = Math.max(0, scrollContainer.scrollTop - firstVisibleTop);
+    const physicalOffset = Math.max(0, Math.min(1, scrollOffset / virtualLineSpan)) * state.lineHeight;
+    return scrollContainer.scrollTop -
+        physicalOffset -
+        ((firstVisible - Math.max(1, Number(startLine || 1))) * state.lineHeight);
 }
 
 function effectiveLineCount() {
@@ -905,10 +974,44 @@ function requestMissingLines(start, end) {
 function prefetchAround(scrollTop) {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const firstVisible = lineAt(scrollTop);
+    if (usesCompressedHexScroll()) {
+        const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
+        const prefetchStart = Math.max(1, firstVisible - PREFETCH_AHEAD);
+        const prefetchEnd = Math.min(state.lineCount, firstVisible + visibleRows + PREFETCH_AHEAD);
+        requestMissingLines(prefetchStart, prefetchEnd);
+        return;
+    }
+
     const lastVisible = lineAt(scrollTop + viewHeight);
     const prefetchStart = Math.max(1, firstVisible - PREFETCH_AHEAD);
     const prefetchEnd = Math.min(state.lineCount, lastVisible + PREFETCH_AHEAD);
     requestMissingLines(prefetchStart, prefetchEnd);
+}
+
+function trimHexCacheToRange(startLine, endLine) {
+    if (state.language !== 'hex' || state.cache.size <= HEX_CACHE_RETAIN_LINES) return;
+
+    const keepRanges = [{
+        start: Math.max(1, Number(startLine || 1) - PREFETCH_AHEAD),
+        end: Math.min(state.lineCount, Number(endLine || startLine || 1) + PREFETCH_AHEAD)
+    }];
+
+    const hexSelection = normalizedHexSelection();
+    if (hexSelection) {
+        const selectionStartLine = Math.floor(hexSelection.startOffset / 16) + 2;
+        const selectionEndLine = Math.floor((hexSelection.endOffset - 1) / 16) + 2;
+        if (selectionEndLine - selectionStartLine + 1 <= HEX_SELECTION_CACHE_RETAIN_LIMIT) {
+            keepRanges.push({ start: selectionStartLine, end: selectionEndLine });
+        }
+    }
+
+    for (const lineNumber of [...state.cache.keys()]) {
+        if (lineNumber === 1) continue;
+        const keep = keepRanges.some(range => lineNumber >= range.start && lineNumber <= range.end);
+        if (!keep) {
+            state.cache.delete(lineNumber);
+        }
+    }
 }
 
 function queueRender(force = false) {
@@ -1496,9 +1599,11 @@ export {
     shiftCachedLines,
     state,
     syncCustomSelectionClass,
+    trimHexCacheToRange,
     totalVirtualHeight,
     updateLineFromHost,
     usesMeasuredLineHeights,
     visibleRange,
+    viewportTopForLine,
     writeClipboardText
 };

@@ -3,14 +3,15 @@ import {
     MAX_RENDER_CHARS,
     escapeHtml,
     lineAt,
-    lineTop,
     measureRenderedRows,
     queueRender,
     requestMissingLines,
     state,
     syncCustomSelectionClass,
+    trimHexCacheToRange,
     totalVirtualHeight,
-    visibleRange
+    visibleRange,
+    viewportTopForLine
 } from './editor-core.js';
 import { renderLineContent } from './editor-highlighter.js';
 import {
@@ -203,6 +204,7 @@ function createEditorRenderer({
         const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${scrollContainer.scrollLeft}:${state.wordWrap}:${totalVirtualHeight()}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${activeLine || 0}:${state.editingLine || 0}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
         if (!state.csvTableEnabled || !isJsonCsvTableMode()) {
             requestMissingLines(renderStart, renderEnd);
+            trimHexCacheToRange(renderStart, renderEnd);
         }
         if (rangeKey === state.lastRangeKey) return;
         state.lastRangeKey = rangeKey;
@@ -215,7 +217,7 @@ function createEditorRenderer({
             ? viewport.querySelector(`.line-row[data-line="${state.compositionLine}"]`)
             : null;
 
-        const offsetY = lineTop(renderStart);
+        const offsetY = viewportTopForLine(renderStart);
         viewport.style.transform = `translateY(${offsetY}px)`;
 
         if (state.csvTableEnabled) {

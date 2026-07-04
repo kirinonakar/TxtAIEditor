@@ -104,6 +104,12 @@ function clampScrollTop(value) {
 }
 
 function centeredScrollTopForLine(lineNumber) {
+    if (state.language === 'hex') {
+        const visibleRows = Math.max(1, Math.floor(scrollContainer.clientHeight / state.lineHeight));
+        const firstLine = Math.max(1, Number(lineNumber || 1) - Math.floor(visibleRows / 2));
+        return clampScrollTop(lineTop(firstLine));
+    }
+
     return clampScrollTop(lineTop(lineNumber) - Math.floor(scrollContainer.clientHeight / 2));
 }
 
