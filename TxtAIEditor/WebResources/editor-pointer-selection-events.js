@@ -177,9 +177,7 @@ export function bindPointerSelectionEvents({
     function setHexSelectionFromOffsets(anchorOffset, cursorOffset) {
         const startOffset = Math.min(anchorOffset, cursorOffset);
         const endOffset = Math.max(anchorOffset, cursorOffset) + 1;
-        state.hexSelection = endOffset > startOffset + 1 || anchorOffset !== cursorOffset
-            ? { startOffset, endOffset }
-            : null;
+        state.hexSelection = { startOffset, endOffset };
     }
 
     function beginHexSelection(event) {
