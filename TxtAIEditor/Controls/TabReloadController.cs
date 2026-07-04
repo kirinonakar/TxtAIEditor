@@ -116,6 +116,19 @@ namespace TxtAIEditor.Controls
 
         public async Task ReloadFromDiskAsync(OpenedTab tab)
         {
+            if (tab.IsHexViewer)
+            {
+                try
+                {
+                    await ReloadHexViewerAsync(tab);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to reload hex viewer tab: {ex.Message}");
+                }
+                return;
+            }
+
             if (string.IsNullOrEmpty(tab.FilePath) || !File.Exists(tab.FilePath))
             {
                 return;
@@ -209,6 +222,35 @@ namespace TxtAIEditor.Controls
                     isReadOnly: isReadOnly,
                     initialLines: session.GetLines(1, _initialEditorLineWarmupCount));
             }
+        }
+
+        private async Task ReloadHexViewerAsync(OpenedTab tab)
+        {
+            string? sourcePath = tab.HexSourceFilePath;
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            {
+                return;
+            }
+
+            var hexModel = new HexDumpTextModel(sourcePath);
+            if (_editorSessions.TryGetValue(tab.Id, out var session))
+            {
+                session.UpdateModelFromSync(hexModel);
+            }
+            else
+            {
+                session = new EditorDocumentSession(tab, hexModel);
+                _editorSessions[tab.Id] = session;
+            }
+
+            tab.IsDirty = false;
+            tab.OriginalContent = tab.Content;
+            tab.OriginalLineEnding = hexModel.LineEnding;
+            tab.OriginalEncodingName = tab.EncodingName;
+            tab.RefreshPreviewResourceVersion();
+
+            await InitializeBridgeModelAsync(tab, session, isReadOnly: true);
+            CompleteDiskReload(tab);
         }
 
         private async Task SetBridgeTextAsync(OpenedTab tab, string text)

@@ -32,6 +32,10 @@ import {
     updateCsvLocalization
 } from './editor-csv-table.js';
 
+function syncLanguageClass() {
+    document.body.classList.toggle('hex-view-mode', state.language === 'hex');
+}
+
 function findSearchMatchIndexFromPosition(matches, line, column, reverse) {
     if (!Array.isArray(matches) || matches.length === 0) {
         return -1;
@@ -78,6 +82,7 @@ export function createHostMessageHandler({
         case 'initModel':
             state.initialized = true;
             state.language = msg.language || 'plaintext';
+            syncLanguageClass();
             state.isSplitView = !!msg.isSplitView;
             state.livePreviewLocalResourceVersion = String(Date.now());
             applyOptions(msg);
@@ -183,6 +188,7 @@ export function createHostMessageHandler({
                 const nextLanguage = msg.language || 'plaintext';
                 if (state.language !== nextLanguage) {
                     state.language = nextLanguage;
+                    syncLanguageClass();
                     state.lineEndStacks.clear();
                     queueRender(true);
                 }

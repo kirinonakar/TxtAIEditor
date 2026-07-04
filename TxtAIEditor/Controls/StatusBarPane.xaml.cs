@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         public Button ExpandPreviewBtn => ExpandPreviewButton;
         public TextBlock LineText => StatusLine;
         public TextBlock LineLabelText => StatusLineLabel;
+        public TextBlock LineColumnSeparatorText => StatusLineColumnSeparator;
         public TextBlock ColumnText => StatusCol;
         public TextBlock ColumnLabelText => StatusColumnLabel;
         public TextBlock TotalLinesText => StatusTotalLines;

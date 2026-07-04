@@ -857,6 +857,9 @@
   <data name="StatusLineLabel" xml:space="preserve">
     <value>熔点</value>
   </data>
+  <data name="StatusHexOffsetLabel" xml:space="preserve">
+    <value>偏移</value>
+  </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>选择文件编码</value>
   </data>
@@ -1418,6 +1421,9 @@
   <data name="TabMenuReload" xml:space="preserve">
     <value>重新加载</value>
   </data>
+  <data name="TabMenuHexView" xml:space="preserve">
+    <value>以 Hex 查看</value>
+  </data>
   <data name="TabMenuEncrypt" xml:space="preserve">
     <value>加密</value>
   </data>
@@ -1495,6 +1501,12 @@
   </data>
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>关闭其他 Tab</value>
+  </data>
+  <data name="HexViewerTitleFormat" xml:space="preserve">
+    <value>{0} [HEX]</value>
+  </data>
+  <data name="HexViewOpenFailedTitle" xml:space="preserve">
+    <value>Hex 查看失败</value>
   </data>
   <data name="EditorContextMenuCut" xml:space="preserve">
     <value>切</value>

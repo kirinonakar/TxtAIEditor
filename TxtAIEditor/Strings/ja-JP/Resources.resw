@@ -857,6 +857,9 @@
   <data name="StatusLineLabel" xml:space="preserve">
     <value>行</value>
   </data>
+  <data name="StatusHexOffsetLabel" xml:space="preserve">
+    <value>オフセット</value>
+  </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>ファイルエンコーディングを選択</value>
   </data>
@@ -1418,6 +1421,9 @@
   <data name="TabMenuReload" xml:space="preserve">
     <value>再読み込み</value>
   </data>
+  <data name="TabMenuHexView" xml:space="preserve">
+    <value>Hex 表示</value>
+  </data>
   <data name="TabMenuEncrypt" xml:space="preserve">
     <value>暗号化</value>
   </data>
@@ -1495,6 +1501,12 @@
   </data>
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>他のタブを閉じる</value>
+  </data>
+  <data name="HexViewerTitleFormat" xml:space="preserve">
+    <value>{0} [HEX]</value>
+  </data>
+  <data name="HexViewOpenFailedTitle" xml:space="preserve">
+    <value>Hex 表示に失敗しました</value>
   </data>
   <data name="EditorContextMenuCut" xml:space="preserve">
     <value>切り取り</value>

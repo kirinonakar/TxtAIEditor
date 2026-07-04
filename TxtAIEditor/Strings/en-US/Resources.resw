@@ -857,6 +857,9 @@
   <data name="StatusLineLabel" xml:space="preserve">
     <value>Ln</value>
   </data>
+  <data name="StatusHexOffsetLabel" xml:space="preserve">
+    <value>Offset</value>
+  </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>Select file encoding</value>
   </data>
@@ -1418,6 +1421,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="TabMenuReload" xml:space="preserve">
     <value>Reload</value>
   </data>
+  <data name="TabMenuHexView" xml:space="preserve">
+    <value>View as Hex</value>
+  </data>
   <data name="TabMenuEncrypt" xml:space="preserve">
     <value>Encrypt</value>
   </data>
@@ -1495,6 +1501,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>Close Other Tabs</value>
+  </data>
+  <data name="HexViewerTitleFormat" xml:space="preserve">
+    <value>{0} [HEX]</value>
+  </data>
+  <data name="HexViewOpenFailedTitle" xml:space="preserve">
+    <value>Hex View Failed</value>
   </data>
   <data name="EditorContextMenuCut" xml:space="preserve">
     <value>Cut</value>

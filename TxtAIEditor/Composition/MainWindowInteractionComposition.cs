@@ -43,6 +43,7 @@ namespace TxtAIEditor.Composition
         Func<string, string, string> GetLocalizedString,
         Func<ElementTheme> GetCurrentElementTheme,
         Func<OpenedTab, TabViewItem, Task> ReloadTabAsync,
+        Func<OpenedTab, Task> OpenHexViewAsync,
         Action<OpenedTab, TabViewItem, TabView> CloseRightTabs,
         Action<OpenedTab, TabViewItem, TabView> CloseLeftTabs,
         Action<OpenedTab, TabViewItem, TabView> CloseOtherTabs);
@@ -135,6 +136,7 @@ namespace TxtAIEditor.Composition
                 callbacks.ShowLeftSidebarPage,
                 callbacks.NavigateExplorerToFolderAndRevealAsync,
                 callbacks.ReloadTabAsync,
+                callbacks.OpenHexViewAsync,
                 tabEncryption.EncryptAsync,
                 tabEncryption.ChangePasswordAsync,
                 tabEncryption.RemoveEncryptionAsync,

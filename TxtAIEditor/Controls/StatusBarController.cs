@@ -13,6 +13,9 @@ namespace TxtAIEditor.Controls
 {
     public sealed class StatusBarController
     {
+        private const int HexBytesPerRow = 16;
+        private const string HexHeaderOffsetLabel = "Offset(h)";
+
         private readonly StatusBarPane _statusBar;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<OpenedTab, bool> _isActiveTab;
@@ -86,9 +89,10 @@ namespace TxtAIEditor.Controls
         public void UpdateFileStats(OpenedTab tab)
         {
             long bytes = 0;
-            if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
+            string? filePath = GetStatsFilePath(tab);
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
             {
-                bytes = new FileInfo(tab.FilePath).Length;
+                bytes = new FileInfo(filePath).Length;
             }
 
             string format = _getString("StatusFileSizeFormat", "크기: {0:N0} bytes");
@@ -101,6 +105,15 @@ namespace TxtAIEditor.Controls
             {
                 return;
             }
+
+            if (tab.IsHexViewer)
+            {
+                _statusBar.TotalLinesText.Text = "HEX";
+                SetHexCursorPosition(tab, line: 2, column: 1);
+                return;
+            }
+
+            ApplyTextPositionMode();
 
             if (tab.IsImageViewer)
             {
@@ -166,8 +179,19 @@ namespace TxtAIEditor.Controls
 
         public void SetCursorPosition(int line, int column)
         {
+            ApplyTextPositionMode();
             _statusBar.LineText.Text = line.ToString();
             _statusBar.ColumnText.Text = column.ToString();
+        }
+
+        public void SetHexCursorPosition(OpenedTab tab, int line, int column)
+        {
+            var (offset, useWideOffset) = CalculateHexOffset(tab, line, column);
+            _statusBar.LineLabelText.Text = _getString("StatusHexOffsetLabel", "Offset");
+            _statusBar.LineText.Text = "0x" + offset.ToString(useWideOffset ? "X16" : "X8");
+            _statusBar.LineColumnSeparatorText.Visibility = Visibility.Collapsed;
+            _statusBar.ColumnLabelText.Visibility = Visibility.Collapsed;
+            _statusBar.ColumnText.Visibility = Visibility.Collapsed;
         }
 
         public void SyncLineEndingText(OpenedTab tab)
@@ -209,6 +233,12 @@ namespace TxtAIEditor.Controls
                 _statusBar.LanguageText.Text = extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase)
                     ? "HWPX"
                     : "DOCX";
+                return;
+            }
+
+            if (tab.IsHexViewer)
+            {
+                _statusBar.LanguageText.Text = "HEX";
                 return;
             }
 
@@ -559,6 +589,94 @@ namespace TxtAIEditor.Controls
             double estLr = cjkCount * 0.418 + spaceCount * 3.95 - words * 2.67;
             int minBound = Math.Max(words, (int)Math.Round(cjkCount * 0.5));
             return Math.Max(minBound, (int)Math.Round(estLr));
+        }
+
+        private static string? GetStatsFilePath(OpenedTab tab)
+        {
+            return !string.IsNullOrWhiteSpace(tab.FilePath)
+                ? tab.FilePath
+                : tab.HexSourceFilePath;
+        }
+
+        private void ApplyTextPositionMode()
+        {
+            _statusBar.LineLabelText.Text = _getString("StatusLineLabel", "줄");
+            _statusBar.ColumnLabelText.Text = _getString("StatusColumnLabel", "열");
+            _statusBar.LineColumnSeparatorText.Visibility = Visibility.Visible;
+            _statusBar.ColumnLabelText.Visibility = Visibility.Visible;
+            _statusBar.ColumnText.Visibility = Visibility.Visible;
+        }
+
+        private static (long Offset, bool UseWideOffset) CalculateHexOffset(OpenedTab tab, int line, int column)
+        {
+            long fileLength = GetHexSourceLength(tab);
+            bool useWideOffset = fileLength > uint.MaxValue;
+            long rowOffset = Math.Max(0, line - 2L) * HexBytesPerRow;
+            int byteIndex = GetHexByteIndex(useWideOffset, column);
+            long offset = Math.Max(0, rowOffset + byteIndex);
+            if (fileLength > 0)
+            {
+                offset = Math.Min(offset, fileLength - 1);
+            }
+
+            return (offset, useWideOffset);
+        }
+
+        private static int GetHexByteIndex(bool useWideOffset, int column)
+        {
+            int offsetWidth = Math.Max(HexHeaderOffsetLabel.Length, useWideOffset ? 16 : 8);
+            int columnZeroBased = Math.Max(0, column - 1);
+            int hexStart = offsetWidth + 2;
+            int asciiStart = hexStart + 51;
+
+            if (columnZeroBased >= asciiStart)
+            {
+                return Math.Clamp(columnZeroBased - asciiStart, 0, HexBytesPerRow - 1);
+            }
+
+            if (columnZeroBased < hexStart)
+            {
+                return 0;
+            }
+
+            int previousByteIndex = 0;
+            for (int i = 0; i < HexBytesPerRow; i++)
+            {
+                int byteStart = hexStart + (i * 3) + (i >= 8 ? 1 : 0);
+                if (columnZeroBased < byteStart)
+                {
+                    return previousByteIndex;
+                }
+
+                if (columnZeroBased <= byteStart + 2)
+                {
+                    return i;
+                }
+
+                previousByteIndex = i;
+            }
+
+            return previousByteIndex;
+        }
+
+        private static long GetHexSourceLength(OpenedTab tab)
+        {
+            try
+            {
+                string? filePath = tab.HexSourceFilePath;
+                if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+                {
+                    return new FileInfo(filePath).Length;
+                }
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            return 0;
         }
     }
 }

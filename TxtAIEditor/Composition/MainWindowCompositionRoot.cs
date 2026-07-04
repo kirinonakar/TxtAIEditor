@@ -402,6 +402,7 @@ namespace TxtAIEditor.Composition
                         tabReloadController,
                         callbacks.UpdateLanguageUi,
                         callbacks.UpdateWindowTitle),
+                    callbacks.OpenHexViewAsync,
                     (_, tabItem, tabView) => tabCloseController.CloseRightTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseLeftTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseOtherTabs(tabItem, tabView)));

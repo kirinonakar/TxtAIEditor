@@ -121,7 +121,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <TextBlock x:Name="StatusLineLabel" Text="줄" FontSize="11" VerticalAlignment="Center"/>
                         <TextBlock x:Name="StatusLine" Text="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        <TextBlock Text=":" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="StatusLineColumnSeparator" Text=":" FontSize="11" VerticalAlignment="Center"/>
                         <TextBlock x:Name="StatusColumnLabel" Text="열" FontSize="11" VerticalAlignment="Center"/>
                         <TextBlock x:Name="StatusCol" Text="1" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>

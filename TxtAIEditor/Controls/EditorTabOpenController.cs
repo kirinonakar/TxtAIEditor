@@ -144,41 +144,34 @@ namespace TxtAIEditor.Controls
                 isEncrypted,
                 encryptionPassword);
             var tab = documentParts.Tab;
-            tab.InlineLivePreviewEnabled = _isLivePreviewEnabled();
             var session = documentParts.Session;
-            _editorSessions[tab.Id] = session;
+            OpenEditorDocumentTab(tab, session, documentParts.IsReadOnly, updateLanguageUi: false);
 
-            AddOpenTab(tab);
+            return tab;
+        }
 
-            var settings = _settingsService.CurrentSettings;
-            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
-            _applyEditorSurfaceBackground(settings);
+        public OpenedTab OpenHexTab(string filePath)
+        {
+            var model = new HexDumpTextModel(filePath);
+            var tab = new OpenedTab
+            {
+                HexSourceFilePath = filePath,
+                Title = string.Format(
+                    _getLocalizedString("HexViewerTitleFormat", "{0} [HEX]"),
+                    Path.GetFileName(filePath)),
+                Content = string.Empty,
+                Language = "hex",
+                EncodingName = string.Empty,
+                EncodingWasAutoDetected = false,
+                IsHexViewer = true
+            };
 
-            var targetTabView = _getCurrentActiveTabView();
-            var tabParts = _editorTabViewItemFactory.Create(
-                tab,
-                editorBgColor,
-                settings.UiFontFamily,
-                _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
-                _tabEncryptionController.ShowMenu,
-                (tabItem, args) => _showTabContextMenu(tab, tabItem, targetTabView, tabItem, args),
-                _getCurrentFolderPath());
-            _tabBridges[tab.Id] = (tabParts.WebView, tabParts.Bridge);
-            _ = tabParts.Bridge.SetSplitViewAsync(_editorWorkspace.CurrentSplitMode != EditorSplitMode.None);
+            var session = new EditorDocumentSession(tab, model);
+            tab.OriginalContent = tab.Content;
+            tab.OriginalLineEnding = model.LineEnding;
+            tab.OriginalEncodingName = tab.EncodingName;
 
-            WireEditorBridge(
-                tabParts.Bridge,
-                tabParts.WebView,
-                tabParts.LoadCover,
-                tab,
-                tabParts.TabItem,
-                session,
-                documentParts.IsReadOnly);
-
-            AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: true);
-            UpdateTabStatus(tab, updateLanguageUi: false);
-            QueueEditorInitialization(tab, tabParts.WebView, tabParts.Bridge);
-
+            OpenEditorDocumentTab(tab, session, isReadOnly: true, updateLanguageUi: true);
             return tab;
         }
 
@@ -299,6 +292,47 @@ namespace TxtAIEditor.Controls
             {
                 _favoritesRecentController.AddRecentFile(tab.FilePath);
             }
+        }
+
+        private void OpenEditorDocumentTab(
+            OpenedTab tab,
+            EditorDocumentSession session,
+            bool isReadOnly,
+            bool updateLanguageUi)
+        {
+            tab.InlineLivePreviewEnabled = !tab.IsHexViewer && _isLivePreviewEnabled();
+            _editorSessions[tab.Id] = session;
+
+            AddOpenTab(tab);
+
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+            _applyEditorSurfaceBackground(settings);
+
+            var targetTabView = _getCurrentActiveTabView();
+            var tabParts = _editorTabViewItemFactory.Create(
+                tab,
+                editorBgColor,
+                settings.UiFontFamily,
+                _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                _tabEncryptionController.ShowMenu,
+                (tabItem, args) => _showTabContextMenu(tab, tabItem, targetTabView, tabItem, args),
+                _getCurrentFolderPath());
+            _tabBridges[tab.Id] = (tabParts.WebView, tabParts.Bridge);
+            _ = tabParts.Bridge.SetSplitViewAsync(_editorWorkspace.CurrentSplitMode != EditorSplitMode.None);
+
+            WireEditorBridge(
+                tabParts.Bridge,
+                tabParts.WebView,
+                tabParts.LoadCover,
+                tab,
+                tabParts.TabItem,
+                session,
+                isReadOnly);
+
+            AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: true);
+            UpdateTabStatus(tab, updateLanguageUi);
+            QueueEditorInitialization(tab, tabParts.WebView, tabParts.Bridge);
         }
 
         private void AddTabItemToWorkspace(
@@ -589,8 +623,8 @@ namespace TxtAIEditor.Controls
             try
             {
                 await bridge.UpdateScrollSyncStateAsync(_isScrollSyncEnabled());
-                await bridge.SetInlineLivePreviewAsync(_isLivePreviewEnabled(), _getPreviewBaseHref(tab));
-                await bridge.SetCsvTableModeAsync(_isCsvTableModeEnabled());
+                await bridge.SetInlineLivePreviewAsync(!tab.IsHexViewer && _isLivePreviewEnabled(), _getPreviewBaseHref(tab));
+                await bridge.SetCsvTableModeAsync(!tab.IsHexViewer && _isCsvTableModeEnabled());
 
                 var snippets = _snippetService.GetSnippets();
                 var autocompleteWords = _snippetService.GetAutocompleteWords();

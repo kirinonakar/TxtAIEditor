@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -17,6 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<int> _showLeftSidebarPage;
         private readonly Func<string, Task> _navigateExplorerToFolderAsync;
         private readonly Func<OpenedTab, TabViewItem, Task> _reloadTabAsync;
+        private readonly Func<OpenedTab, Task> _openHexViewAsync;
         private readonly Func<OpenedTab, Task> _encryptTabAsync;
         private readonly Func<OpenedTab, Task> _changeEncryptionPasswordAsync;
         private readonly Func<OpenedTab, Task> _removeEncryptionAsync;
@@ -31,6 +33,7 @@ namespace TxtAIEditor.Controls
             Action<int> showLeftSidebarPage,
             Func<string, Task> navigateExplorerToFolderAsync,
             Func<OpenedTab, TabViewItem, Task> reloadTabAsync,
+            Func<OpenedTab, Task> openHexViewAsync,
             Func<OpenedTab, Task> encryptTabAsync,
             Func<OpenedTab, Task> changeEncryptionPasswordAsync,
             Func<OpenedTab, Task> removeEncryptionAsync,
@@ -44,6 +47,7 @@ namespace TxtAIEditor.Controls
             _showLeftSidebarPage = showLeftSidebarPage;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
             _reloadTabAsync = reloadTabAsync;
+            _openHexViewAsync = openHexViewAsync;
             _encryptTabAsync = encryptTabAsync;
             _changeEncryptionPasswordAsync = changeEncryptionPasswordAsync;
             _removeEncryptionAsync = removeEncryptionAsync;
@@ -56,21 +60,22 @@ namespace TxtAIEditor.Controls
         public MenuFlyout CreateContextFlyout(OpenedTab tab, TabViewItem tabItem, TabView targetTabView)
         {
             var menu = new MenuFlyout();
+            string? fileActionPath = GetFileActionPath(tab);
 
             var copyFileNameItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFileName", "파일이름 복사"), Icon = new SymbolIcon(Symbol.Copy) };
-            copyFileNameItem.IsEnabled = !string.IsNullOrEmpty(tab.FilePath);
+            copyFileNameItem.IsEnabled = !string.IsNullOrEmpty(fileActionPath);
             copyFileNameItem.Click += (_, __) => CopyFileName(tab);
             menu.Items.Add(copyFileNameItem);
 
             var copyFilePathItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFilePath", "경로 복사"), Icon = new SymbolIcon(Symbol.Link) };
-            copyFilePathItem.IsEnabled = !string.IsNullOrEmpty(tab.FilePath);
+            copyFilePathItem.IsEnabled = !string.IsNullOrEmpty(fileActionPath);
             copyFilePathItem.Click += (_, __) => CopyFilePath(tab);
             menu.Items.Add(copyFilePathItem);
 
             menu.Items.Add(new MenuFlyoutSeparator());
 
             var addToFavoritesItem = new MenuFlyoutItem { Text = _getString("TabMenuAddToFavorites", "즐겨찾기 추가"), Icon = new SymbolIcon(Symbol.Favorite) };
-            addToFavoritesItem.IsEnabled = !string.IsNullOrEmpty(tab.FilePath);
+            addToFavoritesItem.IsEnabled = !string.IsNullOrEmpty(fileActionPath);
             addToFavoritesItem.Click += async (_, __) => await AddBookmarkAsync(tab);
             menu.Items.Add(addToFavoritesItem);
 
@@ -81,9 +86,26 @@ namespace TxtAIEditor.Controls
             menu.Items.Add(new MenuFlyoutSeparator());
 
             var reloadItem = new MenuFlyoutItem { Text = _getString("TabMenuReload", "새로고침"), Icon = new SymbolIcon(Symbol.Refresh) };
-            reloadItem.IsEnabled = !string.IsNullOrEmpty(tab.FilePath);
+            reloadItem.IsEnabled = !string.IsNullOrEmpty(fileActionPath);
             reloadItem.Click += async (_, __) => await _reloadTabAsync(tab, tabItem);
             menu.Items.Add(reloadItem);
+
+            var hexViewItem = new MenuFlyoutItem
+            {
+                Text = _getString("TabMenuHexView", "Hex 보기"),
+                Icon = new FontIcon
+                {
+                    Glyph = "H",
+                    FontFamily = new FontFamily("Segoe UI"),
+                    FontSize = 16,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            };
+            hexViewItem.IsEnabled = !tab.IsHexViewer &&
+                                    !string.IsNullOrEmpty(fileActionPath) &&
+                                    File.Exists(fileActionPath);
+            hexViewItem.Click += async (_, __) => await _openHexViewAsync(tab);
+            menu.Items.Add(hexViewItem);
 
             if (!tab.IsReadOnlyViewer)
             {
@@ -146,43 +168,54 @@ namespace TxtAIEditor.Controls
 
         private static void CopyFileName(OpenedTab tab)
         {
-            if (!string.IsNullOrEmpty(tab.FilePath))
+            string? filePath = GetFileActionPath(tab);
+            if (!string.IsNullOrEmpty(filePath))
             {
-                SetClipboardText(Path.GetFileName(tab.FilePath));
+                SetClipboardText(Path.GetFileName(filePath));
             }
         }
 
         private static void CopyFilePath(OpenedTab tab)
         {
-            if (!string.IsNullOrEmpty(tab.FilePath))
+            string? filePath = GetFileActionPath(tab);
+            if (!string.IsNullOrEmpty(filePath))
             {
-                SetClipboardText(tab.FilePath);
+                SetClipboardText(filePath);
             }
         }
 
         private async Task AddBookmarkAsync(OpenedTab tab)
         {
-            if (string.IsNullOrEmpty(tab.FilePath))
+            string? filePath = GetFileActionPath(tab);
+            if (string.IsNullOrEmpty(filePath))
             {
                 return;
             }
 
-            await _favoritesRecentController.AddFavoritePathAsync(tab.FilePath, true);
+            await _favoritesRecentController.AddFavoritePathAsync(filePath, true);
             _showLeftSidebarPage(1);
         }
 
         private async Task OpenFolderAsync(OpenedTab tab)
         {
-            if (string.IsNullOrEmpty(tab.FilePath))
+            string? filePath = GetFileActionPath(tab);
+            if (string.IsNullOrEmpty(filePath))
             {
                 return;
             }
 
-            string? folderPath = Path.GetDirectoryName(tab.FilePath);
+            string? folderPath = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(folderPath) && Directory.Exists(folderPath))
             {
                 await _navigateExplorerToFolderAsync(folderPath);
             }
+        }
+
+        private static string? GetFileActionPath(OpenedTab tab)
+        {
+            return !string.IsNullOrWhiteSpace(tab.FilePath)
+                ? tab.FilePath
+                : tab.HexSourceFilePath;
         }
 
         private static void SetClipboardText(string text)

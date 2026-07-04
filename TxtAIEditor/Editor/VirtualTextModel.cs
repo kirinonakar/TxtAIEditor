@@ -636,6 +636,14 @@ namespace TxtAIEditor.Editor
             RefreshTabContentPreview();
         }
 
+        public void UpdateModelFromSync(ITextModel model)
+        {
+            Model = model;
+            _undoManager.Clear();
+            _compositionBeforeLines.Clear();
+            RefreshTabContentPreview();
+        }
+
         public void BeginUndoGroup()
         {
             _undoManager.BeginTransaction("editor");

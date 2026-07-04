@@ -857,6 +857,9 @@
   <data name="StatusLineLabel" xml:space="preserve">
     <value>줄</value>
   </data>
+  <data name="StatusHexOffsetLabel" xml:space="preserve">
+    <value>오프셋</value>
+  </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>파일 인코딩 선택</value>
   </data>
@@ -1418,6 +1421,9 @@
   <data name="TabMenuReload" xml:space="preserve">
     <value>새로고침</value>
   </data>
+  <data name="TabMenuHexView" xml:space="preserve">
+    <value>Hex 보기</value>
+  </data>
   <data name="TabMenuEncrypt" xml:space="preserve">
     <value>암호화</value>
   </data>
@@ -1495,6 +1501,12 @@
   </data>
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>다른 탭 닫기</value>
+  </data>
+  <data name="HexViewerTitleFormat" xml:space="preserve">
+    <value>{0} [HEX]</value>
+  </data>
+  <data name="HexViewOpenFailedTitle" xml:space="preserve">
+    <value>Hex 보기 실패</value>
   </data>
   <data name="EditorContextMenuCut" xml:space="preserve">
     <value>잘라내기</value>

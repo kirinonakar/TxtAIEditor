@@ -330,6 +330,9 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--bracket-depth-3', '#a31515');
         document.documentElement.style.setProperty('--bracket-depth-4', '#267f99');
         document.documentElement.style.setProperty('--bracket-depth-5', '#af00db');
+        document.documentElement.style.setProperty('--hex-blue', '#0067c0');
+        document.documentElement.style.setProperty('--hex-data-even', '#111111');
+        document.documentElement.style.setProperty('--hex-data-odd', '#707070');
     } else if (theme === 'PastelDark') {
         document.documentElement.style.setProperty('--token-comment', '#939ab7');
         document.documentElement.style.setProperty('--token-keyword', '#c6a0f6');
@@ -349,6 +352,9 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--bracket-depth-3', '#eed49f');
         document.documentElement.style.setProperty('--bracket-depth-4', '#a6da95');
         document.documentElement.style.setProperty('--bracket-depth-5', '#c6a0f6');
+        document.documentElement.style.setProperty('--hex-blue', '#8aadf4');
+        document.documentElement.style.setProperty('--hex-data-even', '#cad3f5');
+        document.documentElement.style.setProperty('--hex-data-odd', '#939ab7');
     } else {
         document.documentElement.style.setProperty('--token-comment', '#6a9955');
         document.documentElement.style.setProperty('--token-keyword', '#569cd6');
@@ -368,6 +374,9 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--bracket-depth-3', '#ce9178');
         document.documentElement.style.setProperty('--bracket-depth-4', '#4ec9b0');
         document.documentElement.style.setProperty('--bracket-depth-5', '#c586c0');
+        document.documentElement.style.setProperty('--hex-blue', '#4da3ff');
+        document.documentElement.style.setProperty('--hex-data-even', '#f2f2f2');
+        document.documentElement.style.setProperty('--hex-data-odd', '#8a8a8a');
     }
 
     if (!state.wordWrap || previousLineHeight !== state.lineHeight) {
@@ -1084,7 +1093,9 @@ function reportCursorAndSelection(element = document.activeElement) {
     const editable = element && element.closest ? element.closest('.line-text') : null;
     if (editable && document.body.contains(editable)) {
         state.currentLine = Number(editable.dataset.line || state.currentLine);
-        state.currentColumn = runtime.getCaretOffset(editable) + 1;
+        if (editable.getAttribute('contenteditable') === 'true') {
+            state.currentColumn = runtime.getCaretOffset(editable) + 1;
+        }
     }
 
     post({ type: 'cursorChanged', line: state.currentLine, column: state.currentColumn });

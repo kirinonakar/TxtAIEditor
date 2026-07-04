@@ -56,7 +56,15 @@ namespace TxtAIEditor.Controls
 
             if (_activeTabProvider() == tab)
             {
-                _statusBarController.SetCursorPosition(line, column);
+                if (tab.IsHexViewer)
+                {
+                    _statusBarController.SetHexCursorPosition(tab, line, column);
+                }
+                else
+                {
+                    _statusBarController.SetCursorPosition(line, column);
+                }
+
                 _ = bridge.RequestSelectionAsync();
             }
         }

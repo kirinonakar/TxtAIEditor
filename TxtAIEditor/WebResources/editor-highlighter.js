@@ -405,9 +405,106 @@ function highlightHtmlLine(text, lineNumber, startCharIndex, stash) {
     return output;
 }
 
+function renderTokenizedSegment(fullText, segmentStart, segmentLength, tokens) {
+    const segmentEnd = segmentStart + segmentLength;
+    let cursor = segmentStart;
+    let output = '';
+
+    for (const token of tokens) {
+        if (token.end <= segmentStart || token.start >= segmentEnd) continue;
+
+        if (token.start > cursor) {
+            output += escapeHtml(fullText.slice(cursor, Math.min(token.start, segmentEnd)));
+        }
+
+        const start = Math.max(token.start, segmentStart);
+        const end = Math.min(token.end, segmentEnd);
+        const value = fullText.slice(start, end);
+        output += token.className
+            ? `<span class="${token.className}">${escapeHtml(value)}</span>`
+            : escapeHtml(value);
+        cursor = Math.max(cursor, end);
+    }
+
+    if (cursor < segmentEnd) {
+        output += escapeHtml(fullText.slice(cursor, segmentEnd));
+    }
+
+    return output;
+}
+
+function highlightHexLine(text, lineNumber = null, startCharIndex = 0) {
+    const fullText = lineNumber !== null && state.cache.has(lineNumber)
+        ? state.cache.get(lineNumber) || ''
+        : text;
+    const segmentStart = Math.max(0, Number(startCharIndex || 0));
+    const segmentLength = text.length;
+
+    if (/^\s*Offset\(h\)/.test(fullText)) {
+        return renderTokenizedSegment(
+            fullText,
+            segmentStart,
+            segmentLength,
+            [{ start: 0, end: fullText.length, className: 'hex-header' }]);
+    }
+
+    const offsetMatch = /^(\s*[0-9A-F]{8,16})(\s{2})/.exec(fullText);
+    if (!offsetMatch) {
+        return escapeHtml(text);
+    }
+
+    const tokens = [
+        { start: 0, end: offsetMatch[1].length, className: 'hex-offset' }
+    ];
+
+    const hexStart = offsetMatch[0].length;
+    const firstPipe = fullText.indexOf('|', hexStart);
+    const lastPipe = fullText.lastIndexOf('|');
+    if (firstPipe < 0 || lastPipe <= firstPipe) {
+        return renderTokenizedSegment(fullText, segmentStart, segmentLength, tokens);
+    }
+
+    const hexEnd = Math.max(hexStart, firstPipe - 1);
+    let byteIndex = 0;
+    let pos = hexStart;
+    while (pos < hexEnd) {
+        const pair = /^[0-9A-F]{2}/.exec(fullText.slice(pos));
+        if (pair) {
+            tokens.push({
+                start: pos,
+                end: pos + 2,
+                className: byteIndex % 2 === 0 ? 'hex-data-even' : 'hex-data-odd'
+            });
+            pos += 2;
+            byteIndex++;
+            continue;
+        }
+
+        pos++;
+    }
+
+    const asciiStart = firstPipe + 1;
+    const asciiEnd = lastPipe;
+    for (let i = asciiStart; i < asciiEnd; i++) {
+        const asciiIndex = i - asciiStart;
+        tokens.push({
+            start: i,
+            end: i + 1,
+            className: asciiIndex % 2 === 0 ? 'hex-data-even' : 'hex-data-odd'
+        });
+    }
+
+    tokens.sort((a, b) => a.start - b.start);
+    return renderTokenizedSegment(fullText, segmentStart, segmentLength, tokens);
+}
+
 function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
     if (!language || language === 'plaintext') {
         return escapeHtml(text);
+    }
+
+    if (language === 'hex') {
+        return highlightHexLine(text, lineNumber, startCharIndex);
     }
 
     const tokens = [];

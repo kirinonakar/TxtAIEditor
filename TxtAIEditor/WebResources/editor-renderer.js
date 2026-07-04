@@ -37,7 +37,44 @@ function createEditorRenderer({
     let lastPointerClientY = null;
     let pendingInlineLivePreviewFocus = null;
     let inlineLivePreviewFocusSeq = 0;
+    let hexStickyHeader = null;
     const livePreviewProcessedImages = new Set();
+
+    function ensureHexStickyHeader() {
+        if (hexStickyHeader && hexStickyHeader.isConnected) {
+            return hexStickyHeader;
+        }
+
+        hexStickyHeader = document.createElement('div');
+        hexStickyHeader.id = 'hex-sticky-header';
+        hexStickyHeader.className = 'line-row hex-sticky-header';
+        hexStickyHeader.dataset.line = '1';
+        hexStickyHeader.hidden = true;
+        hexStickyHeader.innerHTML =
+            '<div class="line-number">1</div>' +
+            '<div class="line-text" contenteditable="false" spellcheck="false" data-line="1"></div>';
+        scrollContainer.insertBefore(hexStickyHeader, scrollContainer.firstElementChild);
+        return hexStickyHeader;
+    }
+
+    function updateHexStickyHeader() {
+        const header = ensureHexStickyHeader();
+        const isHexView = state.language === 'hex';
+        header.hidden = !isHexView;
+        if (!isHexView) {
+            return;
+        }
+
+        const textElement = header.querySelector('.line-text');
+        const headerText = state.cache.get(1);
+        if (headerText === undefined) {
+            textElement.textContent = '';
+            requestMissingLines(1, 1);
+            return;
+        }
+
+        textElement.innerHTML = renderLineContent(1, headerText);
+    }
 
     function setHoveredLineNumber(lineNumber) {
         const nextLineNumber = Math.max(0, Number(lineNumber || 0));
@@ -103,6 +140,7 @@ function createEditorRenderer({
         }
 
         syncCustomSelectionClass();
+        updateHexStickyHeader();
 
         const csvTableLineCount = state.csvTableEnabled ? prepareCsvTableRenderModel() : 0;
         const range = visibleRange();

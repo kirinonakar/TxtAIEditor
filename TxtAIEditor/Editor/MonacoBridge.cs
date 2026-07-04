@@ -13,12 +13,15 @@ namespace TxtAIEditor.Editor
 {
     public class MonacoBridge
     {
+        private const string HexLanguageName = "hex";
+        private const string HexEditorFontFamily = "Consolas, \"Cascadia Mono\", \"Courier New\", monospace";
         private readonly WebView2 _webView;
         private readonly ILocalizationService? _localizationService;
         private bool _isReady = false;
         private string? _pendingText = null;
         private bool _pendingSetTextShouldFocus = true;
         private bool _isSplitView = false;
+        private string _currentLanguage = "plaintext";
         private readonly object _flushLock = new object();
         private readonly Dictionary<int, TaskCompletionSource<bool>> _pendingFlushRequests = new Dictionary<int, TaskCompletionSource<bool>>();
         private int _flushRequestSeq = 0;
@@ -147,18 +150,20 @@ namespace TxtAIEditor.Editor
             bool isReadOnly = false,
             IReadOnlyList<string>? initialLines = null)
         {
+            _currentLanguage = string.IsNullOrWhiteSpace(language) ? "plaintext" : language;
+            bool isHexLanguage = IsHexLanguage(_currentLanguage);
             var msg = new
             {
                 action = "initModel",
                 lineCount = Math.Max(1, lineCount),
                 initialStartLine = 1,
                 initialLines = initialLines ?? Array.Empty<string>(),
-                language = language,
+                language = _currentLanguage,
                 theme = settings.Theme,
-                wordWrap = settings.WordWrap,
+                wordWrap = isHexLanguage ? false : settings.WordWrap,
                 bracketPairColorization = settings.BracketPairColorization,
                 fontSize = settings.FontSize,
-                fontFamily = settings.FontFamily,
+                fontFamily = isHexLanguage ? HexEditorFontFamily : settings.FontFamily,
                 tabSize = settings.TabSize,
                 customBackgroundColor = settings.CustomBackgroundColor,
                 customForegroundColor = settings.CustomForegroundColor,
@@ -313,6 +318,7 @@ namespace TxtAIEditor.Editor
                 !filePath.Contains('.') &&
                 !string.IsNullOrWhiteSpace(filePath))
             {
+                _currentLanguage = filePath;
                 await SendMessageAsync(new { action = "setLanguage", language = filePath });
                 return;
             }
@@ -320,11 +326,13 @@ namespace TxtAIEditor.Editor
             string name = System.IO.Path.GetFileName(filePath);
             if (name.Equals("Dockerfile", StringComparison.OrdinalIgnoreCase))
             {
+                _currentLanguage = "dockerfile";
                 await SendMessageAsync(new { action = "setLanguage", language = "dockerfile" });
                 return;
             }
             if (name.Equals("Makefile", StringComparison.OrdinalIgnoreCase))
             {
+                _currentLanguage = "makefile";
                 await SendMessageAsync(new { action = "setLanguage", language = "makefile" });
                 return;
             }
@@ -394,20 +402,22 @@ namespace TxtAIEditor.Editor
                 _ => "plaintext"
             };
 
+            _currentLanguage = lang;
             var msg = new { action = "setLanguage", language = lang };
             await SendMessageAsync(msg);
         }
 
         public async Task UpdateOptionsAsync(EditorSettings settings, bool isReadOnly = false)
         {
+            bool isHexLanguage = IsHexLanguage(_currentLanguage);
             var msg = new
             {
                 action = "updateOptions",
                 theme = settings.Theme,
-                wordWrap = settings.WordWrap,
+                wordWrap = isHexLanguage ? false : settings.WordWrap,
                 bracketPairColorization = settings.BracketPairColorization,
                 fontSize = settings.FontSize,
-                fontFamily = settings.FontFamily,
+                fontFamily = isHexLanguage ? HexEditorFontFamily : settings.FontFamily,
                 tabSize = settings.TabSize,
                 customBackgroundColor = settings.CustomBackgroundColor,
                 customForegroundColor = settings.CustomForegroundColor,
@@ -625,6 +635,11 @@ namespace TxtAIEditor.Editor
                 baseHref = baseHref ?? string.Empty
             };
             await SendMessageAsync(msg);
+        }
+
+        private static bool IsHexLanguage(string? language)
+        {
+            return string.Equals(language, HexLanguageName, StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task SendMessageAsync(object obj)
