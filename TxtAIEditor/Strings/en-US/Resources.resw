@@ -864,7 +864,7 @@
     <value>Offset</value>
   </data>
   <data name="StatusHexSelectionFormat" xml:space="preserve">
-    <value>Selected: Offset {0} / Length {1:N0} bytes</value>
+    <value>Selected: Offset {0} - {1} / Length {2:N0} bytes</value>
   </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>Select file encoding</value>

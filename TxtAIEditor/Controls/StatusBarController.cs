@@ -207,11 +207,13 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            string format = _getString("StatusHexSelectionFormat", "선택됨: Offset {0} / 길이 {1:N0} bytes");
+            long endOffset = offset.Value + length.Value - 1;
+            string format = _getString("StatusHexSelectionFormat", "선택됨: Offset {0} - {1} / 길이 {2:N0} bytes");
             _statusBar.StatusSelectionStatsText.Text = string.Format(
                 CultureInfo.CurrentCulture,
                 format,
                 FormatHexOffset(tab, offset.Value),
+                FormatHexOffset(tab, endOffset),
                 length.Value);
             _statusBar.StatusSelectionStatsText.Visibility = Visibility.Visible;
         }

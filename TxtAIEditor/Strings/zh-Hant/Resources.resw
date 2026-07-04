@@ -864,7 +864,7 @@
     <value>偏移</value>
   </data>
   <data name="StatusHexSelectionFormat" xml:space="preserve">
-    <value>已選取：Offset {0} / 長度 {1:N0} bytes</value>
+    <value>已選取：Offset {0} - {1} / 長度 {2:N0} bytes</value>
   </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>選擇文件編碼</value>

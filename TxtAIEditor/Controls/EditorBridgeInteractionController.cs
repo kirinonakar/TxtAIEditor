@@ -83,6 +83,13 @@ namespace TxtAIEditor.Controls
             {
                 if (tab.IsHexViewer)
                 {
+                    if (!hexOffset.HasValue &&
+                        !hexLength.HasValue &&
+                        !string.IsNullOrEmpty(selectedText))
+                    {
+                        return;
+                    }
+
                     _statusBarController.UpdateHexSelectionStats(tab, hexOffset, hexLength);
                     return;
                 }

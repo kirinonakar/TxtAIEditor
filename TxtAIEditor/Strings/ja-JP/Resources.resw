@@ -864,7 +864,7 @@
     <value>オフセット</value>
   </data>
   <data name="StatusHexSelectionFormat" xml:space="preserve">
-    <value>選択: Offset {0} / 長さ {1:N0} bytes</value>
+    <value>選択: Offset {0} - {1} / 長さ {2:N0} bytes</value>
   </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>ファイルエンコーディングを選択</value>

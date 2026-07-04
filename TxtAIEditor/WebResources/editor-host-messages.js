@@ -221,7 +221,14 @@ export function createHostMessageHandler({
                 post({ type: 'selectionResult', text: selectedCsvText(), startLine: 0, endLine: 0 });
             } else {
                 const selInfo = selectionInfo();
-                post({ type: 'selectionResult', text: selInfo.text, startLine: selInfo.startLine, endLine: selInfo.endLine });
+                post({
+                    type: 'selectionResult',
+                    text: selInfo.text,
+                    startLine: selInfo.startLine,
+                    endLine: selInfo.endLine,
+                    hexOffset: selInfo.hexOffset,
+                    hexLength: selInfo.hexLength
+                });
             }
             break;
         case 'flushForSave':

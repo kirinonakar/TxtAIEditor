@@ -864,7 +864,7 @@
     <value>오프셋</value>
   </data>
   <data name="StatusHexSelectionFormat" xml:space="preserve">
-    <value>선택됨: Offset {0} / 길이 {1:N0} bytes</value>
+    <value>선택됨: Offset {0} - {1} / 길이 {2:N0} bytes</value>
   </data>
   <data name="StatusEncodingTooltip" xml:space="preserve">
     <value>파일 인코딩 선택</value>
