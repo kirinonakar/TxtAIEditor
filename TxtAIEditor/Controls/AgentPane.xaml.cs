@@ -1695,12 +1695,7 @@ namespace TxtAIEditor.Controls
                 return string.Empty;
             }
 
-            if (count <= 20)
-            {
-                return char.ConvertFromUtf32(0x2460 + count - 1);
-            }
-
-            return "20+";
+            return count.ToString();
         }
 
         private void RebuildHistoryMenu()
