@@ -109,7 +109,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(LivePreviewToggle, getString("LivePreviewTooltip", "라이브 프리뷰") + " (F4)");
 
             CsvTableToggle.Label = getString("CsvTable", "CSV 테이블");
-            ToolTipService.SetToolTip(CsvTableToggle, getString("CsvTable", "CSV 테이블"));
+            ToolTipService.SetToolTip(CsvTableToggle, getString("CsvTableTooltip", "csv, json 을 테이블 형태로 표시"));
 
             ThemeButton.Label = getString("Theme", "테마");
             ToolTipService.SetToolTip(ThemeButton, getString("Theme", "테마") + " (F10)");

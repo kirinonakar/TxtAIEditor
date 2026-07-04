@@ -68,7 +68,7 @@
                 </AppBarToggleButton.Icon>
                 <AppBarToggleButton.Label>라이브</AppBarToggleButton.Label>
             </AppBarToggleButton>
-            <AppBarToggleButton x:Name="CsvTableToggle" Click="OnToggleCsvTableClick" ToolTipService.ToolTip="CSV 테이블 보기">
+            <AppBarToggleButton x:Name="CsvTableToggle" Click="OnToggleCsvTableClick" ToolTipService.ToolTip="csv, json 을 테이블 형태로 표시">
                 <AppBarToggleButton.Icon>
                     <FontIcon Glyph="&#xE80A;"/>
                 </AppBarToggleButton.Icon>

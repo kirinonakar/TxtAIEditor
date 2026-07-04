@@ -86,6 +86,9 @@
   <data name="CsvTable" xml:space="preserve">
     <value>CSV Table</value>
   </data>
+  <data name="CsvTableTooltip" xml:space="preserve">
+    <value>Display CSV and JSON as a table</value>
+  </data>
   <data name="CsvNameBoxPlaceholder" xml:space="preserve">
     <value>Cell</value>
   </data>

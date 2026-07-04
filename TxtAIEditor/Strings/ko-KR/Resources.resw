@@ -86,6 +86,9 @@
   <data name="CsvTable" xml:space="preserve">
     <value>CSV 테이블</value>
   </data>
+  <data name="CsvTableTooltip" xml:space="preserve">
+    <value>csv, json 을 테이블 형태로 표시</value>
+  </data>
   <data name="CsvNameBoxPlaceholder" xml:space="preserve">
     <value>셀</value>
   </data>

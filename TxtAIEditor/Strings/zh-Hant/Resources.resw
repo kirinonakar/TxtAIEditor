@@ -86,6 +86,9 @@
   <data name="CsvTable" xml:space="preserve">
     <value>CSV Table</value>
   </data>
+  <data name="CsvTableTooltip" xml:space="preserve">
+    <value>以表格形式顯示 CSV 和 JSON</value>
+  </data>
   <data name="CsvNameBoxPlaceholder" xml:space="preserve">
     <value>細胞</value>
   </data>
