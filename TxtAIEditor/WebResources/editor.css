@@ -111,6 +111,7 @@ body.dragging-selection .line-row.row-drop-target {
     font-family: var(--font-family);
     font-size: var(--font-size);
     line-height: var(--line-height);
+    cursor: text;
 }
 
 body.no-horizontal-overflow #scroll-container {
@@ -472,6 +473,7 @@ body.csv-table-mode .line-row {
     caret-color: var(--fg);
     user-select: text;
     -webkit-user-select: text;
+    cursor: text;
 }
 
 body:not(.wrap-enabled) .line-text {
