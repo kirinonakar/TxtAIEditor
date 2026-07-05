@@ -953,7 +953,7 @@ function renderLineContent(lineNumber, text, forcePlainText = false) {
 
     const selectionBounds = selectionBoundsForLine(lineNumber, text.length);
     if (selectionBounds) {
-        return highlightLine(text, state.language, lineNumber, 0);
+        return renderLineContentWithSelection(lineNumber, text, selectionBounds);
     }
 
     if (state.searchQuery && state.searchMatches.length > 0) {
@@ -966,6 +966,64 @@ function renderLineContent(lineNumber, text, forcePlainText = false) {
     }
 
     return highlightLine(text, state.language, lineNumber, 0);
+}
+
+function renderLineContentWithSelection(lineNumber, text, selectionBounds) {
+    const highlighted = highlightLine(text, state.language, lineNumber, 0);
+    const start = Math.max(0, Math.min(selectionBounds.start, text.length));
+    const end = Math.max(start, Math.min(selectionBounds.end, text.length));
+    if (start === end) {
+        return highlighted;
+    }
+
+    return wrapHighlightedSelection(highlighted, start, end);
+}
+
+function wrapHighlightedSelection(html, selectionStart, selectionEnd) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+
+    const selectedTextNodes = [];
+    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+    let offset = 0;
+    let node;
+
+    while ((node = walker.nextNode())) {
+        const text = node.nodeValue || '';
+        const nodeStart = offset;
+        const nodeEnd = nodeStart + text.length;
+
+        if (nodeEnd > selectionStart && nodeStart < selectionEnd) {
+            selectedTextNodes.push({
+                node,
+                start: Math.max(selectionStart, nodeStart) - nodeStart,
+                end: Math.min(selectionEnd, nodeEnd) - nodeStart
+            });
+        }
+
+        offset = nodeEnd;
+    }
+
+    for (const item of selectedTextNodes) {
+        const text = item.node.nodeValue || '';
+        const fragment = document.createDocumentFragment();
+        if (item.start > 0) {
+            fragment.appendChild(document.createTextNode(text.slice(0, item.start)));
+        }
+
+        const selected = document.createElement('span');
+        selected.className = 'selection-fragment';
+        selected.textContent = text.slice(item.start, item.end);
+        fragment.appendChild(selected);
+
+        if (item.end < text.length) {
+            fragment.appendChild(document.createTextNode(text.slice(item.end)));
+        }
+
+        item.node.replaceWith(fragment);
+    }
+
+    return template.innerHTML;
 }
 
 function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch) {

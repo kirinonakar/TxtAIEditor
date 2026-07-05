@@ -5,6 +5,7 @@
     --gutter-fg: #858585;
     --row-hover: rgba(127, 127, 127, 0.12);
     --selection: rgba(0, 120, 212, 0.38);
+    --selection-foreground: #ffffff;
     --preview-code-bg: #2d2d2d;
     --font-family: Consolas, "Courier New", monospace;
     --font-size: 14px;
@@ -39,7 +40,7 @@ body {
 
 ::selection {
     background: var(--selection);
-    color: inherit;
+    color: var(--selection-foreground);
 }
 
 body.selecting ::selection,
@@ -797,8 +798,14 @@ mark.active-match {
 }
 
 .selection-fragment {
-    background: var(--selection);
-    color: inherit;
+    background: transparent;
+    color: var(--selection-foreground);
+    -webkit-text-fill-color: var(--selection-foreground);
+}
+
+.selection-fragment * {
+    color: inherit !important;
+    -webkit-text-fill-color: currentColor !important;
 }
 
 .editable-selection-overlay {

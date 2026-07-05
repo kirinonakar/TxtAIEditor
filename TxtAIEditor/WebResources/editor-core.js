@@ -301,6 +301,7 @@ function applyOptions(msg) {
     document.documentElement.style.setProperty('--gutter-bg', theme === 'PastelDark' ? '#1e2030' : (theme === 'Light' ? '#f3f3f3' : '#252526'));
     document.documentElement.style.setProperty('--gutter-fg', theme === 'PastelDark' ? '#a5adcb' : (theme === 'Light' ? '#6b6b6b' : '#858585'));
     document.documentElement.style.setProperty('--selection', theme === 'PastelDark' ? 'rgba(198, 160, 246, 0.3)' : (theme === 'Light' ? 'rgba(0, 95, 184, 0.28)' : 'rgba(0, 120, 212, 0.38)'));
+    document.documentElement.style.setProperty('--selection-foreground', fg);
     document.documentElement.style.setProperty('--preview-code-bg', theme === 'PastelDark' ? '#1e2030' : (theme === 'Light' ? '#f3f5f7' : '#2d2d2d'));
     document.documentElement.style.setProperty('--font-size', `${fontSize}px`);
     document.documentElement.style.setProperty('--font-family', msg.fontFamily || 'Consolas, "Courier New", monospace');
@@ -1417,7 +1418,13 @@ function clearCustomSelectionVisuals() {
         row.classList.remove('selected-row', 'selected-empty-row');
     });
     viewport.querySelectorAll('.selection-fragment').forEach(fragment => {
-        fragment.replaceWith(document.createTextNode(fragment.textContent || ''));
+        const parent = fragment.parentNode;
+        if (!parent) return;
+
+        while (fragment.firstChild) {
+            parent.insertBefore(fragment.firstChild, fragment);
+        }
+        fragment.remove();
     });
 }
 
