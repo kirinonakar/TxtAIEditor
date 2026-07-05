@@ -450,10 +450,10 @@
     <value>Ollama Cloudは、指定されたエンドポイントからモデルリストを取得します。</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLabel" xml:space="preserve">
-    <value>Cached token統計</value>
+    <value>Token統計</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsButton" xml:space="preserve">
-    <value>Cached token統計を表示</value>
+    <value>Token統計をエディターで開く</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsEmpty" xml:space="preserve">
     <value>まだLLM token usageは観測されていません。</value>

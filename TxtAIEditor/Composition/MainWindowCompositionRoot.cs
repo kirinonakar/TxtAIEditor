@@ -520,6 +520,15 @@ namespace TxtAIEditor.Composition
                     (_, args) => tabCloseController.CloseRequested(args)));
             shellPaneController = editorRuntimeControllers.ShellPane;
 
+            void OpenTextInEditor(string title, string content)
+            {
+                string uniqueTitle = CreateUniqueGeneratedTitle(title, viewModel);
+                var tab = callbacks.OpenGeneratedTab(content);
+                tab.Title = uniqueTitle;
+                tab.Language = services.LanguageDetectionService.GetMonacoLanguageName(uniqueTitle);
+                callbacks.UpdateWindowTitle();
+            }
+
             var startupControllers = MainWindowStartupComposition.Compose(
                 window,
                 ui,
@@ -568,6 +577,7 @@ namespace TxtAIEditor.Composition
                     callbacks.GetLocalizedString,
                     callbacks.GetCurrentElementTheme,
                     callbacks.InitializePickerWindow,
+                    OpenTextInEditor,
                     callbacks.GetPreviewBaseHref));
             settingsController = startupControllers.Settings;
             toolbarCommandController = startupControllers.ToolbarCommand;
@@ -589,6 +599,42 @@ namespace TxtAIEditor.Composition
                 agentControllers,
                 workspaceControllers,
                 LifecycleControllers.From(startupControllers));
+        }
+
+        private static string CreateUniqueGeneratedTitle(string title, MainWindowViewModel viewModel)
+        {
+            string uniqueTitle = string.IsNullOrWhiteSpace(title) ? "Untitled.txt" : title.Trim();
+            string extension = string.Empty;
+            string baseName = uniqueTitle;
+            int lastDot = uniqueTitle.LastIndexOf('.');
+            if (lastDot > 0 && lastDot < uniqueTitle.Length - 1)
+            {
+                baseName = uniqueTitle.Substring(0, lastDot);
+                extension = uniqueTitle.Substring(lastDot);
+            }
+
+            int counter = 1;
+            while (GeneratedTitleExists(uniqueTitle, viewModel))
+            {
+                counter++;
+                uniqueTitle = $"{baseName} ({counter}){extension}";
+            }
+
+            return uniqueTitle;
+        }
+
+        private static bool GeneratedTitleExists(string title, MainWindowViewModel viewModel)
+        {
+            foreach (var tab in viewModel.Tabs)
+            {
+                if (string.IsNullOrEmpty(tab.FilePath) &&
+                    string.Equals(tab.Title, title, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

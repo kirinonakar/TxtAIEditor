@@ -31,10 +31,9 @@ namespace TxtAIEditor.Core.Services
         private readonly ComboBox _llmThinkingLevelCombo;
         private readonly Button _refreshModelsButton;
         private readonly TextBlock _modelStatusText;
-        private readonly DropDownButton _tokenUsageStatsButton;
+        private readonly Button _tokenUsageStatsButton;
+        private readonly Button _tokenUsageResetButton;
         private readonly TextBlock _tokenUsageSummaryText;
-        private readonly TextBlock _tokenUsageDetailText;
-        private readonly Button _resetTokenUsageStatsButton;
         private readonly NumberBox _maxToolCallsBox;
 
         private SettingsLlmPanel(EditorSettings settings, ILLMService llmService, Func<string, string, string> getString)
@@ -70,17 +69,16 @@ namespace TxtAIEditor.Core.Services
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 11
             };
-            _tokenUsageDetailText = new TextBlock
+            _tokenUsageStatsButton = new Button
             {
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 11
+                Content = getString("SettingsLlmTokenUsageStatsButton", "token 통계 에디터에서 열기"),
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            _resetTokenUsageStatsButton = new Button
+            _tokenUsageResetButton = new Button
             {
                 Content = getString("SettingsLlmTokenUsageStatsReset", "통계 초기화"),
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            _tokenUsageStatsButton = CreateTokenUsageStatsButton();
             _maxToolCallsBox = new NumberBox
             {
                 Minimum = 0,
@@ -97,6 +95,8 @@ namespace TxtAIEditor.Core.Services
             AddEventHandlers();
             Content = CreateSection();
         }
+
+        public event Action<string, string>? OpenTextInEditorRequested;
 
         public static async Task<SettingsLlmPanel> CreateAsync(
             EditorSettings settings,
@@ -227,8 +227,9 @@ namespace TxtAIEditor.Core.Services
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTargetLanguage", "번역 대상 언어 (Target Language)"));
             section.Children.Add(_targetLangCombo);
 
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTokenUsageStatsLabel", "Cached token 통계"));
+            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTokenUsageStatsLabel", "token 통계"));
             section.Children.Add(_tokenUsageStatsButton);
+            section.Children.Add(_tokenUsageResetButton);
             section.Children.Add(_tokenUsageSummaryText);
             return section;
         }
@@ -251,35 +252,18 @@ namespace TxtAIEditor.Core.Services
             };
 
             _refreshModelsButton.Click += async (_, __) => await RefreshModelsAsync();
-            _tokenUsageStatsButton.Click += (_, __) => RefreshTokenUsageStatsDisplay();
-            _resetTokenUsageStatsButton.Click += (_, __) =>
+            _tokenUsageStatsButton.Click += (_, __) => OpenTokenUsageStatsInEditor();
+            _tokenUsageResetButton.Click += (_, __) =>
             {
                 _llmService.ResetTokenUsageStats();
                 RefreshTokenUsageStatsDisplay();
             };
         }
 
-        private DropDownButton CreateTokenUsageStatsButton()
+        private void OpenTokenUsageStatsInEditor()
         {
-            var flyoutContent = new StackPanel
-            {
-                Spacing = 8,
-                Padding = new Thickness(8),
-                MinWidth = 380
-            };
-            flyoutContent.Children.Add(_tokenUsageDetailText);
-            flyoutContent.Children.Add(_resetTokenUsageStatsButton);
-            SettingsDialogStyler.ApplyCompactStyleToLogicalTree(flyoutContent);
-
-            return new DropDownButton
-            {
-                Content = _getString("SettingsLlmTokenUsageStatsButton", "Cached token 통계 보기"),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Flyout = new Flyout
-                {
-                    Content = flyoutContent
-                }
-            };
+            string title = $"{_getString("SettingsLlmTokenUsageStatsLabel", "token 통계")}.txt";
+            OpenTextInEditorRequested?.Invoke(title, BuildTokenUsageStatsDetails());
         }
 
         private void RefreshTokenUsageStatsDisplay()
@@ -289,7 +273,6 @@ namespace TxtAIEditor.Core.Services
             {
                 string empty = _getString("SettingsLlmTokenUsageStatsEmpty", "아직 관측된 LLM token usage가 없습니다.");
                 _tokenUsageSummaryText.Text = empty;
-                _tokenUsageDetailText.Text = empty;
                 return;
             }
 
@@ -301,6 +284,23 @@ namespace TxtAIEditor.Core.Services
                 stats.TotalTokens,
                 stats.CachedTokens);
             _tokenUsageSummaryText.Text = summary;
+        }
+
+        private string BuildTokenUsageStatsDetails()
+        {
+            LlmTokenUsageStats stats = _llmService.TokenUsageStats;
+            if (!stats.HasAny)
+            {
+                return _getString("SettingsLlmTokenUsageStatsEmpty", "아직 관측된 LLM token usage가 없습니다.");
+            }
+
+            string summary = string.Format(
+                _getString("SettingsLlmTokenUsageStatsSummaryFormat", "누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0} · 전체 {3:N0} · cached {4:N0} 토큰"),
+                stats.RequestCount,
+                stats.PromptTokens,
+                stats.CompletionTokens,
+                stats.TotalTokens,
+                stats.CachedTokens);
 
             var details = new StringBuilder();
             details.AppendLine(summary);
@@ -350,7 +350,7 @@ namespace TxtAIEditor.Core.Services
                     bucket.TotalTokens));
             }
 
-            _tokenUsageDetailText.Text = details.ToString().TrimEnd();
+            return details.ToString().TrimEnd();
         }
 
         private string GetSelectedProviderName()

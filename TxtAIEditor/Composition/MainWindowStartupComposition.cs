@@ -30,6 +30,7 @@ namespace TxtAIEditor.Composition
         Func<string, string, string> GetLocalizedString,
         Func<ElementTheme> GetCurrentElementTheme,
         Action<object> InitializePickerWindow,
+        Action<string, string> OpenTextInEditor,
         Func<OpenedTab, string> GetPreviewBaseHref);
 
     internal sealed record MainWindowStartupControllers(
@@ -121,7 +122,8 @@ namespace TxtAIEditor.Composition
                 callbacks.UpdateAutoSaveStatus,
                 lifecycle.CleanupBeforeRestart,
                 ui.EditorWorkspace.RefreshSplitters,
-                callbacks.InitializePickerWindow);
+                callbacks.InitializePickerWindow,
+                callbacks.OpenTextInEditor);
 
             var startup = new MainWindowStartupController(
                 window,

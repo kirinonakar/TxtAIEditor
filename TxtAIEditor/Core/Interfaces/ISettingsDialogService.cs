@@ -19,6 +19,7 @@ namespace TxtAIEditor.Core.Interfaces
             XamlRoot xamlRoot,
             Func<string, string, string> getString,
             Action<object>? initializePickerWindow = null,
-            string? initialTab = null);
+            string? initialTab = null,
+            Action<string, string>? openTextInEditor = null);
     }
 }

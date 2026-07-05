@@ -450,10 +450,10 @@
     <value>Ollama Cloud는 지정된 endpoint에서 모델 목록을 불러옵니다.</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLabel" xml:space="preserve">
-    <value>Cached token 통계</value>
+    <value>Token 통계</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsButton" xml:space="preserve">
-    <value>Cached token 통계 보기</value>
+    <value>Token 통계 에디터에서 열기</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsEmpty" xml:space="preserve">
     <value>아직 관측된 LLM token usage가 없습니다.</value>

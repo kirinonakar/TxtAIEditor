@@ -52,6 +52,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _cleanupBeforeRestart;
         private readonly Action _refreshEditorWorkspaceSplitters;
         private readonly Action<object> _initializePickerWindow;
+        private readonly Action<string, string> _openTextInEditor;
 
         public MainWindowSettingsController(
             AppWindow appWindow,
@@ -89,7 +90,8 @@ namespace TxtAIEditor.Controls
             Action updateAutoSaveStatus,
             Action cleanupBeforeRestart,
             Action refreshEditorWorkspaceSplitters,
-            Action<object> initializePickerWindow)
+            Action<object> initializePickerWindow,
+            Action<string, string> openTextInEditor)
         {
             _appWindow = appWindow;
             _rootElementProvider = rootElementProvider;
@@ -127,6 +129,7 @@ namespace TxtAIEditor.Controls
             _cleanupBeforeRestart = cleanupBeforeRestart;
             _refreshEditorWorkspaceSplitters = refreshEditorWorkspaceSplitters;
             _initializePickerWindow = initializePickerWindow;
+            _openTextInEditor = openTextInEditor;
         }
 
         public async Task ToggleThemeAsync()
@@ -159,7 +162,7 @@ namespace TxtAIEditor.Controls
             var settings = _settingsService.CurrentSettings;
             string oldLanguage = settings.Language;
 
-            var result = await _settingsDialogService.ShowAsync(settings, _xamlRootProvider(), _getLocalizedString, _initializePickerWindow, initialTab);
+            var result = await _settingsDialogService.ShowAsync(settings, _xamlRootProvider(), _getLocalizedString, _initializePickerWindow, initialTab, _openTextInEditor);
             ResumeTerminalIfNeeded(terminalWasSuspended);
             if (result.SettingsImported)
             {

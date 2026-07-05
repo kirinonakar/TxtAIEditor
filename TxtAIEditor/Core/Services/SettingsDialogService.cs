@@ -21,7 +21,8 @@ namespace TxtAIEditor.Core.Services
             XamlRoot xamlRoot,
             Func<string, string, string> getString,
             Action<object>? initializePickerWindow = null,
-            string? initialTab = null)
+            string? initialTab = null,
+            Action<string, string>? openTextInEditor = null)
         {
             var dialogView = await SettingsDialogView.CreateAsync(
                 settings,
@@ -35,6 +36,8 @@ namespace TxtAIEditor.Core.Services
 
             bool isDarkTheme = xamlRoot.Content is FrameworkElement fe && fe.ActualTheme == ElementTheme.Dark;
             bool settingsImported = false;
+            string? editorTextTitle = null;
+            string? editorTextContent = null;
             var dialog = new ContentDialog
             {
                 Title = getString("SettingsTitle", "TxtAIEditor 설정"),
@@ -49,8 +52,20 @@ namespace TxtAIEditor.Core.Services
                 settingsImported = true;
                 dialog.Hide();
             };
+            dialogView.OpenTextInEditorRequested += (title, content) =>
+            {
+                editorTextTitle = title;
+                editorTextContent = content;
+                dialog.Hide();
+            };
 
             var result = await dialog.ShowAsync();
+            if (editorTextContent != null)
+            {
+                openTextInEditor?.Invoke(editorTextTitle ?? getString("UntitledNewTab", "제목 없음"), editorTextContent);
+                return new SettingsDialogResult { Saved = false, SettingsImported = settingsImported };
+            }
+
             if (result != ContentDialogResult.Primary)
             {
                 return new SettingsDialogResult { Saved = false, SettingsImported = settingsImported };

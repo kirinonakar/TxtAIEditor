@@ -450,10 +450,10 @@
     <value>Ollama Cloud 从指定端点加载模型列表。</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLabel" xml:space="preserve">
-    <value>Cached token 统计</value>
+    <value>Token 统计</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsButton" xml:space="preserve">
-    <value>查看 cached token 统计</value>
+    <value>在编辑器中打开 token 统计</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsEmpty" xml:space="preserve">
     <value>尚未观测到 LLM token usage。</value>

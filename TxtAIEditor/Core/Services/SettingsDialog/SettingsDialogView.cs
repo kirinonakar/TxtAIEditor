@@ -54,6 +54,7 @@ namespace TxtAIEditor.Core.Services
 
         public Pivot Pivot { get; }
         public event EventHandler? SettingsImported;
+        public event Action<string, string>? OpenTextInEditorRequested;
 
         public static async Task<SettingsDialogView> CreateAsync(
             EditorSettings settings,
@@ -82,6 +83,7 @@ namespace TxtAIEditor.Core.Services
                 getString,
                 initialTab);
             editingPanel.SettingsImported += (_, _) => view.SettingsImported?.Invoke(view, EventArgs.Empty);
+            llmPanel.OpenTextInEditorRequested += (title, content) => view.OpenTextInEditorRequested?.Invoke(title, content);
             return view;
         }
 
