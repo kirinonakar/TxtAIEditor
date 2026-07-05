@@ -424,6 +424,7 @@ body.csv-table-mode .line-row {
     color: var(--gutter-fg);
     font-size: 12px;
     text-align: right;
+    cursor: default;
     user-select: none;
     -webkit-user-select: none;
 }
