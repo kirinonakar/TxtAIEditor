@@ -7,7 +7,7 @@
 <h3 align="center">TxtAIEditor</h3>
 
 <p align="center">
-  <strong>A Premium WinUI 3 Desktop Text Editor Shell with WebView2 Hybrid Core</strong>
+  <strong>A Premium WinUI 3 Desktop Text Editor Shell with an Integrated AI Agent Core</strong>
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 
 ## 🌟 Overview
 
-**TxtAIEditor** is a high-performance, elegant, and modern desktop text editor shell built for Windows. It marries the robust, native desktop capabilities of **WinUI 3 (.NET 10.0)** with the rendering flexibility of a **WebView2-based custom core**. 
+**TxtAIEditor** is a high-performance, elegant, and modern desktop text editor shell built for Windows. It marries the robust, native desktop capabilities of **WinUI 3 (.NET 10.0)** with the intelligence of an **integrated AI agent**.
 
 Designed for developers, writers, and power users, TxtAIEditor provides a fluid, distraction-free environment. It features standard workspace tools like a **live Markdown/HTML/LaTeX previewer**, a **built-in terminal**, **comprehensive Git integration**, **multi-provider AI assistance and AI agent**, and a **virtualized editor core** capable of opening and editing files from small snippets to 200MB+ texts seamlessly.
 
