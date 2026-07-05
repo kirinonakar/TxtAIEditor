@@ -812,6 +812,19 @@ mark.active-match {
     background: var(--selection);
 }
 
+.openable-hover-underline-overlay {
+    position: absolute;
+    z-index: 2;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.95;
+    pointer-events: none;
+}
+
+.line-text.openable-hover-target {
+    cursor: pointer;
+}
+
 .column-cursor {
     border-left: 2px solid #0078d4; /* Premium Windows Blue Caret */
     margin-left: -2px;

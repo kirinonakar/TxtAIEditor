@@ -618,6 +618,28 @@ namespace TxtAIEditor.Controls
                     await _editorLinkNavigationController.HandleCtrlClickAsync(text, isUrl, isPath);
                 });
             };
+
+            bridge.OpenableHoverRequested += (text, isUrl, isPath) =>
+            {
+                var completion = new TaskCompletionSource<bool>();
+                if (!_dispatcherQueue.TryEnqueue(async () =>
+                {
+                    try
+                    {
+                        completion.TrySetResult(await _editorLinkNavigationController.CanOpenAsync(text, isUrl, isPath));
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Openable hover validation failed: {ex.Message}");
+                        completion.TrySetResult(false);
+                    }
+                }))
+                {
+                    completion.TrySetResult(false);
+                }
+
+                return completion.Task;
+            };
         }
 
         private async Task ApplyDeferredEditorStateAsync(MonacoBridge bridge, OpenedTab tab)

@@ -85,7 +85,8 @@ const handleCsharpMessage = createHostMessageHandler({
     suppressNativePaste: editorEvents.suppressNativePaste,
     syncHostScroll: editorEvents.syncHostScroll,
     findEditablePreviewBlockContaining,
-    clearPendingInlineLivePreviewFocus
+    clearPendingInlineLivePreviewFocus,
+    handleOpenableHoverResult: editorEvents.handleOpenableHoverResult
 });
 
 const REVEAL_SCROLL_TOLERANCE = 1;

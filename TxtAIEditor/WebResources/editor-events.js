@@ -31,7 +31,7 @@ export function bindEditorEvents({
     renderer
 }) {
     bindTextInputEvents({ renderer });
-    bindPointerSelectionEvents({ getPreciseLivePreviewPosition, renderer });
+    const pointerEvents = bindPointerSelectionEvents({ getPreciseLivePreviewPosition, renderer });
     bindKeyboardEvents({ openFindPanel });
     const clipboardEvents = bindClipboardEvents();
     bindContextMenu();
@@ -143,6 +143,7 @@ export function bindEditorEvents({
     return {
         suppressNativePaste: clipboardEvents.suppressNativePaste,
         beginProgrammaticScroll,
+        handleOpenableHoverResult: pointerEvents.handleOpenableHoverResult,
         syncHostScroll
     };
 }

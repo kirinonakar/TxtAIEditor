@@ -32,6 +32,31 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public Task<bool> CanOpenAsync(string text, bool isUrl, bool isPath)
+        {
+            if (isUrl)
+            {
+                return Task.FromResult(Uri.TryCreate(text, UriKind.Absolute, out var uri) &&
+                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps));
+            }
+
+            if (!isPath)
+            {
+                return Task.FromResult(false);
+            }
+
+            try
+            {
+                string resolvedPath = ResolvePath(text);
+                return Task.FromResult(File.Exists(resolvedPath) || Directory.Exists(resolvedPath));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to validate openable path: {ex.Message}");
+                return Task.FromResult(false);
+            }
+        }
+
         private static async Task LaunchUrlAsync(string text)
         {
             try

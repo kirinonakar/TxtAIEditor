@@ -40,7 +40,7 @@ export function bindPointerSelectionEvents({
         updateHoveredLineFromCoordinates,
         updateHoveredLineFromPointer
     } = renderer;
-    function getUrlOrPathAtColumn(text, column) {
+    function getOpenableTokenAtColumn(text, column) {
         const value = String(text ?? '');
         if (!value || column < 0) return null;
 
@@ -66,7 +66,227 @@ export function bindPointerSelectionEvents({
         }
 
         if (start >= end) return null;
-        return value.slice(start, end).trim();
+
+        let tokenStart = start;
+        let tokenEnd = end;
+        while (tokenStart < tokenEnd && /\s/.test(value[tokenStart])) tokenStart++;
+        while (tokenEnd > tokenStart && /\s/.test(value[tokenEnd - 1])) tokenEnd--;
+
+        const token = value.slice(tokenStart, tokenEnd);
+        if (!token) return null;
+
+        const isUrl = /^https?:\/\/[^\s\)\(\]\[\}\{\>\<\"\']+/i.test(token);
+        const isPath = /^[a-zA-Z]:[\/\\]/.test(token) ||
+                       /^[\/\\]/.test(token) ||
+                       /^\.\.?[\/\\]/.test(token) ||
+                       ((token.includes('/') || token.includes('\\')) && !isUrl);
+
+        if (!isUrl && !isPath) return null;
+
+        return {
+            text: token,
+            start: tokenStart,
+            end: tokenEnd,
+            isUrl,
+            isPath
+        };
+    }
+
+    let openableHoverElement = null;
+    let openableHoverRequestSeq = 0;
+    let pendingOpenableHover = null;
+    let validatedOpenableHover = null;
+
+    function clearOpenableHoverVisual() {
+        viewport.querySelectorAll('.openable-hover-underline-overlay').forEach(el => el.remove());
+        openableHoverElement?.classList?.remove('openable-hover-target');
+        openableHoverElement = null;
+    }
+
+    function cancelOpenableHoverValidation() {
+        pendingOpenableHover = null;
+        validatedOpenableHover = null;
+        clearOpenableHoverVisual();
+    }
+
+    function setOpenableHoverElement(element) {
+        if (openableHoverElement === element) return;
+        openableHoverElement?.classList?.remove('openable-hover-target');
+        openableHoverElement = element;
+        openableHoverElement?.classList?.add('openable-hover-target');
+    }
+
+    function textPositionForOffset(element, offset) {
+        if (!element) return null;
+
+        let remaining = Math.max(0, Number(offset || 0));
+        let lastText = null;
+
+        function walk(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                lastText = node;
+                const length = node.textContent.length;
+                if (remaining <= length) {
+                    return { node, offset: remaining };
+                }
+                remaining -= length;
+                return null;
+            }
+
+            for (const child of node.childNodes) {
+                const found = walk(child);
+                if (found) return found;
+            }
+            return null;
+        }
+
+        return walk(element) || (lastText
+            ? { node: lastText, offset: lastText.textContent.length }
+            : null);
+    }
+
+    function snapToDevicePixel(value) {
+        const dpr = Number(window.devicePixelRatio || 1);
+        if (!Number.isFinite(dpr) || dpr <= 0) return value;
+        return Math.round(value * dpr) / dpr;
+    }
+
+    function drawOpenableHoverUnderline(element, token) {
+        clearOpenableHoverVisual();
+
+        const row = element?.closest?.('.line-row');
+        if (!row || !token || token.start >= token.end) return;
+
+        const startPosition = textPositionForOffset(element, token.start);
+        const endPosition = textPositionForOffset(element, token.end);
+        if (!startPosition || !endPosition) return;
+
+        const range = document.createRange();
+        try {
+            range.setStart(startPosition.node, startPosition.offset);
+            range.setEnd(endPosition.node, endPosition.offset);
+
+            const rowRect = row.getBoundingClientRect();
+            const elementRect = element.getBoundingClientRect();
+            const computedStyle = window.getComputedStyle(element);
+            const parsedLineHeight = Number.parseFloat(computedStyle.lineHeight);
+            const lineHeight = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : state.lineHeight);
+            const underlineInset = Math.max(2, Math.round(lineHeight * 0.12));
+            const rects = [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0);
+            for (const rect of rects) {
+                const visualLineIndex = Math.max(0, Math.round((rect.top - elementRect.top) / lineHeight));
+                const underlineTop = elementRect.top + ((visualLineIndex + 1) * lineHeight) - underlineInset;
+                const underline = document.createElement('div');
+                underline.className = 'openable-hover-underline-overlay';
+                underline.style.left = `${Math.max(0, snapToDevicePixel(rect.left - rowRect.left))}px`;
+                underline.style.top = `${Math.max(0, snapToDevicePixel(underlineTop - rowRect.top))}px`;
+                underline.style.width = `${Math.max(1, snapToDevicePixel(rect.width))}px`;
+                row.appendChild(underline);
+            }
+            setOpenableHoverElement(element);
+        } finally {
+            range.detach?.();
+        }
+    }
+
+    function openableHoverKey(position, token) {
+        return `${position.line}:${token.start}:${token.end}:${token.text}`;
+    }
+
+    function requestOpenableHoverValidation(position, token) {
+        const key = openableHoverKey(position, token);
+
+        if (validatedOpenableHover?.key === key) {
+            if (validatedOpenableHover.isOpenable) {
+                drawOpenableHoverUnderline(position.element, token);
+            } else {
+                clearOpenableHoverVisual();
+            }
+            return;
+        }
+
+        if (pendingOpenableHover?.key === key) {
+            return;
+        }
+
+        clearOpenableHoverVisual();
+        const requestId = ++openableHoverRequestSeq;
+        pendingOpenableHover = {
+            requestId,
+            key,
+            line: position.line,
+            token: { ...token }
+        };
+        post({
+            type: 'openableHoverRequest',
+            requestId,
+            text: token.text,
+            isUrl: token.isUrl,
+            isPath: token.isPath
+        });
+    }
+
+    function handleOpenableHoverResult(requestId, isOpenable) {
+        const pending = pendingOpenableHover;
+        if (!pending || pending.requestId !== Number(requestId || 0)) {
+            return;
+        }
+
+        pendingOpenableHover = null;
+        validatedOpenableHover = {
+            key: pending.key,
+            isOpenable: !!isOpenable
+        };
+
+        if (!isOpenable) {
+            clearOpenableHoverVisual();
+            return;
+        }
+
+        const element = viewport.querySelector(`.line-text[data-line="${pending.line}"]`);
+        if (!element) return;
+
+        const text = state.cache.get(pending.line) ?? lineTextFromElement(element);
+        const token = getOpenableTokenAtColumn(text, pending.token.start);
+        if (!token || openableHoverKey({ line: pending.line }, token) !== pending.key) {
+            clearOpenableHoverVisual();
+            return;
+        }
+
+        drawOpenableHoverUnderline(element, token);
+    }
+
+    function updateOpenableHoverUnderline(event) {
+        if (state.csvTableEnabled ||
+            state.isSelecting ||
+            state.isDragPotential ||
+            state.isDragMoving ||
+            isHexView()) {
+            cancelOpenableHoverValidation();
+            return;
+        }
+
+        const position = positionFromPointer(event);
+        if (!position) {
+            cancelOpenableHoverValidation();
+            return;
+        }
+
+        const text = state.cache.get(position.line) ?? lineTextFromElement(position.element);
+        const token = getOpenableTokenAtColumn(text, position.column);
+        if (!token) {
+            cancelOpenableHoverValidation();
+            return;
+        }
+
+        if (token.isUrl) {
+            validatedOpenableHover = null;
+            pendingOpenableHover = null;
+            drawOpenableHoverUnderline(position.element, token);
+            return;
+        }
+
+        requestOpenableHoverValidation(position, token);
     }
 
     function isHexView() {
@@ -295,25 +515,18 @@ export function bindPointerSelectionEvents({
             const position = positionFromPointer(event);
             if (position) {
                 const text = state.cache.get(position.line) ?? lineTextFromElement(position.element);
-                const token = getUrlOrPathAtColumn(text, position.column);
+                const token = getOpenableTokenAtColumn(text, position.column);
                 if (token) {
-                    const isUrl = /^https?:\/\/[^\s\)\(\]\[\}\{\>\<\"\']+/i.test(token);
-                    const isPath = /^[a-zA-Z]:[\/\\]/.test(token) || 
-                                   /^[\/\\]/.test(token) || 
-                                   /^\.\.?[\/\\]/.test(token) ||
-                                   ((token.includes('/') || token.includes('\\')) && !isUrl);
-
-                    if (isUrl || isPath) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        post({
-                            type: 'ctrlClick',
-                            text: token,
-                            isUrl: isUrl,
-                            isPath: isPath
-                        });
-                        return;
-                    }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    cancelOpenableHoverValidation();
+                    post({
+                        type: 'ctrlClick',
+                        text: token.text,
+                        isUrl: token.isUrl,
+                        isPath: token.isPath
+                    });
+                    return;
                 }
             }
         }
@@ -753,6 +966,7 @@ export function bindPointerSelectionEvents({
     scrollContainer.addEventListener('pointermove', event => {
         if (state.csvTableEnabled) return;
         updateHoveredLineFromPointer(event);
+        updateOpenableHoverUnderline(event);
 
         if (isHexView()) {
             if (!state.isSelecting) return;
@@ -809,6 +1023,7 @@ export function bindPointerSelectionEvents({
     });
 
     scrollContainer.addEventListener('pointerleave', event => {
+        cancelOpenableHoverValidation();
         updateHoveredLineFromCoordinates(event.clientX, event.clientY);
     });
 
@@ -823,8 +1038,13 @@ export function bindPointerSelectionEvents({
     });
 
     scrollContainer.addEventListener('wheel', () => {
+        cancelOpenableHoverValidation();
         cancelActiveSelectionInteraction({ render: false });
     }, { capture: true });
+
+    scrollContainer.addEventListener('scroll', () => {
+        cancelOpenableHoverValidation();
+    }, { passive: true });
 
     window.addEventListener('pointerup', event => {
         endSelection(event);
@@ -836,11 +1056,13 @@ export function bindPointerSelectionEvents({
     });
 
     window.addEventListener('blur', () => {
+        cancelOpenableHoverValidation();
         cancelActiveSelectionInteraction();
     });
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
+            cancelOpenableHoverValidation();
             cancelActiveSelectionInteraction();
         }
     });
@@ -907,4 +1129,8 @@ export function bindPointerSelectionEvents({
 
         showContextMenu(event.clientX, event.clientY);
     });
+
+    return {
+        handleOpenableHoverResult
+    };
 }

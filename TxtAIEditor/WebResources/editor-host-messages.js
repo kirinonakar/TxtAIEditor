@@ -76,7 +76,8 @@ export function createHostMessageHandler({
     suppressNativePaste,
     syncHostScroll,
     findEditablePreviewBlockContaining,
-    clearPendingInlineLivePreviewFocus
+    clearPendingInlineLivePreviewFocus,
+    handleOpenableHoverResult
 }) {
     return function handleCsharpMessage(msg) {
     switch (msg.action) {
@@ -322,6 +323,11 @@ export function createHostMessageHandler({
                     state.clipboardRequests.delete(requestId);
                     pending.resolve(String(msg.text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
                 }
+            }
+            break;
+        case 'openableHoverResult':
+            if (typeof handleOpenableHoverResult === 'function') {
+                handleOpenableHoverResult(msg.requestId || 0, !!msg.isOpenable);
             }
             break;
         case 'scrollSyncChanged':

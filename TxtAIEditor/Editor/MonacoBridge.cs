@@ -46,6 +46,7 @@ namespace TxtAIEditor.Editor
         public event Action<bool>? ScrollSyncChanged;
         public event Action? EditorRendered;
         public event Action<string, bool, bool>? CtrlClicked;
+        public event Func<string, bool, bool, Task<bool>>? OpenableHoverRequested;
 
         public MonacoBridge(WebView2 webView, ILocalizationService? localizationService = null)
         {
@@ -909,6 +910,20 @@ namespace TxtAIEditor.Editor
                                 CtrlClicked?.Invoke(ctrlClickTextProp.GetString() ?? string.Empty, isUrl, isPath);
                             }
                             break;
+
+                        case "openableHoverRequest":
+                            if (root.TryGetProperty("requestId", out JsonElement hoverRequestIdProp) &&
+                                root.TryGetProperty("text", out JsonElement hoverTextProp))
+                            {
+                                bool isUrl = root.TryGetProperty("isUrl", out JsonElement isUrlProp) && isUrlProp.GetBoolean();
+                                bool isPath = root.TryGetProperty("isPath", out JsonElement isPathProp) && isPathProp.GetBoolean();
+                                _ = HandleOpenableHoverRequestAsync(
+                                    hoverRequestIdProp.GetInt32(),
+                                    hoverTextProp.GetString() ?? string.Empty,
+                                    isUrl,
+                                    isPath);
+                            }
+                            break;
                     }
                 }
             }
@@ -966,6 +981,34 @@ namespace TxtAIEditor.Editor
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to write clipboard text: {ex.Message}");
             }
+        }
+
+        private async Task HandleOpenableHoverRequestAsync(int requestId, string text, bool isUrl, bool isPath)
+        {
+            bool isOpenable = false;
+            try
+            {
+                var handler = OpenableHoverRequested;
+                if (handler != null)
+                {
+                    isOpenable = await handler(text, isUrl, isPath);
+                }
+                else if (isUrl)
+                {
+                    isOpenable = Uri.TryCreate(text, UriKind.Absolute, out _);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to validate openable hover target: {ex.Message}");
+            }
+
+            await SendMessageAsync(new
+            {
+                action = "openableHoverResult",
+                requestId,
+                isOpenable
+            });
         }
 
         private async Task SendClipboardReadResultAsync(int requestId)
