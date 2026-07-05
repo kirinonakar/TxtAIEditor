@@ -46,7 +46,7 @@ namespace TxtAIEditor.Core.Services.LLM
             return (context, output > 0 ? output : 0);
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             bool isLocalEndpoint = endpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
@@ -140,6 +140,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var doc = JsonDocument.Parse(responseBody))
                     {
                         var root = doc.RootElement;
+                        await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                         if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                         {
                             var firstChoice = choices[0];
@@ -170,7 +171,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             bool isLocalEndpoint = endpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
@@ -201,6 +202,14 @@ namespace TxtAIEditor.Core.Services.LLM
                 },
                 ["stream"] = true
             };
+
+            if (!isLocalEndpoint)
+            {
+                payloadDict["stream_options"] = new Dictionary<string, object>
+                {
+                    ["include_usage"] = true
+                };
+            }
 
             if (tools != null && tools.Count > 0)
             {
@@ -284,6 +293,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                 using (var doc = JsonDocument.Parse(data))
                                 {
                                     var root = doc.RootElement;
+                                    await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                                     if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];

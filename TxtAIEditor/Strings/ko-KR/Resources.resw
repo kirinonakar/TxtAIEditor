@@ -449,6 +449,45 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloud는 지정된 endpoint에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmTokenUsageStatsLabel" xml:space="preserve">
+    <value>Cached token 통계</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsButton" xml:space="preserve">
+    <value>Cached token 통계 보기</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsEmpty" xml:space="preserve">
+    <value>아직 관측된 LLM token usage가 없습니다.</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsSummaryFormat" xml:space="preserve">
+    <value>누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0} · 전체 {3:N0} · cached {4:N0} 토큰</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
+    <value>마지막: {0} / {1} · cached {2:N0} 토큰</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsBucketLineFormat" xml:space="preserve">
+    <value>{0} / {1}: 요청 {2:N0}회, cached {3:N0}, 전체 {4:N0} 토큰</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsByProviderModel" xml:space="preserve">
+    <value>공급자/모델별</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsByDay" xml:space="preserve">
+    <value>일별</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsByMonth" xml:space="preserve">
+    <value>월별</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsPeriodLineFormat" xml:space="preserve">
+    <value>{0}: 요청 {1:N0}회, cached {2:N0}, 전체 {3:N0} 토큰</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsReset" xml:space="preserve">
+    <value>통계 초기화</value>
+  </data>
+  <data name="SettingsLlmTokenUsageUnknownProvider" xml:space="preserve">
+    <value>알 수 없는 공급자</value>
+  </data>
+  <data name="SettingsLlmTokenUsageUnknownModel" xml:space="preserve">
+    <value>알 수 없는 모델</value>
+  </data>
   <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
     <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
@@ -2217,6 +2256,15 @@
   </data>
   <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
     <value>{0} ({1})</value>
+  </data>
+  <data name="AgentLlmUsageWithCachedTokensFormat" xml:space="preserve">
+    <value>LLM 사용량: 입력 {0} / 출력 {1} / 전체 {2} / cached {3}</value>
+  </data>
+  <data name="AgentLlmUsageFormat" xml:space="preserve">
+    <value>LLM 사용량: 입력 {0} / 출력 {1} / 전체 {2}</value>
+  </data>
+  <data name="AgentUnknownTokenCount" xml:space="preserve">
+    <value>알 수 없음</value>
   </data>
   <data name="AgentAttachmentCountFormat" xml:space="preserve">
     <value>첨부 {0:N0}개</value>

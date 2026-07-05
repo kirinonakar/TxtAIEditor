@@ -22,7 +22,7 @@ namespace TxtAIEditor.Core.Services.LLM
             _localizationService = localizationService;
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
@@ -63,6 +63,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var doc = JsonDocument.Parse(responseBody))
                     {
                         var root = doc.RootElement;
+                        await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                         if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                         {
                             var firstChoice = choices[0];
@@ -79,7 +80,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
@@ -137,6 +138,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                 using (var doc = JsonDocument.Parse(data))
                                 {
                                     var root = doc.RootElement;
+                                    await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                                     if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];

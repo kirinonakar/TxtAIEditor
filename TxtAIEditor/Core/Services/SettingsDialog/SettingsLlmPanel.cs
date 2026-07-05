@@ -1,11 +1,13 @@
 using System;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -29,6 +31,10 @@ namespace TxtAIEditor.Core.Services
         private readonly ComboBox _llmThinkingLevelCombo;
         private readonly Button _refreshModelsButton;
         private readonly TextBlock _modelStatusText;
+        private readonly DropDownButton _tokenUsageStatsButton;
+        private readonly TextBlock _tokenUsageSummaryText;
+        private readonly TextBlock _tokenUsageDetailText;
+        private readonly Button _resetTokenUsageStatsButton;
         private readonly NumberBox _maxToolCallsBox;
 
         private SettingsLlmPanel(EditorSettings settings, ILLMService llmService, Func<string, string, string> getString)
@@ -59,6 +65,22 @@ namespace TxtAIEditor.Core.Services
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 11
             };
+            _tokenUsageSummaryText = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11
+            };
+            _tokenUsageDetailText = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11
+            };
+            _resetTokenUsageStatsButton = new Button
+            {
+                Content = getString("SettingsLlmTokenUsageStatsReset", "통계 초기화"),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            _tokenUsageStatsButton = CreateTokenUsageStatsButton();
             _maxToolCallsBox = new NumberBox
             {
                 Minimum = 0,
@@ -71,6 +93,7 @@ namespace TxtAIEditor.Core.Services
 
             PopulateModelChoices(GetSelectedProviderName(), settings.LlmModel);
             UpdateModelRefreshButtonVisibility();
+            RefreshTokenUsageStatsDisplay();
             AddEventHandlers();
             Content = CreateSection();
         }
@@ -203,6 +226,10 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(_sourceLangCombo);
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTargetLanguage", "번역 대상 언어 (Target Language)"));
             section.Children.Add(_targetLangCombo);
+
+            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTokenUsageStatsLabel", "Cached token 통계"));
+            section.Children.Add(_tokenUsageStatsButton);
+            section.Children.Add(_tokenUsageSummaryText);
             return section;
         }
 
@@ -224,6 +251,106 @@ namespace TxtAIEditor.Core.Services
             };
 
             _refreshModelsButton.Click += async (_, __) => await RefreshModelsAsync();
+            _tokenUsageStatsButton.Click += (_, __) => RefreshTokenUsageStatsDisplay();
+            _resetTokenUsageStatsButton.Click += (_, __) =>
+            {
+                _llmService.ResetTokenUsageStats();
+                RefreshTokenUsageStatsDisplay();
+            };
+        }
+
+        private DropDownButton CreateTokenUsageStatsButton()
+        {
+            var flyoutContent = new StackPanel
+            {
+                Spacing = 8,
+                Padding = new Thickness(8),
+                MinWidth = 380
+            };
+            flyoutContent.Children.Add(_tokenUsageDetailText);
+            flyoutContent.Children.Add(_resetTokenUsageStatsButton);
+            SettingsDialogStyler.ApplyCompactStyleToLogicalTree(flyoutContent);
+
+            return new DropDownButton
+            {
+                Content = _getString("SettingsLlmTokenUsageStatsButton", "Cached token 통계 보기"),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Flyout = new Flyout
+                {
+                    Content = flyoutContent
+                }
+            };
+        }
+
+        private void RefreshTokenUsageStatsDisplay()
+        {
+            LlmTokenUsageStats stats = _llmService.TokenUsageStats;
+            if (!stats.HasAny)
+            {
+                string empty = _getString("SettingsLlmTokenUsageStatsEmpty", "아직 관측된 LLM token usage가 없습니다.");
+                _tokenUsageSummaryText.Text = empty;
+                _tokenUsageDetailText.Text = empty;
+                return;
+            }
+
+            string summary = string.Format(
+                _getString("SettingsLlmTokenUsageStatsSummaryFormat", "누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0} · 전체 {3:N0} · cached {4:N0} 토큰"),
+                stats.RequestCount,
+                stats.PromptTokens,
+                stats.CompletionTokens,
+                stats.TotalTokens,
+                stats.CachedTokens);
+            _tokenUsageSummaryText.Text = summary;
+
+            var details = new StringBuilder();
+            details.AppendLine(summary);
+            if (stats.LastUsage != null)
+            {
+                details.AppendLine(string.Format(
+                    _getString("SettingsLlmTokenUsageStatsLastFormat", "마지막: {0} / {1} · cached {2:N0} 토큰"),
+                    string.IsNullOrWhiteSpace(stats.LastUsage.Provider) ? _getString("SettingsLlmTokenUsageUnknownProvider", "알 수 없는 공급자") : stats.LastUsage.Provider,
+                    string.IsNullOrWhiteSpace(stats.LastUsage.Model) ? _getString("SettingsLlmTokenUsageUnknownModel", "알 수 없는 모델") : stats.LastUsage.Model,
+                    stats.LastUsage.CachedTokens ?? 0));
+            }
+
+            details.AppendLine();
+            details.AppendLine(_getString("SettingsLlmTokenUsageStatsByProviderModel", "공급자/모델별"));
+            foreach (var bucket in stats.ByProviderModel)
+            {
+                details.AppendLine(string.Format(
+                    _getString("SettingsLlmTokenUsageStatsBucketLineFormat", "{0} / {1}: 요청 {2:N0}회, cached {3:N0}, 전체 {4:N0} 토큰"),
+                    bucket.Provider,
+                    bucket.Model,
+                    bucket.RequestCount,
+                    bucket.CachedTokens,
+                    bucket.TotalTokens));
+            }
+
+            details.AppendLine();
+            details.AppendLine(_getString("SettingsLlmTokenUsageStatsByDay", "일별"));
+            foreach (var bucket in stats.ByDay)
+            {
+                details.AppendLine(string.Format(
+                    _getString("SettingsLlmTokenUsageStatsPeriodLineFormat", "{0}: 요청 {1:N0}회, cached {2:N0}, 전체 {3:N0} 토큰"),
+                    bucket.Period,
+                    bucket.RequestCount,
+                    bucket.CachedTokens,
+                    bucket.TotalTokens));
+            }
+
+            details.AppendLine();
+            details.AppendLine(_getString("SettingsLlmTokenUsageStatsByMonth", "월별"));
+            foreach (var bucket in stats.ByMonth)
+            {
+                details.AppendLine(string.Format(
+                    _getString("SettingsLlmTokenUsageStatsPeriodLineFormat", "{0}: 요청 {1:N0}회, cached {2:N0}, 전체 {3:N0} 토큰"),
+                    bucket.Period,
+                    bucket.RequestCount,
+                    bucket.CachedTokens,
+                    bucket.TotalTokens));
+            }
+
+            _tokenUsageDetailText.Text = details.ToString().TrimEnd();
         }
 
         private string GetSelectedProviderName()

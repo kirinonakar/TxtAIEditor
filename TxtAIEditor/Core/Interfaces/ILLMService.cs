@@ -9,13 +9,17 @@ namespace TxtAIEditor.Core.Interfaces
 {
     public interface ILLMService
     {
+        LlmTokenUsage? LastTokenUsage { get; }
+        LlmTokenUsageStats TokenUsageStats { get; }
+
         Task<string> ExplainCodeAsync(string code, string language, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
         Task<string> SummarizeTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
         Task<string> TranslateTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
         Task<string> ImproveTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
         Task<string> CustomPromptAsync(string prompt, string fileContext, string selectedText, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
-        Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false);
-        Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false);
+        Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null);
+        Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null);
+        void ResetTokenUsageStats();
         
         // Secure API Key handling
         Task SaveApiKeyAsync(string provider, string apiKey);

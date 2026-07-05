@@ -33,18 +33,18 @@ namespace TxtAIEditor.Core.Services.LLM
             return (context, output > 0 ? output : 0);
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             var sb = new StringBuilder();
             await GenerateCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, chunk =>
             {
                 sb.Append(chunk);
                 return Task.CompletedTask;
-            }, cancellationToken, attachments, null, tools);
+            }, cancellationToken, attachments, null, tools, onUsage);
             return sb.ToString();
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -89,6 +89,13 @@ namespace TxtAIEditor.Core.Services.LLM
             if (outputLimit > 0)
             {
                 payloadDict["max_tokens"] = outputLimit;
+            }
+            if (_isCloud)
+            {
+                payloadDict["stream_options"] = new Dictionary<string, object>
+                {
+                    ["include_usage"] = true
+                };
             }
             if (_isCloud && tools != null && tools.Count > 0)
             {
@@ -153,6 +160,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                 using (var doc = JsonDocument.Parse(data))
                                 {
                                     var root = doc.RootElement;
+                                    await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                                     if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];

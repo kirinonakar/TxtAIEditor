@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -18,12 +20,55 @@ namespace TxtAIEditor.Core.Services
         private readonly ISettingsService _settingsService;
         private readonly ICredentialService _credentialService;
         private readonly ILocalizationService _localizationService;
+        private readonly object _tokenUsageStatsLock = new();
+        private readonly Dictionary<string, MutableTokenUsageBucket> _tokenUsageBuckets = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, MutableTokenUsagePeriodBucket> _tokenUsageDayBuckets = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, MutableTokenUsagePeriodBucket> _tokenUsageMonthBuckets = new(StringComparer.OrdinalIgnoreCase);
+        private LlmTokenUsageStats _tokenUsageStats = new();
+        private LlmTokenUsage? _lastTokenUsage;
 
         public LLMService(ISettingsService settingsService, ICredentialService credentialService, ILocalizationService localizationService)
         {
             _settingsService = settingsService;
             _credentialService = credentialService;
             _localizationService = localizationService;
+            LoadTokenUsageStats();
+        }
+
+        public LlmTokenUsage? LastTokenUsage
+        {
+            get
+            {
+                lock (_tokenUsageStatsLock)
+                {
+                    return _lastTokenUsage;
+                }
+            }
+        }
+
+        public LlmTokenUsageStats TokenUsageStats
+        {
+            get
+            {
+                lock (_tokenUsageStatsLock)
+                {
+                    return _tokenUsageStats;
+                }
+            }
+        }
+
+        public void ResetTokenUsageStats()
+        {
+            lock (_tokenUsageStatsLock)
+            {
+                _lastTokenUsage = null;
+                _tokenUsageBuckets.Clear();
+                _tokenUsageDayBuckets.Clear();
+                _tokenUsageMonthBuckets.Clear();
+                _tokenUsageStats = new LlmTokenUsageStats();
+            }
+
+            DeleteTokenUsageStatsFile();
         }
 
         private string GetActiveLanguage()
@@ -232,7 +277,7 @@ namespace TxtAIEditor.Core.Services
             return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken);
         }
 
-        public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false)
+        public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             string langCode = GetActiveLanguage();
             string targetLanguage = _settingsService.CurrentSettings?.LlmTargetLanguage ?? "Default";
@@ -249,10 +294,10 @@ namespace TxtAIEditor.Core.Services
             }
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode, targetLanguage, hasEnabledSkills, hasEnabledMcp);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
-            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools);
+            return await ExecuteLlmAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage);
         }
 
-        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false)
+        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             string langCode = GetActiveLanguage(settings);
             string targetLanguage = settings.LlmTargetLanguage ?? "Default";
@@ -269,7 +314,7 @@ namespace TxtAIEditor.Core.Services
             }
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode, targetLanguage, hasEnabledSkills, hasEnabledMcp);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
-            return await ExecuteLlmAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools);
+            return await ExecuteLlmAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage);
         }
 
         public Task SaveApiKeyAsync(string provider, string apiKey)
@@ -312,12 +357,12 @@ namespace TxtAIEditor.Core.Services
         // Private dynamic Provider Dispatcher
         // ----------------------------------------------------
 
-        private async Task<string> ExecuteLlmAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null)
+        private async Task<string> ExecuteLlmAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
-            return await ExecuteLlmAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools);
+            return await ExecuteLlmAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage);
         }
 
-        private async Task<string> ExecuteLlmAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null)
+        private async Task<string> ExecuteLlmAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
@@ -357,6 +402,17 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
+                LlmTokenUsage? observedUsage = null;
+                Func<LlmTokenUsage, Task> onProviderUsage = async usage =>
+                {
+                    var usageWithContext = usage.WithContext(providerName, settings.LlmModel, DateTimeOffset.Now);
+                    observedUsage = usageWithContext;
+                    if (onUsage != null)
+                    {
+                        await onUsage(usageWithContext);
+                    }
+                };
+
                 if (onChunk != null)
                 {
                     var fullResponse = new StringBuilder();
@@ -379,13 +435,18 @@ namespace TxtAIEditor.Core.Services
                             reasoningResponse.Append(reasoningChunk);
                             if (onReasoning != null) await onReasoning(reasoningChunk);
                         },
-                        tools
+                        tools,
+                        onProviderUsage
                     );
+                    if (observedUsage != null)
+                    {
+                        RecordTokenUsage(observedUsage);
+                    }
                     return fullResponse.Length > 0 ? fullResponse.ToString() : reasoningResponse.ToString();
                 }
                 else
                 {
-                    return await provider.GenerateCompletionAsync(
+                    string result = await provider.GenerateCompletionAsync(
                         settings.LlmEndpoint,
                         apiKey,
                         settings.LlmModel,
@@ -393,8 +454,14 @@ namespace TxtAIEditor.Core.Services
                         userContent,
                         cancellationToken,
                         attachments,
-                        tools
+                        tools,
+                        onProviderUsage
                     );
+                    if (observedUsage != null)
+                    {
+                        RecordTokenUsage(observedUsage);
+                    }
+                    return result;
                 }
             }
             catch (OperationCanceledException)
@@ -410,6 +477,274 @@ namespace TxtAIEditor.Core.Services
                 string errorPrefix = _localizationService.GetString("LlmErrorCommunicationPrefix", "AI 통신 오류가 발생했습니다: ");
                 return $"{errorPrefix}{ex.Message}";
             }
+        }
+
+        private void RecordTokenUsage(LlmTokenUsage usage)
+        {
+            if (!usage.HasAny)
+            {
+                return;
+            }
+
+            LlmTokenUsageStats snapshot;
+            lock (_tokenUsageStatsLock)
+            {
+                _lastTokenUsage = usage;
+                string provider = string.IsNullOrWhiteSpace(usage.Provider) ? "Unknown" : usage.Provider.Trim();
+                string model = string.IsNullOrWhiteSpace(usage.Model) ? "Unknown" : usage.Model.Trim();
+                string bucketKey = $"{provider}\u001f{model}";
+
+                if (!_tokenUsageBuckets.TryGetValue(bucketKey, out var bucket))
+                {
+                    bucket = new MutableTokenUsageBucket
+                    {
+                        Provider = provider,
+                        Model = model
+                    };
+                    _tokenUsageBuckets[bucketKey] = bucket;
+                }
+
+                bucket.RequestCount++;
+                bucket.PromptTokens += usage.PromptTokens ?? 0;
+                bucket.CompletionTokens += usage.CompletionTokens ?? 0;
+                bucket.TotalTokens += usage.TotalTokens ?? 0;
+                bucket.CachedTokens += usage.CachedTokens ?? 0;
+
+                DateTimeOffset observedAt = usage.ObservedAt ?? DateTimeOffset.Now;
+                AddPeriodUsage(_tokenUsageDayBuckets, observedAt.ToLocalTime().ToString("yyyy-MM-dd"), usage);
+                AddPeriodUsage(_tokenUsageMonthBuckets, observedAt.ToLocalTime().ToString("yyyy-MM"), usage);
+
+                _tokenUsageStats = CreateTokenUsageStatsSnapshot();
+                snapshot = _tokenUsageStats;
+            }
+
+            SaveTokenUsageStats(snapshot);
+        }
+
+        private LlmTokenUsageStats CreateTokenUsageStatsSnapshot()
+        {
+            var buckets = _tokenUsageBuckets.Values
+                .OrderByDescending(item => item.CachedTokens)
+                .ThenByDescending(item => item.TotalTokens)
+                .Select(item => item.ToSnapshot())
+                .ToArray();
+            var dayBuckets = _tokenUsageDayBuckets.Values
+                .OrderByDescending(item => item.Period)
+                .Select(item => item.ToSnapshot())
+                .ToArray();
+            var monthBuckets = _tokenUsageMonthBuckets.Values
+                .OrderByDescending(item => item.Period)
+                .Select(item => item.ToSnapshot())
+                .ToArray();
+
+            return new LlmTokenUsageStats
+            {
+                RequestCount = buckets.Sum(item => item.RequestCount),
+                PromptTokens = buckets.Sum(item => item.PromptTokens),
+                CompletionTokens = buckets.Sum(item => item.CompletionTokens),
+                TotalTokens = buckets.Sum(item => item.TotalTokens),
+                CachedTokens = buckets.Sum(item => item.CachedTokens),
+                LastUsage = _lastTokenUsage,
+                ByProviderModel = buckets,
+                ByDay = dayBuckets,
+                ByMonth = monthBuckets
+            };
+        }
+
+        private static void AddPeriodUsage(Dictionary<string, MutableTokenUsagePeriodBucket> buckets, string period, LlmTokenUsage usage)
+        {
+            if (!buckets.TryGetValue(period, out var bucket))
+            {
+                bucket = new MutableTokenUsagePeriodBucket
+                {
+                    Period = period
+                };
+                buckets[period] = bucket;
+            }
+
+            bucket.RequestCount++;
+            bucket.PromptTokens += usage.PromptTokens ?? 0;
+            bucket.CompletionTokens += usage.CompletionTokens ?? 0;
+            bucket.TotalTokens += usage.TotalTokens ?? 0;
+            bucket.CachedTokens += usage.CachedTokens ?? 0;
+        }
+
+        private void LoadTokenUsageStats()
+        {
+            try
+            {
+                string path = GetTokenUsageStatsPath();
+                if (!File.Exists(path))
+                {
+                    return;
+                }
+
+                string json = File.ReadAllText(path);
+                var persisted = JsonSerializer.Deserialize<PersistedTokenUsageStats>(json);
+                if (persisted == null)
+                {
+                    return;
+                }
+
+                lock (_tokenUsageStatsLock)
+                {
+                    _tokenUsageBuckets.Clear();
+                    _tokenUsageDayBuckets.Clear();
+                    _tokenUsageMonthBuckets.Clear();
+
+                    foreach (var bucket in persisted.ByProviderModel ?? new List<LlmTokenUsageBucket>())
+                    {
+                        string key = $"{bucket.Provider}\u001f{bucket.Model}";
+                        _tokenUsageBuckets[key] = new MutableTokenUsageBucket
+                        {
+                            Provider = bucket.Provider,
+                            Model = bucket.Model,
+                            RequestCount = bucket.RequestCount,
+                            PromptTokens = bucket.PromptTokens,
+                            CompletionTokens = bucket.CompletionTokens,
+                            TotalTokens = bucket.TotalTokens,
+                            CachedTokens = bucket.CachedTokens
+                        };
+                    }
+
+                    foreach (var bucket in persisted.ByDay ?? new List<LlmTokenUsagePeriodBucket>())
+                    {
+                        _tokenUsageDayBuckets[bucket.Period] = new MutableTokenUsagePeriodBucket
+                        {
+                            Period = bucket.Period,
+                            RequestCount = bucket.RequestCount,
+                            PromptTokens = bucket.PromptTokens,
+                            CompletionTokens = bucket.CompletionTokens,
+                            TotalTokens = bucket.TotalTokens,
+                            CachedTokens = bucket.CachedTokens
+                        };
+                    }
+
+                    foreach (var bucket in persisted.ByMonth ?? new List<LlmTokenUsagePeriodBucket>())
+                    {
+                        _tokenUsageMonthBuckets[bucket.Period] = new MutableTokenUsagePeriodBucket
+                        {
+                            Period = bucket.Period,
+                            RequestCount = bucket.RequestCount,
+                            PromptTokens = bucket.PromptTokens,
+                            CompletionTokens = bucket.CompletionTokens,
+                            TotalTokens = bucket.TotalTokens,
+                            CachedTokens = bucket.CachedTokens
+                        };
+                    }
+
+                    _lastTokenUsage = persisted.LastUsage;
+                    _tokenUsageStats = CreateTokenUsageStatsSnapshot();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed loading LLM token usage stats: {ex.Message}");
+            }
+        }
+
+        private void SaveTokenUsageStats(LlmTokenUsageStats stats)
+        {
+            try
+            {
+                string path = GetTokenUsageStatsPath();
+                string? directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var persisted = new PersistedTokenUsageStats
+                {
+                    LastUsage = stats.LastUsage,
+                    ByProviderModel = stats.ByProviderModel.ToList(),
+                    ByDay = stats.ByDay.ToList(),
+                    ByMonth = stats.ByMonth.ToList()
+                };
+                string json = JsonSerializer.Serialize(persisted, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(path, json);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed saving LLM token usage stats: {ex.Message}");
+            }
+        }
+
+        private void DeleteTokenUsageStatsFile()
+        {
+            try
+            {
+                string path = GetTokenUsageStatsPath();
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed deleting LLM token usage stats: {ex.Message}");
+            }
+        }
+
+        private static string GetTokenUsageStatsPath()
+        {
+            return Path.Combine(SettingsBackupService.SettingsDirectoryPath, "llm-token-usage-stats.json");
+        }
+
+        private sealed class MutableTokenUsageBucket
+        {
+            public string Provider { get; init; } = string.Empty;
+            public string Model { get; init; } = string.Empty;
+            public int RequestCount { get; set; }
+            public long PromptTokens { get; set; }
+            public long CompletionTokens { get; set; }
+            public long TotalTokens { get; set; }
+            public long CachedTokens { get; set; }
+
+            public LlmTokenUsageBucket ToSnapshot()
+            {
+                return new LlmTokenUsageBucket
+                {
+                    Provider = Provider,
+                    Model = Model,
+                    RequestCount = RequestCount,
+                    PromptTokens = PromptTokens,
+                    CompletionTokens = CompletionTokens,
+                    TotalTokens = TotalTokens,
+                    CachedTokens = CachedTokens
+                };
+            }
+        }
+
+        private sealed class MutableTokenUsagePeriodBucket
+        {
+            public string Period { get; init; } = string.Empty;
+            public int RequestCount { get; set; }
+            public long PromptTokens { get; set; }
+            public long CompletionTokens { get; set; }
+            public long TotalTokens { get; set; }
+            public long CachedTokens { get; set; }
+
+            public LlmTokenUsagePeriodBucket ToSnapshot()
+            {
+                return new LlmTokenUsagePeriodBucket
+                {
+                    Period = Period,
+                    RequestCount = RequestCount,
+                    PromptTokens = PromptTokens,
+                    CompletionTokens = CompletionTokens,
+                    TotalTokens = TotalTokens,
+                    CachedTokens = CachedTokens
+                };
+            }
+        }
+
+        private sealed class PersistedTokenUsageStats
+        {
+            public LlmTokenUsage? LastUsage { get; set; }
+            public List<LlmTokenUsageBucket> ByProviderModel { get; set; } = new();
+            public List<LlmTokenUsagePeriodBucket> ByDay { get; set; } = new();
+            public List<LlmTokenUsagePeriodBucket> ByMonth { get; set; } = new();
         }
 
         // ----------------------------------------------------

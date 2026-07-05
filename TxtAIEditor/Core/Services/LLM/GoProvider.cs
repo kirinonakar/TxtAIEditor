@@ -71,7 +71,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private static bool IsAnthropicModel(string model) => _anthropicModels.Contains(model);
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -79,7 +79,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (IsAnthropicModel(model))
             {
-                return await GenerateAnthropicCompletionAsync(endpoint, apiKey, model, systemPrompt, userContent, cancellationToken, attachments);
+                return await GenerateAnthropicCompletionAsync(endpoint, apiKey, model, systemPrompt, userContent, cancellationToken, attachments, onUsage);
             }
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
@@ -158,6 +158,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var doc = JsonDocument.Parse(responseBody))
                     {
                         var root = doc.RootElement;
+                        await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                         if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                         {
                             var firstChoice = choices[0];
@@ -210,7 +211,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -218,7 +219,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (IsAnthropicModel(model))
             {
-                await GenerateAnthropicCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning);
+                await GenerateAnthropicCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, onUsage);
                 return;
             }
 
@@ -243,7 +244,11 @@ namespace TxtAIEditor.Core.Services.LLM
                 },
                 ["temperature"] = IsKimiModel(model) ? 1.0 : 0.5,
                 ["stream"] = true,
-                ["max_tokens"] = outputLimit
+                ["max_tokens"] = outputLimit,
+                ["stream_options"] = new Dictionary<string, object>
+                {
+                    ["include_usage"] = true
+                }
             };
 
             if (tools != null && tools.Count > 0)
@@ -319,6 +324,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                 using (var doc = JsonDocument.Parse(data))
                                 {
                                     var root = doc.RootElement;
+                                    await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                                     if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];
@@ -429,7 +435,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        private async Task<string> GenerateAnthropicCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments)
+        private async Task<string> GenerateAnthropicCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments, Func<LlmTokenUsage, Task>? onUsage)
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
@@ -497,6 +503,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var doc = JsonDocument.Parse(responseBody))
                     {
                         var root = doc.RootElement;
+                        await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                         if (root.TryGetProperty("content", out var content) && content.GetArrayLength() > 0)
                         {
                             foreach (var block in content.EnumerateArray())
@@ -524,7 +531,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        private async Task GenerateAnthropicCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments, Func<string, Task>? onReasoning)
+        private async Task GenerateAnthropicCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments, Func<string, Task>? onReasoning, Func<LlmTokenUsage, Task>? onUsage)
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
@@ -606,55 +613,55 @@ namespace TxtAIEditor.Core.Services.LLM
                                 string data = line.Substring(6);
                                 if (string.IsNullOrEmpty(data)) continue;
 
-                                if (currentEvent == "content_block_delta")
+                                try
                                 {
-                                    try
+                                    using (var doc = JsonDocument.Parse(data))
                                     {
-                                        using (var doc = JsonDocument.Parse(data))
-                                        {
-                                            var root = doc.RootElement;
-                                            if (root.TryGetProperty("delta", out var delta))
-                                            {
-                                                string? deltaType = delta.TryGetProperty("type", out var dt) && dt.ValueKind == JsonValueKind.String
-                                                    ? dt.GetString()
-                                                    : null;
+                                        var root = doc.RootElement;
+                                        await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
 
-                                                if (deltaType == "text_delta" &&
-                                                    delta.TryGetProperty("text", out var text))
+                                        if (currentEvent == "content_block_delta" &&
+                                            root.TryGetProperty("delta", out var delta))
+                                        {
+                                            string? deltaType = delta.TryGetProperty("type", out var dt) && dt.ValueKind == JsonValueKind.String
+                                                ? dt.GetString()
+                                                : null;
+
+                                            if (deltaType == "text_delta" &&
+                                                delta.TryGetProperty("text", out var text))
+                                            {
+                                                string? chunk = text.GetString();
+                                                if (!string.IsNullOrEmpty(chunk))
                                                 {
-                                                    string? chunk = text.GetString();
-                                                    if (!string.IsNullOrEmpty(chunk))
-                                                    {
-                                                        cancellationToken.ThrowIfCancellationRequested();
-                                                        await onChunk(chunk);
-                                                    }
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    await onChunk(chunk);
                                                 }
-                                                else if (deltaType == "thinking_delta" &&
-                                                         delta.TryGetProperty("thinking", out var thinking) &&
-                                                         onReasoning != null)
+                                            }
+                                            else if (deltaType == "thinking_delta" &&
+                                                     delta.TryGetProperty("thinking", out var thinking) &&
+                                                     onReasoning != null)
+                                            {
+                                                string? chunk = thinking.GetString();
+                                                if (!string.IsNullOrEmpty(chunk))
                                                 {
-                                                    string? chunk = thinking.GetString();
-                                                    if (!string.IsNullOrEmpty(chunk))
-                                                    {
-                                                        cancellationToken.ThrowIfCancellationRequested();
-                                                        await onReasoning(chunk);
-                                                    }
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    await onReasoning(chunk);
                                                 }
-                                                else if (deltaType == null &&
-                                                         delta.TryGetProperty("text", out var fallbackText))
+                                            }
+                                            else if (deltaType == null &&
+                                                     delta.TryGetProperty("text", out var fallbackText))
+                                            {
+                                                string? chunk = fallbackText.GetString();
+                                                if (!string.IsNullOrEmpty(chunk))
                                                 {
-                                                    string? chunk = fallbackText.GetString();
-                                                    if (!string.IsNullOrEmpty(chunk))
-                                                    {
-                                                        cancellationToken.ThrowIfCancellationRequested();
-                                                        await onChunk(chunk);
-                                                    }
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    await onChunk(chunk);
                                                 }
                                             }
                                         }
                                     }
-                                    catch (JsonException) { }
                                 }
+                                catch (JsonException) { }
                                 continue;
                             }
                         }

@@ -100,6 +100,17 @@ namespace TxtAIEditor.Controls
                 };
             }
 
+            Func<LlmTokenUsage, Task> onUsage = async usage =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!runContext.LlmSettings.LlmAgentVerbose || !usage.HasAny)
+                {
+                    return;
+                }
+
+                await _runOutputController.AppendRunActivityAsync(runContext, _displayText.FormatLlmTokenUsage(usage));
+            };
+
             bool truncated = false;
             string response = string.Empty;
             try
@@ -433,7 +444,8 @@ namespace TxtAIEditor.Controls
                     onReasoning,
                     agentToolsList,
                     runContext.HasEnabledSkills,
-                    runContext.HasEnabledMcp);
+                    runContext.HasEnabledMcp,
+                    onUsage);
             }
             catch (ResponseTruncatedException)
             {

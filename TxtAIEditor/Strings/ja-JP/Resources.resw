@@ -449,6 +449,45 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloudは、指定されたエンドポイントからモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmTokenUsageStatsLabel" xml:space="preserve">
+    <value>Cached token統計</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsButton" xml:space="preserve">
+    <value>Cached token統計を表示</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsEmpty" xml:space="preserve">
+    <value>まだLLM token usageは観測されていません。</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsSummaryFormat" xml:space="preserve">
+    <value>累計: リクエスト {0:N0}回 · 入力 {1:N0} · 出力 {2:N0} · 合計 {3:N0} · cached {4:N0}トークン</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
+    <value>最後: {0} / {1} · cached {2:N0}トークン</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsBucketLineFormat" xml:space="preserve">
+    <value>{0} / {1}: リクエスト {2:N0}回, cached {3:N0}, 合計 {4:N0}トークン</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsByProviderModel" xml:space="preserve">
+    <value>プロバイダー/モデル別</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsByDay" xml:space="preserve">
+    <value>日別</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsByMonth" xml:space="preserve">
+    <value>月別</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsPeriodLineFormat" xml:space="preserve">
+    <value>{0}: リクエスト {1:N0}回, cached {2:N0}, 合計 {3:N0}トークン</value>
+  </data>
+  <data name="SettingsLlmTokenUsageStatsReset" xml:space="preserve">
+    <value>統計をリセット</value>
+  </data>
+  <data name="SettingsLlmTokenUsageUnknownProvider" xml:space="preserve">
+    <value>不明なプロバイダー</value>
+  </data>
+  <data name="SettingsLlmTokenUsageUnknownModel" xml:space="preserve">
+    <value>不明なモデル</value>
+  </data>
   <data name="SettingsLlmApiKeyInfo" xml:space="preserve">
     <value>APIキーは設定ファイルではなく、Windowsの資格情報マネージャーに保存されます。</value>
   </data>
@@ -2217,6 +2256,15 @@
   </data>
   <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
     <value>{0} ({1})</value>
+  </data>
+  <data name="AgentLlmUsageWithCachedTokensFormat" xml:space="preserve">
+    <value>LLM使用量: 入力 {0} / 出力 {1} / 合計 {2} / cached {3}</value>
+  </data>
+  <data name="AgentLlmUsageFormat" xml:space="preserve">
+    <value>LLM使用量: 入力 {0} / 出力 {1} / 合計 {2}</value>
+  </data>
+  <data name="AgentUnknownTokenCount" xml:space="preserve">
+    <value>不明</value>
   </data>
   <data name="AgentAttachmentCountFormat" xml:space="preserve">
     <value>添付 {0:N0}件</value>

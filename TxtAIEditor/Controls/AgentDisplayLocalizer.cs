@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Controls
 {
@@ -103,6 +104,35 @@ namespace TxtAIEditor.Controls
                 GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
                 GetString("AgentOutputPreparingTool", "Preparing tool call"),
                 FormatInlineTokenCount(tokenCount));
+        }
+
+        public string FormatLlmTokenUsage(LlmTokenUsage usage)
+        {
+            string prompt = FormatTokenValue(usage.PromptTokens);
+            string completion = FormatTokenValue(usage.CompletionTokens);
+            string total = FormatTokenValue(usage.TotalTokens);
+            if (usage.CachedTokens.HasValue)
+            {
+                return string.Format(
+                    GetString("AgentLlmUsageWithCachedTokensFormat", "LLM usage: input {0} / output {1} / total {2} / cached {3}"),
+                    prompt,
+                    completion,
+                    total,
+                    FormatInlineTokenCount(usage.CachedTokens.Value));
+            }
+
+            return string.Format(
+                GetString("AgentLlmUsageFormat", "LLM usage: input {0} / output {1} / total {2}"),
+                prompt,
+                completion,
+                total);
+        }
+
+        private string FormatTokenValue(int? tokenCount)
+        {
+            return tokenCount.HasValue
+                ? FormatInlineTokenCount(tokenCount.Value)
+                : GetString("AgentUnknownTokenCount", "unknown");
         }
 
         public bool IsOutputPlaceholder(string text)
