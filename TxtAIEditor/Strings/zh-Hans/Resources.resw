@@ -462,10 +462,10 @@
     <value>累计：请求 {0:N0} 次 · 输入 {1:N0} · 输出 {2:N0} · 总计 {3:N0} · cached {4:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
-    <value>最后一次：{0} / {1} · cached {2:N0} tokens</value>
+    <value>最后一次：{0} / {1} · 请求 {2:N0} 次 · 输入 {3:N0} · 输出 {4:N0} · 总计 {5:N0} · cached {6:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsBucketLineFormat" xml:space="preserve">
-    <value>{0} / {1}：请求 {2:N0} 次，cached {3:N0}，总计 {4:N0} tokens</value>
+    <value>{0} / {1}：请求 {2:N0} 次 · 输入 {3:N0} · 输出 {4:N0} · 总计 {5:N0} · cached {6:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsByProviderModel" xml:space="preserve">
     <value>按供应商/模型</value>
@@ -477,7 +477,7 @@
     <value>每月</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsPeriodLineFormat" xml:space="preserve">
-    <value>{0}：请求 {1:N0} 次，cached {2:N0}，总计 {3:N0} tokens</value>
+    <value>{0}：请求 {1:N0} 次 · 输入 {2:N0} · 输出 {3:N0} · 总计 {4:N0} · cached {5:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsReset" xml:space="preserve">
     <value>重置统计</value>

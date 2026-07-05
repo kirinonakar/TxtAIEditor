@@ -25,6 +25,7 @@ import {
     renderCsvTableRows,
     restoreCsvFocusAfterRender
 } from './editor-csv-table.js';
+import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
 
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
@@ -125,6 +126,7 @@ function createEditorRenderer({
             clientY >= containerRect.top &&
             clientY <= containerRect.bottom;
         if (!isInsideContainer) return 0;
+        if (isPointOnScrollContainerScrollbar(clientX, clientY)) return 0;
 
         const hit = document.elementFromPoint(clientX, clientY);
         const row = hit?.closest?.('.line-row');

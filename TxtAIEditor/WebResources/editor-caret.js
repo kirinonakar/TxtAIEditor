@@ -156,7 +156,32 @@ function lineElementFromEvent(event) {
     return target?.parentElement?.closest?.('.line-text') || null;
 }
 
+const SCROLLBAR_FALLBACK_SIZE = 10;
+
+function isPointOnScrollContainerScrollbar(clientX, clientY) {
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return false;
+
+    const rect = scrollContainer.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+        return false;
+    }
+
+    const hasHorizontalScrollbar = scrollContainer.scrollWidth > scrollContainer.clientWidth + 1;
+    const hasVerticalScrollbar = scrollContainer.scrollHeight > scrollContainer.clientHeight + 1;
+    const horizontalSize = hasHorizontalScrollbar
+        ? Math.max(rect.height - scrollContainer.clientHeight, SCROLLBAR_FALLBACK_SIZE)
+        : 0;
+    const verticalSize = hasVerticalScrollbar
+        ? Math.max(rect.width - scrollContainer.clientWidth, SCROLLBAR_FALLBACK_SIZE)
+        : 0;
+
+    return (horizontalSize > 0 && clientY >= rect.bottom - horizontalSize) ||
+        (verticalSize > 0 && clientX >= rect.right - verticalSize);
+}
+
 function positionFromPointer(event) {
+    if (isPointOnScrollContainerScrollbar(event.clientX, event.clientY)) return null;
+
     let element = lineElementFromEvent(event);
     if (!element) {
         const hit = document.elementFromPoint(event.clientX, event.clientY);
@@ -616,6 +641,7 @@ export {
     focusLine,
     getCaretOffset,
     inputRangeInElement,
+    isPointOnScrollContainerScrollbar,
     lineElementFromEvent,
     lineTextFromElement,
     makeEditablePlainText,

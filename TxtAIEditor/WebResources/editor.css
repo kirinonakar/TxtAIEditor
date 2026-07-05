@@ -114,6 +114,14 @@ body.dragging-selection .line-row.row-drop-target {
     cursor: text;
 }
 
+#scroll-container::-webkit-scrollbar,
+#scroll-container::-webkit-scrollbar-track,
+#scroll-container::-webkit-scrollbar-thumb,
+#scroll-container::-webkit-scrollbar-button,
+#scroll-container::-webkit-scrollbar-corner {
+    cursor: default;
+}
+
 body.no-horizontal-overflow #scroll-container {
     overflow-x: hidden;
 }

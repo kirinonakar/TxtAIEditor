@@ -462,10 +462,10 @@
     <value>累計：請求 {0:N0} 次 · 輸入 {1:N0} · 輸出 {2:N0} · 總計 {3:N0} · cached {4:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
-    <value>最後一次：{0} / {1} · cached {2:N0} tokens</value>
+    <value>最後一次：{0} / {1} · 請求 {2:N0} 次 · 輸入 {3:N0} · 輸出 {4:N0} · 總計 {5:N0} · cached {6:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsBucketLineFormat" xml:space="preserve">
-    <value>{0} / {1}：請求 {2:N0} 次，cached {3:N0}，總計 {4:N0} tokens</value>
+    <value>{0} / {1}：請求 {2:N0} 次 · 輸入 {3:N0} · 輸出 {4:N0} · 總計 {5:N0} · cached {6:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsByProviderModel" xml:space="preserve">
     <value>依供應商/模型</value>
@@ -477,7 +477,7 @@
     <value>每月</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsPeriodLineFormat" xml:space="preserve">
-    <value>{0}：請求 {1:N0} 次，cached {2:N0}，總計 {3:N0} tokens</value>
+    <value>{0}：請求 {1:N0} 次 · 輸入 {2:N0} · 輸出 {3:N0} · 總計 {4:N0} · cached {5:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsReset" xml:space="preserve">
     <value>重設統計</value>

@@ -307,9 +307,13 @@ namespace TxtAIEditor.Core.Services
             if (stats.LastUsage != null)
             {
                 details.AppendLine(string.Format(
-                    _getString("SettingsLlmTokenUsageStatsLastFormat", "마지막: {0} / {1} · cached {2:N0} 토큰"),
+                    _getString("SettingsLlmTokenUsageStatsLastFormat", "마지막: {0} / {1} · 요청 {2:N0}회 · 입력 {3:N0} · 출력 {4:N0} · 전체 {5:N0} · cached {6:N0} 토큰"),
                     string.IsNullOrWhiteSpace(stats.LastUsage.Provider) ? _getString("SettingsLlmTokenUsageUnknownProvider", "알 수 없는 공급자") : stats.LastUsage.Provider,
                     string.IsNullOrWhiteSpace(stats.LastUsage.Model) ? _getString("SettingsLlmTokenUsageUnknownModel", "알 수 없는 모델") : stats.LastUsage.Model,
+                    1,
+                    stats.LastUsage.PromptTokens ?? 0,
+                    stats.LastUsage.CompletionTokens ?? 0,
+                    stats.LastUsage.TotalTokens ?? 0,
                     stats.LastUsage.CachedTokens ?? 0));
             }
 
@@ -318,12 +322,14 @@ namespace TxtAIEditor.Core.Services
             foreach (var bucket in stats.ByProviderModel)
             {
                 details.AppendLine(string.Format(
-                    _getString("SettingsLlmTokenUsageStatsBucketLineFormat", "{0} / {1}: 요청 {2:N0}회, cached {3:N0}, 전체 {4:N0} 토큰"),
+                    _getString("SettingsLlmTokenUsageStatsBucketLineFormat", "{0} / {1}: 요청 {2:N0}회 · 입력 {3:N0} · 출력 {4:N0} · 전체 {5:N0} · cached {6:N0} 토큰"),
                     bucket.Provider,
                     bucket.Model,
                     bucket.RequestCount,
-                    bucket.CachedTokens,
-                    bucket.TotalTokens));
+                    bucket.PromptTokens,
+                    bucket.CompletionTokens,
+                    bucket.TotalTokens,
+                    bucket.CachedTokens));
             }
 
             details.AppendLine();
@@ -331,11 +337,13 @@ namespace TxtAIEditor.Core.Services
             foreach (var bucket in stats.ByDay)
             {
                 details.AppendLine(string.Format(
-                    _getString("SettingsLlmTokenUsageStatsPeriodLineFormat", "{0}: 요청 {1:N0}회, cached {2:N0}, 전체 {3:N0} 토큰"),
+                    _getString("SettingsLlmTokenUsageStatsPeriodLineFormat", "{0}: 요청 {1:N0}회 · 입력 {2:N0} · 출력 {3:N0} · 전체 {4:N0} · cached {5:N0} 토큰"),
                     bucket.Period,
                     bucket.RequestCount,
-                    bucket.CachedTokens,
-                    bucket.TotalTokens));
+                    bucket.PromptTokens,
+                    bucket.CompletionTokens,
+                    bucket.TotalTokens,
+                    bucket.CachedTokens));
             }
 
             details.AppendLine();
@@ -343,11 +351,13 @@ namespace TxtAIEditor.Core.Services
             foreach (var bucket in stats.ByMonth)
             {
                 details.AppendLine(string.Format(
-                    _getString("SettingsLlmTokenUsageStatsPeriodLineFormat", "{0}: 요청 {1:N0}회, cached {2:N0}, 전체 {3:N0} 토큰"),
+                    _getString("SettingsLlmTokenUsageStatsPeriodLineFormat", "{0}: 요청 {1:N0}회 · 입력 {2:N0} · 출력 {3:N0} · 전체 {4:N0} · cached {5:N0} 토큰"),
                     bucket.Period,
                     bucket.RequestCount,
-                    bucket.CachedTokens,
-                    bucket.TotalTokens));
+                    bucket.PromptTokens,
+                    bucket.CompletionTokens,
+                    bucket.TotalTokens,
+                    bucket.CachedTokens));
             }
 
             return details.ToString().TrimEnd();

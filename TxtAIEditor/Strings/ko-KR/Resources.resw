@@ -462,10 +462,10 @@
     <value>누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0} · 전체 {3:N0} · cached {4:N0} 토큰</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
-    <value>마지막: {0} / {1} · cached {2:N0} 토큰</value>
+    <value>마지막: {0} / {1} · 요청 {2:N0}회 · 입력 {3:N0} · 출력 {4:N0} · 전체 {5:N0} · cached {6:N0} 토큰</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsBucketLineFormat" xml:space="preserve">
-    <value>{0} / {1}: 요청 {2:N0}회, cached {3:N0}, 전체 {4:N0} 토큰</value>
+    <value>{0} / {1}: 요청 {2:N0}회 · 입력 {3:N0} · 출력 {4:N0} · 전체 {5:N0} · cached {6:N0} 토큰</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsByProviderModel" xml:space="preserve">
     <value>공급자/모델별</value>
@@ -477,7 +477,7 @@
     <value>월별</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsPeriodLineFormat" xml:space="preserve">
-    <value>{0}: 요청 {1:N0}회, cached {2:N0}, 전체 {3:N0} 토큰</value>
+    <value>{0}: 요청 {1:N0}회 · 입력 {2:N0} · 출력 {3:N0} · 전체 {4:N0} · cached {5:N0} 토큰</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsReset" xml:space="preserve">
     <value>통계 초기화</value>

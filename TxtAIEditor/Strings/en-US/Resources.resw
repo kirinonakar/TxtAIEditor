@@ -462,10 +462,10 @@
     <value>Total: {0:N0} requests · input {1:N0} · output {2:N0} · total {3:N0} · cached {4:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
-    <value>Last: {0} / {1} · cached {2:N0} tokens</value>
+    <value>Last: {0} / {1} · {2:N0} request · input {3:N0} · output {4:N0} · total {5:N0} · cached {6:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsBucketLineFormat" xml:space="preserve">
-    <value>{0} / {1}: {2:N0} requests, cached {3:N0}, total {4:N0} tokens</value>
+    <value>{0} / {1}: {2:N0} requests · input {3:N0} · output {4:N0} · total {5:N0} · cached {6:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsByProviderModel" xml:space="preserve">
     <value>By provider/model</value>
@@ -477,7 +477,7 @@
     <value>Monthly</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsPeriodLineFormat" xml:space="preserve">
-    <value>{0}: {1:N0} requests, cached {2:N0}, total {3:N0} tokens</value>
+    <value>{0}: {1:N0} requests · input {2:N0} · output {3:N0} · total {4:N0} · cached {5:N0} tokens</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsReset" xml:space="preserve">
     <value>Reset statistics</value>
