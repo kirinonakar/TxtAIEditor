@@ -70,15 +70,25 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            // Step 1: Extract graph part
-            int index = 0;
-            while (index < text.Length && (IsGitGraphCharacter(text[index]) || text[index] == '\u2191' || text[index] == ' '))
+            string graphStr;
+            string remaining;
+            if (item.HasStructuredDisplay)
             {
-                index++;
+                graphStr = item.GraphText;
+                remaining = string.Empty;
             }
+            else
+            {
+                // Step 1: Extract graph part
+                int index = 0;
+                while (index < text.Length && (IsGitGraphCharacter(text[index]) || text[index] == '\u2191' || text[index] == ' '))
+                {
+                    index++;
+                }
 
-            string graphStr = text.Substring(0, index);
-            string remaining = text.Substring(index);
+                graphStr = text.Substring(0, index);
+                remaining = text.Substring(index);
+            }
 
             // Set up Grid columns:
             // Column 0: Canvas for git graph
@@ -103,7 +113,7 @@ namespace TxtAIEditor.Controls
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 0, 0)
             };
-            PopulateInlines(textBlock, remaining, isDark);
+            PopulateInlines(textBlock, remaining, isDark, item);
             
             // Set ToolTip
             ToolTipService.SetToolTip(grid, text);
@@ -317,10 +327,10 @@ namespace TxtAIEditor.Controls
                    name.EndsWith("/master", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void PopulateInlines(TextBlock textBlock, string remaining, bool isDark)
+        private static void PopulateInlines(TextBlock textBlock, string remaining, bool isDark, GitHistoryItem? item = null)
         {
             textBlock.Inlines.Clear();
-            if (string.IsNullOrEmpty(remaining)) return;
+            if (string.IsNullOrEmpty(remaining) && item?.HasStructuredDisplay != true) return;
 
             // Curated, beautiful HSL-tailored colors for premium look
             Color defaultColor = isDark ? Color.FromArgb(255, 220, 224, 232) : Color.FromArgb(255, 31, 41, 55);       // High-contrast content text
@@ -344,6 +354,40 @@ namespace TxtAIEditor.Controls
             var tagBrush = new SolidColorBrush(tagColor);
             var dateBrush = new SolidColorBrush(dateColor);
 
+            if (item?.HasStructuredDisplay == true)
+            {
+                bool hasMessage = !string.IsNullOrEmpty(item.MessageText);
+                if (hasMessage)
+                {
+                    textBlock.Inlines.Add(new Run { Text = item.MessageText, Foreground = defaultBrush });
+                }
+
+                if (!string.IsNullOrEmpty(item.DecorationText))
+                {
+                    if (hasMessage)
+                    {
+                        textBlock.Inlines.Add(new Run { Text = " ", Foreground = defaultBrush });
+                    }
+
+                    AppendDecorationInlines(
+                        textBlock,
+                        item.DecorationText,
+                        parenBrush,
+                        headBrush,
+                        mainBranchBrush,
+                        localBranchBrush,
+                        remoteBranchBrush,
+                        tagBrush);
+                }
+
+                if (!string.IsNullOrEmpty(item.DateText))
+                {
+                    textBlock.Inlines.Add(new Run { Text = $" - {item.DateText}", Foreground = dateBrush });
+                }
+
+                return;
+            }
+
             if (remaining.StartsWith(" "))
             {
                 textBlock.Inlines.Add(new Run { Text = " ", Foreground = defaultBrush });
@@ -355,69 +399,16 @@ namespace TxtAIEditor.Controls
                 int closeParenIndex = remaining.IndexOf(')');
                 if (closeParenIndex > 0)
                 {
-                    textBlock.Inlines.Add(new Run { Text = "(", Foreground = parenBrush });
-
                     string decorationContent = remaining.Substring(1, closeParenIndex - 1);
-                    string[] refs = decorationContent.Split(new[] { ", " }, StringSplitOptions.None);
-                    for (int i = 0; i < refs.Length; i++)
-                    {
-                        if (i > 0)
-                        {
-                            textBlock.Inlines.Add(new Run { Text = ", ", Foreground = parenBrush });
-                        }
-
-                        string refItem = refs[i];
-                        if (refItem.Contains("->"))
-                        {
-                            int arrowIdx = refItem.IndexOf("->");
-                            string left = refItem.Substring(0, arrowIdx).Trim();
-                            string right = refItem.Substring(arrowIdx + 2).Trim();
-
-                            if (left == "HEAD")
-                            {
-                                textBlock.Inlines.Add(new Run { Text = left, Foreground = headBrush, FontWeight = Microsoft.UI.Text.FontWeights.Bold });
-                            }
-                            else
-                            {
-                                textBlock.Inlines.Add(new Run { Text = left, Foreground = IsMainBranch(left) ? mainBranchBrush : localBranchBrush });
-                            }
-
-                            textBlock.Inlines.Add(new Run { Text = " -> ", Foreground = parenBrush });
-
-                            if (right.StartsWith("origin/") || right.Contains("/"))
-                            {
-                                textBlock.Inlines.Add(new Run { Text = right, Foreground = IsMainBranch(right) ? mainBranchBrush : remoteBranchBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-                            }
-                            else
-                            {
-                                textBlock.Inlines.Add(new Run { Text = right, Foreground = IsMainBranch(right) ? mainBranchBrush : localBranchBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-                            }
-                        }
-                        else if (refItem.StartsWith("tag: "))
-                        {
-                            textBlock.Inlines.Add(new Run { Text = "tag: ", Foreground = parenBrush });
-                            textBlock.Inlines.Add(new Run { Text = refItem.Substring(5), Foreground = tagBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-                        }
-                        else if (refItem.StartsWith("refs/tags/"))
-                        {
-                            textBlock.Inlines.Add(new Run { Text = "tag: ", Foreground = parenBrush });
-                            textBlock.Inlines.Add(new Run { Text = refItem.Substring(10), Foreground = tagBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-                        }
-                        else if (refItem == "HEAD")
-                        {
-                            textBlock.Inlines.Add(new Run { Text = refItem, Foreground = headBrush, FontWeight = Microsoft.UI.Text.FontWeights.Bold });
-                        }
-                        else if (refItem.StartsWith("origin/") || refItem.Contains("/"))
-                        {
-                            textBlock.Inlines.Add(new Run { Text = refItem, Foreground = IsMainBranch(refItem) ? mainBranchBrush : remoteBranchBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-                        }
-                        else
-                        {
-                            textBlock.Inlines.Add(new Run { Text = refItem, Foreground = IsMainBranch(refItem) ? mainBranchBrush : localBranchBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-                        }
-                    }
-
-                    textBlock.Inlines.Add(new Run { Text = ")", Foreground = parenBrush });
+                    AppendDecorationInlines(
+                        textBlock,
+                        decorationContent,
+                        parenBrush,
+                        headBrush,
+                        mainBranchBrush,
+                        localBranchBrush,
+                        remoteBranchBrush,
+                        tagBrush);
                     remaining = remaining.Substring(closeParenIndex + 1);
                 }
             }
@@ -438,6 +429,88 @@ namespace TxtAIEditor.Controls
                     textBlock.Inlines.Add(new Run { Text = remaining, Foreground = defaultBrush });
                 }
             }
+        }
+
+        private static void AppendDecorationInlines(
+            TextBlock textBlock,
+            string decorationText,
+            Brush parenBrush,
+            Brush headBrush,
+            Brush mainBranchBrush,
+            Brush localBranchBrush,
+            Brush remoteBranchBrush,
+            Brush tagBrush)
+        {
+            string decorationContent = decorationText.Trim();
+            if (decorationContent.StartsWith("(") &&
+                decorationContent.EndsWith(")") &&
+                decorationContent.Length > 1)
+            {
+                decorationContent = decorationContent.Substring(1, decorationContent.Length - 2);
+            }
+
+            textBlock.Inlines.Add(new Run { Text = "(", Foreground = parenBrush });
+
+            string[] refs = decorationContent.Split(new[] { ", " }, StringSplitOptions.None);
+            for (int i = 0; i < refs.Length; i++)
+            {
+                if (i > 0)
+                {
+                    textBlock.Inlines.Add(new Run { Text = ", ", Foreground = parenBrush });
+                }
+
+                string refItem = refs[i];
+                if (refItem.Contains("->"))
+                {
+                    int arrowIdx = refItem.IndexOf("->");
+                    string left = refItem.Substring(0, arrowIdx).Trim();
+                    string right = refItem.Substring(arrowIdx + 2).Trim();
+
+                    if (left == "HEAD")
+                    {
+                        textBlock.Inlines.Add(new Run { Text = left, Foreground = headBrush, FontWeight = Microsoft.UI.Text.FontWeights.Bold });
+                    }
+                    else
+                    {
+                        textBlock.Inlines.Add(new Run { Text = left, Foreground = IsMainBranch(left) ? mainBranchBrush : localBranchBrush });
+                    }
+
+                    textBlock.Inlines.Add(new Run { Text = " -> ", Foreground = parenBrush });
+
+                    if (right.StartsWith("origin/") || right.Contains("/"))
+                    {
+                        textBlock.Inlines.Add(new Run { Text = right, Foreground = IsMainBranch(right) ? mainBranchBrush : remoteBranchBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+                    }
+                    else
+                    {
+                        textBlock.Inlines.Add(new Run { Text = right, Foreground = IsMainBranch(right) ? mainBranchBrush : localBranchBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+                    }
+                }
+                else if (refItem.StartsWith("tag: "))
+                {
+                    textBlock.Inlines.Add(new Run { Text = "tag: ", Foreground = parenBrush });
+                    textBlock.Inlines.Add(new Run { Text = refItem.Substring(5), Foreground = tagBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+                }
+                else if (refItem.StartsWith("refs/tags/"))
+                {
+                    textBlock.Inlines.Add(new Run { Text = "tag: ", Foreground = parenBrush });
+                    textBlock.Inlines.Add(new Run { Text = refItem.Substring(10), Foreground = tagBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+                }
+                else if (refItem == "HEAD")
+                {
+                    textBlock.Inlines.Add(new Run { Text = refItem, Foreground = headBrush, FontWeight = Microsoft.UI.Text.FontWeights.Bold });
+                }
+                else if (refItem.StartsWith("origin/") || refItem.Contains("/"))
+                {
+                    textBlock.Inlines.Add(new Run { Text = refItem, Foreground = IsMainBranch(refItem) ? mainBranchBrush : remoteBranchBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+                }
+                else
+                {
+                    textBlock.Inlines.Add(new Run { Text = refItem, Foreground = IsMainBranch(refItem) ? mainBranchBrush : localBranchBrush, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+                }
+            }
+
+            textBlock.Inlines.Add(new Run { Text = ")", Foreground = parenBrush });
         }
 
         private static bool IsGitGraphCharacter(char value)

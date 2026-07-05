@@ -531,7 +531,7 @@ namespace TxtAIEditor.Core.Services
             // Keep the hash for actions, but do not include it in the sidebar display text.
             int safeMaxCount = Math.Max(1, maxCount);
             int safeSkipCount = Math.Max(0, skipCount);
-            string output = await RunGitCommandAsync(repoPath, $"log --graph --all --decorate=short --pretty=format:\"%H%x1f%d %s - %cd\" --date=format:\"%Y-%m-%d %H:%M\" --skip={safeSkipCount} -n {safeMaxCount}");
+            string output = await RunGitCommandAsync(repoPath, $"log --graph --all --decorate=short --pretty=format:\"%H%x1f%d%x1f%s%x1f%cd\" --date=format:\"%Y-%m-%d %H:%M\" --skip={safeSkipCount} -n {safeMaxCount}");
             if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                 return Array.Empty<GitHistoryItem>();
 
@@ -564,6 +564,25 @@ namespace TxtAIEditor.Core.Services
             string graphPrefix = string.IsNullOrEmpty(commitHash)
                 ? hashSegment
                 : hashSegment.Replace(commitHash, string.Empty, StringComparison.Ordinal).TrimEnd();
+            string[] fields = line.Substring(separatorIndex + 1).Split('\u001f');
+            if (fields.Length >= 3)
+            {
+                string decorationText = fields[0].Trim();
+                string messageText = fields[1].TrimStart();
+                string dateText = fields[2].Trim();
+                string structuredDisplayText = BuildHistoryDisplayText(graphPrefix, messageText, decorationText, dateText);
+
+                return new GitHistoryItem
+                {
+                    CommitHash = commitHash,
+                    DisplayText = structuredDisplayText,
+                    GraphText = graphPrefix,
+                    MessageText = messageText,
+                    DecorationText = decorationText,
+                    DateText = dateText
+                };
+            }
+
             string commitText = line.Substring(separatorIndex + 1).TrimStart();
 
             string displayText = string.IsNullOrEmpty(graphPrefix)
@@ -575,6 +594,47 @@ namespace TxtAIEditor.Core.Services
                 CommitHash = commitHash,
                 DisplayText = displayText
             };
+        }
+
+        private static string BuildHistoryDisplayText(string graphPrefix, string messageText, string decorationText, string dateText)
+        {
+            var builder = new StringBuilder();
+            if (!string.IsNullOrEmpty(graphPrefix))
+            {
+                builder.Append(graphPrefix);
+            }
+
+            if (!string.IsNullOrEmpty(messageText))
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append(' ');
+                }
+
+                builder.Append(messageText);
+            }
+
+            if (!string.IsNullOrEmpty(decorationText))
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append(' ');
+                }
+
+                builder.Append(decorationText);
+            }
+
+            if (!string.IsNullOrEmpty(dateText))
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append(" - ");
+                }
+
+                builder.Append(dateText);
+            }
+
+            return builder.ToString();
         }
 
         private static string FindFullCommitHash(string value)
@@ -643,10 +703,30 @@ namespace TxtAIEditor.Core.Services
                 insertIndex++;
             }
 
+            string graphText = item.GraphText;
+            if (!string.IsNullOrEmpty(graphText))
+            {
+                int graphInsertIndex = 0;
+                while (graphInsertIndex < graphText.Length && IsGitGraphCharacter(graphText[graphInsertIndex]))
+                {
+                    graphInsertIndex++;
+                }
+
+                graphText = graphText.Insert(graphInsertIndex, "\u2191 ");
+            }
+            else if (item.HasStructuredDisplay)
+            {
+                graphText = "\u2191 ";
+            }
+
             return new GitHistoryItem
             {
                 CommitHash = item.CommitHash,
-                DisplayText = item.DisplayText.Insert(insertIndex, "\u2191 ")
+                DisplayText = item.DisplayText.Insert(insertIndex, "\u2191 "),
+                GraphText = graphText,
+                MessageText = item.MessageText,
+                DecorationText = item.DecorationText,
+                DateText = item.DateText
             };
         }
 
