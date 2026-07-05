@@ -167,6 +167,8 @@ function prepareSingleLineSelectionForNativeComposition(selection) {
         return null;
     }
 
+    clearCustomSelectionVisuals();
+
     if (!setNativeSelectionRangeInElement(targetElement, start.column, end.column)) {
         return null;
     }
@@ -180,7 +182,6 @@ function prepareSingleLineSelectionForNativeComposition(selection) {
     state.currentColumn = start.column + 1;
     state.editingLine = start.line;
     syncCustomSelectionClass();
-    clearCustomSelectionVisuals();
     reportCursorAndSelection(targetElement);
     return targetElement;
 }
