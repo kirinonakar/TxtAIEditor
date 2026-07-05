@@ -190,6 +190,10 @@ namespace TxtAIEditor.Controls
                     TextWrapping = TextWrapping.NoWrap
                 });
                 selectBtn.Content = textStack;
+                string itemTooltip = string.IsNullOrWhiteSpace(item.Detail)
+                    ? item.Name
+                    : $"{item.Name}\n{item.Detail}";
+                ToolTipService.SetToolTip(selectBtn, itemTooltip);
 
                 string currentName = item.Name;
                 selectBtn.Click += (_, _) => _callbacks.AgentMcpToggled?.Invoke(currentName);
@@ -212,7 +216,7 @@ namespace TxtAIEditor.Controls
                         _callbacks.AgentMcpSettingsRequested?.Invoke(currentName);
                         _agentMcpFlyout.Hide();
                     };
-                    Grid.SetColumn(settingsBtn, 1);
+                    Grid.SetColumn(settingsBtn, 2);
                     rowGrid.Children.Add(settingsBtn);
                     _agentMcpListPanel.Children.Add(rowGrid);
                     continue;
