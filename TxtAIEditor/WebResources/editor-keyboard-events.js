@@ -446,11 +446,13 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
             if (key === 'z') {
                 event.preventDefault();
+                hideAutocomplete(700);
                 post({ type: 'shortcut', name: 'undo' });
                 return;
             }
             if (key === 'y') {
                 event.preventDefault();
+                hideAutocomplete(700);
                 post({ type: 'shortcut', name: 'redo' });
                 return;
             }

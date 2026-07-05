@@ -915,8 +915,15 @@ function insertTextAtCaret(text, options = {}) {
             state.lineCount += insertedCount;
             state.currentLine = lastLineNumber;
             state.currentColumn = (parts[parts.length - 1]?.length || 0) + 1;
+            state.selection = null;
+            state.selectionAnchor = {
+                line: lastLineNumber,
+                column: state.currentColumn - 1
+            };
+            syncCustomSelectionClass();
             setupVirtualHeight();
             focusLine(lastLineNumber, state.currentColumn - 1);
+            reportCursorAndSelection(null);
         } else {
             const nextText = currentText.slice(0, caret) + normalized + currentText.slice(caret);
             state.cache.set(targetLine, nextText);
@@ -976,7 +983,10 @@ function insertTextAtCaret(text, options = {}) {
         };
         setupVirtualHeight();
         queueRender(true);
-        setTimeout(() => focusLine(lastLineNumber, parts[parts.length - 1]?.length || 0), 0);
+        setTimeout(() => {
+            focusLine(lastLineNumber, parts[parts.length - 1]?.length || 0);
+            reportCursorAndSelection(null);
+        }, 0);
         return;
     }
 
@@ -1722,6 +1732,7 @@ function replaceSelectionWith(selection, text, editSelection = null) {
             reportCursorAndSelection();
         } else {
             focusLine(state.currentLine, Math.max(0, state.currentColumn - 1));
+            reportCursorAndSelection(null);
         }
     }, 0);
 }

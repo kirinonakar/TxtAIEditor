@@ -157,6 +157,7 @@ export function createHostMessageHandler({
             break;
         case 'applyEditResult':
             {
+                hideAutocomplete(700);
                 applyEditResultFromHost(
                     msg.startLine || 1,
                     msg.oldLineCount || 0,

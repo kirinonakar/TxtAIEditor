@@ -261,6 +261,7 @@ export function bindPointerSelectionEvents({
             state.isSelecting ||
             state.isDragPotential ||
             state.isDragMoving ||
+            hasCustomSelection() ||
             isHexView()) {
             cancelOpenableHoverValidation();
             return;

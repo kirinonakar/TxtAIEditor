@@ -69,7 +69,7 @@ function selectionBoundsForLine(lineNumber, textLength) {
     const isEndBoundaryAtLineStart = spansMultipleLines &&
         lineNumber === selection.end.line &&
         selection.end.column <= 0;
-    if (start === end && isEndBoundaryAtLineStart) {
+    if (start === end && isEndBoundaryAtLineStart && textLength > 0) {
         return null;
     }
 
@@ -93,8 +93,13 @@ function drawEditableSelectionOverlays() {
         const start = Math.max(0, Math.min(bounds.start, text.length));
         const end = Math.max(0, Math.min(bounds.end, text.length));
 
-        if (start === end) {
+        if (start === end && selection.isColumn) {
             drawEditableColumnCursorOverlay(element, start);
+            continue;
+        }
+
+        if (start === end && text.length === 0) {
+            drawEditableEmptyLineSelectionOverlay(element);
             continue;
         }
 
@@ -259,6 +264,22 @@ function drawEditableColumnCursorOverlay(element, column) {
     if (rect && rect.height > 0) {
         appendEditableSelectionOverlay(row, rect.left - rowRect.left, rect.top - rowRect.top, 2, rect.height, 'column-cursor-overlay');
     }
+}
+
+function drawEditableEmptyLineSelectionOverlay(element) {
+    const row = element.closest('.line-row');
+    if (!row) return;
+
+    const rowRect = row.getBoundingClientRect();
+    const lineRect = element.getBoundingClientRect();
+    const height = Math.max(1, Math.min(lineRect.height, state.lineHeight));
+    appendEditableSelectionOverlay(
+        row,
+        lineRect.left - rowRect.left,
+        lineRect.top - rowRect.top,
+        4,
+        height,
+        'selected-empty-line-overlay');
 }
 
 function appendEditableSelectionOverlay(row, left, top, width, height, extraClass = '') {
