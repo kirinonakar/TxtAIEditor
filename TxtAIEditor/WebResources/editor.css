@@ -5,7 +5,6 @@
     --gutter-fg: #858585;
     --row-hover: rgba(127, 127, 127, 0.12);
     --selection: rgba(0, 120, 212, 0.38);
-    --selection-foreground: #ffffff;
     --preview-code-bg: #2d2d2d;
     --font-family: Consolas, "Courier New", monospace;
     --font-size: 14px;
@@ -40,7 +39,7 @@ body {
 
 ::selection {
     background: var(--selection);
-    color: var(--selection-foreground);
+    color: inherit;
 }
 
 body.selecting ::selection,
@@ -798,20 +797,18 @@ mark.active-match {
 }
 
 .selection-fragment {
-    background: transparent;
-    color: var(--selection-foreground);
-    -webkit-text-fill-color: var(--selection-foreground);
-}
-
-.selection-fragment * {
-    color: inherit !important;
-    -webkit-text-fill-color: currentColor !important;
+    background: var(--selection);
+    color: inherit;
 }
 
 .editable-selection-overlay {
     position: absolute;
     z-index: 0;
     pointer-events: none;
+    background: transparent;
+}
+
+.editable-selection-overlay.column-cursor-overlay {
     background: var(--selection);
 }
 
