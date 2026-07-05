@@ -487,7 +487,7 @@ namespace TxtAIEditor.Controls
             flyout.Items.Add(crlfItem);
             if (sender is Button button)
             {
-                flyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
+                ShowStatusFlyout(flyout, button);
             }
         }
 
@@ -520,8 +520,16 @@ namespace TxtAIEditor.Controls
             flyout.Items.Add(languageItem);
             if (sender is Button button)
             {
-                flyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
+                ShowStatusFlyout(flyout, button);
             }
+        }
+
+        private static void ShowStatusFlyout(MenuFlyout flyout, Button owner)
+        {
+            CursorResetHelper.AttachToFlyout(flyout, owner);
+            CursorResetHelper.ResetToArrow(owner);
+            flyout.ShowAt(owner, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
+            CursorResetHelper.ResetToArrow(owner);
         }
 
         private async Task ChangeLanguageAsync(OpenedTab tab, string targetLanguage)

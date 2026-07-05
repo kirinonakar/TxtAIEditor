@@ -280,16 +280,22 @@ body.csv-table-mode #scroll-container {
 .csv-column-resizer {
     position: absolute;
     top: 0;
-    right: -3px;
-    width: 6px;
+    bottom: 0;
+    right: -5px;
+    width: 10px;
     height: 100%;
-    cursor: col-resize;
+    cursor: ew-resize;
     z-index: 2;
+    touch-action: none;
+}
+
+.csv-column-resizer:hover {
+    cursor: ew-resize;
 }
 
 body.csv-resizing,
 body.csv-resizing * {
-    cursor: col-resize !important;
+    cursor: ew-resize !important;
     user-select: none !important;
 }
 

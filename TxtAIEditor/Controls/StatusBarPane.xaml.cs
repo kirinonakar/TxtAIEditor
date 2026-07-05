@@ -2,6 +2,7 @@ using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
@@ -11,6 +12,8 @@ namespace TxtAIEditor.Controls
         public StatusBarPane()
         {
             InitializeComponent();
+            AttachArrowCursorReset(LineEndingButton);
+            AttachArrowCursorReset(LanguageButton);
         }
 
         public event RoutedEventHandler? LeftPanelToggleClick;
@@ -91,6 +94,19 @@ namespace TxtAIEditor.Controls
         private void HandleLanguageClick(object sender, RoutedEventArgs e)
         {
             LanguageClick?.Invoke(sender, e);
+        }
+
+        private void AttachArrowCursorReset(FrameworkElement element)
+        {
+            element.PointerEntered += ResetPointerCursor;
+            element.PointerMoved += ResetPointerCursor;
+            element.PointerPressed += ResetPointerCursor;
+            element.PointerReleased += ResetPointerCursor;
+        }
+
+        private void ResetPointerCursor(object sender, PointerRoutedEventArgs e)
+        {
+            CursorResetHelper.ResetToArrow(sender as FrameworkElement ?? this);
         }
     }
 }
