@@ -1,4 +1,5 @@
 import {
+    contextMenu,
     findPanel,
     scrollContainer,
     viewport
@@ -27,7 +28,8 @@ import {
     selectWordAtPointer,
     setCaret
 } from './editor-commands.js';
-import { showContextMenu } from './editor-context-menu.js';
+import { showContextMenu, hideContextMenu } from './editor-context-menu.js';
+import { autocompleteState, hideAutocomplete } from './editor-autocomplete.js';
 import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
 
 const HEX_BYTES_PER_ROW = 16;
@@ -763,6 +765,15 @@ export function bindPointerSelectionEvents({
         cancelPostEditFocusFollowUps();
         if (state.csvTableEnabled) return;
         if (event.button !== 0 || findPanel.contains(event.target)) return;
+
+        if (!contextMenu.hidden && !contextMenu.contains(event.target)) {
+            hideContextMenu();
+        }
+        const popup = document.getElementById('autocomplete-popup');
+        if (autocompleteState.isOpen && popup && !popup.contains(event.target)) {
+            hideAutocomplete();
+        }
+
         cancelActiveSelectionInteraction({ render: false });
 
         if (isHexView()) {
