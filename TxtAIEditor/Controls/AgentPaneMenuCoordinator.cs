@@ -532,15 +532,34 @@ namespace TxtAIEditor.Controls
 
         private Border CreateSelectedChip(string text, string tooltip, Action removeAction)
         {
-            Style? buttonStyle = _resourceOwner.Resources["AgentButtonStyle"] as Style;
-            var chip = new Border
+            var textBlock = new TextBlock
             {
-                Background = (Brush)Application.Current.Resources["SystemControlBackgroundAltMediumLowBrush"],
-                BorderBrush = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(6, 2, 2, 2)
+                Text = text,
+                FontSize = 11,
+                MaxWidth = 140,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
             };
+
+            var removeBtn = new Button
+            {
+                Content = "×",
+                Width = 18,
+                Height = 18,
+                MinHeight = 18,
+                MinWidth = 18,
+                FontSize = 9,
+                Padding = new Thickness(0),
+                Margin = new Thickness(0),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+                BorderThickness = new Thickness(0),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+            };
+            ToolTipService.SetToolTip(removeBtn, tooltip);
+            removeBtn.Click += (_, _) => removeAction();
 
             var chipContent = new StackPanel
             {
@@ -548,30 +567,33 @@ namespace TxtAIEditor.Controls
                 Spacing = 4,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            chipContent.Children.Add(new TextBlock
-            {
-                Text = text,
-                FontSize = 11,
-                MaxWidth = 140,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                VerticalAlignment = VerticalAlignment.Center
-            });
-
-            var removeBtn = new Button
-            {
-                Content = "x",
-                Width = 20,
-                Height = 20,
-                Padding = new Thickness(0),
-                FontSize = 10,
-                Style = buttonStyle
-            };
-            ToolTipService.SetToolTip(removeBtn, tooltip);
-            removeBtn.Click += (_, _) => removeAction();
+            chipContent.Children.Add(textBlock);
             chipContent.Children.Add(removeBtn);
 
-            chip.Child = chipContent;
+            var chip = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(8, 0, 4, 0),
+                BorderThickness = new Thickness(1),
+                MinHeight = 24,
+                Height = 24,
+                VerticalAlignment = VerticalAlignment.Center,
+                UseLayoutRounding = true,
+                Child = chipContent
+            };
+
+            ApplySelectedChipTheme(chip, textBlock, removeBtn);
+            chip.ActualThemeChanged += (_, _) => ApplySelectedChipTheme(chip, textBlock, removeBtn);
+
             return chip;
+        }
+
+        private static void ApplySelectedChipTheme(Border chip, TextBlock textBlock, Button removeBtn)
+        {
+            chip.Background = (Brush)Application.Current.Resources["AccentButtonBackground"];
+            chip.BorderBrush = (Brush)Application.Current.Resources["AccentButtonBackground"];
+            textBlock.Foreground = (Brush)Application.Current.Resources["SystemControlForegroundChromeWhiteBrush"];
+            removeBtn.Foreground = (Brush)Application.Current.Resources["SystemControlForegroundChromeWhiteBrush"];
         }
 
         private string GetString(string key, string fallback)
