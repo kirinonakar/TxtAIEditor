@@ -606,6 +606,8 @@ export function bindPointerSelectionEvents({
             beginInlineLivePreviewEdit(precisePos.line, precisePos.column);
         } else {
             captureSelectionPointer(event);
+            cancelOpenableHoverValidation();
+            clearNativeSelection();
 
             const hadSelection = hasCustomSelection();
             const positionText = state.cache.get(position.line) ?? lineTextFromElement(position.element);
@@ -763,6 +765,7 @@ export function bindPointerSelectionEvents({
             state.selection = null;
             syncCustomSelectionClass();
         } else if (selection) {
+            clearNativeSelection();
             const releaseLine = state.currentLine;
             const releaseColumn = Math.max(0, state.currentColumn - 1);
             setTimeout(() => {
@@ -897,6 +900,7 @@ export function bindPointerSelectionEvents({
             const finalSelectionIsEmpty = newSelection.start.line === newSelection.end.line &&
                 newSelection.start.column === newSelection.end.column;
             state.selection = finalSelectionIsEmpty ? null : newSelection;
+            clearNativeSelection();
             syncCustomSelectionClass();
             state.currentLine = position.line;
             state.currentColumn = position.column + 1;
@@ -1065,6 +1069,13 @@ export function bindPointerSelectionEvents({
         if (document.hidden) {
             cancelOpenableHoverValidation();
             cancelActiveSelectionInteraction();
+        }
+    });
+
+    document.addEventListener('keydown', event => {
+        if ((event.key === 'Control' || event.key === 'Meta') && hasCustomSelection()) {
+            cancelOpenableHoverValidation();
+            clearNativeSelection();
         }
     });
 

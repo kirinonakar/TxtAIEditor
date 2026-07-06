@@ -182,6 +182,11 @@ body:not(.wrap-enabled) .line-row {
     background: var(--row-hover);
 }
 
+body.custom-selection-active .line-row:hover,
+body.custom-selection-active .line-row.hovered-row {
+    background: transparent;
+}
+
 body.csv-table-mode #scroll-container {
     top: 62px;
 }
