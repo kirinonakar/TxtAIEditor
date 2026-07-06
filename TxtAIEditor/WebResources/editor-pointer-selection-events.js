@@ -620,6 +620,9 @@ export function bindPointerSelectionEvents({
             };
             const isColumnSelect = event.altKey;
             const clickInsideSelection = hadSelection && !event.shiftKey && !isColumnSelect && isPositionInsideSelection(position);
+            const collapseSelectionWithoutExtending = hadSelection && !event.shiftKey && !clickInsideSelection;
+            const collapseScrollTop = collapseSelectionWithoutExtending ? scrollContainer.scrollTop : 0;
+            const collapseScrollLeft = collapseSelectionWithoutExtending ? scrollContainer.scrollLeft : 0;
 
             if (clickInsideSelection) {
                 const sel = normalizeSelection();
@@ -657,9 +660,17 @@ export function bindPointerSelectionEvents({
                     setCaret(position.element, position.column);
                 }
             }
-            if (event.shiftKey || (hadSelection && !clickInsideSelection)) {
+            if (event.shiftKey || collapseSelectionWithoutExtending) {
                 queueRender(true);
-                setTimeout(() => focusLine(state.currentLine, Math.max(0, state.currentColumn - 1)), 0);
+                const focusTargetLine = state.currentLine;
+                const focusTargetColumn = Math.max(0, state.currentColumn - 1);
+                setTimeout(() => {
+                    focusLine(focusTargetLine, focusTargetColumn);
+                    if (collapseSelectionWithoutExtending) {
+                        scrollContainer.scrollTop = collapseScrollTop;
+                        scrollContainer.scrollLeft = collapseScrollLeft;
+                    }
+                }, 0);
             }
         }
         reportCursorAndSelection(position.element);
