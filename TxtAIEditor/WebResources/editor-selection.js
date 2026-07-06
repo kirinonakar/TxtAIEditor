@@ -80,7 +80,10 @@ function drawEditableSelectionOverlays() {
     viewport.querySelectorAll('.editable-selection-overlay').forEach(el => el.remove());
 
     const selection = normalizeSelection();
-    if (!selection || !hasCustomSelection()) return;
+    if (!selection || !hasCustomSelection()) {
+        drawImeBypassCaretOverlay();
+        return;
+    }
 
     for (const element of viewport.querySelectorAll('.line-text')) {
         const lineNumber = Number(element.dataset.line || 0);
@@ -105,6 +108,8 @@ function drawEditableSelectionOverlays() {
 
         drawEditableSelectionRangeOverlay(element, start, end);
     }
+
+    drawImeBypassCaretOverlay();
 }
 
 function drawEditableSelectionRangeOverlay(element, start, end) {
@@ -246,6 +251,20 @@ function drawEditableColumnCursorOverlay(element, column) {
     const selection = normalizeSelection();
     if (!selection?.isColumn) return;
 
+    drawCaretOverlay(element, column, 2, 'column-cursor-overlay');
+}
+
+function drawImeBypassCaretOverlay() {
+    if (!state.textareaImeBypassActive || !state.bypassCursorLine) return;
+
+    const line = Number(state.bypassCursorLine || 0);
+    const element = viewport.querySelector(`.line-text[data-line="${line}"]`);
+    if (!element) return;
+
+    drawCaretOverlay(element, state.bypassCursorColumn ?? 0, 1, 'ime-bypass-caret-overlay');
+}
+
+function drawCaretOverlay(element, column, width, extraClass) {
     const row = element.closest('.line-row');
     if (!row) return;
 
@@ -255,14 +274,14 @@ function drawEditableColumnCursorOverlay(element, column) {
 
     const textLength = lineTextFromElement(element).length;
     if (textLength === 0) {
-        appendEditableSelectionOverlay(row, lineRect.left - rowRect.left, lineRect.top - rowRect.top, 2, height, 'column-cursor-overlay');
+        appendEditableSelectionOverlay(row, lineRect.left - rowRect.left, lineRect.top - rowRect.top, width, height, extraClass);
         return;
     }
 
     const safeColumn = Math.max(0, Math.min(column, textLength));
     const rect = caretBoundaryRect(element, safeColumn, safeColumn > 0);
     if (rect && rect.height > 0) {
-        appendEditableSelectionOverlay(row, rect.left - rowRect.left, rect.top - rowRect.top, 2, rect.height, 'column-cursor-overlay');
+        appendEditableSelectionOverlay(row, rect.left - rowRect.left, rect.top - rowRect.top, width, rect.height, extraClass);
     }
 }
 

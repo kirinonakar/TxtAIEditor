@@ -834,6 +834,11 @@ mark.active-match {
     background: var(--selection);
 }
 
+.editable-selection-overlay.ime-bypass-caret-overlay {
+    z-index: 2;
+    background: var(--fg);
+}
+
 .editable-selection-overlay.selected-empty-line-overlay {
     background: var(--selection);
 }

@@ -66,6 +66,7 @@ let verticalCaretVisualAnchor = null;
 let splitScrollRestoreToken = 0;
 let postEditFocusToken = 0;
 let scrollPreservingFocusToken = 0;
+let postEditCaretRestoreToken = 0;
 
 function queuePostEditFocus(callback) {
     const token = ++postEditFocusToken;
@@ -76,10 +77,50 @@ function queuePostEditFocus(callback) {
     }, 0);
 }
 
+function queuePostEditCaretRestore(lineNumber, columnZeroBased, scrollMargin = 0) {
+    const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
+    const targetColumn = Math.max(0, Number(columnZeroBased || 0));
+    const token = ++postEditCaretRestoreToken;
+
+    function run(attempt = 0) {
+        if (token !== postEditCaretRestoreToken) return;
+
+        state.currentLine = targetLine;
+        state.currentColumn = targetColumn + 1;
+        state.selectionAnchor = { line: targetLine, column: targetColumn };
+
+        const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
+        if (element && element.getAttribute('contenteditable') === 'true') {
+            const safeColumn = Math.min(targetColumn, lineTextFromElement(element).length);
+            setCaret(element, safeColumn, scrollMargin);
+            reportCursorAndSelection(null);
+            if (attempt < 2) {
+                requestAnimationFrame(() => run(attempt + 1));
+            }
+            return;
+        }
+
+        if (attempt === 0) {
+            focusLine(targetLine, targetColumn, scrollMargin);
+        }
+
+        if (attempt < 8) {
+            requestAnimationFrame(() => run(attempt + 1));
+            return;
+        }
+
+        focusLine(targetLine, targetColumn, scrollMargin);
+        reportCursorAndSelection(null);
+    }
+
+    queuePostEditFocus(() => run());
+}
+
 function cancelPendingRepeatFollowUps(key) {
     if (!key) return;
     postEditFocusToken++;
     scrollPreservingFocusToken++;
+    postEditCaretRestoreToken++;
     if (key === 'Enter') {
         splitScrollRestoreToken++;
     }
@@ -922,8 +963,8 @@ function insertTextAtCaret(text, options = {}) {
             };
             syncCustomSelectionClass();
             setupVirtualHeight();
-            focusLine(lastLineNumber, state.currentColumn - 1);
-            reportCursorAndSelection(null);
+            queueRender(true);
+            queuePostEditCaretRestore(lastLineNumber, state.currentColumn - 1);
         } else {
             const nextText = currentText.slice(0, caret) + normalized + currentText.slice(caret);
             state.cache.set(targetLine, nextText);
@@ -983,10 +1024,7 @@ function insertTextAtCaret(text, options = {}) {
         };
         setupVirtualHeight();
         queueRender(true);
-        setTimeout(() => {
-            focusLine(lastLineNumber, parts[parts.length - 1]?.length || 0);
-            reportCursorAndSelection(null);
-        }, 0);
+        queuePostEditCaretRestore(lastLineNumber, parts[parts.length - 1]?.length || 0);
         return;
     }
 
@@ -1581,9 +1619,11 @@ function replaceColumnSelectionWith(selection, text, skipRender = false) {
         reportCursorAndSelection(activeEditableElement());
     } else {
         queueRender(true);
+        const targetLine = endLine;
+        const targetColumn = nextCol;
         setTimeout(() => {
-            focusLine(state.currentLine, nextCol);
-            reportCursorAndSelection();
+            focusLine(targetLine, targetColumn);
+            reportCursorAndSelection(null);
         }, 0);
     }
 }
@@ -1702,6 +1742,7 @@ function replaceSelectionWith(selection, text, editSelection = null) {
         const endColumn = parts.length === 1 ? start.column + parts[0].length : parts[parts.length - 1].length;
         state.currentLine = endLine;
         state.currentColumn = endColumn + 1;
+        state.selectionAnchor = { line: endLine, column: endColumn };
     }
     if (!editSelection) {
         const immediateLine = state.currentLine;
@@ -1714,9 +1755,9 @@ function replaceSelectionWith(selection, text, editSelection = null) {
     }
 
     queueRender(true);
+    const targetLine = state.currentLine;
+    const targetColumn = Math.max(0, state.currentColumn - 1);
     if (shouldPreserveScrollTop) {
-        const targetLine = state.currentLine;
-        const targetColumn = Math.max(0, state.currentColumn - 1);
         queueFocusPreservingScroll(targetLine, targetColumn, savedScrollTop);
         if (editSelection) {
             setTimeout(() => reportCursorAndSelection(), 0);
@@ -1726,13 +1767,10 @@ function replaceSelectionWith(selection, text, editSelection = null) {
 
     setTimeout(() => {
         if (editSelection) {
-            const targetLine = state.currentLine;
-            const targetColumn = Math.max(0, state.currentColumn - 1);
             focusLine(targetLine, targetColumn);
-            reportCursorAndSelection();
-        } else {
-            focusLine(state.currentLine, Math.max(0, state.currentColumn - 1));
             reportCursorAndSelection(null);
+        } else {
+            queuePostEditCaretRestore(targetLine, targetColumn);
         }
     }, 0);
 }

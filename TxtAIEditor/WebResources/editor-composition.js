@@ -542,9 +542,14 @@ function finishColumnComposition(element, lineNumber) {
         if (!textareaBypassNode) {
             textareaBypassNode = document.createElement('textarea');
             textareaBypassNode.id = 'ime-bypass-textarea';
+            textareaBypassNode.setAttribute('wrap', 'off');
+            textareaBypassNode.autocomplete = 'off';
+            textareaBypassNode.autocapitalize = 'off';
+            textareaBypassNode.spellcheck = false;
             textareaBypassNode.style.cssText = `
                 position: absolute;
                 width: 1px;
+                min-width: 1px;
                 height: 1px;
                 opacity: 0;
                 pointer-events: none;
@@ -556,6 +561,13 @@ function finishColumnComposition(element, lineNumber) {
                 overflow: hidden;
                 background: transparent;
                 color: transparent;
+                caret-color: transparent;
+                font-family: var(--font-family);
+                font-size: var(--font-size);
+                line-height: var(--line-height);
+                white-space: pre;
+                overflow-wrap: normal;
+                word-break: normal;
                 z-index: -1000;
             `;
             const host = document.getElementById('editor-host') || document.body;
@@ -569,6 +581,52 @@ function finishColumnComposition(element, lineNumber) {
             textareaBypassNode.addEventListener('blur', onBypassBlur);
         }
         return textareaBypassNode;
+    }
+
+    function setBypassCursor(column) {
+        const numericColumn = Number(column);
+        const safeColumn = Math.max(0, Number.isFinite(numericColumn) ? numericColumn : 0);
+        state.bypassCursorLine = bypassStartLine;
+        state.bypassCursorColumn = safeColumn;
+        state.currentLine = bypassStartLine;
+        state.currentColumn = safeColumn + 1;
+        state.editingLine = bypassStartLine;
+    }
+
+    function clearBypassCursor() {
+        state.bypassCursorLine = null;
+        state.bypassCursorColumn = null;
+    }
+
+    function syncBypassTextareaPosition(element, anchorColumn = bypassStartColumn) {
+        if (!textareaBypassNode || !element || element.getAttribute?.('contenteditable') !== 'true') return;
+
+        const anchorRect = caretRectForOffset(element, anchorColumn);
+        const elementRect = element.getBoundingClientRect();
+        const host = document.getElementById('editor-host') || document.body;
+        const hostRect = host.getBoundingClientRect();
+        const scrollRect = scrollContainer.getBoundingClientRect();
+        const styles = window.getComputedStyle(element);
+        const parsedLineHeight = Number.parseFloat(styles.lineHeight);
+        const height = Math.max(1, anchorRect?.height || (Number.isFinite(parsedLineHeight) ? parsedLineHeight : state.lineHeight));
+        const left = anchorRect?.left ?? elementRect.left;
+        const top = anchorRect?.top ?? elementRect.top;
+        const rightLimit = Math.max(hostRect.right, scrollRect.right);
+        const width = Math.max(32, rightLimit - left);
+
+        textareaBypassNode.style.left = `${left - hostRect.left}px`;
+        textareaBypassNode.style.top = `${top - hostRect.top}px`;
+        textareaBypassNode.style.width = `${Math.ceil(width)}px`;
+        textareaBypassNode.style.height = `${Math.ceil(height)}px`;
+        textareaBypassNode.style.fontFamily = styles.fontFamily;
+        textareaBypassNode.style.fontSize = styles.fontSize;
+        textareaBypassNode.style.fontWeight = styles.fontWeight;
+        textareaBypassNode.style.fontStyle = styles.fontStyle;
+        textareaBypassNode.style.letterSpacing = styles.letterSpacing;
+        textareaBypassNode.style.lineHeight = Number.isFinite(parsedLineHeight)
+            ? `${parsedLineHeight}px`
+            : `${height}px`;
+        textareaBypassNode.style.tabSize = styles.tabSize || String(state.tabSize || 4);
     }
 
     function collapseEditorSelectionForBypass() {
@@ -659,11 +717,12 @@ function finishColumnComposition(element, lineNumber) {
     function onBypassKeyDown(e) {
         if (!isBypassCompositionActive) {
             const val = textareaBypassNode.value;
-            state.textareaImeBypassActive = false;
-            state.bypassStartLine = null;
             
             if (bypassSelection) {
                 bypassSelection = null;
+                state.textareaImeBypassActive = false;
+                state.bypassStartLine = null;
+                clearBypassCursor();
                 const activeLine = viewport.querySelector(`.line-text[data-line="${state.currentLine}"]`);
                 if (activeLine) {
                     activeLine.focus({ preventScroll: true });
@@ -671,6 +730,9 @@ function finishColumnComposition(element, lineNumber) {
             } else {
                 updateEditorText(val, false);
                 const newCaretCol = bypassStartColumn + val.length;
+                state.textareaImeBypassActive = false;
+                state.bypassStartLine = null;
+                clearBypassCursor();
                 focusLine(bypassStartLine, newCaretCol);
             }
             
@@ -698,13 +760,15 @@ function finishColumnComposition(element, lineNumber) {
     function onBypassBlur(e) {
         if (state.textareaImeBypassActive) {
             const val = textareaBypassNode.value;
-            state.textareaImeBypassActive = false;
-            state.bypassStartLine = null;
             if (bypassSelection) {
                 bypassSelection = null;
             } else {
                 updateEditorText(val, false);
             }
+            state.textareaImeBypassActive = false;
+            state.bypassStartLine = null;
+            clearBypassCursor();
+            drawEditableSelectionOverlays();
         }
     }
 
@@ -723,11 +787,14 @@ function finishColumnComposition(element, lineNumber) {
         bypassSuffix = '';
         state.textareaImeBypassActive = false;
         state.bypassStartLine = null;
+        clearBypassCursor();
         return wasActive;
     }
 
     function updateEditorText(val, isComposing) {
         const nextText = bypassPrefix + val + bypassSuffix;
+        const cursorColumn = bypassStartColumn + String(val ?? '').length;
+        setBypassCursor(cursorColumn);
         state.cache.set(bypassStartLine, nextText);
         state.cacheVersion++;
         
@@ -742,43 +809,15 @@ function finishColumnComposition(element, lineNumber) {
         const element = viewport.querySelector(`.line-text[data-line="${bypassStartLine}"]`);
         if (element) {
             element.innerHTML = renderLineContent(bypassStartLine, nextText);
-            clearCustomSelectionVisuals();
-            drawCustomCursorForBypass(element, bypassStartColumn + val.length);
-            
-            if (isComposing) {
-                const rect = caretRectForOffset(element, bypassStartColumn + val.length);
-                const host = document.getElementById('editor-host') || document.body;
-                const hostRect = host.getBoundingClientRect();
-                if (rect) {
-                    textareaBypassNode.style.left = `${rect.left - hostRect.left}px`;
-                    textareaBypassNode.style.top = `${rect.top - hostRect.top}px`;
-                    textareaBypassNode.style.height = `${rect.height}px`;
-                }
-            }
+            syncBypassTextareaPosition(element, bypassStartColumn);
+            drawEditableSelectionOverlays();
         }
         
         if (state.wordWrap) {
             measureRenderedRows(false);
         }
-    }
 
-    function drawCustomCursorForBypass(element, column) {
-        const row = element.closest('.line-row');
-        if (!row) return;
-
-        const rowRect = row.getBoundingClientRect();
-        const textLength = (element.textContent || '').replace(/\u00a0/g, ' ').length;
-        const safeColumn = Math.max(0, Math.min(column, textLength));
-        const rect = caretRectForOffset(element, safeColumn);
-        if (rect && rect.height > 0) {
-            const overlay = document.createElement('div');
-            overlay.className = 'editable-selection-overlay column-cursor-overlay';
-            overlay.style.left = `${Math.max(0, rect.left - rowRect.left)}px`;
-            overlay.style.top = `${Math.max(0, rect.top - rowRect.top)}px`;
-            overlay.style.width = '2px';
-            overlay.style.height = `${rect.height}px`;
-            row.appendChild(overlay);
-        }
+        reportCursorAndSelection();
     }
 
     function focusImeBypassTextarea() {
@@ -799,21 +838,16 @@ function finishColumnComposition(element, lineNumber) {
                 textarea.value = '';
                 state.textareaImeBypassActive = true;
                 state.bypassStartLine = bypassStartLine;
+                setBypassCursor(bypassStartColumn);
                 
                 const row = viewport.querySelector(`.line-row[data-line="${bypassStartLine}"]`);
                 if (row) {
                     const textElement = row.querySelector('.line-text');
                     if (textElement) {
-                        const rect = caretRectForOffset(textElement, bypassStartColumn);
-                        const host = document.getElementById('editor-host') || document.body;
-                        const hostRect = host.getBoundingClientRect();
-                        if (rect) {
-                            textarea.style.left = `${rect.left - hostRect.left}px`;
-                            textarea.style.top = `${rect.top - hostRect.top}px`;
-                            textarea.style.height = `${rect.height}px`;
-                        }
+                        syncBypassTextareaPosition(textElement, bypassStartColumn);
                     }
                 }
+                drawEditableSelectionOverlays();
                 
                 if (document.activeElement !== textarea) {
                     textarea.focus();
