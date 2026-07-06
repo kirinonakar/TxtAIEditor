@@ -148,7 +148,7 @@ namespace TxtAIEditor.Controls
             bool isComposing = false)
         {
             await _flushOtherTabsPendingSyncsAsync(tab);
-            int lineCount = session.DeleteLine(lineNumber);
+            int lineCount = session.DeleteLine(lineNumber, isComposing);
             await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount, isComposing);
         }
 

@@ -537,6 +537,19 @@ function finishColumnComposition(element, lineNumber) {
     let bypassStartLine = 1;
     let bypassStartColumn = 0;
     let isBypassCompositionActive = false;
+    let bypassUndoTransactionActive = false;
+
+    function beginBypassUndoTransaction() {
+        if (bypassUndoTransactionActive) return;
+        post({ type: 'editTransactionStarted' });
+        bypassUndoTransactionActive = true;
+    }
+
+    function endBypassUndoTransaction() {
+        if (!bypassUndoTransactionActive) return;
+        post({ type: 'editTransactionEnded' });
+        bypassUndoTransactionActive = false;
+    }
 
     function getOrCreateBypassTextarea() {
         if (!textareaBypassNode) {
@@ -639,6 +652,8 @@ function finishColumnComposition(element, lineNumber) {
         const removedLineCount = Math.max(0, end.line - start.line);
         const caretColumn = Math.max(0, Math.min(start.column, nextText.length));
 
+        beginBypassUndoTransaction();
+
         state.selection = null;
         state.selectionAnchor = { line: start.line, column: caretColumn };
         state.currentLine = start.line;
@@ -712,6 +727,7 @@ function finishColumnComposition(element, lineNumber) {
         isBypassCompositionActive = false;
         const val = e.data !== undefined ? (textareaBypassNode.value || e.data) : textareaBypassNode.value;
         updateEditorText(val, false);
+        endBypassUndoTransaction();
     }
 
     function onBypassKeyDown(e) {
@@ -729,6 +745,7 @@ function finishColumnComposition(element, lineNumber) {
                 }
             } else {
                 updateEditorText(val, false);
+                endBypassUndoTransaction();
                 const newCaretCol = bypassStartColumn + val.length;
                 state.textareaImeBypassActive = false;
                 state.bypassStartLine = null;
@@ -764,6 +781,7 @@ function finishColumnComposition(element, lineNumber) {
                 bypassSelection = null;
             } else {
                 updateEditorText(val, false);
+                endBypassUndoTransaction();
             }
             state.textareaImeBypassActive = false;
             state.bypassStartLine = null;
@@ -788,6 +806,7 @@ function finishColumnComposition(element, lineNumber) {
         state.textareaImeBypassActive = false;
         state.bypassStartLine = null;
         clearBypassCursor();
+        endBypassUndoTransaction();
         return wasActive;
     }
 

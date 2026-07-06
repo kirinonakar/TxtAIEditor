@@ -741,7 +741,7 @@ namespace TxtAIEditor.Editor
             return Model.LineCount;
         }
 
-        public int DeleteLine(int lineNumber)
+        public int DeleteLine(int lineNumber, bool isComposing = false)
         {
             if (lineNumber < 1 || lineNumber > Model.LineCount)
             {
@@ -752,7 +752,14 @@ namespace TxtAIEditor.Editor
                 lineNumber,
                 Model.GetLine(lineNumber),
                 Model.LineCount == 1));
-            _compositionBeforeLines.Clear();
+            if (isComposing)
+            {
+                ShiftCompositionSnapshotsAfterDeletedLine(lineNumber);
+            }
+            else
+            {
+                _compositionBeforeLines.Clear();
+            }
             Model.DeleteLine(lineNumber);
             RefreshTabContentPreview();
             return Model.LineCount;
@@ -879,6 +886,27 @@ namespace TxtAIEditor.Editor
         private static string NormalizeSingleLine(string text)
         {
             return (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
+        }
+
+        private void ShiftCompositionSnapshotsAfterDeletedLine(int deletedLineNumber)
+        {
+            if (_compositionBeforeLines.Count == 0)
+            {
+                return;
+            }
+
+            var shifted = _compositionBeforeLines
+                .Where(pair => pair.Key != deletedLineNumber)
+                .Select(pair => new KeyValuePair<int, string>(
+                    pair.Key > deletedLineNumber ? pair.Key - 1 : pair.Key,
+                    pair.Value))
+                .ToList();
+
+            _compositionBeforeLines.Clear();
+            foreach (var pair in shifted)
+            {
+                _compositionBeforeLines[pair.Key] = pair.Value;
+            }
         }
     }
 }
