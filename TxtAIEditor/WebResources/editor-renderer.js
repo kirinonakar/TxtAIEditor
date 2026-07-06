@@ -4,6 +4,7 @@ import {
     escapeHtml,
     lineAt,
     measureRenderedRows,
+    preserveScrollTop,
     queueRender,
     requestMissingLines,
     state,
@@ -185,11 +186,15 @@ function createEditorRenderer({
         const requestedSourceLine = state.inlineLivePreviewEnabled
             ? (state.inlineLivePreviewSourceLine || 0)
             : 0;
+        const hasEditingLineInSourceBlock = containsInlineLivePreviewBlockLine(
+            state.inlineLivePreviewEditableBlock,
+            state.editingLine);
         const hasSourceFocus = requestedSourceLine > 0 &&
             ((isFocused &&
                 (activeLine === requestedSourceLine ||
                     containsInlineLivePreviewBlockLine(state.inlineLivePreviewEditableBlock, activeLine))) ||
                 state.editingLine === requestedSourceLine ||
+                hasEditingLineInSourceBlock ||
                 pendingInlineLivePreviewFocus?.line === requestedSourceLine);
         const sourceLine = hasSourceFocus ? requestedSourceLine : 0;
         if (requestedSourceLine && !sourceLine) {
@@ -278,7 +283,7 @@ function createEditorRenderer({
                 !state.inlineLivePreviewEnabled ||
                 state.isComposing ||
                 !hasLine;
-            let lineContent = renderLineContent(line, displayText);
+            let lineContent = renderLineContent(line, displayText, false, isEditablePreviewBlockLine);
             let livePreviewClass = '';
             let liveContentEditable = contentEditable;
             let livePreviewAttributes = '';
@@ -390,14 +395,37 @@ function createEditorRenderer({
             }
             const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
             if (element && element.getAttribute('contenteditable') === 'true') {
+                const pendingFocus = pendingInlineLivePreviewFocus;
                 setCaret(element, columnZeroBased);
+                restoreInlineLivePreviewScroll(pendingFocus);
                 if (!focusToken || pendingInlineLivePreviewFocus?.token === focusToken) {
                     pendingInlineLivePreviewFocus = null;
                 }
+                scheduleInlineLivePreviewScrollRestore(pendingFocus);
             } else if (retries > 0) {
                 focusLineWithRetry(lineNumber, columnZeroBased, retries - 1, focusToken);
             }
         });
+    }
+
+    function restoreInlineLivePreviewScroll(focus) {
+        if (!focus?.preserveScroll) return;
+
+        preserveScrollTop(focus.scrollTop);
+        const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        scrollContainer.scrollTop = Math.min(maxScrollTop, Math.max(0, Number(focus.scrollTop || 0)));
+        scrollContainer.scrollLeft = Math.max(0, Number(focus.scrollLeft || 0));
+    }
+
+    function scheduleInlineLivePreviewScrollRestore(focus) {
+        if (!focus?.preserveScroll) return;
+
+        restoreInlineLivePreviewScroll(focus);
+        requestAnimationFrame(() => {
+            restoreInlineLivePreviewScroll(focus);
+            requestAnimationFrame(() => restoreInlineLivePreviewScroll(focus));
+        });
+        setTimeout(() => restoreInlineLivePreviewScroll(focus), 80);
     }
 
     function containsInlineLivePreviewBlockLine(block, lineNumber) {
@@ -466,7 +494,7 @@ function createEditorRenderer({
         }
     }
 
-    function beginInlineLivePreviewEdit(lineNumber, columnZeroBased = 0) {
+    function beginInlineLivePreviewEdit(lineNumber, columnZeroBased = 0, options = {}) {
         const safeLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
         const block = findEditablePreviewBlockContaining(
             safeLine,
@@ -479,7 +507,25 @@ function createEditorRenderer({
         const text = state.cache.get(safeLine) || '';
         const safeColumn = Math.max(0, Math.min(Number(columnZeroBased || 0), text.length));
         const token = ++inlineLivePreviewFocusSeq;
-        pendingInlineLivePreviewFocus = { line: safeLine, column: safeColumn, token };
+        const preserveScroll = !!options.preserveScroll;
+        const savedScrollTop = preserveScroll
+            ? Math.max(0, Number(options.scrollTop ?? scrollContainer.scrollTop))
+            : 0;
+        const savedScrollLeft = preserveScroll
+            ? Math.max(0, Number(options.scrollLeft ?? scrollContainer.scrollLeft))
+            : 0;
+        if (preserveScroll) {
+            state.alignCaretToY = null;
+            preserveScrollTop(savedScrollTop);
+        }
+        pendingInlineLivePreviewFocus = {
+            line: safeLine,
+            column: safeColumn,
+            token,
+            preserveScroll,
+            scrollTop: savedScrollTop,
+            scrollLeft: savedScrollLeft
+        };
         const activeElement = document.activeElement?.closest?.('.line-text');
         if (activeElement && Number(activeElement.dataset.line || 0) !== safeLine) {
             activeElement.blur();
@@ -490,6 +536,7 @@ function createEditorRenderer({
         state.currentLine = safeLine;
         state.currentColumn = safeColumn + 1;
         queueRender(true);
+        scheduleInlineLivePreviewScrollRestore(pendingInlineLivePreviewFocus);
         focusLineWithRetry(safeLine, safeColumn, 20, token);
 
         setTimeout(() => {
@@ -508,9 +555,11 @@ function createEditorRenderer({
         const element = viewport.querySelector(`.line-text[data-line="${pending.line}"]`);
         if (element && element.getAttribute('contenteditable') === 'true') {
             setCaret(element, pending.column);
+            restoreInlineLivePreviewScroll(pending);
             if (pendingInlineLivePreviewFocus?.token === pending.token) {
                 pendingInlineLivePreviewFocus = null;
             }
+            scheduleInlineLivePreviewScrollRestore(pending);
             return;
         }
         focusLineWithRetry(pending.line, pending.column, 20, pending.token);

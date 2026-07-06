@@ -946,14 +946,16 @@ function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
     return escapedText;
 }
 
-function renderLineContent(lineNumber, text, forcePlainText = false) {
+function renderLineContent(lineNumber, text, forcePlainText = false, suppressSelectionFragments = false) {
     if (forcePlainText || (state.isComposing && state.compositionLine === lineNumber)) {
         return escapeHtml(text);
     }
 
-    const selectionBounds = selectionBoundsForLine(lineNumber, text.length);
-    if (selectionBounds) {
-        return renderLineContentWithSelection(lineNumber, text, selectionBounds);
+    if (!suppressSelectionFragments) {
+        const selectionBounds = selectionBoundsForLine(lineNumber, text.length);
+        if (selectionBounds) {
+            return renderLineContentWithSelection(lineNumber, text, selectionBounds);
+        }
     }
 
     if (state.searchQuery && state.searchMatches.length > 0) {

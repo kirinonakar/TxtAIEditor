@@ -79,14 +79,22 @@ export function bindTextInputEvents({ renderer }) {
     viewport.addEventListener('focusout', () => {
         if (state.csvTableEnabled) return;
         setTimeout(() => {
-            if (state.inlineLivePreviewEnabled && !document.activeElement?.closest?.('.line-text')) {
+            const hasLineTextFocus = !!document.activeElement?.closest?.('.line-text');
+            const shouldKeepSelectionEditContext = hasCustomSelection() || state.textareaImeBypassActive;
+            if (state.inlineLivePreviewEnabled && !hasLineTextFocus) {
+                if (shouldKeepSelectionEditContext && state.inlineLivePreviewSourceLine) {
+                    return;
+                }
                 state.inlineLivePreviewSourceLine = null;
                 state.inlineLivePreviewEditableBlock = null;
                 state.editingLine = null;
                 queueRender(true);
                 return;
             }
-            if (!document.activeElement?.closest?.('.line-text')) {
+            if (!hasLineTextFocus) {
+                if (shouldKeepSelectionEditContext) {
+                    return;
+                }
                 state.editingLine = null;
                 queueRender(true);
             }

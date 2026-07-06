@@ -638,6 +638,10 @@ body.csv-table-mode:not(.wrap-enabled) .line-row.csv-row {
     background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
+body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-block .line-text[contenteditable="true"] {
+    background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
 .inline-live-preview-enabled .line-row.live-preview-source-code .line-text {
     padding-left: 12px;
     padding-right: 12px;
@@ -658,6 +662,14 @@ body.csv-table-mode:not(.wrap-enabled) .line-row.csv-row {
 
 .inline-live-preview-enabled .line-row.live-preview-source-table-separator .line-text {
     color: color-mix(in srgb, var(--fg) 54%, transparent);
+    background: color-mix(in srgb, var(--fg) 11%, transparent);
+}
+
+body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-code-fence .line-text[contenteditable="true"] {
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
+}
+
+body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-table-separator .line-text[contenteditable="true"] {
     background: color-mix(in srgb, var(--fg) 11%, transparent);
 }
 
@@ -845,6 +857,11 @@ mark.active-match {
 }
 
 .editable-selection-overlay.selected-empty-line-overlay {
+    background: var(--selection);
+}
+
+.inline-live-preview-enabled .line-row.live-preview-source-block .editable-selection-overlay {
+    z-index: 2;
     background: var(--selection);
 }
 

@@ -5,6 +5,7 @@ import {
 } from './editor-dom.js';
 import {
     post,
+    preserveScrollTop,
     queueRender,
     reportCursorAndSelection,
     selectedText,
@@ -12,6 +13,7 @@ import {
     syncCustomSelectionClass
 } from './editor-core.js';
 import {
+    drawEditableSelectionOverlays,
     hasCustomSelection,
     isPositionInsideSelection,
     normalizeSelection
@@ -28,6 +30,7 @@ import {
 import { showContextMenu } from './editor-context-menu.js';
 
 const HEX_BYTES_PER_ROW = 16;
+const LIVE_PREVIEW_DRAG_THRESHOLD_PX = 4;
 
 export function bindPointerSelectionEvents({
     getPreciseLivePreviewPosition,
@@ -463,6 +466,9 @@ export function bindPointerSelectionEvents({
     let lastPointerDownTime = 0;
     let lastPointerDownPosition = null;
     let activeSelectionPointerId = null;
+    let livePreviewPointer = null;
+    let suppressNextLivePreviewClick = false;
+    let suppressNativeLivePreviewInputUntil = 0;
 
     function captureSelectionPointer(event) {
         activeSelectionPointerId = event.pointerId;
@@ -500,6 +506,257 @@ export function bindPointerSelectionEvents({
             reportCursorAndSelection(document.activeElement);
         }
     }
+
+    function isEditablePreviewBlockElement(element) {
+        return state.inlineLivePreviewEnabled &&
+            element?.getAttribute?.('contenteditable') === 'true' &&
+            element.closest?.('.line-row')?.classList?.contains('live-preview-source-block');
+    }
+
+    function livePreviewPositionFromPointer(event) {
+        const position = positionFromPointer(event);
+        if (!position) return null;
+
+        if (state.inlineLivePreviewEnabled &&
+            position.element?.getAttribute?.('contenteditable') !== 'true') {
+            return getPreciseLivePreviewPosition(position.element, event);
+        }
+
+        return position;
+    }
+
+    function restoreScrollPosition(scrollTop, scrollLeft) {
+        const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        scrollContainer.scrollTop = Math.min(maxScrollTop, Math.max(0, Number(scrollTop || 0)));
+        scrollContainer.scrollLeft = Math.max(0, Number(scrollLeft || 0));
+    }
+
+    function preserveAndRestoreScroll(scrollTop, scrollLeft) {
+        preserveScrollTop(scrollTop);
+        restoreScrollPosition(scrollTop, scrollLeft);
+        requestAnimationFrame(() => {
+            restoreScrollPosition(scrollTop, scrollLeft);
+            requestAnimationFrame(() => restoreScrollPosition(scrollTop, scrollLeft));
+        });
+        setTimeout(() => restoreScrollPosition(scrollTop, scrollLeft), 80);
+    }
+
+    function suppressNextClickEvent() {
+        suppressNextLivePreviewClick = true;
+        setTimeout(() => {
+            suppressNextLivePreviewClick = false;
+        }, 250);
+    }
+
+    function beginLivePreviewPointer(event, startPosition) {
+        const sourceBlockSelection = isEditablePreviewBlockElement(startPosition.element);
+        livePreviewPointer = {
+            pointerId: event.pointerId,
+            start: {
+                line: startPosition.line,
+                column: startPosition.column,
+                element: startPosition.element
+            },
+            clientX: event.clientX,
+            clientY: event.clientY,
+            scrollTop: scrollContainer.scrollTop,
+            scrollLeft: scrollContainer.scrollLeft,
+            extendSelection: !!event.shiftKey,
+            sourceBlockSelection,
+            selecting: false
+        };
+
+        event.preventDefault();
+        event.stopPropagation();
+        captureSelectionPointer(event);
+        cancelOpenableHoverValidation();
+        clearNativeSelection();
+
+        if (livePreviewPointer.extendSelection) {
+            startLivePreviewSelection(event);
+            updateLivePreviewSelectionFromPosition(startPosition, event);
+            preserveAndRestoreScroll(livePreviewPointer.scrollTop, livePreviewPointer.scrollLeft);
+        }
+    }
+
+    function startLivePreviewSelection(event) {
+        if (!livePreviewPointer || livePreviewPointer.selecting) return;
+
+        livePreviewPointer.selecting = true;
+        const anchor = livePreviewPointer.extendSelection && state.selectionAnchor
+            ? state.selectionAnchor
+            : { line: livePreviewPointer.start.line, column: livePreviewPointer.start.column };
+        state.selectionAnchor = anchor;
+        state.selection = null;
+        state.isSelecting = true;
+        state.isLineSelecting = false;
+        state.isDragPotential = false;
+        state.isDragMoving = false;
+        state.dragSelectionData = null;
+        state.dragDropPosition = null;
+        state.dragStartPosition = null;
+        document.body.classList.add('selecting');
+        syncCustomSelectionClass();
+        clearNativeSelection();
+    }
+
+    function updateLivePreviewSelectionFromPosition(position, event) {
+        const quietSourceSelection = !!livePreviewPointer?.sourceBlockSelection;
+        return updateSelectionFromPosition(position, event, {
+            render: !quietSourceSelection,
+            drawOverlays: quietSourceSelection
+        });
+    }
+
+    function handleLivePreviewPointerMove(event) {
+        if (!livePreviewPointer || livePreviewPointer.pointerId !== event.pointerId) {
+            return false;
+        }
+
+        if ((event.buttons & 1) === 0) {
+            finishLivePreviewPointer(event);
+            return true;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const distance = Math.hypot(event.clientX - livePreviewPointer.clientX, event.clientY - livePreviewPointer.clientY);
+        if (!livePreviewPointer.selecting && distance <= LIVE_PREVIEW_DRAG_THRESHOLD_PX) {
+            preserveAndRestoreScroll(livePreviewPointer.scrollTop, livePreviewPointer.scrollLeft);
+            return true;
+        }
+
+        startLivePreviewSelection(event);
+        const position = livePreviewPositionFromPointer(event);
+        if (position) {
+            updateLivePreviewSelectionFromPosition(position, event);
+            preserveAndRestoreScroll(livePreviewPointer.scrollTop, livePreviewPointer.scrollLeft);
+        }
+        return true;
+    }
+
+    function finishLivePreviewPointer(event = null) {
+        const pending = livePreviewPointer;
+        if (!pending) return false;
+
+        const endPosition = event ? livePreviewPositionFromPointer(event) : null;
+        livePreviewPointer = null;
+        stopSelectionAutoScroll();
+        releaseSelectionPointer(event);
+        suppressNextClickEvent();
+        if (pending.sourceBlockSelection) {
+            suppressNativeLivePreviewInputUntil = Date.now() + 500;
+        }
+
+        if (pending.selecting) {
+            if (endPosition) {
+                const quietSourceSelection = !!pending.sourceBlockSelection;
+                updateSelectionFromPosition(endPosition, event, {
+                    render: !quietSourceSelection,
+                    drawOverlays: quietSourceSelection
+                });
+            }
+
+            const hadSelection = hasCustomSelection();
+            state.isSelecting = false;
+            state.isLineSelecting = false;
+            state.dragStartPosition = null;
+            document.body.classList.remove('selecting');
+            syncCustomSelectionClass();
+            if (!hasCustomSelection()) {
+                state.selection = null;
+                syncCustomSelectionClass();
+            }
+            if (!pending.sourceBlockSelection && (hadSelection || hasCustomSelection())) {
+                queueRender(true);
+            } else if (pending.sourceBlockSelection) {
+                drawEditableSelectionOverlays();
+            }
+            preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
+            reportCursorAndSelection(endPosition?.element || document.activeElement);
+            return true;
+        }
+
+        const clickPosition = endPosition || pending.start;
+        const clickColumn = Math.max(0, clickPosition.column);
+        state.selection = null;
+        state.selectionAnchor = { line: clickPosition.line, column: clickColumn };
+        state.currentLine = clickPosition.line;
+        state.currentColumn = clickColumn + 1;
+        state.isSelecting = false;
+        state.isLineSelecting = false;
+        state.dragStartPosition = null;
+        syncCustomSelectionClass();
+        preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
+
+        if (clickPosition.element?.getAttribute?.('contenteditable') === 'true') {
+            keepEditablePreviewBlockFromElement(clickPosition.element);
+            setCaret(clickPosition.element, clickColumn);
+            preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
+        } else {
+            beginInlineLivePreviewEdit(clickPosition.line, clickColumn, {
+                preserveScroll: true,
+                scrollTop: pending.scrollTop,
+                scrollLeft: pending.scrollLeft
+            });
+        }
+
+        reportCursorAndSelection(clickPosition.element || document.activeElement);
+        return true;
+    }
+
+    function cancelLivePreviewPointer({ render = true } = {}) {
+        if (!livePreviewPointer) return;
+
+        const pending = livePreviewPointer;
+        livePreviewPointer = null;
+        if (pending.sourceBlockSelection) {
+            suppressNativeLivePreviewInputUntil = Date.now() + 500;
+        }
+        stopSelectionAutoScroll();
+        releaseSelectionPointer();
+        state.isSelecting = false;
+        state.isLineSelecting = false;
+        state.dragStartPosition = null;
+        document.body.classList.remove('selecting');
+        syncCustomSelectionClass();
+        preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
+        if (render) {
+            queueRender(true);
+            reportCursorAndSelection(document.activeElement);
+        }
+    }
+
+    function isNativeDragEdit(event) {
+        const inputType = event?.inputType || '';
+        return inputType === 'insertFromDrop' ||
+            inputType === 'deleteByDrag' ||
+            inputType === 'insertReplacementText';
+    }
+
+    function shouldSuppressNativeLivePreviewEdit(event) {
+        const element = lineElementFromEvent(event);
+        if (!isEditablePreviewBlockElement(element)) return false;
+        if (livePreviewPointer?.sourceBlockSelection) return true;
+        return Date.now() < suppressNativeLivePreviewInputUntil && isNativeDragEdit(event);
+    }
+
+    viewport.addEventListener('beforeinput', event => {
+        if (!shouldSuppressNativeLivePreviewEdit(event)) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        clearNativeSelection();
+    }, true);
+
+    viewport.addEventListener('input', event => {
+        if (!shouldSuppressNativeLivePreviewEdit(event)) return;
+
+        event.stopImmediatePropagation();
+        clearNativeSelection();
+        queueRender(true);
+    }, true);
 
     scrollContainer.addEventListener('pointerdown', event => {
         if (state.csvTableEnabled) return;
@@ -586,24 +843,14 @@ export function bindPointerSelectionEvents({
 
         const isEditable = position.element.getAttribute('contenteditable') === 'true';
         const isInlinePreviewRow = state.inlineLivePreviewEnabled && !isEditable;
+        const isLivePreviewPointerTarget = isInlinePreviewRow || isEditablePreviewBlockElement(position.element);
         event.preventDefault();
 
-        if (isInlinePreviewRow) {
-            const precisePos = getPreciseLivePreviewPosition(position.element, event);
-            state.alignCaretToY = event.clientY;
-            state.selection = null;
-            state.selectionAnchor = { line: precisePos.line, column: precisePos.column };
-            syncCustomSelectionClass();
-            state.isSelecting = false;
-            state.isLineSelecting = false;
-            state.isDragPotential = false;
-            state.isDragMoving = false;
-            state.dragSelectionData = null;
-            state.dragDropPosition = null;
-            state.dragStartPosition = null;
-            state.currentLine = precisePos.line;
-            state.currentColumn = precisePos.column + 1;
-            beginInlineLivePreviewEdit(precisePos.line, precisePos.column);
+        if (isLivePreviewPointerTarget) {
+            const precisePos = isInlinePreviewRow
+                ? getPreciseLivePreviewPosition(position.element, event)
+                : position;
+            beginLivePreviewPointer(event, precisePos);
         } else {
             captureSelectionPointer(event);
             cancelOpenableHoverValidation();
@@ -694,6 +941,11 @@ export function bindPointerSelectionEvents({
     }
 
     function endSelection(event) {
+        if (livePreviewPointer) {
+            finishLivePreviewPointer(event);
+            return;
+        }
+
         if (isHexView() && state.isSelecting) {
             endHexSelection(event);
             return;
@@ -855,6 +1107,10 @@ export function bindPointerSelectionEvents({
         const position = positionFromPointer(event);
         if (!position) return false;
 
+        return updateSelectionFromPosition(position, event);
+    }
+
+    function updateSelectionFromPosition(position, event, options = {}) {
         let newSelection;
         if (state.isLineSelecting) {
             const startLine = state.selectionAnchor.line;
@@ -915,7 +1171,13 @@ export function bindPointerSelectionEvents({
             syncCustomSelectionClass();
             state.currentLine = position.line;
             state.currentColumn = position.column + 1;
-            queueRender(true);
+            if (options.render === false) {
+                if (options.drawOverlays) {
+                    drawEditableSelectionOverlays();
+                }
+            } else {
+                queueRender(true);
+            }
             reportCursorAndSelection(position.element);
         }
 
@@ -984,6 +1246,10 @@ export function bindPointerSelectionEvents({
         updateHoveredLineFromPointer(event);
         updateOpenableHoverUnderline(event);
 
+        if (handleLivePreviewPointerMove(event)) {
+            return;
+        }
+
         if (isHexView()) {
             if (!state.isSelecting) return;
             if ((event.buttons & 1) === 0) {
@@ -1044,6 +1310,10 @@ export function bindPointerSelectionEvents({
     });
 
     scrollContainer.addEventListener('lostpointercapture', event => {
+        if (livePreviewPointer && activeSelectionPointerId === event.pointerId) {
+            cancelLivePreviewPointer();
+            return;
+        }
         if (activeSelectionPointerId === event.pointerId &&
             (state.isSelecting || state.isDragPotential || state.isDragMoving)) {
             cancelActiveSelectionInteraction();
@@ -1055,6 +1325,7 @@ export function bindPointerSelectionEvents({
 
     scrollContainer.addEventListener('wheel', () => {
         cancelOpenableHoverValidation();
+        cancelLivePreviewPointer({ render: false });
         cancelActiveSelectionInteraction({ render: false });
     }, { capture: true });
 
@@ -1067,18 +1338,24 @@ export function bindPointerSelectionEvents({
     });
 
     window.addEventListener('pointercancel', event => {
+        if (livePreviewPointer) {
+            cancelLivePreviewPointer();
+            return;
+        }
         if (!state.isSelecting) return;
         cancelActiveSelectionInteraction();
     });
 
     window.addEventListener('blur', () => {
         cancelOpenableHoverValidation();
+        cancelLivePreviewPointer();
         cancelActiveSelectionInteraction();
     });
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             cancelOpenableHoverValidation();
+            cancelLivePreviewPointer();
             cancelActiveSelectionInteraction();
         }
     });
@@ -1092,6 +1369,14 @@ export function bindPointerSelectionEvents({
 
     viewport.addEventListener('click', event => {
         if (isHexView()) {
+            reportCursorAndSelection(document.activeElement);
+            return;
+        }
+
+        if (suppressNextLivePreviewClick) {
+            suppressNextLivePreviewClick = false;
+            event.preventDefault();
+            event.stopPropagation();
             reportCursorAndSelection(document.activeElement);
             return;
         }
