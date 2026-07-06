@@ -10,7 +10,6 @@ import {
     isStandaloneDelimiter,
     invalidateMeasuredLineHeightsAround,
     lineCommentSyntax,
-    lineHeightFor,
     lineTop,
     markDirty,
     measureRenderedRows,
@@ -25,7 +24,6 @@ import {
     selectedText,
     setupVirtualHeight,
     shiftCachedLines,
-    totalVirtualHeight,
     state,
     syncCustomSelectionClass,
     writeClipboardText
@@ -54,7 +52,19 @@ import {
     hasCustomSelection,
     normalizeSelection
 } from './editor-selection.js';
+import {
+    cancelPostEditFocusFollowUps,
+    clampScrollTop,
+    queueFocusPreservingScroll,
+    queuePostEditCaretRestore,
+    queuePostEditFocus,
+    restoreScrollTop
+} from './editor-edit-focus.js';
+import { createCaretNavigationCommands } from './editor-caret-navigation-commands.js';
+import { createClipboardCommandHandlers } from './editor-clipboard-commands.js';
 import { createEditorCompositionHandlers } from './editor-composition.js';
+import { createHostStreamInsertCommands } from './editor-host-stream-insert.js';
+import { createModelRepeatInputHandlers } from './editor-repeat-input.js';
 import {
     copyCsvSelectionToClipboard,
     cutCsvSelectionToClipboard
@@ -62,65 +72,11 @@ import {
 import { createMarkdownCommandHandlers } from './editor-markdown-commands.js';
 import { createTextCommandActions } from './editor-text-command-actions.js';
 
-let verticalCaretVisualAnchor = null;
 let splitScrollRestoreToken = 0;
-let postEditFocusToken = 0;
-let scrollPreservingFocusToken = 0;
-let postEditCaretRestoreToken = 0;
-
-function queuePostEditFocus(callback) {
-    const token = ++postEditFocusToken;
-    setTimeout(() => {
-        if (token === postEditFocusToken) {
-            callback();
-        }
-    }, 0);
-}
-
-function queuePostEditCaretRestore(lineNumber, columnZeroBased, scrollMargin = 0) {
-    const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
-    const targetColumn = Math.max(0, Number(columnZeroBased || 0));
-    const token = ++postEditCaretRestoreToken;
-
-    function run(attempt = 0) {
-        if (token !== postEditCaretRestoreToken) return;
-
-        state.currentLine = targetLine;
-        state.currentColumn = targetColumn + 1;
-        state.selectionAnchor = { line: targetLine, column: targetColumn };
-
-        const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
-        if (element && element.getAttribute('contenteditable') === 'true') {
-            const safeColumn = Math.min(targetColumn, lineTextFromElement(element).length);
-            setCaret(element, safeColumn, scrollMargin);
-            reportCursorAndSelection(null);
-            if (attempt < 2) {
-                requestAnimationFrame(() => run(attempt + 1));
-            }
-            return;
-        }
-
-        if (attempt === 0) {
-            focusLine(targetLine, targetColumn, scrollMargin);
-        }
-
-        if (attempt < 8) {
-            requestAnimationFrame(() => run(attempt + 1));
-            return;
-        }
-
-        focusLine(targetLine, targetColumn, scrollMargin);
-        reportCursorAndSelection(null);
-    }
-
-    queuePostEditFocus(() => run());
-}
 
 function cancelPendingRepeatFollowUps(key) {
     if (!key) return;
-    postEditFocusToken++;
-    scrollPreservingFocusToken++;
-    postEditCaretRestoreToken++;
+    cancelPostEditFocusFollowUps();
     if (key === 'Enter') {
         splitScrollRestoreToken++;
     }
@@ -135,260 +91,6 @@ function beginEditTransaction() {
 
 function endEditTransaction() {
     post({ type: 'editTransactionEnded' });
-}
-
-function commitDomLineBeforeCaretNavigation(element) {
-    if (!element || element.getAttribute?.('contenteditable') !== 'true') return false;
-
-    const lineNumber = Number(element.dataset.line || state.currentLine || 1);
-    const domText = lineTextFromElement(element);
-    if (state.cache.get(lineNumber) === domText) return false;
-
-    // 화살표키 이동은 queueRender/focusLine을 거치므로, 이동 전에 contenteditable DOM에만
-    // 남아 있는 최종 IME 문자열을 모델 캐시에 먼저 저장해야 한다. 그렇지 않으면 렌더링이
-    // 이전 캐시 값으로 돌아가면서 방금 입력한 한글이 사라질 수 있다.
-    commitLine(element);
-    return true;
-}
-
-function finishPendingImeBeforeCaretNavigation(element) {
-    if (!element || element.getAttribute?.('contenteditable') !== 'true') return false;
-
-    if (state.rangeComposition) {
-        const pending = state.rangeComposition;
-        const lineNumber = Number(pending.lineNumber || element.dataset.line || state.currentLine || 1);
-        const targetElement = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) || element;
-        const finalText = targetElement?.getAttribute?.('contenteditable') === 'true'
-            ? lineTextFromElement(targetElement)
-            : pending.beforeText;
-        const insertedText = changedTextBetween(pending.beforeText, finalText);
-
-        if (finishRangeComposition(targetElement, lineNumber, insertedText)) {
-            state.isComposing = false;
-            state.compositionLine = null;
-            clearPendingImeSelectionCollapse();
-            reportCursorAndSelection(targetElement);
-            return true;
-        }
-    }
-
-    if (state.columnComposition) {
-        const lineNumber = Number(element.dataset.line || state.compositionLine || state.currentLine || 1);
-        if (finishColumnComposition(element, lineNumber)) {
-            state.isComposing = false;
-            state.compositionLine = null;
-            clearPendingImeSelectionCollapse();
-            reportCursorAndSelection(element);
-            return true;
-        }
-    }
-
-    if (state.isComposing) {
-        commitLineForSave(element);
-        clearPendingImeSelectionCollapse();
-        return true;
-    }
-
-    commitDomLineBeforeCaretNavigation(element);
-    return false;
-}
-
-function anchoredCaretRectForVerticalMove(element, lineNumber, caret, fallbackRect) {
-    const anchor = verticalCaretVisualAnchor;
-    if (!anchor ||
-        anchor.line !== lineNumber ||
-        anchor.column !== caret ||
-        performance.now() - anchor.time > 2000 ||
-        document.activeElement?.closest?.('.line-text') !== element) {
-        return fallbackRect;
-    }
-
-    // Wrapped 줄 내부에서 ↑/↓를 계속 누르면 setCaret/focusLine이 scrollTop을 바꿀 수 있다.
-    // 저장된 visual anchor는 viewport 좌표이므로, 스크롤 변화량만큼 보정하지 않으면
-    // 다음 반복 이동이 현재 caret 위치보다 몇 visual line 아래/위를 기준으로 계산되어 건너뛰게 된다.
-    const scrollDelta = scrollContainer.scrollTop - Number(anchor.scrollTop || 0);
-    const top = anchor.top - scrollDelta;
-    const left = anchor.left;
-
-    return {
-        left,
-        right: left,
-        top,
-        bottom: top + anchor.height,
-        height: anchor.height
-    };
-}
-
-function rememberVerticalCaretVisualAnchor(line, column, left, top, height) {
-    const safeHeight = Math.max(1, Number(height || state.lineHeight));
-    verticalCaretVisualAnchor = {
-        line,
-        column,
-        left,
-        top,
-        bottom: top + safeHeight,
-        height: safeHeight,
-        scrollTop: scrollContainer.scrollTop,
-        time: performance.now()
-    };
-}
-
-function clearVerticalCaretVisualAnchor() {
-    verticalCaretVisualAnchor = null;
-}
-
-function visualLineBoundsForElement(element) {
-    const textRect = element?.getBoundingClientRect?.();
-    const rowRect = element?.closest?.('.line-row')?.getBoundingClientRect?.();
-
-    if (!textRect && !rowRect) return null;
-    if (!rowRect || rowRect.height <= 0) return textRect;
-    if (!textRect || textRect.height <= 0) return rowRect;
-
-    // word-wrap 상태에서는 실제 visual line 높이가 .line-text가 아니라
-    // gutter를 포함한 .line-row 높이로 잡히는 경우가 있다.
-    // ↑/↓ 이동의 세로 범위를 .line-text rect만으로 판단하면
-    // 같은 원본 줄 안의 다음 wrap 줄을 건너뛰고 인접 원본 줄로 이동한다.
-    return {
-        left: textRect.left,
-        right: textRect.right,
-        top: Math.min(textRect.top, rowRect.top),
-        bottom: Math.max(textRect.bottom, rowRect.bottom),
-        width: textRect.width,
-        height: Math.max(textRect.height, rowRect.height)
-    };
-}
-
-function adjacentLogicalLineTarget(lineNumber, direction, preferredX, lineStep, fallbackColumn) {
-    const targetLine = lineNumber + direction;
-    if (targetLine < 1 || targetLine > state.lineCount) return null;
-
-    const targetText = state.cache.get(targetLine) || '';
-    const fallback = {
-        line: targetLine,
-        column: Math.min(Math.max(0, Number(fallbackColumn || 0)), targetText.length)
-    };
-
-    if (!state.wordWrap) {
-        return fallback;
-    }
-
-    const targetElement = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
-    if (!targetElement || targetElement.getAttribute('contenteditable') !== 'true') {
-        return fallback;
-    }
-
-    const targetTextRect = targetElement.getBoundingClientRect();
-    const targetBounds = visualLineBoundsForElement(targetElement);
-    if (!targetTextRect || !targetBounds || targetBounds.height <= 0) {
-        return fallback;
-    }
-
-    const x = Math.max(targetTextRect.left + 1, Math.min(preferredX, targetTextRect.right - 1));
-    const y = direction < 0
-        ? targetBounds.bottom - lineStep / 2
-        : targetBounds.top + lineStep / 2;
-    const column = offsetFromPointInElement(targetElement, x, y);
-    const targetColumn = column === null ? fallback.column : column;
-    const visualTop = direction < 0
-        ? Math.max(targetBounds.top, targetBounds.bottom - lineStep)
-        : targetBounds.top;
-    return {
-        line: targetLine,
-        column: targetColumn,
-        visualLeft: x,
-        visualTop,
-        visualHeight: lineStep
-    };
-}
-
-function moveCaretVertical(element, direction, extendSelection = false) {
-    if (!element || element.getAttribute('contenteditable') !== 'true') return false;
-    if (finishPendingImeBeforeCaretNavigation(element)) return true;
-
-    const lineNumber = Number(element.dataset.line || state.currentLine || 1);
-    const text = lineTextFromElement(element);
-    const caret = Math.max(0, Math.min(getCaretOffset(element), text.length));
-
-    const anchor = extendSelection
-        ? (state.selectionAnchor || { line: lineNumber, column: caret })
-        : null;
-
-    let target = null;
-
-    let caretRect = caretRectForOffset(element, caret);
-    let preferredX = null;
-    let lineStep = state.lineHeight;
-    if (!caretRect) {
-        target = adjacentLogicalLineTarget(lineNumber, direction, caret, lineStep, caret);
-    } else {
-        caretRect = anchoredCaretRectForVerticalMove(element, lineNumber, caret, caretRect);
-        const elementRect = element.getBoundingClientRect();
-        const visualBounds = visualLineBoundsForElement(element) || elementRect;
-        const styles = window.getComputedStyle(element);
-        const parsedLineHeight = Number.parseFloat(styles.lineHeight);
-        lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || state.lineHeight));
-        preferredX = Math.max(elementRect.left + 1, Math.min(caretRect.left, elementRect.right - 1));
-        const targetY = direction < 0
-            ? caretRect.top - lineStep / 2
-            : caretRect.bottom + lineStep / 2;
-
-        if (targetY >= visualBounds.top - 1 && targetY <= visualBounds.bottom + 1) {
-            const targetColumn = offsetFromPointInElement(element, preferredX, targetY, caretRect, direction, lineStep);
-            if (targetColumn !== null) {
-                target = {
-                    line: lineNumber,
-                    column: targetColumn,
-                    visualLeft: preferredX,
-                    visualTop: targetY - lineStep / 2,
-                    visualHeight: lineStep
-                };
-            }
-        }
-
-        if (!target) {
-            target = adjacentLogicalLineTarget(lineNumber, direction, preferredX ?? caret, lineStep, caret);
-        }
-    }
-
-    if (target) {
-        if (Number.isFinite(target.visualTop) && Number.isFinite(target.visualLeft)) {
-            rememberVerticalCaretVisualAnchor(
-                target.line,
-                target.column,
-                target.visualLeft,
-                target.visualTop,
-                target.visualHeight ?? lineStep);
-        } else {
-            clearVerticalCaretVisualAnchor();
-        }
-
-        if (extendSelection) {
-            state.selectionAnchor = anchor;
-            state.selection = (anchor.line === target.line && anchor.column === target.column)
-                ? null
-                : { start: anchor, end: target };
-            state.currentLine = target.line;
-            state.currentColumn = target.column + 1;
-            syncCustomSelectionClass();
-            queueRender(true);
-            setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
-        } else {
-            state.selection = null;
-            state.selectionAnchor = { line: target.line, column: target.column };
-            state.currentLine = target.line;
-            state.currentColumn = target.column + 1;
-            syncCustomSelectionClass();
-            if (target.line === lineNumber) {
-                setCaret(element, target.column, 3 * state.lineHeight);
-            } else {
-                focusLine(target.line, target.column, 3 * state.lineHeight);
-            }
-        }
-        return true;
-    }
-
-    return false;
 }
 
 function commitLine(element) {
@@ -586,47 +288,6 @@ function captureSplitScrollAnchor(element, caretOffset) {
     };
 }
 
-function clampScrollTop(scrollTop) {
-    const preservedHeight = state.preservedScrollTop !== null
-        ? Math.max(0, Number(state.preservedScrollTop || 0)) + scrollContainer.clientHeight
-        : 0;
-    const maxScrollTop = Math.max(0, Math.max(totalVirtualHeight(), preservedHeight) - scrollContainer.clientHeight);
-    return Math.min(maxScrollTop, Math.max(0, Number(scrollTop || 0)));
-}
-
-function restoreScrollTop(scrollTop) {
-    scrollContainer.scrollTop = clampScrollTop(scrollTop);
-}
-
-function queueFocusPreservingScroll(lineNumber, columnZeroBased, scrollTop) {
-    const token = ++scrollPreservingFocusToken;
-
-    function run(attempt = 0) {
-        if (token !== scrollPreservingFocusToken) return;
-
-        restoreScrollTop(scrollTop);
-        const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
-        if (element && element.getAttribute('contenteditable') === 'true') {
-            setCaret(element, columnZeroBased);
-            restoreScrollTop(scrollTop);
-            if (attempt < 2) {
-                requestAnimationFrame(() => run(attempt + 1));
-            }
-            return;
-        }
-
-        if (attempt < 8) {
-            requestAnimationFrame(() => run(attempt + 1));
-            return;
-        }
-
-        focusLine(lineNumber, columnZeroBased);
-        restoreScrollTop(scrollTop);
-    }
-
-    queuePostEditFocus(() => run());
-}
-
 function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, token, attempt = 0) {
     if (!anchor || !Number.isFinite(anchor.desiredViewportBottom)) return;
     if (token !== splitScrollRestoreToken) return;
@@ -783,127 +444,6 @@ function mergeWithPrevious(element) {
     applyMergeLineBackward(lineNumber, previous, current);
 }
 
-let hostStreamInsert = null;
-
-function clearHostStreamSelection() {
-    state.selection = null;
-    state.selectionAnchor = null;
-    clearCustomSelectionVisuals();
-    try {
-        window.getSelection()?.removeAllRanges();
-    } catch { }
-    syncCustomSelectionClass();
-}
-
-function beginHostStreamInsert() {
-    let targetLine = Math.max(1, Math.min(Number(state.currentLine || 1), Math.max(1, state.lineCount || 1)));
-    let targetColumn = Math.max(0, Number(state.currentColumn || 1) - 1);
-
-    const active = activeEditableElement();
-    if (active && active.getAttribute('contenteditable') === 'true') {
-        const activeLine = Number(active.dataset.line || targetLine || 1);
-        const activeText = lineTextFromElement(active);
-        if (activeLine >= 1) {
-            targetLine = activeLine;
-            state.cache.set(activeLine, activeText);
-            targetColumn = Math.max(0, Math.min(getCaretOffset(active), activeText.length));
-        }
-    } else {
-        const currentText = state.cache.get(targetLine) ?? '';
-        targetColumn = Math.max(0, Math.min(targetColumn, currentText.length));
-    }
-
-    clearHostStreamSelection();
-    hostStreamInsert = { line: targetLine, column: targetColumn };
-    state.currentLine = targetLine;
-    state.currentColumn = targetColumn + 1;
-    reportCursorAndSelection();
-}
-
-function insertHostStreamText(text) {
-    const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    if (!normalized) return;
-    if (!hostStreamInsert) beginHostStreamInsert();
-
-    const targetLine = Math.max(1, Math.min(Number(hostStreamInsert.line || 1), Math.max(1, state.lineCount || 1)));
-    const currentText = state.cache.get(targetLine) ?? '';
-    const caret = Math.max(0, Math.min(Number(hostStreamInsert.column || 0), currentText.length));
-    const before = currentText.slice(0, caret);
-    const after = currentText.slice(caret);
-
-    beginEditTransaction();
-    try {
-        if (normalized.includes('\n')) {
-            const parts = normalized.split('\n');
-            const insertedCount = parts.length - 1;
-            const firstLine = before + parts[0];
-            const lastLineNumber = targetLine + insertedCount;
-
-            state.cache.set(targetLine, firstLine);
-            shiftCachedLines(targetLine + 1, insertedCount);
-            if (!cleanDirtyMarker(targetLine)) {
-                markDirty(targetLine, 'mod');
-            }
-            post({ type: 'lineChanged', lineNumber: targetLine, text: firstLine });
-
-            for (let i = 1; i < parts.length; i++) {
-                const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
-                const nextLineNumber = targetLine + i;
-                state.cache.set(nextLineNumber, nextText);
-                state.dirtyLines.set(nextLineNumber, 'add');
-                post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
-            }
-
-            state.lineCount += insertedCount;
-            hostStreamInsert = {
-                line: lastLineNumber,
-                column: parts[parts.length - 1].length
-            };
-            state.currentLine = lastLineNumber;
-            state.currentColumn = hostStreamInsert.column + 1;
-            setupVirtualHeight();
-        } else {
-            const nextText = before + normalized + after;
-            state.cache.set(targetLine, nextText);
-            state.cacheVersion++;
-            invalidateMeasuredLineHeightsAround(targetLine);
-            if (!cleanDirtyMarker(targetLine)) {
-                markDirty(targetLine, 'mod');
-            }
-            post({ type: 'lineChanged', lineNumber: targetLine, text: nextText });
-
-            hostStreamInsert = {
-                line: targetLine,
-                column: caret + normalized.length
-            };
-            state.currentLine = targetLine;
-            state.currentColumn = hostStreamInsert.column + 1;
-        }
-
-        clearHostStreamSelection();
-        post({ type: 'contentChanged' });
-    } finally {
-        endEditTransaction();
-    }
-
-    if (state.wordWrap) {
-        measureRenderedRows(false);
-    }
-    queueRender(true);
-}
-
-function endHostStreamInsert() {
-    if (!hostStreamInsert) return;
-
-    const targetLine = hostStreamInsert.line;
-    const targetColumn = hostStreamInsert.column;
-    hostStreamInsert = null;
-    queueRender(true);
-    setTimeout(() => {
-        focusLine(targetLine, targetColumn);
-        reportCursorAndSelection();
-    }, 0);
-}
 function insertTextAtCaret(text, options = {}) {
     if (hasCustomSelection()) {
         const sel = normalizeSelection();
@@ -1031,224 +571,6 @@ function insertTextAtCaret(text, options = {}) {
     insertPlainTextByModel(element, normalized);
 }
 
-function isModelRepeatKey(event) {
-    if (!event) return false;
-    if (event.key === ' ' || event.code === 'Space' || event.key === 'Spacebar') {
-        return !event.ctrlKey && !event.metaKey && !event.altKey;
-    }
-    if (isPlainTextKey(event)) {
-        return true;
-    }
-    if (event.key === 'Enter') {
-        return !event.ctrlKey && !event.metaKey && !event.altKey;
-    }
-
-    const isDelOrBack = event.key === 'Backspace' || event.key === 'Delete';
-    if (!isDelOrBack) return false;
-    if (event.ctrlKey || event.metaKey || event.altKey) {
-        return hasCustomSelection();
-    }
-    return true;
-}
-
-function normalizedModelRepeatKey(event) {
-    if (event.key === ' ' || event.code === 'Space' || event.key === 'Spacebar') return 'Space';
-    if (isPlainTextKey(event)) return `Text:${event.key}`;
-    if (event.key === 'Backspace') return 'Backspace';
-    if (event.key === 'Delete') return 'Delete';
-    if (event.key === 'Enter') return 'Enter';
-    return event.key;
-}
-
-function isSpaceInputEvent(event) {
-    if (!event) return false;
-    const inputType = event.inputType || '';
-    return (inputType === 'insertText' || inputType === 'insertSpace') && event.data === ' ';
-}
-
-function markNativeBeforeInputHandled(inputTypes, durationMs = 120) {
-    state.repeatEdit.suppressBeforeInputUntil = performance.now() + durationMs;
-    state.repeatEdit.suppressBeforeInputTypes = new Set(inputTypes);
-}
-
-function shouldSuppressNativeBeforeInput(event) {
-    if (!event) return false;
-    const now = performance.now();
-    const inputType = event.inputType || '';
-
-    if (state.repeatEdit.continuousKey && beforeInputMatchesRepeatKey(event, state.repeatEdit.continuousKey)) {
-        return true;
-    }
-
-    for (const [key, until] of state.repeatEdit.releasedKeys.entries()) {
-        if (now > until) {
-            state.repeatEdit.releasedKeys.delete(key);
-            continue;
-        }
-        if (beforeInputMatchesRepeatKey(event, key)) {
-            return true;
-        }
-    }
-
-    if (now > state.repeatEdit.suppressBeforeInputUntil) return false;
-    const types = state.repeatEdit.suppressBeforeInputTypes;
-    if (types.has(inputType)) return true;
-    if (types.has('insertSpace') && inputType.startsWith('insert') && event.data === ' ') return true;
-    return false;
-}
-
-function beforeInputMatchesRepeatKey(event, key) {
-    const inputType = event.inputType || '';
-    if (key?.startsWith?.('Text:')) {
-        return inputType === 'insertText' && event.data === key.slice(5);
-    }
-
-    switch (key) {
-        case 'Space':
-            return (inputType === 'insertText' || inputType === 'insertSpace') && event.data === ' ';
-        case 'Enter':
-            return inputType === 'insertLineBreak' ||
-                inputType === 'insertParagraph' ||
-                (inputType === 'insertText' && (event.data === '\n' || event.data === '\r')) ||
-                (inputType === 'insertText' && event.data === null);
-        case 'Backspace':
-            return inputType === 'deleteContentBackward';
-        case 'Delete':
-            return inputType === 'deleteContentForward';
-        default:
-            return false;
-    }
-}
-
-function rememberReleasedRepeatKey(key) {
-    if (!key) return;
-    const until = performance.now() + state.repeatEdit.releaseGuardMs;
-    state.repeatEdit.releasedKeys.set(key, until);
-}
-
-function isReleaseGuardedRepeatKey(key) {
-    if (!key) return false;
-    const until = state.repeatEdit.releasedKeys.get(key);
-    if (!until) return false;
-    if (performance.now() > until) {
-        state.repeatEdit.releasedKeys.delete(key);
-        return false;
-    }
-    return true;
-}
-
-function markLineBoundaryTransition(targetLine, targetColumn) {
-    state.currentLine = Math.min(Math.max(1, Number(targetLine || 1)), state.lineCount);
-    state.currentColumn = Math.max(1, Number(targetColumn || 0) + 1);
-    state.repeatEdit.lineBoundaryUntil = Math.max(
-        state.repeatEdit.lineBoundaryUntil,
-        performance.now() + state.repeatEdit.lineBoundaryHoldMs
-    );
-}
-
-function clearPendingRepeatEdit(releasedKey = null, addReleaseGuard = true) {
-    const activeKey = state.repeatEdit.continuousKey;
-    const keyToGuard = releasedKey || activeKey;
-    const hadContinuousRun = state.repeatEdit.hasContinuousRun;
-    if (state.repeatEdit.timer) {
-        clearTimeout(state.repeatEdit.timer);
-        state.repeatEdit.timer = 0;
-    }
-    if (state.repeatEdit.continuousTimer) {
-        clearTimeout(state.repeatEdit.continuousTimer);
-        state.repeatEdit.continuousTimer = 0;
-    }
-    state.repeatEdit.pending = null;
-    state.repeatEdit.continuousKey = null;
-    state.repeatEdit.hasContinuousRun = false;
-    state.repeatEdit.hasPhysicalRepeatSignal = false;
-    state.repeatEdit.lastKeyDownAt = 0;
-    if (addReleaseGuard) {
-        rememberReleasedRepeatKey(keyToGuard);
-        if (hadContinuousRun) {
-            cancelPendingRepeatFollowUps(keyToGuard);
-        }
-        if (activeKey && activeKey !== keyToGuard) {
-            rememberReleasedRepeatKey(activeKey);
-            if (hadContinuousRun) {
-                cancelPendingRepeatFollowUps(activeKey);
-            }
-        }
-    }
-}
-
-function repeatEditDelayFromNow() {
-    const now = performance.now();
-    const boundaryWait = Math.max(0, state.repeatEdit.lineBoundaryUntil - now);
-    const intervalWait = Math.max(0, state.repeatEdit.intervalMs - (now - state.repeatEdit.lastRunAt));
-    return Math.max(boundaryWait, intervalWait);
-}
-
-function scheduleContinuousModelRepeatEdit(key, delayMs) {
-    if (state.repeatEdit.continuousTimer) {
-        clearTimeout(state.repeatEdit.continuousTimer);
-        state.repeatEdit.continuousTimer = 0;
-    }
-
-    state.repeatEdit.continuousTimer = setTimeout(() => {
-        state.repeatEdit.continuousTimer = 0;
-        if (state.repeatEdit.continuousKey !== key || state.readOnly || state.isComposing) {
-            return;
-        }
-
-        if (state.repeatEdit.hasPhysicalRepeatSignal &&
-            performance.now() - state.repeatEdit.lastKeyDownAt > state.repeatEdit.keyDownSilenceMs) {
-            clearPendingRepeatEdit(key);
-            return;
-        }
-
-        const wait = repeatEditDelayFromNow();
-        if (wait > 0) {
-            scheduleContinuousModelRepeatEdit(key, wait);
-            return;
-        }
-
-        state.repeatEdit.lastRunAt = performance.now();
-        state.repeatEdit.hasContinuousRun = true;
-        runModelRepeatEdit(key);
-        scheduleContinuousModelRepeatEdit(key, state.repeatEdit.intervalMs);
-    }, Math.max(0, Number(delayMs || 0)));
-}
-
-function scheduleModelRepeatEdit(key, isRepeat) {
-    if (state.readOnly || state.isComposing) return;
-    if (isRepeat && isReleaseGuardedRepeatKey(key)) return;
-    if (!isRepeat) {
-        state.repeatEdit.releasedKeys.delete(key);
-    }
-
-    // Backspace/Delete/Enter are handled from one cancellable timer instead of
-    // browser key-repeat events.  This prevents queued keydown events from
-    // continuing to delete or split lines after the physical key is released.
-    if (state.repeatEdit.continuousKey === key) {
-        state.repeatEdit.lastKeyDownAt = performance.now();
-        if (isRepeat) {
-            state.repeatEdit.hasPhysicalRepeatSignal = true;
-            if (!state.repeatEdit.continuousTimer) {
-                scheduleContinuousModelRepeatEdit(key, repeatEditDelayFromNow());
-            }
-        }
-        return;
-    }
-
-    clearPendingRepeatEdit(null, false);
-    state.repeatEdit.continuousKey = key;
-    state.repeatEdit.pending = null;
-    state.repeatEdit.hasContinuousRun = false;
-    state.repeatEdit.hasPhysicalRepeatSignal = !!isRepeat;
-    state.repeatEdit.lastKeyDownAt = performance.now();
-    state.repeatEdit.lastRunAt = performance.now();
-    runModelRepeatEdit(key);
-    if (isRepeat) {
-        scheduleContinuousModelRepeatEdit(key, repeatEditDelayFromNow());
-    }
-}
-
 function insertPlainTextByModel(element, text) {
     if (!element || element.getAttribute('contenteditable') !== 'true') return;
     if (hasCustomSelection()) {
@@ -1262,94 +584,6 @@ function insertPlainTextByModel(element, text) {
     const caret = getCaretOffset(element);
     const nextText = current.slice(0, caret) + text + current.slice(caret);
     updateSingleLine(element, nextText, caret + String(text || '').length);
-}
-
-// ----------------------------------------------------
-// Core Korean IME and Selection Collapse protection helpers
-// ----------------------------------------------------
-function moveCaretHorizontal(element, direction, extendSelection = false) {
-    if (!element || element.getAttribute('contenteditable') !== 'true') return false;
-    if (finishPendingImeBeforeCaretNavigation(element)) return true;
-    clearVerticalCaretVisualAnchor();
-
-    const lineNumber = Number(element.dataset.line || state.currentLine || 1);
-    const text = lineTextFromElement(element);
-    const caret = Math.max(0, Math.min(getCaretOffset(element), text.length));
-    let target = { line: lineNumber, column: caret };
-
-    if (!extendSelection && hasCustomSelection()) {
-        const selection = normalizeSelection();
-        if (selection) {
-            target = direction < 0
-                ? { line: selection.start.line, column: selection.start.column }
-                : { line: selection.end.line, column: selection.end.column };
-        }
-    } else if (direction < 0) {
-        if (caret > 0) {
-            target = { line: lineNumber, column: graphemeDeleteStart(text, caret) };
-        } else if (lineNumber > 1) {
-            const previousText = state.cache.get(lineNumber - 1) || '';
-            target = { line: lineNumber - 1, column: previousText.length };
-        }
-    } else {
-        if (caret < text.length) {
-            target = { line: lineNumber, column: graphemeDeleteEnd(text, caret) };
-        } else if (lineNumber < state.lineCount) {
-            target = { line: lineNumber + 1, column: 0 };
-        }
-    }
-
-    if (extendSelection) {
-        const anchor = state.selectionAnchor || { line: lineNumber, column: caret };
-        state.selectionAnchor = anchor;
-        state.selection = (anchor.line === target.line && anchor.column === target.column)
-            ? null
-            : { start: anchor, end: target };
-        state.currentLine = target.line;
-        state.currentColumn = target.column + 1;
-        syncCustomSelectionClass();
-        queueRender(true);
-        setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
-    } else {
-        state.selection = null;
-        state.selectionAnchor = { line: target.line, column: target.column };
-        syncCustomSelectionClass();
-        focusLine(target.line, target.column, 3 * state.lineHeight);
-    }
-
-    return true;
-}
-
-function runModelRepeatEdit(key) {
-    if (state.readOnly || state.isComposing) return;
-    let element = activeEditableElement();
-    if (!element || element.getAttribute('contenteditable') !== 'true') {
-        focusLine(state.currentLine, Math.max(0, state.currentColumn - 1));
-        return;
-    }
-
-    if (key === 'Enter') {
-        const elementLineNumber = Number(element.dataset.line || 0);
-        splitCurrentLine(element, { preferStateCaret: elementLineNumber !== state.currentLine });
-        return;
-    }
-
-    if (key === 'Space') {
-        insertPlainTextByModel(element, ' ');
-        return;
-    }
-
-    if (key?.startsWith?.('Text:')) {
-        insertPlainTextByModel(element, key.slice(5));
-        return;
-    }
-
-    makeEditablePlainText(element);
-    if (key === 'Backspace') {
-        deleteBackwardAtCaret(element);
-    } else if (key === 'Delete') {
-        deleteForwardAtCaret(element);
-    }
 }
 
 function updateSingleLine(element, text, caretColumn) {
@@ -1812,6 +1046,54 @@ function deleteCurrentLine(element) {
 }
 
 const {
+    beginHostStreamInsert,
+    endHostStreamInsert,
+    insertHostStreamText
+} = createHostStreamInsertCommands({
+    activeEditableElement,
+    beginEditTransaction,
+    cleanDirtyMarker,
+    clearCustomSelectionVisuals,
+    endEditTransaction,
+    focusLine,
+    getCaretOffset,
+    invalidateMeasuredLineHeightsAround,
+    lineTextFromElement,
+    markDirty,
+    measureRenderedRows,
+    post,
+    queueRender,
+    reportCursorAndSelection,
+    setupVirtualHeight,
+    shiftCachedLines,
+    state,
+    syncCustomSelectionClass
+});
+
+const {
+    clearPendingRepeatEdit,
+    isModelRepeatKey,
+    isSpaceInputEvent,
+    markLineBoundaryTransition,
+    markNativeBeforeInputHandled,
+    normalizedModelRepeatKey,
+    scheduleModelRepeatEdit,
+    shouldSuppressNativeBeforeInput
+} = createModelRepeatInputHandlers({
+    activeEditableElement,
+    cancelPendingRepeatFollowUps,
+    deleteBackwardAtCaret,
+    deleteForwardAtCaret,
+    focusLine,
+    hasCustomSelection,
+    insertPlainTextByModel,
+    isPlainTextKey,
+    makeEditablePlainText,
+    splitCurrentLine,
+    state
+});
+
+const {
     beginColumnComposition,
     cancelImeBypassTextarea,
     focusImeBypassTextarea,
@@ -1850,6 +1132,34 @@ const {
     setNativeSelectionRangeInElement,
     setupVirtualHeight,
     shiftCachedLines,
+    state,
+    syncCustomSelectionClass,
+    viewport
+});
+
+const {
+    moveCaretHorizontal,
+    moveCaretVertical
+} = createCaretNavigationCommands({
+    caretRectForOffset,
+    changedTextBetween,
+    clearPendingImeSelectionCollapse,
+    commitLine,
+    commitLineForSave,
+    finishColumnComposition,
+    finishRangeComposition,
+    focusLine,
+    getCaretOffset,
+    graphemeDeleteEnd,
+    graphemeDeleteStart,
+    hasCustomSelection,
+    lineTextFromElement,
+    normalizeSelection,
+    offsetFromPointInElement,
+    queueRender,
+    reportCursorAndSelection,
+    scrollContainer,
+    setCaret,
     state,
     syncCustomSelectionClass,
     viewport
@@ -1900,83 +1210,31 @@ const {
     state
 });
 
-function deleteSelectionOrForward() {
-    if (state.readOnly) return;
-    if (hasCustomSelection()) {
-        const sel = normalizeSelection();
-        if (sel) replaceSelectionWith(sel, '');
-        return;
-    }
-
-    const selection = window.getSelection();
-    const element = activeEditableElement();
-    if (element && selection?.rangeCount && element.contains(selection.anchorNode)) {
-        const selected = selection.toString();
-        if (selected) {
-            document.execCommand('delete');
-            commitLine(element);
-            return;
-        }
-    }
-
-    deleteForwardAtCaret(element);
-}
-
-async function cutSelectionToClipboard() {
-    if (state.csvTableEnabled) {
-        return await cutCsvSelectionToClipboard();
-    }
-
-    const text = selectedText();
-    if (!text) return false;
-    const copied = await writeClipboardText(text);
-    if (!copied || state.readOnly) return copied;
-
-    if (hasCustomSelection()) {
-        const sel = normalizeSelection();
-        if (sel) replaceSelectionWith(sel, '');
-        return true;
-    }
-
-    const element = activeEditableElement();
-    const selection = window.getSelection();
-    if (element && selection?.rangeCount && element.contains(selection.anchorNode)) {
-        document.execCommand('delete');
-        commitLine(element);
-    }
-
-    return true;
-}
-
-async function copySelectionToClipboard() {
-    if (state.csvTableEnabled) {
-        return await copyCsvSelectionToClipboard();
-    }
-
-    const text = selectedText();
-    if (!text) return false;
-    return await writeClipboardText(text);
-}
-
-async function pasteFromClipboard() {
-    if (state.readOnly) return;
-    const text = await readClipboardText();
-    if (text) insertTextAtCaret(text);
-}
-
-function selectAll() {
-    const lastLine = state.lineCount;
-    const lastText = state.cache.get(lastLine) || '';
-    const endColumn = lastText.length;
-    state.selectionAnchor = { line: 1, column: 0 };
-    state.selection = { start: { line: 1, column: 0 }, end: { line: lastLine, column: endColumn } };
-    syncCustomSelectionClass();
-    state.currentLine = lastLine;
-    state.currentColumn = endColumn + 1;
-    queueRender(true);
-    setTimeout(() => focusLine(1, 0), 0);
-    reportCursorAndSelection();
-}
+const {
+    copySelectionToClipboard,
+    cutSelectionToClipboard,
+    deleteSelectionOrForward,
+    pasteFromClipboard,
+    selectAll
+} = createClipboardCommandHandlers({
+    activeEditableElement,
+    copyCsvSelectionToClipboard,
+    cutCsvSelectionToClipboard,
+    commitLine,
+    deleteForwardAtCaret,
+    focusLine,
+    hasCustomSelection,
+    insertTextAtCaret,
+    normalizeSelection,
+    queueRender,
+    readClipboardText,
+    replaceSelectionWith,
+    reportCursorAndSelection,
+    selectedText,
+    state,
+    syncCustomSelectionClass,
+    writeClipboardText
+});
 
 export {
     applyMarkdownCommand,
