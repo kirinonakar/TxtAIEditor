@@ -313,6 +313,9 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 event.key === 'Backspace' || event.key === 'Delete') {
                 hideAutocomplete();
             }
+            if ((event.key === ' ' || event.code === 'Space') && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                hideAutocomplete(300);
+            }
             if (event.key === 'ArrowDown') {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -684,7 +687,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
         if ((state.autocompleteOnEnter || state.autocompleteOnTab) && element && element.getAttribute('contenteditable') === 'true') {
             const ignoredKeys = [
                 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-                'Enter', 'Escape', 'Tab', 'Shift', 'Control', 'Alt', 'Meta',
+                'Enter', 'Escape', 'Tab', ' ', 'Shift', 'Control', 'Alt', 'Meta',
                 'CapsLock', 'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete',
                 'Process', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
             ];
