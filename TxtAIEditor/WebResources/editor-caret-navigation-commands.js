@@ -124,6 +124,36 @@ export function createCaretNavigationCommands({
         verticalCaretVisualAnchor = null;
     }
 
+    function samePosition(a, b) {
+        return !!a && !!b && a.line === b.line && a.column === b.column;
+    }
+
+    function selectionFocusPosition(fallbackPosition) {
+        if (!state.selection || !state.selectionAnchor) return fallbackPosition;
+
+        if (samePosition(state.selection.start, state.selectionAnchor) &&
+            !samePosition(state.selection.end, state.selectionAnchor)) {
+            return state.selection.end;
+        }
+
+        if (samePosition(state.selection.end, state.selectionAnchor) &&
+            !samePosition(state.selection.start, state.selectionAnchor)) {
+            return state.selection.start;
+        }
+
+        return state.selection.end || fallbackPosition;
+    }
+
+    function editableElementForLine(lineNumber, fallbackElement) {
+        if (Number(fallbackElement?.dataset?.line || 0) === lineNumber &&
+            fallbackElement.getAttribute?.('contenteditable') === 'true') {
+            return fallbackElement;
+        }
+
+        const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
+        return element?.getAttribute?.('contenteditable') === 'true' ? element : null;
+    }
+
     function visualLineBoundsForElement(element) {
         const textRect = element?.getBoundingClientRect?.();
         const rowRect = element?.closest?.('.line-row')?.getBoundingClientRect?.();
@@ -193,9 +223,20 @@ export function createCaretNavigationCommands({
         if (!element || element.getAttribute('contenteditable') !== 'true') return false;
         if (finishPendingImeBeforeCaretNavigation(element)) return true;
 
-        const lineNumber = Number(element.dataset.line || state.currentLine || 1);
-        const text = lineTextFromElement(element);
-        const caret = Math.max(0, Math.min(getCaretOffset(element), text.length));
+        let lineNumber = Number(element.dataset.line || state.currentLine || 1);
+        let moveElement = element;
+        let text = lineTextFromElement(moveElement);
+        let caret = Math.max(0, Math.min(getCaretOffset(moveElement), text.length));
+
+        if (extendSelection) {
+            const focusPosition = selectionFocusPosition({ line: lineNumber, column: caret });
+            lineNumber = Math.min(Math.max(1, Number(focusPosition.line || lineNumber)), state.lineCount);
+            moveElement = editableElementForLine(lineNumber, element) || moveElement;
+            text = Number(moveElement.dataset.line || 0) === lineNumber
+                ? lineTextFromElement(moveElement)
+                : (state.cache.get(lineNumber) || '');
+            caret = Math.max(0, Math.min(Number(focusPosition.column || 0), text.length));
+        }
 
         const anchor = extendSelection
             ? (state.selectionAnchor || { line: lineNumber, column: caret })
@@ -203,16 +244,17 @@ export function createCaretNavigationCommands({
 
         let target = null;
 
-        let caretRect = caretRectForOffset(element, caret);
+        const hasMoveElement = Number(moveElement?.dataset?.line || 0) === lineNumber;
+        let caretRect = hasMoveElement ? caretRectForOffset(moveElement, caret) : null;
         let preferredX = null;
         let lineStep = state.lineHeight;
         if (!caretRect) {
             target = adjacentLogicalLineTarget(lineNumber, direction, caret, lineStep, caret);
         } else {
-            caretRect = anchoredCaretRectForVerticalMove(element, lineNumber, caret, caretRect);
-            const elementRect = element.getBoundingClientRect();
-            const visualBounds = visualLineBoundsForElement(element) || elementRect;
-            const styles = window.getComputedStyle(element);
+            caretRect = anchoredCaretRectForVerticalMove(moveElement, lineNumber, caret, caretRect);
+            const elementRect = moveElement.getBoundingClientRect();
+            const visualBounds = visualLineBoundsForElement(moveElement) || elementRect;
+            const styles = window.getComputedStyle(moveElement);
             const parsedLineHeight = Number.parseFloat(styles.lineHeight);
             lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || state.lineHeight));
             preferredX = Math.max(elementRect.left + 1, Math.min(caretRect.left, elementRect.right - 1));
@@ -221,7 +263,7 @@ export function createCaretNavigationCommands({
                 : caretRect.bottom + lineStep / 2;
 
             if (targetY >= visualBounds.top - 1 && targetY <= visualBounds.bottom + 1) {
-                const targetColumn = offsetFromPointInElement(element, preferredX, targetY, caretRect, direction, lineStep);
+                const targetColumn = offsetFromPointInElement(moveElement, preferredX, targetY, caretRect, direction, lineStep);
                 if (targetColumn !== null) {
                     target = {
                         line: lineNumber,
@@ -267,7 +309,7 @@ export function createCaretNavigationCommands({
                 state.currentColumn = target.column + 1;
                 syncCustomSelectionClass();
                 if (target.line === lineNumber) {
-                    setCaret(element, target.column, 3 * state.lineHeight);
+                    setCaret(moveElement, target.column, 3 * state.lineHeight);
                 } else {
                     focusLine(target.line, target.column, 3 * state.lineHeight);
                 }
@@ -283,9 +325,21 @@ export function createCaretNavigationCommands({
         if (finishPendingImeBeforeCaretNavigation(element)) return true;
         clearVerticalCaretVisualAnchor();
 
-        const lineNumber = Number(element.dataset.line || state.currentLine || 1);
-        const text = lineTextFromElement(element);
-        const caret = Math.max(0, Math.min(getCaretOffset(element), text.length));
+        let lineNumber = Number(element.dataset.line || state.currentLine || 1);
+        let moveElement = element;
+        let text = lineTextFromElement(moveElement);
+        let caret = Math.max(0, Math.min(getCaretOffset(moveElement), text.length));
+
+        if (extendSelection) {
+            const focusPosition = selectionFocusPosition({ line: lineNumber, column: caret });
+            lineNumber = Math.min(Math.max(1, Number(focusPosition.line || lineNumber)), state.lineCount);
+            moveElement = editableElementForLine(lineNumber, element) || moveElement;
+            text = Number(moveElement.dataset.line || 0) === lineNumber
+                ? lineTextFromElement(moveElement)
+                : (state.cache.get(lineNumber) || '');
+            caret = Math.max(0, Math.min(Number(focusPosition.column || 0), text.length));
+        }
+
         let target = { line: lineNumber, column: caret };
 
         if (!extendSelection && hasCustomSelection()) {

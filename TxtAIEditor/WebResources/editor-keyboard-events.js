@@ -504,7 +504,10 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
         }
 
-        if (document.activeElement && (document.activeElement.closest('#find-panel') || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+        const activeElement = document.activeElement;
+        const isEditorImeBypass = activeElement?.id === 'ime-bypass-textarea';
+        if (activeElement && !isEditorImeBypass &&
+            (activeElement.closest('#find-panel') || activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
             return;
         }
 
