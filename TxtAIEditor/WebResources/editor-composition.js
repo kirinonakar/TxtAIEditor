@@ -691,6 +691,7 @@ function finishColumnComposition(element, lineNumber) {
                 active.dispatchEvent(new KeyboardEvent('keydown', initOpts));
             }
             e.preventDefault();
+            e.stopPropagation();
         }
     }
  
@@ -705,6 +706,24 @@ function finishColumnComposition(element, lineNumber) {
                 updateEditorText(val, false);
             }
         }
+    }
+
+    function cancelImeBypassTextarea() {
+        if (isBypassCompositionActive || state.isComposing) {
+            return false;
+        }
+
+        const wasActive = !!(state.textareaImeBypassActive || bypassSelection || document.activeElement === textareaBypassNode);
+        if (textareaBypassNode) {
+            textareaBypassNode.value = '';
+        }
+
+        bypassSelection = null;
+        bypassPrefix = '';
+        bypassSuffix = '';
+        state.textareaImeBypassActive = false;
+        state.bypassStartLine = null;
+        return wasActive;
     }
 
     function updateEditorText(val, isComposing) {
@@ -808,6 +827,7 @@ function finishColumnComposition(element, lineNumber) {
 
     return {
         beginColumnComposition,
+        cancelImeBypassTextarea,
         focusImeBypassTextarea,
         changedTextBetween,
         clearPendingImeSelectionCollapse,

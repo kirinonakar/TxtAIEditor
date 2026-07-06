@@ -4,6 +4,7 @@ import {
 } from './editor-dom.js';
 import {
     activeEditableElement,
+    clearCustomSelectionVisuals,
     isHangulImeKeyEvent,
     isPlainTextKey,
     lineTop,
@@ -21,6 +22,7 @@ import {
 } from './editor-selection.js';
 import {
     focusImeBypassTextarea,
+    cancelImeBypassTextarea,
     changeLineIndent,
     clearPendingRepeatEdit,
     commitLine,
@@ -162,6 +164,54 @@ export function bindKeyboardEvents({ openFindPanel }) {
             autocompleteNavigationKey = '';
             autocompleteNavigationAt = 0;
         }
+    }
+
+    function clearSelectionBeforeUndoRedo() {
+        cancelImeBypassTextarea();
+
+        const selection = normalizeSelection();
+        const fallbackLine = selection ? selection.start.line : 1;
+        const fallbackColumn = selection ? selection.start.column : 0;
+        const caretLine = Math.min(
+            state.lineCount,
+            Math.max(1, Number(state.currentLine || fallbackLine)));
+        const lineText = state.cache.get(caretLine) || '';
+        const caretColumn = Math.max(
+            0,
+            Math.min(Number(state.currentColumn || fallbackColumn + 1) - 1, lineText.length));
+
+        state.selection = null;
+        state.selectionAnchor = { line: caretLine, column: caretColumn };
+        state.hexSelection = null;
+        state.hexSelectionAnchorOffset = null;
+        state.hexCursorOffset = 0;
+
+        try {
+            window.getSelection()?.removeAllRanges();
+        } catch (e) { }
+
+        clearCustomSelectionVisuals();
+        syncCustomSelectionClass();
+        queueRender(true);
+        setTimeout(() => {
+            if (!state.isComposing && !state.textareaImeBypassActive) {
+                focusLine(caretLine, caretColumn);
+            }
+        }, 0);
+        reportCursorAndSelection();
+    }
+
+    function handleUndoRedoShortcut(event, name) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        hideAutocomplete(700);
+
+        if (state.isComposing) {
+            return;
+        }
+
+        clearSelectionBeforeUndoRedo();
+        post({ type: 'shortcut', name });
     }
 
     function clearKeyboardVerticalRepeatTimer() {
@@ -445,15 +495,11 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 return;
             }
             if (key === 'z') {
-                event.preventDefault();
-                hideAutocomplete(700);
-                post({ type: 'shortcut', name: 'undo' });
+                handleUndoRedoShortcut(event, 'undo');
                 return;
             }
             if (key === 'y') {
-                event.preventDefault();
-                hideAutocomplete(700);
-                post({ type: 'shortcut', name: 'redo' });
+                handleUndoRedoShortcut(event, 'redo');
                 return;
             }
         }

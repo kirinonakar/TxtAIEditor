@@ -1775,6 +1775,7 @@ function deleteCurrentLine(element) {
 
 const {
     beginColumnComposition,
+    cancelImeBypassTextarea,
     focusImeBypassTextarea,
     changedTextBetween,
     clearPendingImeSelectionCollapse,
@@ -1943,6 +1944,7 @@ export {
     applyMarkdownCommand,
     beginColumnComposition,
     beginHostStreamInsert,
+    cancelImeBypassTextarea,
     focusImeBypassTextarea,
     clearPendingImeSelectionCollapse,
     clearPendingRepeatEdit,
