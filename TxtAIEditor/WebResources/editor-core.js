@@ -1209,7 +1209,10 @@ function reportCursorAndSelection(element = document.activeElement) {
     const editable = element && element.closest ? element.closest('.line-text') : null;
     if (editable && document.body.contains(editable)) {
         state.currentLine = Number(editable.dataset.line || state.currentLine);
-        if (editable.getAttribute('contenteditable') === 'true') {
+        if (state.selection && state.selection.end) {
+            state.currentLine = state.selection.end.line;
+            state.currentColumn = state.selection.end.column + 1;
+        } else if (editable.getAttribute('contenteditable') === 'true') {
             state.currentColumn = runtime.getCaretOffset(editable) + 1;
         }
     }
