@@ -52,6 +52,7 @@ import {
     moveAutocompleteActiveIndex,
     triggerAutocomplete
 } from './editor-autocomplete.js';
+import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
 
 export function bindKeyboardEvents({ openFindPanel }) {
     function focusOrSelectHome(extendSelection) {
@@ -291,6 +292,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
     }
 
     document.addEventListener('keydown', event => {
+        cancelPostEditFocusFollowUps();
         const earlyCtrl = event.ctrlKey || event.metaKey;
         const earlyKey = event.key ? event.key.toLowerCase() : '';
         if (earlyCtrl && earlyKey === 's') {

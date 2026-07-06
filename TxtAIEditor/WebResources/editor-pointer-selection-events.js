@@ -28,6 +28,7 @@ import {
     setCaret
 } from './editor-commands.js';
 import { showContextMenu } from './editor-context-menu.js';
+import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
 
 const HEX_BYTES_PER_ROW = 16;
 const LIVE_PREVIEW_DRAG_THRESHOLD_PX = 4;
@@ -759,6 +760,7 @@ export function bindPointerSelectionEvents({
     }, true);
 
     scrollContainer.addEventListener('pointerdown', event => {
+        cancelPostEditFocusFollowUps();
         if (state.csvTableEnabled) return;
         if (event.button !== 0 || findPanel.contains(event.target)) return;
         cancelActiveSelectionInteraction({ render: false });

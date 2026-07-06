@@ -913,6 +913,7 @@ function replaceSelectionWith(selection, text, editSelection = null) {
     for (let i = 1; i < newLines.length; i++) {
         state.cache.set(start.line + i, newLines[i]);
     }
+    state.cacheVersion++;
 
     if (!cleanDirtyMarker(start.line)) {
         markDirty(start.line, 'mod');
@@ -999,7 +1000,9 @@ function replaceSelectionWith(selection, text, editSelection = null) {
         return;
     }
 
+    const replaceEditVersion = state.cacheVersion;
     setTimeout(() => {
+        if (state.cacheVersion !== replaceEditVersion) return;
         if (editSelection) {
             focusLine(targetLine, targetColumn);
             reportCursorAndSelection(null);
