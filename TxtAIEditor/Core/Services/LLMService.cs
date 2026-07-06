@@ -529,11 +529,11 @@ namespace TxtAIEditor.Core.Services
                 .Select(item => item.ToSnapshot())
                 .ToArray();
             var dayBuckets = _tokenUsageDayBuckets.Values
-                .OrderByDescending(item => item.Period)
+                .OrderBy(item => item.Period)
                 .Select(item => item.ToSnapshot())
                 .ToArray();
             var monthBuckets = _tokenUsageMonthBuckets.Values
-                .OrderByDescending(item => item.Period)
+                .OrderBy(item => item.Period)
                 .Select(item => item.ToSnapshot())
                 .ToArray();
 
