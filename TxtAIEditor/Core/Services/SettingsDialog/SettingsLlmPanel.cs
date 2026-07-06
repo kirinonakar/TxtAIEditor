@@ -228,9 +228,9 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(_targetLangCombo);
 
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTokenUsageStatsLabel", "token 통계"));
+            section.Children.Add(_tokenUsageSummaryText);
             section.Children.Add(_tokenUsageStatsButton);
             section.Children.Add(_tokenUsageResetButton);
-            section.Children.Add(_tokenUsageSummaryText);
             return section;
         }
 
