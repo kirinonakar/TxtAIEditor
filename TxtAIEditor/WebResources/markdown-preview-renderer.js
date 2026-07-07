@@ -445,11 +445,11 @@ function collectDisplayMathBlock(startLine, maxLine, getLine) {
             return { pending: true, endLine: line, extendRangeEnd: line };
         }
         if (isDisplayMathClose(text, opener)) {
-            return { text: parts.join('\n'), endLine: line };
+            return { text: parts.join('\n'), endLine: line, closed: true };
         }
         parts.push(text);
     }
-    return { text: parts.join('\n'), endLine: maxLine };
+    return { text: parts.join('\n'), endLine: maxLine, closed: false };
 }
 
 function regexEscape(value) {
@@ -730,6 +730,49 @@ function findMarkdownTableBlockContaining(lineNumber, maxLine, getLine) {
     return null;
 }
 
+function findDisplayMathBlockContaining(lineNumber, maxLine, getLine) {
+    const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), maxLine);
+    let firstKnownLine = targetLine;
+    while (firstKnownLine > 1 && getLine(firstKnownLine - 1) !== undefined) {
+        firstKnownLine--;
+    }
+
+    let opener = '';
+    let startLine = 0;
+    for (let line = firstKnownLine; line <= maxLine; line++) {
+        const text = getLine(line);
+        if (text === undefined) return null;
+
+        if (opener) {
+            if (isDisplayMathClose(text, opener)) {
+                if (targetLine >= startLine && targetLine <= line) {
+                    return {
+                        kind: 'math',
+                        startLine,
+                        endLine: line,
+                        bodyStartLine: startLine + 1,
+                        bodyEndLine: line - 1,
+                        opener
+                    };
+                }
+
+                opener = '';
+                startLine = 0;
+                if (line >= targetLine) return null;
+            }
+            continue;
+        }
+
+        if (line > targetLine) return null;
+        if (isDisplayMathFence(text)) {
+            opener = (text || '').trim();
+            startLine = line;
+        }
+    }
+
+    return null;
+}
+
 function isEditableParagraphLine(line, options = {}) {
     if (!isParagraphLine(String(line ?? ''), options)) return false;
     if (fencedCodeInfo(line)) return false;
@@ -792,6 +835,7 @@ function findEditablePreviewBlockContaining(lineNumber, maxLine, getLine, option
         ? findMarkdownListBlockContaining(lineNumber, maxLine, getLine, options)
         : null) ||
         findFencedCodeBlockContaining(lineNumber, maxLine, getLine) ||
+        findDisplayMathBlockContaining(lineNumber, maxLine, getLine) ||
         findMarkdownTableBlockContaining(lineNumber, maxLine, getLine) ||
         paragraphBlockBoundsAt(lineNumber, maxLine, getLine, options);
 }

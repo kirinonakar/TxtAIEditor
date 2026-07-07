@@ -125,6 +125,24 @@ export function createLivePreviewPositionResolver({
             const { lineOffset, column } = getCodePosition(element, targetNode, targetOffset);
             clickedLine = Math.min(block.endLine, block.bodyStartLine + lineOffset);
             finalColumn = column;
+        } else if (block.kind === 'math') {
+            const bodyStartLine = Math.min(
+                block.endLine,
+                Math.max(block.startLine, Number(block.bodyStartLine || block.startLine + 1)));
+            const bodyEndLine = Math.max(
+                bodyStartLine,
+                Math.min(block.endLine, Number(block.bodyEndLine || block.endLine - 1)));
+            const bodyLineCount = Math.max(1, bodyEndLine - bodyStartLine + 1);
+            const rect = element.getBoundingClientRect();
+            const relativeY = rect.height > 0
+                ? Math.min(0.999, Math.max(0, (event.clientY - rect.top) / rect.height))
+                : 0;
+            clickedLine = Math.min(bodyEndLine, bodyStartLine + Math.floor(relativeY * bodyLineCount));
+
+            const rawLineText = state.cache.get(clickedLine) || '';
+            const offset = getTextOffsetInElement(element, targetNode, targetOffset);
+            const htmlLineText = element.textContent || '';
+            finalColumn = mapHtmlOffsetToRawOffset(rawLineText, htmlLineText, offset);
         } else {
             clickedLine = defaultLine;
             finalColumn = 0;

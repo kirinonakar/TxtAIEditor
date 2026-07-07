@@ -637,6 +637,18 @@ body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-
     background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
 
+.inline-live-preview-enabled .line-row.live-preview-source-math .line-text {
+    padding-left: 12px;
+    padding-right: 12px;
+    overflow-wrap: normal;
+}
+
+.inline-live-preview-enabled .line-row.live-preview-source-math-fence .line-text {
+    color: color-mix(in srgb, var(--fg) 58%, transparent);
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
+    cursor: default;
+}
+
 .inline-live-preview-enabled .line-row.live-preview-source-table .line-text {
     padding-left: 10px;
     padding-right: 10px;
@@ -650,6 +662,10 @@ body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-
 }
 
 body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-code-fence .line-text[contenteditable="true"] {
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
+}
+
+body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-math-fence .line-text[contenteditable="true"] {
     background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
 

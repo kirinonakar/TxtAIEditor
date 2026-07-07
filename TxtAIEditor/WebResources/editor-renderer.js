@@ -289,16 +289,25 @@ function createEditorRenderer({
             let livePreviewAttributes = '';
             if (isEditablePreviewBlockLine) {
                 const blockEdgeClass = `${line === editablePreviewBlock.startLine ? ' live-preview-source-block-start' : ''}${line === editablePreviewBlock.endLine ? ' live-preview-source-block-end' : ''}`;
+                const isMathFenceLine = editablePreviewBlock.kind === 'math' &&
+                    (line < editablePreviewBlock.bodyStartLine || line > editablePreviewBlock.bodyEndLine);
                 const blockMetaClass = editablePreviewBlock.kind === 'code'
                     ? `${line < editablePreviewBlock.bodyStartLine || line > editablePreviewBlock.bodyEndLine ? ' live-preview-source-code-fence' : ''}`
-                    : `${editablePreviewBlock.kind === 'table' && line === editablePreviewBlock.separatorLine ? ' live-preview-source-table-separator' : ''}`;
+                    : editablePreviewBlock.kind === 'math'
+                        ? `${isMathFenceLine ? ' live-preview-source-math-fence' : ''}`
+                        : `${editablePreviewBlock.kind === 'table' && line === editablePreviewBlock.separatorLine ? ' live-preview-source-table-separator' : ''}`;
                 livePreviewClass = ` live-preview-source-block live-preview-source-${editablePreviewBlock.kind}${blockEdgeClass}${blockMetaClass}`;
                 const commonAttributes = ` data-live-preview-block-kind="${editablePreviewBlock.kind}" data-live-preview-block-start="${editablePreviewBlock.startLine}" data-live-preview-block-end="${editablePreviewBlock.endLine}"`;
                 livePreviewAttributes = editablePreviewBlock.kind === 'code'
                     ? `${commonAttributes} data-live-preview-block-body-start="${editablePreviewBlock.bodyStartLine}" data-live-preview-block-body-end="${editablePreviewBlock.bodyEndLine}" data-live-preview-block-language="${escapeHtml(editablePreviewBlock.language || '')}"`
+                    : editablePreviewBlock.kind === 'math'
+                        ? `${commonAttributes} data-live-preview-block-body-start="${editablePreviewBlock.bodyStartLine}" data-live-preview-block-body-end="${editablePreviewBlock.bodyEndLine}" data-live-preview-block-opener="${escapeHtml(editablePreviewBlock.opener || '')}"`
                     : editablePreviewBlock.kind === 'table'
                         ? `${commonAttributes} data-live-preview-block-separator="${editablePreviewBlock.separatorLine}"`
                         : commonAttributes;
+                if (isMathFenceLine) {
+                    liveContentEditable = 'false';
+                }
             }
             const livePreviewOptions = {
                 mode: 'markdown',
@@ -480,6 +489,10 @@ function createEditorRenderer({
             block.bodyStartLine = Number(row.dataset.livePreviewBlockBodyStart || startLine + 1);
             block.bodyEndLine = Number(row.dataset.livePreviewBlockBodyEnd || endLine - 1);
             block.language = row.dataset.livePreviewBlockLanguage || '';
+        } else if (kind === 'math') {
+            block.bodyStartLine = Number(row.dataset.livePreviewBlockBodyStart || startLine + 1);
+            block.bodyEndLine = Number(row.dataset.livePreviewBlockBodyEnd || endLine - 1);
+            block.opener = row.dataset.livePreviewBlockOpener || '';
         } else if (kind === 'table') {
             block.separatorLine = Number(row.dataset.livePreviewBlockSeparator || startLine + 1);
         }
@@ -494,8 +507,18 @@ function createEditorRenderer({
         }
     }
 
+    function editableLineForMathBlock(lineNumber, block) {
+        const bodyStartLine = Math.min(
+            block.endLine,
+            Math.max(block.startLine, Number(block.bodyStartLine || block.startLine + 1)));
+        const bodyEndLine = Math.max(
+            bodyStartLine,
+            Math.min(block.endLine, Number(block.bodyEndLine || block.endLine - 1)));
+        return Math.min(bodyEndLine, Math.max(bodyStartLine, Number(lineNumber || bodyStartLine)));
+    }
+
     function beginInlineLivePreviewEdit(lineNumber, columnZeroBased = 0, options = {}) {
-        const safeLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
+        let safeLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
         const block = findEditablePreviewBlockContaining(
             safeLine,
             state.lineCount,
@@ -503,6 +526,9 @@ function createEditorRenderer({
             {
                 tabSize: state.tabSize || 4
             });
+        if (block?.kind === 'math') {
+            safeLine = editableLineForMathBlock(safeLine, block);
+        }
 
         const text = state.cache.get(safeLine) || '';
         const safeColumn = Math.max(0, Math.min(Number(columnZeroBased || 0), text.length));
