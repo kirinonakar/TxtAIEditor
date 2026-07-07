@@ -3,7 +3,6 @@
     --fg: #d4d4d4;
     --gutter-bg: #252526;
     --gutter-fg: #858585;
-    --row-hover: rgba(127, 127, 127, 0.12);
     --selection: rgba(0, 120, 212, 0.38);
     --preview-code-bg: #2d2d2d;
     --font-family: Consolas, "Courier New", monospace;
@@ -175,16 +174,6 @@ body.wrap-enabled .line-row {
 
 body:not(.wrap-enabled) .line-row {
     width: max-content;
-}
-
-.line-row:hover,
-.line-row.hovered-row {
-    background: var(--row-hover);
-}
-
-body.custom-selection-active .line-row:hover,
-body.custom-selection-active .line-row.hovered-row {
-    background: transparent;
 }
 
 body.csv-table-mode #scroll-container {
@@ -393,11 +382,6 @@ body.csv-table-mode .line-row {
 
 .csv-cell.loading {
     color: var(--gutter-fg);
-}
-
-.csv-row:hover .csv-cell,
-.csv-row.hovered-row .csv-cell {
-    background: color-mix(in srgb, var(--fg) 6%, var(--bg));
 }
 
 .csv-row.selected-csv-row .line-number {
