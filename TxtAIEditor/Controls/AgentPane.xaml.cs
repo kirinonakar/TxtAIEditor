@@ -229,7 +229,7 @@ namespace TxtAIEditor.Controls
         private string _thinkingLineTimestamp = string.Empty;
         private string? _pendingThinkingLabel;
         private DateTimeOffset _lastThinkingLabelRender = DateTimeOffset.MinValue;
-        private const int MaxOutputFlushChars = 12_000;
+        private const int MaxOutputFlushChars = 8_000;
         private const int OutputFlushIntervalMs = 100;
         private const int ThinkingLabelMinIntervalMs = 200;
 
@@ -702,12 +702,14 @@ namespace TxtAIEditor.Controls
             }
 
             _outputScrollQueued = true;
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                _outputScrollQueued = false;
-                ChangeOutputViewToEnd();
-                QueueDeferredOutputScrollToEnd();
-            });
+            DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () =>
+                {
+                    _outputScrollQueued = false;
+                    ChangeOutputViewToEnd();
+                    QueueDeferredOutputScrollToEnd();
+                });
         }
 
         private void QueueDeferredOutputScrollToEnd()

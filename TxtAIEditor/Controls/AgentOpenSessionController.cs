@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 
@@ -30,8 +32,12 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Func<string, Task>? _navigateToFolderAsync;
         private readonly List<AgentOpenSessionState> _openSessions = new();
+        private readonly object _runOutputBufferGate = new();
+        private readonly Dictionary<string, PendingRunOutputBuffer> _pendingRunOutputBuffers = new(StringComparer.Ordinal);
         private string? _pendingCloseSessionId;
         private bool _restoringOpenSession;
+        private const int RunOutputFlushDelayMs = 75;
+        private const int MaxRunOutputFlushChars = 8_000;
 
         public AgentOpenSessionController(
             ISettingsService settingsService,
@@ -437,6 +443,7 @@ namespace TxtAIEditor.Controls
 
         public async Task BeginRunOutputBlockAsync(AgentRunContext context, string title)
         {
+            await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
             {
                 var session = EnsureSession(context.SessionId);
@@ -469,6 +476,7 @@ namespace TxtAIEditor.Controls
 
         public async Task AppendRunActivityAsync(AgentRunContext context, string message)
         {
+            await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
             {
                 var session = EnsureSession(context.SessionId);
@@ -491,18 +499,20 @@ namespace TxtAIEditor.Controls
             });
         }
 
-        public async Task AppendRunOutputTextAsync(AgentRunContext context, string text)
+        public Task AppendRunOutputTextAsync(AgentRunContext context, string text)
         {
             if (string.IsNullOrEmpty(text))
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            await RunOnUIThreadAsync(() => AppendRunOutputTextOnCurrentThread(context, text));
+            QueueRunOutputText(context, text);
+            return Task.CompletedTask;
         }
 
         public async Task AppendRunOutputLineAsync(AgentRunContext context, string line)
         {
+            await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
             {
                 var session = EnsureSession(context.SessionId);
@@ -525,23 +535,31 @@ namespace TxtAIEditor.Controls
             Action activeAction,
             Action<AgentOpenSessionState>? backgroundAction = null)
         {
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                var session = EnsureSession(context.SessionId);
-                if (IsSessionVisible(context.SessionId))
+            _agentPane.DispatcherQueue.TryEnqueue(
+                DispatcherQueuePriority.Low,
+                () =>
                 {
-                    activeAction();
-                }
-                else
-                {
-                    backgroundAction?.Invoke(session);
-                }
-            });
+                    var session = EnsureSession(context.SessionId);
+                    if (IsSessionVisible(context.SessionId))
+                    {
+                        activeAction();
+                    }
+                    else
+                    {
+                        backgroundAction?.Invoke(session);
+                    }
+                });
         }
 
         public Task BeginRunThinkingActivityAsync(AgentRunContext context, string label)
         {
-            return RunOnUIThreadAsync(() =>
+            return BeginRunThinkingActivityCoreAsync(context, label);
+        }
+
+        private async Task BeginRunThinkingActivityCoreAsync(AgentRunContext context, string label)
+        {
+            await FlushQueuedRunOutputTextAsync(context);
+            await RunOnUIThreadAsync(() =>
             {
                 var session = EnsureSession(context.SessionId);
                 if (IsSessionVisible(context.SessionId))
@@ -559,7 +577,13 @@ namespace TxtAIEditor.Controls
 
         public Task StopRunThinkingActivityAsync(AgentRunContext context)
         {
-            return RunOnUIThreadAsync(() =>
+            return StopRunThinkingActivityCoreAsync(context);
+        }
+
+        private async Task StopRunThinkingActivityCoreAsync(AgentRunContext context)
+        {
+            await FlushQueuedRunOutputTextAsync(context);
+            await RunOnUIThreadAsync(() =>
             {
                 var session = EnsureSession(context.SessionId);
                 if (IsSessionVisible(context.SessionId))
@@ -585,7 +609,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            await RunOnUIThreadAsync(() => AppendRunOutputTextOnCurrentThread(context, text));
+            QueueRunOutputText(context, text);
             await afterAppendAsync();
         }
 
@@ -693,6 +717,134 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private void QueueRunOutputText(AgentRunContext context, string text)
+        {
+            lock (_runOutputBufferGate)
+            {
+                PendingRunOutputBuffer buffer = GetOrCreateRunOutputBuffer(context.SessionId);
+                buffer.Context = context;
+                buffer.PendingText.Append(text);
+
+                if (buffer.FlushTask is { IsCompleted: false })
+                {
+                    return;
+                }
+
+                buffer.FlushTask = FlushRunOutputBufferLoopAsync(context.SessionId);
+            }
+        }
+
+        private async Task FlushRunOutputBufferLoopAsync(string sessionId)
+        {
+            await Task.Delay(RunOutputFlushDelayMs);
+
+            while (true)
+            {
+                if (!TryDequeueRunOutputText(sessionId, out AgentRunContext? context, out string text))
+                {
+                    return;
+                }
+
+                if (context != null)
+                {
+                    await RunOnUIThreadAsync(
+                        () => AppendRunOutputTextOnCurrentThread(context, text),
+                        DispatcherQueuePriority.Low);
+                }
+
+                if (TryMarkRunOutputFlushIdleIfEmpty(sessionId))
+                {
+                    return;
+                }
+
+                await Task.Delay(RunOutputFlushDelayMs);
+            }
+        }
+
+        private async Task FlushQueuedRunOutputTextAsync(AgentRunContext context)
+        {
+            while (true)
+            {
+                Task? flushTask;
+                lock (_runOutputBufferGate)
+                {
+                    flushTask = _pendingRunOutputBuffers.TryGetValue(context.SessionId, out PendingRunOutputBuffer? buffer)
+                        ? buffer.FlushTask
+                        : null;
+                }
+
+                if (flushTask != null && !flushTask.IsCompleted)
+                {
+                    await flushTask;
+                    continue;
+                }
+
+                if (!TryDequeueRunOutputText(context.SessionId, out AgentRunContext? bufferedContext, out string text))
+                {
+                    return;
+                }
+
+                await RunOnUIThreadAsync(
+                    () => AppendRunOutputTextOnCurrentThread(bufferedContext ?? context, text),
+                    DispatcherQueuePriority.Low);
+            }
+        }
+
+        private PendingRunOutputBuffer GetOrCreateRunOutputBuffer(string sessionId)
+        {
+            if (_pendingRunOutputBuffers.TryGetValue(sessionId, out PendingRunOutputBuffer? buffer))
+            {
+                return buffer;
+            }
+
+            buffer = new PendingRunOutputBuffer();
+            _pendingRunOutputBuffers[sessionId] = buffer;
+            return buffer;
+        }
+
+        private bool TryDequeueRunOutputText(
+            string sessionId,
+            out AgentRunContext? context,
+            out string text)
+        {
+            lock (_runOutputBufferGate)
+            {
+                if (!_pendingRunOutputBuffers.TryGetValue(sessionId, out PendingRunOutputBuffer? buffer) ||
+                    buffer.PendingText.Length == 0)
+                {
+                    if (buffer != null)
+                    {
+                        buffer.FlushTask = null;
+                    }
+
+                    context = buffer?.Context;
+                    text = string.Empty;
+                    return false;
+                }
+
+                int take = Math.Min(buffer.PendingText.Length, MaxRunOutputFlushChars);
+                text = buffer.PendingText.ToString(0, take);
+                buffer.PendingText.Remove(0, take);
+                context = buffer.Context;
+                return true;
+            }
+        }
+
+        private bool TryMarkRunOutputFlushIdleIfEmpty(string sessionId)
+        {
+            lock (_runOutputBufferGate)
+            {
+                if (!_pendingRunOutputBuffers.TryGetValue(sessionId, out PendingRunOutputBuffer? buffer) ||
+                    buffer.PendingText.Length > 0)
+                {
+                    return false;
+                }
+
+                buffer.FlushTask = null;
+                return true;
+            }
+        }
+
         private string CaptureCurrentWorkspaceRoot()
         {
             return _fileTools.WorkspaceRoot;
@@ -781,10 +933,25 @@ namespace TxtAIEditor.Controls
             session.UpdatedAt = DateTime.Now;
         }
 
-        public Task RunOnUIThreadAsync(Action action)
+        public Task RunOnUIThreadAsync(
+            Action action,
+            DispatcherQueuePriority priority = DispatcherQueuePriority.Normal)
         {
-            var tcs = new TaskCompletionSource();
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            if (_agentPane.DispatcherQueue.HasThreadAccess)
+            {
+                try
+                {
+                    action();
+                    return Task.CompletedTask;
+                }
+                catch (Exception ex)
+                {
+                    return Task.FromException(ex);
+                }
+            }
+
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool queued = _agentPane.DispatcherQueue.TryEnqueue(priority, () =>
             {
                 try
                 {
@@ -796,13 +963,26 @@ namespace TxtAIEditor.Controls
                     tcs.SetException(ex);
                 }
             });
+
+            if (!queued)
+            {
+                tcs.SetException(new InvalidOperationException("Failed to enqueue Agent UI action."));
+            }
+
             return tcs.Task;
         }
 
-        public Task RunOnUIThreadAsync(Func<Task> func)
+        public Task RunOnUIThreadAsync(
+            Func<Task> func,
+            DispatcherQueuePriority priority = DispatcherQueuePriority.Normal)
         {
-            var tcs = new TaskCompletionSource();
-            _agentPane.DispatcherQueue.TryEnqueue(async () =>
+            if (_agentPane.DispatcherQueue.HasThreadAccess)
+            {
+                return func();
+            }
+
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool queued = _agentPane.DispatcherQueue.TryEnqueue(priority, async () =>
             {
                 try
                 {
@@ -814,7 +994,20 @@ namespace TxtAIEditor.Controls
                     tcs.SetException(ex);
                 }
             });
+
+            if (!queued)
+            {
+                tcs.SetException(new InvalidOperationException("Failed to enqueue Agent UI action."));
+            }
+
             return tcs.Task;
+        }
+
+        private sealed class PendingRunOutputBuffer
+        {
+            public StringBuilder PendingText { get; } = new();
+            public AgentRunContext? Context { get; set; }
+            public Task? FlushTask { get; set; }
         }
 
         private static EditorSettings CloneSessionSettings(EditorSettings settings)
