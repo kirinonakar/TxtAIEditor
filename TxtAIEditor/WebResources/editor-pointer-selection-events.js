@@ -26,7 +26,8 @@ import {
     positionFromPointer,
     replaceSelectionWith,
     selectWordAtPointer,
-    setCaret
+    setCaret,
+    setNativeSelectionRangeInElement
 } from './editor-commands.js';
 import { showContextMenu, hideContextMenu } from './editor-context-menu.js';
 import { autocompleteState, hideAutocomplete } from './editor-autocomplete.js';
@@ -611,6 +612,29 @@ export function bindPointerSelectionEvents({
         });
     }
 
+    function syncLivePreviewSourceSelectionFocus(selection = normalizeSelection()) {
+        if (!selection || selection.isColumn || !hasCustomSelection()) return false;
+
+        const focusLine = Math.max(1, Number(state.currentLine || selection.end.line || 1));
+        const focusColumn = Math.max(0, Number(state.currentColumn || 1) - 1);
+        const focusElement = viewport.querySelector(`.line-text[data-line="${focusLine}"]`);
+        if (!isEditablePreviewBlockElement(focusElement)) return false;
+
+        keepEditablePreviewBlockFromElement(focusElement);
+
+        if (selection.start.line === selection.end.line) {
+            const selectionElement = viewport.querySelector(`.line-text[data-line="${selection.start.line}"]`);
+            if (isEditablePreviewBlockElement(selectionElement) &&
+                setNativeSelectionRangeInElement(selectionElement, selection.start.column, selection.end.column)) {
+                state.editingLine = selection.start.line;
+                return true;
+            }
+        }
+
+        setCaret(focusElement, focusColumn);
+        return true;
+    }
+
     function handleLivePreviewPointerMove(event) {
         if (!livePreviewPointer || livePreviewPointer.pointerId !== event.pointerId) {
             return false;
@@ -675,6 +699,7 @@ export function bindPointerSelectionEvents({
                 queueRender(true);
             } else if (pending.sourceBlockSelection) {
                 drawEditableSelectionOverlays();
+                syncLivePreviewSourceSelectionFocus();
             }
             preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
             reportCursorAndSelection(endPosition?.element || document.activeElement);

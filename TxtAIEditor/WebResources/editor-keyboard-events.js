@@ -55,6 +55,15 @@ import {
 import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
 
 export function bindKeyboardEvents({ openFindPanel }) {
+    function hasNativeSelectionInElement(element) {
+        const selection = window.getSelection();
+        if (!element || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
+            return false;
+        }
+
+        return element.contains(selection.anchorNode) && element.contains(selection.focusNode);
+    }
+
     function focusOrSelectHome(extendSelection) {
         const targetLine = 1;
         const targetColumn = 0;
@@ -626,6 +635,10 @@ export function bindKeyboardEvents({ openFindPanel }) {
         }
 
         if (isPlainTextKey(event)) {
+            if (hasCustomSelection() && hasNativeSelectionInElement(element)) {
+                return;
+            }
+
             event.preventDefault();
             markNativeBeforeInputHandled(['insertText'], 120);
             scheduleModelRepeatEdit(normalizedModelRepeatKey(event), event.repeat);

@@ -1287,6 +1287,7 @@ export {
     selectAll,
     selectWordAtPointer,
     setCaret,
+    setNativeSelectionRangeInElement,
     shouldSuppressNativeBeforeInput,
     splitCurrentLine,
     toggleComment,

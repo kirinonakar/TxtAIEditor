@@ -116,7 +116,23 @@ function drawEditableSelectionOverlays() {
         drawEditableSelectionRangeOverlay(element, start, end);
     }
 
+    drawSelectionFocusCaretOverlay(selection);
     drawImeBypassCaretOverlay();
+}
+
+function drawSelectionFocusCaretOverlay(selection) {
+    if (!selection || selection.isColumn || !hasCustomSelection() || state.textareaImeBypassActive) {
+        return;
+    }
+
+    const line = Math.max(1, Number(state.currentLine || selection.end.line || 1));
+    const column = Math.max(0, Number(state.currentColumn || 1) - 1);
+    if (!isPositionInsideSelection({ line, column })) return;
+
+    const element = viewport.querySelector(`.line-text[data-line="${line}"]`);
+    if (!element) return;
+
+    drawCaretOverlay(element, column, 1, 'selection-caret-overlay');
 }
 
 function drawEditableSelectionRangeOverlay(element, start, end) {
