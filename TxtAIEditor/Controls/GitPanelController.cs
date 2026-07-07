@@ -1049,11 +1049,12 @@ namespace TxtAIEditor.Controls
             else if (status.Contains("A")) statusDesc = isStaged ? "Added staged" : "Added";
             else if (isStaged && isUnstaged) statusDesc = "Staged + Unstaged";
 
+            string displayStatus = status == "??" ? "U" : status.Trim();
             return new GitFileItem
             {
                 Name = GetDisplayName(fullPath),
                 Path = fullPath,
-                StatusText = $"{statusDesc} ({status.Trim()})",
+                StatusText = $"{statusDesc} ({displayStatus})",
                 ActionGlyph = isStaged ? "\xE108" : "\xE109",
                 IsStaged = isStaged
             };
