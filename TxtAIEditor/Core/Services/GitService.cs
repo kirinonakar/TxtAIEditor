@@ -12,6 +12,8 @@ namespace TxtAIEditor.Core.Services
 {
     public class GitService : IGitService
     {
+        private static readonly Lazy<string> GitExecutablePath = new(ResolveGitExecutablePath);
+
         public string? FindRepositoryRoot(string? startPath)
         {
             if (string.IsNullOrEmpty(startPath))
@@ -72,7 +74,7 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        public async Task<Dictionary<string, string>> GetFileStatusesAsync(string repoPath)
+        public async Task<Dictionary<string, string>> GetFileStatusesAsync(string repoPath, bool includeAllUntrackedFiles = false)
         {
             var statuses = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(repoPath) || !Directory.Exists(repoPath))
@@ -80,7 +82,14 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                string output = await RunGitCommandAsync(repoPath, "status --porcelain=v1 -z --ignored");
+                string workingDir = FindRepositoryRoot(repoPath) ?? repoPath;
+                if (!Directory.Exists(workingDir))
+                    return statuses;
+
+                string command = includeAllUntrackedFiles
+                    ? "status --porcelain=v1 -z --ignored --untracked-files=all"
+                    : "status --porcelain=v1 -z --ignored";
+                string output = await RunGitCommandAsync(workingDir, command);
                 if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                     return statuses;
 
@@ -102,7 +111,7 @@ namespace TxtAIEditor.Core.Services
 
                         if (!string.IsNullOrEmpty(relativePath))
                         {
-                            string fullPath = Path.GetFullPath(Path.Combine(repoPath, relativePath));
+                            string fullPath = Path.GetFullPath(Path.Combine(workingDir, relativePath));
                             statuses[fullPath] = status;
                         }
                     }
@@ -140,11 +149,50 @@ namespace TxtAIEditor.Core.Services
             return path.Replace("\"", "\\\"");
         }
 
+        private static string ResolveGitExecutablePath()
+        {
+            var candidates = new List<string>();
+
+            AddGitCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
+            AddGitCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86));
+            AddGitCandidate(candidates, Environment.GetEnvironmentVariable("ProgramW6432"));
+            AddGitCandidate(candidates, Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Programs"));
+
+            return candidates
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(File.Exists)
+                ?? "git";
+        }
+
+        private static void AddGitCandidate(List<string> candidates, string? basePath)
+        {
+            if (string.IsNullOrWhiteSpace(basePath))
+            {
+                return;
+            }
+
+            candidates.Add(Path.Combine(basePath, "Git", "cmd", "git.exe"));
+            candidates.Add(Path.Combine(basePath, "Git", "bin", "git.exe"));
+        }
+
+        private static string BuildGitFailureOutput(string error, string output)
+        {
+            string message = !string.IsNullOrWhiteSpace(error)
+                ? error
+                : output;
+
+            return string.IsNullOrWhiteSpace(message)
+                ? "fatal: git command failed."
+                : $"fatal: {message}";
+        }
+
         public async Task<string> RunGitCommandAsync(string workingDir, string arguments)
         {
             var startInfo = new ProcessStartInfo
             {
-                FileName = "git",
+                FileName = GitExecutablePath.Value,
                 Arguments = $"-c core.quotepath=false {arguments}",
                 WorkingDirectory = workingDir,
                 RedirectStandardOutput = true,
@@ -163,15 +211,17 @@ namespace TxtAIEditor.Core.Services
                 try
                 {
                     process.Start();
-                    string output = await process.StandardOutput.ReadToEndAsync();
-                    string error = await process.StandardError.ReadToEndAsync();
-                    
-                    // We must wait for exit to ensure cleanup
-                    await process.WaitForExitAsync();
-                    
+                    Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+                    Task<string> errorTask = process.StandardError.ReadToEndAsync();
+                    Task waitTask = process.WaitForExitAsync();
+
+                    await Task.WhenAll(outputTask, errorTask, waitTask);
+
+                    string output = await outputTask;
+                    string error = await errorTask;
                     if (process.ExitCode != 0)
                     {
-                        return $"fatal: {error}";
+                        return BuildGitFailureOutput(error, output);
                     }
 
                     return output;
@@ -288,8 +338,12 @@ namespace TxtAIEditor.Core.Services
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
-            string output = await RunGitCommandAsync(repoPath, "add -A");
-            return !output.StartsWith("fatal:");
+            string workingDir = FindRepositoryRoot(repoPath) ?? repoPath;
+            if (!Directory.Exists(workingDir))
+                return false;
+
+            string output = await RunGitCommandAsync(workingDir, "add -A");
+            return !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<bool> UnstageFileAsync(string repoPath, string filePath)

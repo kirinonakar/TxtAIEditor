@@ -28,7 +28,7 @@ namespace TxtAIEditor.Core.Services
             string branch = await _gitService.GetCurrentBranchAsync(repoPath);
             var branches = await _gitService.GetBranchesAsync(repoPath);
             var history = await _gitService.GetRecentHistoryAsync(repoPath);
-            var fileStatuses = await _gitService.GetFileStatusesAsync(repoPath);
+            var fileStatuses = await _gitService.GetFileStatusesAsync(repoPath, includeAllUntrackedFiles: true);
             var files = new List<GitFileItem>();
 
             foreach (var kvp in fileStatuses)

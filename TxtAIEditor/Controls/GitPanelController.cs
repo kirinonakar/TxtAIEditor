@@ -112,6 +112,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            repoPath = _gitService.FindRepositoryRoot(repoPath) ?? repoPath;
             string branch = await _gitService.GetCurrentBranchAsync(repoPath);
             bool isGitNotDetected = GitBranchStatus.IsNotDetected(branch);
             string localizedBranch = isGitNotDetected ? GetGitNotDetectedText() : branch;
@@ -119,7 +120,7 @@ namespace TxtAIEditor.Controls
             // Fetch everything asynchronously first to avoid race conditions and UI flickering
             var branchesTask = _gitService.GetBranchesAsync(repoPath);
             var historyTask = _gitService.GetRecentHistoryAsync(repoPath, GitHistoryBatchSize);
-            var fileStatusesTask = _gitService.GetFileStatusesAsync(repoPath);
+            var fileStatusesTask = _gitService.GetFileStatusesAsync(repoPath, includeAllUntrackedFiles: true);
             var unpushedCountTask = _gitService.GetUnpushedCommitCountAsync(repoPath);
 
             await Task.WhenAll(branchesTask, historyTask, fileStatusesTask, unpushedCountTask);
