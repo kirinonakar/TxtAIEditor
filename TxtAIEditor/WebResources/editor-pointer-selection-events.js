@@ -1223,11 +1223,6 @@ export function bindPointerSelectionEvents({
     }
 
     function updateSelectionAutoScrollPointer(event) {
-        if (state.wordWrap) {
-            stopSelectionAutoScroll();
-            return;
-        }
-
         selectionAutoScrollPointer = {
             clientX: event.clientX,
             clientY: event.clientY,
@@ -1252,18 +1247,33 @@ export function bindPointerSelectionEvents({
         const edge = 44;
         const maxStep = 36;
         const x = selectionAutoScrollPointer.clientX;
+        const y = selectionAutoScrollPointer.clientY;
         let dx = 0;
+        let dy = 0;
 
-        if (x > rect.right - edge) {
-            dx = Math.ceil(Math.min(1, (x - (rect.right - edge)) / edge) * maxStep);
-        } else if (x < rect.left + edge) {
-            dx = -Math.ceil(Math.min(1, ((rect.left + edge) - x) / edge) * maxStep);
+        if (!state.wordWrap && scrollContainer.scrollWidth > scrollContainer.clientWidth + 1) {
+            if (x > rect.right - edge) {
+                dx = Math.ceil(Math.min(1, (x - (rect.right - edge)) / edge) * maxStep);
+            } else if (x < rect.left + edge) {
+                dx = -Math.ceil(Math.min(1, ((rect.left + edge) - x) / edge) * maxStep);
+            }
         }
 
-        if (dx !== 0) {
-            const before = scrollContainer.scrollLeft;
-            scrollContainer.scrollLeft = Math.max(0, before + dx);
-            if (scrollContainer.scrollLeft !== before) {
+        if (scrollContainer.scrollHeight > scrollContainer.clientHeight + 1) {
+            if (y > rect.bottom - edge) {
+                dy = Math.ceil(Math.min(1, (y - (rect.bottom - edge)) / edge) * maxStep);
+            } else if (y < rect.top + edge) {
+                dy = -Math.ceil(Math.min(1, ((rect.top + edge) - y) / edge) * maxStep);
+            }
+        }
+
+        if (dx !== 0 || dy !== 0) {
+            const beforeLeft = scrollContainer.scrollLeft;
+            const beforeTop = scrollContainer.scrollTop;
+            scrollContainer.scrollLeft = Math.max(0, beforeLeft + dx);
+            const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+            scrollContainer.scrollTop = Math.min(maxScrollTop, Math.max(0, beforeTop + dy));
+            if (scrollContainer.scrollLeft !== beforeLeft || scrollContainer.scrollTop !== beforeTop) {
                 updateSelectionFromPointer(selectionAutoScrollPointer);
             }
         }
