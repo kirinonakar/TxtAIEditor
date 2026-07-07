@@ -78,6 +78,9 @@ function selectionBoundsForLine(lineNumber, textLength) {
 
 function drawEditableSelectionOverlays() {
     viewport.querySelectorAll('.editable-selection-overlay').forEach(el => el.remove());
+    viewport.querySelectorAll('.line-row.selected-row, .line-row.selected-empty-row').forEach(row => {
+        row.classList.remove('selected-row', 'selected-empty-row');
+    });
 
     const selection = normalizeSelection();
     if (!selection || !hasCustomSelection()) {
@@ -95,17 +98,21 @@ function drawEditableSelectionOverlays() {
 
         const start = Math.max(0, Math.min(bounds.start, text.length));
         const end = Math.max(0, Math.min(bounds.end, text.length));
+        const row = element.closest('.line-row');
 
         if (start === end && selection.isColumn) {
+            row?.classList.add('selected-row');
             drawEditableColumnCursorOverlay(element, start);
             continue;
         }
 
         if (start === end && text.length === 0) {
+            row?.classList.add('selected-row', 'selected-empty-row');
             drawEditableEmptyLineSelectionOverlay(element);
             continue;
         }
 
+        row?.classList.add('selected-row');
         drawEditableSelectionRangeOverlay(element, start, end);
     }
 
@@ -135,10 +142,14 @@ function drawEditableSelectionRangeOverlay(element, start, end) {
     const endBoundary = caretBoundaryRect(element, safeEnd, true);
     const sameVisualRow = (a, b) => a && b && Math.abs(a.top - b.top) < 2;
     const rects = [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0);
+    const normalizeLineBox = shouldNormalizeSelectionLineBox(row);
+    const overlayRects = [];
 
     for (const rect of rects) {
         let left = rect.left;
         let right = rect.right;
+        let top = rect.top;
+        let height = rect.height;
 
         if (sameVisualRow(rect, startBoundary)) {
             left = Math.max(left, startBoundary.left);
@@ -148,11 +159,57 @@ function drawEditableSelectionRangeOverlay(element, start, end) {
         }
 
         if (right > left) {
-            appendEditableSelectionOverlay(row, left - rowRect.left, rect.top - rowRect.top, right - left, rect.height);
+            if (normalizeLineBox) {
+                const lineBox = selectionLineBoxForRect(element, rect);
+                top = lineBox.top;
+                height = lineBox.height;
+            }
+
+            overlayRects.push({ left, right, top, height });
         }
     }
 
+    appendMergedSelectionOverlays(row, rowRect, overlayRects);
+
     range.detach?.();
+}
+
+function shouldNormalizeSelectionLineBox(row) {
+    return row?.classList?.contains('live-preview-source-block') ||
+        row?.classList?.contains('live-preview-source-line');
+}
+
+function selectionLineBoxForRect(element, rect) {
+    const elementRect = element.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(element);
+    const parsedLineHeight = Number.parseFloat(computedStyle.lineHeight);
+    const lineHeight = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : state.lineHeight);
+    const visualLineIndex = Math.max(0, Math.round((rect.top - elementRect.top) / lineHeight));
+
+    return {
+        top: elementRect.top + (visualLineIndex * lineHeight),
+        height: lineHeight
+    };
+}
+
+function appendMergedSelectionOverlays(row, rowRect, rects) {
+    const merged = [];
+    const sorted = [...rects].sort((a, b) => a.top - b.top || a.left - b.left);
+
+    for (const rect of sorted) {
+        const last = merged[merged.length - 1];
+        if (last && Math.abs(last.top - rect.top) < 1 && Math.abs(last.height - rect.height) < 1) {
+            last.left = Math.min(last.left, rect.left);
+            last.right = Math.max(last.right, rect.right);
+            continue;
+        }
+
+        merged.push({ ...rect });
+    }
+
+    for (const rect of merged) {
+        appendEditableSelectionOverlay(row, rect.left - rowRect.left, rect.top - rowRect.top, rect.right - rect.left, rect.height);
+    }
 }
 
 function textPositionsForOffsets(element, start, end) {

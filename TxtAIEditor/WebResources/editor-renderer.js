@@ -283,7 +283,12 @@ function createEditorRenderer({
                 !state.inlineLivePreviewEnabled ||
                 state.isComposing ||
                 !hasLine;
-            let lineContent = renderLineContent(line, displayText, false, isEditablePreviewBlockLine);
+            const isInlineLivePreviewSourceLine = state.inlineLivePreviewEnabled &&
+                hasLine &&
+                shouldShowSource &&
+                !isLong &&
+                !state.isComposing;
+            let lineContent = renderLineContent(line, displayText, false, isInlineLivePreviewSourceLine);
             let livePreviewClass = '';
             let liveContentEditable = contentEditable;
             let livePreviewAttributes = '';
@@ -308,6 +313,8 @@ function createEditorRenderer({
                 if (isMathFenceLine) {
                     liveContentEditable = 'false';
                 }
+            } else if (isInlineLivePreviewSourceLine) {
+                livePreviewClass = ' live-preview-source-line';
             }
             const livePreviewOptions = {
                 mode: 'markdown',

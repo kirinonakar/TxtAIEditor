@@ -673,6 +673,14 @@ body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-
     background: color-mix(in srgb, var(--fg) 11%, transparent);
 }
 
+body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-block.selected-row .line-text[contenteditable="true"] {
+    background: transparent;
+}
+
+body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-line.selected-row .line-text[contenteditable="true"] {
+    background: transparent;
+}
+
 .inline-live-preview-enabled .line-row.live-preview-source-list .line-text {
     padding-left: 10px;
     padding-right: 10px;
@@ -840,6 +848,11 @@ mark.active-match {
     color: inherit;
 }
 
+body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-block .selection-fragment,
+body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-line .selection-fragment {
+    background: transparent;
+}
+
 .editable-selection-overlay {
     position: absolute;
     z-index: 0;
@@ -860,8 +873,9 @@ mark.active-match {
     background: var(--selection);
 }
 
-.inline-live-preview-enabled .line-row.live-preview-source-block .editable-selection-overlay {
-    z-index: 2;
+.inline-live-preview-enabled .line-row.live-preview-source-block .editable-selection-overlay,
+.inline-live-preview-enabled .line-row.live-preview-source-line .editable-selection-overlay {
+    z-index: 0;
     background: var(--selection);
 }
 
