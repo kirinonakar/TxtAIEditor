@@ -1140,6 +1140,16 @@ export function bindPointerSelectionEvents({
 
     let selectionAutoScrollFrame = 0;
     let selectionAutoScrollPointer = null;
+    let selectionWheelUpdateSeq = 0;
+
+    function selectionPointerSnapshot(event) {
+        return {
+            clientX: event.clientX,
+            clientY: event.clientY,
+            altKey: event.altKey,
+            target: null
+        };
+    }
 
     function updateSelectionFromPointer(event) {
         const position = positionFromPointer(event);
@@ -1223,16 +1233,38 @@ export function bindPointerSelectionEvents({
     }
 
     function updateSelectionAutoScrollPointer(event) {
-        selectionAutoScrollPointer = {
-            clientX: event.clientX,
-            clientY: event.clientY,
-            altKey: event.altKey,
-            target: event.target
-        };
+        selectionAutoScrollPointer = selectionPointerSnapshot(event);
 
         if (!selectionAutoScrollFrame) {
             selectionAutoScrollFrame = requestAnimationFrame(runSelectionAutoScroll);
         }
+    }
+
+    function scheduleSelectionUpdateAfterWheel(event) {
+        const pointer = selectionPointerSnapshot(event);
+        selectionAutoScrollPointer = pointer;
+        const seq = ++selectionWheelUpdateSeq;
+
+        setTimeout(() => {
+            requestAnimationFrame(() => {
+                updateSelectionFromWheelPointer(pointer, seq);
+                requestAnimationFrame(() => updateSelectionFromWheelPointer(pointer, seq));
+            });
+        }, 0);
+    }
+
+    function updateSelectionFromWheelPointer(pointer, seq) {
+        if (seq !== selectionWheelUpdateSeq ||
+            selectionAutoScrollPointer !== pointer ||
+            livePreviewPointer ||
+            isHexView() ||
+            !state.isSelecting ||
+            state.isDragMoving ||
+            state.isDragPotential) {
+            return;
+        }
+
+        updateSelectionFromPointer(pointer);
     }
 
     function runSelectionAutoScroll() {
@@ -1371,8 +1403,17 @@ export function bindPointerSelectionEvents({
         }
     });
 
-    scrollContainer.addEventListener('wheel', () => {
+    scrollContainer.addEventListener('wheel', event => {
         cancelOpenableHoverValidation();
+        if (!livePreviewPointer &&
+            !isHexView() &&
+            state.isSelecting &&
+            !state.isDragPotential &&
+            !state.isDragMoving) {
+            scheduleSelectionUpdateAfterWheel(event);
+            return;
+        }
+
         cancelLivePreviewPointer({ render: false });
         cancelActiveSelectionInteraction({ render: false });
     }, { capture: true });
