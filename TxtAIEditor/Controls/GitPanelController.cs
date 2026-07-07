@@ -16,6 +16,10 @@ namespace TxtAIEditor.Controls
     public sealed class GitPanelController
     {
         private const int GitHistoryBatchSize = 50;
+        private const double GitCommitDialogWidth = 780;
+        private const double GitCommitDialogContentWidth = 700;
+        private const double GitCommitInfoMaxHeight = 130;
+        private const double GitCommitChangedFilesHeight = 220;
 
         public event EventHandler<string>? FileRestored;
 
@@ -879,7 +883,10 @@ namespace TxtAIEditor.Controls
                 Title = string.Format(_getString("GitHistoryItemDialogTitle", "커밋 정보 [{0}]"), hash.Substring(0, 7)),
                 CloseButtonText = _getString("GitHistoryItemClose", "닫기"),
                 XamlRoot = _xamlRootProvider(),
-                RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light
+                RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light,
+                Width = GitCommitDialogWidth,
+                MinWidth = GitCommitDialogWidth,
+                MaxWidth = GitCommitDialogWidth
             };
 
             string currentHash = hash;
@@ -892,10 +899,20 @@ namespace TxtAIEditor.Controls
                     await OpenCommitFileCompareAsync(repoPath, currentHash, file.Status, file.Path);
                 });
 
-            var stack = new StackPanel { Spacing = 2 };
+            var stack = new StackPanel
+            {
+                Spacing = 2,
+                Width = GitCommitDialogContentWidth,
+                MaxWidth = GitCommitDialogContentWidth
+            };
             stack.Children.Add(new ScrollViewer
             {
-                MaxHeight = 130,
+                Width = GitCommitDialogContentWidth,
+                MaxWidth = GitCommitDialogContentWidth,
+                MaxHeight = GitCommitInfoMaxHeight,
+                HorizontalScrollMode = ScrollMode.Enabled,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollMode = ScrollMode.Enabled,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 Margin = new Thickness(0, 0, 0, 8),
                 Content = new TextBlock
@@ -903,7 +920,7 @@ namespace TxtAIEditor.Controls
                     Text = commitInfo,
                     FontFamily = new FontFamily("Consolas"),
                     FontSize = 13,
-                    TextWrapping = TextWrapping.Wrap
+                    TextWrapping = TextWrapping.NoWrap
                 }
             });
             stack.Children.Add(new TextBlock
@@ -928,7 +945,9 @@ namespace TxtAIEditor.Controls
         {
             var fileListView = new ListView
             {
-                Height = 220,
+                Width = GitCommitDialogContentWidth,
+                MaxWidth = GitCommitDialogContentWidth,
+                Height = GitCommitChangedFilesHeight,
                 SelectionMode = ListViewSelectionMode.Single,
                 Margin = new Thickness(0, 5, 0, 0)
             };

@@ -844,17 +844,31 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                string output = await RunGitCommandAsync(repoPath, $"diff-tree --no-commit-id --name-status -r {commitHash}");
+                string workingDir = FindRepositoryRoot(repoPath) ?? repoPath;
+                if (!Directory.Exists(workingDir))
+                    return list;
+
+                string output = await RunGitCommandAsync(workingDir, $"diff-tree --root --no-commit-id --name-status -r --find-renames {commitHash}");
                 if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:"))
                     return list;
 
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var line in lines)
                 {
                     var parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length >= 2)
                     {
-                        list.Add((parts[0].Trim(), parts[1].Trim().Replace('/', '\\')));
+                        string status = parts[0].Trim();
+                        string path = parts.Length >= 3 && (status.StartsWith("R", StringComparison.OrdinalIgnoreCase) || status.StartsWith("C", StringComparison.OrdinalIgnoreCase))
+                            ? parts[2]
+                            : parts[1];
+                        string normalizedPath = NormalizeStatusPath(path.Trim());
+                        string key = $"{status}\t{normalizedPath}";
+                        if (seen.Add(key))
+                        {
+                            list.Add((status, normalizedPath));
+                        }
                     }
                 }
             }
