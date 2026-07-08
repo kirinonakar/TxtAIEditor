@@ -61,9 +61,11 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Live Renderer:** View Markdown, HTML, Aozora or LaTeX (powered by KaTeX) in a split view or an external browser.
 *   **Inline Live Preview:** Renders Markdown elements (headers, lists, tables, code blocks, images) directly within the editor area. Non-active lines transition into their styled preview form, and automatically revert to raw source text when focused or edited for a seamless WYSIWYG-like experience.
 
-### 📄 Office Document Viewer
-*   **Document Preview:** Preview PDF, DOCX, PPTX, HWPX, and XLSX files directly inside TxtAIEditor without leaving the workspace.
-*   **Unified Viewer Workflow:** Open supported office documents from the Explorer or editor tabs and inspect their contents alongside the rest of your project files.
+### 🖼️ Integrated Media & Document Viewer
+*   **Unified Viewer Workflow:** Open and inspect images, office documents, audio, and video files directly from the Explorer or editor tabs alongside your project files.
+*   **Image Viewer:** View popular image formats (`.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.ico`, `.webp`) seamlessly within the editor space.
+*   **Document Viewer:** Preview PDFs (`.pdf`) and common Office documents (`.docx`, `.pptx`, `.xlsx`, `.hwpx`, `.doc`, `.xls`, `.ppt`) in a clean, read-only viewer.
+*   **Audio & Video Player:** Listen to audio (`.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.wma`, `.ogg`, `.oga`, `.opus`) and watch videos (`.mp4`, `.m4v`, `.mov`, `.wmv`, `.avi`, `.mkv`, `.webm`, `.mpeg`, `.mpg`) with native, integrated media playback controls.
 
 ### 🔍 Read-Only Hex Viewer
 *   **Binary Inspection:** View raw binary content in a side-by-side layout (Offset, Hex bytes, and ASCII representation).
