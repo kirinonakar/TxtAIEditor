@@ -11,6 +11,8 @@ namespace TxtAIEditor.Controls
 {
     public sealed class TabDirtyStateController
     {
+        private const int MaxDirtyDiffCells = 4_000_000;
+
         private readonly MainWindowViewModel _viewModel;
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
@@ -152,33 +154,212 @@ namespace TxtAIEditor.Controls
 
         private static Dictionary<int, string> ComputeDirtyLines(OpenedTab tab, EditorDocumentSession session)
         {
-            var markers = new Dictionary<int, string>();
-            if (tab.OriginalContent == null) return markers;
-
             var orig = tab.OriginalLines;
             var current = session.Model.GetLines(1, session.Model.LineCount);
+            return ComputeDirtyLines(orig, current);
+        }
 
+        internal static Dictionary<int, string> ComputeDirtyLines(IReadOnlyList<string> orig, IReadOnlyList<string> current)
+        {
+            var markers = new Dictionary<int, string>();
             int prefixMatchCount = 0;
-            int maxPrefix = Math.Min(orig.Length, current.Count);
+            int maxPrefix = Math.Min(orig.Count, current.Count);
             while (prefixMatchCount < maxPrefix && orig[prefixMatchCount] == current[prefixMatchCount])
             {
                 prefixMatchCount++;
             }
 
             int suffixMatchCount = 0;
-            int maxSuffix = Math.Min(orig.Length - prefixMatchCount, current.Count - prefixMatchCount);
+            int maxSuffix = Math.Min(orig.Count - prefixMatchCount, current.Count - prefixMatchCount);
             while (suffixMatchCount < maxSuffix &&
-                   orig[orig.Length - 1 - suffixMatchCount] == current[current.Count - 1 - suffixMatchCount])
+                   orig[orig.Count - 1 - suffixMatchCount] == current[current.Count - 1 - suffixMatchCount])
             {
                 suffixMatchCount++;
             }
 
-            int unmatchedOrigCount = orig.Length - prefixMatchCount - suffixMatchCount;
+            int unmatchedOrigCount = orig.Count - prefixMatchCount - suffixMatchCount;
             int unmatchedCurrentCount = current.Count - prefixMatchCount - suffixMatchCount;
+            int limitOrig = orig.Count - suffixMatchCount;
+            int limitCurr = current.Count - suffixMatchCount;
+
+            if (unmatchedOrigCount == 0)
+            {
+                for (int line = prefixMatchCount; line < limitCurr; line++)
+                {
+                    markers[line + 1] = "add";
+                }
+
+                return markers;
+            }
+
+            if (unmatchedCurrentCount == 0)
+            {
+                MarkDeletion(markers, prefixMatchCount, 0, current.Count);
+                return markers;
+            }
+
+            long cellCount = (long)unmatchedOrigCount * unmatchedCurrentCount;
+            if (cellCount <= MaxDirtyDiffCells)
+            {
+                var matches = ComputeLcsMatches(orig, prefixMatchCount, limitOrig, current, prefixMatchCount, limitCurr);
+                int previousOrig = prefixMatchCount;
+                int previousCurrent = prefixMatchCount;
+
+                foreach (var (origIndex, currentIndex) in matches)
+                {
+                    AddDirtyMarkersForGap(
+                        markers,
+                        previousOrig,
+                        origIndex,
+                        previousCurrent,
+                        currentIndex,
+                        current.Count);
+                    previousOrig = origIndex + 1;
+                    previousCurrent = currentIndex + 1;
+                }
+
+                AddDirtyMarkersForGap(
+                    markers,
+                    previousOrig,
+                    limitOrig,
+                    previousCurrent,
+                    limitCurr,
+                    current.Count);
+
+                return markers;
+            }
+
+            return ComputeDirtyLinesGreedy(
+                orig,
+                current,
+                prefixMatchCount,
+                suffixMatchCount,
+                unmatchedOrigCount,
+                unmatchedCurrentCount);
+        }
+
+        private static List<(int OrigIndex, int CurrentIndex)> ComputeLcsMatches(
+            IReadOnlyList<string> orig,
+            int origStart,
+            int origEnd,
+            IReadOnlyList<string> current,
+            int currentStart,
+            int currentEnd)
+        {
+            int origCount = origEnd - origStart;
+            int currentCount = currentEnd - currentStart;
+            var table = new int[origCount + 1, currentCount + 1];
+
+            for (int oi = origCount - 1; oi >= 0; oi--)
+            {
+                for (int ci = currentCount - 1; ci >= 0; ci--)
+                {
+                    table[oi, ci] = orig[origStart + oi] == current[currentStart + ci]
+                        ? table[oi + 1, ci + 1] + 1
+                        : Math.Max(table[oi + 1, ci], table[oi, ci + 1]);
+                }
+            }
+
+            var matches = new List<(int OrigIndex, int CurrentIndex)>();
+            int o = 0;
+            int c = 0;
+            while (o < origCount && c < currentCount)
+            {
+                if (orig[origStart + o] == current[currentStart + c])
+                {
+                    matches.Add((origStart + o, currentStart + c));
+                    o++;
+                    c++;
+                }
+                else if (table[o + 1, c] >= table[o, c + 1])
+                {
+                    o++;
+                }
+                else
+                {
+                    c++;
+                }
+            }
+
+            return matches;
+        }
+
+        private static void AddDirtyMarkersForGap(
+            Dictionary<int, string> markers,
+            int origStart,
+            int origEnd,
+            int currentStart,
+            int currentEnd,
+            int currentLineCount)
+        {
+            int deletedCount = origEnd - origStart;
+            int insertedCount = currentEnd - currentStart;
+            if (deletedCount <= 0 && insertedCount <= 0)
+            {
+                return;
+            }
+
+            int modifiedCount = Math.Min(deletedCount, insertedCount);
+            for (int i = 0; i < modifiedCount; i++)
+            {
+                markers[currentStart + i + 1] = "mod";
+            }
+
+            for (int i = modifiedCount; i < insertedCount; i++)
+            {
+                markers[currentStart + i + 1] = "add";
+            }
+
+            if (deletedCount > insertedCount)
+            {
+                MarkDeletion(markers, currentStart, insertedCount, currentLineCount);
+            }
+        }
+
+        private static void MarkDeletion(
+            Dictionary<int, string> markers,
+            int currentStart,
+            int insertedCount,
+            int currentLineCount)
+        {
+            if (currentLineCount <= 0)
+            {
+                return;
+            }
+
+            int markerLine;
+            if (insertedCount == 0)
+            {
+                markerLine = Math.Clamp(currentStart, 1, currentLineCount);
+            }
+            else if (currentStart + insertedCount < currentLineCount)
+            {
+                markerLine = currentStart + insertedCount + 1;
+            }
+            else
+            {
+                markerLine = Math.Clamp(currentStart + insertedCount, 1, currentLineCount);
+            }
+
+            if (!markers.ContainsKey(markerLine))
+            {
+                markers[markerLine] = "del";
+            }
+        }
+
+        private static Dictionary<int, string> ComputeDirtyLinesGreedy(
+            IReadOnlyList<string> orig,
+            IReadOnlyList<string> current,
+            int prefixMatchCount,
+            int suffixMatchCount,
+            int unmatchedOrigCount,
+            int unmatchedCurrentCount)
+        {
+            var markers = new Dictionary<int, string>();
 
             int oi = prefixMatchCount;
             int ci = prefixMatchCount;
-            int limitOrig = orig.Length - suffixMatchCount;
+            int limitOrig = orig.Count - suffixMatchCount;
             int limitCurr = current.Count - suffixMatchCount;
 
             int scanLimit = Math.Max(100, Math.Abs(unmatchedOrigCount - unmatchedCurrentCount) + 10);

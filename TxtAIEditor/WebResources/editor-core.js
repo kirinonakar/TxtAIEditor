@@ -6,6 +6,7 @@ const PREFETCH_AHEAD = 200;
 const HEX_BROWSER_SCROLL_HEIGHT_LIMIT = 24000000;
 const HEX_CACHE_RETAIN_LINES = 900;
 const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
+const MAX_DIRTY_DIFF_CELLS = 4000000;
 
 const runtime = {
     drawEditableSelectionOverlays: () => { },
@@ -1131,30 +1132,163 @@ function cleanDirtyMarker(lineNumber) {
     return false;
 }
 function recomputeDirtyLines() {
-    const markers = new Map();
     const orig = state.originalLines || [];
     const current = [];
     for (let i = 1; i <= state.lineCount; i++) {
         current.push(state.cache.get(i) ?? '');
     }
 
-    // Find common prefix
+    state.dirtyLines = computeDirtyLineMarkers(orig, current);
+}
+
+function computeDirtyLineMarkers(orig, current) {
+    const markers = new Map();
+
     let prefixMatchCount = 0;
     const maxPrefix = Math.min(orig.length, current.length);
     while (prefixMatchCount < maxPrefix && orig[prefixMatchCount] === current[prefixMatchCount]) {
         prefixMatchCount++;
     }
 
-    // Find common suffix
     let suffixMatchCount = 0;
     const maxSuffix = Math.min(orig.length - prefixMatchCount, current.length - prefixMatchCount);
-    while (suffixMatchCount < maxSuffix && 
+    while (suffixMatchCount < maxSuffix &&
            orig[orig.length - 1 - suffixMatchCount] === current[current.length - 1 - suffixMatchCount]) {
         suffixMatchCount++;
     }
 
     const unmatchedOrigCount = orig.length - prefixMatchCount - suffixMatchCount;
     const unmatchedCurrentCount = current.length - prefixMatchCount - suffixMatchCount;
+    const limitOrig = orig.length - suffixMatchCount;
+    const limitCurr = current.length - suffixMatchCount;
+
+    if (unmatchedOrigCount === 0) {
+        for (let line = prefixMatchCount; line < limitCurr; line++) {
+            markers.set(line + 1, 'add');
+        }
+        return markers;
+    }
+
+    if (unmatchedCurrentCount === 0) {
+        markDeletionMarker(markers, prefixMatchCount, 0, current.length);
+        return markers;
+    }
+
+    const cellCount = unmatchedOrigCount * unmatchedCurrentCount;
+    if (cellCount <= MAX_DIRTY_DIFF_CELLS) {
+        const matches = computeLcsMatches(orig, prefixMatchCount, limitOrig, current, prefixMatchCount, limitCurr);
+        let previousOrig = prefixMatchCount;
+        let previousCurrent = prefixMatchCount;
+
+        for (const match of matches) {
+            addDirtyMarkersForGap(
+                markers,
+                previousOrig,
+                match.origIndex,
+                previousCurrent,
+                match.currentIndex,
+                current.length);
+            previousOrig = match.origIndex + 1;
+            previousCurrent = match.currentIndex + 1;
+        }
+
+        addDirtyMarkersForGap(
+            markers,
+            previousOrig,
+            limitOrig,
+            previousCurrent,
+            limitCurr,
+            current.length);
+
+        return markers;
+    }
+
+    return computeDirtyLineMarkersGreedy(
+        orig,
+        current,
+        prefixMatchCount,
+        suffixMatchCount,
+        unmatchedOrigCount,
+        unmatchedCurrentCount);
+}
+
+function computeLcsMatches(orig, origStart, origEnd, current, currentStart, currentEnd) {
+    const origCount = origEnd - origStart;
+    const currentCount = currentEnd - currentStart;
+    const columns = currentCount + 1;
+    const table = new Uint32Array((origCount + 1) * columns);
+
+    for (let oi = origCount - 1; oi >= 0; oi--) {
+        for (let ci = currentCount - 1; ci >= 0; ci--) {
+            const index = oi * columns + ci;
+            table[index] = orig[origStart + oi] === current[currentStart + ci]
+                ? table[(oi + 1) * columns + ci + 1] + 1
+                : Math.max(table[(oi + 1) * columns + ci], table[oi * columns + ci + 1]);
+        }
+    }
+
+    const matches = [];
+    let oi = 0;
+    let ci = 0;
+    while (oi < origCount && ci < currentCount) {
+        if (orig[origStart + oi] === current[currentStart + ci]) {
+            matches.push({ origIndex: origStart + oi, currentIndex: currentStart + ci });
+            oi++;
+            ci++;
+        } else if (table[(oi + 1) * columns + ci] >= table[oi * columns + ci + 1]) {
+            oi++;
+        } else {
+            ci++;
+        }
+    }
+
+    return matches;
+}
+
+function addDirtyMarkersForGap(markers, origStart, origEnd, currentStart, currentEnd, currentLineCount) {
+    const deletedCount = origEnd - origStart;
+    const insertedCount = currentEnd - currentStart;
+    if (deletedCount <= 0 && insertedCount <= 0) return;
+
+    const modifiedCount = Math.min(deletedCount, insertedCount);
+    for (let i = 0; i < modifiedCount; i++) {
+        markers.set(currentStart + i + 1, 'mod');
+    }
+
+    for (let i = modifiedCount; i < insertedCount; i++) {
+        markers.set(currentStart + i + 1, 'add');
+    }
+
+    if (deletedCount > insertedCount) {
+        markDeletionMarker(markers, currentStart, insertedCount, currentLineCount);
+    }
+}
+
+function markDeletionMarker(markers, currentStart, insertedCount, currentLineCount) {
+    if (currentLineCount <= 0) return;
+
+    let markerLine;
+    if (insertedCount === 0) {
+        markerLine = Math.max(1, Math.min(currentStart, currentLineCount));
+    } else if (currentStart + insertedCount < currentLineCount) {
+        markerLine = currentStart + insertedCount + 1;
+    } else {
+        markerLine = Math.max(1, Math.min(currentStart + insertedCount, currentLineCount));
+    }
+
+    if (!markers.has(markerLine)) {
+        markers.set(markerLine, 'del');
+    }
+}
+
+function computeDirtyLineMarkersGreedy(
+    orig,
+    current,
+    prefixMatchCount,
+    suffixMatchCount,
+    unmatchedOrigCount,
+    unmatchedCurrentCount) {
+    const markers = new Map();
 
     let oi = prefixMatchCount;
     let ci = prefixMatchCount;
@@ -1200,7 +1334,7 @@ function recomputeDirtyLines() {
         ci++;
     }
 
-    state.dirtyLines = markers;
+    return markers;
 }
 function reportCursorAndSelection(element = document.activeElement) {
     if (element && !document.body.contains(element)) {
