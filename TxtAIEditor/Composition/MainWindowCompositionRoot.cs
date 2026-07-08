@@ -460,6 +460,7 @@ namespace TxtAIEditor.Composition
                 livePreviewController,
                 pdfViewerController,
                 officeDocumentViewerController,
+                previewControllers.WebViewShortcut,
                 editorWebViewInitializationController,
                 editorLineNavigationController,
                 editorBridgeShortcutController,

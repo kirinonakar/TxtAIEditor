@@ -66,6 +66,7 @@ namespace TxtAIEditor.Composition
             LivePreviewController livePreview,
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
+            WebViewShortcutController webViewShortcut,
             EditorWebViewInitializationController editorWebViewInitialization,
             EditorLineNavigationController editorLineNavigation,
             EditorBridgeShortcutController editorBridgeShortcut,
@@ -169,7 +170,7 @@ namespace TxtAIEditor.Composition
                 callbacks.SetScrollSyncEnabled);
 
             var documentFactory = new EditorTabDocumentFactory(services.LanguageDetectionService, callbacks.GetLocalizedString);
-            var itemFactory = new EditorTabViewItemFactory(services.LocalizationService);
+            var itemFactory = new EditorTabViewItemFactory(services.LocalizationService, webViewShortcut.Handle);
 
             var editorTabOpen = new EditorTabOpenController(
                 services.SettingsService,

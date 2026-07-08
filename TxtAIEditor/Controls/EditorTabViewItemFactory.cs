@@ -27,10 +27,14 @@ namespace TxtAIEditor.Controls
         private const string MediaViewerHostName = "txtaieditor-media-viewer.local";
 
         private readonly ILocalizationService _localizationService;
+        private readonly Action<string>? _viewerShortcutHandler;
 
-        public EditorTabViewItemFactory(ILocalizationService localizationService)
+        public EditorTabViewItemFactory(
+            ILocalizationService localizationService,
+            Action<string>? viewerShortcutHandler = null)
         {
             _localizationService = localizationService;
+            _viewerShortcutHandler = viewerShortcutHandler;
         }
 
         public EditorTabViewItemParts Create(
@@ -105,6 +109,7 @@ namespace TxtAIEditor.Controls
                 UseSystemFocusVisuals = false,
                 Tag = ImageViewerWebViewTag
             };
+            AttachViewerShortcutBridge(imageWebView);
             _ = LoadImageSourceAsync(imageWebView, tab.FilePath, editorBackgroundColor);
 
             var imageHost = new Grid
@@ -151,6 +156,7 @@ namespace TxtAIEditor.Controls
                 UseSystemFocusVisuals = false,
                 Tag = MediaViewerWebViewTag
             };
+            AttachViewerShortcutBridge(mediaWebView);
             _ = LoadMediaSourceAsync(mediaWebView, tab.FilePath, editorBackgroundColor);
 
             var mediaHost = new Grid
@@ -223,6 +229,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 ConfigureViewerWebView(coreWebView);
+                await InstallViewerShortcutBridgeAsync(webView);
 
                 string hostName = contentKind == ViewerContentKind.Image
                     ? ImageViewerHostName
@@ -291,10 +298,69 @@ namespace TxtAIEditor.Controls
 
         private static void ConfigureViewerWebView(CoreWebView2 coreWebView)
         {
+            coreWebView.Settings.IsWebMessageEnabled = true;
             coreWebView.Settings.IsScriptEnabled = true;
             coreWebView.Settings.AreDefaultContextMenusEnabled = true;
-            coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = true;
+            coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = false;
+            coreWebView.Settings.AreDevToolsEnabled = false;
             coreWebView.Settings.IsStatusBarEnabled = true;
+        }
+
+        private void AttachViewerShortcutBridge(WebView2 webView)
+        {
+            if (_viewerShortcutHandler == null)
+            {
+                return;
+            }
+
+            webView.WebMessageReceived += OnViewerWebMessageReceived;
+        }
+
+        private void OnViewerWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            var shortcutHandler = _viewerShortcutHandler;
+            if (shortcutHandler == null)
+            {
+                return;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(args.WebMessageAsJson);
+                var root = document.RootElement;
+                if (!root.TryGetProperty("type", out var typeProp) ||
+                    !string.Equals(typeProp.GetString(), "shortcut", StringComparison.Ordinal) ||
+                    !root.TryGetProperty("name", out var nameProp))
+                {
+                    return;
+                }
+
+                string name = nameProp.GetString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    sender.DispatcherQueue.TryEnqueue(() => shortcutHandler(name));
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static async Task InstallViewerShortcutBridgeAsync(WebView2 webView)
+        {
+            if (webView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(ViewerShortcutBridgeScript);
+                await webView.CoreWebView2.ExecuteScriptAsync(ViewerShortcutBridgeScript);
+            }
+            catch
+            {
+            }
         }
 
         private static string BuildImageViewerHtml(string sourceUrl, Windows.UI.Color backgroundColor)
@@ -623,6 +689,55 @@ audio {{
             {
             }
         }
+
+        private const string ViewerShortcutBridgeScript = @"
+(() => {
+    if (window.__txtAiEditorViewerShortcutBridge) return;
+    window.__txtAiEditorViewerShortcutBridge = true;
+
+    function post(name) {
+        try {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage({ type: 'shortcut', name });
+            }
+        } catch {}
+    }
+
+    function handleKeyDown(event) {
+        let name = '';
+        if (event.key === 'F4') {
+            name = 'f4';
+        } else if (event.key === 'F9') {
+            name = 'f9';
+        } else if (event.key === 'F10') {
+            name = 'f10';
+        } else if (event.key === 'F11') {
+            name = 'f11';
+        } else if (event.key === 'F12') {
+            name = 'f12';
+        } else {
+            const ctrl = event.ctrlKey || event.metaKey;
+            const key = event.key ? event.key.toLowerCase() : '';
+            if (ctrl && key === '3') {
+                name = 'expandRightPanel';
+            } else if (ctrl && key === 'f') {
+                name = 'find';
+            } else if (ctrl && key === 'p') {
+                name = 'print';
+            }
+        }
+
+        if (!name) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        post(name);
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+})();
+";
     }
 
     public sealed class EditorTabViewItemParts
