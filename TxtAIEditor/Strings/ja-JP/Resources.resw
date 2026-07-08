@@ -896,6 +896,9 @@
   <data name="StatusFileSizeFormat" xml:space="preserve">
     <value>サイズ: {0:N0} bytes</value>
   </data>
+  <data name="StatusImageFileStatsFormat" xml:space="preserve">
+    <value>サイズ: {0:N0} bytes / {1:N0} x {2:N0} px</value>
+  </data>
   <data name="StatusLineLabel" xml:space="preserve">
     <value>行</value>
   </data>

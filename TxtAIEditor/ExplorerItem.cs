@@ -177,6 +177,7 @@ namespace TxtAIEditor
                 ".jpeg" => "\uEB9F",
                 ".gif" => "\uEB9F",
                 ".bmp" => "\uEB9F",
+                ".ico" => "\uEB9F",
                 ".webp" => "\uEB9F",
                 ".mp3" => "\uEC4F",
                 ".wav" => "\uEC4F",

@@ -96,6 +96,20 @@ namespace TxtAIEditor.Controls
                 bytes = new FileInfo(filePath).Length;
             }
 
+            if (tab.IsImageViewer && ImageFileInfoReader.TryRead(filePath, out var imageInfo))
+            {
+                string imageFormat = _getString(
+                    "StatusImageFileStatsFormat",
+                    "크기: {0:N0} bytes / {1:N0} x {2:N0} px");
+                _statusBar.FileStatsText.Text = string.Format(
+                    CultureInfo.CurrentCulture,
+                    imageFormat,
+                    bytes,
+                    imageInfo.Width,
+                    imageInfo.Height);
+                return;
+            }
+
             string format = _getString("StatusFileSizeFormat", "크기: {0:N0} bytes");
             _statusBar.FileStatsText.Text = string.Format(format, bytes);
         }
@@ -245,7 +259,9 @@ namespace TxtAIEditor.Controls
 
             if (tab.IsImageViewer)
             {
-                _statusBar.LanguageText.Text = "IMAGE";
+                _statusBar.LanguageText.Text = ImageFileInfoReader.TryRead(tab.FilePath, out var imageInfo)
+                    ? imageInfo.Format
+                    : ImageFileInfoReader.GetFormatFromExtension(tab.FilePath) ?? "IMAGE";
                 return;
             }
 

@@ -60,6 +60,7 @@ namespace TxtAIEditor.Controls
             ".jpeg",
             ".gif",
             ".bmp",
+            ".ico",
             ".webp"
         };
 

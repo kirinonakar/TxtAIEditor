@@ -896,6 +896,9 @@
   <data name="StatusFileSizeFormat" xml:space="preserve">
     <value>大小：{0:N0} 位元組</value>
   </data>
+  <data name="StatusImageFileStatsFormat" xml:space="preserve">
+    <value>大小：{0:N0} 位元組 / {1:N0} x {2:N0} px</value>
+  </data>
   <data name="StatusLineLabel" xml:space="preserve">
     <value>熔點</value>
   </data>
