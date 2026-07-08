@@ -301,6 +301,7 @@ namespace TxtAIEditor.Composition
                     NavigateExplorerToFolderAndRevealAsync,
                     callbacks.OpenNewTabFromRequest,
                     callbacks.OpenImageTab,
+                    callbacks.OpenMediaTab,
                     callbacks.OpenPdfTab,
                     callbacks.OpenOfficeDocumentTab,
                     QueueGitStatusRefresh));

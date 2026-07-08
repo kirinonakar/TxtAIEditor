@@ -74,6 +74,7 @@ namespace TxtAIEditor.Composition
                 () => OpenNewTab(),
                 OpenGeneratedTab,
                 OpenImageTab,
+                OpenMediaTab,
                 OpenPdfTab,
                 OpenOfficeDocumentTab,
                 OpenHexViewAsync,
@@ -197,6 +198,8 @@ namespace TxtAIEditor.Composition
         public OpenedTab OpenOfficeDocumentTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenOfficeDocumentTab(filePath);
 
         public OpenedTab OpenImageTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenImageTab(filePath);
+
+        public OpenedTab OpenMediaTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenMediaTab(filePath);
 
         public Task OpenHexViewAsync(OpenedTab tab)
         {

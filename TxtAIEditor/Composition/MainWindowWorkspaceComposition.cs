@@ -30,6 +30,7 @@ namespace TxtAIEditor.Composition
         Func<string, Task> NavigateExplorerToFolderAndRevealAsync,
         Func<FileTabOpenRequest, OpenedTab> OpenNewTabFromRequest,
         Func<string, OpenedTab> OpenImageTab,
+        Func<string, OpenedTab> OpenMediaTab,
         Func<string, OpenedTab> OpenPdfTab,
         Func<string, OpenedTab> OpenOfficeDocumentTab,
         Action QueueGitStatusRefresh);
@@ -108,6 +109,7 @@ namespace TxtAIEditor.Composition
                 tabEncryption.PromptPasswordAsync,
                 callbacks.OpenNewTabFromRequest,
                 callbacks.OpenImageTab,
+                callbacks.OpenMediaTab,
                 callbacks.OpenPdfTab,
                 callbacks.OpenOfficeDocumentTab,
                 callbacks.QueueGitStatusRefresh,

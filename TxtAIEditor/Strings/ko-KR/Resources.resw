@@ -914,6 +914,9 @@
   <data name="StatusImageViewer" xml:space="preserve">
     <value>이미지</value>
   </data>
+  <data name="StatusMediaViewer" xml:space="preserve">
+    <value>미디어</value>
+  </data>
   <data name="GoToOffsetTitle" xml:space="preserve">
     <value>오프셋 이동</value>
   </data>

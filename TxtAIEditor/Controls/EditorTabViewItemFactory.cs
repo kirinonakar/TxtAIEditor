@@ -1,13 +1,16 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Globalization;
+using System.Net;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
-using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.Web.WebView2.Core;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Editor;
@@ -16,6 +19,13 @@ namespace TxtAIEditor.Controls
 {
     public sealed class EditorTabViewItemFactory
     {
+        private const string ImageViewerHostTag = "ImageViewerHost";
+        private const string ImageViewerWebViewTag = "ImageViewerWebView";
+        private const string ImageViewerHostName = "txtaieditor-image-viewer.local";
+        private const string MediaViewerHostTag = "MediaViewerHost";
+        private const string MediaViewerWebViewTag = "MediaViewerWebView";
+        private const string MediaViewerHostName = "txtaieditor-media-viewer.local";
+
         private readonly ILocalizationService _localizationService;
 
         public EditorTabViewItemFactory(ILocalizationService localizationService)
@@ -87,20 +97,22 @@ namespace TxtAIEditor.Controls
             Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu,
             string? workspaceFolderPath = null)
         {
-            var image = new Image
+            var imageWebView = new WebView2
             {
-                Stretch = Stretch.Uniform,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
+                VerticalAlignment = VerticalAlignment.Stretch,
+                DefaultBackgroundColor = editorBackgroundColor,
+                UseSystemFocusVisuals = false,
+                Tag = ImageViewerWebViewTag
             };
-            _ = LoadImageSourceAsync(image, tab.FilePath);
+            _ = LoadImageSourceAsync(imageWebView, tab.FilePath, editorBackgroundColor);
 
             var imageHost = new Grid
             {
                 Background = new SolidColorBrush(editorBackgroundColor),
-                Tag = "ImageViewerHost"
+                Tag = ImageViewerHostTag
             };
-            imageHost.Children.Add(image);
+            imageHost.Children.Add(imageWebView);
 
             var tabHeader = new TabHeaderControl();
             tabHeader.Configure(tab, encryptedTooltip, workspaceFolderPath);
@@ -122,7 +134,70 @@ namespace TxtAIEditor.Controls
             return tabItem;
         }
 
-        private static async Task LoadImageSourceAsync(Image image, string? filePath)
+        public TabViewItem CreateMediaViewer(
+            OpenedTab tab,
+            Windows.UI.Color editorBackgroundColor,
+            string? uiFontFamily,
+            string encryptedTooltip,
+            Action<OpenedTab, FrameworkElement, RightTappedRoutedEventArgs> showEncryptionMenu,
+            Action<TabViewItem, RightTappedRoutedEventArgs> showTabContextMenu,
+            string? workspaceFolderPath = null)
+        {
+            var mediaWebView = new WebView2
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                DefaultBackgroundColor = editorBackgroundColor,
+                UseSystemFocusVisuals = false,
+                Tag = MediaViewerWebViewTag
+            };
+            _ = LoadMediaSourceAsync(mediaWebView, tab.FilePath, editorBackgroundColor);
+
+            var mediaHost = new Grid
+            {
+                Background = new SolidColorBrush(editorBackgroundColor),
+                Tag = MediaViewerHostTag
+            };
+            mediaHost.Children.Add(mediaWebView);
+
+            var tabHeader = new TabHeaderControl();
+            tabHeader.Configure(tab, encryptedTooltip, workspaceFolderPath);
+            tabHeader.EncryptionMenuRequested += (_, args) =>
+                showEncryptionMenu(args.Tab, args.Target, args.RoutedArgs);
+
+            var tabItem = new TabViewItem
+            {
+                Content = mediaHost,
+                Tag = tab.Id,
+                Header = tabHeader,
+                ContentTransitions = new TransitionCollection(),
+                Transitions = new TransitionCollection(),
+                Opacity = 1
+            };
+            tabItem.RightTapped += (_, args) => showTabContextMenu(tabItem, args);
+            ApplyUiFont(tabItem, uiFontFamily);
+
+            return tabItem;
+        }
+
+        private static Task LoadImageSourceAsync(WebView2 imageWebView, string? filePath, Windows.UI.Color backgroundColor)
+        {
+            return LoadViewerSourceAsync(imageWebView, filePath, backgroundColor, ViewerContentKind.Image);
+        }
+
+        private static Task LoadMediaSourceAsync(WebView2 mediaWebView, string? filePath, Windows.UI.Color backgroundColor)
+        {
+            var contentKind = !string.IsNullOrWhiteSpace(filePath) && SupportedFileTypes.IsAudioFile(filePath)
+                ? ViewerContentKind.Audio
+                : ViewerContentKind.Video;
+            return LoadViewerSourceAsync(mediaWebView, filePath, backgroundColor, contentKind);
+        }
+
+        private static async Task LoadViewerSourceAsync(
+            WebView2 webView,
+            string? filePath,
+            Windows.UI.Color backgroundColor,
+            ViewerContentKind contentKind)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -131,22 +206,44 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                using var fileStream = new FileStream(
-                    filePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete);
-                using var randomAccessStream = fileStream.AsRandomAccessStream();
-                var bitmap = new BitmapImage
+                string? folderPath = Path.GetDirectoryName(filePath);
+                string fileName = Path.GetFileName(filePath);
+                if (string.IsNullOrWhiteSpace(folderPath) || string.IsNullOrWhiteSpace(fileName))
                 {
-                    CreateOptions = BitmapCreateOptions.IgnoreImageCache
+                    return;
+                }
+
+                var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                await webView.EnsureCoreWebView2Async(env);
+
+                var coreWebView = webView.CoreWebView2;
+                if (coreWebView == null)
+                {
+                    return;
+                }
+
+                ConfigureViewerWebView(coreWebView);
+
+                string hostName = contentKind == ViewerContentKind.Image
+                    ? ImageViewerHostName
+                    : MediaViewerHostName;
+                coreWebView.SetVirtualHostNameToFolderMapping(
+                    hostName,
+                    folderPath,
+                    CoreWebView2HostResourceAccessKind.Allow);
+
+                string sourceUrl = $"https://{hostName}/{Uri.EscapeDataString(fileName)}";
+                string html = contentKind switch
+                {
+                    ViewerContentKind.Image => BuildImageViewerHtml(sourceUrl, backgroundColor),
+                    ViewerContentKind.Audio => BuildMediaViewerHtml(sourceUrl, backgroundColor, isAudio: true),
+                    _ => BuildMediaViewerHtml(sourceUrl, backgroundColor, isAudio: false)
                 };
-                await bitmap.SetSourceAsync(randomAccessStream);
-                image.Source = bitmap;
+                webView.NavigateToString(html);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to load image viewer source: {ex.Message}");
+                Debug.WriteLine($"Failed to load viewer source: {ex.Message}");
             }
         }
 
@@ -157,29 +254,199 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            Image? image = FindImageControl(tabItem.Content as FrameworkElement);
-            if (image == null)
+            WebView2? imageWebView = FindTaggedWebView(tabItem.Content as FrameworkElement, ImageViewerWebViewTag);
+            if (imageWebView == null)
             {
                 return;
             }
 
-            await LoadImageSourceAsync(image, filePath);
+            await LoadImageSourceAsync(imageWebView, filePath, GetViewerBackgroundColor(tabItem.Content as FrameworkElement));
+        }
+
+        public static async Task ReloadMediaAsync(TabViewItem tabItem, string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            WebView2? mediaWebView = FindTaggedWebView(tabItem.Content as FrameworkElement, MediaViewerWebViewTag);
+            if (mediaWebView == null)
+            {
+                return;
+            }
+
+            await LoadMediaSourceAsync(mediaWebView, filePath, GetViewerBackgroundColor(tabItem.Content as FrameworkElement));
         }
 
         public static void ApplyImageViewerBackground(TabViewItem tabItem, Windows.UI.Color backgroundColor)
         {
-            if (FindImageViewerHost(tabItem.Content as FrameworkElement) is Panel imageHost)
+            ApplyViewerBackground(tabItem.Content as FrameworkElement, backgroundColor);
+        }
+
+        public static void ReleaseViewerResources(TabViewItem tabItem)
+        {
+            CloseTaggedWebViews(tabItem.Content as FrameworkElement);
+        }
+
+        private static void ConfigureViewerWebView(CoreWebView2 coreWebView)
+        {
+            coreWebView.Settings.IsScriptEnabled = true;
+            coreWebView.Settings.AreDefaultContextMenusEnabled = true;
+            coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = true;
+            coreWebView.Settings.IsStatusBarEnabled = true;
+        }
+
+        private static string BuildImageViewerHtml(string sourceUrl, Windows.UI.Color backgroundColor)
+        {
+            string src = WebUtility.HtmlEncode(sourceUrl);
+            string background = ToCssColor(backgroundColor);
+            return $@"<!doctype html>
+<html>
+<head>
+<meta charset=""utf-8"">
+<style>
+:root {{ --viewer-bg: {background}; }}
+html, body {{
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--viewer-bg);
+    overflow: hidden;
+}}
+body {{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}}
+img {{
+    max-width: 100vw;
+    max-height: 100vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}}
+</style>
+</head>
+<body>
+<img src=""{src}"" draggable=""false"">
+</body>
+</html>";
+        }
+
+        private static string BuildMediaViewerHtml(string sourceUrl, Windows.UI.Color backgroundColor, bool isAudio)
+        {
+            string src = WebUtility.HtmlEncode(sourceUrl);
+            string background = ToCssColor(backgroundColor);
+            string mediaElement = isAudio
+                ? $@"<audio controls preload=""metadata"" src=""{src}""></audio>"
+                : $@"<video controls preload=""metadata"" src=""{src}""></video>";
+
+            return $@"<!doctype html>
+<html>
+<head>
+<meta charset=""utf-8"">
+<style>
+:root {{ --viewer-bg: {background}; }}
+html, body {{
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--viewer-bg);
+    overflow: hidden;
+}}
+body {{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}}
+video {{
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+    background: #000;
+}}
+audio {{
+    width: min(720px, calc(100vw - 48px));
+}}
+</style>
+</head>
+<body>
+{mediaElement}
+</body>
+</html>";
+        }
+
+        private static void ApplyViewerBackground(FrameworkElement? root, Windows.UI.Color backgroundColor)
+        {
+            if (root is Panel panel &&
+                IsViewerHostTag(panel.Tag as string))
             {
-                imageHost.Background = new SolidColorBrush(backgroundColor);
+                panel.Background = new SolidColorBrush(backgroundColor);
+            }
+
+            if (root is Panel childPanel)
+            {
+                foreach (var child in childPanel.Children)
+                {
+                    if (child is FrameworkElement childElement)
+                    {
+                        ApplyViewerBackground(childElement, backgroundColor);
+                    }
+                }
+            }
+
+            if (root is WebView2 webView && IsViewerWebViewTag(webView.Tag as string))
+            {
+                _ = ApplyViewerWebViewBackgroundAsync(webView, backgroundColor);
             }
         }
 
-        private static FrameworkElement? FindImageViewerHost(FrameworkElement? root)
+        private static async Task ApplyViewerWebViewBackgroundAsync(WebView2 webView, Windows.UI.Color backgroundColor)
         {
-            if (root is FrameworkElement fe &&
-                string.Equals(fe.Tag as string, "ImageViewerHost", StringComparison.Ordinal))
+            webView.DefaultBackgroundColor = backgroundColor;
+            if (webView.CoreWebView2 == null)
             {
-                return fe;
+                return;
+            }
+
+            try
+            {
+                string cssColorJson = JsonSerializer.Serialize(ToCssColor(backgroundColor));
+                await webView.CoreWebView2.ExecuteScriptAsync(
+                    $"document.documentElement.style.setProperty('--viewer-bg', {cssColorJson});");
+            }
+            catch
+            {
+            }
+        }
+
+        private static void CloseTaggedWebViews(FrameworkElement? root)
+        {
+            if (root is WebView2 webView && IsViewerWebViewTag(webView.Tag as string))
+            {
+                webView.Close();
+                return;
+            }
+
+            if (root is Panel panel)
+            {
+                foreach (var child in panel.Children)
+                {
+                    if (child is FrameworkElement childElement)
+                    {
+                        CloseTaggedWebViews(childElement);
+                    }
+                }
+            }
+        }
+
+        private static WebView2? FindTaggedWebView(FrameworkElement? root, string tag)
+        {
+            if (root is WebView2 webView &&
+                string.Equals(webView.Tag as string, tag, StringComparison.Ordinal))
+            {
+                return webView;
             }
 
             if (root is Panel panel)
@@ -187,7 +454,7 @@ namespace TxtAIEditor.Controls
                 foreach (var child in panel.Children)
                 {
                     if (child is FrameworkElement childElement &&
-                        FindImageViewerHost(childElement) is FrameworkElement found)
+                        FindTaggedWebView(childElement, tag) is WebView2 found)
                     {
                         return found;
                     }
@@ -197,21 +464,56 @@ namespace TxtAIEditor.Controls
             return null;
         }
 
-        private static Image? FindImageControl(FrameworkElement? root)
+        private static Windows.UI.Color GetViewerBackgroundColor(FrameworkElement? root)
         {
-            if (root is Image img)
-                return img;
-
-            if (root is Panel panel)
+            if (root is Panel panel &&
+                IsViewerHostTag(panel.Tag as string) &&
+                panel.Background is SolidColorBrush brush)
             {
-                foreach (var child in panel.Children)
+                return brush.Color;
+            }
+
+            if (root is Panel parent)
+            {
+                foreach (var child in parent.Children)
                 {
-                    if (child is FrameworkElement fe && FindImageControl(fe) is Image found)
-                        return found;
+                    if (child is FrameworkElement childElement)
+                    {
+                        var color = GetViewerBackgroundColor(childElement);
+                        if (color.A != 0)
+                        {
+                            return color;
+                        }
+                    }
                 }
             }
 
-            return null;
+            return Windows.UI.Color.FromArgb(255, 255, 255, 255);
+        }
+
+        private static bool IsViewerHostTag(string? tag)
+        {
+            return string.Equals(tag, ImageViewerHostTag, StringComparison.Ordinal) ||
+                   string.Equals(tag, MediaViewerHostTag, StringComparison.Ordinal);
+        }
+
+        private static bool IsViewerWebViewTag(string? tag)
+        {
+            return string.Equals(tag, ImageViewerWebViewTag, StringComparison.Ordinal) ||
+                   string.Equals(tag, MediaViewerWebViewTag, StringComparison.Ordinal);
+        }
+
+        private static string ToCssColor(Windows.UI.Color color)
+        {
+            string alpha = (color.A / 255.0).ToString("0.###", CultureInfo.InvariantCulture);
+            return $"rgba({color.R}, {color.G}, {color.B}, {alpha})";
+        }
+
+        private enum ViewerContentKind
+        {
+            Image,
+            Audio,
+            Video
         }
 
         public PdfViewerTabParts CreatePdfViewer(

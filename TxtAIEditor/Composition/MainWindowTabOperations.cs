@@ -25,6 +25,13 @@ namespace TxtAIEditor.Composition
                 return;
             }
 
+            if (tab.IsMediaViewer)
+            {
+                await EditorTabViewItemFactory.ReloadMediaAsync(tabItem, tab.FilePath);
+                UpdateViewerStatus(tab, statusBar, updateLanguageUi, updateWindowTitle);
+                return;
+            }
+
             if (pdfViewer.Reload(tab) || officeDocumentViewer.Reload(tab))
             {
                 UpdateViewerStatus(tab, statusBar, updateLanguageUi, updateWindowTitle);

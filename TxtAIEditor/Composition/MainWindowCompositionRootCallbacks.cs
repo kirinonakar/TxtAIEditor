@@ -30,6 +30,7 @@ namespace TxtAIEditor.Composition
         Func<OpenedTab> OpenNewTab,
         Func<string, OpenedTab> OpenGeneratedTab,
         Func<string, OpenedTab> OpenImageTab,
+        Func<string, OpenedTab> OpenMediaTab,
         Func<string, OpenedTab> OpenPdfTab,
         Func<string, OpenedTab> OpenOfficeDocumentTab,
         Func<OpenedTab, Task> OpenHexViewAsync,

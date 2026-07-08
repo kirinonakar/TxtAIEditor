@@ -125,6 +125,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (tab.IsMediaViewer)
+            {
+                _statusBar.TotalLinesText.Text = _getString("StatusMediaViewer", "미디어");
+                return;
+            }
+
             if (tab.IsPdfViewer)
             {
                 _statusBar.TotalLinesText.Text = "PDF";
@@ -240,6 +246,14 @@ namespace TxtAIEditor.Controls
             if (tab.IsImageViewer)
             {
                 _statusBar.LanguageText.Text = "IMAGE";
+                return;
+            }
+
+            if (tab.IsMediaViewer)
+            {
+                _statusBar.LanguageText.Text = string.Equals(tab.Language, "audio", StringComparison.OrdinalIgnoreCase)
+                    ? "AUDIO"
+                    : "VIDEO";
                 return;
             }
 

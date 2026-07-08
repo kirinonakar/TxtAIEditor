@@ -27,6 +27,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, Task<string?>> _promptPasswordAsync;
         private readonly Func<FileTabOpenRequest, OpenedTab> _openNewTab;
         private readonly Func<string, OpenedTab> _openImageTab;
+        private readonly Func<string, OpenedTab> _openMediaTab;
         private readonly Func<string, OpenedTab> _openPdfTab;
         private readonly Func<string, OpenedTab> _openOfficeDocumentTab;
         private readonly Action _queueGitStatusRefresh;
@@ -45,6 +46,7 @@ namespace TxtAIEditor.Controls
             Func<string, string, Task<string?>> promptPasswordAsync,
             Func<FileTabOpenRequest, OpenedTab> openNewTab,
             Func<string, OpenedTab> openImageTab,
+            Func<string, OpenedTab> openMediaTab,
             Func<string, OpenedTab> openPdfTab,
             Func<string, OpenedTab> openOfficeDocumentTab,
             Action queueGitStatusRefresh,
@@ -61,6 +63,7 @@ namespace TxtAIEditor.Controls
             _promptPasswordAsync = promptPasswordAsync;
             _openNewTab = openNewTab;
             _openImageTab = openImageTab;
+            _openMediaTab = openMediaTab;
             _openPdfTab = openPdfTab;
             _openOfficeDocumentTab = openOfficeDocumentTab;
             _queueGitStatusRefresh = queueGitStatusRefresh;
@@ -91,28 +94,35 @@ namespace TxtAIEditor.Controls
                     return FileTabLoadResult.ActivatedExisting(existingTab);
                 }
 
-                if (IsSupportedImageFile(filePath))
+                if (SupportedFileTypes.IsImageFile(filePath))
                 {
                     var tab = _openImageTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return FileTabLoadResult.Opened(tab);
                 }
 
-                if (IsPdfFile(filePath))
+                if (SupportedFileTypes.IsMediaFile(filePath))
+                {
+                    var tab = _openMediaTab(filePath);
+                    QueueGitRefreshIfNeeded(repoRoot);
+                    return FileTabLoadResult.Opened(tab);
+                }
+
+                if (SupportedFileTypes.IsPdfFile(filePath))
                 {
                     var tab = _openPdfTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return FileTabLoadResult.Opened(tab);
                 }
 
-                if (IsOfficeDocumentFile(filePath))
+                if (SupportedFileTypes.IsOfficeDocumentFile(filePath))
                 {
                     var tab = _openOfficeDocumentTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return FileTabLoadResult.Opened(tab);
                 }
 
-                if (IsReadOnlyDocumentFile(filePath))
+                if (SupportedFileTypes.IsReadOnlyDocumentFile(filePath))
                 {
                     var tab = await OpenReadOnlyDocumentFileAsync(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
@@ -216,42 +226,6 @@ namespace TxtAIEditor.Controls
             return tabView.TabItems
                 .Cast<TabViewItem>()
                 .FirstOrDefault(t => string.Equals(t.Tag as string, tabId, StringComparison.Ordinal));
-        }
-
-        private static bool IsSupportedImageFile(string filePath)
-        {
-            string extension = Path.GetExtension(filePath);
-            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsPdfFile(string filePath)
-        {
-            return Path.GetExtension(filePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsReadOnlyDocumentFile(string filePath)
-        {
-            string extension = Path.GetExtension(filePath);
-            return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".doc", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsOfficeDocumentFile(string filePath)
-        {
-            string extension = Path.GetExtension(filePath);
-            return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".doc", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".xls", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<OpenedTab> OpenReadOnlyDocumentFileAsync(string filePath)

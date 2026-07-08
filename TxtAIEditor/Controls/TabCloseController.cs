@@ -198,6 +198,7 @@ namespace TxtAIEditor.Controls
             _clearPendingSplitImeSync(tab.Id);
             _viewModel.Tabs.Remove(tab);
             _forgetEncryptionPassword(tab);
+            EditorTabViewItemFactory.ReleaseViewerResources(tabItem);
 
             if (_editorTabView.TabItems.Contains(tabItem))
             {

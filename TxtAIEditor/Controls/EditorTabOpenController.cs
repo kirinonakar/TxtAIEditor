@@ -285,6 +285,41 @@ namespace TxtAIEditor.Controls
             return tab;
         }
 
+        public OpenedTab OpenMediaTab(string filePath)
+        {
+            var tab = new OpenedTab
+            {
+                FilePath = filePath,
+                Title = Path.GetFileName(filePath),
+                Content = string.Empty,
+                Language = SupportedFileTypes.IsAudioFile(filePath) ? "audio" : "video",
+                EncodingName = string.Empty,
+                EncodingWasAutoDetected = false,
+                IsMediaViewer = true
+            };
+
+            AddOpenTab(tab);
+
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+            _applyEditorSurfaceBackground(settings);
+
+            var targetTabView = _getCurrentActiveTabView();
+            var tabItem = _editorTabViewItemFactory.CreateMediaViewer(
+                tab,
+                editorBgColor,
+                settings.UiFontFamily,
+                _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                _tabEncryptionController.ShowMenu,
+                (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
+                _getCurrentFolderPath());
+
+            AddTabItemToWorkspace(targetTabView, tabItem, editorBgColor, queueSurfaceRefresh: false);
+            UpdateTabStatus(tab, updateLanguageUi: true);
+
+            return tab;
+        }
+
         private void AddOpenTab(OpenedTab tab)
         {
             _viewModel.Tabs.Add(tab);

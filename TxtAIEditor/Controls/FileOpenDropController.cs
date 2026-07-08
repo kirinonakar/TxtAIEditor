@@ -19,65 +19,6 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
 
-        private static readonly string[] TextFileExtensions =
-        {
-            ".txt",
-            ".md",
-            ".markdown",
-            ".csv",
-            ".html",
-            ".css",
-            ".js",
-            ".ts",
-            ".cs",
-            ".fs",
-            ".vb",
-            ".json",
-            ".jsonc",
-            ".tex",
-            ".py",
-            ".java",
-            ".kt",
-            ".swift",
-            ".php",
-            ".rb",
-            ".rs",
-            ".go",
-            ".dart",
-            ".lua",
-            ".cpp",
-            ".c",
-            ".cc",
-            ".cxx",
-            ".h",
-            ".hpp",
-            ".xml",
-            ".xaml",
-            ".sql",
-            ".sh",
-            ".ps1",
-            ".yaml",
-            ".yml",
-            ".toml",
-            ".ini",
-            ".diff",
-            ".reg",
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".gif",
-            ".bmp",
-            ".webp",
-            ".pdf",
-            ".docx",
-            ".pptx",
-            ".xlsx",
-            ".hwpx",
-            ".doc",
-            ".xls",
-            ".ppt"
-        };
-
         public FileOpenDropController(
             FrameworkElement dragOverlay,
             FrameworkElement leftSidebar,
@@ -107,7 +48,7 @@ namespace TxtAIEditor.Controls
             picker.ViewMode = PickerViewMode.List;
             picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
 
-            foreach (string extension in TextFileExtensions)
+            foreach (string extension in SupportedFileTypes.PickerFileExtensions)
             {
                 picker.FileTypeFilter.Add(extension);
             }

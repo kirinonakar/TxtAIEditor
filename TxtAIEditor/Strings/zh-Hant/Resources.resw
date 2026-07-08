@@ -914,6 +914,9 @@
   <data name="StatusImageViewer" xml:space="preserve">
     <value>圖片</value>
   </data>
+  <data name="StatusMediaViewer" xml:space="preserve">
+    <value>媒體</value>
+  </data>
   <data name="GoToOffsetTitle" xml:space="preserve">
     <value>移至偏移</value>
   </data>

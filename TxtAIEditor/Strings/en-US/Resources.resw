@@ -914,6 +914,9 @@
   <data name="StatusImageViewer" xml:space="preserve">
     <value>Image</value>
   </data>
+  <data name="StatusMediaViewer" xml:space="preserve">
+    <value>Media</value>
+  </data>
   <data name="GoToOffsetTitle" xml:space="preserve">
     <value>Go to Offset</value>
   </data>
