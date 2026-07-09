@@ -1781,6 +1781,27 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>Copy File Path</value>
   </data>
+  <data name="ExplorerExtractArchiveToFolder" xml:space="preserve">
+    <value>Extract to folder</value>
+  </data>
+  <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
+    <value>Extract to {0} folder</value>
+  </data>
+  <data name="ArchiveExtractFailedTitle" xml:space="preserve">
+    <value>Failed to extract archive</value>
+  </data>
+  <data name="ArchiveExtractTargetFileExistsFormat" xml:space="preserve">
+    <value>A file named '{0}' already exists, so the archive cannot be extracted.</value>
+  </data>
+  <data name="ArchiveExtractOverwriteTitle" xml:space="preserve">
+    <value>Confirm extraction</value>
+  </data>
+  <data name="ArchiveExtractOverwriteMessageFormat" xml:space="preserve">
+    <value>The folder '{0}' already exists. Extract and overwrite existing files?</value>
+  </data>
+  <data name="ArchiveExtractOverwriteOK" xml:space="preserve">
+    <value>Extract</value>
+  </data>
   <data name="ExplorerCreateFolderTooltip" xml:space="preserve">
     <value>New Folder</value>
   </data>
@@ -2810,6 +2831,18 @@ Plan: {0}</value>
   </data>
   <data name="ExplorerFilterResultFormat" xml:space="preserve">
     <value>{0:N0} results</value>
+  </data>
+  <data name="ExplorerArchiveStatusFormat" xml:space="preserve">
+    <value>{0}!/{1}&#10;{2}</value>
+  </data>
+  <data name="ArchiveOpenFailedTitle" xml:space="preserve">
+    <value>Failed to open archive</value>
+  </data>
+  <data name="ArchiveEntryOpenFailedTitle" xml:space="preserve">
+    <value>Failed to open archive item</value>
+  </data>
+  <data name="ArchiveExplorerReadOnlyMessage" xml:space="preserve">
+    <value>Archive contents are read-only.</value>
   </data>
   <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
     <value>Unsupported Office document.</value>

@@ -73,6 +73,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? InsertMarkdownImageClick;
         public event RoutedEventHandler? OpenExternalViewerClick;
         public event RoutedEventHandler? OpenWithDefaultProgramClick;
+        public event RoutedEventHandler? ExtractArchiveToFolderClick;
         public event RoutedEventHandler? CopyFileNameClick;
         public event RoutedEventHandler? CopyFilePathClick;
         public event RoutedEventHandler? CopyFolderPathClick;
@@ -346,6 +347,7 @@ namespace TxtAIEditor.Controls
         private void OnInsertMarkdownImageClick(object sender, RoutedEventArgs e) => InsertMarkdownImageClick?.Invoke(sender, e);
         private void OnOpenExternalViewerClick(object sender, RoutedEventArgs e) => OpenExternalViewerClick?.Invoke(sender, e);
         private void OnOpenWithDefaultProgramClick(object sender, RoutedEventArgs e) => OpenWithDefaultProgramClick?.Invoke(sender, e);
+        private void OnExtractArchiveToFolderClick(object sender, RoutedEventArgs e) => ExtractArchiveToFolderClick?.Invoke(sender, e);
         private void OnCopyFileNameClick(object sender, RoutedEventArgs e) => CopyFileNameClick?.Invoke(sender, e);
         private void OnCopyFilePathClick(object sender, RoutedEventArgs e) => CopyFilePathClick?.Invoke(sender, e);
         private void OnCopyFolderPathClick(object sender, RoutedEventArgs e) => CopyFolderPathClick?.Invoke(sender, e);

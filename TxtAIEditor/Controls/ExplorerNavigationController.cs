@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly LeftSidebarPane _leftSidebar;
         private readonly MainWindowViewModel _viewModel;
         private readonly ExplorerDirectoryService _directoryService;
+        private readonly ArchiveExplorerService _archiveExplorerService;
         private readonly IGitService _gitService;
         private readonly Action<object> _initializePickerWindow;
         private readonly Action<string> _currentFolderChanged;
@@ -25,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _ensureLeftPanelVisible;
         private readonly Action<int> _showLeftSidebarPage;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
+        private readonly Func<string, string, Task> _loadArchiveEntryIntoTabAsync;
         private readonly ILocalizationService _localizationService;
         private readonly Func<string> _homeFolderPathProvider;
 
@@ -41,6 +43,7 @@ namespace TxtAIEditor.Controls
             LeftSidebarPane leftSidebar,
             MainWindowViewModel viewModel,
             ExplorerDirectoryService directoryService,
+            ArchiveExplorerService archiveExplorerService,
             IGitService gitService,
             Action<object> initializePickerWindow,
             Action<string> currentFolderChanged,
@@ -49,12 +52,14 @@ namespace TxtAIEditor.Controls
             Action ensureLeftPanelVisible,
             Action<int> showLeftSidebarPage,
             Func<string, Task> loadFileIntoTabAsync,
+            Func<string, string, Task> loadArchiveEntryIntoTabAsync,
             ILocalizationService localizationService,
             Func<string> homeFolderPathProvider)
         {
             _leftSidebar = leftSidebar;
             _viewModel = viewModel;
             _directoryService = directoryService;
+            _archiveExplorerService = archiveExplorerService;
             _gitService = gitService;
             _initializePickerWindow = initializePickerWindow;
             _currentFolderChanged = currentFolderChanged;
@@ -63,6 +68,7 @@ namespace TxtAIEditor.Controls
             _ensureLeftPanelVisible = ensureLeftPanelVisible;
             _showLeftSidebarPage = showLeftSidebarPage;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
+            _loadArchiveEntryIntoTabAsync = loadArchiveEntryIntoTabAsync;
             _localizationService = localizationService;
             _homeFolderPathProvider = homeFolderPathProvider;
 
@@ -76,16 +82,22 @@ namespace TxtAIEditor.Controls
         }
 
         public string CurrentFolderPath { get; private set; } = string.Empty;
+        public string CurrentArchivePath { get; private set; } = string.Empty;
+        public string CurrentArchiveDirectory { get; private set; } = string.Empty;
+        public bool IsViewingArchive => !string.IsNullOrWhiteSpace(CurrentArchivePath);
 
         public void LoadDirectoryRoot(string folderPath)
         {
             _viewModel.ExplorerItems.Clear();
+            CurrentArchivePath = string.Empty;
+            CurrentArchiveDirectory = string.Empty;
             SetCurrentFolderPath(folderPath);
 
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
             foreach (var item in SortItems(_directoryService.CreateDirectoryItems(folderPath)))
             {
                 item.IsDark = isDark;
+                item.IsArchive = !item.IsFolder && _archiveExplorerService.IsSupportedArchiveFile(item.Path);
                 _viewModel.ExplorerItems.Add(item);
             }
 
@@ -93,6 +105,42 @@ namespace TxtAIEditor.Controls
 
             // Trigger Git status update in the background
             _ = UpdateGitStatusesAsync();
+        }
+
+        private void LoadArchiveDirectoryRoot(string archivePath, string entryDirectory)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(archivePath) || !File.Exists(archivePath))
+                {
+                    return;
+                }
+
+                _viewModel.ExplorerItems.Clear();
+                CurrentArchivePath = archivePath;
+                CurrentArchiveDirectory = ArchiveExplorerService.NormalizeEntryPath(entryDirectory);
+
+                bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                foreach (var item in SortItems(_archiveExplorerService.CreateArchiveItems(archivePath, CurrentArchiveDirectory)))
+                {
+                    item.IsDark = isDark;
+                    _viewModel.ExplorerItems.Add(item);
+                }
+
+                string directoryLabel = string.IsNullOrEmpty(CurrentArchiveDirectory) ? "/" : CurrentArchiveDirectory;
+                string format = _localizationService.GetString("ExplorerArchiveStatusFormat", "{0}!/{1}\n{2}");
+                _leftSidebar.ExplorerStatus.Text = string.Format(
+                    format,
+                    archivePath,
+                    directoryLabel,
+                    FormatExplorerItemCount(_viewModel.ExplorerItems.Count));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed reading archive: {ex.Message}");
+                string title = _localizationService.GetString("ArchiveOpenFailedTitle", "압축 파일 열기 실패");
+                _leftSidebar.ExplorerStatus.Text = $"{archivePath}\n{title}: {ex.Message}";
+            }
         }
 
         public async Task NavigateToFolderAsync(string folderPath, bool revealInLeftPanel = true)
@@ -116,6 +164,20 @@ namespace TxtAIEditor.Controls
 
         public void RefreshCurrentFolder()
         {
+            if (IsViewingArchive)
+            {
+                if (File.Exists(CurrentArchivePath))
+                {
+                    LoadArchiveDirectoryRoot(CurrentArchivePath, CurrentArchiveDirectory);
+                }
+                else if (!string.IsNullOrEmpty(CurrentFolderPath) && Directory.Exists(CurrentFolderPath))
+                {
+                    LoadDirectoryRoot(CurrentFolderPath);
+                }
+
+                return;
+            }
+
             if (!string.IsNullOrEmpty(CurrentFolderPath) && Directory.Exists(CurrentFolderPath))
             {
                 LoadDirectoryRoot(CurrentFolderPath);
@@ -171,7 +233,13 @@ namespace TxtAIEditor.Controls
 
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
+            string folderPath = CurrentFolderPath;
+            if (IsViewingArchive)
+            {
+                folderPath = Path.GetDirectoryName(CurrentArchivePath) ?? string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
             {
                 return;
             }
@@ -181,7 +249,7 @@ namespace TxtAIEditor.Controls
                 FileName = "explorer.exe",
                 UseShellExecute = false
             };
-            startInfo.ArgumentList.Add(CurrentFolderPath);
+            startInfo.ArgumentList.Add(folderPath);
             Process.Start(startInfo);
         }
 
@@ -201,6 +269,12 @@ namespace TxtAIEditor.Controls
 
         private void OnExplorerUpClick(object sender, RoutedEventArgs e)
         {
+            if (IsViewingArchive)
+            {
+                NavigateArchiveUp();
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(CurrentFolderPath))
             {
                 return;
@@ -216,6 +290,24 @@ namespace TxtAIEditor.Controls
             LoadDirectoryRoot(parent.FullName);
         }
 
+        private void NavigateArchiveUp()
+        {
+            if (string.IsNullOrEmpty(CurrentArchiveDirectory))
+            {
+                string archiveFolderPath = Path.GetDirectoryName(CurrentArchivePath) ?? CurrentFolderPath;
+                if (!string.IsNullOrWhiteSpace(archiveFolderPath) && Directory.Exists(archiveFolderPath))
+                {
+                    UpdateRepoPath(archiveFolderPath);
+                    LoadDirectoryRoot(archiveFolderPath);
+                }
+
+                return;
+            }
+
+            string parentEntryPath = ArchiveExplorerService.GetParentEntryPath(CurrentArchiveDirectory);
+            LoadArchiveDirectoryRoot(CurrentArchivePath, parentEntryPath);
+        }
+
         private void OnFileListViewItemClick(object sender, Microsoft.UI.Xaml.Controls.ItemClickEventArgs e)
         {
             var item = e.ClickedItem as ExplorerItem
@@ -227,8 +319,22 @@ namespace TxtAIEditor.Controls
 
             if (item.IsFolder)
             {
+                if (item.IsArchiveEntry)
+                {
+                    LoadArchiveDirectoryRoot(item.ArchivePath, item.ArchiveEntryPath);
+                    return;
+                }
+
                 UpdateRepoPath(item.Path);
                 LoadDirectoryRoot(item.Path);
+            }
+            else if (item.IsArchiveEntry)
+            {
+                _ = _loadArchiveEntryIntoTabAsync(item.ArchivePath, item.ArchiveEntryPath);
+            }
+            else if (item.IsArchive || _archiveExplorerService.IsSupportedArchiveFile(item.Path))
+            {
+                LoadArchiveDirectoryRoot(item.Path, string.Empty);
             }
             else
             {
@@ -258,6 +364,19 @@ namespace TxtAIEditor.Controls
         public async Task UpdateGitStatusesAsync()
         {
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+            if (IsViewingArchive)
+            {
+                _leftSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    foreach (var item in _viewModel.ExplorerItems)
+                    {
+                        item.IsDark = isDark;
+                        item.GitStatus = ExplorerItem.GitStatusType.Clean;
+                    }
+                });
+                return;
+            }
+
             string repoPath = _gitService.FindRepositoryRoot(CurrentFolderPath) ?? string.Empty;
             if (string.IsNullOrEmpty(repoPath))
             {
@@ -493,6 +612,12 @@ namespace TxtAIEditor.Controls
 
         private async Task ApplyFilterAsync(string query)
         {
+            if (IsViewingArchive)
+            {
+                await ApplyArchiveFilterAsync(query);
+                return;
+            }
+
             if (string.IsNullOrEmpty(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
             {
                 return;
@@ -523,6 +648,49 @@ namespace TxtAIEditor.Controls
                 });
 
                 await UpdateGitStatusesAsync();
+            }
+        }
+
+        private async Task ApplyArchiveFilterAsync(string query)
+        {
+            if (string.IsNullOrWhiteSpace(CurrentArchivePath) || !File.Exists(CurrentArchivePath))
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                LoadArchiveDirectoryRoot(CurrentArchivePath, CurrentArchiveDirectory);
+                return;
+            }
+
+            string archivePath = CurrentArchivePath;
+            string archiveDirectory = CurrentArchiveDirectory;
+            var matchedItems = await Task.Run(() =>
+                _archiveExplorerService.SearchArchiveItems(archivePath, archiveDirectory, query, MatchesPattern));
+
+            if (query == _lastFilterQuery &&
+                archivePath == CurrentArchivePath &&
+                archiveDirectory == CurrentArchiveDirectory)
+            {
+                _leftSidebar.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _viewModel.ExplorerItems.Clear();
+                    bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                    foreach (var item in SortItems(matchedItems))
+                    {
+                        item.IsDark = isDark;
+                        _viewModel.ExplorerItems.Add(item);
+                    }
+
+                    string directoryLabel = string.IsNullOrEmpty(CurrentArchiveDirectory) ? "/" : CurrentArchiveDirectory;
+                    string format = _localizationService.GetString("ExplorerArchiveStatusFormat", "{0}!/{1}\n{2}");
+                    _leftSidebar.ExplorerStatus.Text = string.Format(
+                        format,
+                        CurrentArchivePath,
+                        directoryLabel,
+                        FormatExplorerFilterResult(_viewModel.ExplorerItems.Count));
+                });
             }
         }
 
@@ -598,6 +766,7 @@ namespace TxtAIEditor.Controls
                                 Name = file.Name,
                                 Path = file.FullName,
                                 IsFolder = false,
+                                IsArchive = _archiveExplorerService.IsSupportedArchiveFile(file.FullName),
                                 ModifiedTime = file.LastWriteTime,
                                 SubPath = relativeDir ?? string.Empty
                             });

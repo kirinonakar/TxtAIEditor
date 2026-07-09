@@ -21,6 +21,7 @@ namespace TxtAIEditor.Composition
             ISettingsDialogService settingsDialogService,
             IUiPersonalizationService uiPersonalizationService,
             ExplorerDirectoryService explorerDirectoryService,
+            ArchiveExplorerService archiveExplorerService,
             PdfTextExtractionService pdfTextExtractionService,
             SecureNoteEncryptionService secureNoteEncryptionService,
             IFileSaveDialogService fileSaveDialogService,
@@ -41,6 +42,7 @@ namespace TxtAIEditor.Composition
             SettingsDialogService = settingsDialogService;
             UiPersonalizationService = uiPersonalizationService;
             ExplorerDirectoryService = explorerDirectoryService;
+            ArchiveExplorerService = archiveExplorerService;
             PdfTextExtractionService = pdfTextExtractionService;
             SecureNoteEncryptionService = secureNoteEncryptionService;
             FileSaveDialogService = fileSaveDialogService;
@@ -62,6 +64,7 @@ namespace TxtAIEditor.Composition
         public ISettingsDialogService SettingsDialogService { get; }
         public IUiPersonalizationService UiPersonalizationService { get; }
         public ExplorerDirectoryService ExplorerDirectoryService { get; }
+        public ArchiveExplorerService ArchiveExplorerService { get; }
         public PdfTextExtractionService PdfTextExtractionService { get; }
         public SecureNoteEncryptionService SecureNoteEncryptionService { get; }
         public IFileSaveDialogService FileSaveDialogService { get; }
@@ -84,6 +87,7 @@ namespace TxtAIEditor.Composition
             var settingsDialogService = new SettingsDialogService(llmService);
             var uiPersonalizationService = new UiPersonalizationService();
             var explorerDirectoryService = new ExplorerDirectoryService();
+            var archiveExplorerService = new ArchiveExplorerService();
             var pdfTextExtractionService = new PdfTextExtractionService();
             var secureNoteEncryptionService = new SecureNoteEncryptionService();
             var fileSaveDialogService = new FileSaveDialogService(getString);
@@ -105,6 +109,7 @@ namespace TxtAIEditor.Composition
                 settingsDialogService,
                 uiPersonalizationService,
                 explorerDirectoryService,
+                archiveExplorerService,
                 pdfTextExtractionService,
                 secureNoteEncryptionService,
                 fileSaveDialogService,

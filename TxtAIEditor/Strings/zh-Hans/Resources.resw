@@ -1781,6 +1781,27 @@
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>复制文件路径</value>
   </data>
+  <data name="ExplorerExtractArchiveToFolder" xml:space="preserve">
+    <value>解压到文件夹</value>
+  </data>
+  <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
+    <value>解压到 {0} 文件夹</value>
+  </data>
+  <data name="ArchiveExtractFailedTitle" xml:space="preserve">
+    <value>解压缩文件失败</value>
+  </data>
+  <data name="ArchiveExtractTargetFileExistsFormat" xml:space="preserve">
+    <value>已存在名为“{0}”的文件，无法解压缩。</value>
+  </data>
+  <data name="ArchiveExtractOverwriteTitle" xml:space="preserve">
+    <value>确认解压</value>
+  </data>
+  <data name="ArchiveExtractOverwriteMessageFormat" xml:space="preserve">
+    <value>“{0}”文件夹已存在。是否解压并覆盖现有文件？</value>
+  </data>
+  <data name="ArchiveExtractOverwriteOK" xml:space="preserve">
+    <value>解压</value>
+  </data>
   <data name="ExplorerCreateFolderTooltip" xml:space="preserve">
     <value>新建文件夹</value>
   </data>
@@ -2810,6 +2831,18 @@
   </data>
   <data name="ExplorerFilterResultFormat" xml:space="preserve">
     <value>{0:N0} 结果</value>
+  </data>
+  <data name="ExplorerArchiveStatusFormat" xml:space="preserve">
+    <value>{0}!/{1}&#10;{2}</value>
+  </data>
+  <data name="ArchiveOpenFailedTitle" xml:space="preserve">
+    <value>打开压缩文件失败</value>
+  </data>
+  <data name="ArchiveEntryOpenFailedTitle" xml:space="preserve">
+    <value>打开压缩文件内项目失败</value>
+  </data>
+  <data name="ArchiveExplorerReadOnlyMessage" xml:space="preserve">
+    <value>压缩文件内容为只读。</value>
   </data>
   <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
     <value>不受支持的 Office 文档。</value>

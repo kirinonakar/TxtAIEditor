@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -17,6 +18,7 @@ namespace TxtAIEditor.Controls
     {
         private readonly LeftSidebarPane _leftSidebar;
         private readonly MainWindowViewModel _viewModel;
+        private readonly ArchiveExplorerService _archiveExplorerService;
         private readonly TabView _primaryTabView;
         private readonly TabView _secondaryTabView;
         private readonly Func<string> _currentFolderProvider;
@@ -34,11 +36,13 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isTerminalVisible;
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
+        private readonly Func<bool> _isArchiveViewProvider;
         private readonly ConditionalWeakTable<MenuFlyout, object> _localizedFlyouts = new ConditionalWeakTable<MenuFlyout, object>();
 
         public ExplorerFileActionsController(
             LeftSidebarPane leftSidebar,
             MainWindowViewModel viewModel,
+            ArchiveExplorerService archiveExplorerService,
             TabView primaryTabView,
             TabView secondaryTabView,
             Func<string> currentFolderProvider,
@@ -55,10 +59,12 @@ namespace TxtAIEditor.Controls
             Action<string, string> showError,
             Func<bool> isTerminalVisible,
             Action suspendTerminal,
-            Action resumeTerminal)
+            Action resumeTerminal,
+            Func<bool> isArchiveViewProvider)
         {
             _leftSidebar = leftSidebar;
             _viewModel = viewModel;
+            _archiveExplorerService = archiveExplorerService;
             _primaryTabView = primaryTabView;
             _secondaryTabView = secondaryTabView;
             _currentFolderProvider = currentFolderProvider;
@@ -76,6 +82,7 @@ namespace TxtAIEditor.Controls
             _isTerminalVisible = isTerminalVisible;
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
+            _isArchiveViewProvider = isArchiveViewProvider;
 
             WireEvents();
         }
@@ -87,6 +94,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.InsertMarkdownImageClick += OnInsertMarkdownImageClick;
             _leftSidebar.OpenExternalViewerClick += OnOpenExternalViewerClick;
             _leftSidebar.OpenWithDefaultProgramClick += OnOpenWithDefaultProgramClick;
+            _leftSidebar.ExtractArchiveToFolderClick += OnExtractArchiveToFolderClick;
             _leftSidebar.CopyFileNameClick += OnCopyFileNameClick;
             _leftSidebar.CopyFilePathClick += OnCopyFilePathClick;
             _leftSidebar.CopyFolderPathClick += OnCopyFolderPathClick;
@@ -105,7 +113,7 @@ namespace TxtAIEditor.Controls
                 _leftSidebar.FileList.SelectedItem = item;
             }
 
-            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 12)
+            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 13)
             {
                 LocalizeContextFlyout(flyout);
                 ConfigureContextFlyout(flyout, _leftSidebar.FileList.SelectedItem as ExplorerItem);
@@ -118,6 +126,14 @@ namespace TxtAIEditor.Controls
 
         private async void OnCreateFolderClick(object sender, RoutedEventArgs e)
         {
+            if (_isArchiveViewProvider())
+            {
+                _showError(
+                    _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
+                    _getString("ArchiveExplorerReadOnlyMessage", "압축 파일 내부는 읽기 전용입니다."));
+                return;
+            }
+
             string currentFolder = _currentFolderProvider();
             if (string.IsNullOrWhiteSpace(currentFolder) || !Directory.Exists(currentFolder))
             {
@@ -214,18 +230,30 @@ namespace TxtAIEditor.Controls
             ((MenuFlyoutItem)flyout.Items[2]).Text = _getString("ExplorerInsertMarkdownImage", "마크다운 삽입");
             ((MenuFlyoutItem)flyout.Items[3]).Text = _getString("OpenExternalViewerTooltip", "외부 뷰어로 열기");
             ((MenuFlyoutItem)flyout.Items[4]).Text = _getString("OpenWithDefaultProgramTooltip", "기본 프로그램으로 열기");
-            ((MenuFlyoutItem)flyout.Items[6]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
-            ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
-            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
-            ((MenuFlyoutItem)flyout.Items[10]).Text = _getString("ExplorerRename", "이름 바꾸기");
-            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerDelete", "삭제");
+            ((MenuFlyoutItem)flyout.Items[5]).Text = _getString("ExplorerExtractArchiveToFolder", "폴더에 풀기");
+            ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
+            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
+            ((MenuFlyoutItem)flyout.Items[9]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
+            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerRename", "이름 바꾸기");
+            ((MenuFlyoutItem)flyout.Items[12]).Text = _getString("ExplorerDelete", "삭제");
         }
 
-        private static void ConfigureContextFlyout(MenuFlyout flyout, ExplorerItem? item)
+        private void ConfigureContextFlyout(MenuFlyout flyout, ExplorerItem? item)
         {
+            bool isArchiveEntry = item?.IsArchiveEntry == true;
+            if (flyout.Items.Count > 0 && flyout.Items[0] is MenuFlyoutItem addFileFavoriteItem)
+            {
+                addFileFavoriteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (flyout.Items.Count > 1 && flyout.Items[1] is MenuFlyoutItem addFolderFavoriteItem)
+            {
+                addFolderFavoriteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+            }
+
             if (flyout.Items.Count > 2 && flyout.Items[2] is MenuFlyoutItem markdownItem)
             {
-                markdownItem.Visibility = item != null && !item.IsFolder && IsSupportedImageFile(item.Path)
+                markdownItem.Visibility = item != null && !isArchiveEntry && !item.IsFolder && IsSupportedImageFile(item.Path)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
@@ -239,6 +267,33 @@ namespace TxtAIEditor.Controls
             if (flyout.Items.Count > 4 && flyout.Items[4] is MenuFlyoutItem defaultProgramItem)
             {
                 defaultProgramItem.Visibility = canOpenFile ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            bool canExtractArchive = IsSupportedArchiveFile(item);
+            if (flyout.Items.Count > 5 && flyout.Items[5] is MenuFlyoutItem extractArchiveItem)
+            {
+                extractArchiveItem.Visibility = canExtractArchive ? Visibility.Visible : Visibility.Collapsed;
+                if (canExtractArchive && item != null)
+                {
+                    string folderName = GetArchiveExtractFolderName(item.Path);
+                    string format = _getString("ExplorerExtractArchiveToFolderFormat", "{0} 폴더에 풀기");
+                    extractArchiveItem.Text = string.Format(format, folderName);
+                }
+            }
+
+            if (flyout.Items.Count > 9 && flyout.Items[9] is MenuFlyoutItem copyFolderPathItem)
+            {
+                copyFolderPathItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem renameItem)
+            {
+                renameItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (flyout.Items.Count > 12 && flyout.Items[12] is MenuFlyoutItem deleteItem)
+            {
+                deleteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
         }
 
@@ -289,6 +344,78 @@ namespace TxtAIEditor.Controls
             }
 
             await _openFileWithDefaultProgramAsync(item!.Path);
+        }
+
+        private async void OnExtractArchiveToFolderClick(object sender, RoutedEventArgs e)
+        {
+            var item = GetExplorerItem(sender);
+            if (!IsSupportedArchiveFile(item))
+            {
+                return;
+            }
+
+            string archivePath = item!.Path;
+            string parentDirectory = Path.GetDirectoryName(archivePath) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(parentDirectory) || !Directory.Exists(parentDirectory))
+            {
+                return;
+            }
+
+            string targetDirectory = Path.Combine(parentDirectory, GetArchiveExtractFolderName(archivePath));
+            try
+            {
+                if (File.Exists(targetDirectory))
+                {
+                    _showError(
+                        _getString("ArchiveExtractFailedTitle", "압축 풀기 실패"),
+                        string.Format(
+                            _getString("ArchiveExtractTargetFileExistsFormat", "'{0}' 이름의 파일이 이미 있어 압축을 풀 수 없습니다."),
+                            Path.GetFileName(targetDirectory)));
+                    return;
+                }
+
+                bool overwrite = false;
+                if (Directory.Exists(targetDirectory) && Directory.EnumerateFileSystemEntries(targetDirectory).Any())
+                {
+                    var confirmDialog = new ContentDialog
+                    {
+                        Title = _getString("ArchiveExtractOverwriteTitle", "압축 풀기 확인"),
+                        Content = string.Format(
+                            _getString("ArchiveExtractOverwriteMessageFormat", "'{0}' 폴더가 이미 있습니다. 기존 파일을 덮어쓰며 압축을 풀까요?"),
+                            Path.GetFileName(targetDirectory)),
+                        PrimaryButtonText = _getString("ArchiveExtractOverwriteOK", "압축 풀기"),
+                        CloseButtonText = _getString("CopyOverwriteCancel", "취소"),
+                        DefaultButton = ContentDialogButton.Close,
+                        XamlRoot = _xamlRootProvider(),
+                        RequestedTheme = _themeProvider()
+                    };
+
+                    if (await ShowDialogAsync(confirmDialog) != ContentDialogResult.Primary)
+                    {
+                        return;
+                    }
+
+                    overwrite = true;
+                }
+
+                await Task.Run(async () =>
+                    await _archiveExplorerService.ExtractArchiveToDirectoryAsync(archivePath, targetDirectory, overwrite));
+
+                _loadDirectoryRoot(parentDirectory);
+                var extractedFolder = _viewModel.ExplorerItems
+                    .FirstOrDefault(candidate => string.Equals(candidate.Path, targetDirectory, StringComparison.OrdinalIgnoreCase));
+                if (extractedFolder != null)
+                {
+                    _leftSidebar.FileList.SelectedItem = extractedFolder;
+                    _leftSidebar.FileList.ScrollIntoView(extractedFolder);
+                }
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("ArchiveExtractFailedTitle", "압축 풀기 실패"),
+                    ex.Message);
+            }
         }
 
         private string CreateMarkdownImageText(ExplorerItem item)
@@ -357,7 +484,7 @@ namespace TxtAIEditor.Controls
         private async void OnRenameClick(object sender, RoutedEventArgs e)
         {
             var item = GetExplorerItem(sender);
-            if (item == null || string.IsNullOrEmpty(item.Path))
+            if (item == null || item.IsArchiveEntry || string.IsNullOrEmpty(item.Path))
             {
                 return;
             }
@@ -434,7 +561,7 @@ namespace TxtAIEditor.Controls
         private async void OnDeleteClick(object sender, RoutedEventArgs e)
         {
             var item = GetExplorerItem(sender);
-            if (item == null || string.IsNullOrEmpty(item.Path))
+            if (item == null || item.IsArchiveEntry || string.IsNullOrEmpty(item.Path))
             {
                 return;
             }
@@ -508,8 +635,27 @@ namespace TxtAIEditor.Controls
         {
             return item != null &&
                    !item.IsFolder &&
+                   !item.IsArchiveEntry &&
                    !string.IsNullOrWhiteSpace(item.Path) &&
                    File.Exists(item.Path);
+        }
+
+        private static bool IsSupportedArchiveFile(ExplorerItem? item)
+        {
+            return item != null &&
+                   !item.IsFolder &&
+                   !item.IsArchiveEntry &&
+                   !string.IsNullOrWhiteSpace(item.Path) &&
+                   File.Exists(item.Path) &&
+                   ArchiveExplorerService.IsSupportedArchivePath(item.Path);
+        }
+
+        private static string GetArchiveExtractFolderName(string archivePath)
+        {
+            string folderName = Path.GetFileNameWithoutExtension(archivePath);
+            return string.IsNullOrWhiteSpace(folderName)
+                ? "archive"
+                : folderName;
         }
 
         private async Task<ContentDialogResult> ShowDialogAsync(ContentDialog dialog)
@@ -577,6 +723,13 @@ namespace TxtAIEditor.Controls
 
         private void OnFileListViewDragOver(object sender, DragEventArgs e)
         {
+            if (_isArchiveViewProvider())
+            {
+                e.AcceptedOperation = DataPackageOperation.None;
+                e.Handled = true;
+                return;
+            }
+
             if (e.DataView.Contains(StandardDataFormats.StorageItems))
             {
                 e.AcceptedOperation = DataPackageOperation.Copy;
@@ -590,6 +743,12 @@ namespace TxtAIEditor.Controls
         private async void OnFileListViewDrop(object sender, DragEventArgs e)
         {
             e.Handled = true;
+            if (_isArchiveViewProvider())
+            {
+                e.AcceptedOperation = DataPackageOperation.None;
+                return;
+            }
+
             if (!e.DataView.Contains(StandardDataFormats.StorageItems))
             {
                 return;
@@ -625,6 +784,15 @@ namespace TxtAIEditor.Controls
 
         private void OnFileListViewItemDragOver(object sender, DragEventArgs e)
         {
+            if (sender is FrameworkElement targetElement &&
+                targetElement.DataContext is ExplorerItem targetArchiveItem &&
+                targetArchiveItem.IsArchiveEntry)
+            {
+                e.AcceptedOperation = DataPackageOperation.None;
+                e.Handled = true;
+                return;
+            }
+
             if (e.DataView.Contains(StandardDataFormats.StorageItems))
             {
                 e.AcceptedOperation = DataPackageOperation.Copy;
@@ -659,6 +827,11 @@ namespace TxtAIEditor.Controls
             }
 
             if (sender is not FrameworkElement element || element.DataContext is not ExplorerItem targetItem)
+            {
+                return;
+            }
+
+            if (targetItem.IsArchiveEntry)
             {
                 return;
             }

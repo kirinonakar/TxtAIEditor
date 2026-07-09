@@ -100,6 +100,7 @@ namespace TxtAIEditor.Composition
             var fileTabLoad = new FileTabLoadController(
                 services.GitService,
                 services.SecureNoteEncryptionService,
+                services.ArchiveExplorerService,
                 viewModel,
                 ui.EditorTabView,
                 ui.EditorTabView2,
@@ -119,6 +120,7 @@ namespace TxtAIEditor.Composition
                 ui.LeftSidebar,
                 viewModel,
                 services.ExplorerDirectoryService,
+                services.ArchiveExplorerService,
                 services.GitService,
                 callbacks.InitializePickerWindow,
                 callbacks.SetCurrentFolderPath,
@@ -127,6 +129,7 @@ namespace TxtAIEditor.Composition
                 callbacks.EnsureLeftPanelVisible,
                 callbacks.ShowLeftSidebarPage,
                 callbacks.LoadFileIntoTabAsync,
+                async (archivePath, entryPath) => { await fileTabLoad.LoadArchiveEntryAsync(archivePath, entryPath); },
                 services.LocalizationService,
                 () => services.SettingsService.CurrentSettings.HomeFolderPath);
 

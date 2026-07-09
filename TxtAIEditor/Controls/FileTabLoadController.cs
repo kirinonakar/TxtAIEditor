@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -18,6 +19,7 @@ namespace TxtAIEditor.Controls
     {
         private readonly IGitService _gitService;
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
+        private readonly ArchiveExplorerService _archiveExplorerService;
         private readonly MainWindowViewModel _viewModel;
         private readonly TabView _editorTabView;
         private readonly TabView _editorTabView2;
@@ -37,6 +39,7 @@ namespace TxtAIEditor.Controls
         public FileTabLoadController(
             IGitService gitService,
             SecureNoteEncryptionService secureNoteEncryptionService,
+            ArchiveExplorerService archiveExplorerService,
             MainWindowViewModel viewModel,
             TabView editorTabView,
             TabView editorTabView2,
@@ -54,6 +57,7 @@ namespace TxtAIEditor.Controls
         {
             _gitService = gitService;
             _secureNoteEncryptionService = secureNoteEncryptionService;
+            _archiveExplorerService = archiveExplorerService;
             _viewModel = viewModel;
             _editorTabView = editorTabView;
             _editorTabView2 = editorTabView2;
@@ -166,6 +170,68 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public async Task<OpenedTab?> LoadArchiveEntryAsync(string archivePath, string entryPath)
+        {
+            var result = await LoadArchiveEntryWithResultAsync(archivePath, entryPath);
+            return result.Tab;
+        }
+
+        public async Task<FileTabLoadResult> LoadArchiveEntryWithResultAsync(string archivePath, string entryPath)
+        {
+            await _fileOpenSemaphore.WaitAsync();
+            try
+            {
+                string normalizedEntryPath = ArchiveExplorerService.NormalizeEntryPath(entryPath);
+                string virtualPath = ArchiveExplorerService.CreateVirtualPath(archivePath, normalizedEntryPath);
+                if (string.IsNullOrWhiteSpace(archivePath) ||
+                    string.IsNullOrWhiteSpace(normalizedEntryPath) ||
+                    !File.Exists(archivePath))
+                {
+                    return FileTabLoadResult.Failed(virtualPath, "archive entry path is invalid.");
+                }
+
+                var existingTab = FocusExistingArchiveEntryTab(archivePath, normalizedEntryPath);
+                if (existingTab != null)
+                {
+                    return FileTabLoadResult.ActivatedExisting(existingTab);
+                }
+
+                if (RequiresExtractedViewer(normalizedEntryPath))
+                {
+                    string cachePath = await _archiveExplorerService.ExtractEntryToCacheFileAsync(archivePath, normalizedEntryPath);
+                    OpenedTab viewerTab = OpenViewerTab(cachePath);
+                    ApplyArchiveEntryTabState(viewerTab, archivePath, normalizedEntryPath, isReadOnlyTextFile: false);
+                    return FileTabLoadResult.Opened(viewerTab);
+                }
+
+                byte[] bytes = await _archiveExplorerService.ReadEntryBytesAsync(archivePath, normalizedEntryPath);
+                EditorDocumentLoadResult readResult = LoadTextEntry(bytes);
+                OpenedTab textTab = _openNewTab(new FileTabOpenRequest
+                {
+                    FilePath = virtualPath,
+                    Content = string.Empty,
+                    IsReadOnly = true,
+                    EncodingName = readResult.EncodingName,
+                    EncodingWasAutoDetected = readResult.EncodingWasAutoDetected,
+                    TextModel = readResult.Model
+                });
+
+                ApplyArchiveEntryTabState(textTab, archivePath, normalizedEntryPath, isReadOnlyTextFile: true);
+                return FileTabLoadResult.Opened(textTab);
+            }
+            catch (Exception ex)
+            {
+                string normalizedEntryPath = ArchiveExplorerService.NormalizeEntryPath(entryPath);
+                string virtualPath = ArchiveExplorerService.CreateVirtualPath(archivePath, normalizedEntryPath);
+                _showErrorMessage(_getString("ArchiveEntryOpenFailedTitle", "압축 파일 항목 열기 실패"), ex.Message);
+                return FileTabLoadResult.Failed(virtualPath, ex.Message);
+            }
+            finally
+            {
+                _fileOpenSemaphore.Release();
+            }
+        }
+
         private async Task<OpenedTab?> OpenEncryptedFileAsync(string filePath)
         {
             string? password = await _promptPasswordAsync(
@@ -198,6 +264,32 @@ namespace TxtAIEditor.Controls
                 return null;
             }
 
+            FocusTab(existingTab);
+            return existingTab;
+        }
+
+        private OpenedTab? FocusExistingArchiveEntryTab(string archivePath, string entryPath)
+        {
+            string normalizedArchivePath = NormalizePathForComparison(archivePath);
+            string normalizedEntryPath = ArchiveExplorerService.NormalizeEntryPath(entryPath);
+            var existingTab = _viewModel.Tabs.FirstOrDefault(t =>
+                t.IsArchiveEntry &&
+                !string.IsNullOrWhiteSpace(t.ArchiveSourcePath) &&
+                !string.IsNullOrWhiteSpace(t.ArchiveEntryPath) &&
+                string.Equals(NormalizePathForComparison(t.ArchiveSourcePath), normalizedArchivePath, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(ArchiveExplorerService.NormalizeEntryPath(t.ArchiveEntryPath), normalizedEntryPath, StringComparison.Ordinal));
+
+            if (existingTab == null)
+            {
+                return null;
+            }
+
+            FocusTab(existingTab);
+            return existingTab;
+        }
+
+        private void FocusTab(OpenedTab existingTab)
+        {
             TabViewItem? tabItem = FindTabItem(_editorTabView, existingTab.Id);
             if (tabItem != null)
             {
@@ -217,8 +309,6 @@ namespace TxtAIEditor.Controls
                 bridgeGroup.WebView.Focus(FocusState.Programmatic);
                 _ = bridgeGroup.Bridge.FocusAsync();
             }
-
-            return existingTab;
         }
 
         private static TabViewItem? FindTabItem(TabView tabView, string tabId)
@@ -248,6 +338,77 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrEmpty(repoRoot))
             {
                 _queueGitStatusRefresh();
+            }
+        }
+
+        private OpenedTab OpenViewerTab(string filePath)
+        {
+            if (SupportedFileTypes.IsImageFile(filePath))
+            {
+                return _openImageTab(filePath);
+            }
+
+            if (SupportedFileTypes.IsMediaFile(filePath))
+            {
+                return _openMediaTab(filePath);
+            }
+
+            if (SupportedFileTypes.IsPdfFile(filePath))
+            {
+                return _openPdfTab(filePath);
+            }
+
+            return _openOfficeDocumentTab(filePath);
+        }
+
+        private static bool RequiresExtractedViewer(string entryPath)
+        {
+            return SupportedFileTypes.IsImageFile(entryPath) ||
+                   SupportedFileTypes.IsMediaFile(entryPath) ||
+                   SupportedFileTypes.IsPdfFile(entryPath) ||
+                   SupportedFileTypes.IsOfficeDocumentFile(entryPath);
+        }
+
+        private static EditorDocumentLoadResult LoadTextEntry(byte[] bytes)
+        {
+            const int sampleSize = 128 * 1024;
+            int sampleLength = Math.Min(bytes.Length, sampleSize);
+            byte[] sample = bytes.AsSpan(0, sampleLength).ToArray();
+            Encoding encoding = TextEncodingService.GetTextEncoding(sample, "Auto");
+            string text = encoding.GetString(bytes);
+
+            return new EditorDocumentLoadResult(
+                LineArrayTextModel.FromText(text),
+                TextEncodingService.GetDisplayName(encoding, TextEncodingService.HasUtf8Bom(sample)),
+                EncodingWasAutoDetected: true);
+        }
+
+        private static void ApplyArchiveEntryTabState(
+            OpenedTab tab,
+            string archivePath,
+            string entryPath,
+            bool isReadOnlyTextFile)
+        {
+            tab.ArchiveSourcePath = archivePath;
+            tab.ArchiveEntryPath = ArchiveExplorerService.NormalizeEntryPath(entryPath);
+            tab.IsReadOnlyTextFile = isReadOnlyTextFile;
+
+            string title = Path.GetFileName(tab.ArchiveEntryPath.Replace('/', Path.DirectorySeparatorChar));
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                tab.Title = title;
+            }
+        }
+
+        private static string NormalizePathForComparison(string path)
+        {
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch
+            {
+                return path;
             }
         }
     }

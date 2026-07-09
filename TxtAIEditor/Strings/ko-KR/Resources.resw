@@ -1781,6 +1781,27 @@
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>경로 복사</value>
   </data>
+  <data name="ExplorerExtractArchiveToFolder" xml:space="preserve">
+    <value>폴더에 풀기</value>
+  </data>
+  <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
+    <value>{0} 폴더에 풀기</value>
+  </data>
+  <data name="ArchiveExtractFailedTitle" xml:space="preserve">
+    <value>압축 풀기 실패</value>
+  </data>
+  <data name="ArchiveExtractTargetFileExistsFormat" xml:space="preserve">
+    <value>'{0}' 이름의 파일이 이미 있어 압축을 풀 수 없습니다.</value>
+  </data>
+  <data name="ArchiveExtractOverwriteTitle" xml:space="preserve">
+    <value>압축 풀기 확인</value>
+  </data>
+  <data name="ArchiveExtractOverwriteMessageFormat" xml:space="preserve">
+    <value>'{0}' 폴더가 이미 있습니다. 기존 파일을 덮어쓰며 압축을 풀까요?</value>
+  </data>
+  <data name="ArchiveExtractOverwriteOK" xml:space="preserve">
+    <value>압축 풀기</value>
+  </data>
   <data name="ExplorerCreateFolderTooltip" xml:space="preserve">
     <value>새 폴더</value>
   </data>
@@ -2810,6 +2831,18 @@
   </data>
   <data name="ExplorerFilterResultFormat" xml:space="preserve">
     <value>{0:N0}개 결과</value>
+  </data>
+  <data name="ExplorerArchiveStatusFormat" xml:space="preserve">
+    <value>{0}!/{1}&#10;{2}</value>
+  </data>
+  <data name="ArchiveOpenFailedTitle" xml:space="preserve">
+    <value>압축 파일 열기 실패</value>
+  </data>
+  <data name="ArchiveEntryOpenFailedTitle" xml:space="preserve">
+    <value>압축 파일 항목 열기 실패</value>
+  </data>
+  <data name="ArchiveExplorerReadOnlyMessage" xml:space="preserve">
+    <value>압축 파일 내부는 읽기 전용입니다.</value>
   </data>
   <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
     <value>지원하지 않는 Office 문서입니다.</value>

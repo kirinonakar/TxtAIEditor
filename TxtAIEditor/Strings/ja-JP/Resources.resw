@@ -1781,6 +1781,27 @@
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>パスをコピー</value>
   </data>
+  <data name="ExplorerExtractArchiveToFolder" xml:space="preserve">
+    <value>フォルダーに展開</value>
+  </data>
+  <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
+    <value>{0} フォルダーに展開</value>
+  </data>
+  <data name="ArchiveExtractFailedTitle" xml:space="preserve">
+    <value>圧縮ファイルの展開に失敗しました</value>
+  </data>
+  <data name="ArchiveExtractTargetFileExistsFormat" xml:space="preserve">
+    <value>'{0}' という名前のファイルが既にあるため展開できません。</value>
+  </data>
+  <data name="ArchiveExtractOverwriteTitle" xml:space="preserve">
+    <value>展開の確認</value>
+  </data>
+  <data name="ArchiveExtractOverwriteMessageFormat" xml:space="preserve">
+    <value>'{0}' フォルダーは既に存在します。既存のファイルを上書きして展開しますか?</value>
+  </data>
+  <data name="ArchiveExtractOverwriteOK" xml:space="preserve">
+    <value>展開</value>
+  </data>
   <data name="ExplorerCreateFolderTooltip" xml:space="preserve">
     <value>新しいフォルダ</value>
   </data>
@@ -2810,6 +2831,18 @@
   </data>
   <data name="ExplorerFilterResultFormat" xml:space="preserve">
     <value>{0:N0}件の結果</value>
+  </data>
+  <data name="ExplorerArchiveStatusFormat" xml:space="preserve">
+    <value>{0}!/{1}&#10;{2}</value>
+  </data>
+  <data name="ArchiveOpenFailedTitle" xml:space="preserve">
+    <value>圧縮ファイルを開けません</value>
+  </data>
+  <data name="ArchiveEntryOpenFailedTitle" xml:space="preserve">
+    <value>圧縮ファイル内の項目を開けません</value>
+  </data>
+  <data name="ArchiveExplorerReadOnlyMessage" xml:space="preserve">
+    <value>圧縮ファイルの中身は読み取り専用です。</value>
   </data>
   <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
     <value>サポートされていない Office 文書です。</value>

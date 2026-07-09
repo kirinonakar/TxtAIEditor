@@ -374,6 +374,7 @@ namespace TxtAIEditor.Composition
                     NavigateExplorerToFolderAsync,
                     NavigateExplorerToFolderAndRevealAsync,
                     callbacks.GetSelectedExplorerItem,
+                    () => explorerNavigationController?.IsViewingArchive == true,
                     ToggleLeftPanelAsync,
                     ToggleRightPanelAsync,
                     callbacks.FocusSearchPanel,

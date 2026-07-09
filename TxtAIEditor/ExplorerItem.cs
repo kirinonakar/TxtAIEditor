@@ -18,6 +18,10 @@ namespace TxtAIEditor
         public string Name { get; set; } = string.Empty;
         public string Path { get; set; } = string.Empty;
         public bool IsFolder { get; set; } = false;
+        public bool IsArchive { get; set; } = false;
+        public string ArchivePath { get; set; } = string.Empty;
+        public string ArchiveEntryPath { get; set; } = string.Empty;
+        public bool IsArchiveEntry => !string.IsNullOrWhiteSpace(ArchivePath);
         public DateTime ModifiedTime { get; set; } = DateTime.MinValue;
 
         private string _subPath = string.Empty;
@@ -113,10 +117,12 @@ namespace TxtAIEditor
         public Microsoft.UI.Xaml.Visibility GitBadgeVisibility =>
             _gitStatus == GitStatusType.Clean ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 
-        public string IconGlyph => IsFolder ? "\uED41" : GetFileIconGlyph(Name);
+        public string IconGlyph => IsFolder ? "\uED41" : IsArchive ? "\uF012" : GetFileIconGlyph(Name);
 
         public Windows.UI.Color IconColor => IsFolder
             ? Windows.UI.Color.FromArgb(255, 255, 195, 0)
+            : IsArchive
+                ? Windows.UI.Color.FromArgb(255, 214, 127, 47)
             : GetFileIconColor();
 
         private Windows.UI.Color GetFileIconColor()
@@ -198,6 +204,9 @@ namespace TxtAIEditor
                 ".mpeg" => "\uE714",
                 ".mpg" => "\uE714",
                 ".pdf" => "\uE12A",
+                ".zip" => "\uF012",
+                ".rar" => "\uF012",
+                ".7z" => "\uF012",
                 ".docx" => "\uE161",
                 ".doc" => "\uE161",
                 ".hwpx" => "\uE161",

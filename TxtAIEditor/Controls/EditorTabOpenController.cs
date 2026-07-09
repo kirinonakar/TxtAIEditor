@@ -323,7 +323,9 @@ namespace TxtAIEditor.Controls
         private void AddOpenTab(OpenedTab tab)
         {
             _viewModel.Tabs.Add(tab);
-            if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
+            if (!string.IsNullOrEmpty(tab.FilePath) &&
+                File.Exists(tab.FilePath) &&
+                !ArchiveExplorerService.IsArchiveCachePath(tab.FilePath))
             {
                 _favoritesRecentController.AddRecentFile(tab.FilePath);
             }

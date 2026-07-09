@@ -134,7 +134,12 @@ namespace TxtAIEditor.Core.Models
         public bool IsOfficeDocumentViewer { get; set; } = false;
         public bool IsHexViewer { get; set; } = false;
         public string? HexSourceFilePath { get; set; }
-        public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer;
+        public bool IsReadOnlyTextFile { get; set; } = false;
+        public string? ArchiveSourcePath { get; set; }
+        public string? ArchiveEntryPath { get; set; }
+        public bool IsArchiveEntry => !string.IsNullOrWhiteSpace(ArchiveSourcePath) &&
+                                      !string.IsNullOrWhiteSpace(ArchiveEntryPath);
+        public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile;
         public string? EncryptionPassword { get; set; }
 
         private bool _isEncrypted = false;

@@ -21,6 +21,7 @@ namespace TxtAIEditor.Composition
         Func<string, bool, Task> NavigateExplorerToFolderAsync,
         Func<string, Task> NavigateExplorerToFolderAndRevealAsync,
         Func<TxtAIEditor.ExplorerItem?> GetSelectedExplorerItem,
+        Func<bool> IsExplorerArchiveView,
         Func<Task> ToggleLeftPanelAsync,
         Func<Task> ToggleRightPanelAsync,
         Action FocusSearchPanel,
@@ -77,6 +78,7 @@ namespace TxtAIEditor.Composition
             var explorerFileActions = new ExplorerFileActionsController(
                 ui.LeftSidebar,
                 viewModel,
+                services.ArchiveExplorerService,
                 ui.EditorTabView,
                 ui.EditorTabView2,
                 callbacks.GetCurrentFolderPath,
@@ -93,7 +95,8 @@ namespace TxtAIEditor.Composition
                 dialog.ShowErrorMessage,
                 () => ui.EditorWorkspace.IsTerminalVisible,
                 () => ui.TerminalPane.SuspendNativeWindows(),
-                () => ui.TerminalPane.ResumeNativeWindows());
+                () => ui.TerminalPane.ResumeNativeWindows(),
+                callbacks.IsExplorerArchiveView);
 
             return ComposeAfterExplorerActions(
                 window,
