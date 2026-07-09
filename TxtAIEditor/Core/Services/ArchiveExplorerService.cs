@@ -23,11 +23,6 @@ namespace TxtAIEditor.Core.Services
             ".7z"
         };
 
-        static ArchiveExplorerService()
-        {
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        }
-
         public bool IsSupportedArchiveFile(string filePath)
         {
             return IsSupportedArchivePath(filePath);
@@ -338,81 +333,20 @@ namespace TxtAIEditor.Core.Services
 
         private static string DecodeZipEntryName(byte[] bytes, int index, int count, EncodingType encodingType)
         {
+            if (count <= 0)
+            {
+                return string.Empty;
+            }
+
             if (encodingType == EncodingType.UTF8)
             {
                 return Encoding.UTF8.GetString(bytes, index, count);
             }
 
-            if (TryDecodeSjisZipName(bytes, index, count, out string sjisName))
-            {
-                return sjisName;
-            }
-
-            return Encoding.UTF8.GetString(bytes, index, count);
-        }
-
-        private static bool TryDecodeSjisZipName(byte[] bytes, int index, int count, out string decodedName)
-        {
-            decodedName = string.Empty;
-            if (count <= 0 || !ContainsNonAsciiByte(bytes, index, count))
-            {
-                return false;
-            }
-
-            Encoding sjis = Encoding.GetEncoding(
-                932,
-                EncoderFallback.ExceptionFallback,
-                DecoderFallback.ExceptionFallback);
-
-            try
-            {
-                string candidate = sjis.GetString(bytes, index, count);
-                if (ContainsJapaneseText(candidate) &&
-                    !ContainsReplacementCharacter(candidate))
-                {
-                    decodedName = candidate;
-                    return true;
-                }
-            }
-            catch (DecoderFallbackException)
-            {
-            }
-
-            return false;
-        }
-
-        private static bool ContainsNonAsciiByte(byte[] bytes, int index, int count)
-        {
-            int end = Math.Min(bytes.Length, index + count);
-            for (int i = Math.Max(0, index); i < end; i++)
-            {
-                if (bytes[i] >= 0x80)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool ContainsJapaneseText(string text)
-        {
-            foreach (char ch in text)
-            {
-                if ((ch >= '\u3040' && ch <= '\u30FF') ||
-                    (ch >= '\uFF61' && ch <= '\uFF9F') ||
-                    (ch >= '\u3400' && ch <= '\u9FFF'))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool ContainsReplacementCharacter(string text)
-        {
-            return text.IndexOf('\uFFFD') >= 0;
+            byte[] nameBytes = new byte[count];
+            Buffer.BlockCopy(bytes, index, nameBytes, 0, count);
+            Encoding encoding = TextEncodingService.GetTextEncoding(nameBytes, "Auto");
+            return encoding.GetString(nameBytes);
         }
 
         private static void AddDirectory(
