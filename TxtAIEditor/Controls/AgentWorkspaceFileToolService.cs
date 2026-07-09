@@ -21,15 +21,15 @@ namespace TxtAIEditor.Controls
         {
             string root = _workspace.ResolveWorkspaceRoot();
             int limit = Math.Clamp(maxResults <= 0 ? 80 : maxResults, 1, 300);
-            var matches = _workspace.EnumerateWorkspaceFiles(root)
+            var matches = _workspace.EnumerateWorkspaceEntries(root)
                 .Where(path => AgentWorkspaceFileResolver.GlobMatches(AgentWorkspaceFileResolver.RelativePath(root, path), glob))
                 .Take(limit)
-                .Select(path => AgentWorkspaceFileResolver.RelativePath(root, path))
+                .Select(path => FormatWorkspaceEntry(root, path))
                 .ToList();
 
             await Task.CompletedTask;
             return matches.Count == 0
-                ? "No files matched."
+                ? "No files or folders matched."
                 : string.Join(Environment.NewLine, matches);
         }
 
@@ -194,6 +194,14 @@ namespace TxtAIEditor.Controls
             }
 
             return true;
+        }
+
+        private static string FormatWorkspaceEntry(string root, string path)
+        {
+            string relativePath = AgentWorkspaceFileResolver.RelativePath(root, path);
+            return Directory.Exists(path)
+                ? relativePath.TrimEnd('/') + "/"
+                : relativePath;
         }
 
         private static Regex? CreateQueryRegex(string query)

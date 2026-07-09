@@ -83,10 +83,25 @@ namespace TxtAIEditor.Controls
 
         public IEnumerable<string> EnumerateWorkspaceFiles()
         {
-            return EnumerateWorkspaceFiles(ResolveWorkspaceRoot());
+            return EnumerateWorkspacePaths(ResolveWorkspaceRoot(), includeDirectories: false);
         }
 
         public IEnumerable<string> EnumerateWorkspaceFiles(string root)
+        {
+            return EnumerateWorkspacePaths(root, includeDirectories: false);
+        }
+
+        public IEnumerable<string> EnumerateWorkspaceEntries()
+        {
+            return EnumerateWorkspacePaths(ResolveWorkspaceRoot(), includeDirectories: true);
+        }
+
+        public IEnumerable<string> EnumerateWorkspaceEntries(string root)
+        {
+            return EnumerateWorkspacePaths(root, includeDirectories: true);
+        }
+
+        private IEnumerable<string> EnumerateWorkspacePaths(string root, bool includeDirectories)
         {
             var gitIgnore = GitIgnoreMatcher.Load(root);
             var pending = new Stack<string>();
@@ -121,9 +136,15 @@ namespace TxtAIEditor.Controls
                 foreach (string subdir in subdirs)
                 {
                     string name = Path.GetFileName(subdir);
+                    string relativeSubdir = RelativePath(root, subdir);
                     if (!ExcludedDirectoryNames.Contains(name) &&
-                        !gitIgnore.IsIgnored(RelativePath(root, subdir), isDirectory: true))
+                        !gitIgnore.IsIgnored(relativeSubdir, isDirectory: true))
                     {
+                        if (includeDirectories)
+                        {
+                            yield return subdir;
+                        }
+
                         pending.Push(subdir);
                     }
                 }

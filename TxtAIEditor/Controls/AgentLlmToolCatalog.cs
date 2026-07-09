@@ -16,14 +16,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "list_files",
-                    Description = "List files in the workspace matching a glob pattern.",
+                    Description = "List files and folders in the workspace matching a glob pattern.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            glob = new { type = "string", description = "Glob pattern to match files, e.g. **/*.cs" },
-                            maxResults = new { type = "integer", description = "Maximum number of files to return (default: 80)" }
+                            glob = new { type = "string", description = "Glob pattern to match files and folders, e.g. **/* or **/*.cs" },
+                            maxResults = new { type = "integer", description = "Maximum number of files or folders to return (default: 80)" }
                         }
                     }
                 },
