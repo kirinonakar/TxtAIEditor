@@ -71,6 +71,10 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Binary Inspection:** View raw binary content in a side-by-side layout (Offset, Hex bytes, and ASCII representation).
 *   **Easy Access & UI Integration:** Right-click any open tab and select **"Hex View"**. Cursor offset and selections are shown in hex format on the status bar.
 
+### 📦 Archive File Support
+*   **Browsing & Open:** Open any `.zip`, `.rar`, or `.7z` archive in the Explorer panel to explore its contents as a virtual directory and open files directly in editor tabs.
+*   **Archive Extraction:** Right-click an archive in the Explorer to extract it to a folder.
+
 ### 📊 Interactive CSV/JSON Table Mode
 *   **Grid Editor Shell:** Automatically renders `.csv` and `.json` files into a premium, highly responsive interactive spreadsheet-like grid/table instead of raw text (decodes and displays JSON objects/arrays in a structured table layout).
 *   **Column & Row Multi-Select:** Click row numbers or column headers to select entire rows/columns, with support for range dragging and multi-selection using `Ctrl` and `Shift` keys.
