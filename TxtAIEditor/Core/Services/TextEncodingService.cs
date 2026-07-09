@@ -21,6 +21,7 @@ namespace TxtAIEditor.Core.Services
             "UTF-32 LE",
             "EUC-KR",
             "Shift-JIS",
+            "JIS",
             "Johab"
         };
 
@@ -50,6 +51,9 @@ namespace TxtAIEditor.Core.Services
                 949 => "EUC-KR",
                 51949 => "EUC-KR",
                 932 => "Shift-JIS",
+                50220 => "JIS",
+                50221 => "JIS",
+                50222 => "JIS",
                 1361 => "Johab",
                 _ => encoding.WebName.ToUpperInvariant()
             };
@@ -66,6 +70,7 @@ namespace TxtAIEditor.Core.Services
                 "UTF-32 LE" => Encoding.UTF32,
                 "EUC-KR" => Encoding.GetEncoding(949),
                 "Shift-JIS" => Encoding.GetEncoding(932),
+                "JIS" => Encoding.GetEncoding(50220),
                 "Johab" => Encoding.GetEncoding(1361),
                 _ => new UTF8Encoding(false)
             };
@@ -279,12 +284,25 @@ namespace TxtAIEditor.Core.Services
                     return Encoding.GetEncoding(949);
                 }
 
+                if (IsJisCharset(charset))
+                {
+                    return null;
+                }
+
                 return Encoding.GetEncoding(charset);
             }
             catch
             {
                 return null;
             }
+        }
+
+        private static bool IsJisCharset(string charset)
+        {
+            return charset.Equals("iso-2022-jp", StringComparison.OrdinalIgnoreCase) ||
+                   charset.Equals("csISO2022JP", StringComparison.OrdinalIgnoreCase) ||
+                   charset.Equals("iso-2022-jp-1", StringComparison.OrdinalIgnoreCase) ||
+                   charset.Equals("iso-2022-jp-2", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool IsValidUtf8(byte[] bytes)
