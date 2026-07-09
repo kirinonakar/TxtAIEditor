@@ -361,7 +361,7 @@ namespace TxtAIEditor.Composition
 
         public async Task ReloadTabWithEncodingAsync(OpenedTab tab, string encodingName)
         {
-            if (tab.IsReadOnlyViewer)
+            if (tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile)
             {
                 Controllers.Shell.Core.StatusBar.UpdateFileStats(tab);
                 Controllers.Shell.Core.StatusBar.UpdateTotalLines(tab);

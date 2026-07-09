@@ -182,7 +182,7 @@ namespace TxtAIEditor.Controls
 
         public void SyncEncodingCombo(OpenedTab tab)
         {
-            if (tab.IsReadOnlyViewer)
+            if (tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile)
             {
                 return;
             }
@@ -335,6 +335,12 @@ namespace TxtAIEditor.Controls
             var tab = _activeTabProvider();
             if (tab == null)
             {
+                return;
+            }
+
+            if (tab.IsReadOnlyTextFile)
+            {
+                await _reloadTabWithEncodingAsync(tab, selectedEncoding);
                 return;
             }
 

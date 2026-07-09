@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
@@ -14,6 +15,7 @@ namespace TxtAIEditor.Controls
     public sealed class TabReloadController
     {
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
+        private readonly ArchiveExplorerService _archiveExplorerService;
         private readonly ISettingsService _settingsService;
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
@@ -29,6 +31,7 @@ namespace TxtAIEditor.Controls
 
         public TabReloadController(
             SecureNoteEncryptionService secureNoteEncryptionService,
+            ArchiveExplorerService archiveExplorerService,
             ISettingsService settingsService,
             Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
@@ -43,6 +46,7 @@ namespace TxtAIEditor.Controls
             Action<string, string> showErrorMessage)
         {
             _secureNoteEncryptionService = secureNoteEncryptionService;
+            _archiveExplorerService = archiveExplorerService;
             _settingsService = settingsService;
             _tabBridges = tabBridges;
             _editorSessions = editorSessions;
@@ -63,6 +67,12 @@ namespace TxtAIEditor.Controls
             {
                 if (string.IsNullOrWhiteSpace(tab.FilePath))
                 {
+                    return;
+                }
+
+                if (tab.IsReadOnlyTextFile)
+                {
+                    await ReloadArchiveTextEntryWithEncodingAsync(tab, encodingName);
                     return;
                 }
 
@@ -211,6 +221,33 @@ namespace TxtAIEditor.Controls
                 _getString("EncryptionOpenButton", "열기"));
         }
 
+        private async Task ReloadArchiveTextEntryWithEncodingAsync(OpenedTab tab, string encodingName)
+        {
+            if (string.IsNullOrWhiteSpace(tab.ArchiveSourcePath) ||
+                string.IsNullOrWhiteSpace(tab.ArchiveEntryPath))
+            {
+                return;
+            }
+
+            byte[] bytes = await _archiveExplorerService.ReadEntryBytesAsync(tab.ArchiveSourcePath, tab.ArchiveEntryPath);
+            var readResult = LoadArchiveTextEntry(bytes, encodingName);
+            string content = readResult.Model.GetText();
+            ApplyTabReloadState(
+                tab,
+                readResult.Model,
+                readResult.EncodingName,
+                readResult.EncodingWasAutoDetected,
+                content);
+
+            tab.IsReadOnlyTextFile = true;
+            tab.ArchiveEntryPath = ArchiveExplorerService.NormalizeEntryPath(tab.ArchiveEntryPath);
+
+            var session = new EditorDocumentSession(tab, readResult.Model);
+            _editorSessions[tab.Id] = session;
+            await InitializeBridgeModelAsync(tab, session, isReadOnly: true);
+            CompleteEncodingReload(tab);
+        }
+
         private async Task InitializeBridgeModelAsync(OpenedTab tab, EditorDocumentSession session, bool isReadOnly)
         {
             if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
@@ -222,6 +259,19 @@ namespace TxtAIEditor.Controls
                     isReadOnly: isReadOnly,
                     initialLines: session.GetLines(1, _initialEditorLineWarmupCount));
             }
+        }
+
+        private static EditorDocumentLoadResult LoadArchiveTextEntry(byte[] bytes, string encodingName)
+        {
+            Encoding encoding = TextEncodingService.GetTextEncoding(bytes, encodingName);
+            string text = encoding.GetString(bytes);
+            bool wasAutoDetected = string.IsNullOrWhiteSpace(encodingName) ||
+                                   encodingName.Equals("Auto", StringComparison.OrdinalIgnoreCase);
+
+            return new EditorDocumentLoadResult(
+                LineArrayTextModel.FromText(text),
+                TextEncodingService.GetDisplayName(encoding, TextEncodingService.HasUtf8Bom(bytes)),
+                wasAutoDetected);
         }
 
         private async Task ReloadHexViewerAsync(OpenedTab tab)

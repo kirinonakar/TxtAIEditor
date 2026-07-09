@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using SharpCompress.Archives;
+using SharpCompress.Common;
 using SharpCompress.Readers;
 
 namespace TxtAIEditor.Core.Services
@@ -21,6 +22,11 @@ namespace TxtAIEditor.Core.Services
             ".rar",
             ".7z"
         };
+
+        static ArchiveExplorerService()
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        }
 
         public bool IsSupportedArchiveFile(string filePath)
         {
@@ -65,7 +71,7 @@ namespace TxtAIEditor.Core.Services
             string currentDirectory = NormalizeEntryPath(entryDirectory);
             string prefix = string.IsNullOrEmpty(currentDirectory) ? string.Empty : currentDirectory + "/";
 
-            using IArchive archive = ArchiveFactory.OpenArchive(archivePath, ReaderOptions.ForFilePath);
+            using IArchive archive = OpenArchive(archivePath);
             foreach (IArchiveEntry entry in archive.Entries)
             {
                 string entryPath = NormalizeEntryPath(entry.Key ?? string.Empty);
@@ -124,7 +130,7 @@ namespace TxtAIEditor.Core.Services
             string prefix = string.IsNullOrEmpty(currentDirectory) ? string.Empty : currentDirectory + "/";
             var matchedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            using IArchive archive = ArchiveFactory.OpenArchive(archivePath, ReaderOptions.ForFilePath);
+            using IArchive archive = OpenArchive(archivePath);
             foreach (IArchiveEntry entry in archive.Entries)
             {
                 string entryPath = NormalizeEntryPath(entry.Key ?? string.Empty);
@@ -174,7 +180,7 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<byte[]> ReadEntryBytesAsync(string archivePath, string entryPath)
         {
-            using IArchive archive = ArchiveFactory.OpenArchive(archivePath, ReaderOptions.ForFilePath);
+            using IArchive archive = OpenArchive(archivePath);
             IArchiveEntry entry = GetFileEntry(archive, entryPath);
             await using Stream source = entry.OpenEntryStream();
             long entrySize = GetEntrySize(entry);
@@ -185,7 +191,7 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<string> ExtractEntryToCacheFileAsync(string archivePath, string entryPath)
         {
-            using IArchive archive = ArchiveFactory.OpenArchive(archivePath, ReaderOptions.ForFilePath);
+            using IArchive archive = OpenArchive(archivePath);
             IArchiveEntry entry = GetFileEntry(archive, entryPath);
             string normalizedEntryPath = NormalizeEntryPath(entryPath);
             string fileName = Path.GetFileName(normalizedEntryPath.Replace('/', Path.DirectorySeparatorChar));
@@ -228,7 +234,7 @@ namespace TxtAIEditor.Core.Services
             Directory.CreateDirectory(targetRoot);
 
             string targetRootWithSeparator = EnsureTrailingDirectorySeparator(targetRoot);
-            using IArchive archive = ArchiveFactory.OpenArchive(archivePath, ReaderOptions.ForFilePath);
+            using IArchive archive = OpenArchive(archivePath);
             foreach (IArchiveEntry entry in archive.Entries)
             {
                 string entryPath = NormalizeEntryPath(entry.Key ?? string.Empty);
@@ -310,6 +316,103 @@ namespace TxtAIEditor.Core.Services
         public static string CreateVirtualPath(string archivePath, string entryPath)
         {
             return archivePath + VirtualPathSeparator + NormalizeEntryPath(entryPath);
+        }
+
+        private static IArchive OpenArchive(string archivePath)
+        {
+            return ArchiveFactory.OpenArchive(archivePath, CreateReaderOptions(archivePath));
+        }
+
+        private static ReaderOptions CreateReaderOptions(string archivePath)
+        {
+            if (!Path.GetExtension(archivePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                return ReaderOptions.ForFilePath;
+            }
+
+            return ReaderOptions.ForEncoding(new ArchiveEncoding
+            {
+                CustomDecoder = DecodeZipEntryName
+            });
+        }
+
+        private static string DecodeZipEntryName(byte[] bytes, int index, int count, EncodingType encodingType)
+        {
+            if (encodingType == EncodingType.UTF8)
+            {
+                return Encoding.UTF8.GetString(bytes, index, count);
+            }
+
+            if (TryDecodeSjisZipName(bytes, index, count, out string sjisName))
+            {
+                return sjisName;
+            }
+
+            return Encoding.UTF8.GetString(bytes, index, count);
+        }
+
+        private static bool TryDecodeSjisZipName(byte[] bytes, int index, int count, out string decodedName)
+        {
+            decodedName = string.Empty;
+            if (count <= 0 || !ContainsNonAsciiByte(bytes, index, count))
+            {
+                return false;
+            }
+
+            Encoding sjis = Encoding.GetEncoding(
+                932,
+                EncoderFallback.ExceptionFallback,
+                DecoderFallback.ExceptionFallback);
+
+            try
+            {
+                string candidate = sjis.GetString(bytes, index, count);
+                if (ContainsJapaneseText(candidate) &&
+                    !ContainsReplacementCharacter(candidate))
+                {
+                    decodedName = candidate;
+                    return true;
+                }
+            }
+            catch (DecoderFallbackException)
+            {
+            }
+
+            return false;
+        }
+
+        private static bool ContainsNonAsciiByte(byte[] bytes, int index, int count)
+        {
+            int end = Math.Min(bytes.Length, index + count);
+            for (int i = Math.Max(0, index); i < end; i++)
+            {
+                if (bytes[i] >= 0x80)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsJapaneseText(string text)
+        {
+            foreach (char ch in text)
+            {
+                if ((ch >= '\u3040' && ch <= '\u30FF') ||
+                    (ch >= '\uFF61' && ch <= '\uFF9F') ||
+                    (ch >= '\u3400' && ch <= '\u9FFF'))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsReplacementCharacter(string text)
+        {
+            return text.IndexOf('\uFFFD') >= 0;
         }
 
         private static void AddDirectory(

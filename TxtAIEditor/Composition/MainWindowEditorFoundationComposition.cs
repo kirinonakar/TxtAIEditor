@@ -65,6 +65,7 @@ namespace TxtAIEditor.Composition
         {
             var tabReload = new TabReloadController(
                 services.SecureNoteEncryptionService,
+                services.ArchiveExplorerService,
                 services.SettingsService,
                 tabBridges,
                 editorSessions,

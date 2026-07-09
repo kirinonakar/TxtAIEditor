@@ -113,13 +113,13 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (tab.IsReadOnlyViewer)
+            if (tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile)
             {
                 return false;
             }
 
-            string? initialDir = GetSaveInitialDirectory();
-            if (initialDir == null && !string.IsNullOrEmpty(tab.FilePath))
+            string? initialDir = GetSaveInitialDirectory(tab);
+            if (initialDir == null && !string.IsNullOrEmpty(tab.FilePath) && !tab.IsArchiveEntry)
             {
                 initialDir = Path.GetDirectoryName(tab.FilePath);
             }
@@ -128,6 +128,9 @@ namespace TxtAIEditor.Controls
             string oldTitle = tab.Title;
             string oldLanguage = tab.Language;
             string oldEncodingName = tab.EncodingName;
+            bool oldIsReadOnlyTextFile = tab.IsReadOnlyTextFile;
+            string? oldArchiveSourcePath = tab.ArchiveSourcePath;
+            string? oldArchiveEntryPath = tab.ArchiveEntryPath;
             if (!TryChooseSavePath(tab, initialDir))
             {
                 return false;
@@ -135,6 +138,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                ClearArchiveReadOnlyState(tab);
                 await SaveTabContentAsync(tab);
                 tab.IsDirty = false;
                 await CompleteSuccessfulSaveAsync(tab, syncLineEnding: false);
@@ -146,6 +150,9 @@ namespace TxtAIEditor.Controls
                 tab.Title = oldTitle;
                 tab.Language = oldLanguage;
                 tab.EncodingName = oldEncodingName;
+                tab.IsReadOnlyTextFile = oldIsReadOnlyTextFile;
+                tab.ArchiveSourcePath = oldArchiveSourcePath;
+                tab.ArchiveEntryPath = oldArchiveEntryPath;
                 _showErrorMessage(
                     _getString("SaveFile", "저장") + " - " + _getString("SaveAsFile", "다른 이름으로 저장"),
                     ex.Message);
@@ -164,11 +171,24 @@ namespace TxtAIEditor.Controls
             return null;
         }
 
+        private string? GetSaveInitialDirectory(OpenedTab tab)
+        {
+            if (tab.IsArchiveEntry &&
+                !string.IsNullOrWhiteSpace(tab.ArchiveSourcePath))
+            {
+                string? archiveDirectory = Path.GetDirectoryName(tab.ArchiveSourcePath);
+                if (!string.IsNullOrWhiteSpace(archiveDirectory) && Directory.Exists(archiveDirectory))
+                {
+                    return archiveDirectory;
+                }
+            }
+
+            return GetSaveInitialDirectory();
+        }
+
         private bool TryChooseSavePath(OpenedTab tab, string? initialDir)
         {
-            string suggestedName = tab.FilePath != null
-                ? Path.GetFileNameWithoutExtension(tab.FilePath)
-                : tab.Title;
+            string suggestedName = GetSuggestedSaveName(tab);
             string? selectedPath = _fileSaveDialogService.ShowSaveDialog(_owner, suggestedName, initialDir);
             if (string.IsNullOrEmpty(selectedPath))
             {
@@ -177,6 +197,23 @@ namespace TxtAIEditor.Controls
 
             ApplySavePathToTab(tab, selectedPath);
             return true;
+        }
+
+        private static string GetSuggestedSaveName(OpenedTab tab)
+        {
+            if (tab.IsArchiveEntry &&
+                !string.IsNullOrWhiteSpace(tab.ArchiveEntryPath))
+            {
+                string archiveEntryFileName = Path.GetFileName(tab.ArchiveEntryPath.Replace('/', Path.DirectorySeparatorChar));
+                if (!string.IsNullOrWhiteSpace(archiveEntryFileName))
+                {
+                    return archiveEntryFileName;
+                }
+            }
+
+            return tab.FilePath != null
+                ? Path.GetFileNameWithoutExtension(tab.FilePath)
+                : tab.Title;
         }
 
         private void ApplySavePathToTab(OpenedTab tab, string selectedPath)
@@ -189,6 +226,18 @@ namespace TxtAIEditor.Controls
             {
                 tab.EncodingName = "UTF-8";
             }
+        }
+
+        private static void ClearArchiveReadOnlyState(OpenedTab tab)
+        {
+            if (!tab.IsReadOnlyTextFile)
+            {
+                return;
+            }
+
+            tab.IsReadOnlyTextFile = false;
+            tab.ArchiveSourcePath = null;
+            tab.ArchiveEntryPath = null;
         }
 
         private async Task FlushTabEditorBeforeSaveAsync(OpenedTab tab)
