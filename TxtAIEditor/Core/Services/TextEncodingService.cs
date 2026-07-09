@@ -22,7 +22,10 @@ namespace TxtAIEditor.Core.Services
             "EUC-KR",
             "Shift-JIS",
             "JIS",
-            "Johab"
+            "Johab",
+            "GB18030",
+            "GBK",
+            "Big5"
         };
 
         public static Encoding GetTextEncoding(byte[] bytes, string encodingName)
@@ -55,6 +58,9 @@ namespace TxtAIEditor.Core.Services
                 50221 => "JIS",
                 50222 => "JIS",
                 1361 => "Johab",
+                54936 => "GB18030",
+                936 => "GBK",
+                950 => "Big5",
                 _ => encoding.WebName.ToUpperInvariant()
             };
         }
@@ -72,6 +78,9 @@ namespace TxtAIEditor.Core.Services
                 "Shift-JIS" => Encoding.GetEncoding(932),
                 "JIS" => Encoding.GetEncoding(50220),
                 "Johab" => Encoding.GetEncoding(1361),
+                "GB18030" => Encoding.GetEncoding(54936),
+                "GBK" => Encoding.GetEncoding(936),
+                "Big5" => Encoding.GetEncoding(950),
                 _ => new UTF8Encoding(false)
             };
         }
@@ -86,18 +95,29 @@ namespace TxtAIEditor.Core.Services
             var htmlCharset = DetectHtmlCharset(bytes);
             if (htmlCharset != null) return htmlCharset;
 
+            if (ContainsJisEscapeSequences(bytes)) return Encoding.GetEncoding(50220);
+
             if (IsValidUtf8(bytes)) return new UTF8Encoding(false);
 
             int eucKrScore = GetEucKrScore(bytes);
             int sjisScore = GetSjisScore(bytes);
             int johabScore = GetJohabScore(bytes);
+            int gbkScore = GetGbkScore(bytes);
+            int gb18030Score = GetGb18030Score(bytes);
+            int big5Score = GetBig5Score(bytes);
 
-            if (sjisScore > eucKrScore && sjisScore > johabScore && sjisScore > 0) return Encoding.GetEncoding(932);
-            if (eucKrScore > sjisScore && eucKrScore > johabScore && eucKrScore > 0) return Encoding.GetEncoding(949);
-            if (johabScore > sjisScore && johabScore > eucKrScore && johabScore > 0) return Encoding.GetEncoding(1361);
+            int maxScore = Math.Max(sjisScore, Math.Max(eucKrScore, Math.Max(johabScore, Math.Max(gbkScore, Math.Max(gb18030Score, big5Score)))));
 
-            if (eucKrScore > 0 && eucKrScore >= sjisScore) return Encoding.GetEncoding(949);
-            if (sjisScore > 0) return Encoding.GetEncoding(932);
+            if (maxScore > 0)
+            {
+                if (maxScore == eucKrScore) return Encoding.GetEncoding(949);
+                if (maxScore == sjisScore) return Encoding.GetEncoding(932);
+                if (maxScore == gb18030Score && gb18030Score > gbkScore) return Encoding.GetEncoding(54936);
+                if (maxScore == gbkScore) return Encoding.GetEncoding(936);
+                if (maxScore == big5Score) return Encoding.GetEncoding(950);
+                if (maxScore == johabScore) return Encoding.GetEncoding(1361);
+            }
+
             if (johabScore > 0 || ContainsJohabPattern(bytes)) return Encoding.GetEncoding(1361);
 
             return new UTF8Encoding(false);
@@ -319,6 +339,146 @@ namespace TxtAIEditor.Core.Services
             {
                 return false;
             }
+        }
+
+        private static bool ContainsJisEscapeSequences(byte[] bytes)
+        {
+            int len = bytes.Length;
+            for (int i = 0; i < len - 2; i++)
+            {
+                if (bytes[i] == 0x1B) // ESC
+                {
+                    byte b1 = bytes[i + 1];
+                    byte b2 = bytes[i + 2];
+                    if ((b1 == 0x24 && (b2 == 0x40 || b2 == 0x42)) ||
+                        (b1 == 0x28 && (b2 == 0x42 || b2 == 0x4A || b2 == 0x49)))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static int GetGbkScore(byte[] bytes)
+        {
+            int score = 0;
+            int i = 0;
+            while (i < bytes.Length)
+            {
+                byte b1 = bytes[i];
+                if (b1 < 0x80)
+                {
+                    i++;
+                    continue;
+                }
+
+                if (i + 1 >= bytes.Length) break;
+                byte b2 = bytes[i + 1];
+                if (b1 >= 0x81 && b1 <= 0xFE && ((b2 >= 0x40 && b2 <= 0x7E) || (b2 >= 0x80 && b2 <= 0xFE)))
+                {
+                    if (b1 >= 0xB0 && b1 <= 0xF7 && b2 >= 0xA1 && b2 <= 0xFE)
+                    {
+                        score += 2;
+                    }
+                    else
+                    {
+                        score += 1;
+                    }
+                    i += 2;
+                    continue;
+                }
+
+                i++;
+            }
+
+            return score;
+        }
+
+        private static int GetGb18030Score(byte[] bytes)
+        {
+            int score = 0;
+            int i = 0;
+            while (i < bytes.Length)
+            {
+                byte b1 = bytes[i];
+                if (b1 < 0x80)
+                {
+                    i++;
+                    continue;
+                }
+
+                if (i + 3 < bytes.Length)
+                {
+                    byte b2 = bytes[i + 1];
+                    byte b3 = bytes[i + 2];
+                    byte b4 = bytes[i + 3];
+                    if (b1 >= 0x81 && b1 <= 0xFE &&
+                        b2 >= 0x30 && b2 <= 0x39 &&
+                        b3 >= 0x81 && b3 <= 0xFE &&
+                        b4 >= 0x30 && b4 <= 0x39)
+                    {
+                        score += 8;
+                        i += 4;
+                        continue;
+                    }
+                }
+
+                if (i + 1 >= bytes.Length) break;
+                byte tb2 = bytes[i + 1];
+                if (b1 >= 0x81 && b1 <= 0xFE && ((tb2 >= 0x40 && tb2 <= 0x7E) || (tb2 >= 0x80 && tb2 <= 0xFE)))
+                {
+                    if (b1 >= 0xB0 && b1 <= 0xF7 && tb2 >= 0xA1 && tb2 <= 0xFE)
+                    {
+                        score += 2;
+                    }
+                    else
+                    {
+                        score += 1;
+                    }
+                    i += 2;
+                    continue;
+                }
+
+                i++;
+            }
+
+            return score;
+        }
+
+        private static int GetBig5Score(byte[] bytes)
+        {
+            int score = 0;
+            int i = 0;
+            while (i < bytes.Length)
+            {
+                byte b1 = bytes[i];
+                if (b1 < 0x80)
+                {
+                    i++;
+                    continue;
+                }
+
+                if (i + 1 >= bytes.Length) break;
+                byte b2 = bytes[i + 1];
+                if (b1 >= 0xA1 && b1 <= 0xF9 && ((b2 >= 0x40 && b2 <= 0x7E) || (b2 >= 0xA1 && b2 <= 0xFE)))
+                {
+                    if ((b1 >= 0xA4 && b1 <= 0xC6) || (b1 >= 0xC9 && b1 <= 0xF9))
+                    {
+                        score += 2;
+                    }
+                    else
+                    {
+                        score += 1;
+                    }
+                    i += 2;
+                    continue;
+                }
+
+                i++;
+            }
+
+            return score;
         }
     }
 }
