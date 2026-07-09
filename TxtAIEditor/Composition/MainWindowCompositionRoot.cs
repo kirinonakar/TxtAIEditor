@@ -211,6 +211,7 @@ namespace TxtAIEditor.Composition
                     callbacks.ToggleMaximize,
                     () => toolbarCommandController?.Print(),
                     TogglePreviewWidth,
+                    callbacks.CloseActiveTab,
                     callbacks.LoadFileIntoTabAsync,
                     MainWindowMessageJson.Normalize,
                     () => state.CurrentFolderPath,

@@ -17,6 +17,7 @@ namespace TxtAIEditor.Composition
         Action ToggleMaximizeRequested,
         Action PrintRequested,
         Action TogglePreviewWidthRequested,
+        Action CloseActiveTabRequested,
         Func<string, Task> LoadFileAsync,
         Func<CoreWebView2WebMessageReceivedEventArgs, string> NormalizeWebMessageJson,
         Func<string> GetCurrentFolderPath,
@@ -58,7 +59,8 @@ namespace TxtAIEditor.Composition
                 callbacks.ToggleMaximizeRequested,
                 stickyNoteMode.ToggleMode,
                 callbacks.PrintRequested,
-                callbacks.TogglePreviewWidthRequested);
+                callbacks.TogglePreviewWidthRequested,
+                callbacks.CloseActiveTabRequested);
 
             var previewScrollSync = new PreviewScrollSyncController(
                 ui.EditorWorkspace,

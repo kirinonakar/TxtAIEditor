@@ -12,6 +12,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _toggleStickyNote;
         private readonly Action _print;
         private readonly Action _togglePreviewWidth;
+        private readonly Action _closeActiveTab;
 
         public WebViewShortcutController(
             Action find,
@@ -21,7 +22,8 @@ namespace TxtAIEditor.Controls
             Action toggleMaximize,
             Action toggleStickyNote,
             Action print,
-            Action togglePreviewWidth)
+            Action togglePreviewWidth,
+            Action closeActiveTab)
         {
             _find = find;
             _toggleLivePreview = toggleLivePreview;
@@ -31,6 +33,7 @@ namespace TxtAIEditor.Controls
             _toggleStickyNote = toggleStickyNote;
             _print = print;
             _togglePreviewWidth = togglePreviewWidth;
+            _closeActiveTab = closeActiveTab;
         }
 
         public void Handle(string name)
@@ -60,6 +63,9 @@ namespace TxtAIEditor.Controls
                     break;
                 case "expandRightPanel":
                     _togglePreviewWidth();
+                    break;
+                case "closeTab":
+                    _closeActiveTab();
                     break;
             }
         }

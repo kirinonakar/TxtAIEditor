@@ -724,6 +724,8 @@ audio {{
                 name = 'find';
             } else if (ctrl && key === 'p') {
                 name = 'print';
+            } else if (ctrl && key === 'w') {
+                name = 'closeTab';
             }
         }
 
