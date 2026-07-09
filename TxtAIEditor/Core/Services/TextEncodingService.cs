@@ -102,6 +102,7 @@ namespace TxtAIEditor.Core.Services
             int eucKrScore = GetEucKrScore(bytes);
             int sjisScore = GetSjisScore(bytes);
             int johabScore = GetJohabScore(bytes);
+            int johabMarkerPairCount = CountJohabMarkerPairs(bytes);
             int gbkScore = GetGbkScore(bytes);
             int gb18030Score = GetGb18030Score(bytes);
             int big5Score = GetBig5Score(bytes);
@@ -112,13 +113,27 @@ namespace TxtAIEditor.Core.Services
             {
                 if (maxScore == eucKrScore) return Encoding.GetEncoding(949);
                 if (maxScore == sjisScore) return Encoding.GetEncoding(932);
+                bool gbkFamilyScoreIsWinning = maxScore == gbkScore || maxScore == gb18030Score;
+                if (gbkFamilyScoreIsWinning &&
+                    ShouldPreferJohabOverChineseScores(bytes.Length, johabScore, johabMarkerPairCount, gbkScore, gb18030Score))
+                {
+                    return Encoding.GetEncoding(1361);
+                }
+
+                bool chineseScoreIsWinning = gbkFamilyScoreIsWinning || maxScore == big5Score;
+                if (chineseScoreIsWinning &&
+                    ShouldPreferEucKrOverChineseScores(bytes, eucKrScore))
+                {
+                    return Encoding.GetEncoding(949);
+                }
+
                 if (maxScore == gb18030Score && gb18030Score > gbkScore) return Encoding.GetEncoding(54936);
                 if (maxScore == gbkScore) return Encoding.GetEncoding(936);
                 if (maxScore == big5Score) return Encoding.GetEncoding(950);
                 if (maxScore == johabScore) return Encoding.GetEncoding(1361);
             }
 
-            if (johabScore > 0 || ContainsJohabPattern(bytes)) return Encoding.GetEncoding(1361);
+            if (johabScore > 0 || johabMarkerPairCount >= 2) return Encoding.GetEncoding(1361);
 
             return new UTF8Encoding(false);
         }
@@ -230,7 +245,7 @@ namespace TxtAIEditor.Core.Services
             return score;
         }
 
-        private static bool ContainsJohabPattern(byte[] bytes)
+        private static int CountJohabMarkerPairs(byte[] bytes)
         {
             int johabOnlyPairCount = 0;
             int i = 0;
@@ -252,7 +267,12 @@ namespace TxtAIEditor.Core.Services
                     {
                         johabOnlyPairCount++;
                         i += 2;
-                        if (johabOnlyPairCount >= 2) return true;
+                        continue;
+                    }
+
+                    if ((b2 >= 0x41 && b2 <= 0x7E) || (b2 >= 0x81 && b2 <= 0xFE))
+                    {
+                        i += 2;
                         continue;
                     }
                 }
@@ -260,7 +280,103 @@ namespace TxtAIEditor.Core.Services
                 i++;
             }
 
-            return false;
+            return johabOnlyPairCount;
+        }
+
+        private static bool ShouldPreferJohabOverChineseScores(
+            int byteCount,
+            int johabScore,
+            int johabMarkerPairCount,
+            int gbkScore,
+            int gb18030Score)
+        {
+            int requiredMarkerPairs = byteCount < 1024 ? 1 : byteCount >= 16 * 1024 ? 8 : 2;
+            if (johabScore <= 0 || johabMarkerPairCount < requiredMarkerPairs)
+            {
+                return false;
+            }
+
+            int chineseScore = Math.Max(gbkScore, gb18030Score);
+            return chineseScore <= 0 || (long)johabScore * 4 >= (long)chineseScore * 3;
+        }
+
+        private static bool ShouldPreferEucKrOverChineseScores(byte[] bytes, int eucKrScore)
+        {
+            if (eucKrScore <= 0)
+            {
+                return false;
+            }
+
+            TextScriptProfile profile = GetTextScriptProfile(bytes, Encoding.GetEncoding(949));
+            int requiredHangulCount = bytes.Length < 1024 ? 8 : 32;
+            if (profile.HangulCount < requiredHangulCount)
+            {
+                return false;
+            }
+
+            if (profile.CjkCount * 3 > profile.HangulCount)
+            {
+                return false;
+            }
+
+            return profile.BadCharacterCount <= Math.Max(2, profile.HangulCount / 6);
+        }
+
+        private static TextScriptProfile GetTextScriptProfile(byte[] bytes, Encoding encoding)
+        {
+            const int sampleLimit = 128 * 1024;
+            int sampleLength = Math.Min(bytes.Length, sampleLimit);
+            string text = encoding.GetString(bytes, 0, sampleLength);
+
+            int hangulCount = 0;
+            int cjkCount = 0;
+            int badCharacterCount = 0;
+            foreach (char ch in text)
+            {
+                if (IsHangul(ch))
+                {
+                    hangulCount++;
+                }
+                else if (IsCjk(ch))
+                {
+                    cjkCount++;
+                }
+                else if (ch == '\uFFFD' || ch == '?')
+                {
+                    badCharacterCount++;
+                }
+            }
+
+            return new TextScriptProfile(hangulCount, cjkCount, badCharacterCount);
+        }
+
+        private static bool IsHangul(char ch)
+        {
+            return (ch >= '\uAC00' && ch <= '\uD7A3') ||
+                   (ch >= '\u1100' && ch <= '\u11FF') ||
+                   (ch >= '\u3130' && ch <= '\u318F');
+        }
+
+        private static bool IsCjk(char ch)
+        {
+            return (ch >= '\u4E00' && ch <= '\u9FFF') ||
+                   (ch >= '\u3400' && ch <= '\u4DBF');
+        }
+
+        private readonly struct TextScriptProfile
+        {
+            public TextScriptProfile(int hangulCount, int cjkCount, int badCharacterCount)
+            {
+                HangulCount = hangulCount;
+                CjkCount = cjkCount;
+                BadCharacterCount = badCharacterCount;
+            }
+
+            public int HangulCount { get; }
+
+            public int CjkCount { get; }
+
+            public int BadCharacterCount { get; }
         }
 
         private static Encoding? DetectHtmlCharset(byte[] bytes)
