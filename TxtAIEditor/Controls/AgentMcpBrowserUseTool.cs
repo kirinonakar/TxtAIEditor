@@ -99,8 +99,8 @@ namespace TxtAIEditor.Controls
                 CreateAlias("mcp_browser_use_read_page", "read_page", "Copy and return selectable text from the current page, together with the current URL and window title. This is browser-agnostic and may not expose canvas or protected page content.", """
                 {"type":"object","properties":{"maxCharacters":{"type":"integer","minimum":1000,"maximum":60000,"default":30000}}}
                 """),
-                CreateAlias("mcp_browser_use_click", "click", "Click a point identified in the latest Browser Use capture. Capture and inspect the current browser image before every click.", """
-                {"type":"object","properties":{"x":{"type":"integer","description":"X coordinate in the latest capture image."},"y":{"type":"integer","description":"Y coordinate in the latest capture image."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot for coordinates from mcp_browser_use_capture. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1}},"required":["x","y"]}
+                CreateAlias("mcp_browser_use_click", "click", "Click a point identified in the latest Browser Use capture. A new screenshot of the post-click page state will be automatically captured and attached to the model context. Do NOT call read_image.", """
+                {"type":"object","properties":{"x":{"type":"integer","description":"X coordinate in the latest capture image."},"y":{"type":"integer","description":"Y coordinate in the latest capture image."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot for coordinates from mcp_browser_use_capture or the post-click capture of mcp_browser_use_click. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1}},"required":["x","y"]}
                 """),
                 CreateAlias("mcp_browser_use_type_text", "type_text", "Type Unicode text into the focused browser control. Can replace the current field selection and optionally press Enter.", """
                 {"type":"object","properties":{"text":{"type":"string"},"replace":{"type":"boolean","default":false},"pressEnter":{"type":"boolean","default":false}},"required":["text"]}
@@ -127,7 +127,7 @@ namespace TxtAIEditor.Controls
                 aliases.Insert(2, CreateAlias(
                     "mcp_browser_use_capture",
                     "capture",
-                    "Capture the controlled browser window as a PNG for visual inspection. After this call, immediately call read_image with the returned image_path. Click coordinates should come from that image.",
+                    "Capture the controlled browser window as a PNG for visual inspection. The captured image is automatically attached to the model context. Do NOT call read_image.",
                     """
                     {"type":"object","properties":{}}
                     """));
