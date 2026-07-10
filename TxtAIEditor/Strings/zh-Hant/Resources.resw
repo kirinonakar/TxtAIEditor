@@ -1793,6 +1793,15 @@
   <data name="ExplorerCompressFolderToSevenZip" xml:space="preserve">
     <value>壓縮為 7z</value>
   </data>
+  <data name="ArchiveProgressCompressing" xml:space="preserve">
+    <value>正在壓縮...</value>
+  </data>
+  <data name="ArchiveProgressExtracting" xml:space="preserve">
+    <value>正在解壓縮...</value>
+  </data>
+  <data name="StatusProgressCancelTooltip" xml:space="preserve">
+    <value>中止操作</value>
+  </data>
   <data name="ArchiveCreateFailedTitle" xml:space="preserve">
     <value>建立壓縮檔失敗</value>
   </data>

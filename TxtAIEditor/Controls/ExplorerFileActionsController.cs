@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
     public sealed class ExplorerFileActionsController
     {
         private readonly LeftSidebarPane _leftSidebar;
+        private readonly StatusBarPane _statusBar;
         private readonly MainWindowViewModel _viewModel;
         private readonly ArchiveExplorerService _archiveExplorerService;
         private readonly TabView _primaryTabView;
@@ -39,8 +40,11 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isArchiveViewProvider;
         private readonly ConditionalWeakTable<MenuFlyout, object> _localizedFlyouts = new ConditionalWeakTable<MenuFlyout, object>();
 
+        private System.Threading.CancellationTokenSource? _archiveCts;
+
         public ExplorerFileActionsController(
             LeftSidebarPane leftSidebar,
+            StatusBarPane statusBar,
             MainWindowViewModel viewModel,
             ArchiveExplorerService archiveExplorerService,
             TabView primaryTabView,
@@ -63,6 +67,7 @@ namespace TxtAIEditor.Controls
             Func<bool> isArchiveViewProvider)
         {
             _leftSidebar = leftSidebar;
+            _statusBar = statusBar;
             _viewModel = viewModel;
             _archiveExplorerService = archiveExplorerService;
             _primaryTabView = primaryTabView;
@@ -381,6 +386,9 @@ namespace TxtAIEditor.Controls
             }
 
             string targetDirectory = Path.Combine(parentDirectory, GetArchiveExtractFolderName(archivePath));
+            _archiveCts = new System.Threading.CancellationTokenSource();
+            var token = _archiveCts.Token;
+            string statusText = _getString("ArchiveProgressExtracting", "압축 푸는 중...");
             try
             {
                 if (File.Exists(targetDirectory))
@@ -418,7 +426,15 @@ namespace TxtAIEditor.Controls
                 }
 
                 await Task.Run(async () =>
-                    await _archiveExplorerService.ExtractArchiveToDirectoryAsync(archivePath, targetDirectory, overwrite));
+                    await _archiveExplorerService.ExtractArchiveToDirectoryAsync(
+                        archivePath,
+                        targetDirectory,
+                        overwrite,
+                        progress => _statusBar.ShowProgress(statusText, progress, () => _archiveCts?.Cancel()),
+                        token
+                    ),
+                    token
+                );
 
                 _loadDirectoryRoot(parentDirectory);
                 var extractedFolder = _viewModel.ExplorerItems
@@ -429,11 +445,21 @@ namespace TxtAIEditor.Controls
                     _leftSidebar.FileList.ScrollIntoView(extractedFolder);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // Silent cancellation
+            }
             catch (Exception ex)
             {
                 _showError(
                     _getString("ArchiveExtractFailedTitle", "압축 풀기 실패"),
                     ex.Message);
+            }
+            finally
+            {
+                _statusBar.HideProgress();
+                _archiveCts?.Dispose();
+                _archiveCts = null;
             }
         }
 
@@ -450,7 +476,7 @@ namespace TxtAIEditor.Controls
         private async Task CompressFolderAsync(
             object sender,
             string archiveExtension,
-            Func<string, string, Task> createArchiveAsync)
+            Func<string, string, Action<double>?, System.Threading.CancellationToken, Task> createArchiveAsync)
         {
             var item = GetExplorerItem(sender);
             if (item == null ||
@@ -506,10 +532,18 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            _archiveCts = new System.Threading.CancellationTokenSource();
+            var token = _archiveCts.Token;
+            string statusText = _getString("ArchiveProgressCompressing", "압축 중...");
             string temporaryPath = outputPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                await createArchiveAsync(sourceDirectory.FullName, temporaryPath);
+                await createArchiveAsync(
+                    sourceDirectory.FullName,
+                    temporaryPath,
+                    progress => _statusBar.ShowProgress(statusText, progress, () => _archiveCts?.Cancel()),
+                    token
+                );
                 File.Move(temporaryPath, outputPath, overwrite: true);
 
                 string currentFolder = _currentFolderProvider();
@@ -517,6 +551,10 @@ namespace TxtAIEditor.Controls
                 {
                     _loadDirectoryRoot(currentFolder);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Silent cancellation
             }
             catch (Exception ex)
             {
@@ -526,6 +564,9 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
+                _statusBar.HideProgress();
+                _archiveCts?.Dispose();
+                _archiveCts = null;
                 TryDeleteTemporaryArchive(temporaryPath);
             }
         }

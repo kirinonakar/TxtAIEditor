@@ -59,6 +59,31 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(LineEndingButton, getString("StatusLineEndingTooltip", "클릭하여 줄 끝 방식 변경"));
             ToolTipService.SetToolTip(LanguageButton, getString("StatusLanguageTooltip", "파일 유형 변경"));
             ToolTipService.SetToolTip(StatusEncodingCombo, getString("StatusEncodingTooltip", "파일 인코딩 선택"));
+            ToolTipService.SetToolTip(StatusProgressCancelButton, getString("StatusProgressCancelTooltip", "작업 중단"));
+        }
+
+        private Action? _cancelAction;
+
+        public void ShowProgress(string statusText, double value, Action? cancelAction = null)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                _cancelAction = cancelAction;
+                StatusProgressText.Text = statusText;
+                StatusProgressBar.Value = value;
+                StatusProgressPercent.Text = $"{(int)value}%";
+                StatusProgressCancelButton.Visibility = cancelAction != null ? Visibility.Visible : Visibility.Collapsed;
+                StatusProgressPanel.Visibility = Visibility.Visible;
+            });
+        }
+
+        public void HideProgress()
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                _cancelAction = null;
+                StatusProgressPanel.Visibility = Visibility.Collapsed;
+            });
         }
 
         private void HandleLeftPanelToggleClick(object sender, RoutedEventArgs e)
@@ -94,6 +119,11 @@ namespace TxtAIEditor.Controls
         private void HandleLanguageClick(object sender, RoutedEventArgs e)
         {
             LanguageClick?.Invoke(sender, e);
+        }
+
+        private void HandleCancelClick(object sender, RoutedEventArgs e)
+        {
+            _cancelAction?.Invoke();
         }
 
         private void AttachArrowCursorReset(FrameworkElement element)

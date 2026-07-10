@@ -1793,6 +1793,15 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExplorerCompressFolderToSevenZip" xml:space="preserve">
     <value>Compress to 7z</value>
   </data>
+  <data name="ArchiveProgressCompressing" xml:space="preserve">
+    <value>Compressing...</value>
+  </data>
+  <data name="ArchiveProgressExtracting" xml:space="preserve">
+    <value>Extracting...</value>
+  </data>
+  <data name="StatusProgressCancelTooltip" xml:space="preserve">
+    <value>Cancel operation</value>
+  </data>
   <data name="ArchiveCreateFailedTitle" xml:space="preserve">
     <value>Failed to create archive</value>
   </data>

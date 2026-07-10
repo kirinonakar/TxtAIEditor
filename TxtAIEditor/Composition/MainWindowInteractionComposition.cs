@@ -77,6 +77,7 @@ namespace TxtAIEditor.Composition
         {
             var explorerFileActions = new ExplorerFileActionsController(
                 ui.LeftSidebar,
+                ui.StatusBar,
                 viewModel,
                 services.ArchiveExplorerService,
                 ui.EditorTabView,

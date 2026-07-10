@@ -216,7 +216,7 @@ namespace TxtAIEditor.Core.Services
             return targetPath;
         }
 
-        public async Task ExtractArchiveToDirectoryAsync(string archivePath, string targetDirectory, bool overwrite)
+        public async Task ExtractArchiveToDirectoryAsync(string archivePath, string targetDirectory, bool overwrite, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(archivePath) || !File.Exists(archivePath))
             {
@@ -233,11 +233,17 @@ namespace TxtAIEditor.Core.Services
 
             string targetRootWithSeparator = EnsureTrailingDirectorySeparator(targetRoot);
             using IArchive archive = OpenArchive(archivePath);
+            int totalEntries = archive.Entries.Count();
+            int processedEntries = 0;
+
             foreach (IArchiveEntry entry in archive.Entries)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string entryPath = NormalizeEntryPath(entry.Key ?? string.Empty);
                 if (string.IsNullOrEmpty(entryPath))
                 {
+                    processedEntries++;
+                    progress?.Invoke(totalEntries > 0 ? (double)processedEntries / totalEntries * 100.0 : 100.0);
                     continue;
                 }
 
@@ -252,6 +258,8 @@ namespace TxtAIEditor.Core.Services
                 if (IsDirectoryEntry(entry))
                 {
                     Directory.CreateDirectory(targetPath);
+                    processedEntries++;
+                    progress?.Invoke(totalEntries > 0 ? (double)processedEntries / totalEntries * 100.0 : 100.0);
                     continue;
                 }
 
@@ -276,17 +284,20 @@ namespace TxtAIEditor.Core.Services
                 {
                     TrySetLastWriteTime(targetPath, modifiedTime);
                 }
+
+                processedEntries++;
+                progress?.Invoke(totalEntries > 0 ? (double)processedEntries / totalEntries * 100.0 : 100.0);
             }
         }
 
-        public Task CreateZipFromDirectoryAsync(string sourceDirectory, string outputPath)
+        public Task CreateZipFromDirectoryAsync(string sourceDirectory, string outputPath, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
         {
-            return Task.Run(() => CreateZipFromDirectory(sourceDirectory, outputPath));
+            return Task.Run(() => CreateZipFromDirectory(sourceDirectory, outputPath, progress, cancellationToken), cancellationToken);
         }
 
-        public Task CreateSevenZipFromDirectoryAsync(string sourceDirectory, string outputPath)
+        public Task CreateSevenZipFromDirectoryAsync(string sourceDirectory, string outputPath, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
         {
-            return Task.Run(() => CreateSevenZipFromDirectory(sourceDirectory, outputPath));
+            return Task.Run(() => CreateSevenZipFromDirectory(sourceDirectory, outputPath, progress, cancellationToken), cancellationToken);
         }
 
         public static string NormalizeEntryPath(string entryPath)
@@ -331,10 +342,15 @@ namespace TxtAIEditor.Core.Services
             return ArchiveFactory.OpenArchive(archivePath, CreateReaderOptions(archivePath));
         }
 
-        private static void CreateZipFromDirectory(string sourceDirectory, string outputPath)
+        private static void CreateZipFromDirectory(string sourceDirectory, string outputPath, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
         {
             string sourceRoot = ValidateArchiveCreationPaths(sourceDirectory, outputPath);
             var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+            var directories = EnumerateArchiveDirectories(sourceRoot).ToList();
+            var files = EnumerateArchiveFiles(sourceRoot).ToList();
+            int total = directories.Count + files.Count;
+            int processed = 0;
 
             using var output = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
             using var archive = new ZipArchive(
@@ -343,43 +359,61 @@ namespace TxtAIEditor.Core.Services
                 leaveOpen: false,
                 entryNameEncoding: utf8);
 
-            foreach (string directoryPath in EnumerateArchiveDirectories(sourceRoot))
+            foreach (string directoryPath in directories)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string entryName = GetArchiveEntryPath(sourceRoot, directoryPath) + "/";
                 ZipArchiveEntry entry = archive.CreateEntry(entryName, System.IO.Compression.CompressionLevel.NoCompression);
                 entry.LastWriteTime = Directory.GetLastWriteTime(directoryPath);
+                processed++;
+                progress?.Invoke(total > 0 ? (double)processed / total * 100.0 : 100.0);
             }
 
-            foreach (string filePath in EnumerateArchiveFiles(sourceRoot))
+            foreach (string filePath in files)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string entryName = GetArchiveEntryPath(sourceRoot, filePath);
                 archive.CreateEntryFromFile(
                     filePath,
                     entryName,
                     System.IO.Compression.CompressionLevel.Optimal);
+                processed++;
+                progress?.Invoke(total > 0 ? (double)processed / total * 100.0 : 100.0);
             }
         }
 
-        private static void CreateSevenZipFromDirectory(string sourceDirectory, string outputPath)
+        private static void CreateSevenZipFromDirectory(string sourceDirectory, string outputPath, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
         {
             string sourceRoot = ValidateArchiveCreationPaths(sourceDirectory, outputPath);
             var options = new SevenZipWriterOptions(CompressionType.LZMA2);
+
+            var directories = EnumerateArchiveDirectories(sourceRoot).ToList();
+            var files = EnumerateArchiveFiles(sourceRoot).ToList();
+            int total = directories.Count + files.Count;
+            int processed = 0;
+
             using IWriter writer = WriterFactory.OpenWriter(outputPath, ArchiveType.SevenZip, options);
 
-            foreach (string directoryPath in EnumerateArchiveDirectories(sourceRoot))
+            foreach (string directoryPath in directories)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 writer.WriteDirectory(
                     GetArchiveEntryPath(sourceRoot, directoryPath),
                     Directory.GetLastWriteTime(directoryPath));
+                processed++;
+                progress?.Invoke(total > 0 ? (double)processed / total * 100.0 : 100.0);
             }
 
-            foreach (string filePath in EnumerateArchiveFiles(sourceRoot))
+            foreach (string filePath in files)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 using var source = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 writer.Write(
                     GetArchiveEntryPath(sourceRoot, filePath),
                     source,
                     File.GetLastWriteTime(filePath));
+                processed++;
+                progress?.Invoke(total > 0 ? (double)processed / total * 100.0 : 100.0);
             }
         }
 

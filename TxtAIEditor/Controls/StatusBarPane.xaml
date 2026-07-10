@@ -134,6 +134,44 @@
                 <TextBlock x:Name="StatusSelectionStats" Text="" FontSize="11" VerticalAlignment="Center" Visibility="Collapsed"/>
             </StackPanel>
 
+            <StackPanel Grid.Column="2"
+                        x:Name="StatusProgressPanel"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Visibility="Collapsed">
+                <TextBlock x:Name="StatusProgressText"
+                           Text="압축 중..."
+                           FontSize="11"
+                           VerticalAlignment="Center"/>
+                <ProgressBar x:Name="StatusProgressBar"
+                             Width="120"
+                             Height="4"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="0"
+                             IsIndeterminate="False"
+                             VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusProgressPercent"
+                           Text="0%"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+                <Button x:Name="StatusProgressCancelButton"
+                        Width="16"
+                        Height="16"
+                        Padding="0"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        CornerRadius="8"
+                        VerticalAlignment="Center"
+                        Click="HandleCancelClick"
+                        ToolTipService.ToolTip="작업 중단">
+                    <FontIcon Glyph="&#xE10A;" FontSize="8"/>
+                </Button>
+            </StackPanel>
+
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="15" VerticalAlignment="Center">
                 <TextBlock x:Name="StatusGitBranch" Text="" Tag="GitNotDetected" FontSize="11" VerticalAlignment="Center"/>
                 <Button x:Name="LanguageButton" MinWidth="68" HorizontalContentAlignment="Left" Padding="4,0" Background="Transparent" BorderBrush="Transparent" Click="HandleLanguageClick">
