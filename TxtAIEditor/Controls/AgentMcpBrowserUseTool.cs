@@ -22,6 +22,7 @@ namespace TxtAIEditor.Controls
         private const string BuiltInBrowserUseId = "builtin-browser-use";
         private const string BuiltInBrowserUseName = "Browser Use";
         private const int MaxPageTextLength = 60_000;
+        private const int DefaultAccessibilityNodeLimit = 180;
         private const int MaxCaptureDimension = 1024;
         private const uint InputKeyboard = 1;
         private const uint InputMouse = 0;
@@ -42,6 +43,7 @@ namespace TxtAIEditor.Controls
 
         private readonly Func<EditorSettings> _settingsProvider;
         private readonly Action<LlmMessageAttachment>? _addImageAttachment;
+        private readonly AgentBrowserAccessibilityService _accessibility = new();
         private IntPtr _browserWindow;
         private bool _controlledWindowIsBrowser = true;
         private string _defaultBrowserProcessName = string.Empty;
@@ -97,11 +99,14 @@ namespace TxtAIEditor.Controls
                 CreateAlias("mcp_browser_use_status", "status", "Get the controlled default browser window title, process, bounds, and current URL.", """
                 {"type":"object","properties":{}}
                 """),
+                CreateAlias("mcp_browser_use_snapshot", "snapshot", "Return a concise accessibility tree for the controlled browser window. Every emitted element has a stable ref that can be passed to mcp_browser_use_click. Set includeScreenshot only when visual context is needed.", """
+                {"type":"object","properties":{"maxNodes":{"type":"integer","minimum":20,"maximum":500,"default":180},"includeScreenshot":{"type":"boolean","default":false}}}
+                """),
                 CreateAlias("mcp_browser_use_read_page", "read_page", "Copy and return selectable text from the current page, together with the current URL and window title. This is browser-agnostic and may not expose canvas or protected page content.", """
                 {"type":"object","properties":{"maxCharacters":{"type":"integer","minimum":1000,"maximum":60000,"default":30000}}}
                 """),
-                CreateAlias("mcp_browser_use_click", "click", "Click a point identified in the latest Browser Use capture. A new screenshot of the post-click page state will be automatically captured and attached to the model context. Do NOT call read_image.", """
-                {"type":"object","properties":{"x":{"type":"integer","description":"X coordinate in the latest capture image."},"y":{"type":"integer","description":"Y coordinate in the latest capture image."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot for coordinates from mcp_browser_use_capture or the post-click capture of mcp_browser_use_click. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1}},"required":["x","y"]}
+                CreateAlias("mcp_browser_use_click", "click", "Click an element by stable ref from mcp_browser_use_snapshot (preferred), or by coordinates from a capture. Returns a fresh accessibility snapshot; request includeScreenshot only when visual context is needed.", """
+                {"type":"object","properties":{"ref":{"type":"string","description":"Stable element ref returned by mcp_browser_use_snapshot."},"x":{"type":"integer","description":"X coordinate in the latest capture image."},"y":{"type":"integer","description":"Y coordinate in the latest capture image."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot for coordinates from mcp_browser_use_capture. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1},"includeScreenshot":{"type":"boolean","default":false}},"anyOf":[{"required":["ref"]},{"required":["x","y"]}]}
                 """),
                 CreateAlias("mcp_browser_use_type_text", "type_text", "Type Unicode text into the focused browser control. Can replace the current field selection and optionally press Enter.", """
                 {"type":"object","properties":{"text":{"type":"string"},"replace":{"type":"boolean","default":false},"pressEnter":{"type":"boolean","default":false}},"required":["text"]}
@@ -170,6 +175,7 @@ namespace TxtAIEditor.Controls
                 {
                     "open_url" => await OpenUrlAsync(arguments, cancellationToken),
                     "status" => await GetStatusAsync(cancellationToken),
+                    "snapshot" => await SnapshotAsync(arguments, cancellationToken),
                     "capture" => await CaptureAsync(cancellationToken),
                     "read_page" => await ReadPageAsync(arguments, cancellationToken),
                     "click" => await ClickAsync(arguments, cancellationToken),
@@ -397,12 +403,23 @@ namespace TxtAIEditor.Controls
                 {
                     SelectControlledWindow(window);
                     FocusBrowserWindow(handle);
-                    await Task.Delay(180, cancellationToken);
-                    return await BuildStatusResultAsync(
+                    await Task.Delay(300, cancellationToken);
+                    string status = await BuildStatusResultAsync(
                         "MCP tool result: Computer Use launched and selected an application window.",
                         handle,
                         includeUrl: _controlledWindowIsBrowser,
                         cancellationToken);
+                    try
+                    {
+                        string snapshot = _accessibility.CaptureSnapshot(handle, DefaultAccessibilityNodeLimit);
+                        return status + "\n" + snapshot;
+                    }
+                    catch (Exception ex)
+                    {
+                        return status +
+                            $"\n(Warning: Initial accessibility snapshot failed: {ex.Message})\n" +
+                            "next_action: Use mcp_browser_use_capture only if visual inspection is required.";
+                    }
                 }
 
                 await Task.Delay(150, cancellationToken);
@@ -486,6 +503,25 @@ namespace TxtAIEditor.Controls
                 "next_action: The captured image is automatically attached. Visually locate the target, then call mcp_browser_use_click using coordinates from this image. After any click, input, scroll, or navigation, capture again before the next click.";
         }
 
+        private async Task<string> SnapshotAsync(JsonElement arguments, CancellationToken cancellationToken)
+        {
+            IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken, requireBrowser: true);
+            int maxNodes = AgentToolHelpers.GetIntArgument(arguments, "maxNodes", DefaultAccessibilityNodeLimit);
+            string snapshot = _accessibility.CaptureSnapshot(browserWindow, maxNodes);
+            bool includeScreenshot = AgentToolHelpers.GetBoolArgument(arguments, "includeScreenshot", false);
+            if (!includeScreenshot)
+            {
+                return snapshot;
+            }
+
+            if (!_settingsProvider().BrowserUseCaptureEnabled)
+            {
+                return snapshot + "\n(Warning: Screenshot was requested but Browser Use capture is disabled.)";
+            }
+
+            return snapshot + "\n\n" + await CaptureAsync(cancellationToken);
+        }
+
         private async Task<string> ReadPageAsync(JsonElement arguments, CancellationToken cancellationToken)
         {
             IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken, requireBrowser: true);
@@ -531,9 +567,13 @@ namespace TxtAIEditor.Controls
         {
             EnsureInteractionAllowed();
             IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken);
-            if (!TryGetInt(arguments, "x", out int x) || !TryGetInt(arguments, "y", out int y))
+            string elementRef = AgentToolHelpers.GetFirstStringArgument(arguments, "ref", "elementRef", "element_ref").Trim();
+            bool hasX = TryGetInt(arguments, "x", out int x);
+            bool hasY = TryGetInt(arguments, "y", out int y);
+            bool hasCoordinates = hasX && hasY;
+            if (string.IsNullOrWhiteSpace(elementRef) && !hasCoordinates)
             {
-                throw new InvalidOperationException("click requires integer x and y coordinates.");
+                throw new InvalidOperationException("click requires a snapshot ref or integer x and y coordinates.");
             }
 
             if (!GetWindowRect(browserWindow, out Rect rect))
@@ -543,79 +583,96 @@ namespace TxtAIEditor.Controls
 
             int windowWidth = rect.Right - rect.Left;
             int windowHeight = rect.Bottom - rect.Top;
-            string coordinateSpace = AgentToolHelpers.GetFirstStringArgument(arguments, "coordinateSpace", "coordinate_space")
-                .Trim()
-                .ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(coordinateSpace))
-            {
-                coordinateSpace = "screenshot";
-            }
-
             int screenX;
             int screenY;
-            if (coordinateSpace == "screenshot")
+            string coordinateSpace;
+            if (!string.IsNullOrWhiteSpace(elementRef))
             {
-                BrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
-                    ? _lastCapture
-                    : null;
-                bool reusedCapture = capture != null;
-                if (capture == null && _settingsProvider().BrowserUseCaptureEnabled)
+                if (!_accessibility.TryResolveRef(elementRef, browserWindow, out AgentBrowserAccessibilityService.AccessibilityTarget target))
                 {
-                    try
-                    {
-                        await CaptureAsync(cancellationToken);
-                        capture = _lastCapture;
-                    }
-                    catch
-                    {
-                        // Ignore capture failures and fall back
-                    }
+                    throw new InvalidOperationException($"Accessibility ref '{elementRef}' is stale or unavailable. Call mcp_browser_use_snapshot and retry with a current ref.");
                 }
 
-                if (capture != null)
-                {
-                    if (reusedCapture)
-                    {
-                        await AttachCaptureImageAsync(capture.ImagePath, cancellationToken);
-                    }
-
-                    x = Math.Clamp(x, 0, capture.ImageWidth - 1);
-                    y = Math.Clamp(y, 0, capture.ImageHeight - 1);
-
-                    int origX = x - capture.PaddingLeft;
-                    int origY = y - capture.PaddingTop;
-
-                    origX = Math.Clamp(origX, 0, capture.OriginalImageWidth - 1);
-                    origY = Math.Clamp(origY, 0, capture.OriginalImageHeight - 1);
-
-                    screenX = rect.Left + Math.Clamp(
-                        (int)Math.Round((origX + 0.5) * (windowWidth / (double)capture.OriginalImageWidth)),
-                        0,
-                        windowWidth - 1);
-                    screenY = rect.Top + Math.Clamp(
-                        (int)Math.Round((origY + 0.5) * (windowHeight / (double)capture.OriginalImageHeight)),
-                        0,
-                        windowHeight - 1);
-                }
-                else
-                {
-                    x = Math.Clamp(x, 0, windowWidth - 1);
-                    y = Math.Clamp(y, 0, windowHeight - 1);
-                    screenX = rect.Left + x;
-                    screenY = rect.Top + y;
-                }
-            }
-            else if (coordinateSpace == "window")
-            {
-                x = Math.Clamp(x, 0, windowWidth - 1);
-                y = Math.Clamp(y, 0, windowHeight - 1);
-
-                screenX = rect.Left + x;
-                screenY = rect.Top + y;
+                coordinateSpace = "ref";
+                screenX = target.ScreenX;
+                screenY = target.ScreenY;
+                x = screenX - rect.Left;
+                y = screenY - rect.Top;
             }
             else
             {
-                throw new InvalidOperationException($"Unsupported coordinate space: {coordinateSpace}");
+                coordinateSpace = AgentToolHelpers.GetFirstStringArgument(arguments, "coordinateSpace", "coordinate_space")
+                    .Trim()
+                    .ToLowerInvariant();
+                if (string.IsNullOrWhiteSpace(coordinateSpace))
+                {
+                    coordinateSpace = "screenshot";
+                }
+
+                if (coordinateSpace == "screenshot")
+                {
+                    BrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
+                        ? _lastCapture
+                        : null;
+                    bool reusedCapture = capture != null;
+                    if (capture == null && _settingsProvider().BrowserUseCaptureEnabled)
+                    {
+                        try
+                        {
+                            await CaptureAsync(cancellationToken);
+                            capture = _lastCapture;
+                        }
+                        catch
+                        {
+                            // Ignore capture failures and fall back
+                        }
+                    }
+
+                    if (capture != null)
+                    {
+                        if (reusedCapture)
+                        {
+                            await AttachCaptureImageAsync(capture.ImagePath, cancellationToken);
+                        }
+
+                        x = Math.Clamp(x, 0, capture.ImageWidth - 1);
+                        y = Math.Clamp(y, 0, capture.ImageHeight - 1);
+
+                        int origX = x - capture.PaddingLeft;
+                        int origY = y - capture.PaddingTop;
+
+                        origX = Math.Clamp(origX, 0, capture.OriginalImageWidth - 1);
+                        origY = Math.Clamp(origY, 0, capture.OriginalImageHeight - 1);
+
+                        screenX = rect.Left + Math.Clamp(
+                            (int)Math.Round((origX + 0.5) * (windowWidth / (double)capture.OriginalImageWidth)),
+                            0,
+                            windowWidth - 1);
+                        screenY = rect.Top + Math.Clamp(
+                            (int)Math.Round((origY + 0.5) * (windowHeight / (double)capture.OriginalImageHeight)),
+                            0,
+                            windowHeight - 1);
+                    }
+                    else
+                    {
+                        x = Math.Clamp(x, 0, windowWidth - 1);
+                        y = Math.Clamp(y, 0, windowHeight - 1);
+                        screenX = rect.Left + x;
+                        screenY = rect.Top + y;
+                    }
+                }
+                else if (coordinateSpace == "window")
+                {
+                    x = Math.Clamp(x, 0, windowWidth - 1);
+                    y = Math.Clamp(y, 0, windowHeight - 1);
+
+                    screenX = rect.Left + x;
+                    screenY = rect.Top + y;
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Unsupported coordinate space: {coordinateSpace}");
+                }
             }
 
             string button = AgentToolHelpers.GetFirstStringArgument(arguments, "button").Trim().ToLowerInvariant();
@@ -649,25 +706,10 @@ namespace TxtAIEditor.Controls
             }
 
             await Task.Delay(350, cancellationToken);
-            string captureResult = string.Empty;
-            if (_settingsProvider().BrowserUseCaptureEnabled)
-            {
-                try
-                {
-                    captureResult = "\n" + await CaptureAsync(cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _lastCapture = null;
-                    captureResult = $"\n(Warning: Capture after click failed: {ex.Message})";
-                }
-            }
-            else
-            {
-                _lastCapture = null;
-            }
+            string postActionContext = await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
 
-            return $"MCP tool result: Browser Use clicked {button} at {coordinateSpace} ({x}, {y}), mapped to screen ({screenX}, {screenY})." + captureResult;
+            string targetDescription = coordinateSpace == "ref" ? $"ref {elementRef}" : $"{coordinateSpace} ({x}, {y})";
+            return $"MCP tool result: Browser Use clicked {button} at {targetDescription}, mapped to screen ({screenX}, {screenY})." + postActionContext;
         }
 
         private async Task<string> TypeTextAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -688,8 +730,8 @@ namespace TxtAIEditor.Controls
             }
 
             await Task.Delay(150, cancellationToken);
-            _lastCapture = null;
-            return $"MCP tool result: Browser Use typed {text.Length:N0} characters.";
+            return $"MCP tool result: Browser Use typed {text.Length:N0} characters." +
+                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
         }
 
         private async Task<string> PressKeyAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -709,8 +751,8 @@ namespace TxtAIEditor.Controls
                 AgentToolHelpers.GetBoolArgument(arguments, "alt", false),
                 AgentToolHelpers.GetBoolArgument(arguments, "shift", false));
             await Task.Delay(120, cancellationToken);
-            _lastCapture = null;
-            return $"MCP tool result: Browser Use pressed {key}.";
+            return $"MCP tool result: Browser Use pressed {key}." +
+                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
         }
 
         private async Task<string> ScrollAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -738,8 +780,8 @@ namespace TxtAIEditor.Controls
             }
 
             await Task.Delay(150, cancellationToken);
-            _lastCapture = null;
-            return $"MCP tool result: Browser Use scrolled (deltaY: {deltaY}, deltaX: {deltaX}).";
+            return $"MCP tool result: Browser Use scrolled (deltaY: {deltaY}, deltaX: {deltaX})." +
+                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
         }
 
         private async Task<string> NavigateAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -758,8 +800,8 @@ namespace TxtAIEditor.Controls
             }
 
             await Task.Delay(200, cancellationToken);
-            _lastCapture = null;
-            return $"MCP tool result: Browser Use navigation action completed: {action}.";
+            return $"MCP tool result: Browser Use navigation action completed: {action}." +
+                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
         }
 
         private async Task<string> TabAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -778,8 +820,8 @@ namespace TxtAIEditor.Controls
             }
 
             await Task.Delay(200, cancellationToken);
-            _lastCapture = null;
-            return $"MCP tool result: Browser Use tab action completed: {action}.";
+            return $"MCP tool result: Browser Use tab action completed: {action}." +
+                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
         }
 
         private async Task<string> FindAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -803,8 +845,51 @@ namespace TxtAIEditor.Controls
             }
 
             await Task.Delay(120, cancellationToken);
-            _lastCapture = null;
-            return $"MCP tool result: Browser Use searched the page for: {text}";
+            return $"MCP tool result: Browser Use searched the page for: {text}" +
+                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
+        }
+
+        private async Task<string> BuildPostActionContextAsync(
+            IntPtr browserWindow,
+            JsonElement arguments,
+            CancellationToken cancellationToken)
+        {
+            bool snapshotFailed = false;
+            string context;
+            try
+            {
+                context = "\n" + _accessibility.CaptureSnapshot(browserWindow, DefaultAccessibilityNodeLimit);
+            }
+            catch (Exception ex)
+            {
+                snapshotFailed = true;
+                context = $"\n(Warning: Accessibility snapshot after interaction failed: {ex.Message})";
+            }
+
+            bool includeScreenshot = AgentToolHelpers.GetBoolArgument(arguments, "includeScreenshot", false);
+            bool shouldCapture = includeScreenshot || snapshotFailed;
+            if (shouldCapture && _settingsProvider().BrowserUseCaptureEnabled)
+            {
+                try
+                {
+                    context += "\n" + await CaptureAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _lastCapture = null;
+                    context += $"\n(Warning: Capture after interaction failed: {ex.Message})";
+                }
+            }
+            else
+            {
+                _lastCapture = null;
+                if (shouldCapture)
+                {
+                    context += "\n(Warning: Screenshot was needed but Browser Use capture is disabled.)";
+                }
+            }
+
+            return context;
         }
 
         private static byte[] CaptureWindowPixels(

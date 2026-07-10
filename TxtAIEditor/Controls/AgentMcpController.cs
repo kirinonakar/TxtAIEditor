@@ -677,6 +677,7 @@ namespace TxtAIEditor.Controls
             builder.AppendLine("[Enabled MCP servers]");
             builder.AppendLine("These tools are provided by enabled MCP servers or built-in MCP-compatible plugins. Use their exact alias names in tool_call.");
             builder.AppendLine("MCP tool aliases use the form mcp_server_tool and are executed through MCP tools/call or the matching built-in plugin.");
+            builder.AppendLine("Never emit a tool_call with an empty or invented name. If a tool action is intended, copy one exact enabled alias and provide all required arguments.");
             builder.AppendLine();
 
             if (hasComfyUi)
@@ -691,7 +692,7 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine("Browser Use controls the installed Windows default browser through OS-level keyboard and mouse input.");
                 if (_settingsService.CurrentSettings.BrowserUseCaptureEnabled)
                 {
-                    builder.AppendLine("For visual actions, always follow this loop: mcp_browser_use_capture -> read_image using the returned image_path -> mcp_browser_use_click with coordinates from that image -> capture again to verify. Use type_text only after visually clicking the intended input field.");
+                    builder.AppendLine("For interactions, prefer the accessibility loop: mcp_browser_use_snapshot -> mcp_browser_use_click with a stable ref -> use the fresh snapshot returned after the action. Use mcp_browser_use_capture only when the accessibility tree does not expose the target or visual context is required.");
                 }
                 else
                 {
@@ -701,7 +702,7 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine("Use read_page after navigation when selectable page text is needed.");
                 if (_settingsService.CurrentSettings.BrowserUseComputerUseEnabled)
                 {
-                    builder.AppendLine("Computer Use is enabled. To control another app: list_windows or open_app -> focus_window when needed -> capture -> read_image -> click/type/key -> capture again. Never guess a window id or visual coordinate.");
+                    builder.AppendLine("Computer Use is enabled. open_app returns an initial accessibility tree with stable refs. To control another app: list_windows or open_app -> focus_window when needed -> snapshot/ref click/type/key. Capture only when the accessibility tree is insufficient. Never guess a window id, ref, or visual coordinate.");
                 }
                 builder.AppendLine();
             }

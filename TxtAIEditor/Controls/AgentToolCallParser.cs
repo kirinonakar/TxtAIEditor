@@ -48,6 +48,25 @@ namespace TxtAIEditor.Controls
                     detail = "The tool_call tag must include one matching <tool_call ...>...</invoke> (or </tool_call>) pair.";
                     return true;
                 }
+
+                int tagEndIndex = text.IndexOf('>', xmlOpenIndex);
+                if (tagEndIndex >= 0 && tagEndIndex < xmlCloseIndex)
+                {
+                    string payload = text.Substring(tagEndIndex + 1, xmlCloseIndex - tagEndIndex - 1);
+                    var nameMatch = Regex.Match(
+                        payload,
+                        @"""name""\s*:\s*""(?<name>[^""\\]*(?:\\.[^""\\]*)*)""",
+                        RegexOptions.IgnoreCase);
+                    if (nameMatch.Success)
+                    {
+                        string toolName = DecodeLenientJsonString(nameMatch.Groups["name"].Value);
+                        if (!IsValidToolName(toolName))
+                        {
+                            detail = "The tool_call name is empty or invalid. Reuse the exact enabled tool alias for the intended action and include its required arguments.";
+                            return true;
+                        }
+                    }
+                }
                 
                 return false;
             }
@@ -1272,11 +1291,13 @@ namespace TxtAIEditor.Controls
 
             if (trimmed.StartsWith("{", StringComparison.Ordinal))
             {
+                bool foundNameProperty = false;
                 foreach (Match match in Regex.Matches(
                     trimmed,
                     @"""name""\s*:\s*""(?<name>[^""\\]*(?:\\.[^""\\]*)*)""",
                     RegexOptions.IgnoreCase))
                 {
+                    foundNameProperty = true;
                     string toolName = DecodeLenientJsonString(match.Groups["name"].Value);
                     if (IsValidToolName(toolName))
                     {
@@ -1284,7 +1305,7 @@ namespace TxtAIEditor.Controls
                     }
                 }
 
-                return false;
+                return foundNameProperty;
             }
 
             int openBraceIndex = trimmed.IndexOf('{');
