@@ -45,6 +45,7 @@ namespace TxtAIEditor.Controls
         private IntPtr _browserWindow;
         private bool _controlledWindowIsBrowser = true;
         private string _defaultBrowserProcessName = string.Empty;
+        private string _defaultBrowserExecutablePath = string.Empty;
         private BrowserCapture? _lastCapture;
 
         public AgentMcpBrowserUseTool(Func<EditorSettings> settingsProvider, Action<LlmMessageAttachment>? addImageAttachment = null)
@@ -1123,11 +1124,36 @@ namespace TxtAIEditor.Controls
             throw new InvalidOperationException("The Windows default browser window could not be found after launch.");
         }
 
-        private static void LaunchDefaultBrowser(string url)
+        private void LaunchDefaultBrowser(string url)
         {
+            string executable = GetDefaultBrowserExecutablePath();
+            if (!string.IsNullOrWhiteSpace(executable))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = executable,
+                        Arguments = url,
+                        UseShellExecute = true
+                    });
+                    return;
+                }
+                catch
+                {
+                    // Fall back to general shell launch if executable launch fails
+                }
+            }
+
+            string launchUrl = url;
+            if (url.Equals("about:blank", StringComparison.OrdinalIgnoreCase))
+            {
+                launchUrl = "https://www.google.com";
+            }
+
             Process.Start(new ProcessStartInfo
             {
-                FileName = url,
+                FileName = launchUrl,
                 UseShellExecute = true
             });
         }
@@ -1272,11 +1298,11 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private string GetDefaultBrowserProcessName()
+        private string GetDefaultBrowserExecutablePath()
         {
-            if (!string.IsNullOrWhiteSpace(_defaultBrowserProcessName))
+            if (!string.IsNullOrWhiteSpace(_defaultBrowserExecutablePath))
             {
-                return _defaultBrowserProcessName;
+                return _defaultBrowserExecutablePath;
             }
 
             try
@@ -1291,12 +1317,27 @@ namespace TxtAIEditor.Controls
 
                 using RegistryKey? commandKey = Registry.ClassesRoot.OpenSubKey(progId + @"\shell\open\command");
                 string command = commandKey?.GetValue(null) as string ?? string.Empty;
-                string executable = ExtractExecutablePath(command);
-                _defaultBrowserProcessName = System.IO.Path.GetFileNameWithoutExtension(executable);
+                _defaultBrowserExecutablePath = ExtractExecutablePath(command);
             }
             catch
             {
-                _defaultBrowserProcessName = string.Empty;
+                _defaultBrowserExecutablePath = string.Empty;
+            }
+
+            return _defaultBrowserExecutablePath;
+        }
+
+        private string GetDefaultBrowserProcessName()
+        {
+            if (!string.IsNullOrWhiteSpace(_defaultBrowserProcessName))
+            {
+                return _defaultBrowserProcessName;
+            }
+
+            string executable = GetDefaultBrowserExecutablePath();
+            if (!string.IsNullOrWhiteSpace(executable))
+            {
+                _defaultBrowserProcessName = System.IO.Path.GetFileNameWithoutExtension(executable);
             }
 
             return _defaultBrowserProcessName;
