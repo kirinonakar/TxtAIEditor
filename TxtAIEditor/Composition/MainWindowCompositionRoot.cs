@@ -305,6 +305,7 @@ namespace TxtAIEditor.Composition
                     callbacks.OpenMediaTab,
                     callbacks.OpenPdfTab,
                     callbacks.OpenOfficeDocumentTab,
+                    callbacks.OpenHexTab,
                     QueueGitStatusRefresh));
             functionKeyShortcutService = workspaceControllers.FunctionKeyShortcut;
             gitAutoRefreshTimer = workspaceControllers.GitAutoRefreshTimer;

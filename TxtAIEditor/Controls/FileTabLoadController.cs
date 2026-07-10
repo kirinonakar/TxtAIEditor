@@ -32,6 +32,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, OpenedTab> _openMediaTab;
         private readonly Func<string, OpenedTab> _openPdfTab;
         private readonly Func<string, OpenedTab> _openOfficeDocumentTab;
+        private readonly Func<string, OpenedTab> _openHexTab;
         private readonly Action _queueGitStatusRefresh;
         private readonly Action<string, string> _showErrorMessage;
         private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
@@ -52,6 +53,7 @@ namespace TxtAIEditor.Controls
             Func<string, OpenedTab> openMediaTab,
             Func<string, OpenedTab> openPdfTab,
             Func<string, OpenedTab> openOfficeDocumentTab,
+            Func<string, OpenedTab> openHexTab,
             Action queueGitStatusRefresh,
             Action<string, string> showErrorMessage)
         {
@@ -70,6 +72,7 @@ namespace TxtAIEditor.Controls
             _openMediaTab = openMediaTab;
             _openPdfTab = openPdfTab;
             _openOfficeDocumentTab = openOfficeDocumentTab;
+            _openHexTab = openHexTab;
             _queueGitStatusRefresh = queueGitStatusRefresh;
             _showErrorMessage = showErrorMessage;
         }
@@ -96,6 +99,13 @@ namespace TxtAIEditor.Controls
                 {
                     QueueGitRefreshIfNeeded(repoRoot);
                     return FileTabLoadResult.ActivatedExisting(existingTab);
+                }
+
+                if (Path.GetExtension(filePath).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    var tab = _openHexTab(filePath);
+                    QueueGitRefreshIfNeeded(repoRoot);
+                    return FileTabLoadResult.Opened(tab);
                 }
 
                 if (SupportedFileTypes.IsImageFile(filePath))
@@ -257,8 +267,11 @@ namespace TxtAIEditor.Controls
 
         private OpenedTab? FocusExistingTab(string filePath)
         {
+            bool isExe = Path.GetExtension(filePath).Equals(".exe", StringComparison.OrdinalIgnoreCase);
             var existingTab = _viewModel.Tabs.FirstOrDefault(t =>
-                string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+                isExe
+                    ? (t.IsHexViewer && string.Equals(t.HexSourceFilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    : string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
             if (existingTab == null)
             {
                 return null;
@@ -343,6 +356,11 @@ namespace TxtAIEditor.Controls
 
         private OpenedTab OpenViewerTab(string filePath)
         {
+            if (Path.GetExtension(filePath).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                return _openHexTab(filePath);
+            }
+
             if (SupportedFileTypes.IsImageFile(filePath))
             {
                 return _openImageTab(filePath);
@@ -366,7 +384,8 @@ namespace TxtAIEditor.Controls
             return SupportedFileTypes.IsImageFile(entryPath) ||
                    SupportedFileTypes.IsMediaFile(entryPath) ||
                    SupportedFileTypes.IsPdfFile(entryPath) ||
-                   SupportedFileTypes.IsOfficeDocumentFile(entryPath);
+                   SupportedFileTypes.IsOfficeDocumentFile(entryPath) ||
+                   Path.GetExtension(entryPath).Equals(".exe", StringComparison.OrdinalIgnoreCase);
         }
 
         private static EditorDocumentLoadResult LoadTextEntry(byte[] bytes)
