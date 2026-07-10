@@ -529,29 +529,49 @@ namespace TxtAIEditor.Controls
             int screenY;
             if (coordinateSpace == "screenshot")
             {
-                BrowserCapture capture = _lastCapture != null && _lastCapture.Window == browserWindow
+                BrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
                     ? _lastCapture
-                    : throw new InvalidOperationException("No current window capture is available. Call mcp_browser_use_capture and read_image before clicking.");
-                if (x < 0 || y < 0 || x >= capture.ImageWidth || y >= capture.ImageHeight)
+                    : null;
+
+                if (capture == null && _settingsProvider().BrowserUseCaptureEnabled)
                 {
-                    throw new InvalidOperationException($"Click point ({x}, {y}) is outside the latest capture ({capture.ImageWidth} x {capture.ImageHeight}).");
+                    try
+                    {
+                        await CaptureAsync(cancellationToken);
+                        capture = _lastCapture;
+                    }
+                    catch
+                    {
+                        // Ignore capture failures and fall back
+                    }
                 }
 
-                screenX = rect.Left + Math.Clamp(
-                    (int)Math.Round((x + 0.5) * (windowWidth / (double)capture.ImageWidth)),
-                    0,
-                    windowWidth - 1);
-                screenY = rect.Top + Math.Clamp(
-                    (int)Math.Round((y + 0.5) * (windowHeight / (double)capture.ImageHeight)),
-                    0,
-                    windowHeight - 1);
+                if (capture != null)
+                {
+                    x = Math.Clamp(x, 0, capture.ImageWidth - 1);
+                    y = Math.Clamp(y, 0, capture.ImageHeight - 1);
+
+                    screenX = rect.Left + Math.Clamp(
+                        (int)Math.Round((x + 0.5) * (windowWidth / (double)capture.ImageWidth)),
+                        0,
+                        windowWidth - 1);
+                    screenY = rect.Top + Math.Clamp(
+                        (int)Math.Round((y + 0.5) * (windowHeight / (double)capture.ImageHeight)),
+                        0,
+                        windowHeight - 1);
+                }
+                else
+                {
+                    x = Math.Clamp(x, 0, windowWidth - 1);
+                    y = Math.Clamp(y, 0, windowHeight - 1);
+                    screenX = rect.Left + x;
+                    screenY = rect.Top + y;
+                }
             }
             else if (coordinateSpace == "window")
             {
-                if (x < 0 || y < 0 || x >= windowWidth || y >= windowHeight)
-                {
-                    throw new InvalidOperationException($"Click point ({x}, {y}) is outside the controlled window ({windowWidth} x {windowHeight}).");
-                }
+                x = Math.Clamp(x, 0, windowWidth - 1);
+                y = Math.Clamp(y, 0, windowHeight - 1);
 
                 screenX = rect.Left + x;
                 screenY = rect.Top + y;
