@@ -143,6 +143,45 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public bool TryOpenArchive(string archivePath, bool revealInLeftPanel = true)
+        {
+            if (!_archiveExplorerService.IsSupportedArchiveFile(archivePath))
+            {
+                return false;
+            }
+
+            string fullArchivePath;
+            try
+            {
+                fullArchivePath = Path.GetFullPath(archivePath);
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (!File.Exists(fullArchivePath))
+            {
+                return false;
+            }
+
+            string? folderPath = Path.GetDirectoryName(fullArchivePath);
+            if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+            {
+                UpdateRepoPath(folderPath);
+                SetCurrentFolderPath(folderPath);
+            }
+
+            if (revealInLeftPanel)
+            {
+                _ensureLeftPanelVisible();
+                _showLeftSidebarPage(0);
+            }
+
+            LoadArchiveDirectoryRoot(fullArchivePath, string.Empty);
+            return true;
+        }
+
         public async Task NavigateToFolderAsync(string folderPath, bool revealInLeftPanel = true)
         {
             if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))

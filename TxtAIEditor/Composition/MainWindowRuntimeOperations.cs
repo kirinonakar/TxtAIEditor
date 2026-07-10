@@ -241,6 +241,11 @@ namespace TxtAIEditor.Composition
 
         public async Task LoadFileIntoTabAsync(string filePath, int lineNumber)
         {
+            if (Controllers.Workspace.ExplorerNavigation.TryOpenArchive(filePath))
+            {
+                return;
+            }
+
             var loadedTab = await Controllers.Workspace.FileTabLoad.LoadAsync(filePath);
             if (loadedTab != null)
             {

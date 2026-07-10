@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -209,14 +210,16 @@ namespace TxtAIEditor.Controls
 
         private async Task OpenStartupTargetsAsync(StartupPaths startupPaths)
         {
-            if (startupPaths.Folders.Count > 0)
+            bool hasArchive = startupPaths.Files.Any(ArchiveExplorerService.IsSupportedArchivePath);
+
+            if (startupPaths.Folders.Count > 0 && !hasArchive)
             {
                 NavigateStartupFolderWithoutBlocking(startupPaths.Folders[0]);
             }
 
             if (startupPaths.Files.Count > 0)
             {
-                if (startupPaths.Folders.Count == 0)
+                if (startupPaths.Folders.Count == 0 && !hasArchive)
                 {
                     NavigateToFirstFileFolder(startupPaths.Files[0]);
                 }
