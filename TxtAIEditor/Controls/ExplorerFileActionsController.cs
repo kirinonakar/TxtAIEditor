@@ -388,7 +388,9 @@ namespace TxtAIEditor.Controls
             string targetDirectory = Path.Combine(parentDirectory, GetArchiveExtractFolderName(archivePath));
             _archiveCts = new System.Threading.CancellationTokenSource();
             var token = _archiveCts.Token;
-            string statusText = _getString("ArchiveProgressExtracting", "압축 푸는 중...");
+            string archiveName = Path.GetFileName(archivePath);
+            string statusTextFormat = _getString("ArchiveProgressExtracting", "[{0}] 압축 푸는 중...");
+            string statusText = string.Format(statusTextFormat, archiveName);
             try
             {
                 if (File.Exists(targetDirectory))
@@ -534,7 +536,9 @@ namespace TxtAIEditor.Controls
 
             _archiveCts = new System.Threading.CancellationTokenSource();
             var token = _archiveCts.Token;
-            string statusText = _getString("ArchiveProgressCompressing", "압축 중...");
+            string archiveName = Path.GetFileName(outputPath);
+            string statusTextFormat = _getString("ArchiveProgressCompressing", "[{0}] 압축 중...");
+            string statusText = string.Format(statusTextFormat, archiveName);
             string temporaryPath = outputPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {

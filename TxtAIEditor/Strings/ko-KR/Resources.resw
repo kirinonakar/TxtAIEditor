@@ -1794,10 +1794,10 @@
     <value>7z로 압축하기</value>
   </data>
   <data name="ArchiveProgressCompressing" xml:space="preserve">
-    <value>압축 중...</value>
+    <value>[{0}] 압축 중...</value>
   </data>
   <data name="ArchiveProgressExtracting" xml:space="preserve">
-    <value>압축 푸는 중...</value>
+    <value>[{0}] 압축 푸는 중...</value>
   </data>
   <data name="StatusProgressCancelTooltip" xml:space="preserve">
     <value>작업 중단</value>
