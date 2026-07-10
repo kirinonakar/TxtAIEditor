@@ -1787,6 +1787,30 @@
   <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
     <value>解壓縮到 {0} 資料夾</value>
   </data>
+  <data name="ExplorerCompressFolderToZip" xml:space="preserve">
+    <value>壓縮為 ZIP</value>
+  </data>
+  <data name="ExplorerCompressFolderToSevenZip" xml:space="preserve">
+    <value>壓縮為 7z</value>
+  </data>
+  <data name="ArchiveCreateFailedTitle" xml:space="preserve">
+    <value>建立壓縮檔失敗</value>
+  </data>
+  <data name="ArchiveCreateRootFolderNotSupported" xml:space="preserve">
+    <value>無法壓縮磁碟機根資料夾。</value>
+  </data>
+  <data name="ArchiveCreateTargetDirectoryExistsFormat" xml:space="preserve">
+    <value>已存在名為「{0}」的資料夾，無法建立壓縮檔。</value>
+  </data>
+  <data name="ArchiveCreateOverwriteTitle" xml:space="preserve">
+    <value>確認覆寫壓縮檔</value>
+  </data>
+  <data name="ArchiveCreateOverwriteMessageFormat" xml:space="preserve">
+    <value>檔案「{0}」已存在。是否覆寫？</value>
+  </data>
+  <data name="ArchiveCreateOverwriteOK" xml:space="preserve">
+    <value>覆寫</value>
+  </data>
   <data name="ArchiveExtractFailedTitle" xml:space="preserve">
     <value>解壓縮檔失敗</value>
   </data>

@@ -1787,6 +1787,30 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
     <value>Extract to {0} folder</value>
   </data>
+  <data name="ExplorerCompressFolderToZip" xml:space="preserve">
+    <value>Compress to ZIP</value>
+  </data>
+  <data name="ExplorerCompressFolderToSevenZip" xml:space="preserve">
+    <value>Compress to 7z</value>
+  </data>
+  <data name="ArchiveCreateFailedTitle" xml:space="preserve">
+    <value>Failed to create archive</value>
+  </data>
+  <data name="ArchiveCreateRootFolderNotSupported" xml:space="preserve">
+    <value>A drive root folder cannot be compressed.</value>
+  </data>
+  <data name="ArchiveCreateTargetDirectoryExistsFormat" xml:space="preserve">
+    <value>A folder named '{0}' already exists, so the archive cannot be created.</value>
+  </data>
+  <data name="ArchiveCreateOverwriteTitle" xml:space="preserve">
+    <value>Confirm archive overwrite</value>
+  </data>
+  <data name="ArchiveCreateOverwriteMessageFormat" xml:space="preserve">
+    <value>The file '{0}' already exists. Overwrite it?</value>
+  </data>
+  <data name="ArchiveCreateOverwriteOK" xml:space="preserve">
+    <value>Overwrite</value>
+  </data>
   <data name="ArchiveExtractFailedTitle" xml:space="preserve">
     <value>Failed to extract archive</value>
   </data>

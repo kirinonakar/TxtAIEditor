@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -8,6 +9,8 @@ using System.Threading.Tasks;
 using SharpCompress.Archives;
 using SharpCompress.Common;
 using SharpCompress.Readers;
+using SharpCompress.Writers;
+using SharpCompress.Writers.SevenZip;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -276,6 +279,16 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        public Task CreateZipFromDirectoryAsync(string sourceDirectory, string outputPath)
+        {
+            return Task.Run(() => CreateZipFromDirectory(sourceDirectory, outputPath));
+        }
+
+        public Task CreateSevenZipFromDirectoryAsync(string sourceDirectory, string outputPath)
+        {
+            return Task.Run(() => CreateSevenZipFromDirectory(sourceDirectory, outputPath));
+        }
+
         public static string NormalizeEntryPath(string entryPath)
         {
             return (entryPath ?? string.Empty)
@@ -316,6 +329,114 @@ namespace TxtAIEditor.Core.Services
         private static IArchive OpenArchive(string archivePath)
         {
             return ArchiveFactory.OpenArchive(archivePath, CreateReaderOptions(archivePath));
+        }
+
+        private static void CreateZipFromDirectory(string sourceDirectory, string outputPath)
+        {
+            string sourceRoot = ValidateArchiveCreationPaths(sourceDirectory, outputPath);
+            var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+            using var output = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            using var archive = new ZipArchive(
+                output,
+                ZipArchiveMode.Create,
+                leaveOpen: false,
+                entryNameEncoding: utf8);
+
+            foreach (string directoryPath in EnumerateArchiveDirectories(sourceRoot))
+            {
+                string entryName = GetArchiveEntryPath(sourceRoot, directoryPath) + "/";
+                ZipArchiveEntry entry = archive.CreateEntry(entryName, System.IO.Compression.CompressionLevel.NoCompression);
+                entry.LastWriteTime = Directory.GetLastWriteTime(directoryPath);
+            }
+
+            foreach (string filePath in EnumerateArchiveFiles(sourceRoot))
+            {
+                string entryName = GetArchiveEntryPath(sourceRoot, filePath);
+                archive.CreateEntryFromFile(
+                    filePath,
+                    entryName,
+                    System.IO.Compression.CompressionLevel.Optimal);
+            }
+        }
+
+        private static void CreateSevenZipFromDirectory(string sourceDirectory, string outputPath)
+        {
+            string sourceRoot = ValidateArchiveCreationPaths(sourceDirectory, outputPath);
+            var options = new SevenZipWriterOptions(CompressionType.LZMA2);
+            using IWriter writer = WriterFactory.OpenWriter(outputPath, ArchiveType.SevenZip, options);
+
+            foreach (string directoryPath in EnumerateArchiveDirectories(sourceRoot))
+            {
+                writer.WriteDirectory(
+                    GetArchiveEntryPath(sourceRoot, directoryPath),
+                    Directory.GetLastWriteTime(directoryPath));
+            }
+
+            foreach (string filePath in EnumerateArchiveFiles(sourceRoot))
+            {
+                using var source = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                writer.Write(
+                    GetArchiveEntryPath(sourceRoot, filePath),
+                    source,
+                    File.GetLastWriteTime(filePath));
+            }
+        }
+
+        private static string ValidateArchiveCreationPaths(string sourceDirectory, string outputPath)
+        {
+            if (string.IsNullOrWhiteSpace(sourceDirectory) || !Directory.Exists(sourceDirectory))
+            {
+                throw new DirectoryNotFoundException("Source directory was not found.");
+            }
+
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                throw new ArgumentException("Output archive path is empty.", nameof(outputPath));
+            }
+
+            string sourceRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(sourceDirectory));
+            string fullOutputPath = Path.GetFullPath(outputPath);
+            string? outputDirectory = Path.GetDirectoryName(fullOutputPath);
+            if (string.IsNullOrWhiteSpace(outputDirectory) || !Directory.Exists(outputDirectory))
+            {
+                throw new DirectoryNotFoundException("Output directory was not found.");
+            }
+
+            if (File.Exists(fullOutputPath) || Directory.Exists(fullOutputPath))
+            {
+                throw new IOException("The output archive path already exists.");
+            }
+
+            return sourceRoot;
+        }
+
+        private static IEnumerable<string> EnumerateArchiveDirectories(string sourceRoot)
+        {
+            return Directory.EnumerateDirectories(sourceRoot, "*", CreateArchiveEnumerationOptions())
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static IEnumerable<string> EnumerateArchiveFiles(string sourceRoot)
+        {
+            return Directory.EnumerateFiles(sourceRoot, "*", CreateArchiveEnumerationOptions())
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static EnumerationOptions CreateArchiveEnumerationOptions()
+        {
+            return new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                IgnoreInaccessible = false,
+                ReturnSpecialDirectories = false,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+        }
+
+        private static string GetArchiveEntryPath(string sourceRoot, string path)
+        {
+            return Path.GetRelativePath(sourceRoot, path).Replace('\\', '/');
         }
 
         private static ReaderOptions CreateReaderOptions(string archivePath)

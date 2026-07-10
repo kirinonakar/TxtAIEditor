@@ -1787,6 +1787,30 @@
   <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
     <value>{0} 폴더에 풀기</value>
   </data>
+  <data name="ExplorerCompressFolderToZip" xml:space="preserve">
+    <value>ZIP으로 압축하기</value>
+  </data>
+  <data name="ExplorerCompressFolderToSevenZip" xml:space="preserve">
+    <value>7z로 압축하기</value>
+  </data>
+  <data name="ArchiveCreateFailedTitle" xml:space="preserve">
+    <value>압축 파일 만들기 실패</value>
+  </data>
+  <data name="ArchiveCreateRootFolderNotSupported" xml:space="preserve">
+    <value>드라이브 루트 폴더는 압축할 수 없습니다.</value>
+  </data>
+  <data name="ArchiveCreateTargetDirectoryExistsFormat" xml:space="preserve">
+    <value>'{0}' 이름의 폴더가 이미 있어 압축 파일을 만들 수 없습니다.</value>
+  </data>
+  <data name="ArchiveCreateOverwriteTitle" xml:space="preserve">
+    <value>압축 파일 덮어쓰기 확인</value>
+  </data>
+  <data name="ArchiveCreateOverwriteMessageFormat" xml:space="preserve">
+    <value>'{0}' 파일이 이미 있습니다. 덮어쓸까요?</value>
+  </data>
+  <data name="ArchiveCreateOverwriteOK" xml:space="preserve">
+    <value>덮어쓰기</value>
+  </data>
   <data name="ArchiveExtractFailedTitle" xml:space="preserve">
     <value>압축 풀기 실패</value>
   </data>

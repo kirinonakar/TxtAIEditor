@@ -220,6 +220,16 @@
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
+                                                        <MenuFlyoutItem x:Name="ExplorerCompressFolderToZipMenuItem" Text="" Click="OnCompressFolderToZipClick" Tag="{Binding}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutItem x:Name="ExplorerCompressFolderToSevenZipMenuItem" Text="" Click="OnCompressFolderToSevenZipClick" Tag="{Binding}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
                                                         <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem x:Name="ExplorerCopyFileNameMenuItem" Text="파일이름 복사" Icon="Copy" Click="OnCopyFileNameClick" Tag="{Binding}"/>
                                                         <MenuFlyoutItem x:Name="ExplorerCopyFilePathMenuItem" Text="경로 복사" Icon="Link" Click="OnCopyFilePathClick" Tag="{Binding}"/>

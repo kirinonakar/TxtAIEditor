@@ -1787,6 +1787,30 @@
   <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
     <value>{0} フォルダーに展開</value>
   </data>
+  <data name="ExplorerCompressFolderToZip" xml:space="preserve">
+    <value>ZIP に圧縮</value>
+  </data>
+  <data name="ExplorerCompressFolderToSevenZip" xml:space="preserve">
+    <value>7z に圧縮</value>
+  </data>
+  <data name="ArchiveCreateFailedTitle" xml:space="preserve">
+    <value>圧縮ファイルの作成に失敗しました</value>
+  </data>
+  <data name="ArchiveCreateRootFolderNotSupported" xml:space="preserve">
+    <value>ドライブのルートフォルダーは圧縮できません。</value>
+  </data>
+  <data name="ArchiveCreateTargetDirectoryExistsFormat" xml:space="preserve">
+    <value>'{0}' という名前のフォルダーが既にあるため、圧縮ファイルを作成できません。</value>
+  </data>
+  <data name="ArchiveCreateOverwriteTitle" xml:space="preserve">
+    <value>圧縮ファイルの上書き確認</value>
+  </data>
+  <data name="ArchiveCreateOverwriteMessageFormat" xml:space="preserve">
+    <value>'{0}' ファイルは既に存在します。上書きしますか?</value>
+  </data>
+  <data name="ArchiveCreateOverwriteOK" xml:space="preserve">
+    <value>上書き</value>
+  </data>
   <data name="ArchiveExtractFailedTitle" xml:space="preserve">
     <value>圧縮ファイルの展開に失敗しました</value>
   </data>

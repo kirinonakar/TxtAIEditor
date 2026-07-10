@@ -1787,6 +1787,30 @@
   <data name="ExplorerExtractArchiveToFolderFormat" xml:space="preserve">
     <value>解压到 {0} 文件夹</value>
   </data>
+  <data name="ExplorerCompressFolderToZip" xml:space="preserve">
+    <value>压缩为 ZIP</value>
+  </data>
+  <data name="ExplorerCompressFolderToSevenZip" xml:space="preserve">
+    <value>压缩为 7z</value>
+  </data>
+  <data name="ArchiveCreateFailedTitle" xml:space="preserve">
+    <value>创建压缩文件失败</value>
+  </data>
+  <data name="ArchiveCreateRootFolderNotSupported" xml:space="preserve">
+    <value>无法压缩驱动器根文件夹。</value>
+  </data>
+  <data name="ArchiveCreateTargetDirectoryExistsFormat" xml:space="preserve">
+    <value>已存在名为“{0}”的文件夹，无法创建压缩文件。</value>
+  </data>
+  <data name="ArchiveCreateOverwriteTitle" xml:space="preserve">
+    <value>确认覆盖压缩文件</value>
+  </data>
+  <data name="ArchiveCreateOverwriteMessageFormat" xml:space="preserve">
+    <value>文件“{0}”已存在。是否覆盖？</value>
+  </data>
+  <data name="ArchiveCreateOverwriteOK" xml:space="preserve">
+    <value>覆盖</value>
+  </data>
   <data name="ArchiveExtractFailedTitle" xml:space="preserve">
     <value>解压缩文件失败</value>
   </data>

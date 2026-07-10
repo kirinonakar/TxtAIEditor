@@ -95,6 +95,8 @@ namespace TxtAIEditor.Controls
             _leftSidebar.OpenExternalViewerClick += OnOpenExternalViewerClick;
             _leftSidebar.OpenWithDefaultProgramClick += OnOpenWithDefaultProgramClick;
             _leftSidebar.ExtractArchiveToFolderClick += OnExtractArchiveToFolderClick;
+            _leftSidebar.CompressFolderToZipClick += OnCompressFolderToZipClick;
+            _leftSidebar.CompressFolderToSevenZipClick += OnCompressFolderToSevenZipClick;
             _leftSidebar.CopyFileNameClick += OnCopyFileNameClick;
             _leftSidebar.CopyFilePathClick += OnCopyFilePathClick;
             _leftSidebar.CopyFolderPathClick += OnCopyFolderPathClick;
@@ -113,7 +115,7 @@ namespace TxtAIEditor.Controls
                 _leftSidebar.FileList.SelectedItem = item;
             }
 
-            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 13)
+            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 15)
             {
                 LocalizeContextFlyout(flyout);
                 ConfigureContextFlyout(flyout, _leftSidebar.FileList.SelectedItem as ExplorerItem);
@@ -231,11 +233,13 @@ namespace TxtAIEditor.Controls
             ((MenuFlyoutItem)flyout.Items[3]).Text = _getString("OpenExternalViewerTooltip", "외부 뷰어로 열기");
             ((MenuFlyoutItem)flyout.Items[4]).Text = _getString("OpenWithDefaultProgramTooltip", "기본 프로그램으로 열기");
             ((MenuFlyoutItem)flyout.Items[5]).Text = _getString("ExplorerExtractArchiveToFolder", "폴더에 풀기");
-            ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
-            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
-            ((MenuFlyoutItem)flyout.Items[9]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
-            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerRename", "이름 바꾸기");
-            ((MenuFlyoutItem)flyout.Items[12]).Text = _getString("ExplorerDelete", "삭제");
+            ((MenuFlyoutItem)flyout.Items[6]).Text = _getString("ExplorerCompressFolderToZip", "ZIP으로 압축하기");
+            ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerCompressFolderToSevenZip", "7z로 압축하기");
+            ((MenuFlyoutItem)flyout.Items[9]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
+            ((MenuFlyoutItem)flyout.Items[10]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
+            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
+            ((MenuFlyoutItem)flyout.Items[13]).Text = _getString("ExplorerRename", "이름 바꾸기");
+            ((MenuFlyoutItem)flyout.Items[14]).Text = _getString("ExplorerDelete", "삭제");
         }
 
         private void ConfigureContextFlyout(MenuFlyout flyout, ExplorerItem? item)
@@ -281,17 +285,32 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (flyout.Items.Count > 9 && flyout.Items[9] is MenuFlyoutItem copyFolderPathItem)
+            bool canCompressFolder = item != null &&
+                item.IsFolder &&
+                !isArchiveEntry &&
+                !string.IsNullOrWhiteSpace(item.Path) &&
+                Directory.Exists(item.Path);
+            if (flyout.Items.Count > 6 && flyout.Items[6] is MenuFlyoutItem compressToZipItem)
+            {
+                compressToZipItem.Visibility = canCompressFolder ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (flyout.Items.Count > 7 && flyout.Items[7] is MenuFlyoutItem compressToSevenZipItem)
+            {
+                compressToSevenZipItem.Visibility = canCompressFolder ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem copyFolderPathItem)
             {
                 copyFolderPathItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
 
-            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem renameItem)
+            if (flyout.Items.Count > 13 && flyout.Items[13] is MenuFlyoutItem renameItem)
             {
                 renameItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
 
-            if (flyout.Items.Count > 12 && flyout.Items[12] is MenuFlyoutItem deleteItem)
+            if (flyout.Items.Count > 14 && flyout.Items[14] is MenuFlyoutItem deleteItem)
             {
                 deleteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
@@ -415,6 +434,113 @@ namespace TxtAIEditor.Controls
                 _showError(
                     _getString("ArchiveExtractFailedTitle", "압축 풀기 실패"),
                     ex.Message);
+            }
+        }
+
+        private async void OnCompressFolderToZipClick(object sender, RoutedEventArgs e)
+        {
+            await CompressFolderAsync(sender, ".zip", _archiveExplorerService.CreateZipFromDirectoryAsync);
+        }
+
+        private async void OnCompressFolderToSevenZipClick(object sender, RoutedEventArgs e)
+        {
+            await CompressFolderAsync(sender, ".7z", _archiveExplorerService.CreateSevenZipFromDirectoryAsync);
+        }
+
+        private async Task CompressFolderAsync(
+            object sender,
+            string archiveExtension,
+            Func<string, string, Task> createArchiveAsync)
+        {
+            var item = GetExplorerItem(sender);
+            if (item == null ||
+                !item.IsFolder ||
+                item.IsArchiveEntry ||
+                string.IsNullOrWhiteSpace(item.Path) ||
+                !Directory.Exists(item.Path))
+            {
+                return;
+            }
+
+            var sourceDirectory = new DirectoryInfo(Path.GetFullPath(item.Path));
+            if (sourceDirectory.Parent == null || string.IsNullOrWhiteSpace(sourceDirectory.Name))
+            {
+                _showError(
+                    _getString("ArchiveCreateFailedTitle", "압축 파일 만들기 실패"),
+                    _getString("ArchiveCreateRootFolderNotSupported", "드라이브 루트 폴더는 압축할 수 없습니다."));
+                return;
+            }
+
+            string outputPath = Path.Combine(
+                sourceDirectory.Parent.FullName,
+                sourceDirectory.Name + archiveExtension);
+
+            if (Directory.Exists(outputPath))
+            {
+                _showError(
+                    _getString("ArchiveCreateFailedTitle", "압축 파일 만들기 실패"),
+                    string.Format(
+                        _getString("ArchiveCreateTargetDirectoryExistsFormat", "'{0}' 이름의 폴더가 이미 있어 압축 파일을 만들 수 없습니다."),
+                        Path.GetFileName(outputPath)));
+                return;
+            }
+
+            if (File.Exists(outputPath))
+            {
+                var confirmDialog = new ContentDialog
+                {
+                    Title = _getString("ArchiveCreateOverwriteTitle", "압축 파일 덮어쓰기 확인"),
+                    Content = string.Format(
+                        _getString("ArchiveCreateOverwriteMessageFormat", "'{0}' 파일이 이미 있습니다. 덮어쓸까요?"),
+                        Path.GetFileName(outputPath)),
+                    PrimaryButtonText = _getString("ArchiveCreateOverwriteOK", "덮어쓰기"),
+                    CloseButtonText = _getString("CopyOverwriteCancel", "취소"),
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = _xamlRootProvider(),
+                    RequestedTheme = _themeProvider()
+                };
+
+                if (await ShowDialogAsync(confirmDialog) != ContentDialogResult.Primary)
+                {
+                    return;
+                }
+            }
+
+            string temporaryPath = outputPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await createArchiveAsync(sourceDirectory.FullName, temporaryPath);
+                File.Move(temporaryPath, outputPath, overwrite: true);
+
+                string currentFolder = _currentFolderProvider();
+                if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
+                {
+                    _loadDirectoryRoot(currentFolder);
+                }
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("ArchiveCreateFailedTitle", "압축 파일 만들기 실패"),
+                    ex.Message);
+            }
+            finally
+            {
+                TryDeleteTemporaryArchive(temporaryPath);
+            }
+        }
+
+        private static void TryDeleteTemporaryArchive(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch
+            {
             }
         }
 
