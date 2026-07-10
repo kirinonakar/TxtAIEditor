@@ -47,6 +47,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(LockIcon, encryptedTooltip);
             UpdateDirtyIndicator();
             UpdateLockIcon();
+            UpdateArchiveIcon();
             UpdateExternalPathIndicator();
 
             _tab.PropertyChanged += OnTabPropertyChanged;
@@ -99,6 +100,10 @@ namespace TxtAIEditor.Controls
             {
                 UpdateLockIcon();
             }
+            else if (args.PropertyName == nameof(OpenedTab.IsArchiveEntry))
+            {
+                UpdateArchiveIcon();
+            }
         }
 
         private void UpdateDirtyIndicator()
@@ -111,6 +116,13 @@ namespace TxtAIEditor.Controls
         private void UpdateLockIcon()
         {
             LockIcon.Visibility = _tab?.IsEncrypted == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void UpdateArchiveIcon()
+        {
+            ArchiveIcon.Visibility = _tab?.IsArchiveEntry == true
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }

@@ -11,6 +11,14 @@
                 Orientation="Horizontal"
                 VerticalAlignment="Center"
                 Opacity="1">
+        <FontIcon x:Name="ArchiveIcon"
+                  Glyph="&#xF012;"
+                  FontSize="12"
+                  VerticalAlignment="Center"
+                  Margin="0,0,6,0"
+                  Visibility="Collapsed"
+                  Opacity="1"
+                  Foreground="#D67F2F" />
         <FontIcon x:Name="LockIcon"
                   Glyph="&#xE72E;"
                   FontSize="12"

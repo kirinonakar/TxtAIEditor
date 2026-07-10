@@ -135,8 +135,36 @@ namespace TxtAIEditor.Core.Models
         public bool IsHexViewer { get; set; } = false;
         public string? HexSourceFilePath { get; set; }
         public bool IsReadOnlyTextFile { get; set; } = false;
-        public string? ArchiveSourcePath { get; set; }
-        public string? ArchiveEntryPath { get; set; }
+        private string? _archiveSourcePath;
+        public string? ArchiveSourcePath
+        {
+            get => _archiveSourcePath;
+            set
+            {
+                if (_archiveSourcePath != value)
+                {
+                    _archiveSourcePath = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsArchiveEntry));
+                }
+            }
+        }
+
+        private string? _archiveEntryPath;
+        public string? ArchiveEntryPath
+        {
+            get => _archiveEntryPath;
+            set
+            {
+                if (_archiveEntryPath != value)
+                {
+                    _archiveEntryPath = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsArchiveEntry));
+                }
+            }
+        }
+
         public bool IsArchiveEntry => !string.IsNullOrWhiteSpace(ArchiveSourcePath) &&
                                       !string.IsNullOrWhiteSpace(ArchiveEntryPath);
         public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile;
