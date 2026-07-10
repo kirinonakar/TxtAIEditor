@@ -3,8 +3,10 @@ import { contextMenu, scrollContainer, viewport, virtualSpacer } from './editor-
 const MAX_RENDER_CHARS = 20000;
 const MIN_BATCH_SIZE = 100;
 const PREFETCH_AHEAD = 200;
+const HEX_PREFETCH_AHEAD = 80;
+const HEX_RENDER_OVERSCAN = 48;
 const HEX_BROWSER_SCROLL_HEIGHT_LIMIT = 24000000;
-const HEX_CACHE_RETAIN_LINES = 900;
+const HEX_CACHE_RETAIN_LINES = 512;
 const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
 const MAX_DIRTY_DIFF_CELLS = 4000000;
 
@@ -26,7 +28,7 @@ function configureEditorCoreRuntime(deps) {
 const state = {
     lineCount: 1,
     lineHeight: 22,
-    overscan: 200,
+    overscan: 80,
     cache: new Map(),
     pending: new Set(),
     lineHeights: new Map(),
@@ -880,14 +882,18 @@ function visibleRange() {
     const firstVisible = lineAt(scrollContainer.scrollTop);
     if (usesCompressedHexScroll()) {
         const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
-        const start = Math.max(1, firstVisible - state.overscan);
-        const end = Math.min(lineCount, firstVisible + visibleRows + state.overscan);
+        const start = Math.max(1, firstVisible - HEX_RENDER_OVERSCAN);
+        const end = Math.min(lineCount, firstVisible + visibleRows + HEX_RENDER_OVERSCAN);
         return { start, end, count: Math.max(0, end - start + 1) };
     }
 
     const lastVisible = lineAt(scrollContainer.scrollTop + viewHeight);
-    const start = Math.max(1, firstVisible - state.overscan);
-    const end = Math.min(lineCount, lastVisible + state.overscan);
+    const overscan = state.language === 'hex' ? HEX_RENDER_OVERSCAN : state.overscan;
+    const windowStep = Math.max(1, Math.floor(overscan / 2));
+    const windowAnchor = Math.floor((firstVisible - 1) / windowStep) * windowStep + 1;
+    const visibleLineCount = Math.max(1, lastVisible - firstVisible + 1);
+    const start = Math.max(1, windowAnchor - overscan);
+    const end = Math.min(lineCount, start + visibleLineCount + (overscan * 2) + windowStep - 1);
     return { start, end, count: Math.max(0, end - start + 1) };
 }
 
@@ -978,17 +984,18 @@ function requestMissingLines(start, end) {
 function prefetchAround(scrollTop) {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const firstVisible = lineAt(scrollTop);
+    const prefetchAhead = state.language === 'hex' ? HEX_PREFETCH_AHEAD : PREFETCH_AHEAD;
     if (usesCompressedHexScroll()) {
         const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
-        const prefetchStart = Math.max(1, firstVisible - PREFETCH_AHEAD);
-        const prefetchEnd = Math.min(state.lineCount, firstVisible + visibleRows + PREFETCH_AHEAD);
+        const prefetchStart = Math.max(1, firstVisible - prefetchAhead);
+        const prefetchEnd = Math.min(state.lineCount, firstVisible + visibleRows + prefetchAhead);
         requestMissingLines(prefetchStart, prefetchEnd);
         return;
     }
 
     const lastVisible = lineAt(scrollTop + viewHeight);
-    const prefetchStart = Math.max(1, firstVisible - PREFETCH_AHEAD);
-    const prefetchEnd = Math.min(state.lineCount, lastVisible + PREFETCH_AHEAD);
+    const prefetchStart = Math.max(1, firstVisible - prefetchAhead);
+    const prefetchEnd = Math.min(state.lineCount, lastVisible + prefetchAhead);
     requestMissingLines(prefetchStart, prefetchEnd);
 }
 
@@ -996,8 +1003,8 @@ function trimHexCacheToRange(startLine, endLine) {
     if (state.language !== 'hex' || state.cache.size <= HEX_CACHE_RETAIN_LINES) return;
 
     const keepRanges = [{
-        start: Math.max(1, Number(startLine || 1) - PREFETCH_AHEAD),
-        end: Math.min(state.lineCount, Number(endLine || startLine || 1) + PREFETCH_AHEAD)
+        start: Math.max(1, Number(startLine || 1) - HEX_PREFETCH_AHEAD),
+        end: Math.min(state.lineCount, Number(endLine || startLine || 1) + HEX_PREFETCH_AHEAD)
     }];
 
     const hexSelection = normalizedHexSelection();

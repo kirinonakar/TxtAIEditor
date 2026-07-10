@@ -60,28 +60,59 @@ namespace TxtAIEditor.Editor
             int safeEnd = Math.Min(LineCount, safeStart + count - 1);
             var lines = new List<string>(safeEnd - safeStart + 1);
 
-            FileStream? stream = null;
-            try
+            int firstDataLine = Math.Max(2, safeStart);
+            int lastDataLine = Math.Min(1 + (int)_displayRowCount, safeEnd);
+            byte[] data = Array.Empty<byte>();
+            int dataLength = 0;
+            if (firstDataLine <= lastDataLine)
             {
-                if (RangeIncludesHexRows(safeStart, safeEnd))
-                {
-                    stream = new FileStream(
-                        _filePath,
-                        FileMode.Open,
-                        FileAccess.Read,
-                        FileShare.ReadWrite | FileShare.Delete,
-                        bufferSize: 4096,
-                        useAsync: false);
-                }
+                long firstOffset = (long)(firstDataLine - 2) * BytesPerRow;
+                int requestedLength = checked((lastDataLine - firstDataLine + 1) * BytesPerRow);
+                int availableLength = (int)Math.Min(requestedLength, Math.Max(0, _fileLength - firstOffset));
+                data = new byte[availableLength];
 
-                for (int lineNumber = safeStart; lineNumber <= safeEnd; lineNumber++)
+                using var stream = new FileStream(
+                    _filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete,
+                    bufferSize: 64 * 1024,
+                    useAsync: false);
+                stream.Seek(firstOffset, SeekOrigin.Begin);
+                while (dataLength < data.Length)
                 {
-                    lines.Add(FormatLine(lineNumber, stream));
+                    int read = stream.Read(data, dataLength, data.Length - dataLength);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+
+                    dataLength += read;
                 }
             }
-            finally
+
+            for (int lineNumber = safeStart; lineNumber <= safeEnd; lineNumber++)
             {
-                stream?.Dispose();
+                if (lineNumber == 1)
+                {
+                    lines.Add(FormatHeaderLine());
+                    continue;
+                }
+
+                if (_isTruncated && lineNumber == LineCount)
+                {
+                    lines.Add("The file is too large to display completely in this hex view.");
+                    continue;
+                }
+
+                int rowIndex = lineNumber - firstDataLine;
+                int dataOffset = rowIndex * BytesPerRow;
+                int rowLength = Math.Min(BytesPerRow, Math.Max(0, dataLength - dataOffset));
+                long fileOffset = (long)(lineNumber - 2) * BytesPerRow;
+                ReadOnlySpan<byte> rowBytes = dataOffset >= 0 && dataOffset <= dataLength
+                    ? data.AsSpan(dataOffset, rowLength)
+                    : ReadOnlySpan<byte>.Empty;
+                lines.Add(FormatHexRow(fileOffset, rowBytes));
             }
 
             return lines;
@@ -318,29 +349,6 @@ namespace TxtAIEditor.Editor
             throw new NotSupportedException("Hex dump views are read-only.");
         }
 
-        private string FormatLine(int lineNumber, FileStream? stream)
-        {
-            if (lineNumber == 1)
-            {
-                return FormatHeaderLine();
-            }
-
-            if (_isTruncated && lineNumber == LineCount)
-            {
-                return "The file is too large to display completely in this hex view.";
-            }
-
-            if (stream == null)
-            {
-                return "The source file is not available.";
-            }
-
-            long offset = (long)(lineNumber - 2) * BytesPerRow;
-            Span<byte> bytes = stackalloc byte[BytesPerRow];
-            int read = ReadRow(stream, offset, bytes);
-            return FormatHexRow(offset, bytes[..read]);
-        }
-
         private string FormatHeaderLine()
         {
             var builder = new StringBuilder();
@@ -404,29 +412,6 @@ namespace TxtAIEditor.Editor
             return builder.ToString();
         }
 
-        private static int ReadRow(FileStream stream, long offset, Span<byte> bytes)
-        {
-            if (offset >= stream.Length)
-            {
-                return 0;
-            }
-
-            stream.Seek(offset, SeekOrigin.Begin);
-            int totalRead = 0;
-            while (totalRead < bytes.Length)
-            {
-                int read = stream.Read(bytes[totalRead..]);
-                if (read == 0)
-                {
-                    break;
-                }
-
-                totalRead += read;
-            }
-
-            return totalRead;
-        }
-
         private static TextSearchResult? TryFindInLine(
             string line,
             string query,
@@ -469,13 +454,6 @@ namespace TxtAIEditor.Editor
             return index >= 0
                 ? new TextSearchResult(0, index, query.Length, line)
                 : null;
-        }
-
-        private bool RangeIncludesHexRows(int startLine, int endLine)
-        {
-            int firstDataLine = 2;
-            int lastDataLine = 1 + (int)_displayRowCount;
-            return endLine >= firstDataLine && startLine <= lastDataLine;
         }
 
         private void NormalizeRange(ref int startLine, ref int startColumn, ref int endLine, ref int endColumn)

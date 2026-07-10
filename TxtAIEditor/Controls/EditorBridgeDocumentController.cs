@@ -100,6 +100,33 @@ namespace TxtAIEditor.Controls
             await _syncLineChangeToOtherTabsAsync(tab, lineNumber, text, isComposing);
         }
 
+        public Task HandleLineEditAsync(
+            OpenedTab tab,
+            TabViewItem tabItem,
+            EditorDocumentSession session,
+            int lineNumber,
+            int startColumn,
+            int endColumn,
+            string replacementText,
+            bool isComposing)
+        {
+            string currentText = session.Model.GetLine(lineNumber);
+            int start = Math.Clamp(startColumn - 1, 0, currentText.Length);
+            int end = Math.Clamp(endColumn - 1, start, currentText.Length);
+            string updatedText = string.Concat(
+                currentText.AsSpan(0, start),
+                replacementText.AsSpan(),
+                currentText.AsSpan(end));
+
+            return HandleLineChangedAsync(
+                tab,
+                tabItem,
+                session,
+                lineNumber,
+                updatedText,
+                isComposing);
+        }
+
         public async Task HandleLineInsertRequestedAsync(
             MonacoBridge bridge,
             OpenedTab tab,

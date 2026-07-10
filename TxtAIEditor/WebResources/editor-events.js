@@ -79,34 +79,40 @@ export function bindEditorEvents({
     let isSyncingScroll = false;
     let lastSetScrollTop = -1;
     let lastProgrammaticScrollTime = 0;
+    let scrollWorkFrame = 0;
     scrollContainer.addEventListener('scroll', () => {
         hideContextMenu();
         if (state.preservedScrollTop !== null &&
             Math.abs(scrollContainer.scrollTop - state.preservedScrollTop) > 1) {
             clearPreservedScrollTop();
         }
-        syncCsvHeaderScroll();
-        prefetchAround(scrollContainer.scrollTop);
-        queueRender();
-        
-        if (lastSetScrollTop !== -1 && Math.abs(scrollContainer.scrollTop - lastSetScrollTop) <= 1) {
-            return;
-        }
-        lastSetScrollTop = -1;
+        if (scrollWorkFrame) return;
 
-        if (Date.now() - lastProgrammaticScrollTime < 100) {
-            return;
-        }
+        scrollWorkFrame = requestAnimationFrame(() => {
+            scrollWorkFrame = 0;
+            syncCsvHeaderScroll();
+            prefetchAround(scrollContainer.scrollTop);
+            queueRender();
 
-        if (state.scrollSyncEnabled && !isSyncingScroll) {
-            const firstVisible = lineAt(scrollContainer.scrollTop);
-            const offset = scrollContainer.scrollTop - lineTop(firstVisible);
-            post({
-                type: 'editorScroll',
-                firstLine: firstVisible,
-                offset: offset
-            });
-        }
+            if (lastSetScrollTop !== -1 && Math.abs(scrollContainer.scrollTop - lastSetScrollTop) <= 1) {
+                return;
+            }
+            lastSetScrollTop = -1;
+
+            if (Date.now() - lastProgrammaticScrollTime < 100) {
+                return;
+            }
+
+            if (state.scrollSyncEnabled && !isSyncingScroll) {
+                const firstVisible = lineAt(scrollContainer.scrollTop);
+                const offset = scrollContainer.scrollTop - lineTop(firstVisible);
+                post({
+                    type: 'editorScroll',
+                    firstLine: firstVisible,
+                    offset: offset
+                });
+            }
+        });
     });
 
     window.addEventListener('resize', () => queueRender(true));

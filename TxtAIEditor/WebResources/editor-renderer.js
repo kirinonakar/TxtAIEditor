@@ -258,12 +258,8 @@ function createEditorRenderer({
             const hasLine = state.cache.has(line);
             const text = hasLine ? state.cache.get(line) : '';
             const isLong = hasLine && text.length > MAX_RENDER_CHARS;
-            const longLineMessage = (state.longLineProtectionFormat || 'Long line: {0} chars, render protection')
-                .replace('{0}', text.length.toLocaleString());
-            const displayText = isLong
-                ? `${text.slice(0, MAX_RENDER_CHARS)} ... [${longLineMessage}]`
-                : text;
-            const contentEditable = !state.readOnly && hasLine && !isLong ? 'true' : 'false';
+            const displayText = text;
+            const contentEditable = !state.readOnly && hasLine ? 'true' : 'false';
             const selectionBounds = selectionBoundsForLine(line, displayText.length);
             const isInSelection = !!selectionBounds;
             const isSelectedEmptyLine = isInSelection && displayText.length === 0 && hasCustomSelection();
@@ -288,7 +284,11 @@ function createEditorRenderer({
                 shouldShowSource &&
                 !isLong &&
                 !state.isComposing;
-            let lineContent = renderLineContent(line, displayText, false, isInlineLivePreviewSourceLine);
+            // Very long lines stay fully editable, but syntax highlighting is skipped to avoid
+            // creating thousands of token spans and blocking the UI thread.
+            let lineContent = isLong
+                ? escapeHtml(displayText)
+                : renderLineContent(line, displayText, false, isInlineLivePreviewSourceLine);
             let livePreviewClass = '';
             let liveContentEditable = contentEditable;
             let livePreviewAttributes = '';

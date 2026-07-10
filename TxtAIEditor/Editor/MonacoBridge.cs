@@ -33,6 +33,7 @@ namespace TxtAIEditor.Editor
         public event Action<string>? ShortcutPressed;
         public event Action<int, int, int>? LinesRequested;
         public event Action<int, string, bool>? LineChanged;
+        public event Action<int, int, int, string, bool>? LineEditRequested;
         public event Action<int, string>? LineInsertRequested;
         public event Action<int, string, string>? LineSplitRequested;
         public event Action<int>? MergeLineWithPreviousRequested;
@@ -725,6 +726,23 @@ namespace TxtAIEditor.Editor
                                 bool isComposing = root.TryGetProperty("isComposing", out JsonElement isComposingProp) &&
                                     isComposingProp.ValueKind == JsonValueKind.True;
                                 LineChanged?.Invoke(lineNumberProp.GetInt32(), textProp.GetString() ?? string.Empty, isComposing);
+                            }
+                            break;
+
+                        case "lineEdit":
+                            if (root.TryGetProperty("lineNumber", out JsonElement editLineNumberProp) &&
+                                root.TryGetProperty("startColumn", out JsonElement editStartColumnProp) &&
+                                root.TryGetProperty("endColumn", out JsonElement editEndColumnProp) &&
+                                root.TryGetProperty("text", out JsonElement editTextProp))
+                            {
+                                bool isComposing = root.TryGetProperty("isComposing", out JsonElement editComposingProp) &&
+                                    editComposingProp.ValueKind == JsonValueKind.True;
+                                LineEditRequested?.Invoke(
+                                    editLineNumberProp.GetInt32(),
+                                    editStartColumnProp.GetInt32(),
+                                    editEndColumnProp.GetInt32(),
+                                    editTextProp.GetString() ?? string.Empty,
+                                    isComposing);
                             }
                             break;
 

@@ -578,8 +578,16 @@ body.csv-table-mode:not(.wrap-enabled) .line-row.csv-row {
 }
 
 .line-text.long-line {
-    color: color-mix(in srgb, var(--fg) 72%, transparent);
-    cursor: not-allowed;
+    color: var(--fg);
+    cursor: text;
+    white-space: pre;
+    overflow-wrap: normal;
+}
+
+body.wrap-enabled .line-text.long-line {
+    width: max-content;
+    min-width: 100%;
+    overflow: visible;
 }
 
 .inline-live-preview-enabled .line-row.live-preview-row {

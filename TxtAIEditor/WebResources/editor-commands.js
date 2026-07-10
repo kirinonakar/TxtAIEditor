@@ -1,4 +1,5 @@
 import {
+    MAX_RENDER_CHARS,
     activeEditableElement,
     cleanDirtyMarker,
     clearCustomSelectionVisuals,
@@ -74,6 +75,39 @@ import { createTextCommandActions } from './editor-text-command-actions.js';
 
 let splitScrollRestoreToken = 0;
 
+function postLineUpdate(lineNumber, previousText, nextText, isComposing = false) {
+    const before = String(previousText ?? '');
+    const after = String(nextText ?? '');
+    if (Math.max(before.length, after.length) <= MAX_RENDER_CHARS) {
+        post({ type: 'lineChanged', lineNumber, text: after, isComposing });
+        return;
+    }
+
+    let prefixLength = 0;
+    const prefixLimit = Math.min(before.length, after.length);
+    while (prefixLength < prefixLimit && before.charCodeAt(prefixLength) === after.charCodeAt(prefixLength)) {
+        prefixLength++;
+    }
+
+    let beforeEnd = before.length;
+    let afterEnd = after.length;
+    while (beforeEnd > prefixLength &&
+        afterEnd > prefixLength &&
+        before.charCodeAt(beforeEnd - 1) === after.charCodeAt(afterEnd - 1)) {
+        beforeEnd--;
+        afterEnd--;
+    }
+
+    post({
+        type: 'lineEdit',
+        lineNumber,
+        startColumn: prefixLength + 1,
+        endColumn: beforeEnd + 1,
+        text: after.slice(prefixLength, afterEnd),
+        isComposing
+    });
+}
+
 function cancelPendingRepeatFollowUps(key) {
     if (!key) return;
     cancelPostEditFocusFollowUps();
@@ -98,6 +132,7 @@ function commitLine(element) {
     const isComposing = state.isComposing &&
         (!state.compositionLine || state.compositionLine === lineNumber);
 
+    const previousText = state.cache.get(lineNumber) ?? '';
     const text = lineTextFromElement(element);
 
     const isInlineLivePreviewActiveLine = state.inlineLivePreviewEnabled &&
@@ -120,7 +155,7 @@ function commitLine(element) {
 
     if (isComposing) {
         if (!state.columnComposition && !state.rangeComposition) {
-            post({ type: 'lineChanged', lineNumber, text, isComposing: true });
+            postLineUpdate(lineNumber, previousText, text, true);
             post({ type: 'contentChanged', isComposing: true });
         }
         reportCursorAndSelection(element);
@@ -134,7 +169,7 @@ function commitLine(element) {
         markDirty(lineNumber, 'mod');
     }
 
-    post({ type: 'lineChanged', lineNumber, text });
+    postLineUpdate(lineNumber, previousText, text);
     post({ type: 'contentChanged' });
     reportCursorAndSelection(element);
 
@@ -588,6 +623,7 @@ function insertPlainTextByModel(element, text) {
 
 function updateSingleLine(element, text, caretColumn) {
     const lineNumber = Number(element.dataset.line || 1);
+    const previousText = state.cache.get(lineNumber) ?? '';
     const nextText = String(text ?? '');
     const nextColumn = Math.max(0, Math.min(Number(caretColumn || 0), nextText.length));
 
@@ -605,7 +641,9 @@ function updateSingleLine(element, text, caretColumn) {
         markDirty(lineNumber, 'mod');
     }
 
-    if (state.isComposing || (state.compositionLine && state.compositionLine === lineNumber)) {
+    if (state.isComposing ||
+        (state.compositionLine && state.compositionLine === lineNumber) ||
+        nextText.length > MAX_RENDER_CHARS) {
         element.textContent = nextText;
     } else {
         element.innerHTML = renderLineContent(lineNumber, nextText);
@@ -613,7 +651,7 @@ function updateSingleLine(element, text, caretColumn) {
 
     setCaret(element, nextColumn);
 
-    post({ type: 'lineChanged', lineNumber, text: nextText });
+    postLineUpdate(lineNumber, previousText, nextText);
     post({ type: 'contentChanged' });
 
     if (state.wordWrap) {
