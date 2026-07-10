@@ -147,7 +147,8 @@ namespace TxtAIEditor.Controls
                 () => fileTools.WorkspaceRoot,
                 fileModifiedAsync,
                 beforeDialog,
-                afterDialog);
+                afterDialog,
+                callbacks.AddCurrentRunImageToolAttachment);
             var historyController = new AgentHistoryController(agentPane);
             var sessionEditController = new AgentSessionEditController(
                 agentPane,

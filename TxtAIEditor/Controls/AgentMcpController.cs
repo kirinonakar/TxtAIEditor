@@ -95,7 +95,8 @@ namespace TxtAIEditor.Controls
             Func<string> workspaceRootProvider,
             Func<string, Task>? fileModifiedAsync,
             Action? beforeDialog,
-            Action? afterDialog)
+            Action? afterDialog,
+            Action<TxtAIEditor.Core.Services.LLM.LlmMessageAttachment>? addImageAttachment = null)
         {
             _agentPane = agentPane;
             _initializePickerWindow = initializePickerWindow;
@@ -109,7 +110,7 @@ namespace TxtAIEditor.Controls
             _afterDialog = afterDialog;
             _dialogService = new AgentMcpDialogService(_agentPane, _initializePickerWindow, _getString, _beforeDialog, _afterDialog);
             _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, () => _settingsService.CurrentSettings, fileModifiedAsync);
-            _browserUseTool = new AgentMcpBrowserUseTool(() => _settingsService.CurrentSettings);
+            _browserUseTool = new AgentMcpBrowserUseTool(() => _settingsService.CurrentSettings, addImageAttachment);
 
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");

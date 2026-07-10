@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services.LLM;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 
@@ -40,14 +41,16 @@ namespace TxtAIEditor.Controls
         private const int Halftone = 4;
 
         private readonly Func<EditorSettings> _settingsProvider;
+        private readonly Action<LlmMessageAttachment>? _addImageAttachment;
         private IntPtr _browserWindow;
         private bool _controlledWindowIsBrowser = true;
         private string _defaultBrowserProcessName = string.Empty;
         private BrowserCapture? _lastCapture;
 
-        public AgentMcpBrowserUseTool(Func<EditorSettings> settingsProvider)
+        public AgentMcpBrowserUseTool(Func<EditorSettings> settingsProvider, Action<LlmMessageAttachment>? addImageAttachment = null)
         {
             _settingsProvider = settingsProvider;
+            _addImageAttachment = addImageAttachment;
         }
 
         public string ServerId => BuiltInBrowserUseId;
@@ -434,30 +437,52 @@ namespace TxtAIEditor.Controls
             int imageHeight = Math.Max(1, (int)Math.Round(windowHeight * scale));
             byte[] pixels = CaptureWindowPixels(rect, windowWidth, windowHeight, imageWidth, imageHeight);
 
+            int targetWidth = MaxCaptureDimension;
+            int targetHeight = MaxCaptureDimension;
+            byte[] paddedPixels = new byte[targetWidth * targetHeight * 4];
+            for (int i = 3; i < paddedPixels.Length; i += 4)
+            {
+                paddedPixels[i] = 255; // Alpha channel to make it opaque black
+            }
+
+            int offsetX = (targetWidth - imageWidth) / 2;
+            int offsetY = (targetHeight - imageHeight) / 2;
+            for (int y = 0; y < imageHeight; y++)
+            {
+                int srcOffset = y * imageWidth * 4;
+                int destOffset = ((y + offsetY) * targetWidth + offsetX) * 4;
+                Array.Copy(pixels, srcOffset, paddedPixels, destOffset, imageWidth * 4);
+            }
+
             string captureDirectory = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "BrowserUse");
             Directory.CreateDirectory(captureDirectory);
             string imagePath = Path.Combine(
                 captureDirectory,
                 $"browser-{DateTime.Now:yyyyMMdd-HHmmss-fff}.png");
-            await SavePngAsync(imagePath, imageWidth, imageHeight, pixels, cancellationToken);
+            await SavePngAsync(imagePath, targetWidth, targetHeight, paddedPixels, cancellationToken);
             CleanupOldCaptures(captureDirectory);
 
             _lastCapture = new BrowserCapture
             {
                 Window = browserWindow,
                 ImagePath = imagePath,
-                ImageWidth = imageWidth,
-                ImageHeight = imageHeight
+                ImageWidth = targetWidth,
+                ImageHeight = targetHeight,
+                OriginalImageWidth = imageWidth,
+                OriginalImageHeight = imageHeight,
+                PaddingLeft = offsetX,
+                PaddingTop = offsetY
             };
+
+            await AttachCaptureImageAsync(imagePath, cancellationToken);
 
             return
                 "MCP tool result: Browser Use captured the current controlled window.\n" +
                 $"window_id: {FormatWindowId(browserWindow)}\n" +
                 $"window_title: {SanitizeWindowTitle(GetWindowTitle(browserWindow))}\n" +
-                $"image_path: {imagePath}\n" +
-                $"image_dimensions: {imageWidth}x{imageHeight}\n" +
+                $"image_dimensions: {targetWidth}x{targetHeight}\n" +
                 $"controlled_window_dimensions: {windowWidth}x{windowHeight}\n" +
-                "next_action: Call read_image with image_path, visually locate the target, then call mcp_browser_use_click using coordinates from this exact image. After any click, input, scroll, or navigation, capture again before the next click.";
+                "next_action: The captured image is automatically attached. Visually locate the target, then call mcp_browser_use_click using coordinates from this image. After any click, input, scroll, or navigation, capture again before the next click.";
         }
 
         private async Task<string> ReadPageAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -532,7 +557,7 @@ namespace TxtAIEditor.Controls
                 BrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
                     ? _lastCapture
                     : null;
-
+                bool reusedCapture = capture != null;
                 if (capture == null && _settingsProvider().BrowserUseCaptureEnabled)
                 {
                     try
@@ -548,15 +573,26 @@ namespace TxtAIEditor.Controls
 
                 if (capture != null)
                 {
+                    if (reusedCapture)
+                    {
+                        await AttachCaptureImageAsync(capture.ImagePath, cancellationToken);
+                    }
+
                     x = Math.Clamp(x, 0, capture.ImageWidth - 1);
                     y = Math.Clamp(y, 0, capture.ImageHeight - 1);
 
+                    int origX = x - capture.PaddingLeft;
+                    int origY = y - capture.PaddingTop;
+
+                    origX = Math.Clamp(origX, 0, capture.OriginalImageWidth - 1);
+                    origY = Math.Clamp(origY, 0, capture.OriginalImageHeight - 1);
+
                     screenX = rect.Left + Math.Clamp(
-                        (int)Math.Round((x + 0.5) * (windowWidth / (double)capture.ImageWidth)),
+                        (int)Math.Round((origX + 0.5) * (windowWidth / (double)capture.OriginalImageWidth)),
                         0,
                         windowWidth - 1);
                     screenY = rect.Top + Math.Clamp(
-                        (int)Math.Round((y + 0.5) * (windowHeight / (double)capture.ImageHeight)),
+                        (int)Math.Round((origY + 0.5) * (windowHeight / (double)capture.OriginalImageHeight)),
                         0,
                         windowHeight - 1);
                 }
@@ -611,8 +647,26 @@ namespace TxtAIEditor.Controls
                 await Task.Delay(80, cancellationToken);
             }
 
-            _lastCapture = null;
-            return $"MCP tool result: Browser Use clicked {button} at {coordinateSpace} ({x}, {y}), mapped to screen ({screenX}, {screenY}). Capture again before the next visual action.";
+            await Task.Delay(350, cancellationToken);
+            string captureResult = string.Empty;
+            if (_settingsProvider().BrowserUseCaptureEnabled)
+            {
+                try
+                {
+                    captureResult = "\n" + await CaptureAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _lastCapture = null;
+                    captureResult = $"\n(Warning: Capture after click failed: {ex.Message})";
+                }
+            }
+            else
+            {
+                _lastCapture = null;
+            }
+
+            return $"MCP tool result: Browser Use clicked {button} at {coordinateSpace} ({x}, {y}), mapped to screen ({screenX}, {screenY})." + captureResult;
         }
 
         private async Task<string> TypeTextAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -1503,6 +1557,10 @@ namespace TxtAIEditor.Controls
             public string ImagePath { get; set; } = string.Empty;
             public int ImageWidth { get; set; }
             public int ImageHeight { get; set; }
+            public int OriginalImageWidth { get; set; }
+            public int OriginalImageHeight { get; set; }
+            public int PaddingLeft { get; set; }
+            public int PaddingTop { get; set; }
         }
 
         private sealed class WindowInfo
@@ -1712,5 +1770,39 @@ namespace TxtAIEditor.Controls
             [Out] byte[] bits,
             ref BitmapInfo bitmapInfo,
             uint usage);
+
+        private async Task AttachCaptureImageAsync(string imagePath, CancellationToken cancellationToken)
+        {
+            if (_addImageAttachment == null || !File.Exists(imagePath))
+            {
+                return;
+            }
+
+            try
+            {
+                byte[] bytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
+                var attachment = new LlmMessageAttachment
+                {
+                    DisplayName = Path.GetFileName(imagePath),
+                    MimeType = "image/png",
+                    Base64Data = Convert.ToBase64String(bytes),
+                    Width = MaxCaptureDimension,
+                    Height = MaxCaptureDimension,
+                    EstimatedTokens = EstimateImageTokens(MaxCaptureDimension, MaxCaptureDimension)
+                };
+                _addImageAttachment(attachment);
+            }
+            catch
+            {
+                // Ignore attachment errors to prevent tool failure
+            }
+        }
+
+        private static int EstimateImageTokens(int width, int height)
+        {
+            int tilesWide = Math.Max(1, (int)Math.Ceiling(width / 512.0));
+            int tilesHigh = Math.Max(1, (int)Math.Ceiling(height / 512.0));
+            return 85 + (tilesWide * tilesHigh * 170);
+        }
     }
 }
