@@ -75,6 +75,7 @@ namespace TxtAIEditor.Controls
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
         private readonly AgentMcpComfyUiTool _comfyUiTool;
+        private readonly AgentMcpBrowserUseTool _browserUseTool;
         private readonly string _mcpFilePath;
         private readonly List<AgentMcpServer> _servers = new();
         private readonly HashSet<string> _selectedServerIds = new(StringComparer.OrdinalIgnoreCase);
@@ -108,6 +109,7 @@ namespace TxtAIEditor.Controls
             _afterDialog = afterDialog;
             _dialogService = new AgentMcpDialogService(_agentPane, _initializePickerWindow, _getString, _beforeDialog, _afterDialog);
             _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, () => _settingsService.CurrentSettings, fileModifiedAsync);
+            _browserUseTool = new AgentMcpBrowserUseTool(() => _settingsService.CurrentSettings);
 
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
@@ -158,6 +160,7 @@ namespace TxtAIEditor.Controls
 
             _selectedServerIds.RemoveWhere(id =>
                 !_comfyUiTool.IsServerId(id) &&
+                !_browserUseTool.IsServerId(id) &&
                 _servers.All(server => !server.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
             if (migratedPlaintextHeaders || migratedPlaintextOAuth)
             {
@@ -379,6 +382,29 @@ namespace TxtAIEditor.Controls
 
         public async Task ConfigureBuiltInMcpAsync(string serverName)
         {
+            if (_browserUseTool.IsServerName(serverName))
+            {
+                var browserSettings = _settingsService.CurrentSettings;
+                var browserInput = await _dialogService.ShowBrowserUseSettingsAsync(new AgentMcpBrowserUseSettingsInput
+                {
+                    AllowInteraction = browserSettings.BrowserUseAllowInteraction,
+                    CaptureEnabled = browserSettings.BrowserUseCaptureEnabled,
+                    ComputerUseEnabled = browserSettings.BrowserUseComputerUseEnabled
+                });
+                if (browserInput == null)
+                {
+                    return;
+                }
+
+                browserSettings.BrowserUseAllowInteraction = browserInput.AllowInteraction;
+                browserSettings.BrowserUseCaptureEnabled = browserInput.CaptureEnabled;
+                browserSettings.BrowserUseComputerUseEnabled = browserInput.ComputerUseEnabled;
+                await _settingsService.SaveSettingsAsync(browserSettings);
+                RebuildAliases();
+                UpdateUI();
+                return;
+            }
+
             if (!_comfyUiTool.IsServerName(serverName))
             {
                 return;
@@ -491,6 +517,18 @@ namespace TxtAIEditor.Controls
 
         public async Task ToggleMcpAsync(string serverName)
         {
+            if (_browserUseTool.IsServerName(serverName))
+            {
+                if (!_selectedServerIds.Add(_browserUseTool.ServerId))
+                {
+                    _selectedServerIds.Remove(_browserUseTool.ServerId);
+                }
+
+                RebuildAliases();
+                UpdateUI();
+                return;
+            }
+
             if (_comfyUiTool.IsServerName(serverName))
             {
                 if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
@@ -531,7 +569,7 @@ namespace TxtAIEditor.Controls
 
         public async Task DeleteMcpAsync(string serverName)
         {
-            if (_comfyUiTool.IsServerName(serverName))
+            if (_comfyUiTool.IsServerName(serverName) || _browserUseTool.IsServerName(serverName))
             {
                 return;
             }
@@ -552,6 +590,14 @@ namespace TxtAIEditor.Controls
 
         public void RemoveSelectedMcp(string serverName)
         {
+            if (_browserUseTool.IsServerName(serverName))
+            {
+                _selectedServerIds.Remove(_browserUseTool.ServerId);
+                RebuildAliases();
+                UpdateUI();
+                return;
+            }
+
             if (_comfyUiTool.IsServerName(serverName))
             {
                 _selectedServerIds.Remove(_comfyUiTool.ServerId);
@@ -581,13 +627,20 @@ namespace TxtAIEditor.Controls
                 labels.Add(_comfyUiTool.ServerName);
             }
 
+            if (_selectedServerIds.Contains(_browserUseTool.ServerId))
+            {
+                labels.Add(_browserUseTool.ServerName);
+            }
+
             labels.AddRange(GetSelectedServers().Select(server => server.Name));
             return string.Join(", ", labels);
         }
 
         public bool HasSelectedMcpServers()
         {
-            return _selectedServerIds.Contains(_comfyUiTool.ServerId) || GetSelectedServers().Count > 0;
+            return _selectedServerIds.Contains(_comfyUiTool.ServerId) ||
+                _selectedServerIds.Contains(_browserUseTool.ServerId) ||
+                GetSelectedServers().Count > 0;
         }
 
         public async Task EnsureActiveToolsAsync(CancellationToken cancellationToken)
@@ -612,7 +665,8 @@ namespace TxtAIEditor.Controls
         {
             var selectedServers = GetSelectedServers();
             bool hasComfyUi = _selectedServerIds.Contains(_comfyUiTool.ServerId);
-            if (selectedServers.Count == 0 && !hasComfyUi)
+            bool hasBrowserUse = _selectedServerIds.Contains(_browserUseTool.ServerId);
+            if (selectedServers.Count == 0 && !hasComfyUi && !hasBrowserUse)
             {
                 return string.Empty;
             }
@@ -628,6 +682,27 @@ namespace TxtAIEditor.Controls
             {
                 AppendMcpAliasSection(builder, _comfyUiTool.ServerName, _comfyUiTool.ServerId);
                 _comfyUiTool.AppendWorkflowContext(builder);
+            }
+
+            if (hasBrowserUse)
+            {
+                AppendMcpAliasSection(builder, _browserUseTool.ServerName, _browserUseTool.ServerId);
+                builder.AppendLine("Browser Use controls the installed Windows default browser through OS-level keyboard and mouse input.");
+                if (_settingsService.CurrentSettings.BrowserUseCaptureEnabled)
+                {
+                    builder.AppendLine("For visual actions, always follow this loop: mcp_browser_use_capture -> read_image using the returned image_path -> mcp_browser_use_click with coordinates from that image -> capture again to verify. Use type_text only after visually clicking the intended input field.");
+                }
+                else
+                {
+                    builder.AppendLine("Browser image capture is disabled in plugin settings. Only use window coordinate clicks when coordinates are explicitly known.");
+                }
+
+                builder.AppendLine("Use read_page after navigation when selectable page text is needed.");
+                if (_settingsService.CurrentSettings.BrowserUseComputerUseEnabled)
+                {
+                    builder.AppendLine("Computer Use is enabled. To control another app: list_windows or open_app -> focus_window when needed -> capture -> read_image -> click/type/key -> capture again. Never guess a window id or visual coordinate.");
+                }
+                builder.AppendLine();
             }
 
             foreach (var server in selectedServers)
@@ -733,6 +808,11 @@ namespace TxtAIEditor.Controls
             if (_comfyUiTool.CanHandleAlias(alias))
             {
                 return await _comfyUiTool.ExecuteAsync(alias, arguments, cancellationToken);
+            }
+
+            if (_browserUseTool.CanHandleAlias(alias))
+            {
+                return await _browserUseTool.ExecuteAsync(alias, arguments, cancellationToken);
             }
 
             return $"MCP tool failed: unknown built-in MCP tool alias: {alias.Alias}";
@@ -995,6 +1075,15 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            if (_selectedServerIds.Contains(_browserUseTool.ServerId))
+            {
+                foreach (AgentMcpToolAlias alias in _browserUseTool.CreateAliases())
+                {
+                    usedAliases.Add(alias.Alias);
+                    _toolAliases[alias.Alias] = alias;
+                }
+            }
+
             foreach (var server in GetSelectedServers())
             {
                 if (!_sessions.TryGetValue(server.Id, out var session))
@@ -1031,7 +1120,8 @@ namespace TxtAIEditor.Controls
         {
             var items = new List<AgentMcpItem>
             {
-                _comfyUiTool.CreateMenuItem(_selectedServerIds.Contains(_comfyUiTool.ServerId), _getString, _comfyUiStatus)
+                _comfyUiTool.CreateMenuItem(_selectedServerIds.Contains(_comfyUiTool.ServerId), _getString, _comfyUiStatus),
+                _browserUseTool.CreateMenuItem(_selectedServerIds.Contains(_browserUseTool.ServerId), _getString)
             };
 
             items.AddRange(_servers
@@ -1059,6 +1149,11 @@ namespace TxtAIEditor.Controls
             if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
             {
                 selectedNames.Add(_comfyUiTool.ServerName);
+            }
+
+            if (_selectedServerIds.Contains(_browserUseTool.ServerId))
+            {
+                selectedNames.Add(_browserUseTool.ServerName);
             }
 
             selectedNames.AddRange(GetSelectedServers().Select(server => server.Name));

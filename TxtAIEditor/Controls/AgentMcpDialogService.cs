@@ -30,6 +30,13 @@ namespace TxtAIEditor.Controls
         public string WorkflowDirectory { get; set; } = string.Empty;
     }
 
+    internal sealed class AgentMcpBrowserUseSettingsInput
+    {
+        public bool AllowInteraction { get; set; } = true;
+        public bool CaptureEnabled { get; set; } = true;
+        public bool ComputerUseEnabled { get; set; }
+    }
+
     internal sealed class AgentMcpDialogService
     {
         private readonly AgentPane _agentPane;
@@ -144,6 +151,60 @@ namespace TxtAIEditor.Controls
             {
                 LaunchPath = launchPathBox.Text?.Trim() ?? string.Empty,
                 WorkflowDirectory = workflowDirectoryBox.Text?.Trim() ?? string.Empty
+            };
+        }
+
+        public async Task<AgentMcpBrowserUseSettingsInput?> ShowBrowserUseSettingsAsync(AgentMcpBrowserUseSettingsInput initial)
+        {
+            var interactionToggle = new ToggleSwitch
+            {
+                Header = _getString("AgentMcpBrowserUseAllowInteractionLabel", "클릭, 키 입력 및 스크롤 허용"),
+                IsOn = initial.AllowInteraction
+            };
+            var captureToggle = new ToggleSwitch
+            {
+                Header = _getString("AgentMcpBrowserUseCaptureEnabledLabel", "이미지 캡처 사용"),
+                IsOn = initial.CaptureEnabled
+            };
+            var computerUseToggle = new ToggleSwitch
+            {
+                Header = _getString("AgentMcpBrowserUseComputerUseEnabledLabel", "Computer Use - 다른 프로그램 조작"),
+                IsOn = initial.ComputerUseEnabled
+            };
+
+            var stack = new StackPanel { Spacing = 12, Width = 460 };
+            stack.Children.Add(captureToggle);
+            stack.Children.Add(interactionToggle);
+            stack.Children.Add(computerUseToggle);
+            stack.Children.Add(CreateInfoText(_getString(
+                "AgentMcpBrowserUseSettingsInfo",
+                "Browser Use는 Windows 기본 브라우저를 실행하고 키보드·마우스 입력으로 조작합니다. 읽기 전용 URL 열기, 상태 확인 및 페이지 텍스트 읽기는 이 옵션과 관계없이 사용할 수 있습니다.")));
+            stack.Children.Add(CreateInfoText(_getString(
+                "AgentMcpBrowserUseComputerUseInfo",
+                "Computer Use를 켜면 Agent가 실행 중인 다른 프로그램 창을 선택하거나 프로그램을 실행하고, 동일한 이미지 캡처·클릭·키 입력 도구로 조작할 수 있습니다.")));
+
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AgentMcpBrowserUseSettingsTitle", "Browser Use 설정"),
+                Content = stack,
+                PrimaryButtonText = _getString("SettingsSave", "저장"),
+                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.None,
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+
+            var result = await ShowDialogAsync(dialog);
+            if (result != ContentDialogResult.Primary)
+            {
+                return null;
+            }
+
+            return new AgentMcpBrowserUseSettingsInput
+            {
+                AllowInteraction = interactionToggle.IsOn,
+                CaptureEnabled = captureToggle.IsOn,
+                ComputerUseEnabled = computerUseToggle.IsOn
             };
         }
 

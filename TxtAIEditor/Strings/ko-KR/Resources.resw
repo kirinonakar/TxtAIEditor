@@ -3060,6 +3060,27 @@
   <data name="AgentMcpComfyUiDetail" xml:space="preserve">
     <value>내장 플러그인 - API JSON/파라미터로 이미지 생성</value>
   </data>
+  <data name="AgentMcpBrowserUseDetail" xml:space="preserve">
+    <value>내장 플러그인 - Windows 기본 브라우저 조작</value>
+  </data>
+  <data name="AgentMcpBrowserUseSettingsTitle" xml:space="preserve">
+    <value>Browser Use 설정</value>
+  </data>
+  <data name="AgentMcpBrowserUseAllowInteractionLabel" xml:space="preserve">
+    <value>클릭, 키 입력 및 스크롤 허용</value>
+  </data>
+  <data name="AgentMcpBrowserUseCaptureEnabledLabel" xml:space="preserve">
+    <value>이미지 캡처 사용</value>
+  </data>
+  <data name="AgentMcpBrowserUseComputerUseEnabledLabel" xml:space="preserve">
+    <value>Computer Use - 다른 프로그램 조작</value>
+  </data>
+  <data name="AgentMcpBrowserUseComputerUseInfo" xml:space="preserve">
+    <value>Computer Use를 켜면 Agent가 실행 중인 다른 프로그램 창을 선택하거나 프로그램을 실행하고, 동일한 이미지 캡처·클릭·키 입력 도구로 조작할 수 있습니다.</value>
+  </data>
+  <data name="AgentMcpBrowserUseSettingsInfo" xml:space="preserve">
+    <value>Browser Use는 Windows 기본 브라우저를 실행하고 키보드·마우스 입력으로 조작합니다. 읽기 전용 URL 열기, 상태 확인 및 페이지 텍스트 읽기는 이 옵션과 관계없이 사용할 수 있습니다.</value>
+  </data>
   <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
     <value>내장 플러그인은 수정하거나 삭제할 수 없습니다.</value>
   </data>

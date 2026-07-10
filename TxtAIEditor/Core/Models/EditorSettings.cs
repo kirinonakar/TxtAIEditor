@@ -77,6 +77,11 @@ namespace TxtAIEditor.Core.Models
         public string ComfyUiLaunchPath { get; set; } = string.Empty;
         public string ComfyUiWorkflowDirectory { get; set; } = GetDefaultComfyUiWorkflowDirectory();
 
+        // Browser Use built-in MCP plugin
+        public bool BrowserUseAllowInteraction { get; set; } = true;
+        public bool BrowserUseCaptureEnabled { get; set; } = true;
+        public bool BrowserUseComputerUseEnabled { get; set; } = false;
+
         // Git Config
         public bool AutoGitDetect { get; set; } = true;
 
