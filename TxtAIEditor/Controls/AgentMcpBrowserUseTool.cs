@@ -1095,7 +1095,7 @@ namespace TxtAIEditor.Controls
                 await Task.Delay(40, cancellationToken);
             }
 
-            throw new InvalidOperationException("The browser did not provide text through the clipboard.");
+            return string.Empty;
         }
 
         private async Task<string> BuildStatusResultAsync(string header, IntPtr browserWindow, bool includeUrl, CancellationToken cancellationToken)
