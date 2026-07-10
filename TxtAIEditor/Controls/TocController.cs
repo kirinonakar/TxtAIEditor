@@ -68,6 +68,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (tab.IsHexViewer)
+            {
+                _viewModel.TocItems.Clear();
+                return;
+            }
+
             var session = _getSession(tab);
             if (session == null)
             {

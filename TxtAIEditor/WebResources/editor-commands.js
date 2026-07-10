@@ -229,13 +229,22 @@ function commitLineForSave(element) {
 }
 
 function flushPendingEditForSave(requestId) {
-    const requestedLine = Number(state.compositionLine || state.editingLine || state.currentLine || 1);
     const focusedElement = document.activeElement?.closest?.('.line-text');
+    const focusedLine = focusedElement?.getAttribute('contenteditable') === 'true'
+        ? Number(focusedElement.dataset.line || 0)
+        : 0;
+    const requestedLine = Number(state.compositionLine || focusedLine || state.currentLine || state.editingLine || 1);
     let element = (focusedElement && focusedElement.getAttribute('contenteditable') === 'true')
         ? focusedElement
         : viewport.querySelector(`.line-text[data-line="${requestedLine}"]`) || activeEditableElement();
     const wasFocused = !!(element && document.activeElement === element);
-    const restoreColumn = element ? getCaretOffset(element) : Math.max(0, Number(state.currentColumn || 1) - 1);
+    const domSelection = window.getSelection();
+    const hasDomCaret = !!((!hasCustomSelection() || state.isComposing) && element && domSelection?.rangeCount &&
+        element.contains(domSelection.getRangeAt(0).startContainer));
+    const restoreLine = Math.max(1, Number(focusedLine || state.currentLine || requestedLine));
+    const restoreColumn = hasDomCaret
+        ? getCaretOffset(element)
+        : Math.max(0, Number(state.currentColumn || 1) - 1);
     let finished = false;
 
     const finish = () => {
@@ -254,9 +263,26 @@ function flushPendingEditForSave(requestId) {
             state.compositionLine = null;
         }
 
-        if (wasFocused && element && element.getAttribute('contenteditable') === 'true') {
-            const textLength = lineTextFromElement(element).length;
-            setTimeout(() => setCaret(element, Math.min(restoreColumn, textLength)), 0);
+        const safeRestoreLine = Math.min(Math.max(1, restoreLine), state.lineCount);
+        const restoreElement = viewport.querySelector(`.line-text[data-line="${safeRestoreLine}"]`);
+        const restoreText = restoreElement?.getAttribute('contenteditable') === 'true'
+            ? lineTextFromElement(restoreElement)
+            : (state.cache.get(safeRestoreLine) ?? '');
+        const safeRestoreColumn = Math.min(restoreColumn, restoreText.length);
+        state.currentLine = safeRestoreLine;
+        state.currentColumn = safeRestoreColumn + 1;
+
+        if (wasFocused) {
+            setTimeout(() => {
+                const currentElement = viewport.querySelector(`.line-text[data-line="${safeRestoreLine}"]`);
+                if (currentElement?.getAttribute('contenteditable') === 'true') {
+                    setCaret(currentElement, safeRestoreColumn);
+                } else {
+                    reportCursorAndSelection();
+                }
+            }, 0);
+        } else {
+            reportCursorAndSelection();
         }
 
         post({ type: 'editorFlushedForSave', requestId: Number(requestId || 0) });
