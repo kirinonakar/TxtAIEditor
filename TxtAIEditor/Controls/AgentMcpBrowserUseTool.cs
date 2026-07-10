@@ -20,7 +20,7 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentMcpBrowserUseTool
     {
         private const string BuiltInBrowserUseId = "builtin-browser-use";
-        private const string BuiltInBrowserUseName = "Browser Use";
+        private const string BuiltInBrowserUseName = "Browser Use & Computer Use";
         private const int MaxPageTextLength = 60_000;
         private const int DefaultAccessibilityNodeLimit = 180;
         private const int MaxCaptureDimension = 1024;

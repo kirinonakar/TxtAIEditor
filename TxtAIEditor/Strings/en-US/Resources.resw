@@ -3094,10 +3094,10 @@ Plan: {0}</value>
     <value>Built-in plugin - generate images from API JSON/parameters</value>
   </data>
   <data name="AgentMcpBrowserUseDetail" xml:space="preserve">
-    <value>Built-in plugin - control the Windows default browser</value>
+    <value>Built-in plugin - control the Windows default browser and use Computer Use</value>
   </data>
   <data name="AgentMcpBrowserUseSettingsTitle" xml:space="preserve">
-    <value>Browser Use Settings</value>
+    <value>Browser Use &amp; Computer Use Settings</value>
   </data>
   <data name="AgentMcpBrowserUseAllowInteractionLabel" xml:space="preserve">
     <value>Allow clicks, keyboard input, and scrolling</value>
@@ -3112,7 +3112,7 @@ Plan: {0}</value>
     <value>When Computer Use is enabled, the Agent can select other open application windows or launch a program and control it with the same image capture, click, and keyboard tools.</value>
   </data>
   <data name="AgentMcpBrowserUseSettingsInfo" xml:space="preserve">
-    <value>Browser Use launches the Windows default browser and controls it with keyboard and mouse input. Read-only URL opening, status checks, and page-text reading remain available regardless of this option.</value>
+    <value>Browser Use &amp; Computer Use launches the Windows default browser or other applications and controls them with keyboard and mouse input. Read-only URL opening, status checks, and page-text reading remain available regardless of this option.</value>
   </data>
   <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
     <value>Built-in plugins cannot be edited or deleted.</value>

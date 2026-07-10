@@ -3094,10 +3094,10 @@
     <value>内置插件 - 从 API JSON/parameters 生成图像</value>
   </data>
   <data name="AgentMcpBrowserUseDetail" xml:space="preserve">
-    <value>内置插件 - 控制 Windows 默认浏览器</value>
+    <value>内置插件 - 控制 Windows 默认浏览器及 Computer Use</value>
   </data>
   <data name="AgentMcpBrowserUseSettingsTitle" xml:space="preserve">
-    <value>Browser Use 设置</value>
+    <value>Browser Use &amp; Computer Use 设置</value>
   </data>
   <data name="AgentMcpBrowserUseAllowInteractionLabel" xml:space="preserve">
     <value>允许点击、键盘输入和滚动</value>
@@ -3112,7 +3112,7 @@
     <value>启用 Computer Use 后，Agent 可以选择其他已打开的应用程序窗口或启动程序，并使用相同的图像捕获、点击和键盘工具进行控制。</value>
   </data>
   <data name="AgentMcpBrowserUseSettingsInfo" xml:space="preserve">
-    <value>Browser Use 会启动 Windows 默认浏览器，并通过键盘和鼠标输入进行控制。无论此选项如何设置，仍可使用只读的 URL 打开、状态检查和页面文本读取功能。</value>
+    <value>Browser Use &amp; Computer Use 会启动 Windows 默认浏览器或其他应用程序，并通过键盘和鼠标输入进行控制。无论此选项如何设置，仍可使用只读的 URL 打开、状态检查和页面文本读取功能。</value>
   </data>
   <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
     <value>内置插件无法编辑或删除。</value>

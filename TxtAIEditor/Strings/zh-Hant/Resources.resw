@@ -3094,10 +3094,10 @@
     <value>內建外掛 - 從 API JSON/parameters 產生圖像</value>
   </data>
   <data name="AgentMcpBrowserUseDetail" xml:space="preserve">
-    <value>內建外掛 - 控制 Windows 預設瀏覽器</value>
+    <value>內建外掛 - 控制 Windows 預設瀏覽器及 Computer Use</value>
   </data>
   <data name="AgentMcpBrowserUseSettingsTitle" xml:space="preserve">
-    <value>Browser Use 設定</value>
+    <value>Browser Use &amp; Computer Use 設定</value>
   </data>
   <data name="AgentMcpBrowserUseAllowInteractionLabel" xml:space="preserve">
     <value>允許點擊、鍵盤輸入與捲動</value>
@@ -3112,7 +3112,7 @@
     <value>啟用 Computer Use 後，Agent 可以選擇其他已開啟的應用程式視窗或啟動程式，並使用相同的影像擷取、點擊和鍵盤工具進行控制。</value>
   </data>
   <data name="AgentMcpBrowserUseSettingsInfo" xml:space="preserve">
-    <value>Browser Use 會啟動 Windows 預設瀏覽器，並透過鍵盤與滑鼠輸入進行控制。無論此選項如何設定，仍可使用唯讀的 URL 開啟、狀態檢查與頁面文字讀取功能。</value>
+    <value>Browser Use &amp; Computer Use 會啟動 Windows 預設瀏覽器或其他應用程式，並透過鍵盤與滑鼠輸入進行控制。無論此選項如何設定，仍可使用唯讀的 URL 開啟、狀態檢查與頁面文字讀取功能。</value>
   </data>
   <data name="AgentMcpBuiltInLockedTooltip" xml:space="preserve">
     <value>內建插件無法編輯或刪除。</value>

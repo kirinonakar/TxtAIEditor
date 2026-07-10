@@ -689,7 +689,7 @@ namespace TxtAIEditor.Controls
             if (hasBrowserUse)
             {
                 AppendMcpAliasSection(builder, _browserUseTool.ServerName, _browserUseTool.ServerId);
-                builder.AppendLine("Browser Use controls the installed Windows default browser through OS-level keyboard and mouse input.");
+                builder.AppendLine("Browser Use & Computer Use controls the installed Windows default browser and other Windows applications through OS-level keyboard and mouse input.");
                 if (_settingsService.CurrentSettings.BrowserUseCaptureEnabled)
                 {
                     builder.AppendLine("For interactions, prefer the accessibility loop: mcp_browser_use_snapshot -> mcp_browser_use_click with a stable ref -> use the fresh snapshot returned after the action. Use mcp_browser_use_capture only when the accessibility tree does not expose the target or visual context is required.");
