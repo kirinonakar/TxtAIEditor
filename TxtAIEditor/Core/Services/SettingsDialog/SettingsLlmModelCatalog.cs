@@ -110,7 +110,13 @@ namespace TxtAIEditor.Core.Services
 
             if (IsOpenAIProvider(provider))
             {
-                return new[] { "gpt-5.5" };
+                return new[]
+                {
+                    "gpt-5.6-sol",
+                    "gpt-5.6-terra",
+                    "gpt-5.6-luna",
+                    "gpt-5.5"
+                };
             }
 
             if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))

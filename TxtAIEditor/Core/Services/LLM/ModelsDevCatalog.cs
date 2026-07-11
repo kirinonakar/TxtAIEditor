@@ -73,6 +73,9 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("openai", "gpt-5.4-pro"), (1050000, 128000) },
                 { ("openai", "gpt-5.5"), (1050000, 128000) },
                 { ("openai", "gpt-5.5-pro"), (1050000, 128000) },
+                { ("openai", "gpt-5.6-sol"), (1050000, 128000) },
+                { ("openai", "gpt-5.6-terra"), (1050000, 128000) },
+                { ("openai", "gpt-5.6-luna"), (1050000, 128000) },
 
                 { ("cerebras", "gpt-oss-120b"), (131000, 40000) },
                 { ("cerebras", "gemma-4-31b"), (131000, 40000) },
