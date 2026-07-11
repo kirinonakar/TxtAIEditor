@@ -692,17 +692,18 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine("Browser Use & Computer Use controls the installed Windows default browser and other Windows applications through OS-level keyboard and mouse input.");
                 if (_settingsService.CurrentSettings.BrowserUseCaptureEnabled)
                 {
-                    builder.AppendLine("For interactions, prefer the accessibility loop: mcp_browser_use_snapshot -> mcp_browser_use_click with a stable ref -> use the fresh snapshot returned after the action. Use mcp_browser_use_capture only when the accessibility tree does not expose the target or visual context is required.");
+                    builder.AppendLine("Accessibility snapshots provide stable refs, and interaction tools return a fresh snapshot.");
+                    builder.AppendLine("mcp_browser_use_capture is available whenever you determine that screenshot context would help with the task.");
                 }
                 else
                 {
-                    builder.AppendLine("Browser image capture is disabled in plugin settings. Only use window coordinate clicks when coordinates are explicitly known.");
+                    builder.AppendLine("Browser image capture is disabled in plugin settings. Use accessibility snapshots and stable refs for interactions.");
                 }
 
                 builder.AppendLine("Use read_page after navigation when selectable page text is needed.");
                 if (_settingsService.CurrentSettings.BrowserUseComputerUseEnabled)
                 {
-                    builder.AppendLine("Computer Use is enabled. open_app returns an initial accessibility tree with stable refs. To control another app: list_windows or open_app -> focus_window when needed -> snapshot/ref click/type/key. Capture only when the accessibility tree is insufficient. Never guess a window id, ref, or visual coordinate.");
+                    builder.AppendLine("Computer Use is enabled. open_app returns an initial accessibility tree with stable refs. After list_windows or open_app, use focus_window when needed and choose between accessibility refs and capture based on the current task. Never guess a window id, ref, or visual coordinate.");
                 }
                 builder.AppendLine();
             }

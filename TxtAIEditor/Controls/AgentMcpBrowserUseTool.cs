@@ -105,8 +105,8 @@ namespace TxtAIEditor.Controls
                 CreateAlias("mcp_browser_use_read_page", "read_page", "Copy and return selectable text from the current page, together with the current URL and window title. This is browser-agnostic and may not expose canvas or protected page content.", """
                 {"type":"object","properties":{"maxCharacters":{"type":"integer","minimum":1000,"maximum":60000,"default":30000}}}
                 """),
-                CreateAlias("mcp_browser_use_click", "click", "Click an element by stable ref from mcp_browser_use_snapshot (preferred), or by coordinates from a capture. Returns a fresh accessibility snapshot; request includeScreenshot only when visual context is needed.", """
-                {"type":"object","properties":{"ref":{"type":"string","description":"Stable element ref returned by mcp_browser_use_snapshot."},"x":{"type":"integer","description":"X coordinate in the latest capture image."},"y":{"type":"integer","description":"Y coordinate in the latest capture image."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot for coordinates from mcp_browser_use_capture. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1},"includeScreenshot":{"type":"boolean","default":false}},"anyOf":[{"required":["ref"]},{"required":["x","y"]}]}
+                CreateAlias("mcp_browser_use_click", "click", "Click an element by stable ref from mcp_browser_use_snapshot (preferred), or by coordinates from an existing explicit capture. Returns a fresh accessibility snapshot.", """
+                {"type":"object","properties":{"ref":{"type":"string","description":"Stable element ref returned by mcp_browser_use_snapshot."},"x":{"type":"integer","description":"X coordinate in the latest explicit capture image."},"y":{"type":"integer","description":"Y coordinate in the latest explicit capture image."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot only for coordinates from a prior mcp_browser_use_capture. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1}},"anyOf":[{"required":["ref"]},{"required":["x","y"]}]}
                 """),
                 CreateAlias("mcp_browser_use_type_text", "type_text", "Type Unicode text into the focused browser control. Can replace the current field selection and optionally press Enter.", """
                 {"type":"object","properties":{"text":{"type":"string"},"replace":{"type":"boolean","default":false},"pressEnter":{"type":"boolean","default":false}},"required":["text"]}
@@ -285,7 +285,7 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine($"  bounds: x={window.Bounds.Left}, y={window.Bounds.Top}, width={window.Bounds.Right - window.Bounds.Left}, height={window.Bounds.Bottom - window.Bounds.Top}");
             }
 
-            builder.Append("Use mcp_browser_use_focus_window with a windowId, then capture and read_image before interacting.");
+            builder.Append("Use mcp_browser_use_focus_window with a windowId, then choose accessibility refs or capture based on the task.");
             return builder.ToString();
         }
 
@@ -418,7 +418,7 @@ namespace TxtAIEditor.Controls
                     {
                         return status +
                             $"\n(Warning: Initial accessibility snapshot failed: {ex.Message})\n" +
-                            "next_action: Use mcp_browser_use_capture only if visual inspection is required.";
+                            "next_action: mcp_browser_use_capture remains available if screenshot context would help.";
                     }
                 }
 
@@ -500,7 +500,7 @@ namespace TxtAIEditor.Controls
                 $"window_title: {SanitizeWindowTitle(GetWindowTitle(browserWindow))}\n" +
                 $"image_dimensions: {targetWidth}x{targetHeight}\n" +
                 $"controlled_window_dimensions: {windowWidth}x{windowHeight}\n" +
-                "next_action: The captured image is automatically attached. Visually locate the target, then call mcp_browser_use_click using coordinates from this image. After any click, input, scroll, or navigation, capture again before the next click.";
+                "next_action: The captured image is automatically attached. You can use coordinates from this image or accessibility refs, and interaction tools will return a fresh accessibility snapshot.";
         }
 
         private async Task<string> SnapshotAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -614,52 +614,28 @@ namespace TxtAIEditor.Controls
                     BrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
                         ? _lastCapture
                         : null;
-                    bool reusedCapture = capture != null;
-                    if (capture == null && _settingsProvider().BrowserUseCaptureEnabled)
+                    if (capture == null)
                     {
-                        try
-                        {
-                            await CaptureAsync(cancellationToken);
-                            capture = _lastCapture;
-                        }
-                        catch
-                        {
-                            // Ignore capture failures and fall back
-                        }
+                        throw new InvalidOperationException("Screenshot coordinates require a prior explicit mcp_browser_use_capture result. Prefer a stable accessibility ref when available.");
                     }
 
-                    if (capture != null)
-                    {
-                        if (reusedCapture)
-                        {
-                            await AttachCaptureImageAsync(capture.ImagePath, cancellationToken);
-                        }
+                    x = Math.Clamp(x, 0, capture.ImageWidth - 1);
+                    y = Math.Clamp(y, 0, capture.ImageHeight - 1);
 
-                        x = Math.Clamp(x, 0, capture.ImageWidth - 1);
-                        y = Math.Clamp(y, 0, capture.ImageHeight - 1);
+                    int origX = x - capture.PaddingLeft;
+                    int origY = y - capture.PaddingTop;
 
-                        int origX = x - capture.PaddingLeft;
-                        int origY = y - capture.PaddingTop;
+                    origX = Math.Clamp(origX, 0, capture.OriginalImageWidth - 1);
+                    origY = Math.Clamp(origY, 0, capture.OriginalImageHeight - 1);
 
-                        origX = Math.Clamp(origX, 0, capture.OriginalImageWidth - 1);
-                        origY = Math.Clamp(origY, 0, capture.OriginalImageHeight - 1);
-
-                        screenX = rect.Left + Math.Clamp(
-                            (int)Math.Round((origX + 0.5) * (windowWidth / (double)capture.OriginalImageWidth)),
-                            0,
-                            windowWidth - 1);
-                        screenY = rect.Top + Math.Clamp(
-                            (int)Math.Round((origY + 0.5) * (windowHeight / (double)capture.OriginalImageHeight)),
-                            0,
-                            windowHeight - 1);
-                    }
-                    else
-                    {
-                        x = Math.Clamp(x, 0, windowWidth - 1);
-                        y = Math.Clamp(y, 0, windowHeight - 1);
-                        screenX = rect.Left + x;
-                        screenY = rect.Top + y;
-                    }
+                    screenX = rect.Left + Math.Clamp(
+                        (int)Math.Round((origX + 0.5) * (windowWidth / (double)capture.OriginalImageWidth)),
+                        0,
+                        windowWidth - 1);
+                    screenY = rect.Top + Math.Clamp(
+                        (int)Math.Round((origY + 0.5) * (windowHeight / (double)capture.OriginalImageHeight)),
+                        0,
+                        windowHeight - 1);
                 }
                 else if (coordinateSpace == "window")
                 {
@@ -706,7 +682,7 @@ namespace TxtAIEditor.Controls
             }
 
             await Task.Delay(350, cancellationToken);
-            string postActionContext = await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
+            string postActionContext = BuildPostActionContext(browserWindow);
 
             string targetDescription = coordinateSpace == "ref" ? $"ref {elementRef}" : $"{coordinateSpace} ({x}, {y})";
             return $"MCP tool result: Browser Use clicked {button} at {targetDescription}, mapped to screen ({screenX}, {screenY})." + postActionContext;
@@ -731,7 +707,7 @@ namespace TxtAIEditor.Controls
 
             await Task.Delay(150, cancellationToken);
             return $"MCP tool result: Browser Use typed {text.Length:N0} characters." +
-                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
+                BuildPostActionContext(browserWindow);
         }
 
         private async Task<string> PressKeyAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -752,7 +728,7 @@ namespace TxtAIEditor.Controls
                 AgentToolHelpers.GetBoolArgument(arguments, "shift", false));
             await Task.Delay(120, cancellationToken);
             return $"MCP tool result: Browser Use pressed {key}." +
-                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
+                BuildPostActionContext(browserWindow);
         }
 
         private async Task<string> ScrollAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -781,7 +757,7 @@ namespace TxtAIEditor.Controls
 
             await Task.Delay(150, cancellationToken);
             return $"MCP tool result: Browser Use scrolled (deltaY: {deltaY}, deltaX: {deltaX})." +
-                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
+                BuildPostActionContext(browserWindow);
         }
 
         private async Task<string> NavigateAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -801,7 +777,7 @@ namespace TxtAIEditor.Controls
 
             await Task.Delay(200, cancellationToken);
             return $"MCP tool result: Browser Use navigation action completed: {action}." +
-                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
+                BuildPostActionContext(browserWindow);
         }
 
         private async Task<string> TabAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -821,7 +797,7 @@ namespace TxtAIEditor.Controls
 
             await Task.Delay(200, cancellationToken);
             return $"MCP tool result: Browser Use tab action completed: {action}." +
-                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
+                BuildPostActionContext(browserWindow);
         }
 
         private async Task<string> FindAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -846,15 +822,12 @@ namespace TxtAIEditor.Controls
 
             await Task.Delay(120, cancellationToken);
             return $"MCP tool result: Browser Use searched the page for: {text}" +
-                await BuildPostActionContextAsync(browserWindow, arguments, cancellationToken);
+                BuildPostActionContext(browserWindow);
         }
 
-        private async Task<string> BuildPostActionContextAsync(
-            IntPtr browserWindow,
-            JsonElement arguments,
-            CancellationToken cancellationToken)
+        private string BuildPostActionContext(IntPtr browserWindow)
         {
-            bool snapshotFailed = false;
+            _lastCapture = null;
             string context;
             try
             {
@@ -862,31 +835,8 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                snapshotFailed = true;
-                context = $"\n(Warning: Accessibility snapshot after interaction failed: {ex.Message})";
-            }
-
-            bool includeScreenshot = AgentToolHelpers.GetBoolArgument(arguments, "includeScreenshot", false);
-            bool shouldCapture = includeScreenshot || snapshotFailed;
-            if (shouldCapture && _settingsProvider().BrowserUseCaptureEnabled)
-            {
-                try
-                {
-                    context += "\n" + await CaptureAsync(cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _lastCapture = null;
-                    context += $"\n(Warning: Capture after interaction failed: {ex.Message})";
-                }
-            }
-            else
-            {
-                _lastCapture = null;
-                if (shouldCapture)
-                {
-                    context += "\n(Warning: Screenshot was needed but Browser Use capture is disabled.)";
-                }
+                context = $"\n(Warning: Accessibility snapshot after interaction failed: {ex.Message})\n" +
+                    "next_action: mcp_browser_use_capture remains available if screenshot context would help.";
             }
 
             return context;
