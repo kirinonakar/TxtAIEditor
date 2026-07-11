@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         private readonly ToggleButton _leftPanelToggle;
         private readonly ToggleButton _rightPanelToggle;
         private readonly MarkdownToolbarControl _markdownToolbar;
+        private readonly RightSidebarPane _rightSidebar;
         private readonly ComboBox _previewModeCombo;
         private readonly DispatcherTimer _gitAutoRefreshTimer;
         private readonly LivePreviewController _livePreviewController;
@@ -56,6 +57,7 @@ namespace TxtAIEditor.Controls
             ToggleButton leftPanelToggle,
             ToggleButton rightPanelToggle,
             MarkdownToolbarControl markdownToolbar,
+            RightSidebarPane rightSidebar,
             ComboBox previewModeCombo,
             DispatcherTimer gitAutoRefreshTimer,
             LivePreviewController livePreviewController,
@@ -85,6 +87,7 @@ namespace TxtAIEditor.Controls
             _leftPanelToggle = leftPanelToggle;
             _rightPanelToggle = rightPanelToggle;
             _markdownToolbar = markdownToolbar;
+            _rightSidebar = rightSidebar;
             _previewModeCombo = previewModeCombo;
             _gitAutoRefreshTimer = gitAutoRefreshTimer;
             _livePreviewController = livePreviewController;
@@ -201,6 +204,7 @@ namespace TxtAIEditor.Controls
 
             _topToolbar.MarkdownToolbarIsChecked = settings.DefaultMarkdownToolbarEnabled;
             _markdownToolbar.Visibility = settings.DefaultMarkdownToolbarEnabled ? Visibility.Visible : Visibility.Collapsed;
+            _rightSidebar.RestoreSelectedTab(settings.RightSidebarSelectedTab);
             _previewModeCombo.SelectedIndex = 0;
 
             _applyUiPersonalization(settings);

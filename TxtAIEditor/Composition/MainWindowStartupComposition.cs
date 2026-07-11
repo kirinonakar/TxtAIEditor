@@ -134,6 +134,7 @@ namespace TxtAIEditor.Composition
                 ui.StatusBar.LeftPanelToggleButton,
                 ui.StatusBar.RightPanelToggleButton,
                 ui.MarkdownToolbar,
+                ui.PreviewGrid,
                 ui.PreviewGrid.PreviewMode,
                 gitAutoRefreshTimer,
                 livePreview,
@@ -154,6 +155,13 @@ namespace TxtAIEditor.Composition
                 callbacks.UpdateAutoSaveStatus,
                 callbacks.GetLocalizedString,
                 dialog.ShowErrorMessage);
+
+            ui.PreviewGrid.SelectedTabChanged += async (_, selectedTabKey) =>
+            {
+                EditorSettings currentSettings = services.SettingsService.CurrentSettings;
+                currentSettings.RightSidebarSelectedTab = selectedTabKey;
+                await services.SettingsService.SaveSettingsAsync(currentSettings);
+            };
 
             var shellInteraction = new MainWindowShellInteractionController(
                 ui.RootGrid,

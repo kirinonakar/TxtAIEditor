@@ -34,6 +34,7 @@ namespace TxtAIEditor.Core.Models
         public string ExternalViewerArguments { get; set; } = string.Empty;
         public bool LeftSidebarVisible { get; set; } = true;
         public bool RightSidebarVisible { get; set; } = true;
+        public string RightSidebarSelectedTab { get; set; } = "LivePreview";
         public double LeftSidebarWidth { get; set; } = 260;
         public double RightSidebarWidth { get; set; } = 400;
         public bool ScrollSyncEnabled { get; set; } = true;

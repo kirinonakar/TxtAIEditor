@@ -9,6 +9,7 @@ namespace TxtAIEditor.Controls
     public sealed partial class RightSidebarPane : UserControl
     {
         private readonly RightSidebarPresetMenuController _presetMenuController;
+        private bool _isRestoringSelectedTab;
 
         public RightSidebarPane()
         {
@@ -38,6 +39,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? LlmInsertNewTabOutputClick;
         public event RoutedEventHandler? LlmAddInstructionClick;
         public event RoutedEventHandler? ModelNameClick;
+        public event EventHandler<string>? SelectedTabChanged;
 
         public TabView RightTabs => RightTabView;
         public ComboBox PreviewMode => PreviewModeCombo;
@@ -48,6 +50,9 @@ namespace TxtAIEditor.Controls
         public TextBox LlmFileContext => LlmFileContextInput;
         public TextBox LlmCustomPrompt => LlmCustomPromptInput;
         public AgentPane AgentPane => AgentPaneControl;
+
+        public string SelectedTabKey =>
+            RightTabView.SelectedItem is TabViewItem { Tag: string key } ? key : "LivePreview";
 
         // Named controls exposed for localization
         public TabViewItem LivePreviewTabItem => LivePreviewTab;
@@ -73,6 +78,33 @@ namespace TxtAIEditor.Controls
         public Button LlmInsertNewTabOutputBtn => LlmInsertNewTabOutputButton;
         public Button LlmAddInstructionBtn => LlmAddInstructionButton;
         public ScrollViewer InstructionTabScroller => InstructionTabScrollViewer;
+
+        public void RestoreSelectedTab(string? selectedTabKey)
+        {
+            if (string.IsNullOrWhiteSpace(selectedTabKey))
+            {
+                return;
+            }
+
+            foreach (object item in RightTabView.TabItems)
+            {
+                if (item is TabViewItem { Tag: string key } tab &&
+                    string.Equals(key, selectedTabKey, StringComparison.Ordinal))
+                {
+                    _isRestoringSelectedTab = true;
+                    try
+                    {
+                        RightTabView.SelectedItem = tab;
+                    }
+                    finally
+                    {
+                        _isRestoringSelectedTab = false;
+                    }
+
+                    return;
+                }
+            }
+        }
 
         private WebView2 EnsurePreviewWebView()
         {
@@ -421,6 +453,11 @@ namespace TxtAIEditor.Controls
 
         private void OnRightTabViewSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isRestoringSelectedTab)
+            {
+                return;
+            }
+
             try
             {
                 RightTabView.Focus(FocusState.Programmatic);
@@ -429,6 +466,8 @@ namespace TxtAIEditor.Controls
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to shift focus on right tab selection change: {ex.Message}");
             }
+
+            SelectedTabChanged?.Invoke(this, SelectedTabKey);
         }
     }
 }

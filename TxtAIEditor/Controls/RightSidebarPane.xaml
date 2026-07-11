@@ -29,7 +29,7 @@
                              SelectionChanged="OnRightTabViewSelectionChanged">
                         
                         <!-- Tab 1: Live Preview -->
-                        <TabViewItem x:Name="LivePreviewTab" Header="실시간 프리뷰" IsClosable="False">
+                        <TabViewItem x:Name="LivePreviewTab" Header="실시간 프리뷰" IsClosable="False" Tag="LivePreview">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -73,7 +73,7 @@
                         </TabViewItem>
     
                         <!-- Tab 2: AI Assistant -->
-                        <TabViewItem x:Name="AiAssistantTab" Header="AI Assistant" IsClosable="False">
+                        <TabViewItem x:Name="AiAssistantTab" Header="AI Assistant" IsClosable="False" Tag="AiAssistant">
                             <Grid Padding="15" RowSpacing="15">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="*"/>    <!-- AI Chat Logs Area (Row 0) -->
@@ -243,7 +243,7 @@
                         </TabViewItem>
 
                         <!-- Tab 3: Agent -->
-                        <TabViewItem x:Name="AgentTab" Header="Agent" IsClosable="False">
+                        <TabViewItem x:Name="AgentTab" Header="Agent" IsClosable="False" Tag="Agent">
                             <controls:AgentPane x:Name="AgentPaneControl"/>
                         </TabViewItem>
     
