@@ -79,7 +79,7 @@ namespace TxtAIEditor.Core.Models
 
         // Browser Use built-in MCP plugin
         public bool BrowserUseAllowInteraction { get; set; } = true;
-        public bool BrowserUseCaptureEnabled { get; set; } = true;
+        public bool BrowserUseCaptureEnabled { get; set; } = false;
         public bool BrowserUseComputerUseEnabled { get; set; } = true;
 
         // Git Config
