@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -158,9 +159,9 @@ namespace TxtAIEditor.Controls
                 aliases.Add(CreateAlias(
                     "mcp_browser_use_open_app",
                     "open_app",
-                    "Launch a Windows program, application target, document, or registered URI and select its visible window for Computer Use.",
+                    "Launch a Windows program, friendly application name, document, or registered URI and select its visible window for Computer Use. Common names such as excel, word, powerpoint, outlook, calculator, and their Korean names are resolved automatically.",
                     """
-                    {"type":"object","properties":{"target":{"type":"string","description":"Executable name/path, document path, or registered URI."},"arguments":{"type":"string","description":"Optional program arguments."}},"required":["target"]}
+                    {"type":"object","properties":{"target":{"type":"string","description":"Friendly app name, executable name/path, document path, or registered URI. Examples: excel, 엑셀, word, powerpoint, calculator."},"arguments":{"type":"string","description":"Optional program arguments."}},"required":["target"]}
                     """));
             }
 
@@ -353,16 +354,28 @@ namespace TxtAIEditor.Controls
             }
 
             string processArguments = AgentToolHelpers.GetFirstStringArgument(arguments, "arguments", "args");
+            string resolvedTarget = ResolveApplicationTarget(target);
             IntPtr foregroundBefore = GetForegroundWindow();
-            Process? launchedProcess = Process.Start(new ProcessStartInfo
+            Process? launchedProcess;
+            try
             {
-                FileName = target,
-                Arguments = processArguments,
-                UseShellExecute = true
-            });
+                launchedProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = resolvedTarget,
+                    Arguments = processArguments,
+                    UseShellExecute = true
+                });
+            }
+            catch (Win32Exception ex) when (!resolvedTarget.Equals(target, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"The application alias '{target}' resolved to '{resolvedTarget}', but Windows could not launch it: {ex.Message}",
+                    ex);
+            }
 
-            string expectedProcessName = Path.GetFileNameWithoutExtension(target);
+            string expectedProcessName = Path.GetFileNameWithoutExtension(resolvedTarget);
             DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(8);
+            DateTimeOffset foregroundFallbackAt = DateTimeOffset.UtcNow.AddSeconds(2);
             while (DateTimeOffset.UtcNow < deadline)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -386,7 +399,7 @@ namespace TxtAIEditor.Controls
                         ?.Handle ?? IntPtr.Zero;
                 }
 
-                if (handle == IntPtr.Zero)
+                if (handle == IntPtr.Zero && DateTimeOffset.UtcNow >= foregroundFallbackAt)
                 {
                     IntPtr foreground = GetForegroundWindow();
                     if (foreground != IntPtr.Zero && foreground != foregroundBefore && IsWindowVisible(foreground))
@@ -401,9 +414,24 @@ namespace TxtAIEditor.Controls
 
                 if (handle != IntPtr.Zero && TryCreateWindowInfo(handle, out WindowInfo window))
                 {
-                    SelectControlledWindow(window);
-                    FocusBrowserWindow(handle);
+                    try
+                    {
+                        FocusBrowserWindow(handle);
+                    }
+                    catch
+                    {
+                        await Task.Delay(150, cancellationToken);
+                        continue;
+                    }
+
                     await Task.Delay(300, cancellationToken);
+                    if (!TryCreateWindowInfo(handle, out WindowInfo stableWindow))
+                    {
+                        await Task.Delay(150, cancellationToken);
+                        continue;
+                    }
+
+                    SelectControlledWindow(stableWindow);
                     string status = await BuildStatusResultAsync(
                         "MCP tool result: Computer Use launched and selected an application window.",
                         handle,
@@ -411,11 +439,17 @@ namespace TxtAIEditor.Controls
                         cancellationToken);
                     try
                     {
-                        string snapshot = _accessibility.CaptureSnapshot(handle, DefaultAccessibilityNodeLimit);
+                        string snapshot = await CaptureInitialAccessibilitySnapshotAsync(handle, cancellationToken);
                         return status + "\n" + snapshot;
                     }
                     catch (Exception ex)
                     {
+                        if (!TryCreateWindowInfo(handle, out _))
+                        {
+                            await Task.Delay(150, cancellationToken);
+                            continue;
+                        }
+
                         return status +
                             $"\n(Warning: Initial accessibility snapshot failed: {ex.Message})\n" +
                             "next_action: mcp_browser_use_capture remains available if screenshot context would help.";
@@ -426,6 +460,148 @@ namespace TxtAIEditor.Controls
             }
 
             throw new InvalidOperationException($"The application was launched but no visible window was found: {target}");
+        }
+
+        private static string ResolveApplicationTarget(string target)
+        {
+            string trimmed = target.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed) ||
+                File.Exists(trimmed) ||
+                Path.IsPathRooted(trimmed) ||
+                trimmed.Contains(Path.DirectorySeparatorChar) ||
+                trimmed.Contains(Path.AltDirectorySeparatorChar) ||
+                Uri.TryCreate(trimmed, UriKind.Absolute, out _))
+            {
+                return trimmed;
+            }
+
+            string executableName = MapFriendlyApplicationName(trimmed);
+            string? appPath = TryResolveRegisteredAppPath(executableName);
+            if (!string.IsNullOrWhiteSpace(appPath))
+            {
+                return appPath;
+            }
+
+            string? officePath = TryResolveOfficeExecutable(executableName);
+            return !string.IsNullOrWhiteSpace(officePath) ? officePath : trimmed;
+        }
+
+        private static string MapFriendlyApplicationName(string target)
+        {
+            string normalized = target.Trim().ToLowerInvariant();
+            return normalized switch
+            {
+                "excel" or "excel.exe" or "엑셀" => "EXCEL.EXE",
+                "word" or "winword" or "winword.exe" or "워드" => "WINWORD.EXE",
+                "powerpoint" or "powerpnt" or "powerpnt.exe" or "ppt" or "파워포인트" => "POWERPNT.EXE",
+                "outlook" or "outlook.exe" or "아웃룩" => "OUTLOOK.EXE",
+                "onenote" or "onenote.exe" or "원노트" => "ONENOTE.EXE",
+                "access" or "msaccess" or "msaccess.exe" or "액세스" => "MSACCESS.EXE",
+                "publisher" or "mspub" or "mspub.exe" or "퍼블리셔" => "MSPUB.EXE",
+                "calculator" or "calc" or "calc.exe" or "계산기" => "calc.exe",
+                "notepad" or "notepad.exe" or "메모장" => "notepad.exe",
+                "paint" or "mspaint" or "mspaint.exe" or "그림판" => "mspaint.exe",
+                _ when Path.HasExtension(target) => target,
+                _ => target + ".exe"
+            };
+        }
+
+        private static string? TryResolveRegisteredAppPath(string executableName)
+        {
+            RegistryHive[] hives = { RegistryHive.CurrentUser, RegistryHive.LocalMachine };
+            RegistryView[] views = { RegistryView.Registry64, RegistryView.Registry32 };
+            foreach (RegistryHive hive in hives)
+            {
+                foreach (RegistryView view in views)
+                {
+                    try
+                    {
+                        using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, view);
+                        using RegistryKey? appPathKey = baseKey.OpenSubKey(
+                            @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + executableName);
+                        string value = appPathKey?.GetValue(null) as string ?? string.Empty;
+                        string expanded = Environment.ExpandEnvironmentVariables(value.Trim().Trim('"'));
+                        if (File.Exists(expanded))
+                        {
+                            return expanded;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static string? TryResolveOfficeExecutable(string executableName)
+        {
+            string[] officeExecutables =
+            {
+                "EXCEL.EXE", "WINWORD.EXE", "POWERPNT.EXE", "OUTLOOK.EXE",
+                "ONENOTE.EXE", "MSACCESS.EXE", "MSPUB.EXE"
+            };
+            if (!officeExecutables.Contains(executableName, StringComparer.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            string[] programFilesRoots =
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
+            };
+            foreach (string programFiles in programFilesRoots.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                for (int version = 16; version >= 12; version--)
+                {
+                    string[] candidates =
+                    {
+                        Path.Combine(programFiles, "Microsoft Office", "root", $"Office{version}", executableName),
+                        Path.Combine(programFiles, "Microsoft Office", $"Office{version}", executableName)
+                    };
+                    foreach (string candidate in candidates)
+                    {
+                        if (File.Exists(candidate))
+                        {
+                            return candidate;
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private async Task<string> CaptureInitialAccessibilitySnapshotAsync(
+            IntPtr window,
+            CancellationToken cancellationToken)
+        {
+            Exception? lastError = null;
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryCreateWindowInfo(window, out _))
+                {
+                    throw new InvalidOperationException("The launched application window closed before its accessibility tree became available.");
+                }
+
+                try
+                {
+                    return _accessibility.CaptureSnapshot(window, DefaultAccessibilityNodeLimit);
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                }
+
+                await Task.Delay(350, cancellationToken);
+            }
+
+            throw new InvalidOperationException(
+                "The application window opened, but its accessibility provider was not ready.",
+                lastError);
         }
 
         private async Task<string> CaptureAsync(CancellationToken cancellationToken)
@@ -1085,6 +1261,12 @@ namespace TxtAIEditor.Controls
                 return browserWindow;
             }
 
+            if (!requireBrowser && _browserWindow != IntPtr.Zero && !_controlledWindowIsBrowser)
+            {
+                throw new InvalidOperationException(
+                    "The selected Computer Use application window is no longer available. Use list_windows, focus_window, or open_app to select it again.");
+            }
+
             LaunchDefaultBrowser("about:blank");
             return await WaitForBrowserWindowAsync(cancellationToken);
         }
@@ -1098,6 +1280,12 @@ namespace TxtAIEditor.Controls
             {
                 browserWindow = _browserWindow;
                 return true;
+            }
+
+            if (!requireBrowser && _browserWindow != IntPtr.Zero && !_controlledWindowIsBrowser)
+            {
+                browserWindow = IntPtr.Zero;
+                return false;
             }
 
             string processName = GetDefaultBrowserProcessName();
