@@ -100,7 +100,7 @@ namespace TxtAIEditor.Controls
                 CreateAlias("mcp_browser_use_status", "status", "Get the controlled default browser window title, process, bounds, and current URL.", """
                 {"type":"object","properties":{}}
                 """),
-                CreateAlias("mcp_browser_use_snapshot", "snapshot", "Return a concise accessibility tree for the controlled browser window. Every emitted element has a stable ref that can be passed to mcp_browser_use_click. Set includeScreenshot only when visual context is needed.", """
+                CreateAlias("mcp_browser_use_snapshot", "snapshot", "Return a concise accessibility tree for the currently controlled browser or Computer Use application window. Every emitted element has a stable ref that can be passed to mcp_browser_use_click. Set includeScreenshot only when visual context is needed.", """
                 {"type":"object","properties":{"maxNodes":{"type":"integer","minimum":20,"maximum":500,"default":180},"includeScreenshot":{"type":"boolean","default":false}}}
                 """),
                 CreateAlias("mcp_browser_use_read_page", "read_page", "Copy and return selectable text from the current page, together with the current URL and window title. This is browser-agnostic and may not expose canvas or protected page content.", """
@@ -681,7 +681,7 @@ namespace TxtAIEditor.Controls
 
         private async Task<string> SnapshotAsync(JsonElement arguments, CancellationToken cancellationToken)
         {
-            IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken, requireBrowser: true);
+            IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken);
             int maxNodes = AgentToolHelpers.GetIntArgument(arguments, "maxNodes", DefaultAccessibilityNodeLimit);
             string snapshot = _accessibility.CaptureSnapshot(browserWindow, maxNodes);
             bool includeScreenshot = AgentToolHelpers.GetBoolArgument(arguments, "includeScreenshot", false);

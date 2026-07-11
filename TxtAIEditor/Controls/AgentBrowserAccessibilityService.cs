@@ -43,7 +43,11 @@ namespace TxtAIEditor.Controls
 
         public bool TryResolveRef(string elementRef, IntPtr window, out AccessibilityTarget target)
         {
-            target = default;
+            if (TryGetCurrentTarget(elementRef, window, out target))
+            {
+                return true;
+            }
+
             try
             {
                 CaptureSnapshot(window, 500);
@@ -53,6 +57,12 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
+            return TryGetCurrentTarget(elementRef, window, out target);
+        }
+
+        private bool TryGetCurrentTarget(string elementRef, IntPtr window, out AccessibilityTarget target)
+        {
+            target = default;
             if (!_elementsByRef.TryGetValue(elementRef, out AccessibilityRef? entry) ||
                 entry.Generation != _generation ||
                 entry.Window != window ||
