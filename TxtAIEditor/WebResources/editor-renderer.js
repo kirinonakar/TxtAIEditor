@@ -43,6 +43,7 @@ function createEditorRenderer({
     let hexStickyHeader = null;
     let horizontalOverflowFrame = 0;
     const livePreviewProcessedImages = new Set();
+    const livePreviewFailedImages = new Set();
 
     function ensureHexStickyHeader() {
         if (hexStickyHeader && hexStickyHeader.isConnected) {
@@ -320,6 +321,7 @@ function createEditorRenderer({
                 mode: 'markdown',
                 baseHref: state.livePreviewBaseHref || '',
                 localResourceVersion: state.livePreviewLocalResourceVersion || '0',
+                failedImageSources: livePreviewFailedImages,
                 tabSize: state.tabSize || 4,
                 rangeEnd: renderEnd,
                 requireClosedFence: true,
@@ -387,8 +389,8 @@ function createEditorRenderer({
         }
         refreshHoveredLineFromLastPointer();
 
-        measureRenderedRows();
         watchLivePreviewImages();
+        measureRenderedRows();
         renderMermaidBlocks(viewport, () => measureRenderedRows());
 
         if (pendingInlineLivePreviewFocus) {
@@ -619,18 +621,26 @@ function createEditorRenderer({
             img.dataset.livePreviewImageWatch = '1';
             const src = img.getAttribute('src');
             if (!src) return;
-            if (livePreviewProcessedImages.has(src)) return;
+            const imageKey = img.dataset.previewImageKey || src;
+            if (livePreviewProcessedImages.has(imageKey)) return;
 
-            const update = () => {
-                livePreviewProcessedImages.add(src);
+            let settled = false;
+            const finish = loaded => {
+                if (settled) return;
+                settled = true;
+                livePreviewProcessedImages.add(imageKey);
+                if (!loaded) {
+                    livePreviewFailedImages.add(imageKey);
+                    img.replaceWith(document.createTextNode(img.getAttribute('alt') || ''));
+                }
                 state.lastRangeKey = '';
                 measureRenderedRows();
             };
             if (img.complete) {
-                livePreviewProcessedImages.add(src);
+                finish(img.naturalWidth > 0);
             } else {
-                img.addEventListener('load', update, { once: true });
-                img.addEventListener('error', update, { once: true });
+                img.addEventListener('load', () => finish(true), { once: true });
+                img.addEventListener('error', () => finish(false), { once: true });
             }
         });
     }

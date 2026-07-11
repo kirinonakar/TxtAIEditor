@@ -155,6 +155,10 @@ function resolvePreviewResourceUrl(value, options = {}) {
     return withPreviewResourceVersion(resolved, options);
 }
 
+function previewImageKey(value, options = {}) {
+    return resolvePreviewResourceUrl(value, { ...options, localResourceVersion: '' });
+}
+
 function withPreviewResourceVersion(value, options = {}) {
     const version = String(options.localResourceVersion ?? '').trim();
     if (!version) return value;
@@ -197,12 +201,14 @@ function resolvePreviewSrcset(value, options = {}) {
         .join(', ');
 }
 
-function renderMarkdownImage(alt, target, options) {
+function renderMarkdownImage(alt, target, options = {}) {
     const parsed = parseMarkdownImageTarget(target);
     if (!isSafeMediaUrl(parsed.src)) return escapeHtml(`![${alt}](${target})`);
+    const imageKey = previewImageKey(parsed.src, options);
+    if (options.failedImageSources?.has(imageKey)) return escapeHtml(alt);
     const src = resolvePreviewResourceUrl(parsed.src, options);
     const title = parsed.title ? ` title="${escapeAttribute(parsed.title)}"` : '';
-    return `<img src="${escapeAttribute(src)}" alt="${escapeAttribute(alt)}"${title} decoding="async">`;
+    return `<img src="${escapeAttribute(src)}" alt="${escapeAttribute(alt)}"${title} decoding="async" data-preview-image-key="${escapeAttribute(imageKey)}">`;
 }
 
 function sanitizeHtml(html, options = {}) {
@@ -220,7 +226,17 @@ function sanitizeHtml(html, options = {}) {
             }
         });
     });
-    template.content.querySelectorAll('img[src], video[src], audio[src], source[src], track[src]').forEach(node => {
+    template.content.querySelectorAll('img[src]').forEach(node => {
+        const rawSrc = node.getAttribute('src');
+        const imageKey = previewImageKey(rawSrc, options);
+        if (options.failedImageSources?.has(imageKey)) {
+            node.replaceWith(document.createTextNode(node.getAttribute('alt') || ''));
+            return;
+        }
+        node.setAttribute('src', resolvePreviewResourceUrl(rawSrc, options));
+        node.dataset.previewImageKey = imageKey;
+    });
+    template.content.querySelectorAll('video[src], audio[src], source[src], track[src]').forEach(node => {
         node.setAttribute('src', resolvePreviewResourceUrl(node.getAttribute('src'), options));
     });
     template.content.querySelectorAll('img[srcset], source[srcset]').forEach(node => {
