@@ -38,6 +38,8 @@ namespace TxtAIEditor.Editor
             _isTruncated = rowCount > maxRows;
         }
 
+        public bool HasPendingEdits => _editedBytes.Count > 0;
+
         public int LineCount => 1 + (int)_displayRowCount + (_isTruncated ? 1 : 0);
 
         public string LineEnding
@@ -159,7 +161,7 @@ namespace TxtAIEditor.Editor
                 return string.Empty;
             }
 
-            int limit = maxChars ?? int.MaxValue;
+            int limit = Math.Min(maxChars ?? 120_000, 120_000);
             var builder = new StringBuilder(Math.Min(limit, 128 * 1024));
             int lineNumber = 1;
 
@@ -375,7 +377,7 @@ namespace TxtAIEditor.Editor
             return SaveEditedBytesAsync(filePath, cancellationToken);
         }
 
-        private async Task SaveEditedBytesAsync(string filePath, CancellationToken cancellationToken)
+        private Task SaveEditedBytesAsync(string filePath, CancellationToken cancellationToken)
         {
             if (!string.Equals(
                     Path.GetFullPath(filePath),
@@ -388,43 +390,46 @@ namespace TxtAIEditor.Editor
             if (_editedBytes.Count == 0)
             {
                 _filePath = filePath;
-                return;
+                return Task.CompletedTask;
             }
 
-            await using var stream = new FileStream(
-                filePath,
-                FileMode.Open,
-                FileAccess.Write,
-                FileShare.Read,
-                bufferSize: 64 * 1024,
-                useAsync: true);
-
-            var edits = _editedBytes.OrderBy(pair => pair.Key).ToArray();
-            int editIndex = 0;
-            while (editIndex < edits.Length)
+            return Task.Run(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                long runOffset = edits[editIndex].Key;
-                int runEnd = editIndex + 1;
-                while (runEnd < edits.Length && edits[runEnd].Key == edits[runEnd - 1].Key + 1)
+                using var stream = new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.ReadWrite,
+                    bufferSize: 64 * 1024,
+                    useAsync: false);
+
+                var edits = _editedBytes.OrderBy(pair => pair.Key).ToArray();
+                int editIndex = 0;
+                while (editIndex < edits.Length)
                 {
-                    runEnd++;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    long runOffset = edits[editIndex].Key;
+                    int runEnd = editIndex + 1;
+                    while (runEnd < edits.Length && edits[runEnd].Key == edits[runEnd - 1].Key + 1)
+                    {
+                        runEnd++;
+                    }
+
+                    byte[] run = new byte[runEnd - editIndex];
+                    for (int i = editIndex; i < runEnd; i++)
+                    {
+                        run[i - editIndex] = edits[i].Value;
+                    }
+
+                    stream.Position = runOffset;
+                    stream.Write(run, 0, run.Length);
+                    editIndex = runEnd;
                 }
 
-                byte[] run = new byte[runEnd - editIndex];
-                for (int i = editIndex; i < runEnd; i++)
-                {
-                    run[i - editIndex] = edits[i].Value;
-                }
-
-                stream.Position = runOffset;
-                await stream.WriteAsync(run, cancellationToken).ConfigureAwait(false);
-                editIndex = runEnd;
-            }
-
-            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-            _editedBytes.Clear();
-            _filePath = filePath;
+                stream.Flush();
+                _editedBytes.Clear();
+                _filePath = filePath;
+            }, cancellationToken);
         }
 
         private string FormatHeaderLine()

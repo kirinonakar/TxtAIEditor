@@ -73,7 +73,7 @@ namespace TxtAIEditor.Controls
             {
                 if (_editorSessions.TryGetValue(sourceTab.Id, out var session))
                 {
-                    savedContent = session.GetText();
+                    savedContent = session.Model is HexDumpTextModel ? string.Empty : session.GetText();
                 }
                 else
                 {
@@ -94,8 +94,15 @@ namespace TxtAIEditor.Controls
                     {
                         if (hasSession)
                         {
-                            var lines = session!.GetLines(1, session.Model.LineCount);
-                            _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
+                            if (session!.Model is HexDumpTextModel)
+                            {
+                                _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(Array.Empty<string>());
+                            }
+                            else
+                            {
+                                var lines = session!.GetLines(1, session.Model.LineCount);
+                                _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
+                            }
                         }
                         else
                         {
@@ -132,11 +139,26 @@ namespace TxtAIEditor.Controls
         {
             if (_editorSessions.TryGetValue(tab.Id, out var session))
             {
+                if (session.Model is HexDumpTextModel hexModel)
+                {
+                    bool isDirty = hexModel.HasPendingEdits;
+                    SetDirtyStateForFileGroup(tab, isDirty);
+
+                    foreach (var t in GetTabsForSameFile(tab))
+                    {
+                        if (_tabBridges.TryGetValue(t.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                        {
+                            _ = bridgeGroup.Bridge.UpdateDirtyLinesAsync(new Dictionary<int, string>());
+                        }
+                    }
+                    return;
+                }
+
                 var dirtyLines = ComputeDirtyLines(tab, session);
-                bool isDirty = (dirtyLines.Count > 0) ||
+                bool isDirtyCurrent = (dirtyLines.Count > 0) ||
                                (tab.OriginalLineEnding != null && session.Model.LineEnding != tab.OriginalLineEnding) ||
                                (tab.OriginalEncodingName != null && tab.EncodingName != tab.OriginalEncodingName);
-                SetDirtyStateForFileGroup(tab, isDirty);
+                SetDirtyStateForFileGroup(tab, isDirtyCurrent);
 
                 foreach (var t in GetTabsForSameFile(tab))
                 {

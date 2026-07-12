@@ -263,16 +263,16 @@ namespace TxtAIEditor.Controls
                     throw new InvalidOperationException(_getString("EncryptedTabMissingPassword", "암호화된 탭의 암호가 없습니다. 파일을 다시 열어 암호를 입력해 주세요."));
                 }
 
-                string text = session != null ? session.GetText() : tab.Content;
+                string text = session != null ? (session.Model is HexDumpTextModel ? string.Empty : session.GetText()) : tab.Content;
                 await _secureNoteEncryptionService.SaveEncryptedTextFileAsync(tab.FilePath!, text, password);
-                tab.Content = session?.GetText(120_000) ?? tab.Content;
+                tab.Content = session != null && session.Model is HexDumpTextModel ? string.Empty : (session?.GetText(120_000) ?? tab.Content);
                 return;
             }
 
             if (session != null)
             {
                 await session.SaveAsync(tab.FilePath!, tab.EncodingName);
-                tab.Content = session.GetText(120_000);
+                tab.Content = session.Model is HexDumpTextModel ? string.Empty : session.GetText(120_000);
                 return;
             }
 
