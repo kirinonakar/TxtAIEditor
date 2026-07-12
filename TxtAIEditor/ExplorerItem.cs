@@ -175,6 +175,7 @@ namespace TxtAIEditor
                 ".cs" => "\uE74C",  // C# Developer icon or custom code glyph
                 ".xaml" => "\uF158",
                 ".xml" => "\uF158",
+                ".resw" => "\uF158",
                 ".json" => "\uE94A",
                 ".yaml" => "\uE94A",
                 ".yml" => "\uE94A",

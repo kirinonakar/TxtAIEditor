@@ -574,7 +574,7 @@ function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
     // Check language category
     const isClike = ['csharp', 'javascript', 'typescript', 'cpp', 'java', 'go', 'rust', 'php', 'swift', 'dart', 'kotlin'].includes(language);
     const isPython = language === 'python';
-    const isHtml = ['html', 'xml', 'xaml'].includes(language);
+    const isHtml = ['html', 'xml', 'xaml', 'resw'].includes(language);
     const isCss = ['css', 'scss', 'less'].includes(language);
     const isJson = language === 'json';
     const isSql = language === 'sql';

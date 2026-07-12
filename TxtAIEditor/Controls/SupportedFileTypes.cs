@@ -42,6 +42,7 @@ namespace TxtAIEditor.Controls
             ".hpp",
             ".xml",
             ".xaml",
+            ".resw",
             ".sql",
             ".sh",
             ".ps1",

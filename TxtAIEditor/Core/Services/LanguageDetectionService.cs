@@ -47,6 +47,7 @@ namespace TxtAIEditor.Core.Services
                 ".hpp" => "cpp",
                 ".xml" => "xml",
                 ".xaml" => "xml",
+                ".resw" => "xml",
                 ".appxmanifest" => "xml",
                 ".csproj" => "xml",
                 ".manifest" => "xml",
