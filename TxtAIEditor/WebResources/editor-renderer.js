@@ -396,9 +396,11 @@ function createEditorRenderer({
         if (pendingInlineLivePreviewFocus) {
             focusPendingInlineLivePreviewLine();
         } else if (isFocused && activeLine !== null) {
-            const element = viewport.querySelector(`.line-text[data-line="${activeLine}"]`);
+            const targetLine = activeLine === state.currentLine ? activeLine : state.currentLine;
+            const targetCaret = activeLine === state.currentLine ? activeCaret : Math.max(0, state.currentColumn - 1);
+            const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
             if (element && element.getAttribute('contenteditable') === 'true') {
-                setCaret(element, activeCaret);
+                setCaret(element, targetCaret);
             }
         }
 
