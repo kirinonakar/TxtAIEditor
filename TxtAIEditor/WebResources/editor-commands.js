@@ -1,6 +1,7 @@
 import {
     MAX_RENDER_CHARS,
     activeEditableElement,
+    captureScrollAnchor,
     cleanDirtyMarker,
     clearCustomSelectionVisuals,
     comparePositions,
@@ -21,12 +22,14 @@ import {
     readClipboardText,
     reportCursorAndSelection,
     requestLines,
+    restoreScrollAnchor,
     selectedLineRange,
     selectedText,
     setupVirtualHeight,
     shiftCachedLines,
     state,
     syncCustomSelectionClass,
+    visualScrollDeltaToScrollTopDelta,
     writeClipboardText
 } from './editor-core.js';
 import { scrollContainer, viewport } from './editor-dom.js';
@@ -134,6 +137,7 @@ function commitLine(element) {
 
     const previousText = state.cache.get(lineNumber) ?? '';
     const text = lineTextFromElement(element);
+    const textChanged = previousText !== text;
 
     const isInlineLivePreviewActiveLine = state.inlineLivePreviewEnabled &&
         state.inlineLivePreviewSourceLine === lineNumber;
@@ -143,7 +147,7 @@ function commitLine(element) {
         // 최종 조합 문자열은 compositionend에서 원래 선택 영역에 한 번에 반영한다.
     } else if (isComposing && state.columnComposition) {
         updateColumnCompositionPreview(element);
-    } else {
+    } else if (isComposing || textChanged) {
         state.cache.set(lineNumber, text);
         if (!isInlineLivePreviewActiveLine) {
             state.cacheVersion++;
@@ -162,6 +166,15 @@ function commitLine(element) {
         if (state.wordWrap && !state.rangeComposition) {
             measureRenderedRows(false);
         }
+        return;
+    }
+
+    // Cursor-only navigation (notably PageUp/PageDown) commits the active row
+    // before moving. Avoid rewriting an unchanged cache entry: cache.set()
+    // invalidates all later syntax-context entries, which becomes an O(n)
+    // main-thread stall after navigating through a large document.
+    if (!textChanged) {
+        reportCursorAndSelection(element);
         return;
     }
 
@@ -374,7 +387,8 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
         const currentViewportBottom = caretRect.bottom - containerRect.top;
         const delta = currentViewportBottom - anchor.desiredViewportBottom;
         if (Math.abs(delta) > 0.5) {
-            scrollContainer.scrollTop = clampScrollTop(scrollContainer.scrollTop + delta);
+            scrollContainer.scrollTop = clampScrollTop(
+                scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(delta));
         }
 
         // A scrollTop write can cause one more virtual render.  Re-check once or
@@ -431,6 +445,7 @@ function splitCurrentLine(element, options = {}) {
     const splitScrollAnchor = useElementCaret
         ? captureSplitScrollAnchor(element, caret)
         : null;
+    const virtualScrollAnchor = captureScrollAnchor();
 
     const before = text.slice(0, caret);
     const after = text.slice(caret);
@@ -466,6 +481,7 @@ function splitCurrentLine(element, options = {}) {
     clearCustomSelectionVisuals();
     syncCustomSelectionClass();
     setupVirtualHeight();
+    restoreScrollAnchor(virtualScrollAnchor);
     post({ type: 'splitLine', lineNumber, before, after: indentedAfter });
     post({ type: 'contentChanged' });
     markLineBoundaryTransition(nextLineNumber, nextCaretColumn);

@@ -10,7 +10,9 @@ import {
     prefetchAround,
     queueRender,
     reportCursorAndSelection,
-    state
+    state,
+    usesCompressedScroll,
+    visualScrollDeltaToScrollTopDelta
 } from './editor-core.js';
 import {
     autocompleteState,
@@ -80,6 +82,24 @@ export function bindEditorEvents({
     let lastSetScrollTop = -1;
     let lastProgrammaticScrollTime = 0;
     let scrollWorkFrame = 0;
+    scrollContainer.addEventListener('wheel', event => {
+        if (!usesCompressedScroll() || event.ctrlKey || event.deltaY === 0) return;
+
+        event.preventDefault();
+        const visualDelta = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? event.deltaY * state.lineHeight
+            : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                ? event.deltaY * Math.max(scrollContainer.clientHeight, state.lineHeight)
+                : event.deltaY;
+        const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        scrollContainer.scrollTop = Math.min(
+            maxScrollTop,
+            Math.max(0, scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(visualDelta)));
+        if (event.deltaX !== 0) {
+            scrollContainer.scrollLeft = Math.max(0, scrollContainer.scrollLeft + event.deltaX);
+        }
+    }, { passive: false });
+
     scrollContainer.addEventListener('scroll', () => {
         hideContextMenu();
         if (state.preservedScrollTop !== null &&

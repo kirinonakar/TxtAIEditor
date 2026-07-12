@@ -1,10 +1,14 @@
 import {
+    compressedScrollMetrics,
     lineHeightFor,
+    lineAt,
     lineTop,
     orderedRange,
     queueRender,
     reportCursorAndSelection,
-    state
+    state,
+    usesCompressedScroll,
+    visualScrollDeltaToScrollTopDelta
 } from './editor-core.js';
 import { scrollContainer, viewport } from './editor-dom.js';
 import {
@@ -302,7 +306,9 @@ function setCaret(element, offset, scrollMargin = 0) {
             const caretCenter = caretRect.top + caretRect.height / 2;
             const scrollDiff = caretCenter - clickY;
             const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
-            scrollContainer.scrollTop = Math.min(maxScroll, Math.max(0, scrollContainer.scrollTop + scrollDiff));
+            scrollContainer.scrollTop = Math.min(maxScroll, Math.max(
+                0,
+                scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(scrollDiff)));
         }
     } else if (scrollMargin > 0) {
         const containerRect = scrollContainer.getBoundingClientRect();
@@ -310,9 +316,15 @@ function setCaret(element, offset, scrollMargin = 0) {
         if (caretRect) {
             const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
             if (caretRect.bottom > containerRect.bottom - scrollMargin) {
-                scrollContainer.scrollTop = Math.min(maxScroll, scrollContainer.scrollTop + (caretRect.bottom - (containerRect.bottom - scrollMargin)));
+                scrollContainer.scrollTop = Math.min(
+                    maxScroll,
+                    scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(
+                        caretRect.bottom - (containerRect.bottom - scrollMargin)));
             } else if (caretRect.top < containerRect.top + scrollMargin) {
-                scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - ((containerRect.top + scrollMargin) - caretRect.top));
+                scrollContainer.scrollTop = Math.max(
+                    0,
+                    scrollContainer.scrollTop - visualScrollDeltaToScrollTopDelta(
+                        (containerRect.top + scrollMargin) - caretRect.top));
             }
         }
     }
@@ -510,7 +522,28 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
     }
     const wrappedTargetTop = lineTop(lineNumber);
 
-    if (scrollMargin > 0) {
+    if (usesCompressedScroll()) {
+        const metrics = compressedScrollMetrics();
+        const firstVisible = lineAt(scrollContainer.scrollTop);
+        const lastVisible = Math.min(state.lineCount, firstVisible + metrics.visibleRows - 1);
+        const marginRows = Math.max(0, Math.ceil(scrollMargin / state.lineHeight));
+        const isFarAway = lineNumber < firstVisible - metrics.visibleRows ||
+            lineNumber > lastVisible + metrics.visibleRows;
+        let nextFirstVisible = firstVisible;
+
+        if (isFarAway) {
+            nextFirstVisible = lineNumber - Math.floor(metrics.visibleRows / 2);
+        } else if (lineNumber <= firstVisible + marginRows) {
+            nextFirstVisible = lineNumber - marginRows;
+        } else if (lineNumber >= lastVisible - marginRows) {
+            nextFirstVisible = lineNumber - metrics.visibleRows + marginRows + 1;
+        }
+
+        nextFirstVisible = Math.min(metrics.maxFirstLine, Math.max(1, nextFirstVisible));
+        if (nextFirstVisible !== firstVisible) {
+            scrollContainer.scrollTop = lineTop(nextFirstVisible);
+        }
+    } else if (scrollMargin > 0) {
         const viewTop = scrollContainer.scrollTop;
         const viewBottom = viewTop + scrollContainer.clientHeight;
         const lineH = lineHeightFor(lineNumber);
@@ -578,9 +611,9 @@ function keepElementInView(element) {
     const containerRect = scrollContainer.getBoundingClientRect();
     const rect = element.closest('.line-row')?.getBoundingClientRect() || element.getBoundingClientRect();
     if (rect.top < containerRect.top) {
-        scrollContainer.scrollTop -= containerRect.top - rect.top;
+        scrollContainer.scrollTop -= visualScrollDeltaToScrollTopDelta(containerRect.top - rect.top);
     } else if (rect.bottom > containerRect.bottom) {
-        scrollContainer.scrollTop += rect.bottom - containerRect.bottom;
+        scrollContainer.scrollTop += visualScrollDeltaToScrollTopDelta(rect.bottom - containerRect.bottom);
     }
 }
 

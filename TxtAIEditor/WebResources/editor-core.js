@@ -5,7 +5,7 @@ const MIN_BATCH_SIZE = 100;
 const PREFETCH_AHEAD = 200;
 const HEX_PREFETCH_AHEAD = 80;
 const HEX_RENDER_OVERSCAN = 48;
-const HEX_BROWSER_SCROLL_HEIGHT_LIMIT = 24000000;
+const BROWSER_SCROLL_HEIGHT_LIMIT = 12000000;
 const HEX_CACHE_RETAIN_LINES = 512;
 const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
 const MAX_DIRTY_DIFF_CELLS = 4000000;
@@ -820,9 +820,9 @@ function shiftMeasuredLineHeights(fromLine, delta) {
 
 function totalVirtualHeight() {
     const total = rawTotalVirtualHeight();
-    if (usesCompressedHexScroll()) {
+    if (usesCompressedScroll()) {
         const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
-        return Math.max(viewHeight + state.lineHeight, Math.min(total, HEX_BROWSER_SCROLL_HEIGHT_LIMIT));
+        return Math.max(viewHeight + state.lineHeight, Math.min(total, BROWSER_SCROLL_HEIGHT_LIMIT));
     }
 
     return total;
@@ -838,8 +838,8 @@ function rawTotalVirtualHeight() {
 }
 
 function lineTop(lineNumber) {
-    if (usesCompressedHexScroll()) {
-        const metrics = compressedHexScrollMetrics();
+    if (usesCompressedScroll()) {
+        const metrics = compressedScrollMetrics();
         if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 0;
         const line = Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(Number(lineNumber || 1))));
         return ((line - 1) / (metrics.maxFirstLine - 1)) * metrics.maxScrollTop;
@@ -852,8 +852,8 @@ function lineTop(lineNumber) {
 
 function lineAt(scrollTop) {
     const lineCount = effectiveLineCount();
-    if (usesCompressedHexScroll()) {
-        const metrics = compressedHexScrollMetrics();
+    if (usesCompressedScroll()) {
+        const metrics = compressedScrollMetrics();
         if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 1;
         const ratio = Math.max(0, Math.min(1, Number(scrollTop || 0) / metrics.maxScrollTop));
         return Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(ratio * (metrics.maxFirstLine - 1)) + 1));
@@ -883,10 +883,11 @@ function visibleRange() {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const lineCount = effectiveLineCount();
     const firstVisible = lineAt(scrollContainer.scrollTop);
-    if (usesCompressedHexScroll()) {
+    if (usesCompressedScroll()) {
         const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
-        const start = Math.max(1, firstVisible - HEX_RENDER_OVERSCAN);
-        const end = Math.min(lineCount, firstVisible + visibleRows + HEX_RENDER_OVERSCAN);
+        const overscan = state.language === 'hex' ? HEX_RENDER_OVERSCAN : state.overscan;
+        const start = Math.max(1, firstVisible - overscan);
+        const end = Math.min(lineCount, firstVisible + visibleRows + overscan);
         return { start, end, count: Math.max(0, end - start + 1) };
     }
 
@@ -900,13 +901,12 @@ function visibleRange() {
     return { start, end, count: Math.max(0, end - start + 1) };
 }
 
-function usesCompressedHexScroll() {
-    return state.language === 'hex' &&
-        !usesMeasuredLineHeights() &&
-        rawTotalVirtualHeight() > HEX_BROWSER_SCROLL_HEIGHT_LIMIT;
+function usesCompressedScroll() {
+    return !state.csvTableEnabled &&
+        rawTotalVirtualHeight() > BROWSER_SCROLL_HEIGHT_LIMIT;
 }
 
-function compressedHexScrollMetrics() {
+function compressedScrollMetrics() {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight));
     const lineCount = effectiveLineCount();
@@ -917,11 +917,11 @@ function compressedHexScrollMetrics() {
 }
 
 function viewportTopForLine(startLine) {
-    if (!usesCompressedHexScroll()) {
+    if (!usesCompressedScroll()) {
         return lineTop(startLine);
     }
 
-    const metrics = compressedHexScrollMetrics();
+    const metrics = compressedScrollMetrics();
     const firstVisible = lineAt(scrollContainer.scrollTop);
     const firstVisibleTop = lineTop(firstVisible);
     const nextVisibleTop = firstVisible < metrics.maxFirstLine
@@ -988,7 +988,7 @@ function prefetchAround(scrollTop) {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const firstVisible = lineAt(scrollTop);
     const prefetchAhead = state.language === 'hex' ? HEX_PREFETCH_AHEAD : PREFETCH_AHEAD;
-    if (usesCompressedHexScroll()) {
+    if (usesCompressedScroll()) {
         const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
         const prefetchStart = Math.max(1, firstVisible - prefetchAhead);
         const prefetchEnd = Math.min(state.lineCount, firstVisible + visibleRows + prefetchAhead);
@@ -1012,6 +1012,43 @@ function prefetchAround(scrollTop) {
     if (viewportRequestEnd < prefetchEnd) {
         requestMissingLines(viewportRequestEnd + 1, prefetchEnd);
     }
+}
+
+function compressedScrollScale() {
+    if (!usesCompressedScroll()) return 1;
+
+    const metrics = compressedScrollMetrics();
+    const rawMaxScrollTop = Math.max(0, rawTotalVirtualHeight() - metrics.viewHeight);
+    if (metrics.maxScrollTop <= 0 || rawMaxScrollTop <= 0) return 1;
+    return Math.max(1, rawMaxScrollTop / metrics.maxScrollTop);
+}
+
+function visualScrollDeltaToScrollTopDelta(delta) {
+    return Number(delta || 0) / compressedScrollScale();
+}
+
+function captureScrollAnchor(scrollTop = scrollContainer.scrollTop) {
+    const line = lineAt(scrollTop);
+    const top = lineTop(line);
+    const nextTop = line < effectiveLineCount()
+        ? lineTop(line + 1)
+        : top + state.lineHeight;
+    const span = Math.max(0.0001, nextTop - top);
+    const ratio = Math.max(0, Math.min(1, (Number(scrollTop || 0) - top) / span));
+    return { line, ratio };
+}
+
+function restoreScrollAnchor(anchor) {
+    if (!anchor) return;
+
+    const line = Math.min(effectiveLineCount(), Math.max(1, Number(anchor.line || 1)));
+    const top = lineTop(line);
+    const nextTop = line < effectiveLineCount()
+        ? lineTop(line + 1)
+        : top + state.lineHeight;
+    const ratio = Math.max(0, Math.min(1, Number(anchor.ratio || 0)));
+    const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+    scrollContainer.scrollTop = Math.min(maxScrollTop, Math.max(0, top + ((nextTop - top) * ratio)));
 }
 
 function trimHexCacheToRange(startLine, endLine) {
@@ -1726,11 +1763,13 @@ export {
     applyOptions,
     applyEditResultFromHost,
     activeEditableElement,
+    captureScrollAnchor,
     cleanDirtyMarker,
     clearPreservedScrollTop,
     clearMeasuredLineHeights,
     clearCustomSelectionVisuals,
     comparePositions,
+    compressedScrollMetrics,
     configureEditorCoreRuntime,
     containsHangulInputText,
     escapeHtml,
@@ -1758,6 +1797,7 @@ export {
     reportCursorAndSelection,
     requestLines,
     requestMissingLines,
+    restoreScrollAnchor,
     selectedLineRange,
     selectionInfo,
     selectedText,
@@ -1770,7 +1810,9 @@ export {
     trimHexCacheToRange,
     totalVirtualHeight,
     updateLineFromHost,
+    usesCompressedScroll,
     usesMeasuredLineHeights,
+    visualScrollDeltaToScrollTopDelta,
     visibleRange,
     viewportTopForLine,
     writeClipboardText
