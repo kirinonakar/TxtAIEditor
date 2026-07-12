@@ -34,7 +34,10 @@ import {
     shouldSuppressNativeBeforeInput,
     updateSingleLine
 } from './editor-commands.js';
-import { triggerAutocomplete } from './editor-autocomplete.js';
+import {
+    cancelAutocompleteCaretRestore,
+    triggerAutocomplete
+} from './editor-autocomplete.js';
 
 export function bindTextInputEvents({ renderer }) {
     const { clearPendingInlineLivePreviewFocusForLine } = renderer;
@@ -102,6 +105,7 @@ export function bindTextInputEvents({ renderer }) {
     });
 
     viewport.addEventListener('compositionstart', event => {
+        cancelAutocompleteCaretRestore();
         let element = lineElementFromEvent(event) || activeEditableElement();
         const pendingCompositionSelection = compositionSelectionRange();
         let collapsedSelectionForComposition = false;
@@ -171,12 +175,14 @@ export function bindTextInputEvents({ renderer }) {
                 if (current && current.getAttribute('contenteditable') === 'true') {
                     commitLine(current);
                     triggerAutocomplete(current);
+                    queueRender(true);
                 }
             }, 0);
         }
     });
 
     viewport.addEventListener('beforeinput', event => {
+        cancelAutocompleteCaretRestore();
         if (state.csvTableEnabled) return;
         let element = lineElementFromEvent(event);
 

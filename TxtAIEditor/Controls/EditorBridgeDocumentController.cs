@@ -28,15 +28,21 @@ namespace TxtAIEditor.Controls
 
         private sealed class DeferredContentRefresh
         {
-            public DeferredContentRefresh(DispatcherQueueTimer timer, OpenedTab tab)
+            public DeferredContentRefresh(
+                DispatcherQueueTimer timer,
+                OpenedTab tab,
+                EditorDocumentSession session)
             {
                 Timer = timer;
                 Tab = tab;
+                Session = session;
             }
 
             public DispatcherQueueTimer Timer { get; }
 
             public OpenedTab Tab { get; set; }
+
+            public EditorDocumentSession Session { get; set; }
         }
 
         public EditorBridgeDocumentController(
@@ -226,25 +232,32 @@ namespace TxtAIEditor.Controls
             _statusBarController.UpdateTotalLines(tab);
         }
 
-        public void HandleContentChanged(OpenedTab tab, TabViewItem tabItem, bool isComposing)
+        public void HandleContentChanged(
+            OpenedTab tab,
+            TabViewItem tabItem,
+            EditorDocumentSession session,
+            bool isComposing)
         {
             if (!isComposing)
             {
                 MarkDirty(tab, tabItem);
-                ScheduleDeferredContentRefresh(tab, tabItem);
+                ScheduleDeferredContentRefresh(tab, tabItem, session);
             }
 
             _schedulePreview(tab);
         }
 
-        private void ScheduleDeferredContentRefresh(OpenedTab tab, TabViewItem tabItem)
+        private void ScheduleDeferredContentRefresh(
+            OpenedTab tab,
+            TabViewItem tabItem,
+            EditorDocumentSession session)
         {
             if (!_contentRefreshTimers.TryGetValue(tab.Id, out var refresh))
             {
                 var timer = tabItem.DispatcherQueue.CreateTimer();
                 timer.IsRepeating = false;
                 timer.Interval = ContentRefreshDebounce;
-                refresh = new DeferredContentRefresh(timer, tab);
+                refresh = new DeferredContentRefresh(timer, tab, session);
                 _contentRefreshTimers[tab.Id] = refresh;
                 string tabId = tab.Id;
                 timer.Tick += (_, _) => RunDeferredContentRefresh(tabId);
@@ -253,6 +266,7 @@ namespace TxtAIEditor.Controls
             {
                 refresh.Timer.Stop();
                 refresh.Tab = tab;
+                refresh.Session = session;
             }
 
             refresh.Timer.Start();
@@ -269,6 +283,8 @@ namespace TxtAIEditor.Controls
             _contentRefreshTimers.Remove(tabId);
 
             OpenedTab tab = refresh.Tab;
+            refresh.Session.RefreshTabContentPreview();
+            _tabDirtyStateController.ReconcileTabDirtyState(tab);
             _updateLanguage(tab);
             _tocController.RefreshTocAfterDocumentChange(tab);
             _statusBarController.UpdateTotalLines(tab);
@@ -307,8 +323,9 @@ namespace TxtAIEditor.Controls
 
         private void MarkDirty(OpenedTab tab, TabViewItem tabItem)
         {
-            _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-            _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
+            // Full dirty-line reconciliation scans the document. Keep the input path
+            // constant-time and reconcile once after the edit burst becomes idle.
+            _tabDirtyStateController.MarkTabDirtyOptimistically(tab);
         }
     }
 }

@@ -48,6 +48,7 @@ import {
 } from './editor-commands.js';
 import {
     autocompleteState,
+    cancelAutocompleteCaretRestore,
     hideAutocomplete,
     insertSelectedCandidate,
     moveAutocompleteActiveIndex,
@@ -302,6 +303,9 @@ export function bindKeyboardEvents({ openFindPanel }) {
     }
 
     document.addEventListener('keydown', event => {
+        // A delayed caret restore from an accepted completion must never move the
+        // caret after the user has started the next physical key or IME input.
+        cancelAutocompleteCaretRestore();
         cancelPostEditFocusFollowUps();
         const earlyCtrl = event.ctrlKey || event.metaKey;
         const earlyKey = event.key ? event.key.toLowerCase() : '';

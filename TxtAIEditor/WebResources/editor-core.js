@@ -106,7 +106,7 @@ const state = {
         lastKeyDownAt: 0,
         keyDownSilenceMs: 350,
         continuousInitialDelayMs: 140,
-        intervalMs: 60,
+        intervalMs: 32,
         lineBoundaryHoldMs: 65,
         lineBoundaryUntil: 0,
         releaseGuardMs: 250,

@@ -663,7 +663,11 @@ namespace TxtAIEditor.Controls
 
             bridge.ContentChanged += isComposing =>
             {
-                _editorBridgeDocumentController.HandleContentChanged(tab, tabItem, isComposing);
+                _editorBridgeDocumentController.HandleContentChanged(
+                    tab,
+                    tabItem,
+                    getSession(),
+                    isComposing);
             };
 
             bridge.CursorChanged += (line, col) =>

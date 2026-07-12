@@ -35,6 +35,16 @@ namespace TxtAIEditor.Controls
             CheckAndUpdateDirtyState(tab);
         }
 
+        public void MarkTabDirtyOptimistically(OpenedTab tab)
+        {
+            SetDirtyStateForFileGroup(tab, true);
+        }
+
+        public void ReconcileTabDirtyState(OpenedTab tab)
+        {
+            CheckAndUpdateDirtyState(tab);
+        }
+
         public List<OpenedTab> GetTabsForSameFile(OpenedTab sourceTab)
         {
             string? pathKey = NormalizeTabPath(sourceTab.FilePath);

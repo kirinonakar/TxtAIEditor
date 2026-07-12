@@ -10,7 +10,14 @@ import {
     syncCustomSelectionClass,
     state
 } from './editor-core.js';
-import { focusLine, getCaretOffset, lineTextFromElement, setCaret, updateSingleLine } from './editor-commands.js';
+import {
+    focusLine,
+    getCaretOffset,
+    lineTextFromElement,
+    makeEditablePlainText,
+    setCaret,
+    updateSingleLine
+} from './editor-commands.js';
 import { hasCustomSelection } from './editor-selection.js';
 
 // Auto-complete Popup State
@@ -28,6 +35,10 @@ const autocompleteState = {
 
 let autocompleteCaretRestoreToken = 0;
 const AUTOCOMPLETE_NAVIGATION_REFRESH_SUPPRESS_MS = 240;
+
+function cancelAutocompleteCaretRestore() {
+    autocompleteCaretRestoreToken++;
+}
 
 function getWordUnderCaret(text, caretOffset) {
     let start = caretOffset;
@@ -410,9 +421,27 @@ function moveAutocompleteActiveIndex(delta) {
     scrollAutocompleteActiveIntoView();
 }
 
+function currentAutocompleteElement() {
+    const savedElement = autocompleteState.element;
+    if (savedElement?.isConnected && savedElement.getAttribute('contenteditable') === 'true') {
+        return savedElement;
+    }
+
+    const lineNumber = Number(savedElement?.dataset?.line || state.currentLine || 0);
+    if (!lineNumber) return null;
+
+    const currentElement = document.querySelector(`.line-text[data-line="${lineNumber}"]`);
+    if (!currentElement || currentElement.getAttribute('contenteditable') !== 'true') {
+        return null;
+    }
+
+    autocompleteState.element = currentElement;
+    return currentElement;
+}
+
 function insertSelectedCandidate() {
     const candidate = autocompleteState.candidates[autocompleteState.activeIndex];
-    const element = autocompleteState.element;
+    const element = currentAutocompleteElement();
     if (!candidate || !element) {
         hideAutocomplete();
         return;
@@ -443,6 +472,11 @@ function replaceWordWithAutocompleteText(element, wordStart, replaceEnd, insertT
         const nextCaret = wordStart + normalized.length;
         const lineNumber = Number(element.dataset.line || 1);
         updateSingleLine(element, nextText, nextCaret);
+        // Syntax-highlight spans can retain the native selection at the end of the
+        // typed prefix (for example after "ao") even though the model caret moved.
+        // Keep the actively edited row as one text node so the completion end and
+        // the next IME composition share the same unambiguous DOM position.
+        makeEditablePlainText(element, nextCaret);
         restoreAutocompleteCaretAfterCommit(lineNumber, nextCaret, nextText);
         return;
     }
@@ -495,6 +529,10 @@ function restoreAutocompleteCaretAfterCommit(lineNumber, columnZeroBased, expect
 
     const restore = () => {
         if (token !== autocompleteCaretRestoreToken) return;
+        if (state.isComposing || state.compositionLine) {
+            cancelAutocompleteCaretRestore();
+            return;
+        }
         if ((state.cache.get(targetLine) ?? '') !== expectedText) return;
 
         const activeElement = document.activeElement;
@@ -534,6 +572,7 @@ function restoreAutocompleteCaretAfterCommit(lineNumber, columnZeroBased, expect
 
 export {
     autocompleteState,
+    cancelAutocompleteCaretRestore,
     hideAutocomplete,
     insertSelectedCandidate,
     moveAutocompleteActiveIndex,

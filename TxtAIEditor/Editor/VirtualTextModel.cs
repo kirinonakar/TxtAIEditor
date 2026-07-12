@@ -742,7 +742,6 @@ namespace TxtAIEditor.Editor
                 }
 
                 Model.ReplaceLine(lineNumber, after);
-                RefreshTabContentPreview();
                 return;
             }
 
@@ -757,7 +756,6 @@ namespace TxtAIEditor.Editor
             }
 
             Model.ReplaceLine(lineNumber, after);
-            RefreshTabContentPreview();
         }
 
         public int SplitLine(int lineNumber, string before, string after)
@@ -775,7 +773,6 @@ namespace TxtAIEditor.Editor
                 NormalizeSingleLine(after)));
             _compositionBeforeLines.Clear();
             Model.SplitLine(lineNumber, before, after);
-            RefreshTabContentPreview();
             return Model.LineCount;
         }
 
@@ -786,7 +783,6 @@ namespace TxtAIEditor.Editor
             _undoManager.AddEdit(new InsertLineEdit(safeLineNumber, inserted));
             _compositionBeforeLines.Clear();
             Model.InsertLine(safeLineNumber, inserted);
-            RefreshTabContentPreview();
             return Model.LineCount;
         }
 
@@ -803,7 +799,6 @@ namespace TxtAIEditor.Editor
                 Model.GetLine(lineNumber)));
             _compositionBeforeLines.Clear();
             Model.MergeLineWithPrevious(lineNumber);
-            RefreshTabContentPreview();
             return Model.LineCount;
         }
 
@@ -827,7 +822,6 @@ namespace TxtAIEditor.Editor
                 _compositionBeforeLines.Clear();
             }
             Model.DeleteLine(lineNumber);
-            RefreshTabContentPreview();
             return Model.LineCount;
         }
 
@@ -944,7 +938,7 @@ namespace TxtAIEditor.Editor
             return Model.SaveAsync(filePath, encodingName, cancellationToken);
         }
 
-        private void RefreshTabContentPreview()
+        public void RefreshTabContentPreview()
         {
             Tab.Content = Model is HexDumpTextModel ? string.Empty : Model.GetText(120_000);
         }

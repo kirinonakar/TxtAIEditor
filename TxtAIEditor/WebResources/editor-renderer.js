@@ -164,6 +164,15 @@ function createEditorRenderer({
             return;
         }
 
+        // Replacing viewport.innerHTML disconnects the active contenteditable,
+        // even when the composing row is inserted back immediately afterwards.
+        // WebView2 treats that disconnect as an IME commit boundary and Korean
+        // syllables can be committed as separate jamo. Defer every DOM render
+        // until compositionend instead of trying to detach/preserve the row.
+        if (state.isComposing && state.compositionLine) {
+            return;
+        }
+
         syncCustomSelectionClass();
         updateHexStickyHeader();
 
