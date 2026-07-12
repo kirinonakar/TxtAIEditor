@@ -1432,7 +1432,7 @@ namespace TxtAIEditor.Controls
 
             bool isDanger = command != null && System.Text.RegularExpressions.Regex.IsMatch(
                 command,
-                @"\b(Remove\w*|rm\w*)\b",
+                @"\b(Remove\w*|rm\w*|Clear-Content|Clear-Disk|Initialize-Disk|Resize-Partition|Set-Disk|format|diskpart|del|delete|erase|rd|ri)\b",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
             if (isDanger)
