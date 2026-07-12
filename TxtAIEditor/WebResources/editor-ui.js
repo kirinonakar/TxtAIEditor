@@ -7,7 +7,9 @@ import {
     queueRender,
     requestLines,
     setupVirtualHeight,
-    state
+    state,
+    usesCompressedScroll,
+    visualScrollDeltaToScrollTopDelta
 } from './editor-core.js';
 const {
     findEditablePreviewBlockContaining,
@@ -105,7 +107,7 @@ function clampScrollTop(value) {
 }
 
 function centeredScrollTopForLine(lineNumber) {
-    if (state.language === 'hex') {
+    if (state.language === 'hex' || usesCompressedScroll()) {
         const visibleRows = Math.max(1, Math.floor(scrollContainer.clientHeight / state.lineHeight));
         const firstLine = Math.max(1, Number(lineNumber || 1) - Math.floor(visibleRows / 2));
         return clampScrollTop(lineTop(firstLine));
@@ -137,7 +139,9 @@ function alignRenderedLineInView(lineNumber) {
     const targetScrollTop = rowRect.height >= scrollContainer.clientHeight
         ? rowTopInContent
         : rowTopInContent - Math.floor((scrollContainer.clientHeight - rowRect.height) / 2);
-    const nextScrollTop = clampScrollTop(targetScrollTop);
+    const visualDelta = targetScrollTop - scrollContainer.scrollTop;
+    const nextScrollTop = clampScrollTop(
+        scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(visualDelta));
     const adjusted = Math.abs(scrollContainer.scrollTop - nextScrollTop) > REVEAL_SCROLL_TOLERANCE;
 
     if (adjusted) {
