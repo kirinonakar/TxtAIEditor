@@ -101,7 +101,9 @@ namespace TxtAIEditor.Controls
                     return FileTabLoadResult.ActivatedExisting(existingTab);
                 }
 
-                if (Path.GetExtension(filePath).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+                string extension = Path.GetExtension(filePath);
+                if (extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
+                    extension.Equals(".dll", StringComparison.OrdinalIgnoreCase))
                 {
                     var tab = _openHexTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
@@ -267,9 +269,11 @@ namespace TxtAIEditor.Controls
 
         private OpenedTab? FocusExistingTab(string filePath)
         {
-            bool isExe = Path.GetExtension(filePath).Equals(".exe", StringComparison.OrdinalIgnoreCase);
+            string extension = Path.GetExtension(filePath);
+            bool isHexDefault = extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
+                                extension.Equals(".dll", StringComparison.OrdinalIgnoreCase);
             var existingTab = _viewModel.Tabs.FirstOrDefault(t =>
-                isExe
+                isHexDefault
                     ? (t.IsHexViewer && string.Equals(t.HexSourceFilePath, filePath, StringComparison.OrdinalIgnoreCase))
                     : string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
             if (existingTab == null)
@@ -356,7 +360,9 @@ namespace TxtAIEditor.Controls
 
         private OpenedTab OpenViewerTab(string filePath)
         {
-            if (Path.GetExtension(filePath).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+            string extension = Path.GetExtension(filePath);
+            if (extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".dll", StringComparison.OrdinalIgnoreCase))
             {
                 return _openHexTab(filePath);
             }
@@ -381,11 +387,13 @@ namespace TxtAIEditor.Controls
 
         private static bool RequiresExtractedViewer(string entryPath)
         {
+            string extension = Path.GetExtension(entryPath);
             return SupportedFileTypes.IsImageFile(entryPath) ||
                    SupportedFileTypes.IsMediaFile(entryPath) ||
                    SupportedFileTypes.IsPdfFile(entryPath) ||
                    SupportedFileTypes.IsOfficeDocumentFile(entryPath) ||
-                   Path.GetExtension(entryPath).Equals(".exe", StringComparison.OrdinalIgnoreCase);
+                   extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".dll", StringComparison.OrdinalIgnoreCase);
         }
 
         private static EditorDocumentLoadResult LoadTextEntry(byte[] bytes)
