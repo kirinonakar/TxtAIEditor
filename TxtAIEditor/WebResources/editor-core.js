@@ -999,7 +999,19 @@ function prefetchAround(scrollTop) {
     const lastVisible = lineAt(scrollTop + viewHeight);
     const prefetchStart = Math.max(1, firstVisible - prefetchAhead);
     const prefetchEnd = Math.min(state.lineCount, lastVisible + prefetchAhead);
-    requestMissingLines(prefetchStart, prefetchEnd);
+    const viewportRequestEnd = Math.min(
+        prefetchEnd,
+        Math.max(lastVisible, firstVisible + MIN_BATCH_SIZE - 1));
+
+    // Request the viewport first so a fast scroll never waits for a large surrounding
+    // prefetch block before the rows at the current position can be displayed.
+    requestMissingLines(firstVisible, viewportRequestEnd);
+    if (prefetchStart < firstVisible) {
+        requestMissingLines(prefetchStart, firstVisible - 1);
+    }
+    if (viewportRequestEnd < prefetchEnd) {
+        requestMissingLines(viewportRequestEnd + 1, prefetchEnd);
+    }
 }
 
 function trimHexCacheToRange(startLine, endLine) {

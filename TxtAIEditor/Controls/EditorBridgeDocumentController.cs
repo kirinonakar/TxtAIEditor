@@ -269,7 +269,7 @@ namespace TxtAIEditor.Controls
 
             OpenedTab tab = refresh.Tab;
             _updateLanguage(tab);
-            _tocController.RefreshToc(tab);
+            _tocController.RefreshTocAfterDocumentChange(tab);
             _statusBarController.UpdateTotalLines(tab);
             _scheduleDeferredPendingSplitImeSync(tab);
         }

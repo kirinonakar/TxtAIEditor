@@ -1,6 +1,8 @@
 import { escapeHtml, state } from './editor-core.js';
 import { selectionBoundsForLine } from './editor-selection.js';
 
+const MAX_SYNTAX_CONTEXT_LOOKBACK_LINES = 200;
+
 function cleanLineForBrackets(text) {
     let clean = text.replace(/\/\/.*/g, '');
     clean = clean.replace(/"(?:\\.|[^"\\])*"/g, '');
@@ -42,12 +44,19 @@ function getLineStartStack(lineNumber) {
     if (prev) return prev;
 
     let startLine = lineNumber - 1;
-    while (startLine > 1 && !state.lineEndStacks.has(startLine)) {
+    const minimumContextLine = Math.max(1, lineNumber - MAX_SYNTAX_CONTEXT_LOOKBACK_LINES);
+    while (startLine > minimumContextLine && !state.lineEndStacks.has(startLine)) {
         startLine--;
     }
 
-    let currentStack = startLine > 1 ? [...state.lineEndStacks.get(startLine)] : [];
-    for (let l = startLine + 1; l < lineNumber; l++) {
+    const cachedStack = state.lineEndStacks.get(startLine);
+    let currentStack = cachedStack ? [...cachedStack] : [];
+    const scanStart = cachedStack ? startLine + 1 : startLine;
+    for (let l = scanStart; l < lineNumber; l++) {
+        if (!state.cache.has(l)) {
+            currentStack = [];
+            continue;
+        }
         currentStack = computeLineEndStack(l, currentStack);
         state.lineEndStacks.set(l, currentStack);
     }
@@ -196,10 +205,11 @@ function getHtmlLineStartContext(lineNumber) {
     if (previousContext) return cloneHtmlLineContext(previousContext);
 
     let context = createHtmlLineContext();
-    let scanStart = 1;
+    const minimumContextLine = Math.max(1, lineNumber - MAX_SYNTAX_CONTEXT_LOOKBACK_LINES);
+    let scanStart = minimumContextLine;
     let anchor = previousLine;
 
-    while (anchor > 0) {
+    while (anchor >= minimumContextLine) {
         const anchorContext = contexts.get(anchor);
         if (anchorContext) {
             context = cloneHtmlLineContext(anchorContext);

@@ -15,6 +15,8 @@ namespace TxtAIEditor.Controls
 {
     public sealed class TocController
     {
+        private const long MaximumTocFileSizeBytes = 20L * 1024 * 1024;
+
         private readonly MainWindowViewModel _viewModel;
         private readonly LeftSidebarPane _leftSidebar;
         private readonly Func<OpenedTab?> _getActiveTab;
@@ -94,6 +96,38 @@ namespace TxtAIEditor.Controls
             bool isTextFile = tab.FilePath != null && tab.FilePath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
 
             _ = BuildTocInBackgroundAsync(refreshVersion, tab.Id, lines, aozoraMode, lang, isTextFile);
+        }
+
+        public void RefreshTocAfterDocumentChange(OpenedTab tab)
+        {
+            if (IsLargeTextFile(tab))
+            {
+                return;
+            }
+
+            RefreshToc(tab);
+        }
+
+        private static bool IsLargeTextFile(OpenedTab tab)
+        {
+            if (tab.IsArchiveEntry || string.IsNullOrWhiteSpace(tab.FilePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                return File.Exists(tab.FilePath) &&
+                    new FileInfo(tab.FilePath).Length >= MaximumTocFileSizeBytes;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         private List<TocItem> BuildTocItems(IReadOnlyList<string> lines, bool aozoraMode, string lang, bool isTextFile)
