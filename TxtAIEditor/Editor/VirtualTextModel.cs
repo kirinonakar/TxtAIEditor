@@ -43,7 +43,7 @@ namespace TxtAIEditor.Editor
         void SplitLine(int lineNumber, string before, string after);
         void MergeLineWithPrevious(int lineNumber);
         TextSearchResult? Find(string query, int startLine, int startColumn, bool reverse, bool matchCase, bool isRegex = false);
-        List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false);
+        List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false, int currentLine = 1, int maxMatches = 50000);
         Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default);
     }
 
@@ -421,12 +421,17 @@ namespace TxtAIEditor.Editor
             return null;
         }
 
-        public List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false)
+        public List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false, int currentLine = 1, int maxMatches = 50000)
         {
             if (string.IsNullOrEmpty(query))
             {
                 return new List<TextSearchResult>();
             }
+
+            int startLine = Math.Clamp(currentLine, 1, _lines.Count);
+            int winStart = Math.Max(1, startLine - 200);
+            int winEnd = Math.Min(_lines.Count, startLine + 200);
+            var results = new List<TextSearchResult>();
 
             if (isRegex)
             {
@@ -441,11 +446,10 @@ namespace TxtAIEditor.Editor
                     return new List<TextSearchResult>();
                 }
 
-                var results = new List<TextSearchResult>();
-                for (int lineNumber = 1; lineNumber <= _lines.Count; lineNumber++)
+                void SearchRegexLine(int lineNumber)
                 {
                     string line = _lines[lineNumber - 1];
-                    if (line.Length == 0) continue;
+                    if (line.Length == 0) return;
 
                     var matches = regex.Matches(line);
                     foreach (Match match in matches)
@@ -453,19 +457,50 @@ namespace TxtAIEditor.Editor
                         if (match.Length > 0)
                         {
                             results.Add(new TextSearchResult(lineNumber, match.Index, match.Length, line));
+                            if (results.Count >= maxMatches)
+                            {
+                                break;
+                            }
                         }
                     }
                 }
-                return results;
+
+                // 1. Nearby Window
+                for (int lineNumber = winStart; lineNumber <= winEnd; lineNumber++)
+                {
+                    SearchRegexLine(lineNumber);
+                    if (results.Count >= maxMatches) break;
+                }
+
+                // 2. Remaining Below
+                if (results.Count < maxMatches && winEnd < _lines.Count)
+                {
+                    for (int lineNumber = winEnd + 1; lineNumber <= _lines.Count; lineNumber++)
+                    {
+                        SearchRegexLine(lineNumber);
+                        if (results.Count >= maxMatches) break;
+                    }
+                }
+
+                // 3. Remaining Above
+                if (results.Count < maxMatches && winStart > 1)
+                {
+                    for (int lineNumber = 1; lineNumber < winStart; lineNumber++)
+                    {
+                        SearchRegexLine(lineNumber);
+                        if (results.Count >= maxMatches) break;
+                    }
+                }
+
+                return results.OrderBy(r => r.LineNumber).ThenBy(r => r.IndexOfMatch).ToList();
             }
 
             var comparison = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            var resultsNormal = new List<TextSearchResult>();
 
-            for (int lineNumber = 1; lineNumber <= _lines.Count; lineNumber++)
+            void SearchNormalLine(int lineNumber)
             {
                 string line = _lines[lineNumber - 1];
-                if (line.Length == 0) continue;
+                if (line.Length == 0) return;
 
                 int searchStart = 0;
                 while (searchStart <= line.Length)
@@ -473,12 +508,43 @@ namespace TxtAIEditor.Editor
                     int index = line.IndexOf(query, searchStart, comparison);
                     if (index < 0) break;
 
-                    resultsNormal.Add(new TextSearchResult(lineNumber, index, query.Length, line));
+                    results.Add(new TextSearchResult(lineNumber, index, query.Length, line));
+                    if (results.Count >= maxMatches)
+                    {
+                        break;
+                    }
                     searchStart = index + 1;
                 }
             }
 
-            return resultsNormal;
+            // 1. Nearby Window
+            for (int lineNumber = winStart; lineNumber <= winEnd; lineNumber++)
+            {
+                SearchNormalLine(lineNumber);
+                if (results.Count >= maxMatches) break;
+            }
+
+            // 2. Remaining Below
+            if (results.Count < maxMatches && winEnd < _lines.Count)
+            {
+                for (int lineNumber = winEnd + 1; lineNumber <= _lines.Count; lineNumber++)
+                {
+                    SearchNormalLine(lineNumber);
+                    if (results.Count >= maxMatches) break;
+                }
+            }
+
+            // 3. Remaining Above
+            if (results.Count < maxMatches && winStart > 1)
+            {
+                for (int lineNumber = 1; lineNumber < winStart; lineNumber++)
+                {
+                    SearchNormalLine(lineNumber);
+                    if (results.Count >= maxMatches) break;
+                }
+            }
+
+            return results.OrderBy(r => r.LineNumber).ThenBy(r => r.IndexOfMatch).ToList();
         }
 
         public async Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)
@@ -796,9 +862,9 @@ namespace TxtAIEditor.Editor
             return Model.Find(query, startLine, startColumn, reverse, matchCase, isRegex);
         }
 
-        public List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false)
+        public List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false, int currentLine = 1)
         {
-            return Model.FindAll(query, matchCase, isRegex);
+            return Model.FindAll(query, matchCase, isRegex, currentLine);
         }
 
         public void ReplaceAll(string query, string replace, bool matchCase, bool isRegex)

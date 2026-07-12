@@ -973,7 +973,7 @@ function renderLineContent(lineNumber, text, forcePlainText = false, suppressSel
         const activeMatchOnLine = active && active.lineNumber === lineNumber
             ? active
             : null;
-        const matchesOnLine = state.searchMatches.filter(m => m.lineNumber === lineNumber);
+        const matchesOnLine = state.searchMatchesByLine?.get(lineNumber) || [];
         return renderSearchMatchesForLine(lineNumber, text, matchesOnLine, activeMatchOnLine);
     }
 

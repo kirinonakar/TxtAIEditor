@@ -198,9 +198,10 @@ namespace TxtAIEditor.Controls
             EditorDocumentSession session,
             string query,
             bool matchCase,
-            bool isRegex)
+            bool isRegex,
+            int currentLine)
         {
-            var results = session.FindAll(query, matchCase, isRegex);
+            var results = session.FindAll(query, matchCase, isRegex, currentLine);
             await bridge.SendFindAllResultsAsync(results, query);
         }
 
@@ -218,7 +219,7 @@ namespace TxtAIEditor.Controls
             string updatedText = session.GetText();
             await bridge.SetTextAsync(updatedText, shouldFocus: false);
             await _syncEditsToOtherTabsAsync(tab);
-            await bridge.SendFindAllResultsAsync(session.FindAll(query, matchCase, isRegex), query);
+            await bridge.SendFindAllResultsAsync(session.FindAll(query, matchCase, isRegex, 1), query);
 
             MarkDirty(tab, tabItem);
             _schedulePreview(tab);

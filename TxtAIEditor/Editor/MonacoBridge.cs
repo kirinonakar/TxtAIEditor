@@ -42,7 +42,7 @@ namespace TxtAIEditor.Editor
         public event Action? EditTransactionStarted;
         public event Action? EditTransactionEnded;
         public event Action<string, int, int, bool, bool, bool>? FindRequested;
-        public event Action<string, bool, bool>? FindAllRequested;
+        public event Action<string, bool, bool, int>? FindAllRequested;
         public event Action<string, string, bool, bool>? ReplaceAllRequested;
         public event Action<int, double>? ScrollChanged;
         public event Action<bool>? ScrollSyncChanged;
@@ -837,10 +837,14 @@ namespace TxtAIEditor.Editor
                                     findAllMatchCaseProp.GetBoolean();
                                 bool isRegex = root.TryGetProperty("isRegex", out JsonElement isRegexProp) &&
                                     isRegexProp.GetBoolean();
+                                int currentLine = root.TryGetProperty("currentLine", out JsonElement currentLineProp) && currentLineProp.TryGetInt32(out int cl)
+                                    ? cl
+                                    : 1;
                                 FindAllRequested?.Invoke(
                                     findAllQueryProp.GetString() ?? string.Empty,
                                     findAllMatchCase,
-                                    isRegex);
+                                    isRegex,
+                                    currentLine);
                             }
                             break;
 

@@ -318,7 +318,7 @@ namespace TxtAIEditor.Editor
             return null;
         }
 
-        public List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false)
+        public List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false, int currentLine = 1, int maxMatches = 50000)
         {
             var results = new List<TextSearchResult>();
             if (string.IsNullOrEmpty(query))
@@ -340,7 +340,11 @@ namespace TxtAIEditor.Editor
             }
 
             var comparison = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            for (int lineNumber = 1; lineNumber <= LineCount; lineNumber++)
+            int startLine = Math.Clamp(currentLine, 1, LineCount);
+            int winStart = Math.Max(1, startLine - 200);
+            int winEnd = Math.Min(LineCount, startLine + 200);
+
+            void SearchLine(int lineNumber)
             {
                 string line = GetLine(lineNumber);
                 if (regex != null)
@@ -350,26 +354,53 @@ namespace TxtAIEditor.Editor
                         if (match.Length > 0)
                         {
                             results.Add(new TextSearchResult(lineNumber, match.Index, match.Length, line));
+                            if (results.Count >= maxMatches) break;
                         }
                     }
-                    continue;
                 }
-
-                int searchStart = 0;
-                while (searchStart <= line.Length)
+                else
                 {
-                    int index = line.IndexOf(query, searchStart, comparison);
-                    if (index < 0)
+                    int searchStart = 0;
+                    while (searchStart <= line.Length)
                     {
-                        break;
-                    }
+                        int index = line.IndexOf(query, searchStart, comparison);
+                        if (index < 0) break;
 
-                    results.Add(new TextSearchResult(lineNumber, index, query.Length, line));
-                    searchStart = index + 1;
+                        results.Add(new TextSearchResult(lineNumber, index, query.Length, line));
+                        if (results.Count >= maxMatches) break;
+                        searchStart = index + 1;
+                    }
                 }
             }
 
-            return results;
+            // 1. Nearby Window
+            for (int lineNumber = winStart; lineNumber <= winEnd; lineNumber++)
+            {
+                SearchLine(lineNumber);
+                if (results.Count >= maxMatches) break;
+            }
+
+            // 2. Remaining Below
+            if (results.Count < maxMatches && winEnd < LineCount)
+            {
+                for (int lineNumber = winEnd + 1; lineNumber <= LineCount; lineNumber++)
+                {
+                    SearchLine(lineNumber);
+                    if (results.Count >= maxMatches) break;
+                }
+            }
+
+            // 3. Remaining Above
+            if (results.Count < maxMatches && winStart > 1)
+            {
+                for (int lineNumber = 1; lineNumber < winStart; lineNumber++)
+                {
+                    SearchLine(lineNumber);
+                    if (results.Count >= maxMatches) break;
+                }
+            }
+
+            return results.OrderBy(r => r.LineNumber).ThenBy(r => r.IndexOfMatch).ToList();
         }
 
         public Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)

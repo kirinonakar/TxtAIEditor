@@ -275,6 +275,18 @@ export function createHostMessageHandler({
 
                 state.searchQuery = resultQuery;
                 state.searchMatches = msg.matches || [];
+                
+                const byLine = new Map();
+                for (const match of state.searchMatches) {
+                    let list = byLine.get(match.lineNumber);
+                    if (!list) {
+                        list = [];
+                        byLine.set(match.lineNumber, list);
+                    }
+                    list.push(match);
+                }
+                state.searchMatchesByLine = byLine;
+
                 state.searchDocumentVersion = state.documentVersion;
 
                 const pendingNavigation = state.pendingSearchNavigation;

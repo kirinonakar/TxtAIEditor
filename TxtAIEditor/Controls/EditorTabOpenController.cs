@@ -637,14 +637,15 @@ namespace TxtAIEditor.Controls
                     isRegex);
             };
 
-            bridge.FindAllRequested += async (query, matchCase, isRegex) =>
+            bridge.FindAllRequested += async (query, matchCase, isRegex, currentLine) =>
             {
                 await _editorBridgeDocumentController.HandleFindAllRequestedAsync(
                     bridge,
                     getSession(),
                     query,
                     matchCase,
-                    isRegex);
+                    isRegex,
+                    currentLine);
             };
 
             bridge.ReplaceAllRequested += async (query, replace, matchCase, isRegex) =>

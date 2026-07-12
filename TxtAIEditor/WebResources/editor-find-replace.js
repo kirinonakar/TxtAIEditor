@@ -135,6 +135,7 @@ function closeFindPanel() {
     findPanel.hidden = true;
     state.searchQuery = '';
     state.searchMatches = [];
+    state.searchMatchesByLine = new Map();
     state.searchIndex = -1;
     state.activeSearch = null;
     queueRender(true);
@@ -146,6 +147,7 @@ function requestFindAll() {
     if (!query) {
         state.searchQuery = '';
         state.searchMatches = [];
+        state.searchMatchesByLine = new Map();
         state.searchIndex = -1;
         state.activeSearch = null;
         state.searchDocumentVersion = state.documentVersion;
@@ -154,7 +156,13 @@ function requestFindAll() {
         return;
     }
     state.searchQuery = query;
-    post({ type: 'findAll', query, matchCase: state.findMatchCase, isRegex: state.findRegex });
+    post({
+        type: 'findAll',
+        query,
+        matchCase: state.findMatchCase,
+        isRegex: state.findRegex,
+        currentLine: state.currentLine || 1
+    });
 }
 
 function requestFind(reverse = false) {
