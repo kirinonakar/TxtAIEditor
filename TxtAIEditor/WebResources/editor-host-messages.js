@@ -289,7 +289,11 @@ export function createHostMessageHandler({
                         pendingNavigation.line,
                         pendingNavigation.column,
                         pendingNavigation.reverse)
-                    : (state.searchMatches.length > 0 ? 0 : -1);
+                    : findSearchMatchIndexFromPosition(
+                        state.searchMatches,
+                        state.currentLine,
+                        state.currentColumn,
+                        false);
                 state.activeSearch = null;
                 if (state.searchIndex >= 0) {
                     const match = state.searchMatches[state.searchIndex];

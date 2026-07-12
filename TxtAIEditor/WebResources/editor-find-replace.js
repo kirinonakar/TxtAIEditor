@@ -20,6 +20,31 @@ import {
 } from './editor-core.js';
 import { focusLine } from './editor-commands.js';
 
+function findSearchMatchIndexFromCurrentPosition(matches, reverse) {
+    const currentLine = Math.max(1, Number(state.currentLine || 1));
+    const currentColumn = Math.max(1, Number(state.currentColumn || 1));
+
+    if (reverse) {
+        for (let i = matches.length - 1; i >= 0; i--) {
+            const matchLine = Number(matches[i].lineNumber || 1);
+            const matchColumn = Number(matches[i].indexOfMatch || 0) + 1;
+            if (matchLine < currentLine || (matchLine === currentLine && matchColumn < currentColumn)) {
+                return i;
+            }
+        }
+        return matches.length - 1;
+    }
+
+    for (let i = 0; i < matches.length; i++) {
+        const matchLine = Number(matches[i].lineNumber || 1);
+        const matchColumn = Number(matches[i].indexOfMatch || 0) + 1;
+        if (matchLine > currentLine || (matchLine === currentLine && matchColumn >= currentColumn)) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 export function createFindReplaceController({ revealLine }) {
     let findDebounceTimer = 0;
 
@@ -149,9 +174,9 @@ function requestFind(reverse = false) {
 
     if (state.searchMatches.length === 0) return;
 
-    if (state.searchIndex < 0) state.searchIndex = 0;
-
-    if (reverse) {
+    if (state.searchIndex < 0) {
+        state.searchIndex = findSearchMatchIndexFromCurrentPosition(state.searchMatches, reverse);
+    } else if (reverse) {
         state.searchIndex = (state.searchIndex - 1 + state.searchMatches.length) % state.searchMatches.length;
     } else {
         state.searchIndex = (state.searchIndex + 1) % state.searchMatches.length;
