@@ -1282,7 +1282,8 @@ const {
     cutSelectionToClipboard,
     deleteSelectionOrForward,
     pasteFromClipboard,
-    selectAll
+    selectAll,
+    submitHexEdit
 } = createClipboardCommandHandlers({
     activeEditableElement,
     copyCsvSelectionToClipboard,
@@ -1293,6 +1294,7 @@ const {
     hasCustomSelection,
     insertTextAtCaret,
     normalizeSelection,
+    post,
     queueRender,
     readClipboardText,
     replaceSelectionWith,
@@ -1343,6 +1345,7 @@ export {
     moveCaretVertical,
     normalizedModelRepeatKey,
     pasteFromClipboard,
+    submitHexEdit,
     positionFromPointer,
     replaceSelectionForCompositionStart,
     replaceSelectionWith,

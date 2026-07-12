@@ -33,6 +33,7 @@ namespace TxtAIEditor.Editor
         public event Action<string>? ShortcutPressed;
         public event Action<int, int, int>? LinesRequested;
         public event Action<int, string, bool>? LineChanged;
+        public event Action<long, string>? HexEditRequested;
         public event Action<int, int, int, string, bool>? LineEditRequested;
         public event Action<int, string>? LineInsertRequested;
         public event Action<int, string, string>? LineSplitRequested;
@@ -172,6 +173,7 @@ namespace TxtAIEditor.Editor
                 autocompleteOnEnter = settings.AutocompleteOnEnter,
                 autocompleteOnTab = settings.AutocompleteOnTab,
                 readOnly = isReadOnly,
+                hexEditable = isHexLanguage,
                 isSplitView = _isSplitView,
                 findPlaceholder = _localizationService?.GetString("EditorFindPlaceholder", "찾기") ?? "찾기",
                 replacePlaceholder = _localizationService?.GetString("EditorReplacePlaceholder", "바꾸기") ?? "바꾸기",
@@ -426,6 +428,7 @@ namespace TxtAIEditor.Editor
                 autocompleteOnEnter = settings.AutocompleteOnEnter,
                 autocompleteOnTab = settings.AutocompleteOnTab,
                 readOnly = isReadOnly,
+                hexEditable = isHexLanguage,
                 findPlaceholder = _localizationService?.GetString("EditorFindPlaceholder", "찾기") ?? "찾기",
                 replacePlaceholder = _localizationService?.GetString("EditorReplacePlaceholder", "바꾸기") ?? "바꾸기",
                 replaceButton = _localizationService?.GetString("EditorReplaceButton", "바꾸기") ?? "바꾸기",
@@ -726,6 +729,16 @@ namespace TxtAIEditor.Editor
                                 bool isComposing = root.TryGetProperty("isComposing", out JsonElement isComposingProp) &&
                                     isComposingProp.ValueKind == JsonValueKind.True;
                                 LineChanged?.Invoke(lineNumberProp.GetInt32(), textProp.GetString() ?? string.Empty, isComposing);
+                            }
+                            break;
+
+                        case "hexEdit":
+                            if (root.TryGetProperty("offset", out JsonElement hexEditOffsetProp) &&
+                                root.TryGetProperty("hex", out JsonElement hexEditTextProp))
+                            {
+                                HexEditRequested?.Invoke(
+                                    hexEditOffsetProp.GetInt64(),
+                                    hexEditTextProp.GetString() ?? string.Empty);
                             }
                             break;
 

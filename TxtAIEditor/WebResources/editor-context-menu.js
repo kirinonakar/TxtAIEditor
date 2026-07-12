@@ -17,7 +17,7 @@ import {
 export function showContextMenu(clientX, clientY) {
     for (const button of contextMenu.querySelectorAll('.context-menu-button')) {
         const requiresEdit = button.dataset.requiresEdit === 'true';
-        button.disabled = requiresEdit && state.readOnly;
+        button.disabled = requiresEdit && state.readOnly && !state.hexEditable;
     }
 
     const scrollSyncBtn = contextMenu.querySelector('[data-action="toggleScrollSync"]');

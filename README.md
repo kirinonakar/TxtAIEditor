@@ -67,8 +67,8 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Document Viewer:** Preview PDFs (`.pdf`) and common Office documents (`.docx`, `.pptx`, `.xlsx`, `.hwpx`, `.doc`, `.xls`, `.ppt`) in a clean, read-only viewer.
 *   **Audio & Video Player:** Listen to audio (`.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.wma`, `.ogg`, `.oga`, `.opus`) and watch videos (`.mp4`, `.m4v`, `.mov`, `.wmv`, `.avi`, `.mkv`, `.webm`, `.mpeg`, `.mpg`) with native, integrated media playback controls.
 
-### 🔍 Read-Only Hex Viewer
-*   **Binary Inspection:** View raw binary content in a side-by-side layout (Offset, Hex bytes, and ASCII representation).
+### 🔍 Hex Editor
+*   **Binary Inspection:** View and edit raw binary content in a side-by-side layout (Offset, Hex bytes, and ASCII representation).
 *   **Easy Access & UI Integration:** Right-click any open tab and select **"Hex View"**. Cursor offset and selections are shown in hex format on the status bar.
 
 ### 📦 Archive File Support

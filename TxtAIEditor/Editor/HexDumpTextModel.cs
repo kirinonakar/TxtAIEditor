@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,11 +13,12 @@ namespace TxtAIEditor.Editor
     {
         private const int BytesPerRow = 16;
         private const string HeaderOffsetLabel = "Offset(h)";
-        private readonly string _filePath;
+        private string _filePath;
         private readonly long _fileLength;
         private readonly int _offsetWidth;
         private readonly long _displayRowCount;
         private readonly bool _isTruncated;
+        private readonly Dictionary<long, byte> _editedBytes = new();
         private string _lineEnding = "\n";
 
         public HexDumpTextModel(string filePath)
@@ -88,6 +90,14 @@ namespace TxtAIEditor.Editor
                     }
 
                     dataLength += read;
+                }
+
+                for (int i = 0; i < dataLength; i++)
+                {
+                    if (_editedBytes.TryGetValue(firstOffset + i, out byte editedByte))
+                    {
+                        data[i] = editedByte;
+                    }
                 }
             }
 
@@ -211,6 +221,22 @@ namespace TxtAIEditor.Editor
 
         public void ApplyEdit(TextEdit edit)
         {
+        }
+
+        public int ApplyByteEdit(long offset, ReadOnlySpan<byte> bytes)
+        {
+            if (offset < 0 || offset >= _fileLength || bytes.IsEmpty)
+            {
+                return 0;
+            }
+
+            int writableCount = (int)Math.Min(bytes.Length, _fileLength - offset);
+            for (int i = 0; i < writableCount; i++)
+            {
+                _editedBytes[offset + i] = bytes[i];
+            }
+
+            return writableCount;
         }
 
         public void ReplaceLine(int lineNumber, string text)
@@ -346,7 +372,59 @@ namespace TxtAIEditor.Editor
 
         public Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException("Hex dump views are read-only.");
+            return SaveEditedBytesAsync(filePath, cancellationToken);
+        }
+
+        private async Task SaveEditedBytesAsync(string filePath, CancellationToken cancellationToken)
+        {
+            if (!string.Equals(
+                    Path.GetFullPath(filePath),
+                    Path.GetFullPath(_filePath),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                File.Copy(_filePath, filePath, overwrite: true);
+            }
+
+            if (_editedBytes.Count == 0)
+            {
+                _filePath = filePath;
+                return;
+            }
+
+            await using var stream = new FileStream(
+                filePath,
+                FileMode.Open,
+                FileAccess.Write,
+                FileShare.Read,
+                bufferSize: 64 * 1024,
+                useAsync: true);
+
+            var edits = _editedBytes.OrderBy(pair => pair.Key).ToArray();
+            int editIndex = 0;
+            while (editIndex < edits.Length)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                long runOffset = edits[editIndex].Key;
+                int runEnd = editIndex + 1;
+                while (runEnd < edits.Length && edits[runEnd].Key == edits[runEnd - 1].Key + 1)
+                {
+                    runEnd++;
+                }
+
+                byte[] run = new byte[runEnd - editIndex];
+                for (int i = editIndex; i < runEnd; i++)
+                {
+                    run[i - editIndex] = edits[i].Value;
+                }
+
+                stream.Position = runOffset;
+                await stream.WriteAsync(run, cancellationToken).ConfigureAwait(false);
+                editIndex = runEnd;
+            }
+
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            _editedBytes.Clear();
+            _filePath = filePath;
         }
 
         private string FormatHeaderLine()

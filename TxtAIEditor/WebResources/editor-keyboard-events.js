@@ -43,6 +43,7 @@ import {
     pasteFromClipboard,
     scheduleModelRepeatEdit,
     selectAll,
+    submitHexEdit,
     splitCurrentLine
 } from './editor-commands.js';
 import {
@@ -308,6 +309,17 @@ export function bindKeyboardEvents({ openFindPanel }) {
             event.preventDefault();
             hideAutocomplete(300);
             post({ type: 'shortcut', name: 'save' });
+            return;
+        }
+
+        const activeTarget = event.target;
+        const isNativeHexInputTarget = activeTarget && (
+            activeTarget.closest?.('#find-panel') ||
+            activeTarget.tagName === 'INPUT' ||
+            activeTarget.tagName === 'TEXTAREA'
+        );
+        if (state.language === 'hex' && state.hexEditable && !isNativeHexInputTarget &&
+            !earlyCtrl && !event.altKey && handleHexEditorKey(event)) {
             return;
         }
 
@@ -675,6 +687,76 @@ export function bindKeyboardEvents({ openFindPanel }) {
             return;
         }
     });
+
+    function handleHexEditorKey(event) {
+        const key = event.key || '';
+        const selection = state.hexSelection;
+        const startOffset = selection
+            ? Math.max(0, Math.min(Number(selection.startOffset || 0), Number(selection.endOffset || 0)))
+            : Math.max(0, Number(state.hexCursorOffset || 0));
+
+        if (key === 'Backspace' || key === 'Delete') {
+            event.preventDefault();
+            const length = selection
+                ? Math.max(1, Math.abs(Number(selection.endOffset || 0) - Number(selection.startOffset || 0)))
+                : 1;
+            submitHexEdit(new Array(length).fill(0), startOffset);
+            return true;
+        }
+
+        const movement = key === 'ArrowLeft' ? -1
+            : key === 'ArrowRight' ? 1
+                : key === 'ArrowUp' ? -16
+                    : key === 'ArrowDown' ? 16
+                        : 0;
+        if (movement !== 0) {
+            event.preventDefault();
+            moveHexCursor(Math.max(0, startOffset + movement));
+            return true;
+        }
+
+        if (state.hexSelectionPane === 'ascii' && key.length === 1 && key.charCodeAt(0) <= 0xFF) {
+            event.preventDefault();
+            submitHexEdit([key.charCodeAt(0)], startOffset);
+            moveHexCursor(startOffset + 1);
+            return true;
+        }
+
+        if (state.hexSelectionPane === 'hex' && /^[0-9a-f]$/i.test(key)) {
+            event.preventDefault();
+            const nibble = key.toUpperCase();
+            const pending = state.hexPendingHighNibble;
+            if (!pending || pending.offset !== startOffset) {
+                state.hexPendingHighNibble = { offset: startOffset, value: nibble };
+            } else {
+                submitHexEdit([parseInt(pending.value + nibble, 16)], startOffset);
+                moveHexCursor(startOffset + 1);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    function moveHexCursor(offset) {
+        const safeOffset = Math.max(0, Number(offset || 0));
+        state.hexCursorOffset = safeOffset;
+        state.hexSelectionAnchorOffset = safeOffset;
+        state.hexSelection = { startOffset: safeOffset, endOffset: safeOffset + 1 };
+        state.hexPendingHighNibble = null;
+        state.currentLine = Math.floor(safeOffset / 16) + 2;
+
+        const byteIndex = safeOffset % 16;
+        const text = state.cache.get(state.currentLine) || '';
+        const firstPipe = text.indexOf('|');
+        const hexStart = Math.max(0, firstPipe > 0 ? firstPipe - 50 : 11);
+        const column = state.hexSelectionPane === 'ascii' && firstPipe >= 0
+            ? firstPipe + 1 + byteIndex
+            : hexStart + (byteIndex * 3) + (byteIndex >= 8 ? 1 : 0);
+        state.currentColumn = column + 1;
+        queueRender(true);
+        reportCursorAndSelection();
+    }
 
     viewport.addEventListener('keyup', event => {
         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {

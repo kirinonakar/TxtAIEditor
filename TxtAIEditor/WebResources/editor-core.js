@@ -37,6 +37,7 @@ const state = {
     currentLine: 1,
     currentColumn: 1,
     readOnly: false,
+    hexEditable: false,
     wordWrap: false,
     language: 'plaintext',
     tabSize: 4,
@@ -52,6 +53,7 @@ const state = {
     hexSelectionAnchorOffset: null,
     hexSelectionPane: 'hex',
     hexCursorOffset: 0,
+    hexPendingHighNibble: null,
     isSelecting: false,
     isLineSelecting: false,
     initialized: false,
@@ -296,6 +298,7 @@ function applyOptions(msg) {
     state.lineHeight = snapCssPixelsToDevicePixels(baseLineHeight);
     state.tabSize = Number(msg.tabSize || 4);
     state.readOnly = !!msg.readOnly;
+    state.hexEditable = !!msg.hexEditable;
     state.wordWrap = !!msg.wordWrap;
     state.bracketPairColorization = msg.hasOwnProperty('bracketPairColorization') ? !!msg.bracketPairColorization : true;
     state.autocompleteOnEnter = msg.hasOwnProperty('autocompleteOnEnter') ? !!msg.autocompleteOnEnter : true;

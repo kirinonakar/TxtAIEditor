@@ -155,6 +155,7 @@ namespace TxtAIEditor.Controls
             var model = new HexDumpTextModel(filePath);
             var tab = new OpenedTab
             {
+                FilePath = filePath,
                 HexSourceFilePath = filePath,
                 Title = string.Format(
                     _getLocalizedString("HexViewerTitleFormat", "{0} [HEX]"),
@@ -525,6 +526,35 @@ namespace TxtAIEditor.Controls
                     lineNumber,
                     text,
                     isComposing);
+            };
+
+            bridge.HexEditRequested += async (offset, hex) =>
+            {
+                try
+                {
+                    var currentSession = getSession();
+                    if (currentSession.Model is not HexDumpTextModel hexModel ||
+                        string.IsNullOrEmpty(hex) ||
+                        hex.Length % 2 != 0)
+                    {
+                        return;
+                    }
+
+                    byte[] bytes = Convert.FromHexString(hex);
+                    int written = hexModel.ApplyByteEdit(offset, bytes);
+                    if (written <= 0)
+                    {
+                        return;
+                    }
+
+                    int startLine = checked((int)(offset / 16) + 2);
+                    int endLine = checked((int)((offset + written - 1) / 16) + 2);
+                    await bridge.SendLinesAsync(0, startLine, currentSession.GetLines(startLine, endLine - startLine + 1));
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to apply hex edit: {ex.Message}");
+                }
             };
 
             bridge.LineEditRequested += async (lineNumber, startColumn, endColumn, text, isComposing) =>
