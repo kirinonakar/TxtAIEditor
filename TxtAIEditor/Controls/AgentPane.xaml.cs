@@ -1429,9 +1429,60 @@ namespace TxtAIEditor.Controls
             AgentDiffConfirmHeader.Text = header;
             AgentDiffConfirmDescription.Text = description;
             AgentPowerShellConfirmCommand.Text = command;
+
+            bool isDanger = command != null && System.Text.RegularExpressions.Regex.IsMatch(
+                command,
+                @"\b(Remove\w*|rm\w*)\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (isDanger)
+            {
+                AgentPowerShellConfirmCommand.Foreground = GetAgentBrush("AgentPowerShellConfirmDangerForeground", Microsoft.UI.Colors.Red);
+            }
+            else
+            {
+                AgentPowerShellConfirmCommand.Foreground = GetAgentBrush("AgentOutputForeground", Microsoft.UI.Colors.Black);
+            }
             AgentPowerShellCommandPanel.Visibility = Visibility.Visible;
             AgentDiffConfirmPanel.Visibility = Visibility.Visible;
             UpdateReviewPanelsHostVisibility();
+        }
+
+        private Brush GetAgentBrush(string key, Windows.UI.Color fallbackColor)
+        {
+            string themeName = ActualTheme == ElementTheme.Default
+                ? (Application.Current.RequestedTheme == ApplicationTheme.Dark ? "Dark" : "Light")
+                : (ActualTheme == ElementTheme.Dark ? "Dark" : "Light");
+
+            object? dictObj;
+            object? resource;
+
+            if (Resources.ThemeDictionaries.TryGetValue(themeName, out dictObj) &&
+                dictObj is ResourceDictionary themeDict &&
+                themeDict.TryGetValue(key, out resource) &&
+                resource is Brush brush1)
+            {
+                return brush1;
+            }
+
+            if (Application.Current.Resources.ThemeDictionaries.TryGetValue(themeName, out dictObj) &&
+                dictObj is ResourceDictionary appThemeDict &&
+                appThemeDict.TryGetValue(key, out resource) &&
+                resource is Brush brush2)
+            {
+                return brush2;
+            }
+
+            if (Resources.TryGetValue(key, out resource) && resource is Brush brush3)
+            {
+                return brush3;
+            }
+            if (Application.Current.Resources.TryGetValue(key, out resource) && resource is Brush brush4)
+            {
+                return brush4;
+            }
+
+            return new SolidColorBrush(fallbackColor);
         }
 
         public void HideDiffConfirm()
