@@ -187,10 +187,7 @@ namespace TxtAIEditor.Controls
                                             _getString("AgentActivityThinking", "생각중"),
                                             _displayText.FormatInlineTokenCount(0)
                                         );
-                                        _runOutputController.EnqueueRunUi(
-                                            runContext,
-                                            () => _agentPane.BeginThinkingActivity(label),
-                                            session => _openSessionController.BeginThinkingInSession(session, label));
+                                        await _runOutputController.BeginRunThinkingActivityAsync(runContext, label);
                                     }
                                     else
                                     {
@@ -272,10 +269,7 @@ namespace TxtAIEditor.Controls
                                         heldPotentialToolCallText = true;
                                         int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
                                         string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                        _runOutputController.EnqueueRunUi(
-                                            runContext,
-                                            () => _agentPane.BeginThinkingActivity(label),
-                                            session => _openSessionController.BeginThinkingInSession(session, label));
+                                        await _runOutputController.BeginRunThinkingActivityAsync(runContext, label);
                                         printedLength = streamedText.Length;
                                     }
                                     else
@@ -394,10 +388,7 @@ namespace TxtAIEditor.Controls
                                     toolCallPlaceholderShown = true;
                                     int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText.Substring(toolCallIndex)));
                                     string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                    _runOutputController.EnqueueRunUi(
-                                        runContext,
-                                        () => _agentPane.BeginThinkingActivity(label),
-                                        session => _openSessionController.BeginThinkingInSession(session, label));
+                                    await _runOutputController.BeginRunThinkingActivityAsync(runContext, label);
                                 }
                             }
                             else
