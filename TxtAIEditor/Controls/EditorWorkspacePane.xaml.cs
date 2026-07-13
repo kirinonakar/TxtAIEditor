@@ -40,6 +40,8 @@ namespace TxtAIEditor.Controls
         {
             InitializeComponent();
             SizeChanged += OnWorkspaceSizeChanged;
+            EditorTabView.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
+            EditorTabView2.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
             PrimaryTabActions.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
             SecondaryTabActions.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
             StickyNoteBar.RegisterPropertyChangedCallback(VisibilityProperty, (_, __) => QueueTabActionSpacerUpdate());
@@ -115,14 +117,14 @@ namespace TxtAIEditor.Controls
             SecondaryTabActionsSpacer.Width = secondaryWidth;
 
             var primaryListView = FindTabViewListView(EditorTabView);
-            if (primaryListView != null)
+            if (primaryListView != null && EditorTabView.ActualWidth > 0)
             {
                 double availableWidth = EditorTabView.ActualWidth - primaryWidth - 44;
                 primaryListView.MaxWidth = Math.Max(0, availableWidth);
             }
 
             var secondaryListView = FindTabViewListView(EditorTabView2);
-            if (secondaryListView != null)
+            if (secondaryListView != null && EditorTabView2.ActualWidth > 0)
             {
                 double availableWidth = EditorTabView2.ActualWidth - secondaryWidth - 44;
                 secondaryListView.MaxWidth = Math.Max(0, availableWidth);
@@ -494,6 +496,8 @@ namespace TxtAIEditor.Controls
 
                 EnsureSecondPaneHasTab(openNewTab);
             }
+
+            QueueTabActionSpacerUpdate();
         }
 
         public bool ToggleTerminal(Func<string> workingDirectoryProvider)
