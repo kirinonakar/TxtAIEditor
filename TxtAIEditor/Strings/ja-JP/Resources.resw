@@ -314,6 +314,9 @@
   <data name="SettingsWordWrap" xml:space="preserve">
     <value>デフォルトで右端折り返しを有効にする</value>
   </data>
+  <data name="SettingsSyntaxHighlighting" xml:space="preserve">
+    <value>構文の強調表示を有効にする</value>
+  </data>
   <data name="SettingsBracketPair" xml:space="preserve">
     <value>ブラケットペアのカラー表示</value>
   </data>

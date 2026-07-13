@@ -314,6 +314,9 @@
   <data name="SettingsWordWrap" xml:space="preserve">
     <value>Enable Word Wrap by Default</value>
   </data>
+  <data name="SettingsSyntaxHighlighting" xml:space="preserve">
+    <value>Enable Syntax Highlighting</value>
+  </data>
   <data name="SettingsBracketPair" xml:space="preserve">
     <value>Bracket Pair Colorization</value>
   </data>

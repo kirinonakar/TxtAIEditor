@@ -12,6 +12,7 @@ namespace TxtAIEditor.Core.Models
         public string FontFamily { get; set; } = "Consolas, 'Courier New', monospace";
         public double FontSize { get; set; } = 14.0;
         public bool WordWrap { get; set; } = true;
+        public bool SyntaxHighlighting { get; set; } = true;
         public int TabSize { get; set; } = 4;
         public bool AutocompleteOnEnter { get; set; } = true;
         public bool AutocompleteOnTab { get; set; } = true;

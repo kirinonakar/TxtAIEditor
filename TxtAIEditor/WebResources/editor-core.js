@@ -39,6 +39,7 @@ const state = {
     readOnly: false,
     hexEditable: false,
     wordWrap: false,
+    syntaxHighlighting: true,
     language: 'plaintext',
     tabSize: 4,
     searchQuery: '',
@@ -300,6 +301,7 @@ function applyOptions(msg) {
     state.readOnly = !!msg.readOnly;
     state.hexEditable = !!msg.hexEditable;
     state.wordWrap = !!msg.wordWrap;
+    state.syntaxHighlighting = msg.hasOwnProperty('syntaxHighlighting') ? !!msg.syntaxHighlighting : true;
     state.bracketPairColorization = msg.hasOwnProperty('bracketPairColorization') ? !!msg.bracketPairColorization : true;
     state.autocompleteOnEnter = msg.hasOwnProperty('autocompleteOnEnter') ? !!msg.autocompleteOnEnter : true;
     state.autocompleteOnTab = msg.hasOwnProperty('autocompleteOnTab') ? !!msg.autocompleteOnTab : true;

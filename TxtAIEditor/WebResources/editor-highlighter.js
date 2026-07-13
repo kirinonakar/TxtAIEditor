@@ -532,6 +532,10 @@ function isHexByteSelected(selection, byteOffset) {
 }
 
 function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
+    if (!state.syntaxHighlighting && language !== 'hex') {
+        return escapeHtml(text);
+    }
+
     if (!language || language === 'plaintext') {
         return escapeHtml(text);
     }

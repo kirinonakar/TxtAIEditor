@@ -314,6 +314,9 @@
   <data name="SettingsWordWrap" xml:space="preserve">
     <value>기본 Word Wrap 켜기</value>
   </data>
+  <data name="SettingsSyntaxHighlighting" xml:space="preserve">
+    <value>구문 강조 활성화</value>
+  </data>
   <data name="SettingsBracketPair" xml:space="preserve">
     <value>괄호 쌍 색상화 활성화</value>
   </data>

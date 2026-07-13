@@ -314,6 +314,9 @@
   <data name="SettingsWordWrap" xml:space="preserve">
     <value>默认启用自动换行</value>
   </data>
+  <data name="SettingsSyntaxHighlighting" xml:space="preserve">
+    <value>启用语法高亮</value>
+  </data>
   <data name="SettingsBracketPair" xml:space="preserve">
     <value>括号对着色</value>
   </data>
