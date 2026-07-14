@@ -1397,7 +1397,7 @@ function computeDirtyLineMarkersGreedy(
 
     return markers;
 }
-function reportCursorAndSelection(element = document.activeElement) {
+function reportCursorAndSelection(element = document.activeElement, knownCaretOffset = null) {
     if (element && !document.body.contains(element)) {
         element = document.activeElement;
     }
@@ -1408,7 +1408,10 @@ function reportCursorAndSelection(element = document.activeElement) {
             state.currentLine = state.selection.end.line;
             state.currentColumn = state.selection.end.column + 1;
         } else if (editable.getAttribute('contenteditable') === 'true') {
-            state.currentColumn = runtime.getCaretOffset(editable) + 1;
+            const caretOffset = Number(knownCaretOffset);
+            state.currentColumn = (knownCaretOffset !== null && Number.isFinite(caretOffset)
+                ? Math.max(0, caretOffset)
+                : runtime.getCaretOffset(editable)) + 1;
         }
     }
 

@@ -62,9 +62,9 @@ export function bindTextInputEvents({ renderer }) {
                 state.selection = null;
                 syncCustomSelectionClass();
             }
-            commitLine(element);
+            const inputSnapshot = commitLine(element);
             if (!state.isComposing && !state.rangeComposition) {
-                triggerAutocomplete(element);
+                triggerAutocomplete(element, inputSnapshot);
             }
         }
     });
@@ -173,8 +173,8 @@ export function bindTextInputEvents({ renderer }) {
             setTimeout(() => {
                 const current = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) || element;
                 if (current && current.getAttribute('contenteditable') === 'true') {
-                    commitLine(current);
-                    triggerAutocomplete(current);
+                    const inputSnapshot = commitLine(current);
+                    triggerAutocomplete(current, inputSnapshot);
                     queueRender(true);
                 }
             }, 0);

@@ -302,15 +302,19 @@ function getCaretCoordinates() {
     return null;
 }
 
-function triggerAutocomplete(element) {
+function triggerAutocomplete(element, inputSnapshot = null) {
     if (!state.autocompleteOnEnter && !state.autocompleteOnTab) return;
     if (isAutocompleteSuppressed()) return;
     if (hasCustomSelection()) {
         hideAutocomplete();
         return;
     }
-    const text = lineTextFromElement(element);
-    const caret = getCaretOffset(element);
+    const lineNumber = Number(element?.dataset?.line || 0);
+    const canReuseInput = inputSnapshot && inputSnapshot.lineNumber === lineNumber;
+    const text = canReuseInput ? inputSnapshot.text : lineTextFromElement(element);
+    const caret = canReuseInput
+        ? Math.max(0, Math.min(inputSnapshot.caretOffset, text.length))
+        : getCaretOffset(element);
     const { word, start, end, fullWord } = getWordUnderCaret(text, caret);
 
     if (!word || word.length < 1) {

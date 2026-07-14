@@ -17,7 +17,12 @@ import {
 } from './editor-selection.js';
 
 function lineTextFromElement(element) {
-    return (element.textContent || '').replace(/\u00a0/g, ' ');
+    const onlyTextNode = element?.childNodes?.length === 1 &&
+        element.firstChild?.nodeType === Node.TEXT_NODE
+        ? element.firstChild
+        : null;
+    const text = onlyTextNode ? (onlyTextNode.nodeValue || '') : (element?.textContent || '');
+    return text.includes('\u00a0') ? text.replace(/\u00a0/g, ' ') : text;
 }
 
 function makeEditablePlainText(element, caretColumn = null, restoreCaret = true) {
@@ -47,6 +52,18 @@ function getCaretOffset(element) {
     if (!selection || selection.rangeCount === 0) return 0;
     const range = selection.getRangeAt(0);
     if (!element.contains(range.startContainer)) return 0;
+
+    const onlyTextNode = element.childNodes.length === 1 &&
+        element.firstChild?.nodeType === Node.TEXT_NODE
+        ? element.firstChild
+        : null;
+    if (onlyTextNode && range.startContainer === onlyTextNode) {
+        return Math.max(0, Math.min(range.startOffset, onlyTextNode.nodeValue?.length || 0));
+    }
+    if (onlyTextNode && range.startContainer === element) {
+        return range.startOffset <= 0 ? 0 : (onlyTextNode.nodeValue?.length || 0);
+    }
+
     return offsetFromNodeInElement(element, range.startContainer, range.startOffset);
 }
 

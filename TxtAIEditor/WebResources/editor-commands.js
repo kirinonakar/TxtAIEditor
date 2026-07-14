@@ -77,11 +77,12 @@ import { createMarkdownCommandHandlers } from './editor-markdown-commands.js';
 import { createTextCommandActions } from './editor-text-command-actions.js';
 
 let splitScrollRestoreToken = 0;
+const LONG_LINE_EDIT_THRESHOLD = 1000;
 
 function postLineUpdate(lineNumber, previousText, nextText, isComposing = false) {
     const before = String(previousText ?? '');
     const after = String(nextText ?? '');
-    if (Math.max(before.length, after.length) <= MAX_RENDER_CHARS) {
+    if (Math.max(before.length, after.length) < LONG_LINE_EDIT_THRESHOLD) {
         post({ type: 'lineChanged', lineNumber, text: after, isComposing });
         return;
     }
@@ -154,19 +155,21 @@ function commitLine(element) {
         }
     }
 
+    const caretOffset = getCaretOffset(element);
+    const inputSnapshot = { lineNumber, text, caretOffset };
     state.currentLine = lineNumber;
-    state.currentColumn = getCaretOffset(element) + 1;
+    state.currentColumn = caretOffset + 1;
 
     if (isComposing) {
         if (!state.columnComposition && !state.rangeComposition) {
             postLineUpdate(lineNumber, previousText, text, true);
             post({ type: 'contentChanged', isComposing: true });
         }
-        reportCursorAndSelection(element);
+        reportCursorAndSelection(element, caretOffset);
         if (state.wordWrap && !state.rangeComposition) {
             measureRenderedRows(false);
         }
-        return;
+        return inputSnapshot;
     }
 
     // Cursor-only navigation (notably PageUp/PageDown) commits the active row
@@ -174,8 +177,8 @@ function commitLine(element) {
     // invalidates all later syntax-context entries, which becomes an O(n)
     // main-thread stall after navigating through a large document.
     if (!textChanged) {
-        reportCursorAndSelection(element);
-        return;
+        reportCursorAndSelection(element, caretOffset);
+        return inputSnapshot;
     }
 
     if (!cleanDirtyMarker(lineNumber)) {
@@ -184,11 +187,12 @@ function commitLine(element) {
 
     postLineUpdate(lineNumber, previousText, text);
     post({ type: 'contentChanged' });
-    reportCursorAndSelection(element);
+    reportCursorAndSelection(element, caretOffset);
 
     if (state.wordWrap) {
         measureRenderedRows(false);
     }
+    return inputSnapshot;
 }
 
 function commitLineForSave(element) {
