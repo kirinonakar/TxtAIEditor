@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly EditorTabViewItemFactory _editorTabViewItemFactory;
         private readonly FavoritesRecentController _favoritesRecentController;
         private readonly StatusBarController _statusBarController;
+        private readonly UnsavedChangesDialogService _unsavedChangesDialogService;
         private readonly TabEncryptionController _tabEncryptionController;
         private readonly PdfViewerController _pdfViewerController;
         private readonly OfficeDocumentViewerController _officeDocumentViewerController;
@@ -38,15 +39,19 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly Dictionary<string, HexViewState> _hexViewStates = new();
+        private readonly Dictionary<string, ViewerHexViewState> _viewerHexViewStates = new();
         private readonly Dictionary<string, int> _viewModeTransitionVersions = new();
         private int _viewModeTransitionVersion;
         private readonly DispatcherQueue _dispatcherQueue;
+        private readonly Func<XamlRoot?> _xamlRootProvider;
         private readonly Func<TabView> _getCurrentActiveTabView;
         private readonly Func<OpenedTab?> _getActiveTab;
         private readonly Func<TabViewItem, TabView?> _getTabViewForTabItem;
         private readonly Func<string> _getCurrentFolderPath;
         private readonly Func<bool> _isLivePreviewEnabled;
         private readonly Func<bool> _isScrollSyncEnabled;
+        private readonly Func<ElementTheme> _getCurrentElementTheme;
+        private readonly Func<OpenedTab, Task<bool>> _saveTabAsync;
         private readonly Func<OpenedTab, string> _getPreviewBaseHref;
         private readonly Func<string, string, string> _getLocalizedString;
         private readonly Action<EditorSettings> _applyEditorSurfaceBackground;
@@ -66,7 +71,25 @@ namespace TxtAIEditor.Controls
             string OriginalContent,
             string? OriginalLineEnding,
             string? OriginalEncodingName,
-            string? HexSourceFilePath);
+            string? HexSourceFilePath,
+            bool WasDirty);
+
+        private sealed record ViewerHexViewState(
+            TabViewItem HexTabItem,
+            EditorDocumentSession HexSession,
+            WebView2 HexWebView,
+            MonacoBridge HexBridge,
+            EditorDocumentSession? ViewerSession,
+            string Content,
+            string Language,
+            string EncodingName,
+            bool EncodingWasAutoDetected,
+            string? HexSourceFilePath,
+            bool IsImageViewer,
+            bool IsPdfViewer,
+            bool IsDocxViewer,
+            bool IsOfficeDocumentViewer,
+            bool WasDirty);
 
         public EditorTabOpenController(
             ISettingsService settingsService,
@@ -77,6 +100,7 @@ namespace TxtAIEditor.Controls
             EditorTabViewItemFactory editorTabViewItemFactory,
             FavoritesRecentController favoritesRecentController,
             StatusBarController statusBarController,
+            UnsavedChangesDialogService unsavedChangesDialogService,
             TabEncryptionController tabEncryptionController,
             PdfViewerController pdfViewerController,
             OfficeDocumentViewerController officeDocumentViewerController,
@@ -89,12 +113,15 @@ namespace TxtAIEditor.Controls
             Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             DispatcherQueue dispatcherQueue,
+            Func<XamlRoot?> xamlRootProvider,
             Func<TabView> getCurrentActiveTabView,
             Func<OpenedTab?> getActiveTab,
             Func<TabViewItem, TabView?> getTabViewForTabItem,
             Func<string> getCurrentFolderPath,
             Func<bool> isLivePreviewEnabled,
             Func<bool> isScrollSyncEnabled,
+            Func<ElementTheme> getCurrentElementTheme,
+            Func<OpenedTab, Task<bool>> saveTabAsync,
             Func<OpenedTab, string> getPreviewBaseHref,
             Func<string, string, string> getLocalizedString,
             Action<EditorSettings> applyEditorSurfaceBackground,
@@ -111,6 +138,7 @@ namespace TxtAIEditor.Controls
             _editorTabViewItemFactory = editorTabViewItemFactory;
             _favoritesRecentController = favoritesRecentController;
             _statusBarController = statusBarController;
+            _unsavedChangesDialogService = unsavedChangesDialogService;
             _tabEncryptionController = tabEncryptionController;
             _pdfViewerController = pdfViewerController;
             _officeDocumentViewerController = officeDocumentViewerController;
@@ -123,12 +151,15 @@ namespace TxtAIEditor.Controls
             _tabBridges = tabBridges;
             _editorSessions = editorSessions;
             _dispatcherQueue = dispatcherQueue;
+            _xamlRootProvider = xamlRootProvider;
             _getCurrentActiveTabView = getCurrentActiveTabView;
             _getActiveTab = getActiveTab;
             _getTabViewForTabItem = getTabViewForTabItem;
             _getCurrentFolderPath = getCurrentFolderPath;
             _isLivePreviewEnabled = isLivePreviewEnabled;
             _isScrollSyncEnabled = isScrollSyncEnabled;
+            _getCurrentElementTheme = getCurrentElementTheme;
+            _saveTabAsync = saveTabAsync;
             _getPreviewBaseHref = getPreviewBaseHref;
             _getLocalizedString = getLocalizedString;
             _applyEditorSurfaceBackground = applyEditorSurfaceBackground;
@@ -190,6 +221,11 @@ namespace TxtAIEditor.Controls
 
         public async Task SetHexViewModeAsync(OpenedTab tab, bool enabled)
         {
+            if (IsExecutableBinary(tab.FilePath))
+            {
+                return;
+            }
+
             if (enabled == tab.IsHexViewer)
             {
                 return;
@@ -197,17 +233,132 @@ namespace TxtAIEditor.Controls
 
             if (enabled)
             {
+                if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                {
+                    await bridgeGroup.Bridge.FlushPendingEditForSaveAsync();
+                }
+
+                if (tab.IsDirty)
+                {
+                    var result = await ShowUnsavedHexToggleDialogAsync(
+                        tab,
+                        "HexViewEnterUnsavedChangesMessage",
+                        "파일 '{0}'의 변경 내용이 저장되지 않았습니다. Hex 보기로 전환하기 전에 저장하시겠습니까?");
+                    if (result == UnsavedChangesDialogResult.Save)
+                    {
+                        if (!await _saveTabAsync(tab))
+                        {
+                            return;
+                        }
+                    }
+                    else if (result == UnsavedChangesDialogResult.Discard)
+                    {
+                        if (!await DiscardTextChangesBeforeHexAsync(tab))
+                        {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
                 await EnableHexViewModeAsync(tab);
             }
             else
             {
-                await DisableHexViewModeAsync(tab);
+                bool discardPendingHexEdits = false;
+                if (TryGetHexModel(tab, out var hexModel) && hexModel.HasPendingEdits)
+                {
+                    var result = await ShowUnsavedHexToggleDialogAsync(
+                        tab,
+                        "HexViewUnsavedChangesMessage",
+                        "파일 '{0}'의 Hex 변경 내용이 저장되지 않았습니다. 일반 보기로 돌아가기 전에 저장하시겠습니까?");
+
+                    if (result == UnsavedChangesDialogResult.Save)
+                    {
+                        if (!await _saveTabAsync(tab))
+                        {
+                            return;
+                        }
+                    }
+                    else if (result == UnsavedChangesDialogResult.Discard)
+                    {
+                        discardPendingHexEdits = true;
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
+                await DisableHexViewModeAsync(tab, discardPendingHexEdits);
             }
+        }
+
+        private async Task<UnsavedChangesDialogResult> ShowUnsavedHexToggleDialogAsync(
+            OpenedTab tab,
+            string messageResourceKey,
+            string fallbackMessage)
+        {
+            XamlRoot? xamlRoot = _xamlRootProvider();
+            if (xamlRoot == null)
+            {
+                return UnsavedChangesDialogResult.Cancel;
+            }
+
+            return await _unsavedChangesDialogService.ShowAsync(
+                _getLocalizedString("UnsavedChangesTabCloseTitle", "변경 내용 저장"),
+                string.Format(_getLocalizedString(messageResourceKey, fallbackMessage), tab.Title),
+                _getLocalizedString("HexViewUnsavedChangesDiscard", "저장하지 않음"),
+                _getLocalizedString("UnsavedChangesTabCloseSave", "저장"),
+                _getLocalizedString("UnsavedChangesCancel", "취소"),
+                xamlRoot,
+                _getCurrentElementTheme());
+        }
+
+        private async Task<bool> DiscardTextChangesBeforeHexAsync(OpenedTab tab)
+        {
+            if (string.IsNullOrWhiteSpace(tab.FilePath) || !File.Exists(tab.FilePath))
+            {
+                return false;
+            }
+
+            byte[] fileBytes = await File.ReadAllBytesAsync(tab.FilePath);
+            string diskText = DecodeText(fileBytes, tab.EncodingName);
+            var diskSession = new EditorDocumentSession(tab, LineArrayTextModel.FromText(diskText));
+            diskSession.RefreshTabContentPreview();
+            _editorSessions[tab.Id] = diskSession;
+            tab.OriginalContent = diskText;
+            tab.OriginalLineEnding = diskSession.Model.LineEnding;
+            tab.OriginalEncodingName = tab.EncodingName;
+            tab.IsDirty = false;
+            return true;
+        }
+
+        private bool TryGetHexModel(OpenedTab tab, out HexDumpTextModel hexModel)
+        {
+            if (_editorSessions.TryGetValue(tab.Id, out var session) &&
+                session.Model is HexDumpTextModel currentHexModel)
+            {
+                hexModel = currentHexModel;
+                return true;
+            }
+
+            hexModel = null!;
+            return false;
         }
 
         private async Task EnableHexViewModeAsync(OpenedTab tab)
         {
             string? sourcePath = tab.FilePath;
+            if (IsBinaryViewer(tab))
+            {
+                await EnableViewerHexViewModeAsync(tab, sourcePath);
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(sourcePath) ||
                 !File.Exists(sourcePath) ||
                 tab.IsEncrypted ||
@@ -240,7 +391,8 @@ namespace TxtAIEditor.Controls
                 tab.OriginalContent,
                 tab.OriginalLineEnding,
                 tab.OriginalEncodingName,
-                tab.HexSourceFilePath);
+                tab.HexSourceFilePath,
+                tab.IsDirty);
 
             tab.HexSourceFilePath = sourcePath;
             tab.IsHexViewer = true;
@@ -254,8 +406,14 @@ namespace TxtAIEditor.Controls
             UpdateTabStatus(tab, updateLanguageUi: true);
         }
 
-        private async Task DisableHexViewModeAsync(OpenedTab tab)
+        private async Task DisableHexViewModeAsync(OpenedTab tab, bool discardPendingHexEdits)
         {
+            if (_viewerHexViewStates.ContainsKey(tab.Id))
+            {
+                await DisableViewerHexViewModeAsync(tab, discardPendingHexEdits);
+                return;
+            }
+
             if (!_hexViewStates.Remove(tab.Id, out var state) ||
                 !_editorSessions.TryGetValue(tab.Id, out var hexSession) ||
                 hexSession.Model is not HexDumpTextModel hexModel)
@@ -272,7 +430,8 @@ namespace TxtAIEditor.Controls
             tab.InlineLivePreviewEnabled = state.InlineLivePreviewEnabled;
 
             EditorDocumentSession restoredSession;
-            if (!ReferenceEquals(hexModel, state.InitialHexModel) || hexModel.HasEverBeenEdited)
+            if (!discardPendingHexEdits &&
+                (!ReferenceEquals(hexModel, state.InitialHexModel) || hexModel.HasEverBeenEdited))
             {
                 string restoredText = DecodeText(hexModel.GetCurrentBytes(), state.EncodingName);
                 restoredSession = new EditorDocumentSession(tab, LineArrayTextModel.FromText(restoredText));
@@ -284,6 +443,11 @@ namespace TxtAIEditor.Controls
             }
 
             _editorSessions[tab.Id] = restoredSession;
+            if (discardPendingHexEdits)
+            {
+                tab.IsDirty = state.WasDirty;
+            }
+
             if (tab.IsDirty)
             {
                 tab.OriginalContent = state.OriginalContent;
@@ -301,10 +465,294 @@ namespace TxtAIEditor.Controls
             UpdateTabStatus(tab, updateLanguageUi: true);
         }
 
+        private async Task EnableViewerHexViewModeAsync(OpenedTab tab, string? sourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            {
+                return;
+            }
+
+            TabViewItem? tabItem = FindTabItem(tab.Id);
+            if (tabItem == null)
+            {
+                return;
+            }
+
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+            var hexParts = _editorTabViewItemFactory.Create(
+                tab,
+                editorBgColor,
+                settings.UiFontFamily,
+                _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                _tabEncryptionController.ShowMenu,
+                (item, args) =>
+                {
+                    var ownerTabView = _getTabViewForTabItem(item) ?? _getCurrentActiveTabView();
+                    _showTabContextMenu(tab, item, ownerTabView, item, args);
+                },
+                _getCurrentFolderPath());
+
+            _editorSessions.TryGetValue(tab.Id, out var viewerSession);
+            _tabBridges.TryGetValue(tab.Id, out var viewerBridge);
+
+            var hexModel = new HexDumpTextModel(sourcePath);
+            var hexSession = new EditorDocumentSession(tab, hexModel);
+            var state = new ViewerHexViewState(
+                hexParts.TabItem,
+                hexSession,
+                hexParts.WebView,
+                hexParts.Bridge,
+                viewerSession,
+                tab.Content,
+                tab.Language,
+                tab.EncodingName,
+                tab.EncodingWasAutoDetected,
+                tab.HexSourceFilePath,
+                tab.IsImageViewer,
+                tab.IsPdfViewer,
+                tab.IsDocxViewer,
+                tab.IsOfficeDocumentViewer,
+                tab.IsDirty);
+            _viewerHexViewStates[tab.Id] = state;
+
+            EditorTabViewItemFactory.ReleaseViewerResources(tabItem);
+            if (state.IsPdfViewer)
+            {
+                _pdfViewerController.Close(tab.Id);
+            }
+            if (state.IsOfficeDocumentViewer)
+            {
+                _officeDocumentViewerController.Close(tab.Id);
+            }
+            if (viewerBridge.WebView != null)
+            {
+                viewerBridge.WebView.Close();
+            }
+            _tabBridges.Remove(tab.Id);
+            _editorSessions.Remove(tab.Id);
+
+            ApplyViewerHexFlags(tab, state);
+            TabView ownerTabView = _getTabViewForTabItem(tabItem) ?? _getCurrentActiveTabView();
+            ReplaceTabViewItem(ownerTabView, tabItem, hexParts.TabItem);
+            _editorSessions[tab.Id] = hexSession;
+            _tabBridges[tab.Id] = (hexParts.WebView, hexParts.Bridge);
+
+            WireEditorBridge(
+                hexParts.Bridge,
+                hexParts.WebView,
+                hexParts.LoadCover,
+                tab,
+                hexParts.TabItem,
+                hexSession,
+                isReadOnly: true);
+            QueueEditorInitialization(tab, hexParts.WebView, hexParts.Bridge);
+            UpdateTabStatus(tab, updateLanguageUi: true);
+        }
+
+        private async Task DisableViewerHexViewModeAsync(OpenedTab tab, bool discardPendingHexEdits)
+        {
+            if (!_viewerHexViewStates.TryGetValue(tab.Id, out var state))
+            {
+                return;
+            }
+
+            tab.Content = state.Content;
+            tab.IsHexViewer = false;
+            tab.HexSourceFilePath = state.HexSourceFilePath;
+            tab.Language = state.Language;
+            tab.EncodingName = state.EncodingName;
+            tab.EncodingWasAutoDetected = state.EncodingWasAutoDetected;
+            tab.IsImageViewer = state.IsImageViewer;
+            tab.IsPdfViewer = state.IsPdfViewer;
+            tab.IsDocxViewer = state.IsDocxViewer;
+            tab.IsOfficeDocumentViewer = state.IsOfficeDocumentViewer;
+            if (discardPendingHexEdits)
+            {
+                tab.IsDirty = state.WasDirty;
+            }
+
+            _tabBridges.Remove(tab.Id);
+            _editorSessions.Remove(tab.Id);
+            TabViewItem? viewerTabItem = ReopenViewerTabItem(tab, state);
+            if (viewerTabItem == null)
+            {
+                ApplyViewerHexFlags(tab, state);
+                _editorSessions[tab.Id] = state.HexSession;
+                _tabBridges[tab.Id] = (state.HexWebView, state.HexBridge);
+                return;
+            }
+
+            TabView ownerTabView = _getTabViewForTabItem(state.HexTabItem) ?? _getCurrentActiveTabView();
+            ReplaceTabViewItem(ownerTabView, state.HexTabItem, viewerTabItem);
+            state.HexWebView.Close();
+            _viewerHexViewStates.Remove(tab.Id);
+            UpdateTabStatus(tab, updateLanguageUi: true);
+            await Task.CompletedTask;
+        }
+
+        private static bool IsBinaryViewer(OpenedTab tab)
+        {
+            return tab.IsImageViewer ||
+                   tab.IsPdfViewer ||
+                   tab.IsDocxViewer ||
+                   tab.IsOfficeDocumentViewer;
+        }
+
+        private static bool IsExecutableBinary(string? filePath)
+        {
+            string? extension = Path.GetExtension(filePath);
+            return string.Equals(extension, ".exe", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(extension, ".dll", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private TabViewItem? ReopenViewerTabItem(OpenedTab tab, ViewerHexViewState state)
+        {
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+
+            if (state.IsImageViewer)
+            {
+                var viewerItem = _editorTabViewItemFactory.CreateImageViewer(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) =>
+                    {
+                        var ownerTabView = _getTabViewForTabItem(item) ?? _getCurrentActiveTabView();
+                        _showTabContextMenu(tab, item, ownerTabView, item, args);
+                    },
+                    _getCurrentFolderPath());
+                return viewerItem;
+            }
+
+            if (state.IsPdfViewer)
+            {
+                var viewerParts = _editorTabViewItemFactory.CreatePdfViewer(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) =>
+                    {
+                        var ownerTabView = _getTabViewForTabItem(item) ?? _getCurrentActiveTabView();
+                        _showTabContextMenu(tab, item, ownerTabView, item, args);
+                    },
+                    _getCurrentFolderPath());
+                _pdfViewerController.Register(tab, viewerParts.WebView, viewerParts.FindControl!);
+                return viewerParts.TabItem;
+            }
+
+            if (state.IsOfficeDocumentViewer)
+            {
+                var viewerParts = _editorTabViewItemFactory.CreateOfficeDocumentViewer(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) =>
+                    {
+                        var ownerTabView = _getTabViewForTabItem(item) ?? _getCurrentActiveTabView();
+                        _showTabContextMenu(tab, item, ownerTabView, item, args);
+                    },
+                    _getCurrentFolderPath());
+                _officeDocumentViewerController.Register(tab, viewerParts.WebView);
+                return viewerParts.TabItem;
+            }
+
+            if (state.IsDocxViewer && state.ViewerSession != null)
+            {
+                var editorParts = _editorTabViewItemFactory.Create(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) =>
+                    {
+                        var ownerTabView = _getTabViewForTabItem(item) ?? _getCurrentActiveTabView();
+                        _showTabContextMenu(tab, item, ownerTabView, item, args);
+                    },
+                    _getCurrentFolderPath());
+                _editorSessions[tab.Id] = state.ViewerSession;
+                _tabBridges[tab.Id] = (editorParts.WebView, editorParts.Bridge);
+                WireEditorBridge(
+                    editorParts.Bridge,
+                    editorParts.WebView,
+                    editorParts.LoadCover,
+                    tab,
+                    editorParts.TabItem,
+                    state.ViewerSession,
+                    isReadOnly: true);
+                QueueEditorInitialization(tab, editorParts.WebView, editorParts.Bridge);
+                return editorParts.TabItem;
+            }
+
+            return null;
+        }
+
+        private void ReplaceTabViewItem(TabView ownerTabView, TabViewItem oldItem, TabViewItem newItem)
+        {
+            int index = ownerTabView.TabItems.IndexOf(oldItem);
+            if (index < 0)
+            {
+                return;
+            }
+
+            bool wasSelected = ReferenceEquals(ownerTabView.SelectedItem, oldItem);
+            _editorWorkspace.DisableTabItemTransitions();
+            ownerTabView.TabItems.RemoveAt(index);
+            ownerTabView.TabItems.Insert(index, newItem);
+            if (wasSelected)
+            {
+                ownerTabView.SelectedItem = newItem;
+            }
+
+            _editorWorkspace.DisableTabItemTransitions();
+        }
+
+        private static void ApplyViewerHexFlags(OpenedTab tab, ViewerHexViewState state)
+        {
+            tab.IsImageViewer = false;
+            tab.IsPdfViewer = false;
+            tab.IsDocxViewer = false;
+            tab.IsOfficeDocumentViewer = false;
+            tab.HexSourceFilePath = tab.FilePath;
+            tab.IsHexViewer = true;
+            tab.IsCsvTableModeEnabled = false;
+            tab.InlineLivePreviewEnabled = false;
+            tab.Language = "hex";
+        }
+
+        private TabViewItem? FindTabItem(string tabId)
+        {
+            return FindTabItem(_editorWorkspace.EditorTabViewControl, tabId) ??
+                   FindTabItem(_editorWorkspace.EditorTabView2Control, tabId);
+        }
+
+        private static TabViewItem? FindTabItem(TabView tabView, string tabId)
+        {
+            foreach (var item in tabView.TabItems)
+            {
+                if (item is TabViewItem tabItem && string.Equals(tabItem.Tag as string, tabId, StringComparison.Ordinal))
+                {
+                    return tabItem;
+                }
+            }
+
+            return null;
+        }
+
         public void ForgetHexViewState(string tabId)
         {
             _hexViewStates.Remove(tabId);
             _viewModeTransitionVersions.Remove(tabId);
+
+            _viewerHexViewStates.Remove(tabId);
         }
 
         private async Task ApplyViewModeToBridgeAsync(

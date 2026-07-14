@@ -523,6 +523,8 @@ namespace TxtAIEditor.Composition
                     () => state.CurrentFolderPath,
                     () => toolbarCommandController?.LivePreviewEnabled == true,
                     tab => toolbarCommandController?.SyncCsvTableMode(tab),
+                    callbacks.GetCurrentElementTheme,
+                    callbacks.SaveTabAsync,
                     callbacks.GetPreviewBaseHref,
                     callbacks.GetLocalizedString,
                     ApplyEditorSurfaceBackground,
@@ -541,6 +543,7 @@ namespace TxtAIEditor.Composition
                         }),
                     callbacks.CloseTabAndCleanup,
                     (_, args) => tabCloseController.CloseRequested(args)));
+            tabCloseController.SetAdditionalTabCleanup(editorRuntimeControllers.EditorTabOpen.ForgetHexViewState);
             shellPaneController = editorRuntimeControllers.ShellPane;
 
             void OpenTextInEditor(string title, string content)

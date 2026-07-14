@@ -1325,6 +1325,15 @@
   <data name="UnsavedChangesCancel" xml:space="preserve">
     <value>취소</value>
   </data>
+  <data name="HexViewEnterUnsavedChangesMessage" xml:space="preserve">
+    <value>파일 '{0}'의 변경 내용이 저장되지 않았습니다. Hex 보기로 전환하기 전에 저장하시겠습니까?</value>
+  </data>
+  <data name="HexViewUnsavedChangesMessage" xml:space="preserve">
+    <value>파일 '{0}'의 Hex 변경 내용이 저장되지 않았습니다. 일반 보기로 돌아가기 전에 저장하시겠습니까?</value>
+  </data>
+  <data name="HexViewUnsavedChangesDiscard" xml:space="preserve">
+    <value>저장하지 않음</value>
+  </data>
   <data name="GitHistoryItemDialogTitle" xml:space="preserve">
     <value>커밋 정보 [{0}]</value>
   </data>

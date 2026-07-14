@@ -1325,6 +1325,15 @@
   <data name="UnsavedChangesCancel" xml:space="preserve">
     <value>取消</value>
   </data>
+  <data name="HexViewEnterUnsavedChangesMessage" xml:space="preserve">
+    <value>文件“{0}”的更改尚未保存。切换到 Hex 视图前是否保存？</value>
+  </data>
+  <data name="HexViewUnsavedChangesMessage" xml:space="preserve">
+    <value>文件“{0}”的 Hex 更改尚未保存。返回普通视图前是否保存？</value>
+  </data>
+  <data name="HexViewUnsavedChangesDiscard" xml:space="preserve">
+    <value>不保存</value>
+  </data>
   <data name="GitHistoryItemDialogTitle" xml:space="preserve">
     <value>提交信息 [{0}]</value>
   </data>

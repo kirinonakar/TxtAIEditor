@@ -1325,6 +1325,15 @@
   <data name="UnsavedChangesCancel" xml:space="preserve">
     <value>キャンセル</value>
   </data>
+  <data name="HexViewEnterUnsavedChangesMessage" xml:space="preserve">
+    <value>ファイル '{0}' の変更内容が保存されていません。Hex 表示に切り替える前に保存しますか？</value>
+  </data>
+  <data name="HexViewUnsavedChangesMessage" xml:space="preserve">
+    <value>ファイル '{0}' の Hex 変更内容が保存されていません。通常表示に戻る前に保存しますか？</value>
+  </data>
+  <data name="HexViewUnsavedChangesDiscard" xml:space="preserve">
+    <value>保存しない</value>
+  </data>
   <data name="GitHistoryItemDialogTitle" xml:space="preserve">
     <value>コミット情報 [{0}]</value>
   </data>

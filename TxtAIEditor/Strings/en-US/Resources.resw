@@ -1325,6 +1325,15 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="UnsavedChangesCancel" xml:space="preserve">
     <value>Cancel</value>
   </data>
+  <data name="HexViewEnterUnsavedChangesMessage" xml:space="preserve">
+    <value>Changes to file '{0}' have not been saved. Save them before switching to Hex view?</value>
+  </data>
+  <data name="HexViewUnsavedChangesMessage" xml:space="preserve">
+    <value>Hex changes to file '{0}' have not been saved. Save them before returning to the normal view?</value>
+  </data>
+  <data name="HexViewUnsavedChangesDiscard" xml:space="preserve">
+    <value>Don't save</value>
+  </data>
   <data name="GitHistoryItemDialogTitle" xml:space="preserve">
     <value>Commit Info [{0}]</value>
   </data>

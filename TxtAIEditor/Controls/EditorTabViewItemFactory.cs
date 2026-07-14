@@ -296,6 +296,11 @@ namespace TxtAIEditor.Controls
             CloseTaggedWebViews(tabItem.Content as FrameworkElement);
         }
 
+        public static void ReleaseViewerResources(FrameworkElement? content)
+        {
+            CloseTaggedWebViews(content);
+        }
+
         private static void ConfigureViewerWebView(CoreWebView2 coreWebView)
         {
             coreWebView.Settings.IsWebMessageEnabled = true;

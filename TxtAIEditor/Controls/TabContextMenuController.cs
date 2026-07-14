@@ -105,7 +105,8 @@ namespace TxtAIEditor.Controls
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 }
             };
-            hexViewItem.IsEnabled = tab.IsHexViewer || SupportsHexView(tab, fileActionPath);
+            hexViewItem.IsEnabled = !IsExecutableBinary(fileActionPath) &&
+                                    (tab.IsHexViewer || SupportsHexView(tab, fileActionPath));
             hexViewItem.Click += async (_, __) =>
             {
                 await _setHexViewModeAsync(tab, hexViewItem.IsChecked);
@@ -248,13 +249,16 @@ namespace TxtAIEditor.Controls
         private static bool SupportsHexView(OpenedTab tab, string? filePath)
         {
             return !tab.IsEncrypted &&
-                   !tab.IsImageViewer &&
                    !tab.IsMediaViewer &&
-                   !tab.IsPdfViewer &&
-                   !tab.IsDocxViewer &&
-                   !tab.IsOfficeDocumentViewer &&
                    !string.IsNullOrWhiteSpace(filePath) &&
                    File.Exists(filePath);
+        }
+
+        private static bool IsExecutableBinary(string? filePath)
+        {
+            string? extension = Path.GetExtension(filePath);
+            return string.Equals(extension, ".exe", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(extension, ".dll", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void SetClipboardText(string text)

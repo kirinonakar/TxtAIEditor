@@ -32,6 +32,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab> _openNewTab;
         private readonly Action<string> _closeReadOnlyViewer;
         private readonly Action _updateWindowTitle;
+        private Action<string>? _additionalTabCleanup;
 
         public TabCloseController(
             MainWindowViewModel viewModel,
@@ -195,6 +196,7 @@ namespace TxtAIEditor.Controls
 
         public void CloseAndCleanup(OpenedTab tab, TabViewItem tabItem)
         {
+            _additionalTabCleanup?.Invoke(tab.Id);
             _clearPendingSplitImeSync(tab.Id);
             _viewModel.Tabs.Remove(tab);
             _forgetEncryptionPassword(tab);
@@ -225,6 +227,11 @@ namespace TxtAIEditor.Controls
             }
 
             _updateWindowTitle();
+        }
+
+        public void SetAdditionalTabCleanup(Action<string> cleanup)
+        {
+            _additionalTabCleanup = cleanup;
         }
 
         private void CloseItemOrWarn(TabViewItem item)
