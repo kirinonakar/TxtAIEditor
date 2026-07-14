@@ -191,13 +191,16 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+const graphemeSegmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+    ? new Intl.Segmenter('en', { granularity: 'grapheme' })
+    : null;
+
 function graphemeDeleteStart(text, caret) {
     if (caret <= 0) return 0;
-    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    if (graphemeSegmenter) {
         try {
-            const s = new Intl.Segmenter('en', { granularity: 'grapheme' });
-            const segs = [...s.segment(text.slice(0, caret))];
-            return segs.length > 0 ? segs[segs.length - 1].index : 0;
+            const segment = graphemeSegmenter.segment(text).containing(caret - 1);
+            if (segment) return segment.index;
         } catch { }
     }
     let pos = caret - 1;
@@ -213,11 +216,10 @@ function graphemeDeleteStart(text, caret) {
 
 function graphemeDeleteEnd(text, caret) {
     if (caret >= text.length) return text.length;
-    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    if (graphemeSegmenter) {
         try {
-            const s = new Intl.Segmenter('en', { granularity: 'grapheme' });
-            const segs = [...s.segment(text.slice(caret))];
-            if (segs.length > 0) return caret + segs[0].segment.length;
+            const segment = graphemeSegmenter.segment(text).containing(caret);
+            if (segment) return segment.index + segment.segment.length;
         } catch { }
     }
     let pos = caret;
@@ -1397,7 +1399,10 @@ function computeDirtyLineMarkersGreedy(
 
     return markers;
 }
-function reportCursorAndSelection(element = document.activeElement, knownCaretOffset = null) {
+function reportCursorAndSelection(
+    element = document.activeElement,
+    knownCaretOffset = null,
+    includeSelection = true) {
     if (element && !document.body.contains(element)) {
         element = document.activeElement;
     }
@@ -1416,6 +1421,8 @@ function reportCursorAndSelection(element = document.activeElement, knownCaretOf
     }
 
     post({ type: 'cursorChanged', line: state.currentLine, column: state.currentColumn });
+    if (!includeSelection) return;
+
     const selInfo = selectionInfo();
     post({
         type: 'selectionResult',

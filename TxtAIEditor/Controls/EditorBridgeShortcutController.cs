@@ -18,6 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _togglePreviewWidth;
         private readonly Action _openNewTab;
         private readonly Action _saveFile;
+        private readonly Action _saveFileAs;
         private readonly Action _openFile;
         private readonly Action _requestTerminalToggle;
         private readonly Action _closeActiveTab;
@@ -38,6 +39,7 @@ namespace TxtAIEditor.Controls
             Action togglePreviewWidth,
             Action openNewTab,
             Action saveFile,
+            Action saveFileAs,
             Action openFile,
             Action requestTerminalToggle,
             Action closeActiveTab,
@@ -57,6 +59,7 @@ namespace TxtAIEditor.Controls
             _togglePreviewWidth = togglePreviewWidth;
             _openNewTab = openNewTab;
             _saveFile = saveFile;
+            _saveFileAs = saveFileAs;
             _openFile = openFile;
             _requestTerminalToggle = requestTerminalToggle;
             _closeActiveTab = closeActiveTab;
@@ -105,6 +108,9 @@ namespace TxtAIEditor.Controls
                     break;
                 case "save":
                     _saveFile();
+                    break;
+                case "saveAs":
+                    _saveFileAs();
                     break;
                 case "open":
                     _openFile();

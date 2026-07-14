@@ -361,7 +361,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
         if (earlyCtrl && earlyKey === 's') {
             event.preventDefault();
             hideAutocomplete(300);
-            post({ type: 'shortcut', name: 'save' });
+            post({ type: 'shortcut', name: event.shiftKey ? 'saveAs' : 'save' });
             return;
         }
 
@@ -539,7 +539,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
             if (key === 's') {
                 event.preventDefault();
                 hideAutocomplete(300);
-                post({ type: 'shortcut', name: 'save' });
+                post({ type: 'shortcut', name: event.shiftKey ? 'saveAs' : 'save' });
                 return;
             }
             if (key === 'o') {

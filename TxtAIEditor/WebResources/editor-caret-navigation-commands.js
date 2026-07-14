@@ -1,6 +1,7 @@
 export function createCaretNavigationCommands({
     caretRectForOffset,
     changedTextBetween,
+    clearCustomSelectionVisuals,
     clearPendingImeSelectionCollapse,
     commitLine,
     commitLineForSave,
@@ -300,8 +301,14 @@ export function createCaretNavigationCommands({
                 state.currentLine = target.line;
                 state.currentColumn = target.column + 1;
                 syncCustomSelectionClass();
-                queueRender(true);
-                setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
+                clearCustomSelectionVisuals();
+                if (target.line === lineNumber &&
+                    Number(moveElement?.dataset?.line || 0) === target.line) {
+                    setCaret(moveElement, target.column, 3 * state.lineHeight, false);
+                } else {
+                    queueRender(true);
+                    setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
+                }
             } else {
                 state.selection = null;
                 state.selectionAnchor = { line: target.line, column: target.column };
@@ -341,10 +348,12 @@ export function createCaretNavigationCommands({
         }
 
         let target = { line: lineNumber, column: caret };
+        let collapsedCustomSelection = false;
 
         if (!extendSelection && hasCustomSelection()) {
             const selection = normalizeSelection();
             if (selection) {
+                collapsedCustomSelection = true;
                 target = direction < 0
                     ? { line: selection.start.line, column: selection.start.column }
                     : { line: selection.end.line, column: selection.end.column };
@@ -373,13 +382,27 @@ export function createCaretNavigationCommands({
             state.currentLine = target.line;
             state.currentColumn = target.column + 1;
             syncCustomSelectionClass();
-            queueRender(true);
-            setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
+            clearCustomSelectionVisuals();
+            if (target.line === lineNumber &&
+                Number(moveElement?.dataset?.line || 0) === target.line) {
+                setCaret(moveElement, target.column, 3 * state.lineHeight, false);
+            } else {
+                queueRender(true);
+                setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
+            }
         } else {
             state.selection = null;
             state.selectionAnchor = { line: target.line, column: target.column };
             syncCustomSelectionClass();
-            focusLine(target.line, target.column, 3 * state.lineHeight);
+            if (collapsedCustomSelection) {
+                clearCustomSelectionVisuals();
+            }
+            if (target.line === lineNumber &&
+                Number(moveElement?.dataset?.line || 0) === target.line) {
+                setCaret(moveElement, target.column, 3 * state.lineHeight);
+            } else {
+                focusLine(target.line, target.column, 3 * state.lineHeight);
+            }
         }
 
         return true;

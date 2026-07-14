@@ -2,7 +2,12 @@ import { state } from './editor-core.js';
 import { viewport } from './editor-dom.js';
 
 function lineTextFromElement(element) {
-    return (element.textContent || '').replace(/\u00a0/g, ' ');
+    const onlyTextNode = element?.childNodes?.length === 1 &&
+        element.firstChild?.nodeType === Node.TEXT_NODE
+        ? element.firstChild
+        : null;
+    const text = onlyTextNode ? (onlyTextNode.nodeValue || '') : (element?.textContent || '');
+    return text.includes('\u00a0') ? text.replace(/\u00a0/g, ' ') : text;
 }
 
 function normalizeSelection(selection = state.selection) {
@@ -239,6 +244,17 @@ function textPositionForOffset(element, offset) {
     if (!element) return null;
 
     let remaining = Math.max(0, Number(offset || 0));
+    const onlyTextNode = element.childNodes.length === 1 &&
+        element.firstChild?.nodeType === Node.TEXT_NODE
+        ? element.firstChild
+        : null;
+    if (onlyTextNode) {
+        return {
+            node: onlyTextNode,
+            offset: Math.min(remaining, onlyTextNode.nodeValue?.length || 0)
+        };
+    }
+
     let lastText = null;
 
     function walk(node) {

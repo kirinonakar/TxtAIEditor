@@ -25,6 +25,7 @@ import { bindClipboardEvents } from './editor-clipboard-events.js';
 import { bindKeyboardEvents } from './editor-keyboard-events.js';
 import { bindPointerSelectionEvents } from './editor-pointer-selection-events.js';
 import { bindTextInputEvents } from './editor-text-input-events.js';
+import { hasCustomSelection } from './editor-selection.js';
 
 export function bindEditorEvents({
     findReplaceController,
@@ -71,7 +72,7 @@ export function bindEditorEvents({
 
     let nativeSelectionReportTimer = 0;
     document.addEventListener('selectionchange', () => {
-        if (state.isSelecting) return;
+        if (state.isSelecting || hasCustomSelection()) return;
         clearTimeout(nativeSelectionReportTimer);
         nativeSelectionReportTimer = setTimeout(() => {
             reportCursorAndSelection(document.activeElement);

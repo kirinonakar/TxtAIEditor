@@ -311,9 +311,7 @@ function createEditorRenderer({
                 shouldShowSource &&
                 !isLong &&
                 !state.isComposing;
-            // JSON token spans are capped separately from display truncation so medium-sized
-            // minified lines stay visible without paying the syntax-highlighting DOM cost. The
-            // selected range and search matches keep lightweight spans so their overlays remain visible.
+            // Long JSON rows skip token spans independently of search and selection overlays.
             let lineContent = renderLineContent(
                 line,
                 displayText,

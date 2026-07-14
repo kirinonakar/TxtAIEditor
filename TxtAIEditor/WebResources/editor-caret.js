@@ -156,6 +156,17 @@ function getCaretOffsetFromPoint(element, clientX, clientY) {
     }
 
     if (range && element.contains(range.startContainer)) {
+        const onlyTextNode = element.childNodes.length === 1 &&
+            element.firstChild?.nodeType === Node.TEXT_NODE
+            ? element.firstChild
+            : null;
+        if (onlyTextNode && range.startContainer === onlyTextNode) {
+            return Math.max(0, Math.min(range.startOffset, onlyTextNode.nodeValue?.length || 0));
+        }
+        if (onlyTextNode && range.startContainer === element) {
+            return range.startOffset <= 0 ? 0 : (onlyTextNode.nodeValue?.length || 0);
+        }
+
         const before = range.cloneRange();
         before.selectNodeContents(element);
         before.setEnd(range.startContainer, range.startOffset);
@@ -276,7 +287,7 @@ function selectWordAtPointer(event) {
     return true;
 }
 
-function setCaret(element, offset, scrollMargin = 0) {
+function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = true) {
     const oldActiveElement = document.activeElement?.closest?.('.line-text');
     const oldActiveLine = oldActiveElement ? Number(oldActiveElement.dataset.line || 0) : null;
 
@@ -346,7 +357,7 @@ function setCaret(element, offset, scrollMargin = 0) {
         }
     }
 
-    reportCursorAndSelection(element);
+    reportCursorAndSelection(element, getCaretOffset(element), includeSelectionReport);
 
     if (oldActiveLine !== null && oldActiveLine !== state.editingLine) {
         queueRender(true);

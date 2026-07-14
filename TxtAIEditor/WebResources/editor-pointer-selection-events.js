@@ -5,6 +5,7 @@ import {
     viewport
 } from './editor-dom.js';
 import {
+    clearCustomSelectionVisuals,
     post,
     preserveScrollTop,
     queueRender,
@@ -1151,11 +1152,11 @@ export function bindPointerSelectionEvents({
         };
     }
 
-    function updateSelectionFromPointer(event) {
+    function updateSelectionFromPointer(event, options = {}) {
         const position = positionFromPointer(event);
         if (!position) return false;
 
-        return updateSelectionFromPosition(position, event);
+        return updateSelectionFromPosition(position, event, options);
     }
 
     function updateSelectionFromPosition(position, event, options = {}) {
@@ -1221,12 +1222,13 @@ export function bindPointerSelectionEvents({
             state.currentColumn = position.column + 1;
             if (options.render === false) {
                 if (options.drawOverlays) {
+                    clearCustomSelectionVisuals();
                     drawEditableSelectionOverlays();
                 }
             } else {
                 queueRender(true);
             }
-            reportCursorAndSelection(position.element);
+            reportCursorAndSelection(position.element, null, false);
         }
 
         return true;
@@ -1264,7 +1266,7 @@ export function bindPointerSelectionEvents({
             return;
         }
 
-        updateSelectionFromPointer(pointer);
+        updateSelectionFromPointer(pointer, { render: false, drawOverlays: true });
     }
 
     function runSelectionAutoScroll() {
@@ -1306,7 +1308,9 @@ export function bindPointerSelectionEvents({
             const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
             scrollContainer.scrollTop = Math.min(maxScrollTop, Math.max(0, beforeTop + dy));
             if (scrollContainer.scrollLeft !== beforeLeft || scrollContainer.scrollTop !== beforeTop) {
-                updateSelectionFromPointer(selectionAutoScrollPointer);
+                updateSelectionFromPointer(
+                    selectionAutoScrollPointer,
+                    { render: false, drawOverlays: true });
             }
         }
 
@@ -1381,7 +1385,7 @@ export function bindPointerSelectionEvents({
 
         event.preventDefault();
         updateSelectionAutoScrollPointer(event);
-        updateSelectionFromPointer(event);
+        updateSelectionFromPointer(event, { render: false, drawOverlays: true });
     });
 
     scrollContainer.addEventListener('pointerleave', event => {

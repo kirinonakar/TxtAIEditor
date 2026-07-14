@@ -252,6 +252,7 @@ namespace TxtAIEditor.Composition
                     TogglePreviewWidth,
                     () => callbacks.OpenNewTab(),
                     () => toolbarCommandController?.SaveActive(),
+                    () => toolbarCommandController?.SaveActiveAs(),
                     () => toolbarCommandController?.OpenFile(),
                     callbacks.CloseActiveTab,
                     () => toolbarCommandController?.Print(),

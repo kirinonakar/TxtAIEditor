@@ -77,7 +77,7 @@ import { createMarkdownCommandHandlers } from './editor-markdown-commands.js';
 import { createTextCommandActions } from './editor-text-command-actions.js';
 
 let splitScrollRestoreToken = 0;
-const LONG_LINE_EDIT_THRESHOLD = 1000;
+const LONG_LINE_EDIT_THRESHOLD = 500;
 
 function postLineUpdate(lineNumber, previousText, nextText, isComposing = false) {
     const before = String(previousText ?? '');
@@ -1244,6 +1244,7 @@ const {
 } = createCaretNavigationCommands({
     caretRectForOffset,
     changedTextBetween,
+    clearCustomSelectionVisuals,
     clearPendingImeSelectionCollapse,
     commitLine,
     commitLineForSave,
