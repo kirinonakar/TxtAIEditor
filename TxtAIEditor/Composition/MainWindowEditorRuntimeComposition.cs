@@ -30,7 +30,7 @@ namespace TxtAIEditor.Composition
         Action<bool> SetScrollSyncEnabled,
         Func<string> GetCurrentFolderPath,
         Func<bool> IsLivePreviewEnabled,
-        Func<bool> IsCsvTableModeEnabled,
+        Action<OpenedTab> SyncCsvTableModeUi,
         Func<OpenedTab, string> GetPreviewBaseHref,
         Func<string, string, string> GetLocalizedString,
         Action<EditorSettings> ApplyEditorSurfaceBackground,
@@ -152,6 +152,7 @@ namespace TxtAIEditor.Composition
                 callbacks.GetLocalizedString,
                 livePreview.Render,
                 callbacks.UpdateLanguageUi,
+                callbacks.SyncCsvTableModeUi,
                 toc,
                 callbacks.UpdateWindowTitle);
 
@@ -199,7 +200,6 @@ namespace TxtAIEditor.Composition
                 callbacks.GetCurrentFolderPath,
                 callbacks.IsLivePreviewEnabled,
                 callbacks.IsScrollSyncEnabled,
-                callbacks.IsCsvTableModeEnabled,
                 callbacks.GetPreviewBaseHref,
                 callbacks.GetLocalizedString,
                 callbacks.ApplyEditorSurfaceBackground,

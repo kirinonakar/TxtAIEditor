@@ -104,8 +104,6 @@ namespace TxtAIEditor.Controls
 
         public bool LivePreviewEnabled { get; private set; }
 
-        public bool CsvTableModeEnabled { get; private set; }
-
         public async void OpenFile() => await _fileOpenDropController.OpenFileAsync();
 
         public async void SaveActive() => await SaveActiveAsync();
@@ -126,6 +124,26 @@ namespace TxtAIEditor.Controls
         {
             _topToolbar.LivePreviewIsChecked = !_topToolbar.LivePreviewIsChecked;
             _ = ApplyLivePreviewToggleAsync();
+        }
+
+        public void SyncCsvTableMode(OpenedTab tab)
+        {
+            _topToolbar.CsvTableIsChecked = tab.IsCsvTableModeEnabled;
+        }
+
+        public async Task SetCsvTableModeAsync(OpenedTab tab, bool enabled)
+        {
+            tab.IsCsvTableModeEnabled = enabled && !tab.IsHexViewer;
+
+            if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+            {
+                await bridgeGroup.Bridge.SetCsvTableModeAsync(tab.IsCsvTableModeEnabled);
+            }
+
+            if (ReferenceEquals(_tabNavigationController.GetActiveTab(), tab))
+            {
+                SyncCsvTableMode(tab);
+            }
         }
 
         public async void Print() => await PrintAsync();
@@ -254,14 +272,10 @@ namespace TxtAIEditor.Controls
 
         private async Task ApplyCsvTableModeAsync()
         {
-            CsvTableModeEnabled = _topToolbar.CsvTableIsChecked;
-
-            foreach (var grp in _tabBridges.Values)
+            var tab = _tabNavigationController.GetActiveTab();
+            if (tab != null)
             {
-                if (grp.Bridge != null)
-                {
-                    await grp.Bridge.SetCsvTableModeAsync(CsvTableModeEnabled);
-                }
+                await SetCsvTableModeAsync(tab, _topToolbar.CsvTableIsChecked);
             }
         }
 

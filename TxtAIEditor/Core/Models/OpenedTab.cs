@@ -133,6 +133,7 @@ namespace TxtAIEditor.Core.Models
         public bool IsDocxViewer { get; set; } = false;
         public bool IsOfficeDocumentViewer { get; set; } = false;
         public bool IsHexViewer { get; set; } = false;
+        public bool IsCsvTableModeEnabled { get; set; } = false;
         public string? HexSourceFilePath { get; set; }
         public bool IsReadOnlyTextFile { get; set; } = false;
         private string? _archiveSourcePath;

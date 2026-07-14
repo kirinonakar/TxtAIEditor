@@ -19,6 +19,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task> _navigateExplorerToFolderAsync;
         private readonly Func<OpenedTab, TabViewItem, Task> _reloadTabAsync;
         private readonly Func<OpenedTab, Task> _openHexViewAsync;
+        private readonly Func<OpenedTab, bool, Task> _setCsvTableModeAsync;
         private readonly Func<OpenedTab, Task> _encryptTabAsync;
         private readonly Func<OpenedTab, Task> _changeEncryptionPasswordAsync;
         private readonly Func<OpenedTab, Task> _removeEncryptionAsync;
@@ -34,6 +35,7 @@ namespace TxtAIEditor.Controls
             Func<string, Task> navigateExplorerToFolderAsync,
             Func<OpenedTab, TabViewItem, Task> reloadTabAsync,
             Func<OpenedTab, Task> openHexViewAsync,
+            Func<OpenedTab, bool, Task> setCsvTableModeAsync,
             Func<OpenedTab, Task> encryptTabAsync,
             Func<OpenedTab, Task> changeEncryptionPasswordAsync,
             Func<OpenedTab, Task> removeEncryptionAsync,
@@ -48,6 +50,7 @@ namespace TxtAIEditor.Controls
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
             _reloadTabAsync = reloadTabAsync;
             _openHexViewAsync = openHexViewAsync;
+            _setCsvTableModeAsync = setCsvTableModeAsync;
             _encryptTabAsync = encryptTabAsync;
             _changeEncryptionPasswordAsync = changeEncryptionPasswordAsync;
             _removeEncryptionAsync = removeEncryptionAsync;
@@ -106,6 +109,17 @@ namespace TxtAIEditor.Controls
                                     File.Exists(fileActionPath);
             hexViewItem.Click += async (_, __) => await _openHexViewAsync(tab);
             menu.Items.Add(hexViewItem);
+
+            var csvTableItem = new ToggleMenuFlyoutItem
+            {
+                Text = _getString("CsvTable", "CSV 테이블"),
+                Icon = new FontIcon { Glyph = "\uE80A" },
+                IsChecked = tab.IsCsvTableModeEnabled,
+                IsEnabled = SupportsCsvTableView(tab)
+            };
+            csvTableItem.Click += async (_, __) =>
+                await _setCsvTableModeAsync(tab, csvTableItem.IsChecked);
+            menu.Items.Add(csvTableItem);
 
             if (!tab.IsReadOnlyViewer)
             {
@@ -216,6 +230,16 @@ namespace TxtAIEditor.Controls
             return !string.IsNullOrWhiteSpace(tab.FilePath)
                 ? tab.FilePath
                 : tab.HexSourceFilePath;
+        }
+
+        private static bool SupportsCsvTableView(OpenedTab tab)
+        {
+            return !tab.IsImageViewer &&
+                   !tab.IsMediaViewer &&
+                   !tab.IsPdfViewer &&
+                   !tab.IsDocxViewer &&
+                   !tab.IsOfficeDocumentViewer &&
+                   !tab.IsHexViewer;
         }
 
         private static void SetClipboardText(string text)

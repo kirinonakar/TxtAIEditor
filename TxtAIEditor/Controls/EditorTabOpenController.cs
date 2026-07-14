@@ -43,7 +43,6 @@ namespace TxtAIEditor.Controls
         private readonly Func<string> _getCurrentFolderPath;
         private readonly Func<bool> _isLivePreviewEnabled;
         private readonly Func<bool> _isScrollSyncEnabled;
-        private readonly Func<bool> _isCsvTableModeEnabled;
         private readonly Func<OpenedTab, string> _getPreviewBaseHref;
         private readonly Func<string, string, string> _getLocalizedString;
         private readonly Action<EditorSettings> _applyEditorSurfaceBackground;
@@ -79,7 +78,6 @@ namespace TxtAIEditor.Controls
             Func<string> getCurrentFolderPath,
             Func<bool> isLivePreviewEnabled,
             Func<bool> isScrollSyncEnabled,
-            Func<bool> isCsvTableModeEnabled,
             Func<OpenedTab, string> getPreviewBaseHref,
             Func<string, string, string> getLocalizedString,
             Action<EditorSettings> applyEditorSurfaceBackground,
@@ -114,7 +112,6 @@ namespace TxtAIEditor.Controls
             _getCurrentFolderPath = getCurrentFolderPath;
             _isLivePreviewEnabled = isLivePreviewEnabled;
             _isScrollSyncEnabled = isScrollSyncEnabled;
-            _isCsvTableModeEnabled = isCsvTableModeEnabled;
             _getPreviewBaseHref = getPreviewBaseHref;
             _getLocalizedString = getLocalizedString;
             _applyEditorSurfaceBackground = applyEditorSurfaceBackground;
@@ -733,7 +730,7 @@ namespace TxtAIEditor.Controls
             {
                 await bridge.UpdateScrollSyncStateAsync(_isScrollSyncEnabled());
                 await bridge.SetInlineLivePreviewAsync(!tab.IsHexViewer && _isLivePreviewEnabled(), _getPreviewBaseHref(tab));
-                await bridge.SetCsvTableModeAsync(!tab.IsHexViewer && _isCsvTableModeEnabled());
+                await bridge.SetCsvTableModeAsync(!tab.IsHexViewer && tab.IsCsvTableModeEnabled);
 
                 var snippets = _snippetService.GetSnippets();
                 var autocompleteWords = _snippetService.GetAutocompleteWords();

@@ -25,6 +25,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Action<OpenedTab> _updateLivePreview;
         private readonly Action<OpenedTab> _updateLanguageUi;
+        private readonly Action<OpenedTab> _syncCsvTableModeUi;
         private readonly TocController _tocController;
         private readonly Action _updateWindowTitle;
         private int _selectionUpdateVersion;
@@ -42,6 +43,7 @@ namespace TxtAIEditor.Controls
             Func<string, string, string> getString,
             Action<OpenedTab> updateLivePreview,
             Action<OpenedTab> updateLanguageUi,
+            Action<OpenedTab> syncCsvTableModeUi,
             TocController tocController,
             Action updateWindowTitle)
         {
@@ -57,6 +59,7 @@ namespace TxtAIEditor.Controls
             _getString = getString;
             _updateLivePreview = updateLivePreview;
             _updateLanguageUi = updateLanguageUi;
+            _syncCsvTableModeUi = syncCsvTableModeUi;
             _tocController = tocController;
             _updateWindowTitle = updateWindowTitle;
 
@@ -118,6 +121,7 @@ namespace TxtAIEditor.Controls
                     _statusBarController.UpdateSelectionStats(null);
                     _updateLivePreview(tab);
                     _updateLanguageUi(tab);
+                    _syncCsvTableModeUi(tab);
                     _statusBarController.SyncEncodingCombo(tab);
                     _statusBarController.SyncLineEndingText(tab);
 

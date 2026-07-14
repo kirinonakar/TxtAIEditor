@@ -407,6 +407,20 @@ namespace TxtAIEditor.Composition
                         callbacks.UpdateLanguageUi,
                         callbacks.UpdateWindowTitle),
                     callbacks.OpenHexViewAsync,
+                    async (tab, enabled) =>
+                    {
+                        if (toolbarCommandController != null)
+                        {
+                            await toolbarCommandController.SetCsvTableModeAsync(tab, enabled);
+                            return;
+                        }
+
+                        tab.IsCsvTableModeEnabled = enabled && !tab.IsHexViewer;
+                        if (state.TabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                        {
+                            await bridgeGroup.Bridge.SetCsvTableModeAsync(tab.IsCsvTableModeEnabled);
+                        }
+                    },
                     (_, tabItem, tabView) => tabCloseController.CloseRightTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseLeftTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseOtherTabs(tabItem, tabView)));
@@ -504,7 +518,7 @@ namespace TxtAIEditor.Composition
                     },
                     () => state.CurrentFolderPath,
                     () => toolbarCommandController?.LivePreviewEnabled == true,
-                    () => toolbarCommandController?.CsvTableModeEnabled == true,
+                    tab => toolbarCommandController?.SyncCsvTableMode(tab),
                     callbacks.GetPreviewBaseHref,
                     callbacks.GetLocalizedString,
                     ApplyEditorSurfaceBackground,
