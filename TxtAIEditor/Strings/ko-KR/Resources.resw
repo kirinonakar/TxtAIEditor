@@ -1290,7 +1290,7 @@
     <value>로딩 중...</value>
   </data>
   <data name="EditorLongLineProtectionFormat" xml:space="preserve">
-    <value>긴 줄: {0}자, 렌더링 보호</value>
+    <value>... too long (전체 {0}자)</value>
   </data>
   <data name="StatusTotalLinesFormat" xml:space="preserve">
     <value>전체 줄수: {0}</value>

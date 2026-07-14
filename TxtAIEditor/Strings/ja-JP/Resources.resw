@@ -1290,7 +1290,7 @@
     <value>読み込み中...</value>
   </data>
   <data name="EditorLongLineProtectionFormat" xml:space="preserve">
-    <value>長い行: {0} 文字, レンダリング保護</value>
+    <value>... 長すぎるため省略（全 {0} 文字）</value>
   </data>
   <data name="StatusTotalLinesFormat" xml:space="preserve">
     <value>総行数: {0}</value>

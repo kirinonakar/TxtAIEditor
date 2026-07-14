@@ -28,6 +28,24 @@ import {
 } from './editor-csv-table.js';
 import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
 
+const MAX_JSON_SYNTAX_HIGHLIGHT_CHARS = 1000;
+
+function renderPlainLineContent(text, selectionBounds) {
+    if (!selectionBounds) {
+        return escapeHtml(text);
+    }
+
+    const start = Math.max(0, Math.min(selectionBounds.start, text.length));
+    const end = Math.max(start, Math.min(selectionBounds.end, text.length));
+    if (start === end) {
+        return escapeHtml(text);
+    }
+
+    return escapeHtml(text.slice(0, start)) +
+        `<span class="selection-fragment">${escapeHtml(text.slice(start, end))}</span>` +
+        escapeHtml(text.slice(end));
+}
+
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
     getCaretOffset,
@@ -268,12 +286,26 @@ function createEditorRenderer({
             const hasLine = state.cache.has(line);
             const text = hasLine ? state.cache.get(line) : '';
             const isLong = hasLine && text.length > MAX_RENDER_CHARS;
-            const displayText = text;
-            const contentEditable = !state.readOnly && hasLine ? 'true' : 'false';
+            const shouldSkipSyntaxHighlighting = isLong ||
+                (hasLine && state.language === 'json' && text.length >= MAX_JSON_SYNTAX_HIGHLIGHT_CHARS);
+            const isTruncatedLongLine = isLong && state.language === 'json';
+            const displayText = isTruncatedLongLine
+                ? text.slice(0, MAX_RENDER_CHARS)
+                : text;
+            const longLineMessage = isTruncatedLongLine
+                ? String(state.longLineProtectionFormat || '... too long ({0} characters)')
+                    .replace('{0}', text.length.toLocaleString())
+                : '';
+            // A truncated contenteditable would commit only the visible prefix and destroy the
+            // hidden JSON tail. Keep the model intact and expose this row as a protected preview.
+            const contentEditable = !state.readOnly && hasLine && !isTruncatedLongLine ? 'true' : 'false';
             const selectionBounds = selectionBoundsForLine(line, displayText.length);
             const isInSelection = !!selectionBounds;
             const isSelectedEmptyLine = isInSelection && displayText.length === 0 && hasCustomSelection();
-            const textClass = `line-text${hasLine ? '' : ' loading'}${isLong ? ' long-line' : ''}`;
+            const textClass = `line-text${hasLine ? '' : ' loading'}${isLong ? ' long-line' : ''}${isTruncatedLongLine ? ' truncated-long-line' : ''}`;
+            const longLineAttributes = isTruncatedLongLine
+                ? ` data-long-line-message="${escapeHtml(longLineMessage)}" title="${escapeHtml(longLineMessage)}"`
+                : '';
             const shouldShowSelectionSource = state.inlineLivePreviewEnabled &&
                 hasLine &&
                 !isLong &&
@@ -294,10 +326,11 @@ function createEditorRenderer({
                 shouldShowSource &&
                 !isLong &&
                 !state.isComposing;
-            // Very long lines stay fully editable, but syntax highlighting is skipped to avoid
-            // creating thousands of token spans and blocking the UI thread.
-            let lineContent = isLong
-                ? escapeHtml(displayText)
+            // JSON token spans are capped separately from display truncation so medium-sized
+            // minified lines stay visible without paying the syntax-highlighting DOM cost. The
+            // selected range still gets one lightweight span so its shading remains visible.
+            let lineContent = shouldSkipSyntaxHighlighting
+                ? renderPlainLineContent(displayText, selectionBounds)
                 : renderLineContent(line, displayText, false, isInlineLivePreviewSourceLine);
             let livePreviewClass = '';
             let liveContentEditable = contentEditable;
@@ -382,7 +415,7 @@ function createEditorRenderer({
             rows.push(
                 `<div class="line-row${livePreviewClass}${editingClass}${hoveredClass}${isInSelection ? ' selected-row' : ''}${isSelectedEmptyLine ? ' selected-empty-row' : ''}${dirtyClass}" data-line="${line}"${livePreviewAttributes}>` +
                 `<div class="line-number">${line}</div>` +
-                `<div class="${textClass}" contenteditable="${liveContentEditable}" spellcheck="false" data-line="${line}">${lineContent}</div>` +
+                `<div class="${textClass}" contenteditable="${liveContentEditable}" spellcheck="false" data-line="${line}"${longLineAttributes}>${lineContent}</div>` +
                 `</div>`
             );
         }

@@ -118,7 +118,7 @@ const state = {
     originalLines: [],
     dirtyLines: new Map(),
     csvVirtualLineCount: 0,
-    longLineProtectionFormat: 'Long line: {0} chars, render protection'
+    longLineProtectionFormat: '... too long ({0} characters total)'
 };
 
 state.lineEndStacks = new Map();

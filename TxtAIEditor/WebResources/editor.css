@@ -584,10 +584,34 @@ body.csv-table-mode:not(.wrap-enabled) .line-row.csv-row {
     overflow-wrap: normal;
 }
 
+.line-text.truncated-long-line {
+    cursor: default;
+}
+
+.line-text.truncated-long-line::after {
+    content: attr(data-long-line-message);
+    display: inline-block;
+    margin-left: 12px;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, var(--gutter-fg) 45%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--gutter-fg) 12%, transparent);
+    color: var(--gutter-fg);
+    font-style: italic;
+    user-select: none;
+}
+
 body.wrap-enabled .line-text.long-line {
     width: max-content;
     min-width: 100%;
     overflow: visible;
+}
+
+body.wrap-enabled .line-text.truncated-long-line {
+    width: 100%;
+    min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .inline-live-preview-enabled .line-row.live-preview-row {

@@ -1290,7 +1290,7 @@
     <value>加载中...</value>
   </data>
   <data name="EditorLongLineProtectionFormat" xml:space="preserve">
-    <value>长线：{0} 字符，渲染保护</value>
+    <value>... 内容过长（共 {0} 个字符）</value>
   </data>
   <data name="StatusTotalLinesFormat" xml:space="preserve">
     <value>总行数：{0}</value>

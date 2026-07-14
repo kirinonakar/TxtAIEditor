@@ -1290,7 +1290,7 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
     <value>Loading...</value>
   </data>
   <data name="EditorLongLineProtectionFormat" xml:space="preserve">
-    <value>Long line: {0} chars, render protection</value>
+    <value>... too long ({0} characters total)</value>
   </data>
   <data name="StatusTotalLinesFormat" xml:space="preserve">
     <value>Total Lines: {0}</value>
