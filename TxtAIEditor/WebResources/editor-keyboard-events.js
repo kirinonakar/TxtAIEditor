@@ -441,6 +441,22 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 active.tagName === 'INPUT' ||
                 active.tagName === 'TEXTAREA'
             );
+            const verticalImeArrowKey = event.key === 'ArrowUp' || event.key === 'ArrowDown'
+                ? event.key
+                : (event.code === 'ArrowUp' || event.code === 'ArrowDown' ? event.code : '');
+            if (!isFindOrInput && state.isComposing && verticalImeArrowKey) {
+                const compositionElement = lineElementFromEvent(event) || activeEditableElement();
+                // WebView2 reports the arrow key that commits Korean IME text as
+                // an in-composition key (often keyCode 229). Moving immediately
+                // would touch the native composition selection, so remember the
+                // intent and apply it once compositionend has committed the DOM.
+                state.pendingImeVerticalNavigation = {
+                    direction: verticalImeArrowKey === 'ArrowUp' ? -1 : 1,
+                    extendSelection: !!event.shiftKey,
+                    lineNumber: Number(compositionElement?.dataset?.line || state.compositionLine || state.currentLine || 1),
+                    column: compositionElement ? getCaretOffset(compositionElement) : Math.max(0, state.currentColumn - 1)
+                };
+            }
             if (!isFindOrInput && !state.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) {
                 const imeElement = lineElementFromEvent(event) || activeEditableElement();
                 const pendingSelection = compositionSelectionRange();

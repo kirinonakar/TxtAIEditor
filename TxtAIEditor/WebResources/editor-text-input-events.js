@@ -20,6 +20,7 @@ import {
     finishColumnComposition,
     finishRangeComposition,
     focusImeBypassTextarea,
+    focusLine,
     getCaretOffset,
     inputRangeInElement,
     isPendingImeSelectionCollapseFor,
@@ -29,6 +30,7 @@ import {
     makeEditablePlainText,
     mergeLineBackward,
     mergeLineForward,
+    moveCaretVertical,
     replaceSelectionForCompositionStart,
     replaceSelectionWith,
     shouldSuppressNativeBeforeInput,
@@ -41,6 +43,17 @@ import {
 
 export function bindTextInputEvents({ renderer }) {
     const { clearPendingInlineLivePreviewFocusForLine } = renderer;
+    let postCompositionNavigationInputGuard = null;
+
+    function guardNextCompositionInput(lineNumber) {
+        const guard = { lineNumber: Number(lineNumber || 0) };
+        postCompositionNavigationInputGuard = guard;
+        setTimeout(() => {
+            if (postCompositionNavigationInputGuard === guard) {
+                postCompositionNavigationInputGuard = null;
+            }
+        }, 0);
+    }
 
     function isSplitMultilineCompositionSelection(selection) {
         return !!state.isSplitView &&
@@ -55,6 +68,11 @@ export function bindTextInputEvents({ renderer }) {
         }
         const element = lineElementFromEvent(event);
         if (element) {
+            if (postCompositionNavigationInputGuard &&
+                Number(element.dataset.line || 0) === postCompositionNavigationInputGuard.lineNumber) {
+                postCompositionNavigationInputGuard = null;
+                return;
+            }
             if (!state.isComposing && isPendingImeSelectionCollapseFor(element, event)) {
                 return;
             }
@@ -106,6 +124,8 @@ export function bindTextInputEvents({ renderer }) {
 
     viewport.addEventListener('compositionstart', event => {
         cancelAutocompleteCaretRestore();
+        postCompositionNavigationInputGuard = null;
+        state.pendingImeVerticalNavigation = null;
         let element = lineElementFromEvent(event) || activeEditableElement();
         const pendingCompositionSelection = compositionSelectionRange();
         let collapsedSelectionForComposition = false;
@@ -153,16 +173,49 @@ export function bindTextInputEvents({ renderer }) {
     viewport.addEventListener('compositionend', event => {
         const element = lineElementFromEvent(event) || activeEditableElement();
         const lineNumber = element ? Number(element.dataset.line || state.compositionLine || state.currentLine) : state.compositionLine;
+        const pendingVerticalNavigation = state.pendingImeVerticalNavigation;
 
         state.isComposing = false;
         clearPendingImeSelectionCollapse();
         state.compositionLine = null;
+        state.pendingImeVerticalNavigation = null;
+
+        const moveAfterComposition = current => {
+            if (!pendingVerticalNavigation || !current ||
+                current.getAttribute('contenteditable') !== 'true') {
+                return false;
+            }
+
+            const sourceLine = Math.min(
+                state.lineCount,
+                Math.max(1, Number(pendingVerticalNavigation.lineNumber || lineNumber || state.currentLine || 1)));
+            const sourceColumn = Math.max(0, Number(pendingVerticalNavigation.column || 0));
+            focusLine(sourceLine, sourceColumn);
+            const source = viewport.querySelector(`.line-text[data-line="${sourceLine}"]`) || current;
+
+            return moveCaretVertical(
+                source,
+                pendingVerticalNavigation.direction,
+                pendingVerticalNavigation.extendSelection);
+        };
 
         if (finishRangeComposition(element, lineNumber, event.data || '')) {
+            if (pendingVerticalNavigation) {
+                setTimeout(() => {
+                    const current = activeEditableElement();
+                    moveAfterComposition(current);
+                }, 0);
+            }
             return;
         }
 
         if (finishColumnComposition(element, lineNumber)) {
+            if (pendingVerticalNavigation) {
+                setTimeout(() => {
+                    const current = activeEditableElement();
+                    moveAfterComposition(current);
+                }, 0);
+            }
             return;
         }
 
@@ -170,14 +223,20 @@ export function bindTextInputEvents({ renderer }) {
             state.selection = null;
             syncCustomSelectionClass();
             state.editingLine = lineNumber;
-            setTimeout(() => {
-                const current = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) || element;
-                if (current && current.getAttribute('contenteditable') === 'true') {
-                    const inputSnapshot = commitLine(current);
+            const current = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) || element;
+            if (current && current.getAttribute('contenteditable') === 'true') {
+                // Finalize the composition before the next physical keydown. A
+                // zero-delay timer here used to run after ArrowDown had already
+                // moved the caret, and commitLine() then restored currentLine to
+                // the composition source row.
+                const inputSnapshot = commitLine(current);
+                if (moveAfterComposition(current)) {
+                    guardNextCompositionInput(lineNumber);
+                } else {
                     triggerAutocomplete(current, inputSnapshot);
                     queueRender(true);
                 }
-            }, 0);
+            }
         }
     });
 

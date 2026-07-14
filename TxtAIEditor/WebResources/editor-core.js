@@ -85,6 +85,7 @@ const state = {
     isComposing: false,
     compositionLine: null,
     columnComposition: null,
+    pendingImeVerticalNavigation: null,
     pendingImeSelectionCollapse: null,
     textareaImeBypassActive: false,
     bypassStartLine: null,
