@@ -64,13 +64,17 @@ function getLineStartStack(lineNumber) {
 }
 
 const htmlNamePattern = /^[A-Za-z_][A-Za-z0-9:._-]*/;
+const markdownHtmlBlockLinePattern = /^\s*<(?:\/?[A-Za-z][A-Za-z0-9:._-]*(?:\s|\/?>)|!--|!\[CDATA\[|![A-Za-z])/;
 
 function createHtmlLineContext() {
     return {
         inTag: false,
         tagNameSeen: false,
         quote: null,
-        special: null
+        special: null,
+        tagName: null,
+        closingTag: false,
+        rawTextTag: null
     };
 }
 
@@ -79,14 +83,40 @@ function cloneHtmlLineContext(context) {
         inTag: !!context?.inTag,
         tagNameSeen: !!context?.tagNameSeen,
         quote: context?.quote || null,
-        special: context?.special || null
+        special: context?.special || null,
+        tagName: context?.tagName || null,
+        closingTag: !!context?.closingTag,
+        rawTextTag: context?.rawTextTag || null
     };
 }
 
-function closeHtmlTagContext(context) {
+function closeHtmlTagContext(context, selfClosing = false) {
+    if (!selfClosing && !context.closingTag &&
+        (context.tagName === 'style' || context.tagName === 'script')) {
+        context.rawTextTag = context.tagName;
+    }
+
     context.inTag = false;
     context.tagNameSeen = false;
     context.quote = null;
+    context.tagName = null;
+    context.closingTag = false;
+}
+
+function findRawTextClosingTag(text, startIndex, tagName) {
+    const lowerText = text.toLowerCase();
+    const needle = `</${tagName}`;
+    let index = lowerText.indexOf(needle, startIndex);
+
+    while (index >= 0) {
+        const nextChar = lowerText[index + needle.length];
+        if (nextChar === undefined || /[\s>]/.test(nextChar)) {
+            return index;
+        }
+        index = lowerText.indexOf(needle, index + needle.length);
+    }
+
+    return -1;
 }
 
 function advanceHtmlContext(context, text) {
@@ -94,6 +124,14 @@ function advanceHtmlContext(context, text) {
     let i = 0;
 
     while (i < text.length) {
+        if (next.rawTextTag) {
+            const closingTag = findRawTextClosingTag(text, i, next.rawTextTag);
+            if (closingTag < 0) return next;
+            next.rawTextTag = null;
+            i = closingTag;
+            continue;
+        }
+
         if (next.special === 'comment') {
             const end = text.indexOf('-->', i);
             if (end < 0) return next;
@@ -135,7 +173,7 @@ function advanceHtmlContext(context, text) {
             }
 
             if ((ch === '/' || ch === '?') && text[i + 1] === '>') {
-                closeHtmlTagContext(next);
+                closeHtmlTagContext(next, true);
                 i += 2;
                 continue;
             }
@@ -150,6 +188,7 @@ function advanceHtmlContext(context, text) {
                 const nameMatch = htmlNamePattern.exec(text.slice(i));
                 if (nameMatch) {
                     next.tagNameSeen = true;
+                    next.tagName = nameMatch[0].toLowerCase();
                     i += nameMatch[0].length;
                     continue;
                 }
@@ -183,8 +222,11 @@ function advanceHtmlContext(context, text) {
         next.inTag = true;
         next.tagNameSeen = false;
         next.quote = null;
+        next.tagName = null;
+        next.closingTag = false;
         i = tagStart + 1;
         if (text[i] === '/' || text[i] === '?') {
+            next.closingTag = text[i] === '/';
             i++;
         }
     }
@@ -261,8 +303,24 @@ function highlightHtmlLine(text, lineNumber, startCharIndex, stash) {
         }
     };
     const emitPunctuation = value => emitToken('token-punctuation', value);
+    const emitEmbedded = (language, value) => {
+        if (value.length > 0) {
+            output += stash(highlightLine(value, language));
+        }
+    };
 
     while (i < text.length) {
+        if (context.rawTextTag) {
+            const rawTextTag = context.rawTextTag;
+            const closingTag = findRawTextClosingTag(text, i, rawTextTag);
+            const contentEnd = closingTag < 0 ? text.length : closingTag;
+            emitEmbedded(rawTextTag === 'style' ? 'css' : 'javascript', text.slice(i, contentEnd));
+            i = contentEnd;
+            if (closingTag < 0) break;
+            context.rawTextTag = null;
+            continue;
+        }
+
         if (context.special === 'comment') {
             const end = text.indexOf('-->', i);
             const endIndex = end < 0 ? text.length : end + 3;
@@ -319,7 +377,7 @@ function highlightHtmlLine(text, lineNumber, startCharIndex, stash) {
             if ((ch === '/' || ch === '?') && text[i + 1] === '>') {
                 emitPunctuation(text.slice(i, i + 2));
                 i += 2;
-                closeHtmlTagContext(context);
+                closeHtmlTagContext(context, true);
                 continue;
             }
 
@@ -355,6 +413,9 @@ function highlightHtmlLine(text, lineNumber, startCharIndex, stash) {
             if (nameMatch) {
                 const className = context.tagNameSeen ? 'token-attr' : 'token-tag';
                 emitToken(className, nameMatch[0]);
+                if (!context.tagNameSeen) {
+                    context.tagName = nameMatch[0].toLowerCase();
+                }
                 context.tagNameSeen = true;
                 i += nameMatch[0].length;
                 continue;
@@ -405,9 +466,12 @@ function highlightHtmlLine(text, lineNumber, startCharIndex, stash) {
         context.inTag = true;
         context.tagNameSeen = false;
         context.quote = null;
+        context.tagName = null;
+        context.closingTag = false;
 
         if (text[i] === '/' || text[i] === '?') {
             emitPunctuation(text[i]);
+            context.closingTag = text[i] === '/';
             i++;
         }
     }
@@ -645,21 +709,25 @@ function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
         workingText = workingText.replace(/\b\d+(?:\.\d+)?\b/g, m => stash(`<span class="token-number">${escapeHtml(m)}</span>`));
     }
     else if (isMarkdown) {
-        // 1. Code ticks / fenced code block indicators
-        workingText = workingText.replace(/^```.*/g, m => stash(`<span class="token-control">${escapeHtml(m)}</span>`));
-        // 2. Inline Code
-        workingText = workingText.replace(/`[^`]+`/g, m => stash(`<span class="token-string">${escapeHtml(m)}</span>`));
-        // 3. Headers
-        workingText = workingText.replace(/^#{1,6}\s+.*/g, m => stash(`<span class="token-keyword">${escapeHtml(m)}</span>`));
-        // 4. Lists
-        workingText = workingText.replace(/^\s*[-*+]\s+|^\s*\d+\.\s+/g, m => stash(`<span class="token-control">${escapeHtml(m)}</span>`));
-        // 5. Blockquotes
-        workingText = workingText.replace(/^\s*>\s+/g, m => stash(`<span class="token-comment">${escapeHtml(m)}</span>`));
-        // 6. Bold/Italic
-        workingText = workingText.replace(/\*\*[^*]+\*\*/g, m => stash(`<span class="token-keyword">${escapeHtml(m)}</span>`));
-        workingText = workingText.replace(/\*[^*]+\*/g, m => stash(`<span class="token-comment">${escapeHtml(m)}</span>`));
-        // 7. Links
-        workingText = workingText.replace(/!?\[[^\]]*\]\([^)]*\)/g, m => stash(`<span class="token-variable">${escapeHtml(m)}</span>`));
+        if (markdownHtmlBlockLinePattern.test(workingText)) {
+            workingText = highlightHtmlLine(workingText, lineNumber, startCharIndex, stash);
+        } else {
+            // 1. Code ticks / fenced code block indicators
+            workingText = workingText.replace(/^```.*/g, m => stash(`<span class="token-control">${escapeHtml(m)}</span>`));
+            // 2. Inline Code
+            workingText = workingText.replace(/`[^`]+`/g, m => stash(`<span class="token-string">${escapeHtml(m)}</span>`));
+            // 3. Headers
+            workingText = workingText.replace(/^#{1,6}\s+.*/g, m => stash(`<span class="token-keyword">${escapeHtml(m)}</span>`));
+            // 4. Lists
+            workingText = workingText.replace(/^\s*[-*+]\s+|^\s*\d+\.\s+/g, m => stash(`<span class="token-control">${escapeHtml(m)}</span>`));
+            // 5. Blockquotes
+            workingText = workingText.replace(/^\s*>\s+/g, m => stash(`<span class="token-comment">${escapeHtml(m)}</span>`));
+            // 6. Bold/Italic
+            workingText = workingText.replace(/\*\*[^*]+\*\*/g, m => stash(`<span class="token-keyword">${escapeHtml(m)}</span>`));
+            workingText = workingText.replace(/\*[^*]+\*/g, m => stash(`<span class="token-comment">${escapeHtml(m)}</span>`));
+            // 7. Links
+            workingText = workingText.replace(/!?\[[^\]]*\]\([^)]*\)/g, m => stash(`<span class="token-variable">${escapeHtml(m)}</span>`));
+        }
     }
     else if (isShell) {
         // 1. Comments
