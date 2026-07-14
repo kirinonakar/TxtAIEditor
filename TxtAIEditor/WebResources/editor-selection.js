@@ -93,6 +93,8 @@ function drawEditableSelectionOverlays() {
         return;
     }
 
+    const useVisibleRangeOverlays = !viewport.querySelector('.selection-fragment');
+
     for (const element of viewport.querySelectorAll('.line-text')) {
         const lineNumber = Number(element.dataset.line || 0);
         if (!lineNumber) continue;
@@ -118,7 +120,7 @@ function drawEditableSelectionOverlays() {
         }
 
         row?.classList.add('selected-row');
-        drawEditableSelectionRangeOverlay(element, start, end);
+        drawEditableSelectionRangeOverlay(element, start, end, useVisibleRangeOverlays);
     }
 
     drawSelectionFocusCaretOverlay(selection);
@@ -140,7 +142,7 @@ function drawSelectionFocusCaretOverlay(selection) {
     drawCaretOverlay(element, column, 1, 'selection-caret-overlay');
 }
 
-function drawEditableSelectionRangeOverlay(element, start, end) {
+function drawEditableSelectionRangeOverlay(element, start, end, useVisibleRangeOverlay = false) {
     const row = element.closest('.line-row');
     if (!row) return;
 
@@ -190,7 +192,11 @@ function drawEditableSelectionRangeOverlay(element, start, end) {
         }
     }
 
-    appendMergedSelectionOverlays(row, rowRect, overlayRects);
+    appendMergedSelectionOverlays(
+        row,
+        rowRect,
+        overlayRects,
+        useVisibleRangeOverlay ? 'selection-range-overlay' : '');
 
     range.detach?.();
 }
@@ -213,7 +219,7 @@ function selectionLineBoxForRect(element, rect) {
     };
 }
 
-function appendMergedSelectionOverlays(row, rowRect, rects) {
+function appendMergedSelectionOverlays(row, rowRect, rects, extraClass = '') {
     const merged = [];
     const sorted = [...rects].sort((a, b) => a.top - b.top || a.left - b.left);
 
@@ -229,7 +235,13 @@ function appendMergedSelectionOverlays(row, rowRect, rects) {
     }
 
     for (const rect of merged) {
-        appendEditableSelectionOverlay(row, rect.left - rowRect.left, rect.top - rowRect.top, rect.right - rect.left, rect.height);
+        appendEditableSelectionOverlay(
+            row,
+            rect.left - rowRect.left,
+            rect.top - rowRect.top,
+            rect.right - rect.left,
+            rect.height,
+            extraClass);
     }
 }
 

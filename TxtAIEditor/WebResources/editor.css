@@ -892,6 +892,10 @@ body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-
     background: transparent;
 }
 
+.editable-selection-overlay.selection-range-overlay {
+    background: var(--selection);
+}
+
 .editable-selection-overlay.column-cursor-overlay {
     background: var(--selection);
 }
