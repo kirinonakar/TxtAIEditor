@@ -66,6 +66,55 @@ export function bindKeyboardEvents({ openFindPanel }) {
         return element.contains(selection.anchorNode) && element.contains(selection.focusNode);
     }
 
+    function samePosition(a, b) {
+        return !!a && !!b && a.line === b.line && a.column === b.column;
+    }
+
+    function selectionFocusPosition(fallbackPosition) {
+        if (!state.selection || !state.selectionAnchor) return fallbackPosition;
+
+        if (samePosition(state.selection.start, state.selectionAnchor) &&
+            !samePosition(state.selection.end, state.selectionAnchor)) {
+            return state.selection.end;
+        }
+
+        if (samePosition(state.selection.end, state.selectionAnchor) &&
+            !samePosition(state.selection.start, state.selectionAnchor)) {
+            return state.selection.start;
+        }
+
+        return fallbackPosition;
+    }
+
+    function extendSelectionToLineBoundary(element, moveToEnd) {
+        const fallbackPosition = {
+            line: Number(state.currentLine || element.dataset.line || 1),
+            column: Math.max(0, Number(state.currentColumn || 1) - 1)
+        };
+        const focus = selectionFocusPosition(fallbackPosition);
+        const targetLine = Math.min(state.lineCount, Math.max(1, Number(focus.line || 1)));
+        const targetElement = Number(element.dataset.line || 0) === targetLine
+            ? element
+            : viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
+        const targetText = targetElement
+            ? (targetElement.textContent || '').replace(/\u00a0/g, ' ')
+            : (state.cache.get(targetLine) || '');
+        const targetColumn = moveToEnd ? targetText.length : 0;
+        const target = { line: targetLine, column: targetColumn };
+        const anchor = state.selectionAnchor || focus;
+
+        state.selectionAnchor = anchor;
+        state.selection = samePosition(anchor, target)
+            ? null
+            : { start: anchor, end: target };
+        state.currentLine = targetLine;
+        state.currentColumn = targetColumn + 1;
+        syncCustomSelectionClass();
+        queueRender(true);
+        setTimeout(() => focusLine(targetLine, targetColumn, 3 * state.lineHeight), 0);
+        reportCursorAndSelection();
+    }
+
     function focusOrSelectHome(extendSelection) {
         const targetLine = 1;
         const targetColumn = 0;
@@ -558,6 +607,12 @@ export function bindKeyboardEvents({ openFindPanel }) {
             } else {
                 focusOrSelectEnd(event.shiftKey);
             }
+            return;
+        }
+
+        if ((event.key === 'Home' || event.key === 'End') && event.shiftKey && hasCustomSelection()) {
+            event.preventDefault();
+            extendSelectionToLineBoundary(element, event.key === 'End');
             return;
         }
 
