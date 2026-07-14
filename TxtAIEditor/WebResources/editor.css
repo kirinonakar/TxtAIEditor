@@ -558,8 +558,27 @@ body .line-row.editing-row .line-text[contenteditable="true"] {
     background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
+body:not(.wrap-enabled):not(.csv-table-mode) .line-row:focus-within,
+body:not(.wrap-enabled):not(.csv-table-mode) .line-row.editing-row {
+    background: linear-gradient(
+        to right,
+        transparent 0 var(--gutter-width),
+        color-mix(in srgb, var(--fg) 8%, transparent) var(--gutter-width)
+    );
+}
+
+body:not(.wrap-enabled):not(.csv-table-mode) .line-row:focus-within .line-text[contenteditable="true"],
+body:not(.wrap-enabled):not(.csv-table-mode) .line-row.editing-row .line-text[contenteditable="true"] {
+    background: transparent;
+}
+
 body.custom-selection-active .line-text[contenteditable="true"]:focus,
 body.custom-selection-active .line-row.editing-row .line-text[contenteditable="true"] {
+    background: transparent;
+}
+
+body.custom-selection-active:not(.wrap-enabled):not(.csv-table-mode) .line-row:focus-within,
+body.custom-selection-active:not(.wrap-enabled):not(.csv-table-mode) .line-row.editing-row {
     background: transparent;
 }
 
