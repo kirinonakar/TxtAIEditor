@@ -1230,6 +1230,20 @@ namespace TxtAIEditor.Controls
                     isComposing);
             };
 
+            bridge.RangeEditRequested += async (startLine, startColumn, endLine, endColumn, text) =>
+            {
+                await _editorBridgeDocumentController.HandleRangeEditRequestedAsync(
+                    bridge,
+                    tab,
+                    tabItem,
+                    getSession(),
+                    startLine,
+                    startColumn,
+                    endLine,
+                    endColumn,
+                    text);
+            };
+
             bridge.LineInsertRequested += async (lineNumber, text) =>
             {
                 await _editorBridgeDocumentController.HandleLineInsertRequestedAsync(

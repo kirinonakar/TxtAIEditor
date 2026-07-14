@@ -786,6 +786,58 @@ namespace TxtAIEditor.Editor
             return Model.LineCount;
         }
 
+        public int ApplyRangeEdit(
+            int startLine,
+            int startColumn,
+            int endLine,
+            int endColumn,
+            string text)
+        {
+            if (Model.LineCount <= 0)
+            {
+                return Model.LineCount;
+            }
+
+            int safeStartLine = Math.Clamp(startLine, 1, Model.LineCount);
+            int safeEndLine = Math.Clamp(endLine, safeStartLine, Model.LineCount);
+            string startText = Model.GetLine(safeStartLine);
+            string endText = Model.GetLine(safeEndLine);
+            int safeStartColumn = Math.Clamp(startColumn, 1, startText.Length + 1);
+            int safeEndColumn = Math.Clamp(endColumn, 1, endText.Length + 1);
+            if (safeStartLine == safeEndLine)
+            {
+                safeEndColumn = Math.Max(safeStartColumn, safeEndColumn);
+            }
+
+            string normalizedText = NormalizeText(text);
+            var forward = new TextEdit(
+                safeStartLine,
+                safeStartColumn,
+                safeEndLine,
+                safeEndColumn,
+                normalizedText);
+            string replacedText = Model.GetTextRange(
+                safeStartLine,
+                safeStartColumn,
+                safeEndLine,
+                safeEndColumn);
+            TextPosition replacementEnd = GetReplacementEnd(
+                safeStartLine,
+                safeStartColumn,
+                normalizedText);
+            var reverse = new TextEdit(
+                safeStartLine,
+                safeStartColumn,
+                replacementEnd.LineNumber,
+                replacementEnd.Column,
+                replacedText);
+
+            _undoManager.AddEdit(new RangeTextEdit(forward, reverse));
+            _compositionBeforeLines.Clear();
+            Model.ApplyEdit(forward);
+            return Model.LineCount;
+        }
+
         public int MergeLineWithPrevious(int lineNumber)
         {
             if (lineNumber <= 1 || lineNumber > Model.LineCount)
@@ -823,6 +875,19 @@ namespace TxtAIEditor.Editor
             }
             Model.DeleteLine(lineNumber);
             return Model.LineCount;
+        }
+
+        private static TextPosition GetReplacementEnd(int startLine, int startColumn, string text)
+        {
+            string[] lines = text.Split('\n');
+            return lines.Length == 1
+                ? new TextPosition(startLine, startColumn + lines[0].Length)
+                : new TextPosition(startLine + lines.Length - 1, lines[^1].Length + 1);
+        }
+
+        private static string NormalizeText(string text)
+        {
+            return (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
         }
 
         public UndoResult? Undo()

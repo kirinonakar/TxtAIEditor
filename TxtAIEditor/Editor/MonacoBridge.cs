@@ -35,6 +35,7 @@ namespace TxtAIEditor.Editor
         public event Action<int, string, bool>? LineChanged;
         public event Action<long, string>? HexEditRequested;
         public event Action<int, int, int, string, bool>? LineEditRequested;
+        public event Action<int, int, int, int, string>? RangeEditRequested;
         public event Action<int, string>? LineInsertRequested;
         public event Action<int, string, string>? LineSplitRequested;
         public event Action<int>? MergeLineWithPreviousRequested;
@@ -759,6 +760,22 @@ namespace TxtAIEditor.Editor
                                     editEndColumnProp.GetInt32(),
                                     editTextProp.GetString() ?? string.Empty,
                                     isComposing);
+                            }
+                            break;
+
+                        case "rangeEdit":
+                            if (root.TryGetProperty("startLine", out JsonElement rangeStartLineProp) &&
+                                root.TryGetProperty("startColumn", out JsonElement rangeStartColumnProp) &&
+                                root.TryGetProperty("endLine", out JsonElement rangeEndLineProp) &&
+                                root.TryGetProperty("endColumn", out JsonElement rangeEndColumnProp) &&
+                                root.TryGetProperty("text", out JsonElement rangeTextProp))
+                            {
+                                RangeEditRequested?.Invoke(
+                                    rangeStartLineProp.GetInt32(),
+                                    rangeStartColumnProp.GetInt32(),
+                                    rangeEndLineProp.GetInt32(),
+                                    rangeEndColumnProp.GetInt32(),
+                                    rangeTextProp.GetString() ?? string.Empty);
                             }
                             break;
 

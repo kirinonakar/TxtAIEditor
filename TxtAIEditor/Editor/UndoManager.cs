@@ -306,6 +306,28 @@ namespace TxtAIEditor.Editor
         }
     }
 
+    public sealed record RangeTextEdit(TextEdit Forward, TextEdit Reverse) : IUndoableEdit
+    {
+        private static int LineSpan(TextEdit edit) => Math.Max(1, edit.EndLine - edit.StartLine + 1);
+        private static int ReplacementLineCount(TextEdit edit) =>
+            Math.Max(1, (edit.Text ?? string.Empty).Count(character => character == '\n') + 1);
+
+        public UndoEditRange RedoRange =>
+            new(Forward.StartLine, LineSpan(Forward), ReplacementLineCount(Forward));
+
+        public UndoEditRange UndoRange =>
+            new(Reverse.StartLine, LineSpan(Reverse), ReplacementLineCount(Reverse));
+
+        public void Apply(ITextModel model) => model.ApplyEdit(Forward);
+        public void Unapply(ITextModel model) => model.ApplyEdit(Reverse);
+
+        public bool TryMergeWith(IUndoableEdit next, TimeSpan interval, out IUndoableEdit merged)
+        {
+            merged = this;
+            return false;
+        }
+    }
+
     public sealed record InsertLineEdit(int LineNumber, string InsertedText) : IUndoableEdit
     {
         public UndoEditRange RedoRange => new(LineNumber, 0, 1);

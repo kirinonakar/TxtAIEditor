@@ -92,6 +92,7 @@ const handleCsharpMessage = createHostMessageHandler({
 });
 
 const REVEAL_SCROLL_TOLERANCE = 1;
+const REVEAL_HORIZONTAL_MARGIN = 24;
 const REVEAL_SCROLL_RETRY_DELAY_MS = 40;
 const REVEAL_SCROLL_MAX_RETRIES = 8;
 const HEX_BYTES_PER_ROW = 16;
@@ -127,6 +128,38 @@ function postEditorScroll(scrollTop = scrollContainer.scrollTop) {
     });
 }
 
+function alignActiveSearchMatchHorizontally(row) {
+    if (state.wordWrap || !state.activeSearch) return false;
+
+    const activeMatch = row.querySelector('mark.active-match');
+    if (!activeMatch) return false;
+
+    const matchRect = activeMatch.getBoundingClientRect();
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const leftLimit = containerRect.left + REVEAL_HORIZONTAL_MARGIN;
+    const rightLimit = containerRect.left + scrollContainer.clientWidth - REVEAL_HORIZONTAL_MARGIN;
+    const availableWidth = Math.max(0, rightLimit - leftLimit);
+    let scrollDelta = 0;
+
+    if (matchRect.width > availableWidth) {
+        scrollDelta = matchRect.left - leftLimit;
+    } else if (matchRect.right > rightLimit) {
+        scrollDelta = matchRect.right - rightLimit;
+    } else if (matchRect.left < leftLimit) {
+        scrollDelta = matchRect.left - leftLimit;
+    }
+
+    const maxScrollLeft = Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth);
+    const nextScrollLeft = Math.min(
+        maxScrollLeft,
+        Math.max(0, scrollContainer.scrollLeft + scrollDelta));
+    const adjusted = Math.abs(scrollContainer.scrollLeft - nextScrollLeft) > REVEAL_SCROLL_TOLERANCE;
+    if (adjusted) {
+        scrollContainer.scrollLeft = nextScrollLeft;
+    }
+    return adjusted;
+}
+
 function alignRenderedLineInView(lineNumber) {
     const row = viewport.querySelector(`.line-row[data-line="${lineNumber}"]`);
     if (!row) {
@@ -142,16 +175,18 @@ function alignRenderedLineInView(lineNumber) {
     const visualDelta = targetScrollTop - scrollContainer.scrollTop;
     const nextScrollTop = clampScrollTop(
         scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(visualDelta));
-    const adjusted = Math.abs(scrollContainer.scrollTop - nextScrollTop) > REVEAL_SCROLL_TOLERANCE;
+    const verticallyAdjusted = Math.abs(scrollContainer.scrollTop - nextScrollTop) > REVEAL_SCROLL_TOLERANCE;
 
-    if (adjusted) {
+    if (verticallyAdjusted) {
         editorEvents.beginProgrammaticScroll(nextScrollTop);
         postEditorScroll(nextScrollTop);
     }
 
+    const horizontallyAdjusted = alignActiveSearchMatchHorizontally(row);
+
     return {
         found: true,
-        adjusted,
+        adjusted: verticallyAdjusted || horizontallyAdjusted,
         loading: !!row.querySelector('.line-text.loading')
     };
 }

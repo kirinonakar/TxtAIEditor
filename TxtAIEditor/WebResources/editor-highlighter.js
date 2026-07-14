@@ -960,15 +960,27 @@ function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
     return escapedText;
 }
 
+const MAX_JSON_SYNTAX_HIGHLIGHT_CHARS = 1000;
+
+function shouldSkipLineSyntaxHighlighting(text, language = state.language) {
+    return language === 'json' && String(text ?? '').length >= MAX_JSON_SYNTAX_HIGHLIGHT_CHARS;
+}
+
 function renderLineContent(lineNumber, text, forcePlainText = false, suppressSelectionFragments = false) {
-    if (forcePlainText || (state.isComposing && state.compositionLine === lineNumber)) {
+    if (state.isComposing && state.compositionLine === lineNumber) {
         return escapeHtml(text);
     }
+
+    const suppressSyntaxHighlighting = forcePlainText || shouldSkipLineSyntaxHighlighting(text);
 
     if (!suppressSelectionFragments) {
         const selectionBounds = selectionBoundsForLine(lineNumber, text.length);
         if (selectionBounds) {
-            return renderLineContentWithSelection(lineNumber, text, selectionBounds);
+            return renderLineContentWithSelection(
+                lineNumber,
+                text,
+                selectionBounds,
+                suppressSyntaxHighlighting);
         }
     }
 
@@ -978,14 +990,25 @@ function renderLineContent(lineNumber, text, forcePlainText = false, suppressSel
             ? active
             : null;
         const matchesOnLine = state.searchMatchesByLine?.get(lineNumber) || [];
-        return renderSearchMatchesForLine(lineNumber, text, matchesOnLine, activeMatchOnLine);
+        return renderSearchMatchesForLine(
+            lineNumber,
+            text,
+            matchesOnLine,
+            activeMatchOnLine,
+            suppressSyntaxHighlighting);
     }
 
-    return highlightLine(text, state.language, lineNumber, 0);
+    return renderHighlightedText(text, lineNumber, 0, suppressSyntaxHighlighting);
 }
 
-function renderLineContentWithSelection(lineNumber, text, selectionBounds) {
-    const highlighted = highlightLine(text, state.language, lineNumber, 0);
+function renderHighlightedText(text, lineNumber, startCharIndex, suppressSyntaxHighlighting) {
+    return suppressSyntaxHighlighting
+        ? escapeHtml(text)
+        : highlightLine(text, state.language, lineNumber, startCharIndex);
+}
+
+function renderLineContentWithSelection(lineNumber, text, selectionBounds, suppressSyntaxHighlighting) {
+    const highlighted = renderHighlightedText(text, lineNumber, 0, suppressSyntaxHighlighting);
     const start = Math.max(0, Math.min(selectionBounds.start, text.length));
     const end = Math.max(start, Math.min(selectionBounds.end, text.length));
     if (start === end) {
@@ -1042,9 +1065,9 @@ function wrapHighlightedSelection(html, selectionStart, selectionEnd) {
     return template.innerHTML;
 }
 
-function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch) {
+function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch, suppressSyntaxHighlighting) {
     if (matches.length === 0) {
-        return highlightLine(text, state.language, lineNumber, 0);
+        return renderHighlightedText(text, lineNumber, 0, suppressSyntaxHighlighting);
     }
 
     matches = [...matches].sort((a, b) => a.indexOfMatch - b.indexOfMatch);
@@ -1059,7 +1082,11 @@ function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch) {
         if (idx < pos || idx >= text.length) continue;
 
         if (idx > pos) {
-            parts.push(highlightLine(text.slice(pos, idx), state.language, lineNumber, pos));
+            parts.push(renderHighlightedText(
+                text.slice(pos, idx),
+                lineNumber,
+                pos,
+                suppressSyntaxHighlighting));
         }
 
         const isActive = activeMatch && 
@@ -1073,7 +1100,11 @@ function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch) {
     }
 
     if (pos < text.length) {
-        parts.push(highlightLine(text.slice(pos), state.language, lineNumber, pos));
+        parts.push(renderHighlightedText(
+            text.slice(pos),
+            lineNumber,
+            pos,
+            suppressSyntaxHighlighting));
     }
 
     return parts.join('');
@@ -1081,5 +1112,6 @@ function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch) {
 
 export {
     highlightLine,
-    renderLineContent
+    renderLineContent,
+    shouldSkipLineSyntaxHighlighting
 };

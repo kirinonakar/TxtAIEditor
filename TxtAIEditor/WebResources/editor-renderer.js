@@ -14,7 +14,10 @@ import {
     visibleRange,
     viewportTopForLine
 } from './editor-core.js';
-import { renderLineContent } from './editor-highlighter.js';
+import {
+    renderLineContent,
+    shouldSkipLineSyntaxHighlighting
+} from './editor-highlighter.js';
 import {
     drawEditableSelectionOverlays,
     hasCustomSelection,
@@ -27,24 +30,6 @@ import {
     restoreCsvFocusAfterRender
 } from './editor-csv-table.js';
 import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
-
-const MAX_JSON_SYNTAX_HIGHLIGHT_CHARS = 1000;
-
-function renderPlainLineContent(text, selectionBounds) {
-    if (!selectionBounds) {
-        return escapeHtml(text);
-    }
-
-    const start = Math.max(0, Math.min(selectionBounds.start, text.length));
-    const end = Math.max(start, Math.min(selectionBounds.end, text.length));
-    if (start === end) {
-        return escapeHtml(text);
-    }
-
-    return escapeHtml(text.slice(0, start)) +
-        `<span class="selection-fragment">${escapeHtml(text.slice(start, end))}</span>` +
-        escapeHtml(text.slice(end));
-}
 
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
@@ -287,7 +272,7 @@ function createEditorRenderer({
             const text = hasLine ? state.cache.get(line) : '';
             const isLong = hasLine && text.length > MAX_RENDER_CHARS;
             const shouldSkipSyntaxHighlighting = isLong ||
-                (hasLine && state.language === 'json' && text.length >= MAX_JSON_SYNTAX_HIGHLIGHT_CHARS);
+                (hasLine && shouldSkipLineSyntaxHighlighting(text));
             const isTruncatedLongLine = isLong && state.language === 'json';
             const displayText = isTruncatedLongLine
                 ? text.slice(0, MAX_RENDER_CHARS)
@@ -328,10 +313,12 @@ function createEditorRenderer({
                 !state.isComposing;
             // JSON token spans are capped separately from display truncation so medium-sized
             // minified lines stay visible without paying the syntax-highlighting DOM cost. The
-            // selected range still gets one lightweight span so its shading remains visible.
-            let lineContent = shouldSkipSyntaxHighlighting
-                ? renderPlainLineContent(displayText, selectionBounds)
-                : renderLineContent(line, displayText, false, isInlineLivePreviewSourceLine);
+            // selected range and search matches keep lightweight spans so their overlays remain visible.
+            let lineContent = renderLineContent(
+                line,
+                displayText,
+                shouldSkipSyntaxHighlighting,
+                isInlineLivePreviewSourceLine);
             let livePreviewClass = '';
             let liveContentEditable = contentEditable;
             let livePreviewAttributes = '';

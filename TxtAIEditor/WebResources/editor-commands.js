@@ -1023,18 +1023,28 @@ function replaceSelectionWith(selection, text, editSelection = null) {
     } else if (shouldPreserveScrollTop) {
         restoreScrollTop(savedScrollTop);
     }
-    beginEditTransaction();
-    try {
-        post({ type: 'lineChanged', lineNumber: start.line, text: newLines[0] });
-        for (let i = end.line; i > start.line; i--) {
-            post({ type: 'deleteLine', lineNumber: i });
-        }
-        for (let i = 1; i < newLines.length; i++) {
-            post({ type: 'insertLine', lineNumber: start.line + i, text: newLines[i] });
-        }
+    const isStructuralRangeEdit = start.line !== end.line || newLines.length > 1;
+    if (isStructuralRangeEdit) {
+        // Send one range edit instead of one WebView message per removed/inserted line.
+        // Large multi-line selections otherwise flood the UI thread and repeatedly
+        // shift the backing line array for every deleted line.
+        post({
+            type: 'rangeEdit',
+            startLine: start.line,
+            startColumn: start.column + 1,
+            endLine: end.line,
+            endColumn: end.column + 1,
+            text: replacementText
+        });
         post({ type: 'contentChanged' });
-    } finally {
-        endEditTransaction();
+    } else {
+        beginEditTransaction();
+        try {
+            post({ type: 'lineChanged', lineNumber: start.line, text: newLines[0] });
+            post({ type: 'contentChanged' });
+        } finally {
+            endEditTransaction();
+        }
     }
     if (editSelection) {
         const positionFromOffset = offset => {

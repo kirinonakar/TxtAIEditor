@@ -146,6 +146,27 @@ namespace TxtAIEditor.Controls
             await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
         }
 
+        public async Task HandleRangeEditRequestedAsync(
+            MonacoBridge bridge,
+            OpenedTab tab,
+            TabViewItem tabItem,
+            EditorDocumentSession session,
+            int startLine,
+            int startColumn,
+            int endLine,
+            int endColumn,
+            string text)
+        {
+            await _flushOtherTabsPendingSyncsAsync(tab);
+            int lineCount = session.ApplyRangeEdit(
+                startLine,
+                startColumn,
+                endLine,
+                endColumn,
+                text);
+            await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
+        }
+
         public async Task HandleLineSplitRequestedAsync(
             MonacoBridge bridge,
             OpenedTab tab,
