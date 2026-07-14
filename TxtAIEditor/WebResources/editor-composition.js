@@ -131,7 +131,9 @@ function syncRenderedRowsAfterCompositionSelectionCollapse(startLine, endLine, n
                 if (textElement) {
                     textElement.dataset.line = String(newLine);
                     if (state.cache.has(newLine)) {
-                        textElement.textContent = state.cache.get(newLine) || '';
+                        // This row is outside the IME host. Re-highlight it after its line number
+                        // shifts instead of flattening its syntax-token spans to plain text.
+                        textElement.innerHTML = renderLineContent(newLine, state.cache.get(newLine) || '');
                     }
                 }
             }
