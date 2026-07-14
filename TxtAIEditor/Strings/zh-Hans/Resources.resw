@@ -1563,7 +1563,7 @@
     <value>关闭其他 Tab</value>
   </data>
   <data name="HexViewerTitleFormat" xml:space="preserve">
-    <value>{0} [HEX]</value>
+    <value>[H] {0}</value>
   </data>
   <data name="HexViewOpenFailedTitle" xml:space="preserve">
     <value>Hex 查看失败</value>

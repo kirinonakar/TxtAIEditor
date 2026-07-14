@@ -219,19 +219,23 @@ function commitLineForSave(element) {
     }
 
     const text = lineTextFromElement(element);
+    const previousText = state.cache.get(lineNumber) ?? '';
     state.isComposing = false;
     state.compositionLine = null;
-    state.cache.set(lineNumber, text);
-    state.cacheVersion++;
     state.currentLine = lineNumber;
     state.currentColumn = Math.min(getCaretOffset(element) + 1, text.length + 1);
 
-    if (!cleanDirtyMarker(lineNumber)) {
-        markDirty(lineNumber, 'mod');
-    }
+    if (text !== previousText) {
+        state.cache.set(lineNumber, text);
+        state.cacheVersion++;
 
-    post({ type: 'lineChanged', lineNumber, text });
-    post({ type: 'contentChanged' });
+        if (!cleanDirtyMarker(lineNumber)) {
+            markDirty(lineNumber, 'mod');
+        }
+
+        post({ type: 'lineChanged', lineNumber, text });
+        post({ type: 'contentChanged' });
+    }
     reportCursorAndSelection(element);
 
     if (state.wordWrap) {

@@ -18,7 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<int> _showLeftSidebarPage;
         private readonly Func<string, Task> _navigateExplorerToFolderAsync;
         private readonly Func<OpenedTab, TabViewItem, Task> _reloadTabAsync;
-        private readonly Func<OpenedTab, Task> _openHexViewAsync;
+        private readonly Func<OpenedTab, bool, Task> _setHexViewModeAsync;
         private readonly Func<OpenedTab, bool, Task> _setCsvTableModeAsync;
         private readonly Func<OpenedTab, Task> _encryptTabAsync;
         private readonly Func<OpenedTab, Task> _changeEncryptionPasswordAsync;
@@ -34,7 +34,7 @@ namespace TxtAIEditor.Controls
             Action<int> showLeftSidebarPage,
             Func<string, Task> navigateExplorerToFolderAsync,
             Func<OpenedTab, TabViewItem, Task> reloadTabAsync,
-            Func<OpenedTab, Task> openHexViewAsync,
+            Func<OpenedTab, bool, Task> setHexViewModeAsync,
             Func<OpenedTab, bool, Task> setCsvTableModeAsync,
             Func<OpenedTab, Task> encryptTabAsync,
             Func<OpenedTab, Task> changeEncryptionPasswordAsync,
@@ -49,7 +49,7 @@ namespace TxtAIEditor.Controls
             _showLeftSidebarPage = showLeftSidebarPage;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
             _reloadTabAsync = reloadTabAsync;
-            _openHexViewAsync = openHexViewAsync;
+            _setHexViewModeAsync = setHexViewModeAsync;
             _setCsvTableModeAsync = setCsvTableModeAsync;
             _encryptTabAsync = encryptTabAsync;
             _changeEncryptionPasswordAsync = changeEncryptionPasswordAsync;
@@ -93,9 +93,10 @@ namespace TxtAIEditor.Controls
             reloadItem.Click += async (_, __) => await _reloadTabAsync(tab, tabItem);
             menu.Items.Add(reloadItem);
 
-            var hexViewItem = new MenuFlyoutItem
+            var hexViewItem = new ToggleMenuFlyoutItem
             {
                 Text = _getString("TabMenuHexView", "Hex 보기"),
+                IsChecked = tab.IsHexViewer,
                 Icon = new FontIcon
                 {
                     Glyph = "H",
@@ -104,10 +105,12 @@ namespace TxtAIEditor.Controls
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 }
             };
-            hexViewItem.IsEnabled = !tab.IsHexViewer &&
-                                    !string.IsNullOrEmpty(fileActionPath) &&
-                                    File.Exists(fileActionPath);
-            hexViewItem.Click += async (_, __) => await _openHexViewAsync(tab);
+            hexViewItem.IsEnabled = tab.IsHexViewer || SupportsHexView(tab, fileActionPath);
+            hexViewItem.Click += async (_, __) =>
+            {
+                await _setHexViewModeAsync(tab, hexViewItem.IsChecked);
+                hexViewItem.IsChecked = tab.IsHexViewer;
+            };
             menu.Items.Add(hexViewItem);
 
             var csvTableItem = new ToggleMenuFlyoutItem
@@ -240,6 +243,18 @@ namespace TxtAIEditor.Controls
                    !tab.IsDocxViewer &&
                    !tab.IsOfficeDocumentViewer &&
                    !tab.IsHexViewer;
+        }
+
+        private static bool SupportsHexView(OpenedTab tab, string? filePath)
+        {
+            return !tab.IsEncrypted &&
+                   !tab.IsImageViewer &&
+                   !tab.IsMediaViewer &&
+                   !tab.IsPdfViewer &&
+                   !tab.IsDocxViewer &&
+                   !tab.IsOfficeDocumentViewer &&
+                   !string.IsNullOrWhiteSpace(filePath) &&
+                   File.Exists(filePath);
         }
 
         private static void SetClipboardText(string text)

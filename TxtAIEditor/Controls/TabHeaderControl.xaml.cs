@@ -37,10 +37,10 @@ namespace TxtAIEditor.Controls
 
             _tab = tab;
             _workspaceFolderPath = workspaceFolderPath ?? string.Empty;
-            TitleText.Text = tab.Title;
+            TitleText.Text = tab.TabHeaderTitle;
             TitleText.SetBinding(TextBlock.TextProperty, new Binding
             {
-                Path = new PropertyPath(nameof(OpenedTab.Title)),
+                Path = new PropertyPath(nameof(OpenedTab.TabHeaderTitle)),
                 Mode = BindingMode.OneWay,
                 Source = tab
             });

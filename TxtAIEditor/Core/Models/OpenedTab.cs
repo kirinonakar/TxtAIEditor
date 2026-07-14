@@ -45,6 +45,7 @@ namespace TxtAIEditor.Core.Models
                 {
                     _title = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(TabHeaderTitle));
                     OnPropertyChanged(nameof(DisplayTitle));
                 }
             }
@@ -132,7 +133,21 @@ namespace TxtAIEditor.Core.Models
         public bool IsPdfViewer { get; set; } = false;
         public bool IsDocxViewer { get; set; } = false;
         public bool IsOfficeDocumentViewer { get; set; } = false;
-        public bool IsHexViewer { get; set; } = false;
+        private bool _isHexViewer;
+        public bool IsHexViewer
+        {
+            get => _isHexViewer;
+            set
+            {
+                if (_isHexViewer != value)
+                {
+                    _isHexViewer = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(TabHeaderTitle));
+                    OnPropertyChanged(nameof(DisplayTitle));
+                }
+            }
+        }
         public bool IsCsvTableModeEnabled { get; set; } = false;
         public string? HexSourceFilePath { get; set; }
         public bool IsReadOnlyTextFile { get; set; } = false;
@@ -199,7 +214,15 @@ namespace TxtAIEditor.Core.Models
             }
         }
 
-        public string DisplayTitle => IsDirty ? $"{Title} *" : Title;
+        public string TabHeaderTitle => IsHexViewer ? $"[H] {Title}" : Title;
+
+        public string DisplayTitle
+        {
+            get
+            {
+                return IsDirty ? $"{TabHeaderTitle} *" : TabHeaderTitle;
+            }
+        }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {

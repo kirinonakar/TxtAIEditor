@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -36,6 +37,9 @@ namespace TxtAIEditor.Controls
         private readonly TabSelectionController _tabSelectionController;
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
+        private readonly Dictionary<string, HexViewState> _hexViewStates = new();
+        private readonly Dictionary<string, int> _viewModeTransitionVersions = new();
+        private int _viewModeTransitionVersion;
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly Func<TabView> _getCurrentActiveTabView;
         private readonly Func<OpenedTab?> _getActiveTab;
@@ -50,6 +54,19 @@ namespace TxtAIEditor.Controls
         private readonly Action _updateWindowTitle;
         private readonly Action<OpenedTab, TabViewItem, TabView, FrameworkElement, RightTappedRoutedEventArgs> _showTabContextMenu;
         private readonly int _initialEditorLineWarmupCount;
+
+        private sealed record HexViewState(
+            EditorDocumentSession TextSession,
+            HexDumpTextModel InitialHexModel,
+            string Language,
+            bool IsLanguageManuallySelected,
+            string EncodingName,
+            bool EncodingWasAutoDetected,
+            bool InlineLivePreviewEnabled,
+            string OriginalContent,
+            string? OriginalLineEnding,
+            string? OriginalEncodingName,
+            string? HexSourceFilePath);
 
         public EditorTabOpenController(
             ISettingsService settingsService,
@@ -154,9 +171,7 @@ namespace TxtAIEditor.Controls
             {
                 FilePath = filePath,
                 HexSourceFilePath = filePath,
-                Title = string.Format(
-                    _getLocalizedString("HexViewerTitleFormat", "{0} [HEX]"),
-                    Path.GetFileName(filePath)),
+                Title = Path.GetFileName(filePath),
                 Content = string.Empty,
                 Language = "hex",
                 EncodingName = string.Empty,
@@ -171,6 +186,205 @@ namespace TxtAIEditor.Controls
 
             OpenEditorDocumentTab(tab, session, isReadOnly: true, updateLanguageUi: true);
             return tab;
+        }
+
+        public async Task SetHexViewModeAsync(OpenedTab tab, bool enabled)
+        {
+            if (enabled == tab.IsHexViewer)
+            {
+                return;
+            }
+
+            if (enabled)
+            {
+                await EnableHexViewModeAsync(tab);
+            }
+            else
+            {
+                await DisableHexViewModeAsync(tab);
+            }
+        }
+
+        private async Task EnableHexViewModeAsync(OpenedTab tab)
+        {
+            string? sourcePath = tab.FilePath;
+            if (string.IsNullOrWhiteSpace(sourcePath) ||
+                !File.Exists(sourcePath) ||
+                tab.IsEncrypted ||
+                tab.IsImageViewer ||
+                tab.IsMediaViewer ||
+                tab.IsPdfViewer ||
+                tab.IsDocxViewer ||
+                tab.IsOfficeDocumentViewer ||
+                !_editorSessions.TryGetValue(tab.Id, out var textSession) ||
+                textSession.Model is HexDumpTextModel)
+            {
+                return;
+            }
+
+            if (_tabBridges.TryGetValue(tab.Id, out var existingBridgeGroup) && existingBridgeGroup.Bridge != null)
+            {
+                await existingBridgeGroup.Bridge.FlushPendingEditForSaveAsync();
+            }
+
+            byte[] sourceBytes = EncodeText(textSession.GetText(), tab.EncodingName);
+            var hexModel = new HexDumpTextModel(sourcePath, sourceBytes);
+            _hexViewStates[tab.Id] = new HexViewState(
+                textSession,
+                hexModel,
+                tab.Language,
+                tab.IsLanguageManuallySelected,
+                tab.EncodingName,
+                tab.EncodingWasAutoDetected,
+                tab.InlineLivePreviewEnabled,
+                tab.OriginalContent,
+                tab.OriginalLineEnding,
+                tab.OriginalEncodingName,
+                tab.HexSourceFilePath);
+
+            tab.HexSourceFilePath = sourcePath;
+            tab.IsHexViewer = true;
+            tab.IsCsvTableModeEnabled = false;
+            tab.InlineLivePreviewEnabled = false;
+            tab.Language = "hex";
+
+            var hexSession = new EditorDocumentSession(tab, hexModel);
+            _editorSessions[tab.Id] = hexSession;
+            await ApplyViewModeToBridgeAsync(tab, hexSession, isReadOnly: true);
+            UpdateTabStatus(tab, updateLanguageUi: true);
+        }
+
+        private async Task DisableHexViewModeAsync(OpenedTab tab)
+        {
+            if (!_hexViewStates.Remove(tab.Id, out var state) ||
+                !_editorSessions.TryGetValue(tab.Id, out var hexSession) ||
+                hexSession.Model is not HexDumpTextModel hexModel)
+            {
+                return;
+            }
+
+            tab.IsHexViewer = false;
+            tab.HexSourceFilePath = state.HexSourceFilePath;
+            tab.Language = state.Language;
+            tab.IsLanguageManuallySelected = state.IsLanguageManuallySelected;
+            tab.EncodingName = state.EncodingName;
+            tab.EncodingWasAutoDetected = state.EncodingWasAutoDetected;
+            tab.InlineLivePreviewEnabled = state.InlineLivePreviewEnabled;
+
+            EditorDocumentSession restoredSession;
+            if (!ReferenceEquals(hexModel, state.InitialHexModel) || hexModel.HasEverBeenEdited)
+            {
+                string restoredText = DecodeText(hexModel.GetCurrentBytes(), state.EncodingName);
+                restoredSession = new EditorDocumentSession(tab, LineArrayTextModel.FromText(restoredText));
+            }
+            else
+            {
+                restoredSession = state.TextSession;
+                restoredSession.RefreshTabContentPreview();
+            }
+
+            _editorSessions[tab.Id] = restoredSession;
+            if (tab.IsDirty)
+            {
+                tab.OriginalContent = state.OriginalContent;
+                tab.OriginalLineEnding = state.OriginalLineEnding;
+                tab.OriginalEncodingName = state.OriginalEncodingName;
+            }
+            else
+            {
+                tab.OriginalContent = restoredSession.GetText();
+                tab.OriginalLineEnding = restoredSession.Model.LineEnding;
+                tab.OriginalEncodingName = tab.EncodingName;
+            }
+
+            await ApplyViewModeToBridgeAsync(tab, restoredSession, tab.IsReadOnlyTextFile);
+            UpdateTabStatus(tab, updateLanguageUi: true);
+        }
+
+        public void ForgetHexViewState(string tabId)
+        {
+            _hexViewStates.Remove(tabId);
+            _viewModeTransitionVersions.Remove(tabId);
+        }
+
+        private async Task ApplyViewModeToBridgeAsync(
+            OpenedTab tab,
+            EditorDocumentSession session,
+            bool isReadOnly)
+        {
+            if (!_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) || bridgeGroup.Bridge == null)
+            {
+                return;
+            }
+
+            int transitionVersion = BeginViewModeTransition(tab.Id);
+            try
+            {
+                await bridgeGroup.Bridge.InitializeModelAsync(
+                    session.Model.LineCount,
+                    tab.Language,
+                    _settingsService.CurrentSettings,
+                    isReadOnly,
+                    session.GetLines(1, _initialEditorLineWarmupCount));
+                await bridgeGroup.Bridge.SetCsvTableModeAsync(tab.IsCsvTableModeEnabled);
+                await bridgeGroup.Bridge.SetInlineLivePreviewAsync(
+                    tab.InlineLivePreviewEnabled,
+                    _getPreviewBaseHref(tab));
+            }
+            catch
+            {
+                CompleteViewModeTransition(tab.Id, transitionVersion);
+                throw;
+            }
+        }
+
+        private int BeginViewModeTransition(string tabId)
+        {
+            int version = ++_viewModeTransitionVersion;
+            _viewModeTransitionVersions[tabId] = version;
+            _ = ClearViewModeTransitionFallbackAsync(tabId, version);
+            return version;
+        }
+
+        private void CompleteViewModeTransition(string tabId, int? expectedVersion = null)
+        {
+            if (!expectedVersion.HasValue ||
+                (_viewModeTransitionVersions.TryGetValue(tabId, out int version) && version == expectedVersion.Value))
+            {
+                _viewModeTransitionVersions.Remove(tabId);
+            }
+        }
+
+        private async Task ClearViewModeTransitionFallbackAsync(string tabId, int version)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            _dispatcherQueue.TryEnqueue(() => CompleteViewModeTransition(tabId, version));
+        }
+
+        private static byte[] EncodeText(string text, string encodingName)
+        {
+            Encoding encoding = TextEncodingService.GetEncodingByName(encodingName);
+            byte[] preamble = encoding.GetPreamble();
+            byte[] content = encoding.GetBytes(text);
+            if (preamble.Length == 0)
+            {
+                return content;
+            }
+
+            byte[] bytes = new byte[preamble.Length + content.Length];
+            Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
+            Buffer.BlockCopy(content, 0, bytes, preamble.Length, content.Length);
+            return bytes;
+        }
+
+        private static string DecodeText(byte[] bytes, string encodingName)
+        {
+            Encoding encoding = TextEncodingService.GetEncodingByName(encodingName);
+            byte[] preamble = encoding.GetPreamble();
+            int offset = preamble.Length > 0 && bytes.AsSpan().StartsWith(preamble)
+                ? preamble.Length
+                : 0;
+            return encoding.GetString(bytes, offset, bytes.Length - offset);
         }
 
         public OpenedTab OpenPdfTab(string filePath)
@@ -486,6 +700,7 @@ namespace TxtAIEditor.Controls
 
             bridge.EditorRendered += () =>
             {
+                CompleteViewModeTransition(tab.Id);
                 _dispatcherQueue.TryEnqueue(() =>
                 {
                     editorWebView.Opacity = 1;
@@ -660,6 +875,11 @@ namespace TxtAIEditor.Controls
 
             bridge.ContentChanged += isComposing =>
             {
+                if (_viewModeTransitionVersions.ContainsKey(tab.Id))
+                {
+                    return;
+                }
+
                 _editorBridgeDocumentController.HandleContentChanged(
                     tab,
                     tabItem,

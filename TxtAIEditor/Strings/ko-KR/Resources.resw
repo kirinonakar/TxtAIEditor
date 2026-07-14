@@ -1563,7 +1563,7 @@
     <value>다른 탭 닫기</value>
   </data>
   <data name="HexViewerTitleFormat" xml:space="preserve">
-    <value>{0} [HEX]</value>
+    <value>[H] {0}</value>
   </data>
   <data name="HexViewOpenFailedTitle" xml:space="preserve">
     <value>Hex 보기 실패</value>

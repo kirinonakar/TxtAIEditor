@@ -78,7 +78,7 @@ namespace TxtAIEditor.Composition
                 OpenPdfTab,
                 OpenOfficeDocumentTab,
                 OpenHexTab,
-                OpenHexViewAsync,
+                SetHexViewModeAsync,
                 CloseActiveTab,
                 SyncSnippetsToOpenEditorsAsync,
                 InitializePickerWindow,
@@ -204,25 +204,11 @@ namespace TxtAIEditor.Composition
 
         public OpenedTab OpenMediaTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenMediaTab(filePath);
 
-        public Task OpenHexViewAsync(OpenedTab tab)
+        public async Task SetHexViewModeAsync(OpenedTab tab, bool enabled)
         {
-            string? sourcePath = GetHexViewSourcePath(tab);
-            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
-            {
-                return Task.CompletedTask;
-            }
-
             try
             {
-                var existingHexTab = FindOpenHexTab(sourcePath);
-                if (existingHexTab != null)
-                {
-                    ActivateLoadedTab(existingHexTab);
-                    return Task.CompletedTask;
-                }
-
-                var openedTab = Controllers.Editor.Runtime.EditorTabOpen.OpenHexTab(sourcePath);
-                ActivateLoadedTab(openedTab);
+                await Controllers.Editor.Runtime.EditorTabOpen.SetHexViewModeAsync(tab, enabled);
             }
             catch (Exception ex)
             {
@@ -230,8 +216,6 @@ namespace TxtAIEditor.Composition
                     GetLocalizedString("HexViewOpenFailedTitle", "Hex 보기 실패"),
                     ex.Message);
             }
-
-            return Task.CompletedTask;
         }
 
         public void SchedulePreview(OpenedTab tab) => Controllers.Preview.LivePreview.Schedule(tab);
@@ -344,6 +328,7 @@ namespace TxtAIEditor.Composition
 
         public void CloseTabAndCleanup(OpenedTab tab, TabViewItem tabItem)
         {
+            Controllers.Editor.Runtime.EditorTabOpen.ForgetHexViewState(tab.Id);
             Controllers.Documents.TabClose.CloseAndCleanup(tab, tabItem);
         }
 
@@ -495,37 +480,6 @@ namespace TxtAIEditor.Composition
             }
 
             Controllers.Preview.LivePreview.Render(tab);
-        }
-
-        private static string? GetHexViewSourcePath(OpenedTab tab)
-        {
-            return !string.IsNullOrWhiteSpace(tab.FilePath)
-                ? tab.FilePath
-                : tab.HexSourceFilePath;
-        }
-
-        private OpenedTab? FindOpenHexTab(string sourcePath)
-        {
-            string normalizedSourcePath = NormalizePathForComparison(sourcePath);
-            return _viewModel.Tabs.FirstOrDefault(tab =>
-                tab.IsHexViewer &&
-                !string.IsNullOrWhiteSpace(tab.HexSourceFilePath) &&
-                string.Equals(
-                    NormalizePathForComparison(tab.HexSourceFilePath),
-                    normalizedSourcePath,
-                    StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static string NormalizePathForComparison(string path)
-        {
-            try
-            {
-                return Path.GetFullPath(path);
-            }
-            catch
-            {
-                return path;
-            }
         }
 
         private void UpdateAllTabWorkspaceIndicators()

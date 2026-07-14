@@ -406,7 +406,11 @@ namespace TxtAIEditor.Composition
                         tabReloadController,
                         callbacks.UpdateLanguageUi,
                         callbacks.UpdateWindowTitle),
-                    callbacks.OpenHexViewAsync,
+                    async (tab, enabled) =>
+                    {
+                        await callbacks.SetHexViewModeAsync(tab, enabled);
+                        toolbarCommandController?.SyncCsvTableMode(tab);
+                    },
                     async (tab, enabled) =>
                     {
                         if (toolbarCommandController != null)

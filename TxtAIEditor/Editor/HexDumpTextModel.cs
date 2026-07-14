@@ -19,9 +19,21 @@ namespace TxtAIEditor.Editor
         private readonly long _displayRowCount;
         private readonly bool _isTruncated;
         private readonly Dictionary<long, byte> _editedBytes = new();
+        private byte[]? _sourceBytes;
+        private bool _hasEverBeenEdited;
         private string _lineEnding = "\n";
 
         public HexDumpTextModel(string filePath)
+            : this(filePath, null, useSourceBytes: false)
+        {
+        }
+
+        public HexDumpTextModel(string filePath, byte[] sourceBytes)
+            : this(filePath, sourceBytes ?? throw new ArgumentNullException(nameof(sourceBytes)), useSourceBytes: true)
+        {
+        }
+
+        private HexDumpTextModel(string filePath, byte[]? sourceBytes, bool useSourceBytes)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -29,7 +41,8 @@ namespace TxtAIEditor.Editor
             }
 
             _filePath = filePath;
-            _fileLength = new FileInfo(filePath).Length;
+            _sourceBytes = useSourceBytes ? sourceBytes : null;
+            _fileLength = sourceBytes?.LongLength ?? new FileInfo(filePath).Length;
             _offsetWidth = Math.Max(HeaderOffsetLabel.Length, _fileLength > uint.MaxValue ? 16 : 8);
 
             long rowCount = Math.Max(1, (_fileLength + BytesPerRow - 1) / BytesPerRow);
@@ -39,6 +52,8 @@ namespace TxtAIEditor.Editor
         }
 
         public bool HasPendingEdits => _editedBytes.Count > 0;
+
+        public bool HasEverBeenEdited => _hasEverBeenEdited;
 
         public int LineCount => 1 + (int)_displayRowCount + (_isTruncated ? 1 : 0);
 
@@ -75,23 +90,31 @@ namespace TxtAIEditor.Editor
                 int availableLength = (int)Math.Min(requestedLength, Math.Max(0, _fileLength - firstOffset));
                 data = new byte[availableLength];
 
-                using var stream = new FileStream(
-                    _filePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete,
-                    bufferSize: 64 * 1024,
-                    useAsync: false);
-                stream.Seek(firstOffset, SeekOrigin.Begin);
-                while (dataLength < data.Length)
+                if (_sourceBytes != null)
                 {
-                    int read = stream.Read(data, dataLength, data.Length - dataLength);
-                    if (read == 0)
+                    Buffer.BlockCopy(_sourceBytes, checked((int)firstOffset), data, 0, availableLength);
+                    dataLength = availableLength;
+                }
+                else
+                {
+                    using var stream = new FileStream(
+                        _filePath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite | FileShare.Delete,
+                        bufferSize: 64 * 1024,
+                        useAsync: false);
+                    stream.Seek(firstOffset, SeekOrigin.Begin);
+                    while (dataLength < data.Length)
                     {
-                        break;
-                    }
+                        int read = stream.Read(data, dataLength, data.Length - dataLength);
+                        if (read == 0)
+                        {
+                            break;
+                        }
 
-                    dataLength += read;
+                        dataLength += read;
+                    }
                 }
 
                 for (int i = 0; i < dataLength; i++)
@@ -238,7 +261,26 @@ namespace TxtAIEditor.Editor
                 _editedBytes[offset + i] = bytes[i];
             }
 
+            _hasEverBeenEdited = true;
+
             return writableCount;
+        }
+
+        public byte[] GetCurrentBytes()
+        {
+            byte[] bytes = _sourceBytes != null
+                ? (byte[])_sourceBytes.Clone()
+                : File.ReadAllBytes(_filePath);
+
+            foreach (var edit in _editedBytes)
+            {
+                if (edit.Key >= 0 && edit.Key < bytes.LongLength)
+                {
+                    bytes[checked((int)edit.Key)] = edit.Value;
+                }
+            }
+
+            return bytes;
         }
 
         public void ReplaceLine(int lineNumber, string text)
@@ -408,8 +450,18 @@ namespace TxtAIEditor.Editor
             return SaveEditedBytesAsync(filePath, cancellationToken);
         }
 
-        private Task SaveEditedBytesAsync(string filePath, CancellationToken cancellationToken)
+        private async Task SaveEditedBytesAsync(string filePath, CancellationToken cancellationToken)
         {
+            if (_sourceBytes != null)
+            {
+                byte[] bytes = GetCurrentBytes();
+                await File.WriteAllBytesAsync(filePath, bytes, cancellationToken).ConfigureAwait(false);
+                _sourceBytes = bytes;
+                _editedBytes.Clear();
+                _filePath = filePath;
+                return;
+            }
+
             if (!string.Equals(
                     Path.GetFullPath(filePath),
                     Path.GetFullPath(_filePath),
@@ -421,10 +473,10 @@ namespace TxtAIEditor.Editor
             if (_editedBytes.Count == 0)
             {
                 _filePath = filePath;
-                return Task.CompletedTask;
+                return;
             }
 
-            return Task.Run(() =>
+            await Task.Run(() =>
             {
                 using var stream = new FileStream(
                     filePath,
@@ -460,7 +512,7 @@ namespace TxtAIEditor.Editor
                 stream.Flush();
                 _editedBytes.Clear();
                 _filePath = filePath;
-            }, cancellationToken);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         private string FormatHeaderLine()
