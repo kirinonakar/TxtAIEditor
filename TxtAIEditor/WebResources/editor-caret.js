@@ -287,7 +287,7 @@ function selectWordAtPointer(event) {
     return true;
 }
 
-function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = true) {
+function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = true, revealHorizontally = true) {
     const oldActiveElement = document.activeElement?.closest?.('.line-text');
     const oldActiveLine = oldActiveElement ? Number(oldActiveElement.dataset.line || 0) : null;
 
@@ -324,7 +324,9 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
 
     selection.removeAllRanges();
     selection.addRange(range);
-    revealCaretHorizontally(element, offset);
+    if (revealHorizontally) {
+        revealCaretHorizontally(element, offset);
+    }
 
     if (state.alignCaretToY !== null && state.alignCaretToY !== undefined) {
         const clickY = state.alignCaretToY;

@@ -1054,7 +1054,6 @@ export function bindPointerSelectionEvents({
         }
 
         if (!state.isSelecting) return;
-        const savedScrollTop = scrollContainer.scrollTop;
         state.isSelecting = false;
         state.isLineSelecting = false;
         document.body.classList.remove('selecting');
@@ -1068,15 +1067,17 @@ export function bindPointerSelectionEvents({
             syncCustomSelectionClass();
         } else if (selection) {
             clearNativeSelection();
-            const releaseLine = state.currentLine;
-            const releaseColumn = Math.max(0, state.currentColumn - 1);
-            setTimeout(() => {
-                focusLine(releaseLine, releaseColumn);
-                scrollContainer.scrollTop = savedScrollTop;
-            }, 0);
+            if (selection.start.line === selection.end.line) {
+                const releaseLine = state.currentLine;
+                const releaseColumn = Math.max(0, state.currentColumn - 1);
+                const releaseElement = viewport.querySelector(`.line-text[data-line="${releaseLine}"]`);
+                if (releaseElement?.getAttribute('contenteditable') === 'true') {
+                    setCaret(releaseElement, releaseColumn, 0, true, false);
+                }
+            }
         }
         if (hadSelection || hasCustomSelection()) {
-            queueRender(true);
+            drawEditableSelectionOverlays();
         }
         reportCursorAndSelection(document.activeElement);
     }

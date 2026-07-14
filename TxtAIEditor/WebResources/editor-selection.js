@@ -128,7 +128,7 @@ function drawEditableSelectionOverlays() {
 }
 
 function drawSelectionFocusCaretOverlay(selection) {
-    if (!selection || selection.isColumn || !hasCustomSelection() || state.textareaImeBypassActive) {
+    if (!selection || selection.isColumn || !hasCustomSelection()) {
         return;
     }
 
@@ -356,7 +356,7 @@ function drawEditableColumnCursorOverlay(element, column) {
 }
 
 function drawImeBypassCaretOverlay() {
-    if (!state.textareaImeBypassActive || !state.bypassCursorLine) return;
+    if (!state.textareaImeBypassActive || !state.bypassCursorLine || hasCustomSelection()) return;
 
     const line = Number(state.bypassCursorLine || 0);
     const element = viewport.querySelector(`.line-text[data-line="${line}"]`);
