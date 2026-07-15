@@ -400,10 +400,6 @@ namespace TxtAIEditor.Controls
             string transcript = string.Empty;
             string approvedPlanExecutionPrompt = string.Empty;
             string approvedPlanWorkspaceRoot = activeOpenSession.WorkspaceRoot;
-            void AppendRunSessionHistoryLine(string line = "")
-            {
-                AgentRunTranscriptRecorder.AppendLine(runContext, line);
-            }
 
             Task PersistRunSessionToHistoryAsync()
             {
@@ -505,19 +501,21 @@ namespace TxtAIEditor.Controls
                                 "Your previous response was cut off due to the output token limit. " +
                                 "Continue exactly from where you stopped. Do not repeat what you already wrote. " +
                                 "If you were about to write a tool_call, write it now.";
+                            string retryDetail = _runTranscriptService.BuildRetryDetail(
+                                "truncated_response",
+                                response,
+                                continuationNote);
 
                             await _uiDispatcher.RunAsync(() =>
                             {
-                                transcript += response + continuationNote;
-                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + continuationNote);
+                                transcript += retryDetail;
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
                                 UpdateContextStatsImmediate(force: true);
                             });
                             string truncationRetryMessage = _getString(
                                 "AgentActivityTruncatedRetry",
                                 "응답이 잘려 이어서 작성합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, truncationRetryMessage);
-                            AppendRunSessionHistoryLine($"[Truncated Response Retry]: {truncationRetryMessage}");
-                            AppendRunSessionHistoryLine();
                             continue;
                         }
                     }
@@ -532,19 +530,21 @@ namespace TxtAIEditor.Controls
                             string retryNote =
                                 "\n\n[Agent empty response]\n" +
                                 "The model returned no visible content. Continue with a final tool_call or a final answer.";
+                            string retryDetail = _runTranscriptService.BuildRetryDetail(
+                                "empty_response",
+                                string.Empty,
+                                retryNote);
 
                             await _uiDispatcher.RunAsync(() =>
                             {
-                                transcript += retryNote;
-                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryNote);
+                                transcript += retryDetail;
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
                                 UpdateContextStatsImmediate(force: true);
                             });
                             string emptyRetryMessage = _getString(
                                 "AgentActivityEmptyResponseRetry",
                                 "빈 응답을 수신해 다시 시도합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, emptyRetryMessage);
-                            AppendRunSessionHistoryLine($"[Empty Response Retry]: {emptyRetryMessage}");
-                            AppendRunSessionHistoryLine();
 
                             continue;
                         }
@@ -608,20 +608,18 @@ namespace TxtAIEditor.Controls
                                 !string.IsNullOrWhiteSpace(toolCallFormatIssue)
                                     ? toolCallFormatIssue
                                     : "The tool_call JSON could not be parsed.");
-                            transcript += "\n\n" + response + "\n\n" + retryNote;
-                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + "\n\n" + retryNote);
+                            string retryDetail = _runTranscriptService.BuildRetryDetail(
+                                "tool_call_format",
+                                response,
+                                retryNote);
+                            transcript += retryDetail;
+                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
 
                             string retryMessage = _getString(
                                 "AgentToolCallFormatRetry",
                                 "도구 호출을 해석하지 못해 다시 요청합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
-                            AppendRunSessionHistoryLine($"[Tool Call Format Retry]: {retryMessage}");
-                            if (!string.IsNullOrWhiteSpace(response))
-                            {
-                                AppendRunSessionHistoryLine($"[Previous Tool Call]: {response.Trim()}");
-                            }
-                            AppendRunSessionHistoryLine();
                             if (_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
                                 UpdateContextStatsImmediate(force: true);
@@ -657,21 +655,19 @@ namespace TxtAIEditor.Controls
                             string retryNote =
                                 "\n\n[Planning mode make_plan required]\n" +
                                 "Do not answer with the plan as plain text. Save it by including exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
+                            string retryDetail = _runTranscriptService.BuildRetryDetail(
+                                "make_plan_required",
+                                response,
+                                retryNote);
 
-                            transcript += "\n\n" + response + "\n\n" + retryNote;
-                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + "\n\n" + retryNote);
+                            transcript += retryDetail;
+                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
 
                             string retryMessage = _getString(
                                 "AgentMakePlanRequired",
                                 "계획 모드에서는 make_plan 도구로 계획서를 저장해야 합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
-                            AppendRunSessionHistoryLine($"[Make Plan Retry]: {retryMessage}");
-                            if (!string.IsNullOrWhiteSpace(response))
-                            {
-                                AppendRunSessionHistoryLine($"[Previous Response]: {response.Trim()}");
-                            }
-                            AppendRunSessionHistoryLine();
                             if (_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
                                 UpdateContextStatsImmediate(force: true);
@@ -712,11 +708,15 @@ namespace TxtAIEditor.Controls
                                 "You described intent to use a skill in prose but did not emit the skill_use tool_call. " +
                                 "Briefly state why if useful, then end with exactly one skill_use tool_call for the relevant skill:\n" +
                                 "<tool_call>{\"name\":\"skill_use\",\"arguments\":{\"name\":\"skill-name\"}}>";
+                            string retryDetail = _runTranscriptService.BuildRetryDetail(
+                                "skill_not_called",
+                                response,
+                                retryNote);
 
                             await _uiDispatcher.RunAsync(() =>
                             {
-                                transcript += "\n\n" + response + retryNote;
-                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response + retryNote);
+                                transcript += retryDetail;
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
                                 UpdateContextStatsImmediate(force: true);
                             });
 
@@ -725,12 +725,6 @@ namespace TxtAIEditor.Controls
                                 "스킬을 호출하지 않고 설명만 했습니다. 도구 호출을 다시 시도합니다.");
                             await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
-                            AppendRunSessionHistoryLine($"[Skill Not Called Retry]: {retryMessage}");
-                            if (!string.IsNullOrWhiteSpace(response))
-                            {
-                                AppendRunSessionHistoryLine($"[Previous Response]: {response.Trim()}");
-                            }
-                            AppendRunSessionHistoryLine();
                             if (_runOutputController.IsSessionVisible(runContext.SessionId))
                             {
                                 UpdateContextStatsImmediate(force: true);

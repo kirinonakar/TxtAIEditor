@@ -237,12 +237,45 @@ namespace TxtAIEditor.Controls
             var result = new StringBuilder();
             bool inToolCall = false;
             bool inToolResult = false;
+            bool inRetryDetail = false;
+            bool inLegacyRetryPayload = false;
             bool inUserPromptInstructionMetadata = false;
             bool suppressInstructionMetadataSection = false;
             bool afterUserRequest = false;
 
             foreach (var line in lines)
             {
+                if (inRetryDetail)
+                {
+                    if (line.StartsWith("[End retry detail]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inRetryDetail = false;
+                    }
+
+                    continue;
+                }
+
+                if (line.StartsWith("[Retry detail:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inToolCall = false;
+                    inToolResult = false;
+                    inRetryDetail = true;
+                    inUserPromptInstructionMetadata = false;
+                    suppressInstructionMetadataSection = false;
+                    afterUserRequest = false;
+                    continue;
+                }
+
+                if (inLegacyRetryPayload)
+                {
+                    if (!line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    inLegacyRetryPayload = false;
+                }
+
                 if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
@@ -254,6 +287,17 @@ namespace TxtAIEditor.Controls
                     suppressInstructionMetadataSection = line.Contains("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase);
                     afterUserRequest = false;
                     result.AppendLine(inUserPromptInstructionMetadata ? "[User Prompt]:" : line);
+                }
+                else if (line.StartsWith("[Previous Tool Call]:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Previous Response]:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inToolCall = false;
+                    inToolResult = false;
+                    inLegacyRetryPayload = true;
+                    inUserPromptInstructionMetadata = false;
+                    suppressInstructionMetadataSection = false;
+                    afterUserRequest = false;
+                    continue;
                 }
                 else if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase))
                 {

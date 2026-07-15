@@ -54,6 +54,29 @@ namespace TxtAIEditor.Controls
             return AppendToolStatusMessage(toolResultForTranscript, timingNote);
         }
 
+        public string BuildRetryDetail(
+            string retryType,
+            string previousResponse,
+            string retryInstruction)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.AppendLine($"[Retry detail: {retryType}]");
+            if (!string.IsNullOrEmpty(previousResponse))
+            {
+                builder.AppendLine(string.Equals(retryType, "tool_call_format", StringComparison.Ordinal)
+                    ? "[Failed tool call response]"
+                    : "[Previous response]");
+                builder.AppendLine(previousResponse);
+            }
+
+            builder.AppendLine("[Retry instruction]");
+            builder.AppendLine(retryInstruction);
+            builder.Append("[End retry detail]");
+            return builder.ToString();
+        }
+
         private static string BuildDiffLog(IReadOnlyList<AgentFileEditPreview> edits, int startIndex, int endIndex)
         {
             startIndex = Math.Max(0, startIndex);
