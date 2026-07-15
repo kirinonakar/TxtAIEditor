@@ -67,6 +67,11 @@ import {
 import { createCaretNavigationCommands } from './editor-caret-navigation-commands.js';
 import { createClipboardCommandHandlers } from './editor-clipboard-commands.js';
 import { createEditorCompositionHandlers } from './editor-composition.js';
+import {
+    beginImeCommit,
+    completeImeCommit,
+    resetImeState
+} from './editor-ime-state.js';
 import { createHostStreamInsertCommands } from './editor-host-stream-insert.js';
 import { createModelRepeatInputHandlers } from './editor-repeat-input.js';
 import {
@@ -145,10 +150,13 @@ function commitLine(element) {
 
     if (isComposing && state.rangeComposition) {
         // 다중 줄 선택 IME 조합 중에는 모델/DOM 재렌더를 건드리지 않는다.
-        // 최종 조합 문자열은 compositionend에서 원래 선택 영역에 한 번에 반영한다.
+        // 최종 조합 문자열은 compositionend에서 rangeEdit 한 건으로 반영한다.
     } else if (isComposing && state.columnComposition) {
         updateColumnCompositionPreview(element);
-    } else if (isComposing || textChanged) {
+    } else if (isComposing) {
+        // 네이티브 IME가 소유한 DOM을 로컬 미리보기로만 유지한다.
+        // cache 및 C# 문서 모델 delta는 compositionend에서 한 번만 확정한다.
+    } else if (textChanged) {
         state.cache.set(lineNumber, text);
         if (!isInlineLivePreviewActiveLine) {
             state.cacheVersion++;
@@ -161,10 +169,6 @@ function commitLine(element) {
     state.currentColumn = caretOffset + 1;
 
     if (isComposing) {
-        if (!state.columnComposition && !state.rangeComposition) {
-            postLineUpdate(lineNumber, previousText, text, true);
-            post({ type: 'contentChanged', isComposing: true });
-        }
         reportCursorAndSelection(element, caretOffset);
         if (state.wordWrap && !state.rangeComposition) {
             measureRenderedRows(false);
@@ -203,8 +207,8 @@ function commitLineForSave(element) {
     const lineNumber = Number(element.dataset.line || state.compositionLine || state.currentLine || 1);
 
     if (state.rangeComposition && finishRangeComposition(element, lineNumber)) {
-        state.isComposing = false;
-        state.compositionLine = null;
+        beginImeCommit(state);
+        completeImeCommit(state);
         reportCursorAndSelection(element);
         if (state.wordWrap) {
             measureRenderedRows(false);
@@ -213,8 +217,8 @@ function commitLineForSave(element) {
     }
 
     if (state.columnComposition && finishColumnComposition(element, lineNumber)) {
-        state.isComposing = false;
-        state.compositionLine = null;
+        beginImeCommit(state);
+        completeImeCommit(state);
         reportCursorAndSelection(element);
         if (state.wordWrap) {
             measureRenderedRows(false);
@@ -224,8 +228,7 @@ function commitLineForSave(element) {
 
     const text = lineTextFromElement(element);
     const previousText = state.cache.get(lineNumber) ?? '';
-    state.isComposing = false;
-    state.compositionLine = null;
+    resetImeState(state);
     state.currentLine = lineNumber;
     state.currentColumn = Math.min(getCaretOffset(element) + 1, text.length + 1);
 
@@ -267,10 +270,15 @@ function flushPendingEditForSave(requestId) {
         ? getCaretOffset(element)
         : Math.max(0, Number(state.currentColumn || 1) - 1);
     let finished = false;
+    let compositionFallbackTimer = 0;
 
     const finish = () => {
         if (finished) return;
         finished = true;
+        if (compositionFallbackTimer) {
+            clearTimeout(compositionFallbackTimer);
+            compositionFallbackTimer = 0;
+        }
 
         const lineNumber = Number(state.compositionLine || requestedLine || state.currentLine || 1);
         element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) ||
@@ -280,8 +288,7 @@ function flushPendingEditForSave(requestId) {
         if (element && element.getAttribute('contenteditable') === 'true') {
             commitLineForSave(element);
         } else {
-            state.isComposing = false;
-            state.compositionLine = null;
+            resetImeState(state);
         }
 
         const safeRestoreLine = Math.min(Math.max(1, restoreLine), state.lineCount);
@@ -310,15 +317,23 @@ function flushPendingEditForSave(requestId) {
     };
 
     if (state.isComposing && element && element.getAttribute('contenteditable') === 'true') {
+        const finishAfterCompositionEnd = () => queueMicrotask(finish);
+        element.addEventListener('compositionend', finishAfterCompositionEnd, { once: true });
         try {
             element.blur();
         } catch { }
 
-        setTimeout(finish, 60);
+        if (!state.isComposing) {
+            queueMicrotask(finish);
+        } else {
+            // WebView가 blur에 compositionend를 보내지 않는 비정상 상황에서만
+            // 저장 요청이 영구 대기하지 않도록 하는 안전 fallback이다.
+            compositionFallbackTimer = setTimeout(finish, 250);
+        }
         return;
     }
 
-    setTimeout(finish, 0);
+    queueMicrotask(finish);
 }
 
 
@@ -1226,7 +1241,6 @@ const {
     queueRender,
     renderLineContent,
     replaceColumnSelectionWith,
-    replaceSelectionWith,
     reportCursorAndSelection,
     scrollContainer,
     setCaret,

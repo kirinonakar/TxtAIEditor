@@ -66,12 +66,21 @@ namespace TxtAIEditor.Controls
             {
                 var readResult = await LineArrayTextModel.LoadFromFileAsync(filePath, "Auto");
                 string content = readResult.Model.GetText();
+                var updatedDocumentIds = new HashSet<string>(StringComparer.Ordinal);
 
                 foreach (var tab in matchedTabs)
                 {
-                    if (_editorSessions.TryGetValue(tab.Id, out var session))
+                    EditorDocumentSession? session = null;
+                    if (_editorSessions.TryGetValue(tab.Id, out session))
                     {
-                        session.UpdateContentFromSync(content);
+                        if (updatedDocumentIds.Add(session.DocumentId))
+                        {
+                            session.UpdateContentFromSync(content);
+                        }
+                        else
+                        {
+                            session.RefreshTabContentPreview();
+                        }
                     }
 
                     tab.Content = content;
@@ -82,7 +91,13 @@ namespace TxtAIEditor.Controls
                         tab.IsPendingReload = false;
                         if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                         {
-                            await bridgeGroup.Bridge.SetTextAsync(tab.Content, shouldFocus: false);
+                            await bridgeGroup.Bridge.SetTextAsync(
+                                tab.Content,
+                                shouldFocus: false,
+                                session?.DocumentId,
+                                session?.DocumentVersion,
+                                tab.Id);
+                            session?.MarkViewSynchronized(session.DocumentVersion);
                         }
                     }
                     else

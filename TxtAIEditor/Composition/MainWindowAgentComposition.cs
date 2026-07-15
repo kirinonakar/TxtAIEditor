@@ -143,14 +143,21 @@ namespace TxtAIEditor.Composition
                 editTabAsync: async (tab, newContent) =>
                 {
                     tab.Content = newContent;
-                    if (editorSessions.TryGetValue(tab.Id, out var session))
+                    EditorDocumentSession? session = null;
+                    if (editorSessions.TryGetValue(tab.Id, out session))
                     {
                         session.UpdateContentFromSync(newContent);
                     }
 
                     if (tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                     {
-                        await bridgeGroup.Bridge.SetTextAsync(newContent, shouldFocus: false);
+                        await bridgeGroup.Bridge.SetTextAsync(
+                            newContent,
+                            shouldFocus: false,
+                            session?.DocumentId,
+                            session?.DocumentVersion,
+                            tab.Id);
+                        session?.MarkViewSynchronized(session.DocumentVersion);
                     }
 
                     tabDirtyState.MarkTabDirty(tab);

@@ -14,14 +14,8 @@ namespace TxtAIEditor.Composition
     internal sealed record MainWindowEditorRuntimeCallbacks(
         Action<OpenedTab> SchedulePreview,
         Action<OpenedTab> UpdateLanguageUi,
-        Func<OpenedTab, int, string, bool> QueuePendingSplitImeLineSyncIfNeeded,
-        Func<OpenedTab, int, string, bool> SchedulePendingSplitImeCompletionSyncIfNeeded,
-        Func<OpenedTab, bool> ScheduleDeferredPendingSplitImeSyncIfNeeded,
         Func<OpenedTab, int, string, bool, Task> SyncLineChangeToOtherTabsAsync,
         Func<OpenedTab, Task> SyncEditsToOtherTabsAsync,
-        Action<OpenedTab> RecordPendingSplitImeStructuralEdit,
-        Func<OpenedTab, bool> HasOtherTabForSameFile,
-        Func<OpenedTab, Task> FlushOtherTabsPendingSyncsAsync,
         Func<Task> SaveSidebarVisibilitySettingsAsync,
         Action RefreshActivePreview,
         Func<string, Task> LoadFileIntoTabAsync,
@@ -112,14 +106,8 @@ namespace TxtAIEditor.Composition
                 toc,
                 callbacks.SchedulePreview,
                 callbacks.UpdateLanguageUi,
-                callbacks.QueuePendingSplitImeLineSyncIfNeeded,
-                callbacks.SchedulePendingSplitImeCompletionSyncIfNeeded,
-                tab => callbacks.ScheduleDeferredPendingSplitImeSyncIfNeeded(tab),
                 callbacks.SyncLineChangeToOtherTabsAsync,
-                tab => callbacks.SyncEditsToOtherTabsAsync(tab),
-                callbacks.RecordPendingSplitImeStructuralEdit,
-                callbacks.HasOtherTabForSameFile,
-                callbacks.FlushOtherTabsPendingSyncsAsync);
+                tab => callbacks.SyncEditsToOtherTabsAsync(tab));
 
             var shellPane = new ShellPaneController(
                 ui.LeftSidebar,
@@ -146,6 +134,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 ui.EditorTabView,
                 tabBridges,
+                editorSessions,
                 window.DispatcherQueue,
                 llmAssistant,
                 agent,

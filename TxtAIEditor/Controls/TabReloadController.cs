@@ -257,7 +257,10 @@ namespace TxtAIEditor.Controls
                     tab.Language,
                     _settingsService.CurrentSettings,
                     isReadOnly: isReadOnly,
-                    initialLines: session.GetLines(1, _initialEditorLineWarmupCount));
+                    initialLines: session.GetLines(1, _initialEditorLineWarmupCount),
+                    documentId: session.DocumentId,
+                    documentVersion: session.DocumentVersion,
+                    viewId: tab.Id);
             }
         }
 
@@ -307,7 +310,14 @@ namespace TxtAIEditor.Controls
         {
             if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
             {
-                await bridgeGroup.Bridge.SetTextAsync(text);
+                _editorSessions.TryGetValue(tab.Id, out var session);
+                await bridgeGroup.Bridge.SetTextAsync(
+                    text,
+                    shouldFocus: true,
+                    session?.DocumentId,
+                    session?.DocumentVersion,
+                    tab.Id);
+                session?.MarkViewSynchronized(session.DocumentVersion);
             }
         }
 

@@ -53,7 +53,6 @@ namespace TxtAIEditor.Composition
             FunctionKeyShortcutService functionKeyShortcut,
             AutoSaveController autoSave,
             DispatcherTimer gitAutoRefreshTimer,
-            SplitImeSyncController splitImeSync,
             LivePreviewController livePreview,
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
@@ -81,7 +80,6 @@ namespace TxtAIEditor.Composition
                 functionKeyShortcut,
                 autoSave,
                 gitAutoRefreshTimer,
-                splitImeSync,
                 ui.EditorWorkspace,
                 tabBridges,
                 livePreview);

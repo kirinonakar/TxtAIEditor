@@ -3324,6 +3324,9 @@ Plan: {0}</value>
   <data name="SaveFailedTitle" xml:space="preserve">
     <value>Save Failed</value>
   </data>
+  <data name="SaveEditorFlushFailed" xml:space="preserve">
+    <value>The editor input could not be finalized, so the save was cancelled. Try again.</value>
+  </data>
   <data name="EncryptedTabMissingPassword" xml:space="preserve">
     <value>The encrypted tab has no password. Reopen the file and enter the password.</value>
   </data>

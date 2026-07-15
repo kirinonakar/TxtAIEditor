@@ -15,7 +15,6 @@ namespace TxtAIEditor.Controls
         private readonly FunctionKeyShortcutService _functionKeyShortcutService;
         private readonly AutoSaveController _autoSaveController;
         private readonly DispatcherTimer _gitAutoRefreshTimer;
-        private readonly SplitImeSyncController _splitImeSyncController;
         private readonly EditorWorkspacePane _editorWorkspace;
         private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly LivePreviewController _livePreviewController;
@@ -27,7 +26,6 @@ namespace TxtAIEditor.Controls
             FunctionKeyShortcutService functionKeyShortcutService,
             AutoSaveController autoSaveController,
             DispatcherTimer gitAutoRefreshTimer,
-            SplitImeSyncController splitImeSyncController,
             EditorWorkspacePane editorWorkspace,
             IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             LivePreviewController livePreviewController)
@@ -38,7 +36,6 @@ namespace TxtAIEditor.Controls
             _functionKeyShortcutService = functionKeyShortcutService;
             _autoSaveController = autoSaveController;
             _gitAutoRefreshTimer = gitAutoRefreshTimer;
-            _splitImeSyncController = splitImeSyncController;
             _editorWorkspace = editorWorkspace;
             _tabBridges = tabBridges;
             _livePreviewController = livePreviewController;
@@ -101,7 +98,6 @@ namespace TxtAIEditor.Controls
             {
                 _autoSaveController.Stop();
                 _gitAutoRefreshTimer.Stop();
-                _splitImeSyncController.ClearAll();
             }, suppressErrors);
             RunCleanup(_editorWorkspace.StopAllTerminalSessions, suppressErrors);
             RunCleanup(CloseEditorBridges, suppressErrors);

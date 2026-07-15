@@ -128,15 +128,20 @@ namespace TxtAIEditor.Controls
                     _focusSearchPanel();
                     break;
                 case "undo":
-                    _ = ApplyUndoRedoAsync(session.Undo(), bridge, tab, tabItem);
+                    _ = ApplyUndoRedoAsync(session, session.Undo(), bridge, tab, tabItem);
                     break;
                 case "redo":
-                    _ = ApplyUndoRedoAsync(session.Redo(), bridge, tab, tabItem);
+                    _ = ApplyUndoRedoAsync(session, session.Redo(), bridge, tab, tabItem);
                     break;
             }
         }
 
-        private async Task ApplyUndoRedoAsync(UndoResult? result, MonacoBridge bridge, OpenedTab tab, TabViewItem tabItem)
+        private async Task ApplyUndoRedoAsync(
+            EditorDocumentSession session,
+            UndoResult? result,
+            MonacoBridge bridge,
+            OpenedTab tab,
+            TabViewItem tabItem)
         {
             if (result == null)
             {
@@ -146,7 +151,12 @@ namespace TxtAIEditor.Controls
             _tabDirtyStateController.MarkTabDirty(tab, tabItem);
             _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
             _schedulePreview(tab);
-            await bridge.ApplyEditResultAsync(result);
+            EditorDocumentChange? change = session.LastChange;
+            await bridge.ApplyEditResultAsync(
+                result,
+                change?.DocumentId,
+                change?.BaseVersion,
+                change?.Version);
             await _syncEditsToOtherTabsAsync(tab);
         }
     }

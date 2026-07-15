@@ -11,7 +11,6 @@ using TxtAIEditor.ViewModels;
 namespace TxtAIEditor.Composition
 {
     internal sealed record MainWindowDocumentCommandCallbacks(
-        Func<OpenedTab, Task> FlushPendingSplitImeSyncAsync,
         Action<OpenedTab> UpdateLanguageUi,
         Func<Task> RefreshGitStatusAsync,
         Action UpdateWindowTitle,
@@ -19,7 +18,6 @@ namespace TxtAIEditor.Composition
         Action<string> LoadDirectoryRoot,
         Func<string> GetSearchRoot,
         Func<string> GetCurrentRepoPath,
-        Action<string> ClearPendingSplitImeSync,
         Func<OpenedTab> OpenNewTab,
         Action<string> CloseReadOnlyViewer,
         Func<Task> SaveUiLayoutSettingsAsync,
@@ -61,7 +59,6 @@ namespace TxtAIEditor.Composition
                 tabNavigation.IsOpen,
                 tabId => editorSessions.TryGetValue(tabId, out var session) ? session : null,
                 tabId => tabBridges.TryGetValue(tabId, out var bridgeGroup) ? bridgeGroup : null,
-                callbacks.FlushPendingSplitImeSyncAsync,
                 tabDirtyState.CleanDirtyStateOnOtherTabs,
                 callbacks.UpdateLanguageUi,
                 callbacks.RefreshGitStatusAsync,
@@ -93,7 +90,6 @@ namespace TxtAIEditor.Composition
                 () => ui.EditorWorkspace.IsTerminalVisible,
                 () => ui.TerminalPane.SuspendNativeWindows(),
                 () => ui.TerminalPane.ResumeNativeWindows(),
-                callbacks.ClearPendingSplitImeSync,
                 tabEncryption.ForgetPassword,
                 tabSave.SaveAsync,
                 callbacks.OpenNewTab,

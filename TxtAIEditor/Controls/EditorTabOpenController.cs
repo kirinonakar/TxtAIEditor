@@ -773,7 +773,10 @@ namespace TxtAIEditor.Controls
                     tab.Language,
                     _settingsService.CurrentSettings,
                     isReadOnly,
-                    session.GetLines(1, _initialEditorLineWarmupCount));
+                    session.GetLines(1, _initialEditorLineWarmupCount),
+                    session.DocumentId,
+                    session.DocumentVersion,
+                    tab.Id);
                 await bridgeGroup.Bridge.SetCsvTableModeAsync(tab.IsCsvTableModeEnabled);
                 await bridgeGroup.Bridge.SetInlineLivePreviewAsync(
                     tab.InlineLivePreviewEnabled,
@@ -1143,7 +1146,10 @@ namespace TxtAIEditor.Controls
                     tab.Language,
                     _settingsService.CurrentSettings,
                     isReadOnly,
-                    currentSession.GetLines(1, _initialEditorLineWarmupCount));
+                    currentSession.GetLines(1, _initialEditorLineWarmupCount),
+                    currentSession.DocumentId,
+                    currentSession.DocumentVersion,
+                    tab.Id);
             };
 
             bridge.EditorRendered += () =>

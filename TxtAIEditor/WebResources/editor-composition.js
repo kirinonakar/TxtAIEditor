@@ -1,3 +1,13 @@
+import {
+    activateTextareaImeBypass,
+    beginImeCommit,
+    beginImeComposition,
+    cancelImeComposition,
+    completeImeCommit,
+    ImePhase,
+    updateImeComposition
+} from './editor-ime-state.js';
+
 export function createEditorCompositionHandlers({
     activeColumnSelection,
     activeEditableElement,
@@ -18,7 +28,6 @@ export function createEditorCompositionHandlers({
     queueRender,
     renderLineContent,
     replaceColumnSelectionWith,
-    replaceSelectionWith,
     reportCursorAndSelection,
     scrollContainer,
     setCaret,
@@ -49,6 +58,94 @@ function isPendingImeSelectionCollapseFor(element, event = null) {
         state.pendingImeSelectionCollapse = null;
         return false;
     }
+    return true;
+}
+
+function createRangeCompositionEditCommand(selection) {
+    const originalSelection = cloneEditorSelection(selection);
+    const { start, end } = originalSelection;
+    const prefix = (state.cache.get(start.line) ?? '').slice(0, start.column);
+    const suffix = (state.cache.get(end.line) ?? '').slice(end.column);
+    const collapsedText = prefix + suffix;
+
+    return {
+        type: 'replaceRange',
+        selection: originalSelection,
+        start,
+        end,
+        collapsedText,
+        caretColumn: Math.max(0, Math.min(start.column, collapsedText.length)),
+        removedLineCount: Math.max(0, end.line - start.line)
+    };
+}
+
+function applyLocalRangeCompositionEdit(command, preferredElement = null) {
+    if (!command || command.type !== 'replaceRange') return null;
+
+    const { start, end, collapsedText, caretColumn, removedLineCount } = command;
+    state.selection = null;
+    state.selectionAnchor = { line: start.line, column: caretColumn };
+    state.currentLine = start.line;
+    state.currentColumn = caretColumn + 1;
+    state.editingLine = start.line;
+    syncCustomSelectionClass();
+    clearCustomSelectionVisuals();
+
+    state.cache.set(start.line, collapsedText);
+    for (let line = start.line + 1; line <= end.line; line++) {
+        state.cache.delete(line);
+    }
+    if (removedLineCount > 0) {
+        shiftCachedLines(end.line + 1, -removedLineCount);
+        state.lineCount = Math.max(1, state.lineCount - removedLineCount);
+        setupVirtualHeight();
+    }
+    state.cacheVersion++;
+
+    if (!cleanDirtyMarker(start.line)) {
+        markDirty(start.line, 'mod');
+    }
+
+    const incomingLine = Number(preferredElement?.dataset?.line || 0);
+    const incomingElementIsInsideSelection = preferredElement &&
+        preferredElement.getAttribute?.('contenteditable') === 'true' &&
+        incomingLine >= start.line && incomingLine <= end.line;
+    const startRow = viewport.querySelector(`.line-row[data-line="${start.line}"]`);
+    const startTextElement = startRow?.querySelector('.line-text') || null;
+    let targetElement = incomingElementIsInsideSelection ? preferredElement : startTextElement;
+
+    if (targetElement?.getAttribute?.('contenteditable') === 'true') {
+        makeEditablePlainText(targetElement, null, false);
+        targetElement.textContent = collapsedText;
+    }
+
+    const collapsedElement = syncRenderedRowsAfterCompositionSelectionCollapse(
+        start.line,
+        end.line,
+        collapsedText,
+        caretColumn,
+        targetElement
+    );
+
+    state.lastRangeKey = '';
+    if (state.wordWrap) {
+        measureRenderedRows(false);
+    }
+    return collapsedElement || targetElement || startTextElement || preferredElement;
+}
+
+function commitRangeCompositionEdit(command, insertedText) {
+    if (!command || command.type !== 'replaceRange') return false;
+    const { start, end } = command;
+    post({
+        type: 'rangeEdit',
+        startLine: start.line,
+        startColumn: start.column + 1,
+        endLine: end.line,
+        endColumn: end.column + 1,
+        text: String(insertedText ?? '')
+    });
+    post({ type: 'contentChanged' });
     return true;
 }
 
@@ -190,12 +287,12 @@ function prepareSingleLineSelectionForNativeComposition(selection) {
 
 function finishRangeComposition(element, lineNumber, compositionText = '') {
     const pending = state.rangeComposition;
-    if (!pending || !pending.selection) {
+    if (!pending || !pending.command) {
         state.rangeComposition = null;
         return false;
     }
 
-    const targetLine = Number(lineNumber || element?.dataset?.line || pending.lineNumber || state.currentLine || 1);
+    const targetLine = Number(lineNumber || element?.dataset?.line || pending.command.start.line || state.currentLine || 1);
     let targetElement = targetLine === pending.lineNumber && element?.getAttribute?.('contenteditable') === 'true'
         ? element
         : viewport.querySelector(`.line-text[data-line="${pending.lineNumber}"]`);
@@ -204,33 +301,33 @@ function finishRangeComposition(element, lineNumber, compositionText = '') {
         targetElement = element && element.getAttribute?.('contenteditable') === 'true' ? element : null;
     }
 
-    const finalText = targetElement ? lineTextFromElement(targetElement) : pending.beforeText;
-    let insertedText = String(compositionText || '');
-    if (!insertedText && finalText !== pending.beforeText) {
-        insertedText = changedTextBetween(pending.beforeText, finalText);
-    }
+    const fallbackCompositionText = String(compositionText || '');
+    const finalText = targetElement
+        ? lineTextFromElement(targetElement)
+        : pending.command.collapsedText.slice(0, pending.command.caretColumn) +
+            fallbackCompositionText +
+            pending.command.collapsedText.slice(pending.command.caretColumn);
+    const insertedText = finalText !== pending.command.collapsedText
+        ? changedTextBetween(pending.command.collapsedText, finalText)
+        : fallbackCompositionText;
 
-    const originalSelection = cloneEditorSelection(pending.selection);
     state.rangeComposition = null;
-
-    // 임시 조합 위치에 들어간 텍스트를 원래 줄 상태로 되돌린 뒤,
-    // 원래 다중 줄 선택 영역을 최종 조합 문자열로 한 번에 교체한다.
-    state.cache.set(pending.lineNumber, pending.beforeText);
-    if (targetElement && targetElement.getAttribute?.('contenteditable') === 'true') {
-        targetElement.textContent = pending.beforeText;
-        const restoreColumn = Math.max(0, Math.min(pending.caretColumn, pending.beforeText.length));
-        setCaret(targetElement, restoreColumn);
+    state.cache.set(pending.lineNumber, finalText);
+    state.cacheVersion++;
+    state.selection = null;
+    state.selectionAnchor = {
+        line: pending.lineNumber,
+        column: pending.command.caretColumn + insertedText.length
+    };
+    state.currentLine = pending.lineNumber;
+    state.currentColumn = state.selectionAnchor.column + 1;
+    if (!cleanDirtyMarker(pending.lineNumber)) {
+        markDirty(pending.lineNumber, 'mod');
     }
-
-    if (insertedText) {
-        replaceSelectionWith(originalSelection, insertedText);
-    } else {
-        state.selection = originalSelection;
-        state.selectionAnchor = originalSelection.start;
-        syncCustomSelectionClass();
-        queueRender(true);
-        setTimeout(() => focusLine(originalSelection.start.line, originalSelection.start.column), 0);
-    }
+    commitRangeCompositionEdit(pending.command, insertedText);
+    syncCustomSelectionClass();
+    queueRender(true);
+    setTimeout(() => focusLine(state.currentLine, Math.max(0, state.currentColumn - 1)), 0);
 
     return true;
 }
@@ -246,81 +343,21 @@ function replaceSelectionForCompositionStart(element, markPendingImeStart = true
         return nativeCompositionElement;
     }
 
-    // 여러 줄 선택 영역도 한글 조합이 끝날 때까지 삭제를 미루지 않는다.
-    // 이전 방식은 IME 임시 조합 위치만 만들고 compositionend/화살표 이동 때
-    // 원래 선택 영역을 교체했기 때문에, 마우스로 다른 곳을 클릭하면 선택 영역이
-    // 그대로 남거나 다음 caret 이동 시점에야 뒤늦게 삭제되는 문제가 있었다.
-    // 여기서 먼저 모델과 현재 렌더된 행을 선택 시작 위치로 접고, 브라우저 IME는
-    // 접힌 caret에 조합 문자열을 네이티브로 입력하게 둔다.
-
-    const { start, end } = selection;
-    const prefix = (state.cache.get(start.line) ?? '').slice(0, start.column);
-    const suffix = (state.cache.get(end.line) ?? '').slice(end.column);
-    const nextText = prefix + suffix;
-    const removedLineCount = Math.max(0, end.line - start.line);
-    const caretColumn = Math.max(0, Math.min(start.column, nextText.length));
-
-    state.selection = null;
-    state.selectionAnchor = { line: start.line, column: caretColumn };
-    state.currentLine = start.line;
-    state.currentColumn = caretColumn + 1;
-    state.editingLine = start.line;
-    syncCustomSelectionClass();
-    clearCustomSelectionVisuals();
-
-    state.cache.set(start.line, nextText);
-    for (let line = start.line + 1; line <= end.line; line++) {
-        state.cache.delete(line);
-    }
-    if (removedLineCount > 0) {
-        shiftCachedLines(end.line + 1, -removedLineCount);
-        state.lineCount = Math.max(1, state.lineCount - removedLineCount);
-        setupVirtualHeight();
-    }
-    state.cacheVersion++;
-
-    if (!cleanDirtyMarker(start.line)) {
-        markDirty(start.line, 'mod');
-    }
-
-    post({ type: 'lineChanged', lineNumber: start.line, text: nextText });
-    for (let line = end.line; line > start.line; line--) {
-        post({ type: 'deleteLine', lineNumber: line });
-    }
-    post({ type: 'contentChanged' });
-
-    const incomingLine = Number(element?.dataset?.line || 0);
-    const incomingElementIsInsideSelection = element &&
-        element.getAttribute?.('contenteditable') === 'true' &&
-        incomingLine >= start.line && incomingLine <= end.line;
-    const startRow = viewport.querySelector(`.line-row[data-line="${start.line}"]`);
-    const startTextElement = startRow?.querySelector('.line-text') || null;
-    let preferredElement = incomingElementIsInsideSelection ? element : startTextElement;
-
-    if (preferredElement && preferredElement.getAttribute('contenteditable') === 'true') {
-        makeEditablePlainText(preferredElement, null, false);
-        preferredElement.textContent = nextText;
-    } else if (startTextElement && startTextElement.getAttribute('contenteditable') === 'true') {
-        preferredElement = startTextElement;
-        makeEditablePlainText(preferredElement, null, false);
-        preferredElement.textContent = nextText;
-    }
-
-    const collapsedElement = syncRenderedRowsAfterCompositionSelectionCollapse(
-        start.line,
-        end.line,
-        nextText,
-        caretColumn,
-        preferredElement
-    );
-    const targetElement = collapsedElement || preferredElement || startTextElement || element;
+    // DOM은 IME 호스트를 유지하기 위해 즉시 접지만, C# 문서 모델에는 아직
+    // 아무 메시지도 보내지 않는다. compositionend에서 rangeEdit 한 건만 확정한다.
+    const command = createRangeCompositionEditCommand(selection);
+    const targetElement = applyLocalRangeCompositionEdit(command, element);
+    state.rangeComposition = {
+        command,
+        lineNumber: command.start.line
+    };
 
     if (targetElement && targetElement.getAttribute?.('contenteditable') === 'true') {
         targetElement.focus({ preventScroll: true });
         const textNode = targetElement.firstChild;
         const range = document.createRange();
         if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-            range.setStart(textNode, Math.max(0, Math.min(caretColumn, textNode.textContent.length)));
+            range.setStart(textNode, Math.max(0, Math.min(command.caretColumn, textNode.textContent.length)));
         } else {
             range.setStart(targetElement, 0);
         }
@@ -333,12 +370,7 @@ function replaceSelectionForCompositionStart(element, markPendingImeStart = true
     }
 
     if (markPendingImeStart && targetElement && targetElement.getAttribute?.('contenteditable') === 'true') {
-        beginPendingImeSelectionCollapse(targetElement, start.line, caretColumn);
-    }
-
-    state.lastRangeKey = '';
-    if (state.wordWrap) {
-        measureRenderedRows(false);
+        beginPendingImeSelectionCollapse(targetElement, command.start.line, command.caretColumn);
     }
     return targetElement || element;
 }
@@ -401,22 +433,14 @@ function applyColumnCompositionPreview(element, insertedText) {
     if (!pending || !bounds) return false;
 
     let changed = false;
-    let posted = false;
     const previewText = String(insertedText ?? '');
 
     for (let line = bounds.startLine; line <= bounds.endLine; line++) {
         const baseText = pending.baseLines.get(line) ?? '';
         const nextText = buildColumnCompositionLine(baseText, bounds.startCol, bounds.endCol, previewText);
-        const previousPreview = pending.lastPreviewLines.get(line);
-
         state.cache.set(line, nextText);
         pending.lastPreviewLines.set(line, nextText);
         updateVisibleLineTextDuringComposition(line, nextText, element);
-
-        if (previousPreview !== nextText) {
-            post({ type: 'lineChanged', lineNumber: line, text: nextText, isComposing: true, isColumnComposition: true });
-            posted = true;
-        }
         changed = true;
     }
 
@@ -426,10 +450,6 @@ function applyColumnCompositionPreview(element, insertedText) {
             measureRenderedRows(false);
         }
         drawEditableSelectionOverlays();
-    }
-
-    if (posted) {
-        post({ type: 'contentChanged', isComposing: true, isColumnComposition: true });
     }
 
     return changed;
@@ -444,27 +464,17 @@ function updateColumnCompositionPreview(element) {
     return applyColumnCompositionPreview(element, insertedText);
 }
 
-function restoreColumnCompositionBase(pending, postChanges = false, preserveElement = null) {
+function restoreColumnCompositionBase(pending, preserveElement = null) {
     const bounds = pending ? columnCompositionBounds(pending.selection) : null;
     if (!pending || !bounds) return;
 
-    let posted = false;
     for (let line = bounds.startLine; line <= bounds.endLine; line++) {
         const baseText = pending.baseLines.get(line) ?? '';
-        const previousPreview = pending.lastPreviewLines.get(line);
         state.cache.set(line, baseText);
         updateVisibleLineTextDuringComposition(line, baseText, preserveElement);
-
-        if (postChanges && previousPreview !== undefined && previousPreview !== baseText) {
-            post({ type: 'lineChanged', lineNumber: line, text: baseText, isComposing: true, isColumnComposition: true, isCompositionCancel: true });
-            posted = true;
-        }
     }
 
     state.cacheVersion++;
-    if (posted) {
-        post({ type: 'contentChanged', isComposing: true, isColumnComposition: true, isCompositionCancel: true });
-    }
 }
 
 function beginColumnComposition(element) {
@@ -505,7 +515,7 @@ function finishColumnComposition(element, lineNumber) {
 
     const targetLine = Number(lineNumber || element.dataset.line || pending.lineNumber || state.currentLine || 1);
     if (targetLine !== pending.lineNumber) {
-        restoreColumnCompositionBase(pending, true, element);
+        restoreColumnCompositionBase(pending, element);
         state.columnComposition = null;
         return false;
     }
@@ -515,7 +525,7 @@ function finishColumnComposition(element, lineNumber) {
     const originalSelection = cloneEditorSelection(pending.selection);
     const changed = insertedText.length > 0 || finalText !== pending.beforeText;
 
-    restoreColumnCompositionBase(pending, !changed, element);
+    restoreColumnCompositionBase(pending, element);
     state.columnComposition = null;
 
     if (changed) {
@@ -539,6 +549,7 @@ function finishColumnComposition(element, lineNumber) {
     let bypassStartLine = 1;
     let bypassStartColumn = 0;
     let isBypassCompositionActive = false;
+    let bypassEditCommand = null;
     let bypassUndoTransactionActive = false;
 
     function beginBypassUndoTransaction() {
@@ -647,89 +658,43 @@ function finishColumnComposition(element, lineNumber) {
     function collapseEditorSelectionForBypass() {
         if (!bypassSelection) return;
 
-        const { start, end } = bypassSelection;
-        const prefix = bypassPrefix;
-        const suffix = bypassSuffix;
-        const nextText = prefix + suffix;
-        const removedLineCount = Math.max(0, end.line - start.line);
-        const caretColumn = Math.max(0, Math.min(start.column, nextText.length));
-
         beginBypassUndoTransaction();
-
-        state.selection = null;
-        state.selectionAnchor = { line: start.line, column: caretColumn };
-        state.currentLine = start.line;
-        state.currentColumn = caretColumn + 1;
-        state.editingLine = start.line;
-
-        state.cache.set(start.line, nextText);
-        for (let line = start.line + 1; line <= end.line; line++) {
-            state.cache.delete(line);
-        }
-        if (removedLineCount > 0) {
-            shiftCachedLines(end.line + 1, -removedLineCount);
-            state.lineCount = Math.max(1, state.lineCount - removedLineCount);
-            setupVirtualHeight();
-        }
-        state.cacheVersion++;
-
-        if (!cleanDirtyMarker(start.line)) {
-            markDirty(start.line, 'mod');
-        }
-
-        post({ type: 'lineChanged', lineNumber: start.line, text: nextText, isComposing: true });
-        for (let line = end.line; line > start.line; line--) {
-            post({ type: 'deleteLine', lineNumber: line, isComposing: true });
-        }
-        post({ type: 'contentChanged', isComposing: true });
-
-        const row = viewport.querySelector(`.line-row[data-line="${start.line}"]`);
+        bypassEditCommand = createRangeCompositionEditCommand(bypassSelection);
+        const row = viewport.querySelector(`.line-row[data-line="${bypassEditCommand.start.line}"]`);
         const element = row ? row.querySelector('.line-text') : null;
-
-        syncRenderedRowsAfterCompositionSelectionCollapse(
-            start.line,
-            end.line,
-            nextText,
-            caretColumn,
-            element
-        );
-
-        state.lastRangeKey = '';
-        if (state.wordWrap) {
-            measureRenderedRows(false);
-        }
-
+        applyLocalRangeCompositionEdit(bypassEditCommand, element);
         bypassSelection = null;
     }
 
     function onBypassCompositionStart(e) {
-        state.isComposing = true;
-        state.compositionLine = bypassStartLine;
+        if (!beginImeComposition(state, ImePhase.TextareaBypassComposition, bypassStartLine)) return;
         state.editingLine = bypassStartLine;
         isBypassCompositionActive = true;
         collapseEditorSelectionForBypass();
     }
 
     function onBypassCompositionUpdate(e) {
-        state.isComposing = true;
+        if (!updateImeComposition(state)) return;
         const val = e.data || '';
         updateEditorText(val, true);
     }
 
     function onBypassInput(e) {
+        if (!isBypassCompositionActive && !bypassSelection) return;
         if (bypassSelection) {
             collapseEditorSelectionForBypass();
         }
         const val = textareaBypassNode.value;
-        updateEditorText(val, true);
+        updateEditorText(val, isBypassCompositionActive);
     }
 
     function onBypassCompositionEnd(e) {
-        state.isComposing = false;
+        beginImeCommit(state);
         isBypassCompositionActive = false;
         const val = e.data !== undefined ? (textareaBypassNode.value || e.data) : textareaBypassNode.value;
         updateEditorText(val, false);
         endBypassUndoTransaction();
+        completeImeCommit(state, true);
     }
 
     function onBypassKeyDown(e) {
@@ -738,7 +703,8 @@ function finishColumnComposition(element, lineNumber) {
             
             if (bypassSelection) {
                 bypassSelection = null;
-                state.textareaImeBypassActive = false;
+                cancelImeComposition(state);
+                completeImeCommit(state);
                 state.bypassStartLine = null;
                 clearBypassCursor();
                 const activeLine = viewport.querySelector(`.line-text[data-line="${state.currentLine}"]`);
@@ -749,7 +715,8 @@ function finishColumnComposition(element, lineNumber) {
                 updateEditorText(val, false);
                 endBypassUndoTransaction();
                 const newCaretCol = bypassStartColumn + val.length;
-                state.textareaImeBypassActive = false;
+                cancelImeComposition(state);
+                completeImeCommit(state);
                 state.bypassStartLine = null;
                 clearBypassCursor();
                 focusLine(bypassStartLine, newCaretCol);
@@ -785,7 +752,8 @@ function finishColumnComposition(element, lineNumber) {
                 updateEditorText(val, false);
                 endBypassUndoTransaction();
             }
-            state.textareaImeBypassActive = false;
+            cancelImeComposition(state);
+            completeImeCommit(state);
             state.bypassStartLine = null;
             clearBypassCursor();
             drawEditableSelectionOverlays();
@@ -803,9 +771,11 @@ function finishColumnComposition(element, lineNumber) {
         }
 
         bypassSelection = null;
+        bypassEditCommand = null;
         bypassPrefix = '';
         bypassSuffix = '';
-        state.textareaImeBypassActive = false;
+        cancelImeComposition(state);
+        completeImeCommit(state);
         state.bypassStartLine = null;
         clearBypassCursor();
         endBypassUndoTransaction();
@@ -814,18 +784,21 @@ function finishColumnComposition(element, lineNumber) {
 
     function updateEditorText(val, isComposing) {
         const nextText = bypassPrefix + val + bypassSuffix;
+        const previousText = state.cache.get(bypassStartLine) ?? '';
         const cursorColumn = bypassStartColumn + String(val ?? '').length;
         setBypassCursor(cursorColumn);
         state.cache.set(bypassStartLine, nextText);
         state.cacheVersion++;
-        
-        post({
-            type: 'lineChanged',
-            lineNumber: bypassStartLine,
-            text: nextText,
-            isComposing: isComposing
-        });
-        post({ type: 'contentChanged', isComposing: isComposing });
+
+        if (!isComposing) {
+            if (bypassEditCommand) {
+                commitRangeCompositionEdit(bypassEditCommand, val);
+                bypassEditCommand = null;
+            } else if (previousText !== nextText) {
+                post({ type: 'lineChanged', lineNumber: bypassStartLine, text: nextText });
+                post({ type: 'contentChanged' });
+            }
+        }
         
         const element = viewport.querySelector(`.line-text[data-line="${bypassStartLine}"]`);
         if (element) {
@@ -848,6 +821,7 @@ function finishColumnComposition(element, lineNumber) {
             const shouldRefreshBypass = state.isSplitView || document.activeElement !== textarea;
             if (shouldRefreshBypass) {
                 bypassSelection = cloneEditorSelection(selection);
+                bypassEditCommand = null;
                 bypassStartLine = selection.start.line;
                 bypassStartColumn = selection.start.column;
                 
@@ -857,7 +831,7 @@ function finishColumnComposition(element, lineNumber) {
                 bypassSuffix = suffix;
                 
                 textarea.value = '';
-                state.textareaImeBypassActive = true;
+                if (!activateTextareaImeBypass(state, bypassStartLine)) return false;
                 state.bypassStartLine = bypassStartLine;
                 setBypassCursor(bypassStartColumn);
                 

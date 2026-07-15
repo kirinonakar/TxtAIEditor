@@ -21,7 +21,6 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab, bool> _isTabOpen;
         private readonly Func<string, EditorDocumentSession?> _sessionProvider;
         private readonly Func<string, (WebView2 WebView, MonacoBridge Bridge)?> _bridgeProvider;
-        private readonly Func<OpenedTab, Task> _flushPendingImeAsync;
         private readonly Action<OpenedTab> _cleanDirtyStateOnOtherTabs;
         private readonly Action<OpenedTab> _updateLanguageUi;
         private readonly Func<Task> _refreshGitStatusAsync;
@@ -42,7 +41,6 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab, bool> isTabOpen,
             Func<string, EditorDocumentSession?> sessionProvider,
             Func<string, (WebView2 WebView, MonacoBridge Bridge)?> bridgeProvider,
-            Func<OpenedTab, Task> flushPendingImeAsync,
             Action<OpenedTab> cleanDirtyStateOnOtherTabs,
             Action<OpenedTab> updateLanguageUi,
             Func<Task> refreshGitStatusAsync,
@@ -62,7 +60,6 @@ namespace TxtAIEditor.Controls
             _isTabOpen = isTabOpen;
             _sessionProvider = sessionProvider;
             _bridgeProvider = bridgeProvider;
-            _flushPendingImeAsync = flushPendingImeAsync;
             _cleanDirtyStateOnOtherTabs = cleanDirtyStateOnOtherTabs;
             _updateLanguageUi = updateLanguageUi;
             _refreshGitStatusAsync = refreshGitStatusAsync;
@@ -240,21 +237,38 @@ namespace TxtAIEditor.Controls
             tab.ArchiveEntryPath = null;
         }
 
-        private async Task FlushTabEditorBeforeSaveAsync(OpenedTab tab)
+        private async Task<long?> FlushTabEditorBeforeSaveAsync(OpenedTab tab)
         {
             var bridgeGroup = _bridgeProvider(tab.Id);
             if (bridgeGroup?.Bridge != null)
             {
-                await bridgeGroup.Value.Bridge.FlushPendingEditForSaveAsync();
+                long? version = await bridgeGroup.Value.Bridge.FlushPendingEditForSaveAsync();
+                if (version == null)
+                {
+                    throw new InvalidOperationException(_getString(
+                        "SaveEditorFlushFailed",
+                        "편집 입력을 확정하지 못해 저장을 취소했습니다. 다시 시도해 주세요."));
+                }
+                return version;
             }
+            return null;
         }
 
         private async Task SaveTabContentAsync(OpenedTab tab)
         {
-            await FlushTabEditorBeforeSaveAsync(tab);
-            await _flushPendingImeAsync(tab);
+            long? flushedDocumentVersion = await FlushTabEditorBeforeSaveAsync(tab);
 
             var session = _sessionProvider(tab.Id);
+            if (session != null && flushedDocumentVersion is long expectedVersion)
+            {
+                bool reachedVersion = await session.WaitForDocumentVersionAsync(expectedVersion);
+                if (!reachedVersion)
+                {
+                    throw new InvalidOperationException(_getString(
+                        "SaveEditorFlushFailed",
+                        "편집 입력을 확정하지 못해 저장을 취소했습니다. 다시 시도해 주세요."));
+                }
+            }
             if (tab.IsEncrypted)
             {
                 string? password = tab.EncryptionPassword;

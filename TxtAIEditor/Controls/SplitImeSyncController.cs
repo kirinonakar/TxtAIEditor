@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Editor;
@@ -11,15 +10,11 @@ namespace TxtAIEditor.Controls
 {
     public sealed class SplitImeSyncController
     {
-        private const int DeferredUiSyncDelayMs = 260;
-
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly Func<OpenedTab, IEnumerable<OpenedTab>> _getTabsForSameFile;
         private readonly Action<OpenedTab> _schedulePreview;
         private readonly Action<OpenedTab, bool> _setDirtyStateForFileGroup;
-        private readonly Dictionary<string, PendingSplitImeSyncState> _pendingStates =
-            new Dictionary<string, PendingSplitImeSyncState>();
 
         public SplitImeSyncController(
             Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
@@ -35,138 +30,10 @@ namespace TxtAIEditor.Controls
             _setDirtyStateForFileGroup = setDirtyStateForFileGroup;
         }
 
-        public bool QueuePendingLineSyncIfNeeded(OpenedTab sourceTab, int lineNumber, string text)
-        {
-            if (string.IsNullOrEmpty(sourceTab.FilePath)) return false;
-            if (!HasOtherTabForSameFile(sourceTab)) return false;
-
-            if (!_pendingStates.TryGetValue(sourceTab.Id, out var state))
-            {
-                state = new PendingSplitImeSyncState();
-                _pendingStates[sourceTab.Id] = state;
-            }
-
-            StopPendingTimer(state);
-            state.Lines[lineNumber] = text;
-
-            if (state.Lines.Count > 1)
-            {
-                state.IsColumnEdit = true;
-            }
-
-            // IME 조합 중에는 실시간 동기화로 인한 재렌더링 및 자소 분리를 막기 위해 항상 true를 반환하여 동기화를 보류합니다.
-            return true;
-        }
-
-        public bool ScheduleCompletionSyncIfNeeded(OpenedTab sourceTab, int lineNumber, string text)
-        {
-            if (!_pendingStates.TryGetValue(sourceTab.Id, out var state))
-            {
-                return false;
-            }
-
-            state.Lines[lineNumber] = text;
-            if (!state.HasStructuralEdit && !state.IsColumnEdit && state.Lines.Count <= 1)
-            {
-                Clear(sourceTab.Id);
-                return false;
-            }
-
-            state.IsColumnEdit = true;
-            ScheduleDeferredSync(sourceTab, state);
-            return true;
-        }
-
-        public bool ScheduleDeferredSyncIfNeeded(OpenedTab sourceTab)
-        {
-            if (!_pendingStates.TryGetValue(sourceTab.Id, out var state))
-            {
-                return false;
-            }
-
-            if (!state.HasStructuralEdit && !state.IsColumnEdit && state.Lines.Count <= 1)
-            {
-                Clear(sourceTab.Id);
-                return false;
-            }
-
-            state.IsColumnEdit = true;
-            ScheduleDeferredSync(sourceTab, state);
-            return true;
-        }
-
-        public async Task FlushAsync(OpenedTab sourceTab)
-        {
-            if (!_pendingStates.TryGetValue(sourceTab.Id, out var state)) return;
-
-            StopPendingTimer(state);
-            bool hasStructural = state.HasStructuralEdit;
-            var pendingLineNumbers = state.Lines.Keys.OrderBy(line => line).ToList();
-            Clear(sourceTab.Id);
-
-            if (hasStructural)
-            {
-                await SyncEditsToOtherTabsAsync(sourceTab, updateUi: true);
-            }
-            else
-            {
-                foreach (int lineNumber in pendingLineNumbers)
-                {
-                    string lineText = GetCurrentLineText(sourceTab, lineNumber, string.Empty);
-                    await SyncLineChangeToOtherTabsAsync(sourceTab, lineNumber, lineText, isComposing: false);
-                }
-            }
-        }
-
-        public void Clear(string tabId)
-        {
-            if (_pendingStates.TryGetValue(tabId, out var state))
-            {
-                StopPendingTimer(state);
-            }
-
-            _pendingStates.Remove(tabId);
-        }
-
-        public void ClearAll()
-        {
-            foreach (var tabId in _pendingStates.Keys.ToList())
-            {
-                Clear(tabId);
-            }
-        }
-
-        public void RecordStructuralEdit(OpenedTab sourceTab)
-        {
-            if (string.IsNullOrEmpty(sourceTab.FilePath)) return;
-            if (!HasOtherTabForSameFile(sourceTab)) return;
-
-            if (!_pendingStates.TryGetValue(sourceTab.Id, out var state))
-            {
-                state = new PendingSplitImeSyncState();
-                _pendingStates[sourceTab.Id] = state;
-            }
-            state.HasStructuralEdit = true;
-        }
-
-        public async Task FlushOtherTabsPendingSyncsAsync(OpenedTab sourceTab)
-        {
-            if (string.IsNullOrEmpty(sourceTab.FilePath)) return;
-            if (!HasOtherTabForSameFile(sourceTab)) return;
-
-            var otherPendingTabIds = _pendingStates.Keys.Where(id => id != sourceTab.Id).ToList();
-            foreach (var otherTabId in otherPendingTabIds)
-            {
-                if (_editorSessions.TryGetValue(otherTabId, out var session))
-                {
-                    await FlushAsync(session.Tab);
-                }
-            }
-        }
-
         public async Task SyncLineChangeToOtherTabsAsync(OpenedTab sourceTab, int lineNumber, string text, bool isComposing)
         {
             if (string.IsNullOrEmpty(sourceTab.FilePath)) return;
+            if (!_editorSessions.TryGetValue(sourceTab.Id, out var sourceSession)) return;
 
             var otherTabs = _getTabsForSameFile(sourceTab)
                 .Where(t => t.Id != sourceTab.Id)
@@ -175,13 +42,17 @@ namespace TxtAIEditor.Controls
             if (otherTabs.Count == 0) return;
 
             bool sourceDirty = sourceTab.IsDirty;
+            EditorDocumentChange? change = sourceSession.LastChange;
 
             foreach (var otherTab in otherTabs)
             {
                 if (_editorSessions.TryGetValue(otherTab.Id, out var otherSession))
                 {
-                    otherSession.ReplaceLine(lineNumber, text, trackUndo: !isComposing, isComposing: isComposing);
-                    otherTab.Content = otherSession.GetText();
+                    if (!otherSession.SharesDocumentWith(sourceSession))
+                    {
+                        otherSession.ReplaceLine(lineNumber, text, trackUndo: !isComposing, isComposing: isComposing);
+                    }
+                    otherSession.RefreshTabContentPreview();
                 }
                 else
                 {
@@ -190,7 +61,19 @@ namespace TxtAIEditor.Controls
 
                 if (_tabBridges.TryGetValue(otherTab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {
-                    await bridgeGroup.Bridge.UpdateLineAsync(lineNumber, text, isComposing);
+                    if (!_editorSessions.TryGetValue(otherTab.Id, out var targetSession) ||
+                        !targetSession.SharesDocumentWith(sourceSession) ||
+                        targetSession.ViewVersion < sourceSession.DocumentVersion)
+                    {
+                        await bridgeGroup.Bridge.UpdateLineAsync(
+                            lineNumber,
+                            text,
+                            isComposing,
+                            sourceSession.DocumentId,
+                            change?.BaseVersion,
+                            change?.Version ?? sourceSession.DocumentVersion);
+                        targetSession?.MarkViewSynchronized(sourceSession.DocumentVersion);
+                    }
                 }
 
                 if (!isComposing)
@@ -206,8 +89,6 @@ namespace TxtAIEditor.Controls
         {
             if (string.IsNullOrEmpty(sourceTab.FilePath)) return;
 
-            Clear(sourceTab.Id);
-
             var otherTabs = _getTabsForSameFile(sourceTab)
                 .Where(t => t.Id != sourceTab.Id)
                 .ToList();
@@ -215,20 +96,53 @@ namespace TxtAIEditor.Controls
             if (otherTabs.Count == 0) return;
 
             if (!_editorSessions.TryGetValue(sourceTab.Id, out var sourceSession)) return;
-            string updatedText = sourceSession.GetText();
             bool sourceDirty = sourceTab.IsDirty;
+            EditorDocumentChange? change = sourceSession.LastChange;
 
             foreach (var otherTab in otherTabs)
             {
-                if (_editorSessions.TryGetValue(otherTab.Id, out var otherSession))
+                bool hasOtherSession = _editorSessions.TryGetValue(otherTab.Id, out var otherSession);
+                bool sharesDocument = hasOtherSession && otherSession!.SharesDocumentWith(sourceSession);
+
+                if (hasOtherSession && !sharesDocument)
                 {
-                    otherSession.UpdateContentFromSync(updatedText);
+                    string updatedText = sourceSession.GetText();
+                    otherSession!.UpdateContentFromSync(updatedText);
+                    otherTab.Content = updatedText;
                 }
-                otherTab.Content = updatedText;
+                else if (hasOtherSession)
+                {
+                    otherSession!.RefreshTabContentPreview();
+                }
 
                 if (updateUi && _tabBridges.TryGetValue(otherTab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {
-                    await bridgeGroup.Bridge.SetTextAsync(updatedText, shouldFocus: false);
+                    if (sharesDocument && otherSession != null && change != null &&
+                        otherSession.ViewVersion == change.BaseVersion)
+                    {
+                        await bridgeGroup.Bridge.ApplyEditResultAsync(new UndoResult(
+                            change.StartLine,
+                            change.OldLineCount,
+                            change.DocumentLineCount,
+                            change.Lines,
+                            null),
+                            change.DocumentId,
+                            change.BaseVersion,
+                            change.Version);
+                        otherSession.MarkViewSynchronized(change.Version);
+                    }
+                    else if (!sharesDocument ||
+                        (otherSession != null && change != null && otherSession.ViewVersion < change.Version))
+                    {
+                        string updatedText = sourceSession.GetText();
+                        await bridgeGroup.Bridge.SetTextAsync(
+                            updatedText,
+                            shouldFocus: false,
+                            sourceSession.DocumentId,
+                            sourceSession.DocumentVersion,
+                            otherTab.Id);
+                        otherSession?.MarkViewSynchronized(sourceSession.DocumentVersion);
+                    }
                 }
 
                 if (updateUi)
@@ -240,61 +154,5 @@ namespace TxtAIEditor.Controls
             _setDirtyStateForFileGroup(sourceTab, sourceDirty);
         }
 
-        private void ScheduleDeferredSync(OpenedTab sourceTab, PendingSplitImeSyncState state)
-        {
-            StopPendingTimer(state);
-
-            var timer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(DeferredUiSyncDelayMs)
-            };
-
-            state.DeferredSyncTimer = timer;
-            timer.Tick += async (_, _) =>
-            {
-                timer.Stop();
-
-                if (_pendingStates.TryGetValue(sourceTab.Id, out var currentState) &&
-                    ReferenceEquals(currentState, state) &&
-                    ReferenceEquals(currentState.DeferredSyncTimer, timer))
-                {
-                    await FlushAsync(sourceTab);
-                }
-            };
-            timer.Start();
-        }
-
-        public bool HasOtherTabForSameFile(OpenedTab sourceTab)
-        {
-            if (string.IsNullOrEmpty(sourceTab.FilePath)) return false;
-            return _getTabsForSameFile(sourceTab).Any(tab => tab.Id != sourceTab.Id);
-        }
-
-        private string GetCurrentLineText(OpenedTab tab, int lineNumber, string fallback)
-        {
-            if (_editorSessions.TryGetValue(tab.Id, out var session))
-            {
-                return session.GetLines(lineNumber, 1).FirstOrDefault() ?? string.Empty;
-            }
-
-            return fallback;
-        }
-
-        private static void StopPendingTimer(PendingSplitImeSyncState state)
-        {
-            if (state.DeferredSyncTimer != null)
-            {
-                state.DeferredSyncTimer.Stop();
-                state.DeferredSyncTimer = null;
-            }
-        }
-
-        private sealed class PendingSplitImeSyncState
-        {
-            public Dictionary<int, string> Lines { get; } = new Dictionary<int, string>();
-            public DispatcherTimer? DeferredSyncTimer { get; set; }
-            public bool IsColumnEdit { get; set; }
-            public bool HasStructuralEdit { get; set; }
-        }
     }
 }

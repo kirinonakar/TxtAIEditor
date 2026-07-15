@@ -38,7 +38,6 @@ import {
     moveCaretHorizontal,
     moveCaretVertical,
     normalizedModelRepeatKey,
-    replaceSelectionForCompositionStart,
     replaceSelectionWith,
     pasteFromClipboard,
     scheduleModelRepeatEdit,
@@ -464,16 +463,10 @@ export function bindKeyboardEvents({ openFindPanel }) {
                     if (pendingSelection.start.line !== pendingSelection.end.line) {
                         focusImeBypassTextarea();
                     } else {
-                        const isCollapsed = pendingSelection.start.line === pendingSelection.end.line &&
-                                            pendingSelection.start.column === pendingSelection.end.column;
-                        if (!isCollapsed) {
-                            const replacedElement = replaceSelectionForCompositionStart(imeElement, true) || imeElement;
-                            state.compositionLine = Number(replacedElement.dataset.line || state.currentLine || 1);
-                            state.editingLine = state.compositionLine;
-                        } else {
-                            state.compositionLine = Number(imeElement.dataset.line || state.currentLine || 1);
-                            state.editingLine = state.compositionLine;
-                        }
+                        // compositionstart/beforeinput가 실제로 도착한 뒤에만 선택을
+                        // 조합용 로컬 편집으로 바꾼다. keyCode 229만으로 문서를 변경하면
+                        // 조합이 시작되지 않은 경우 미확정 range edit가 남을 수 있다.
+                        state.editingLine = Number(imeElement.dataset.line || state.currentLine || 1);
                     }
                 }
             }

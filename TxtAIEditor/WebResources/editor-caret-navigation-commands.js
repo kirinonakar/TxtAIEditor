@@ -1,3 +1,8 @@
+import {
+    beginImeCommit,
+    completeImeCommit
+} from './editor-ime-state.js';
+
 export function createCaretNavigationCommands({
     caretRectForOffset,
     changedTextBetween,
@@ -48,12 +53,12 @@ export function createCaretNavigationCommands({
             const targetElement = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) || element;
             const finalText = targetElement?.getAttribute?.('contenteditable') === 'true'
                 ? lineTextFromElement(targetElement)
-                : pending.beforeText;
-            const insertedText = changedTextBetween(pending.beforeText, finalText);
+                : pending.command.collapsedText;
+            const insertedText = changedTextBetween(pending.command.collapsedText, finalText);
 
             if (finishRangeComposition(targetElement, lineNumber, insertedText)) {
-                state.isComposing = false;
-                state.compositionLine = null;
+                beginImeCommit(state);
+                completeImeCommit(state);
                 clearPendingImeSelectionCollapse();
                 reportCursorAndSelection(targetElement);
                 return true;
@@ -63,8 +68,8 @@ export function createCaretNavigationCommands({
         if (state.columnComposition) {
             const lineNumber = Number(element.dataset.line || state.compositionLine || state.currentLine || 1);
             if (finishColumnComposition(element, lineNumber)) {
-                state.isComposing = false;
-                state.compositionLine = null;
+                beginImeCommit(state);
+                completeImeCommit(state);
                 clearPendingImeSelectionCollapse();
                 reportCursorAndSelection(element);
                 return true;

@@ -129,35 +129,11 @@ namespace TxtAIEditor.Composition
             long GetLargeFileThresholdBytes() =>
                 MainWindowWorkspaceOperations.GetLargeFileThresholdBytes(services.SettingsService);
 
-            bool QueuePendingSplitImeLineSyncIfNeeded(OpenedTab sourceTab, int lineNumber, string text) =>
-                splitImeSyncController!.QueuePendingLineSyncIfNeeded(sourceTab, lineNumber, text);
-
-            bool SchedulePendingSplitImeCompletionSyncIfNeeded(OpenedTab sourceTab, int lineNumber, string text) =>
-                splitImeSyncController!.ScheduleCompletionSyncIfNeeded(sourceTab, lineNumber, text);
-
-            bool ScheduleDeferredPendingSplitImeSyncIfNeeded(OpenedTab sourceTab) =>
-                splitImeSyncController!.ScheduleDeferredSyncIfNeeded(sourceTab);
-
-            Task FlushPendingSplitImeSyncAsync(OpenedTab sourceTab) =>
-                splitImeSyncController!.FlushAsync(sourceTab);
-
-            void ClearPendingSplitImeSync(string tabId) =>
-                splitImeSyncController!.Clear(tabId);
-
             Task SyncLineChangeToOtherTabsAsync(OpenedTab sourceTab, int lineNumber, string text, bool isComposing) =>
                 splitImeSyncController!.SyncLineChangeToOtherTabsAsync(sourceTab, lineNumber, text, isComposing);
 
             Task SyncEditsToOtherTabsAsync(OpenedTab sourceTab, bool updateUi = true) =>
                 splitImeSyncController!.SyncEditsToOtherTabsAsync(sourceTab, updateUi);
-
-            void RecordPendingSplitImeStructuralEdit(OpenedTab sourceTab) =>
-                splitImeSyncController!.RecordStructuralEdit(sourceTab);
-
-            bool HasOtherTabForSameFile(OpenedTab sourceTab) =>
-                splitImeSyncController!.HasOtherTabForSameFile(sourceTab);
-
-            Task FlushOtherTabsPendingSyncsAsync(OpenedTab sourceTab) =>
-                splitImeSyncController!.FlushOtherTabsPendingSyncsAsync(sourceTab);
 
             void ApplyUiPersonalization(EditorSettings settings) =>
                 settingsController!.ApplyUiPersonalization(settings);
@@ -331,7 +307,6 @@ namespace TxtAIEditor.Composition
                 favoritesRecentController,
                 dialogController,
                 new MainWindowDocumentCommandCallbacks(
-                    FlushPendingSplitImeSyncAsync,
                     callbacks.UpdateLanguageUi,
                     RefreshGitStatusUIAsync,
                     callbacks.UpdateWindowTitle,
@@ -339,7 +314,6 @@ namespace TxtAIEditor.Composition
                     LoadDirectoryRoot,
                     GetSearchRoot,
                     () => state.CurrentRepoPath,
-                    ClearPendingSplitImeSync,
                     callbacks.OpenNewTab,
                     callbacks.CloseReadOnlyViewer,
                     SaveUiLayoutSettingsAsync,
@@ -498,14 +472,8 @@ namespace TxtAIEditor.Composition
                 new MainWindowEditorRuntimeCallbacks(
                     callbacks.SchedulePreview,
                     callbacks.UpdateLanguageUi,
-                    QueuePendingSplitImeLineSyncIfNeeded,
-                    SchedulePendingSplitImeCompletionSyncIfNeeded,
-                    ScheduleDeferredPendingSplitImeSyncIfNeeded,
                     SyncLineChangeToOtherTabsAsync,
                     tab => SyncEditsToOtherTabsAsync(tab),
-                    RecordPendingSplitImeStructuralEdit,
-                    HasOtherTabForSameFile,
-                    FlushOtherTabsPendingSyncsAsync,
                     SaveSidebarVisibilitySettingsAsync,
                     callbacks.RefreshActivePreview,
                     callbacks.LoadFileIntoTabAsync,
@@ -567,7 +535,6 @@ namespace TxtAIEditor.Composition
                 functionKeyShortcutService,
                 autoSaveController,
                 gitAutoRefreshTimer,
-                splitImeSyncController,
                 livePreviewController,
                 pdfViewerController,
                 officeDocumentViewerController,

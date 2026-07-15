@@ -124,9 +124,8 @@ namespace TxtAIEditor.Controls
             }
 
             string? path = activeTab.FilePath;
-            string content = _editorSessions.TryGetValue(activeTab.Id, out var session)
-                ? session.GetText()
-                : activeTab.Content ?? string.Empty;
+            bool hasSourceSession = _editorSessions.TryGetValue(activeTab.Id, out var sourceSession);
+            string content = hasSourceSession ? string.Empty : activeTab.Content ?? string.Empty;
 
             bool isDirty = _isAnySameFileTabDirty(activeTab);
             var newTab = _openEditorTab(
@@ -137,6 +136,16 @@ namespace TxtAIEditor.Controls
                 activeTab.EncodingWasAutoDetected,
                 activeTab.IsEncrypted,
                 activeTab.EncryptionPassword);
+
+            if (hasSourceSession && sourceSession != null &&
+                _editorSessions.TryGetValue(newTab.Id, out var splitViewSession))
+            {
+                splitViewSession.ShareDocumentWith(sourceSession);
+                newTab.Content = activeTab.Content ?? string.Empty;
+                newTab.OriginalContent = activeTab.OriginalContent;
+                newTab.OriginalLineEnding = activeTab.OriginalLineEnding;
+                newTab.OriginalEncodingName = activeTab.OriginalEncodingName;
+            }
 
             newTab.IsDirty = isDirty;
             _setDirtyStateForFileGroup(activeTab, isDirty);
@@ -223,13 +232,27 @@ namespace TxtAIEditor.Controls
                 string duplicateText = duplicateSession.GetText();
                 if (_editorSessions.TryGetValue(keeper.Id, out var keeperSession))
                 {
-                    keeperSession.UpdateContentFromSync(duplicateText);
+                    if (!keeperSession.SharesDocumentWith(duplicateSession))
+                    {
+                        keeperSession.UpdateContentFromSync(duplicateText);
+                    }
+                    else
+                    {
+                        keeperSession.RefreshTabContentPreview();
+                    }
                 }
                 keeper.Content = duplicateText;
 
                 if (_tabBridges.TryGetValue(keeper.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {
-                    _ = bridgeGroup.Bridge.SetTextAsync(duplicateText, shouldFocus: false);
+                    _editorSessions.TryGetValue(keeper.Id, out var keeperBridgeSession);
+                    _ = bridgeGroup.Bridge.SetTextAsync(
+                        duplicateText,
+                        shouldFocus: false,
+                        keeperBridgeSession?.DocumentId,
+                        keeperBridgeSession?.DocumentVersion,
+                        keeper.Id);
+                    keeperBridgeSession?.MarkViewSynchronized(keeperBridgeSession.DocumentVersion);
                 }
             }
 

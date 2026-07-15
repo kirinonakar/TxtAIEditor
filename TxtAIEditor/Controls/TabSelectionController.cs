@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowViewModel _viewModel;
         private readonly TabView _primaryTabView;
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly LlmAssistantController _llmAssistantController;
         private readonly AgentController _agentController;
@@ -35,6 +36,7 @@ namespace TxtAIEditor.Controls
             MainWindowViewModel viewModel,
             TabView primaryTabView,
             Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, EditorDocumentSession> editorSessions,
             DispatcherQueue dispatcherQueue,
             LlmAssistantController llmAssistantController,
             AgentController agentController,
@@ -51,6 +53,7 @@ namespace TxtAIEditor.Controls
             _viewModel = viewModel;
             _primaryTabView = primaryTabView;
             _tabBridges = tabBridges;
+            _editorSessions = editorSessions;
             _dispatcherQueue = dispatcherQueue;
             _llmAssistantController = llmAssistantController;
             _agentController = agentController;
@@ -130,7 +133,14 @@ namespace TxtAIEditor.Controls
                         tab.IsPendingReload = false;
                         if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                         {
-                            await bridgeGroup.Bridge.SetTextAsync(tab.Content, shouldFocus: false);
+                            _editorSessions.TryGetValue(tab.Id, out var session);
+                            await bridgeGroup.Bridge.SetTextAsync(
+                                tab.Content,
+                                shouldFocus: false,
+                                session?.DocumentId,
+                                session?.DocumentVersion,
+                                tab.Id);
+                            session?.MarkViewSynchronized(session.DocumentVersion);
                         }
                     }
 

@@ -26,7 +26,6 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isTerminalVisible;
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
-        private readonly Action<string> _clearPendingSplitImeSync;
         private readonly Action<OpenedTab> _forgetEncryptionPassword;
         private readonly Func<OpenedTab, Task<bool>> _saveTabAsync;
         private readonly Func<OpenedTab> _openNewTab;
@@ -48,7 +47,6 @@ namespace TxtAIEditor.Controls
             Func<bool> isTerminalVisible,
             Action suspendTerminal,
             Action resumeTerminal,
-            Action<string> clearPendingSplitImeSync,
             Action<OpenedTab> forgetEncryptionPassword,
             Func<OpenedTab, Task<bool>> saveTabAsync,
             Func<OpenedTab> openNewTab,
@@ -68,7 +66,6 @@ namespace TxtAIEditor.Controls
             _isTerminalVisible = isTerminalVisible;
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
-            _clearPendingSplitImeSync = clearPendingSplitImeSync;
             _forgetEncryptionPassword = forgetEncryptionPassword;
             _saveTabAsync = saveTabAsync;
             _openNewTab = openNewTab;
@@ -197,7 +194,6 @@ namespace TxtAIEditor.Controls
         public void CloseAndCleanup(OpenedTab tab, TabViewItem tabItem)
         {
             _additionalTabCleanup?.Invoke(tab.Id);
-            _clearPendingSplitImeSync(tab.Id);
             _viewModel.Tabs.Remove(tab);
             _forgetEncryptionPassword(tab);
             EditorTabViewItemFactory.ReleaseViewerResources(tabItem);

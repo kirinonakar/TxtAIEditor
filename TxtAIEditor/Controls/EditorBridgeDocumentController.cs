@@ -15,14 +15,8 @@ namespace TxtAIEditor.Controls
         private readonly TocController _tocController;
         private readonly Action<OpenedTab> _schedulePreview;
         private readonly Action<OpenedTab> _updateLanguage;
-        private readonly Func<OpenedTab, int, string, bool> _queuePendingSplitImeLineSync;
-        private readonly Func<OpenedTab, int, string, bool> _schedulePendingSplitImeCompletionSync;
-        private readonly Action<OpenedTab> _scheduleDeferredPendingSplitImeSync;
         private readonly Func<OpenedTab, int, string, bool, Task> _syncLineChangeToOtherTabsAsync;
         private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
-        private readonly Action<OpenedTab> _recordPendingSplitImeStructuralEdit;
-        private readonly Func<OpenedTab, bool> _hasOtherTabForSameFile;
-        private readonly Func<OpenedTab, Task> _flushOtherTabsPendingSyncsAsync;
         private readonly Dictionary<string, DeferredContentRefresh> _contentRefreshTimers = new();
         private static readonly TimeSpan ContentRefreshDebounce = TimeSpan.FromMilliseconds(350);
 
@@ -51,28 +45,16 @@ namespace TxtAIEditor.Controls
             TocController tocController,
             Action<OpenedTab> schedulePreview,
             Action<OpenedTab> updateLanguage,
-            Func<OpenedTab, int, string, bool> queuePendingSplitImeLineSync,
-            Func<OpenedTab, int, string, bool> schedulePendingSplitImeCompletionSync,
-            Action<OpenedTab> scheduleDeferredPendingSplitImeSync,
             Func<OpenedTab, int, string, bool, Task> syncLineChangeToOtherTabsAsync,
-            Func<OpenedTab, Task> syncEditsToOtherTabsAsync,
-            Action<OpenedTab> recordPendingSplitImeStructuralEdit,
-            Func<OpenedTab, bool> hasOtherTabForSameFile,
-            Func<OpenedTab, Task> flushOtherTabsPendingSyncsAsync)
+            Func<OpenedTab, Task> syncEditsToOtherTabsAsync)
         {
             _tabDirtyStateController = tabDirtyStateController;
             _statusBarController = statusBarController;
             _tocController = tocController;
             _schedulePreview = schedulePreview;
             _updateLanguage = updateLanguage;
-            _queuePendingSplitImeLineSync = queuePendingSplitImeLineSync;
-            _schedulePendingSplitImeCompletionSync = schedulePendingSplitImeCompletionSync;
-            _scheduleDeferredPendingSplitImeSync = scheduleDeferredPendingSplitImeSync;
             _syncLineChangeToOtherTabsAsync = syncLineChangeToOtherTabsAsync;
             _syncEditsToOtherTabsAsync = syncEditsToOtherTabsAsync;
-            _recordPendingSplitImeStructuralEdit = recordPendingSplitImeStructuralEdit;
-            _hasOtherTabForSameFile = hasOtherTabForSameFile;
-            _flushOtherTabsPendingSyncsAsync = flushOtherTabsPendingSyncsAsync;
         }
 
         public async Task HandleLineChangedAsync(
@@ -83,27 +65,19 @@ namespace TxtAIEditor.Controls
             string text,
             bool isComposing)
         {
-            await _flushOtherTabsPendingSyncsAsync(tab);
-            session.ReplaceLine(lineNumber, text, trackUndo: !isComposing, isComposing: isComposing);
-
-            if (!isComposing)
+            if (isComposing)
             {
-                MarkDirty(tab, tabItem);
+                // compositionstart~compositionupdate는 WebView 로컬 투영이다.
+                // compositionend에서 오는 확정 편집만 공유 DocumentBuffer에 적용한다.
+                return;
             }
+
+            session.ReplaceLine(lineNumber, text);
+
+            MarkDirty(tab, tabItem);
 
             _schedulePreview(tab);
-
-            if (isComposing && _queuePendingSplitImeLineSync(tab, lineNumber, text))
-            {
-                return;
-            }
-
-            if (!isComposing && _schedulePendingSplitImeCompletionSync(tab, lineNumber, text))
-            {
-                return;
-            }
-
-            await _syncLineChangeToOtherTabsAsync(tab, lineNumber, text, isComposing);
+            await _syncLineChangeToOtherTabsAsync(tab, lineNumber, text, false);
         }
 
         public Task HandleLineEditAsync(
@@ -141,7 +115,6 @@ namespace TxtAIEditor.Controls
             int lineNumber,
             string text)
         {
-            await _flushOtherTabsPendingSyncsAsync(tab);
             int lineCount = session.InsertLine(lineNumber, text);
             await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
         }
@@ -157,7 +130,6 @@ namespace TxtAIEditor.Controls
             int endColumn,
             string text)
         {
-            await _flushOtherTabsPendingSyncsAsync(tab);
             int lineCount = session.ApplyRangeEdit(
                 startLine,
                 startColumn,
@@ -176,7 +148,6 @@ namespace TxtAIEditor.Controls
             string before,
             string after)
         {
-            await _flushOtherTabsPendingSyncsAsync(tab);
             int lineCount = session.SplitLine(lineNumber, before, after);
             await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
         }
@@ -188,7 +159,6 @@ namespace TxtAIEditor.Controls
             EditorDocumentSession session,
             int lineNumber)
         {
-            await _flushOtherTabsPendingSyncsAsync(tab);
             int lineCount = session.MergeLineWithPrevious(lineNumber);
             await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
         }
@@ -201,9 +171,9 @@ namespace TxtAIEditor.Controls
             int lineNumber,
             bool isComposing = false)
         {
-            await _flushOtherTabsPendingSyncsAsync(tab);
-            int lineCount = session.DeleteLine(lineNumber, isComposing);
-            await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount, isComposing);
+            if (isComposing) return;
+            int lineCount = session.DeleteLine(lineNumber);
+            await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
         }
 
         public async Task HandleFindRequestedAsync(
@@ -244,7 +214,12 @@ namespace TxtAIEditor.Controls
         {
             session.ReplaceAll(query, replace, matchCase, isRegex);
             string updatedText = session.GetText();
-            await bridge.SetTextAsync(updatedText, shouldFocus: false);
+            await bridge.SetTextAsync(
+                updatedText,
+                shouldFocus: false,
+                session.DocumentId,
+                session.DocumentVersion,
+                tab.Id);
             await _syncEditsToOtherTabsAsync(tab);
             await bridge.SendFindAllResultsAsync(session.FindAll(query, matchCase, isRegex, 1), query);
 
@@ -309,35 +284,19 @@ namespace TxtAIEditor.Controls
             _updateLanguage(tab);
             _tocController.RefreshTocAfterDocumentChange(tab);
             _statusBarController.UpdateTotalLines(tab);
-            _scheduleDeferredPendingSplitImeSync(tab);
         }
 
         private async Task CompleteStructuralEditAsync(
             MonacoBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
-            int lineCount,
-            bool isComposing = false)
+            int lineCount)
         {
             MarkDirty(tab, tabItem);
             await bridge.UpdateLineCountAsync(lineCount);
             _schedulePreview(tab);
 
-            if (_hasOtherTabForSameFile(tab))
-            {
-                if (isComposing)
-                {
-                    _recordPendingSplitImeStructuralEdit(tab);
-                }
-                else
-                {
-                    await _syncEditsToOtherTabsAsync(tab);
-                }
-            }
-            else
-            {
-                await _syncEditsToOtherTabsAsync(tab);
-            }
+            await _syncEditsToOtherTabsAsync(tab);
 
             _statusBarController.UpdateTotalLines(tab);
         }

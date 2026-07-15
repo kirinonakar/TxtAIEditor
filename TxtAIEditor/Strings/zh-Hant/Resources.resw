@@ -3324,6 +3324,9 @@
   <data name="SaveFailedTitle" xml:space="preserve">
     <value>保存失敗</value>
   </data>
+  <data name="SaveEditorFlushFailed" xml:space="preserve">
+    <value>無法確認編輯器輸入，已取消儲存。請再試一次。</value>
+  </data>
   <data name="EncryptedTabMissingPassword" xml:space="preserve">
     <value>加密選項卡沒有密碼。重新開啟檔案並輸入密碼。</value>
   </data>

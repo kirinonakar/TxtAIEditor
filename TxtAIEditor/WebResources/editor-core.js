@@ -1,4 +1,5 @@
 import { contextMenu, scrollContainer, viewport, virtualSpacer } from './editor-dom.js';
+import { ImePhase } from './editor-ime-state.js';
 
 const MAX_RENDER_CHARS = 20000;
 const MIN_BATCH_SIZE = 100;
@@ -61,6 +62,10 @@ const state = {
     lastRangeKey: '',
     cacheVersion: 0,
     documentVersion: 0,
+    hostDocumentId: '',
+    hostDocumentVersion: 0,
+    viewId: '',
+    messageSequence: 0,
     searchDocumentVersion: -1,
     pendingSearchNavigation: null,
     renderQueued: false,
@@ -82,8 +87,10 @@ const state = {
     dragSelectionData: null,
     dragDropPosition: null,
     isDragCopy: false,
+    imePhase: ImePhase.Idle,
     isComposing: false,
     compositionLine: null,
+    rangeComposition: null,
     columnComposition: null,
     pendingImeVerticalNavigation: null,
     pendingImeSelectionCollapse: null,
@@ -175,11 +182,25 @@ function invalidateHtmlLineEndContexts(startLine) {
 function post(msg) {
     if (msg?.type === 'contentChanged') {
         state.documentVersion++;
+        if (!msg.isComposing && state.hostDocumentId) {
+            state.hostDocumentVersion++;
+        }
         state.searchDocumentVersion = -1;
     }
 
+    const outgoing = state.hostDocumentId
+        ? {
+            protocolVersion: 1,
+            documentId: state.hostDocumentId,
+            viewId: state.viewId,
+            documentVersion: state.hostDocumentVersion,
+            sequence: ++state.messageSequence,
+            ...msg
+        }
+        : msg;
+
     if (window.chrome && window.chrome.webview) {
-        window.chrome.webview.postMessage(msg);
+        window.chrome.webview.postMessage(outgoing);
     }
 }
 

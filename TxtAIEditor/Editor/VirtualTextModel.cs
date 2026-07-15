@@ -678,46 +678,172 @@ namespace TxtAIEditor.Editor
         string EncodingName,
         bool EncodingWasAutoDetected);
 
+    public sealed record EditorDocumentChange(
+        string DocumentId,
+        string SourceViewId,
+        long BaseVersion,
+        long Version,
+        int StartLine,
+        int OldLineCount,
+        int DocumentLineCount,
+        IReadOnlyList<string> Lines);
+
+    public sealed class EditorDocumentBuffer
+    {
+        private ITextModel _model;
+
+        public EditorDocumentBuffer(ITextModel model)
+        {
+            _model = model;
+            DocumentId = Guid.NewGuid().ToString("N");
+        }
+
+        public event EventHandler<EditorDocumentChange>? Changed;
+
+        public string DocumentId { get; }
+
+        public long Version { get; private set; }
+
+        public ITextModel Model => _model;
+
+        internal UndoManager UndoManager { get; } = new();
+
+        internal EditorDocumentChange? LastChange { get; private set; }
+
+        internal EditorDocumentChange ReplaceModel(string sourceViewId, ITextModel model, bool clearUndo)
+        {
+            int oldLineCount = Math.Max(1, _model.LineCount);
+            _model = model;
+            if (clearUndo)
+            {
+                UndoManager.Clear();
+            }
+            return CommitChange(sourceViewId, 1, oldLineCount, Math.Max(1, model.LineCount));
+        }
+
+        internal EditorDocumentChange CommitChange(
+            string sourceViewId,
+            int startLine,
+            int oldLineCount,
+            int newLineCount)
+        {
+            long baseVersion = Version;
+            Version++;
+            int safeStartLine = Math.Max(1, startLine);
+            int safeNewLineCount = Math.Max(0, newLineCount);
+            IReadOnlyList<string> lines = safeNewLineCount == 0
+                ? Array.Empty<string>()
+                : _model.GetLines(
+                    Math.Clamp(safeStartLine, 1, Math.Max(1, _model.LineCount)),
+                    safeNewLineCount);
+            var change = new EditorDocumentChange(
+                DocumentId,
+                sourceViewId,
+                baseVersion,
+                Version,
+                safeStartLine,
+                Math.Max(0, oldLineCount),
+                Math.Max(1, _model.LineCount),
+                lines);
+            LastChange = change;
+            Changed?.Invoke(this, change);
+            return change;
+        }
+    }
+
     public sealed class EditorDocumentSession
     {
-        private readonly UndoManager _undoManager = new();
-        private readonly Dictionary<int, string> _compositionBeforeLines = new();
+        private EditorDocumentBuffer _buffer;
 
         public EditorDocumentSession(OpenedTab tab, ITextModel model)
         {
             Tab = tab;
-            Model = model;
+            _buffer = new EditorDocumentBuffer(model);
+            ViewVersion = _buffer.Version;
             Tab.Content = model is HexDumpTextModel ? string.Empty : model.GetText(120_000);
         }
 
         public OpenedTab Tab { get; }
 
-        public ITextModel Model { get; private set; }
+        public ITextModel Model => _buffer.Model;
+
+        public string DocumentId => _buffer.DocumentId;
+
+        public long DocumentVersion => _buffer.Version;
+
+        public long ViewVersion { get; private set; }
+
+        public EditorDocumentChange? LastChange => _buffer.LastChange;
+
+        public bool SharesDocumentWith(EditorDocumentSession other) =>
+            ReferenceEquals(_buffer, other._buffer);
+
+        public void ShareDocumentWith(EditorDocumentSession source)
+        {
+            _buffer = source._buffer;
+            ViewVersion = _buffer.Version;
+            RefreshTabContentPreview();
+        }
+
+        public void MarkViewSynchronized(long version)
+        {
+            ViewVersion = Math.Max(ViewVersion, version);
+        }
+
+        public async Task<bool> WaitForDocumentVersionAsync(long version, int timeoutMs = 700)
+        {
+            EditorDocumentBuffer buffer = _buffer;
+            if (buffer.Version >= version) return true;
+
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            EventHandler<EditorDocumentChange>? handler = null;
+            handler = (_, change) =>
+            {
+                if (change.Version >= version)
+                {
+                    tcs.TrySetResult(true);
+                }
+            };
+            buffer.Changed += handler;
+            try
+            {
+                if (buffer.Version >= version) return true;
+                Task completed = await Task.WhenAny(
+                    tcs.Task,
+                    Task.Delay(Math.Max(80, timeoutMs)));
+                return completed == tcs.Task && await tcs.Task;
+            }
+            finally
+            {
+                buffer.Changed -= handler;
+            }
+        }
 
         public void UpdateContentFromSync(string text)
         {
-            Model = LineArrayTextModel.FromText(text);
-            _undoManager.Clear();
-            _compositionBeforeLines.Clear();
+            EditorDocumentChange change = _buffer.ReplaceModel(
+                Tab.Id,
+                LineArrayTextModel.FromText(text),
+                clearUndo: true);
+            ViewVersion = change.Version;
             RefreshTabContentPreview();
         }
 
         public void UpdateModelFromSync(ITextModel model)
         {
-            Model = model;
-            _undoManager.Clear();
-            _compositionBeforeLines.Clear();
+            EditorDocumentChange change = _buffer.ReplaceModel(Tab.Id, model, clearUndo: true);
+            ViewVersion = change.Version;
             RefreshTabContentPreview();
         }
 
         public void BeginUndoGroup()
         {
-            _undoManager.BeginTransaction("editor");
+            _buffer.UndoManager.BeginTransaction("editor");
         }
 
         public void EndUndoGroup()
         {
-            _undoManager.EndTransaction();
+            _buffer.UndoManager.EndTransaction();
         }
 
         public IReadOnlyList<string> GetLines(int startLine, int count) => Model.GetLines(startLine, count);
@@ -731,31 +857,25 @@ namespace TxtAIEditor.Editor
                 return;
             }
 
-            string before = Model.GetLine(lineNumber);
-            string after = NormalizeSingleLine(text);
-
+            // 조합 중 DOM은 뷰 로컬 상태다. 공유 문서 버퍼에는 compositionend의
+            // 확정 편집만 들어오며, 예전 프로토콜의 중간 메시지도 여기서 폐기한다.
             if (isComposing)
             {
-                if (!_compositionBeforeLines.ContainsKey(lineNumber))
-                {
-                    _compositionBeforeLines[lineNumber] = before;
-                }
-
-                Model.ReplaceLine(lineNumber, after);
                 return;
             }
 
-            if (_compositionBeforeLines.Remove(lineNumber, out string? compositionBefore))
-            {
-                before = compositionBefore;
-            }
+            string before = Model.GetLine(lineNumber);
+            string after = NormalizeSingleLine(text);
 
-            if (trackUndo && !string.Equals(before, after, StringComparison.Ordinal))
+            if (string.Equals(before, after, StringComparison.Ordinal)) return;
+
+            if (trackUndo)
             {
-                _undoManager.AddEdit(new ReplaceLineEdit(lineNumber, before, after));
+                _buffer.UndoManager.AddEdit(new ReplaceLineEdit(lineNumber, before, after));
             }
 
             Model.ReplaceLine(lineNumber, after);
+            CommitViewChange(lineNumber, oldLineCount: 1, newLineCount: 1);
         }
 
         public int SplitLine(int lineNumber, string before, string after)
@@ -766,13 +886,13 @@ namespace TxtAIEditor.Editor
             }
 
             string original = Model.GetLine(lineNumber);
-            _undoManager.AddEdit(new SplitLineEdit(
+            _buffer.UndoManager.AddEdit(new SplitLineEdit(
                 lineNumber,
                 original,
                 NormalizeSingleLine(before),
                 NormalizeSingleLine(after)));
-            _compositionBeforeLines.Clear();
             Model.SplitLine(lineNumber, before, after);
+            CommitViewChange(lineNumber, oldLineCount: 1, newLineCount: 2);
             return Model.LineCount;
         }
 
@@ -780,9 +900,9 @@ namespace TxtAIEditor.Editor
         {
             int safeLineNumber = Math.Clamp(lineNumber, 1, Model.LineCount + 1);
             string inserted = NormalizeSingleLine(text);
-            _undoManager.AddEdit(new InsertLineEdit(safeLineNumber, inserted));
-            _compositionBeforeLines.Clear();
+            _buffer.UndoManager.AddEdit(new InsertLineEdit(safeLineNumber, inserted));
             Model.InsertLine(safeLineNumber, inserted);
+            CommitViewChange(safeLineNumber, oldLineCount: 0, newLineCount: 1);
             return Model.LineCount;
         }
 
@@ -832,9 +952,12 @@ namespace TxtAIEditor.Editor
                 replacementEnd.Column,
                 replacedText);
 
-            _undoManager.AddEdit(new RangeTextEdit(forward, reverse));
-            _compositionBeforeLines.Clear();
+            _buffer.UndoManager.AddEdit(new RangeTextEdit(forward, reverse));
             Model.ApplyEdit(forward);
+            CommitViewChange(
+                safeStartLine,
+                oldLineCount: safeEndLine - safeStartLine + 1,
+                newLineCount: normalizedText.Split('\n').Length);
             return Model.LineCount;
         }
 
@@ -845,35 +968,29 @@ namespace TxtAIEditor.Editor
                 return Model.LineCount;
             }
 
-            _undoManager.AddEdit(new MergeLineEdit(
+            _buffer.UndoManager.AddEdit(new MergeLineEdit(
                 lineNumber,
                 Model.GetLine(lineNumber - 1),
                 Model.GetLine(lineNumber)));
-            _compositionBeforeLines.Clear();
             Model.MergeLineWithPrevious(lineNumber);
+            CommitViewChange(lineNumber - 1, oldLineCount: 2, newLineCount: 1);
             return Model.LineCount;
         }
 
-        public int DeleteLine(int lineNumber, bool isComposing = false)
+        public int DeleteLine(int lineNumber)
         {
             if (lineNumber < 1 || lineNumber > Model.LineCount)
             {
                 return Model.LineCount;
             }
 
-            _undoManager.AddEdit(new DeleteLineEdit(
+            bool wasOnlyLine = Model.LineCount == 1;
+            _buffer.UndoManager.AddEdit(new DeleteLineEdit(
                 lineNumber,
                 Model.GetLine(lineNumber),
-                Model.LineCount == 1));
-            if (isComposing)
-            {
-                ShiftCompositionSnapshotsAfterDeletedLine(lineNumber);
-            }
-            else
-            {
-                _compositionBeforeLines.Clear();
-            }
+                wasOnlyLine));
             Model.DeleteLine(lineNumber);
+            CommitViewChange(lineNumber, oldLineCount: 1, newLineCount: wasOnlyLine ? 1 : 0);
             return Model.LineCount;
         }
 
@@ -892,26 +1009,26 @@ namespace TxtAIEditor.Editor
 
         public UndoResult? Undo()
         {
-            UndoResult? result = _undoManager.Undo(Model);
+            UndoResult? result = _buffer.UndoManager.Undo(Model);
             if (result == null)
             {
                 return null;
             }
 
-            _compositionBeforeLines.Clear();
+            CommitViewChange(result.StartLine, result.OldLineCount, result.NewLineCount);
             RefreshTabContentPreview();
             return result;
         }
 
         public UndoResult? Redo()
         {
-            UndoResult? result = _undoManager.Redo(Model);
+            UndoResult? result = _buffer.UndoManager.Redo(Model);
             if (result == null)
             {
                 return null;
             }
 
-            _compositionBeforeLines.Clear();
+            CommitViewChange(result.StartLine, result.OldLineCount, result.NewLineCount);
             RefreshTabContentPreview();
             return result;
         }
@@ -928,7 +1045,8 @@ namespace TxtAIEditor.Editor
 
         public void ReplaceAll(string query, string replace, bool matchCase, bool isRegex)
         {
-            _undoManager.BeginTransaction("replaceAll");
+            int originalLineCount = Model.LineCount;
+            _buffer.UndoManager.BeginTransaction("replaceAll");
             bool changed = false;
             if (isRegex)
             {
@@ -942,7 +1060,7 @@ namespace TxtAIEditor.Editor
                         string nextText = regex.Replace(original, replace);
                         if (nextText != original)
                         {
-                            _undoManager.AddEdit(new ReplaceLineEdit(i, original, nextText));
+                            _buffer.UndoManager.AddEdit(new ReplaceLineEdit(i, original, nextText));
                             Model.ReplaceLine(i, nextText);
                             changed = true;
                         }
@@ -962,17 +1080,17 @@ namespace TxtAIEditor.Editor
                     string nextText = ReplaceString(original, query, replace, comparison);
                     if (nextText != original)
                     {
-                        _undoManager.AddEdit(new ReplaceLineEdit(i, original, nextText));
+                        _buffer.UndoManager.AddEdit(new ReplaceLineEdit(i, original, nextText));
                         Model.ReplaceLine(i, nextText);
                         changed = true;
                     }
                 }
             }
 
-            _undoManager.EndTransaction();
+            _buffer.UndoManager.EndTransaction();
             if (changed)
             {
-                _compositionBeforeLines.Clear();
+                CommitViewChange(1, originalLineCount, Model.LineCount);
                 RefreshTabContentPreview();
             }
         }
@@ -1013,25 +1131,14 @@ namespace TxtAIEditor.Editor
             return (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
         }
 
-        private void ShiftCompositionSnapshotsAfterDeletedLine(int deletedLineNumber)
+        private void CommitViewChange(int startLine, int oldLineCount, int newLineCount)
         {
-            if (_compositionBeforeLines.Count == 0)
-            {
-                return;
-            }
-
-            var shifted = _compositionBeforeLines
-                .Where(pair => pair.Key != deletedLineNumber)
-                .Select(pair => new KeyValuePair<int, string>(
-                    pair.Key > deletedLineNumber ? pair.Key - 1 : pair.Key,
-                    pair.Value))
-                .ToList();
-
-            _compositionBeforeLines.Clear();
-            foreach (var pair in shifted)
-            {
-                _compositionBeforeLines[pair.Key] = pair.Value;
-            }
+            EditorDocumentChange change = _buffer.CommitChange(
+                Tab.Id,
+                startLine,
+                oldLineCount,
+                newLineCount);
+            ViewVersion = change.Version;
         }
     }
 }

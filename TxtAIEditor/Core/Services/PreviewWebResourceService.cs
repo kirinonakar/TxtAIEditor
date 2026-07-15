@@ -11,6 +11,7 @@ namespace TxtAIEditor.Core.Services
             "editor.html",
             "editor.css",
             "editor-core.js",
+            "editor-ime-state.js",
             "editor-highlighter.js",
             "editor-selection.js",
             "editor-caret.js",

@@ -20,11 +20,17 @@ namespace TxtAIEditor.Editor
         private bool _isReady = false;
         private string? _pendingText = null;
         private bool _pendingSetTextShouldFocus = true;
+        private string? _pendingSetTextDocumentId;
+        private long? _pendingSetTextDocumentVersion;
+        private string? _pendingSetTextViewId;
         private bool _isSplitView = false;
         private string _currentLanguage = "plaintext";
         private readonly object _flushLock = new object();
-        private readonly Dictionary<int, TaskCompletionSource<bool>> _pendingFlushRequests = new Dictionary<int, TaskCompletionSource<bool>>();
+        private readonly Dictionary<int, TaskCompletionSource<long>> _pendingFlushRequests = new Dictionary<int, TaskCompletionSource<long>>();
         private int _flushRequestSeq = 0;
+        private string _documentId = string.Empty;
+        private string _viewId = string.Empty;
+        private long _lastIncomingSequence;
 
         public event Action<bool>? ContentChanged;
         public event Action<string, int, int, long?, long?>? SelectionReceived;
@@ -122,16 +128,33 @@ namespace TxtAIEditor.Editor
             _webView.Source = new Uri(hostUrl);
         }
 
-        public async Task SetTextAsync(string text, bool shouldFocus = true)
+        public async Task SetTextAsync(
+            string text,
+            bool shouldFocus = true,
+            string? documentId = null,
+            long? documentVersion = null,
+            string? viewId = null)
         {
             if (!_isReady)
             {
                 _pendingText = text;
                 _pendingSetTextShouldFocus = shouldFocus;
+                _pendingSetTextDocumentId = documentId;
+                _pendingSetTextDocumentVersion = documentVersion;
+                _pendingSetTextViewId = viewId;
                 return;
             }
 
-            var msg = new { action = "setText", text = text, shouldFocus = shouldFocus };
+            var msg = new
+            {
+                protocolVersion = 1,
+                action = "setText",
+                documentId,
+                viewId,
+                documentVersion,
+                text,
+                shouldFocus
+            };
             await SendMessageAsync(msg);
         }
 
@@ -152,13 +175,23 @@ namespace TxtAIEditor.Editor
             string language,
             EditorSettings settings,
             bool isReadOnly = false,
-            IReadOnlyList<string>? initialLines = null)
+            IReadOnlyList<string>? initialLines = null,
+            string? documentId = null,
+            long documentVersion = 0,
+            string? viewId = null)
         {
+            _documentId = documentId ?? string.Empty;
+            _viewId = viewId ?? string.Empty;
+            _lastIncomingSequence = 0;
             _currentLanguage = string.IsNullOrWhiteSpace(language) ? "plaintext" : language;
             bool isHexLanguage = IsHexLanguage(_currentLanguage);
             var msg = new
             {
+                protocolVersion = 1,
                 action = "initModel",
+                documentId,
+                viewId,
+                documentVersion,
                 lineCount = Math.Max(1, lineCount),
                 initialStartLine = 1,
                 initialLines = initialLines ?? Array.Empty<string>(),
@@ -245,11 +278,21 @@ namespace TxtAIEditor.Editor
             await SendMessageAsync(new { action = "lineCountChanged", lineCount = Math.Max(1, lineCount) });
         }
 
-        public async Task UpdateLineAsync(int lineNumber, string text, bool isComposing = false)
+        public async Task UpdateLineAsync(
+            int lineNumber,
+            string text,
+            bool isComposing = false,
+            string? documentId = null,
+            long? baseVersion = null,
+            long? documentVersion = null)
         {
             await SendMessageAsync(new
             {
+                protocolVersion = 1,
                 action = "updateLine",
+                documentId,
+                baseVersion,
+                documentVersion,
                 lineNumber = Math.Max(1, lineNumber),
                 text = text ?? string.Empty,
                 isComposing = isComposing
@@ -266,11 +309,19 @@ namespace TxtAIEditor.Editor
             });
         }
 
-        public async Task ApplyEditResultAsync(UndoResult result)
+        public async Task ApplyEditResultAsync(
+            UndoResult result,
+            string? documentId = null,
+            long? baseVersion = null,
+            long? documentVersion = null)
         {
             await SendMessageAsync(new
             {
+                protocolVersion = 1,
                 action = "applyEditResult",
+                documentId,
+                baseVersion,
+                documentVersion,
                 startLine = Math.Max(1, result.StartLine),
                 oldLineCount = Math.Max(0, result.OldLineCount),
                 lineCount = Math.Max(1, result.DocumentLineCount),
@@ -502,14 +553,14 @@ namespace TxtAIEditor.Editor
             await SendMessageAsync(msg);
         }
 
-        public async Task FlushPendingEditForSaveAsync(int timeoutMs = 700)
+        public async Task<long?> FlushPendingEditForSaveAsync(int timeoutMs = 700)
         {
             if (!_isReady || _webView.CoreWebView2 == null)
             {
-                return;
+                return null;
             }
 
-            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<long>(TaskCreationOptions.RunContinuationsAsynchronously);
             int requestId;
             lock (_flushLock)
             {
@@ -523,19 +574,14 @@ namespace TxtAIEditor.Editor
                 var completed = await Task.WhenAny(tcs.Task, Task.Delay(Math.Max(80, timeoutMs)));
                 if (completed == tcs.Task)
                 {
-                    await tcs.Task;
-                }
-                else
-                {
-                    lock (_flushLock)
-                    {
-                        _pendingFlushRequests.Remove(requestId);
-                    }
+                    return await tcs.Task;
                 }
 
-                // JS의 compositionend/input 후속 task와 WebMessageReceived의 lineChanged 처리가
-                // 저장 로직보다 먼저 끝날 수 있도록 아주 짧게 양보한다.
-                await Task.Delay(30);
+                lock (_flushLock)
+                {
+                    _pendingFlushRequests.Remove(requestId);
+                }
+                return null;
             }
             catch (Exception ex)
             {
@@ -544,6 +590,7 @@ namespace TxtAIEditor.Editor
                     _pendingFlushRequests.Remove(requestId);
                 }
                 System.Diagnostics.Debug.WriteLine($"Failed to flush editor before save: {ex.Message}");
+                return null;
             }
         }
 
@@ -687,6 +734,26 @@ namespace TxtAIEditor.Editor
                     if (!root.TryGetProperty("type", out JsonElement typeProp)) return;
 
                     string type = typeProp.GetString() ?? string.Empty;
+                    if (root.TryGetProperty("documentId", out JsonElement documentIdProp) &&
+                        documentIdProp.ValueKind == JsonValueKind.String &&
+                        !string.IsNullOrEmpty(_documentId) &&
+                        !string.Equals(documentIdProp.GetString(), _documentId, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+                    if (root.TryGetProperty("viewId", out JsonElement viewIdProp) &&
+                        viewIdProp.ValueKind == JsonValueKind.String &&
+                        !string.IsNullOrEmpty(_viewId) &&
+                        !string.Equals(viewIdProp.GetString(), _viewId, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+                    if (root.TryGetProperty("sequence", out JsonElement sequenceProp) &&
+                        sequenceProp.TryGetInt64(out long sequence))
+                    {
+                        if (sequence <= _lastIncomingSequence) return;
+                        _lastIncomingSequence = sequence;
+                    }
 
                     switch (type)
                     {
@@ -696,9 +763,17 @@ namespace TxtAIEditor.Editor
                             _ = SetSplitViewAsync(_isSplitView);
                             if (_pendingText != null)
                             {
-                                _ = SetTextAsync(_pendingText, _pendingSetTextShouldFocus);
+                                _ = SetTextAsync(
+                                    _pendingText,
+                                    _pendingSetTextShouldFocus,
+                                    _pendingSetTextDocumentId,
+                                    _pendingSetTextDocumentVersion,
+                                    _pendingSetTextViewId);
                                 _pendingText = null;
                                 _pendingSetTextShouldFocus = true;
+                                _pendingSetTextDocumentId = null;
+                                _pendingSetTextDocumentVersion = null;
+                                _pendingSetTextViewId = null;
                             }
                             break;
 
@@ -907,7 +982,11 @@ namespace TxtAIEditor.Editor
                                 int requestId = root.TryGetProperty("requestId", out JsonElement flushRequestIdProp)
                                     ? flushRequestIdProp.GetInt32()
                                     : 0;
-                                TaskCompletionSource<bool>? pending = null;
+                                long documentVersion = root.TryGetProperty("documentVersion", out JsonElement flushVersionProp) &&
+                                    flushVersionProp.TryGetInt64(out long parsedVersion)
+                                        ? parsedVersion
+                                        : 0;
+                                TaskCompletionSource<long>? pending = null;
                                 lock (_flushLock)
                                 {
                                     if (_pendingFlushRequests.TryGetValue(requestId, out pending))
@@ -915,7 +994,7 @@ namespace TxtAIEditor.Editor
                                         _pendingFlushRequests.Remove(requestId);
                                     }
                                 }
-                                pending?.TrySetResult(true);
+                                pending?.TrySetResult(documentVersion);
                             }
                             break;
 

@@ -69,6 +69,32 @@ function findSearchMatchIndexFromPosition(matches, line, column, reverse) {
     return 0;
 }
 
+function canApplyVersionedDocumentChange(msg) {
+    if (!msg.documentId || msg.documentVersion === undefined || msg.documentVersion === null) {
+        return true;
+    }
+    if (state.hostDocumentId && state.hostDocumentId !== String(msg.documentId)) {
+        return false;
+    }
+
+    const version = Number(msg.documentVersion);
+    const baseVersion = Number(msg.baseVersion);
+    if (!Number.isFinite(version) || version <= state.hostDocumentVersion) {
+        return false;
+    }
+    return !Number.isFinite(baseVersion) || baseVersion === state.hostDocumentVersion;
+}
+
+function markVersionedDocumentChangeApplied(msg) {
+    if (msg.documentId) {
+        state.hostDocumentId = String(msg.documentId);
+    }
+    const version = Number(msg.documentVersion);
+    if (Number.isFinite(version)) {
+        state.hostDocumentVersion = version;
+    }
+}
+
 export function createHostMessageHandler({
     revealLine,
     revealHexOffset,
@@ -83,6 +109,10 @@ export function createHostMessageHandler({
     switch (msg.action) {
         case 'initModel':
             state.initialized = true;
+            state.hostDocumentId = String(msg.documentId || '');
+            state.hostDocumentVersion = Math.max(0, Number(msg.documentVersion || 0));
+            state.viewId = String(msg.viewId || '');
+            state.messageSequence = 0;
             state.language = msg.language || 'plaintext';
             syncLanguageClass();
             state.isSplitView = !!msg.isSplitView;
@@ -127,6 +157,14 @@ export function createHostMessageHandler({
                 if (state.isComposing) {
                     break;
                 }
+                const incomingVersion = Number(msg.documentVersion);
+                if (msg.documentId && state.hostDocumentId &&
+                    state.hostDocumentId !== String(msg.documentId)) {
+                    break;
+                }
+                if (Number.isFinite(incomingVersion) && incomingVersion < state.hostDocumentVersion) {
+                    break;
+                }
                 const text = msg.text || '';
                 const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
                 state.selection = null;
@@ -138,6 +176,7 @@ export function createHostMessageHandler({
                 const targetCol = Math.min(Math.max(0, state.currentColumn - 1), (lines[targetLine - 1] || '').length);
                 setupModel(Math.max(1, lines.length));
                 lines.forEach((line, index) => state.cache.set(index + 1, line));
+                markVersionedDocumentChangeApplied(msg);
                 recomputeDirtyLines();
                 state.livePreviewLocalResourceVersion = String(Date.now());
                 queueRender(true);
@@ -152,18 +191,24 @@ export function createHostMessageHandler({
             break;
         case 'updateLine':
             {
-                updateLineFromHost(msg.lineNumber || 1, msg.text || '', !!msg.isComposing);
+                if (!canApplyVersionedDocumentChange(msg)) break;
+                if (updateLineFromHost(msg.lineNumber || 1, msg.text || '', !!msg.isComposing)) {
+                    markVersionedDocumentChangeApplied(msg);
+                }
             }
             break;
         case 'applyEditResult':
             {
+                if (!canApplyVersionedDocumentChange(msg)) break;
                 hideAutocomplete(700);
-                applyEditResultFromHost(
+                if (applyEditResultFromHost(
                     msg.startLine || 1,
                     msg.oldLineCount || 0,
                     msg.lines || [],
                     msg.lineCount || state.lineCount,
-                    msg.caret || null);
+                    msg.caret || null)) {
+                    markVersionedDocumentChangeApplied(msg);
+                }
             }
             break;
         case 'receiveLines':

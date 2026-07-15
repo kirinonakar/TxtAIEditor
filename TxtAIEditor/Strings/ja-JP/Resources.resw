@@ -3324,6 +3324,9 @@
   <data name="SaveFailedTitle" xml:space="preserve">
     <value>保存失敗</value>
   </data>
+  <data name="SaveEditorFlushFailed" xml:space="preserve">
+    <value>エディターの入力を確定できなかったため、保存をキャンセルしました。もう一度お試しください。</value>
+  </data>
   <data name="EncryptedTabMissingPassword" xml:space="preserve">
     <value>暗号化されたタブのパスワードがありません。ファイルを開き直してパスワードを入力してください。</value>
   </data>

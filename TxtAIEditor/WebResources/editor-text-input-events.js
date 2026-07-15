@@ -1,5 +1,12 @@
 import { viewport } from './editor-dom.js';
 import {
+    beginImeCommit,
+    beginImeComposition,
+    completeImeCommit,
+    ImePhase,
+    updateImeComposition
+} from './editor-ime-state.js';
+import {
     activeEditableElement,
     graphemeDeleteEnd,
     graphemeDeleteStart,
@@ -149,25 +156,28 @@ export function bindTextInputEvents({ renderer }) {
             clearPendingImeSelectionCollapse();
         }
 
-        state.isComposing = true;
-        state.compositionLine = element ? Number(element.dataset.line || state.currentLine || 1) : state.currentLine;
+        const compositionLine = element ? Number(element.dataset.line || state.currentLine || 1) : state.currentLine;
+        let phase = state.rangeComposition ? ImePhase.RangeComposition : ImePhase.NativeComposition;
 
         if (element && element.getAttribute('contenteditable') === 'true') {
-            state.editingLine = state.compositionLine;
+            state.editingLine = compositionLine;
 
             if (collapsedSelectionForComposition) {
                 state.columnComposition = null;
-                return;
+            } else if (beginColumnComposition(element)) {
+                phase = ImePhase.ColumnComposition;
             }
-
-            beginColumnComposition(element);
         } else {
             state.columnComposition = null;
+        }
+
+        if (!beginImeComposition(state, phase, compositionLine)) {
+            return;
         }
     });
 
     viewport.addEventListener('compositionupdate', event => {
-        state.isComposing = true;
+        updateImeComposition(state);
     });
 
     viewport.addEventListener('compositionend', event => {
@@ -175,9 +185,8 @@ export function bindTextInputEvents({ renderer }) {
         const lineNumber = element ? Number(element.dataset.line || state.compositionLine || state.currentLine) : state.compositionLine;
         const pendingVerticalNavigation = state.pendingImeVerticalNavigation;
 
-        state.isComposing = false;
+        beginImeCommit(state);
         clearPendingImeSelectionCollapse();
-        state.compositionLine = null;
         state.pendingImeVerticalNavigation = null;
 
         const moveAfterComposition = current => {
@@ -200,6 +209,7 @@ export function bindTextInputEvents({ renderer }) {
         };
 
         if (finishRangeComposition(element, lineNumber, event.data || '')) {
+            completeImeCommit(state);
             if (pendingVerticalNavigation) {
                 setTimeout(() => {
                     const current = activeEditableElement();
@@ -210,6 +220,7 @@ export function bindTextInputEvents({ renderer }) {
         }
 
         if (finishColumnComposition(element, lineNumber)) {
+            completeImeCommit(state);
             if (pendingVerticalNavigation) {
                 setTimeout(() => {
                     const current = activeEditableElement();
@@ -238,6 +249,7 @@ export function bindTextInputEvents({ renderer }) {
                 }
             }
         }
+        completeImeCommit(state);
     });
 
     viewport.addEventListener('beforeinput', event => {
@@ -261,8 +273,10 @@ export function bindTextInputEvents({ renderer }) {
                 const replacedElement = replaceSelectionForCompositionStart(element || activeEditableElement());
                 if (replacedElement) {
                     element = replacedElement;
-                    state.compositionLine = Number(replacedElement.dataset.line || state.currentLine || 1);
-                    state.editingLine = state.compositionLine;
+                    state.editingLine = Number(replacedElement.dataset.line || state.currentLine || 1);
+                    if (state.rangeComposition && !state.isComposing) {
+                        beginImeComposition(state, ImePhase.RangeComposition, state.editingLine);
+                    }
                 }
             }
             return;
