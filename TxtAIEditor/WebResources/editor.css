@@ -900,12 +900,20 @@ mark.active-match {
 }
 
 body.range-composition-active .selection-fragment {
-    background: var(--bg);
-    color: transparent;
+    display: none;
 }
 
-body.range-composition-active .editable-selection-overlay.selected-empty-line-overlay {
-    background: var(--bg);
+body.range-composition-active .line-row.range-composition-removed-row {
+    display: none;
+}
+
+body.range-composition-active .line-text[data-range-composition-suffix]::after {
+    content: attr(data-range-composition-suffix);
+    white-space: pre;
+}
+
+body.range-composition-active .editable-selection-overlay {
+    display: none;
 }
 
 body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-block .selection-fragment,

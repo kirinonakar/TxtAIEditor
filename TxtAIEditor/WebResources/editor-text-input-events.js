@@ -275,7 +275,13 @@ export function bindTextInputEvents({ renderer }) {
             const pendingCompositionSelection = compositionSelectionRange(!state.isComposing);
 
             if (pendingCompositionSelection && !pendingCompositionSelection.isColumn) {
-                const replacedElement = replaceSelectionForCompositionStart(element || activeEditableElement());
+                const isMultilineSelection = pendingCompositionSelection.start.line !==
+                    pendingCompositionSelection.end.line;
+                const replacedElement = isMultilineSelection
+                    ? beginDeferredRangeComposition(
+                        element || activeEditableElement(),
+                        pendingCompositionSelection)
+                    : replaceSelectionForCompositionStart(element || activeEditableElement());
                 if (replacedElement) {
                     element = replacedElement;
                     state.editingLine = Number(replacedElement.dataset.line || state.currentLine || 1);

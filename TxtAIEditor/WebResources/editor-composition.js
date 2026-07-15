@@ -287,11 +287,18 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
         return null;
     }
 
-    const { start } = normalized;
+    const { start, end } = normalized;
     const targetElement = viewport.querySelector(`.line-text[data-line="${start.line}"]`);
     if (!targetElement || targetElement.getAttribute('contenteditable') !== 'true') {
         return null;
     }
+
+    viewport.querySelectorAll('.range-composition-removed-row').forEach(row => {
+        row.classList.remove('range-composition-removed-row');
+    });
+    viewport.querySelectorAll('.line-text[data-range-composition-suffix]').forEach(element => {
+        delete element.dataset.rangeCompositionSuffix;
+    });
 
     // 선택이 끝난 시점은 아직 IME 조합 전이므로, 표시 중인 선택 행을 한 번
     // 일관되게 렌더해 모든 선택 조각의 음영을 유지하고 시작 위치만 IME 호스트로 준비한다.
@@ -300,6 +307,9 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
         if (lineNumber < normalized.start.line || lineNumber > normalized.end.line) continue;
         if (element.getAttribute('contenteditable') !== 'true') continue;
         element.innerHTML = renderLineContent(lineNumber, state.cache.get(lineNumber) ?? lineTextFromElement(element));
+        if (lineNumber > start.line) {
+            element.closest('.line-row')?.classList.add('range-composition-removed-row');
+        }
     }
 
     const text = state.cache.get(start.line) ?? lineTextFromElement(targetElement);
@@ -307,10 +317,16 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
     const prefix = document.createTextNode(text.slice(0, startColumn));
     const inputHost = document.createElement('span');
     inputHost.className = 'range-composition-input-host';
+    const compositionAnchor = document.createTextNode('');
+    inputHost.appendChild(compositionAnchor);
     const selected = document.createElement('span');
     selected.className = 'selection-fragment';
     selected.textContent = text.slice(startColumn);
     targetElement.replaceChildren(prefix, inputHost, selected);
+
+    const endText = state.cache.get(end.line) ?? '';
+    const endColumn = Math.max(0, Math.min(end.column, endText.length));
+    targetElement.dataset.rangeCompositionSuffix = endText.slice(endColumn);
 
     state.preparedRangeCompositionLine = start.line;
     state.currentLine = start.line;
@@ -319,9 +335,11 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
 
     // 선택 조각과 같은 DOM 경계에 caret을 두면 WebView2가 첫 조합 문자를
     // 투명한 selection-fragment 안에 삽입해 다음 입력 전까지 보이지 않을 수 있다.
-    // 별도의 빈 호스트 안에 caret을 두어 첫 compositionupdate부터 보이게 한다.
+    // 별도의 텍스트 앵커 안에 caret을 두어 첫 compositionupdate부터 보이게 한다.
+    // 빈 element 경계에 둔 Range는 WebView2가 인접한 selection-fragment 쪽으로
+    // 조합 문자를 삽입하는 경우가 있어, 실제 Text 노드에 조합 위치를 고정한다.
     const range = document.createRange();
-    range.setStart(inputHost, 0);
+    range.setStart(compositionAnchor, 0);
     range.collapse(true);
     targetElement.focus({ preventScroll: true });
     const domSelection = window.getSelection();
@@ -336,6 +354,15 @@ function beginDeferredRangeComposition(element, selection) {
     const normalized = normalizeSelection(selection);
     if (!normalized || normalized.isColumn || normalized.start.line === normalized.end.line) {
         return null;
+    }
+
+    const existing = state.rangeComposition;
+    if (existing?.deferred &&
+        existing.command?.start?.line === normalized.start.line &&
+        existing.command?.start?.column === normalized.start.column &&
+        existing.command?.end?.line === normalized.end.line &&
+        existing.command?.end?.column === normalized.end.column) {
+        return existing.hostElement?.isConnected ? existing.hostElement : element;
     }
 
     const targetElement = element?.getAttribute?.('contenteditable') === 'true'
