@@ -1224,8 +1224,11 @@ function shiftCachedLines(fromLine, delta) {
 
 function shiftLineMap(map, fromLine, delta) {
     const entries = [...map.entries()]
-        .filter(([line]) => line >= fromLine)
-        .sort((a, b) => delta > 0 ? b[0] - a[0] : a[0] - b[0]);
+        .filter(([line]) => line >= fromLine);
+
+    // All source keys are removed before any destination key is inserted, so
+    // ordering is unnecessary. Avoiding the sort keeps large range undo/redo
+    // linear in the number of cached lines instead of O(n log n).
     for (const [line] of entries) {
         map.delete(line);
     }

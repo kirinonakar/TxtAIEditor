@@ -156,7 +156,8 @@ namespace TxtAIEditor.Controls
                 result,
                 change?.DocumentId,
                 change?.BaseVersion,
-                change?.Version);
+                change?.Version,
+                change?.SourceViewId);
             await _syncEditsToOtherTabsAsync(tab);
         }
     }

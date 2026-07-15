@@ -329,7 +329,8 @@ namespace TxtAIEditor.Editor
             UndoResult result,
             string? documentId = null,
             long? baseVersion = null,
-            long? documentVersion = null)
+            long? documentVersion = null,
+            string? sourceViewId = null)
         {
             await SendMessageAsync(new
             {
@@ -338,6 +339,7 @@ namespace TxtAIEditor.Editor
                 documentId,
                 baseVersion,
                 documentVersion,
+                sourceViewId,
                 startLine = Math.Max(1, result.StartLine),
                 oldLineCount = Math.Max(0, result.OldLineCount),
                 lineCount = Math.Max(1, result.DocumentLineCount),

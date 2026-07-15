@@ -82,7 +82,16 @@ function canApplyVersionedDocumentChange(msg) {
     if (!Number.isFinite(version) || version <= state.hostDocumentVersion) {
         return false;
     }
-    return !Number.isFinite(baseVersion) || baseVersion === state.hostDocumentVersion;
+    if (!Number.isFinite(baseVersion) || baseVersion === state.hostDocumentVersion) {
+        return true;
+    }
+
+    // This view already applied its own edits locally before the host model
+    // assigned versions to them. Allow its undo/redo response to bridge those
+    // locally-applied versions, while keeping split-view updates strictly ordered.
+    const isLocalSource = msg.sourceViewId && state.viewId &&
+        String(msg.sourceViewId) === String(state.viewId);
+    return isLocalSource && baseVersion > state.hostDocumentVersion;
 }
 
 function markVersionedDocumentChangeApplied(msg) {

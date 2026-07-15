@@ -128,7 +128,8 @@ namespace TxtAIEditor.Controls
                             null),
                             change.DocumentId,
                             change.BaseVersion,
-                            change.Version);
+                            change.Version,
+                            change.SourceViewId);
                         otherSession.MarkViewSynchronized(change.Version);
                     }
                     else if (!sharesDocument ||
