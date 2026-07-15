@@ -1067,15 +1067,32 @@ export function bindPointerSelectionEvents({
             state.selection = null;
             syncCustomSelectionClass();
         } else if (selection) {
-            clearNativeSelection();
-            if (selection.start.line === selection.end.line) {
+            if (selection.isColumn) {
+                // Column selection is painted with overlays. Keep a collapsed
+                // native caret in the original contenteditable so Windows IMEs
+                // (notably Japanese IME) retain their active input context.
+                const inputHost = document.activeElement?.closest?.('.line-text');
+                const domSelection = window.getSelection();
+                const hasInputCaret = !!(inputHost && domSelection?.rangeCount &&
+                    inputHost.contains(domSelection.getRangeAt(0).startContainer));
+                if (!hasInputCaret) {
+                    const anchor = state.selectionAnchor || selection.start;
+                    const anchorElement = viewport.querySelector(`.line-text[data-line="${anchor.line}"]`);
+                    if (anchorElement?.getAttribute('contenteditable') === 'true') {
+                        setCaret(anchorElement, anchor.column, 0, true, false);
+                    }
+                }
+            } else {
+                clearNativeSelection();
+            }
+            if (!selection.isColumn && selection.start.line === selection.end.line) {
                 const releaseLine = state.currentLine;
                 const releaseColumn = Math.max(0, state.currentColumn - 1);
                 const releaseElement = viewport.querySelector(`.line-text[data-line="${releaseLine}"]`);
                 if (releaseElement?.getAttribute('contenteditable') === 'true') {
                     setCaret(releaseElement, releaseColumn, 0, true, false);
                 }
-            } else {
+            } else if (!selection.isColumn) {
                 prepareMultilineCompositionHost(selection);
             }
         }
@@ -1220,7 +1237,9 @@ export function bindPointerSelectionEvents({
             const finalSelectionIsEmpty = newSelection.start.line === newSelection.end.line &&
                 newSelection.start.column === newSelection.end.column;
             state.selection = finalSelectionIsEmpty ? null : newSelection;
-            clearNativeSelection();
+            if (!newSelection.isColumn) {
+                clearNativeSelection();
+            }
             syncCustomSelectionClass();
             state.currentLine = position.line;
             state.currentColumn = position.column + 1;

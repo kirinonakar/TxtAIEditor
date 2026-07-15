@@ -361,7 +361,8 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
 
     reportCursorAndSelection(element, getCaretOffset(element), includeSelectionReport);
 
-    if (oldActiveLine !== null && oldActiveLine !== state.editingLine) {
+    const preserveSelectionInputContext = state.isSelecting || !!state.selection?.isColumn;
+    if (oldActiveLine !== null && oldActiveLine !== state.editingLine && !preserveSelectionInputContext) {
         queueRender(true);
     } else {
         drawEditableSelectionOverlays();
