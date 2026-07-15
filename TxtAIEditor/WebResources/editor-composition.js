@@ -305,16 +305,30 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
     const text = state.cache.get(start.line) ?? lineTextFromElement(targetElement);
     const startColumn = Math.max(0, Math.min(start.column, text.length));
     const prefix = document.createTextNode(text.slice(0, startColumn));
+    const inputHost = document.createElement('span');
+    inputHost.className = 'range-composition-input-host';
     const selected = document.createElement('span');
     selected.className = 'selection-fragment';
     selected.textContent = text.slice(startColumn);
-    targetElement.replaceChildren(prefix, selected);
+    targetElement.replaceChildren(prefix, inputHost, selected);
 
     state.preparedRangeCompositionLine = start.line;
     state.currentLine = start.line;
     state.currentColumn = startColumn + 1;
     state.editingLine = start.line;
-    setNativeSelectionRangeInElement(targetElement, startColumn, startColumn);
+
+    // 선택 조각과 같은 DOM 경계에 caret을 두면 WebView2가 첫 조합 문자를
+    // 투명한 selection-fragment 안에 삽입해 다음 입력 전까지 보이지 않을 수 있다.
+    // 별도의 빈 호스트 안에 caret을 두어 첫 compositionupdate부터 보이게 한다.
+    const range = document.createRange();
+    range.setStart(inputHost, 0);
+    range.collapse(true);
+    targetElement.focus({ preventScroll: true });
+    const domSelection = window.getSelection();
+    if (domSelection) {
+        domSelection.removeAllRanges();
+        domSelection.addRange(range);
+    }
     return targetElement;
 }
 
