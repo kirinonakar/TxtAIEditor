@@ -93,8 +93,6 @@ function drawEditableSelectionOverlays() {
         return;
     }
 
-    const useVisibleRangeOverlays = !viewport.querySelector('.selection-fragment');
-
     for (const element of viewport.querySelectorAll('.line-text')) {
         const lineNumber = Number(element.dataset.line || 0);
         if (!lineNumber) continue;
@@ -120,6 +118,7 @@ function drawEditableSelectionOverlays() {
         }
 
         row?.classList.add('selected-row');
+        const useVisibleRangeOverlays = !element.querySelector('.selection-fragment');
         drawEditableSelectionRangeOverlay(element, start, end, useVisibleRangeOverlays);
     }
 

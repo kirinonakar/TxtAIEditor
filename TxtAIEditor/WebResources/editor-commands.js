@@ -1210,6 +1210,7 @@ const {
 });
 
 const {
+    beginDeferredRangeComposition,
     beginColumnComposition,
     cancelImeBypassTextarea,
     focusImeBypassTextarea,
@@ -1219,6 +1220,7 @@ const {
     finishRangeComposition,
     isLineInColumnComposition,
     isPendingImeSelectionCollapseFor,
+    prepareMultilineCompositionHost,
     replaceSelectionForCompositionStart,
     updateColumnCompositionPreview
 } = createEditorCompositionHandlers({
@@ -1356,6 +1358,7 @@ const {
 
 export {
     applyMarkdownCommand,
+    beginDeferredRangeComposition,
     beginColumnComposition,
     beginHostStreamInsert,
     cancelImeBypassTextarea,
@@ -1394,6 +1397,7 @@ export {
     moveCaretVertical,
     normalizedModelRepeatKey,
     pasteFromClipboard,
+    prepareMultilineCompositionHost,
     submitHexEdit,
     positionFromPointer,
     replaceSelectionForCompositionStart,

@@ -52,6 +52,8 @@ export function completeImeCommit(state, keepTextareaBypass = false) {
     state.isComposing = false;
     state.compositionLine = null;
     state.rangeComposition = null;
+    state.preparedRangeCompositionLine = null;
+    globalThis.document?.body?.classList.remove('range-composition-active');
     state.columnComposition = null;
     if (keepTextareaBypass && state.textareaImeBypassActive) {
         state.imePhase = ImePhase.TextareaBypassComposition;
@@ -92,6 +94,8 @@ export function resetImeState(state) {
     state.isComposing = false;
     state.compositionLine = null;
     state.rangeComposition = null;
+    state.preparedRangeCompositionLine = null;
+    globalThis.document?.body?.classList.remove('range-composition-active');
     state.columnComposition = null;
     state.textareaImeBypassActive = false;
 }

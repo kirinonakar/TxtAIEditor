@@ -91,6 +91,7 @@ const state = {
     isComposing: false,
     compositionLine: null,
     rangeComposition: null,
+    preparedRangeCompositionLine: null,
     columnComposition: null,
     pendingImeVerticalNavigation: null,
     pendingImeSelectionCollapse: null,
@@ -1639,6 +1640,10 @@ function isHangulImeKeyEvent(event) {
 function syncCustomSelectionClass() {
     const hasSelection = runtime.hasCustomSelection();
     document.body.classList.toggle('custom-selection-active', hasSelection);
+    if (!hasSelection && !state.rangeComposition?.deferred) {
+        state.preparedRangeCompositionLine = null;
+        document.body.classList.remove('range-composition-active');
+    }
 }
 
 function clearCustomSelectionVisuals() {

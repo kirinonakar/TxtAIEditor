@@ -899,6 +899,15 @@ mark.active-match {
     color: inherit;
 }
 
+body.range-composition-active .selection-fragment {
+    background: var(--bg);
+    color: transparent;
+}
+
+body.range-composition-active .editable-selection-overlay.selected-empty-line-overlay {
+    background: var(--bg);
+}
+
 body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-block .selection-fragment,
 body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-source-line .selection-fragment {
     background: transparent;

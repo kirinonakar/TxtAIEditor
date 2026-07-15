@@ -281,10 +281,70 @@ function prepareSingleLineSelectionForNativeComposition(selection) {
     return targetElement;
 }
 
+function prepareMultilineCompositionHost(selection = normalizeSelection()) {
+    const normalized = normalizeSelection(selection);
+    if (!normalized || normalized.isColumn || normalized.start.line === normalized.end.line) {
+        return null;
+    }
+
+    const { start } = normalized;
+    const targetElement = viewport.querySelector(`.line-text[data-line="${start.line}"]`);
+    if (!targetElement || targetElement.getAttribute('contenteditable') !== 'true') {
+        return null;
+    }
+
+    // 선택이 끝난 시점은 아직 IME 조합 전이므로, 표시 중인 선택 행을 한 번
+    // 일관되게 렌더해 모든 선택 조각의 음영을 유지하고 시작 위치만 IME 호스트로 준비한다.
+    for (const element of viewport.querySelectorAll('.line-text')) {
+        const lineNumber = Number(element.dataset.line || 0);
+        if (lineNumber < normalized.start.line || lineNumber > normalized.end.line) continue;
+        if (element.getAttribute('contenteditable') !== 'true') continue;
+        element.innerHTML = renderLineContent(lineNumber, state.cache.get(lineNumber) ?? lineTextFromElement(element));
+    }
+
+    const text = state.cache.get(start.line) ?? lineTextFromElement(targetElement);
+    const startColumn = Math.max(0, Math.min(start.column, text.length));
+    if (startColumn === 0) {
+        // 오프셋 0이 선택 span 내부로 해석되면 조합 글자까지 숨겨질 수 있으므로
+        // 선택 조각 앞의 안정적인 빈 텍스트 노드에 IME caret을 둔다.
+        targetElement.insertBefore(document.createTextNode(''), targetElement.firstChild);
+    }
+
+    state.preparedRangeCompositionLine = start.line;
+    state.currentLine = start.line;
+    state.currentColumn = startColumn + 1;
+    state.editingLine = start.line;
+    setNativeSelectionRangeInElement(targetElement, startColumn, startColumn);
+    return targetElement;
+}
+
+function beginDeferredRangeComposition(element, selection) {
+    const normalized = normalizeSelection(selection);
+    if (!normalized || normalized.isColumn || normalized.start.line === normalized.end.line) {
+        return null;
+    }
+
+    const targetElement = element?.getAttribute?.('contenteditable') === 'true'
+        ? element
+        : viewport.querySelector(`.line-text[data-line="${normalized.start.line}"]`);
+    const command = createRangeCompositionEditCommand(normalized);
+    state.rangeComposition = {
+        command,
+        lineNumber: command.start.line,
+        deferred: true,
+        hostElement: targetElement,
+        hostBeforeText: targetElement ? lineTextFromElement(targetElement) : (state.cache.get(command.start.line) ?? '')
+    };
+    document.body.classList.add('range-composition-active');
+    return targetElement || element;
+}
+
 function finishRangeComposition(element, lineNumber, compositionText = '') {
     const pending = state.rangeComposition;
     if (!pending || !pending.command) {
         state.rangeComposition = null;
+        state.preparedRangeCompositionLine = null;
+        document.body.classList.remove('range-composition-active');
         return false;
     }
 
@@ -298,16 +358,41 @@ function finishRangeComposition(element, lineNumber, compositionText = '') {
     }
 
     const fallbackCompositionText = String(compositionText || '');
-    const finalText = targetElement
-        ? lineTextFromElement(targetElement)
-        : pending.command.collapsedText.slice(0, pending.command.caretColumn) +
-            fallbackCompositionText +
+    let finalText;
+    let insertedText;
+
+    if (pending.deferred) {
+        const hostElement = pending.hostElement?.isConnected ? pending.hostElement : targetElement;
+        const hostFinalText = hostElement ? lineTextFromElement(hostElement) : pending.hostBeforeText;
+        insertedText = fallbackCompositionText || changedTextBetween(pending.hostBeforeText, hostFinalText);
+        if (!insertedText && hostFinalText === pending.hostBeforeText) {
+            state.rangeComposition = null;
+            state.preparedRangeCompositionLine = null;
+            document.body.classList.remove('range-composition-active');
+            queueRender(true);
+            return true;
+        }
+        targetElement = applyLocalRangeCompositionEdit(pending.command, hostElement);
+        finalText = pending.command.collapsedText.slice(0, pending.command.caretColumn) +
+            insertedText +
             pending.command.collapsedText.slice(pending.command.caretColumn);
-    const insertedText = finalText !== pending.command.collapsedText
-        ? changedTextBetween(pending.command.collapsedText, finalText)
-        : fallbackCompositionText;
+        if (targetElement?.getAttribute?.('contenteditable') === 'true') {
+            targetElement.textContent = finalText;
+        }
+    } else {
+        finalText = targetElement
+            ? lineTextFromElement(targetElement)
+            : pending.command.collapsedText.slice(0, pending.command.caretColumn) +
+                fallbackCompositionText +
+                pending.command.collapsedText.slice(pending.command.caretColumn);
+        insertedText = finalText !== pending.command.collapsedText
+            ? changedTextBetween(pending.command.collapsedText, finalText)
+            : fallbackCompositionText;
+    }
 
     state.rangeComposition = null;
+    state.preparedRangeCompositionLine = null;
+    document.body.classList.remove('range-composition-active');
     state.cache.set(pending.lineNumber, finalText);
     state.cacheVersion++;
     state.selection = null;
@@ -317,13 +402,18 @@ function finishRangeComposition(element, lineNumber, compositionText = '') {
     };
     state.currentLine = pending.lineNumber;
     state.currentColumn = state.selectionAnchor.column + 1;
+    if (targetElement?.getAttribute?.('contenteditable') === 'true') {
+        setNativeSelectionRangeInElement(
+            targetElement,
+            state.selectionAnchor.column,
+            state.selectionAnchor.column);
+    }
     if (!cleanDirtyMarker(pending.lineNumber)) {
         markDirty(pending.lineNumber, 'mod');
     }
     commitRangeCompositionEdit(pending.command, insertedText);
     syncCustomSelectionClass();
     queueRender(true);
-    setTimeout(() => focusLine(state.currentLine, Math.max(0, state.currentColumn - 1)), 0);
 
     return true;
 }
@@ -834,6 +924,7 @@ function finishColumnComposition(element, lineNumber) {
     }
 
     return {
+        beginDeferredRangeComposition,
         beginColumnComposition,
         cancelImeBypassTextarea,
         focusImeBypassTextarea,
@@ -843,6 +934,7 @@ function finishColumnComposition(element, lineNumber) {
         finishRangeComposition,
         isLineInColumnComposition,
         isPendingImeSelectionCollapseFor,
+        prepareMultilineCompositionHost,
         replaceSelectionForCompositionStart,
         updateColumnCompositionPreview
     };

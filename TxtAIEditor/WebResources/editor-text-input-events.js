@@ -20,6 +20,7 @@ import {
     normalizeSelection
 } from './editor-selection.js';
 import {
+    beginDeferredRangeComposition,
     beginColumnComposition,
     clearPendingImeSelectionCollapse,
     commitLine,
@@ -83,7 +84,7 @@ export function bindTextInputEvents({ renderer }) {
             if (!state.isComposing && isPendingImeSelectionCollapseFor(element, event)) {
                 return;
             }
-            if (!state.columnComposition) {
+            if (!state.columnComposition && !state.rangeComposition?.deferred) {
                 state.selection = null;
                 syncCustomSelectionClass();
             }
@@ -141,7 +142,9 @@ export function bindTextInputEvents({ renderer }) {
             const isCollapsed = pendingCompositionSelection.start.line === pendingCompositionSelection.end.line &&
                                 pendingCompositionSelection.start.column === pendingCompositionSelection.end.column;
             if (!isCollapsed) {
-                element = replaceSelectionForCompositionStart(element) || element;
+                element = pendingCompositionSelection.start.line !== pendingCompositionSelection.end.line
+                    ? (beginDeferredRangeComposition(element, pendingCompositionSelection) || element)
+                    : (replaceSelectionForCompositionStart(element) || element);
                 collapsedSelectionForComposition = true;
             }
         }
@@ -254,6 +257,9 @@ export function bindTextInputEvents({ renderer }) {
         if (event.isComposing || state.isComposing ||
             event.inputType === 'insertCompositionText' ||
             event.inputType === 'deleteCompositionText') {
+            if (state.rangeComposition?.deferred) {
+                return;
+            }
             const pendingCompositionSelection = compositionSelectionRange(!state.isComposing);
 
             if (pendingCompositionSelection && !pendingCompositionSelection.isColumn) {

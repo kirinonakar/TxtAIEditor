@@ -25,6 +25,7 @@ import {
     lineElementFromEvent,
     lineTextFromElement,
     positionFromPointer,
+    prepareMultilineCompositionHost,
     replaceSelectionWith,
     selectWordAtPointer,
     setCaret,
@@ -1074,6 +1075,8 @@ export function bindPointerSelectionEvents({
                 if (releaseElement?.getAttribute('contenteditable') === 'true') {
                     setCaret(releaseElement, releaseColumn, 0, true, false);
                 }
+            } else {
+                prepareMultilineCompositionHost(selection);
             }
         }
         if (hadSelection || hasCustomSelection()) {
