@@ -304,11 +304,11 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
 
     const text = state.cache.get(start.line) ?? lineTextFromElement(targetElement);
     const startColumn = Math.max(0, Math.min(start.column, text.length));
-    if (startColumn === 0) {
-        // 오프셋 0이 선택 span 내부로 해석되면 조합 글자까지 숨겨질 수 있으므로
-        // 선택 조각 앞의 안정적인 빈 텍스트 노드에 IME caret을 둔다.
-        targetElement.insertBefore(document.createTextNode(''), targetElement.firstChild);
-    }
+    const prefix = document.createTextNode(text.slice(0, startColumn));
+    const selected = document.createElement('span');
+    selected.className = 'selection-fragment';
+    selected.textContent = text.slice(startColumn);
+    targetElement.replaceChildren(prefix, selected);
 
     state.preparedRangeCompositionLine = start.line;
     state.currentLine = start.line;
@@ -337,6 +337,33 @@ function beginDeferredRangeComposition(element, selection) {
     };
     document.body.classList.add('range-composition-active');
     return targetElement || element;
+}
+
+function commitRangeCompositionResult(pending, targetElement, insertedText, finalText) {
+    state.rangeComposition = null;
+    state.preparedRangeCompositionLine = null;
+    document.body.classList.remove('range-composition-active');
+    state.cache.set(pending.lineNumber, finalText);
+    state.cacheVersion++;
+    state.selection = null;
+    state.selectionAnchor = {
+        line: pending.lineNumber,
+        column: pending.command.caretColumn + insertedText.length
+    };
+    state.currentLine = pending.lineNumber;
+    state.currentColumn = state.selectionAnchor.column + 1;
+    if (targetElement?.getAttribute?.('contenteditable') === 'true') {
+        setNativeSelectionRangeInElement(
+            targetElement,
+            state.selectionAnchor.column,
+            state.selectionAnchor.column);
+    }
+    if (!cleanDirtyMarker(pending.lineNumber)) {
+        markDirty(pending.lineNumber, 'mod');
+    }
+    commitRangeCompositionEdit(pending.command, insertedText);
+    syncCustomSelectionClass();
+    queueRender(true);
 }
 
 function finishRangeComposition(element, lineNumber, compositionText = '') {
@@ -372,13 +399,23 @@ function finishRangeComposition(element, lineNumber, compositionText = '') {
             queueRender(true);
             return true;
         }
-        targetElement = applyLocalRangeCompositionEdit(pending.command, hostElement);
-        finalText = pending.command.collapsedText.slice(0, pending.command.caretColumn) +
-            insertedText +
-            pending.command.collapsedText.slice(pending.command.caretColumn);
-        if (targetElement?.getAttribute?.('contenteditable') === 'true') {
-            targetElement.textContent = finalText;
-        }
+        state.rangeComposition = null;
+        state.preparedRangeCompositionLine = null;
+        document.body.classList.remove('range-composition-active');
+
+        // compositionend 이벤트 안에서 DOM/Selection을 바꾸면 WebView2 한글 IME가
+        // 다음 음절의 첫 자소를 이전 조합에 소모할 수 있다. 이벤트 반환 후 한 번만 확정한다.
+        queueMicrotask(() => {
+            const committedElement = applyLocalRangeCompositionEdit(pending.command, hostElement);
+            const committedText = pending.command.collapsedText.slice(0, pending.command.caretColumn) +
+                insertedText +
+                pending.command.collapsedText.slice(pending.command.caretColumn);
+            if (committedElement?.getAttribute?.('contenteditable') === 'true') {
+                committedElement.textContent = committedText;
+            }
+            commitRangeCompositionResult(pending, committedElement, insertedText, committedText);
+        });
+        return true;
     } else {
         finalText = targetElement
             ? lineTextFromElement(targetElement)
@@ -390,30 +427,7 @@ function finishRangeComposition(element, lineNumber, compositionText = '') {
             : fallbackCompositionText;
     }
 
-    state.rangeComposition = null;
-    state.preparedRangeCompositionLine = null;
-    document.body.classList.remove('range-composition-active');
-    state.cache.set(pending.lineNumber, finalText);
-    state.cacheVersion++;
-    state.selection = null;
-    state.selectionAnchor = {
-        line: pending.lineNumber,
-        column: pending.command.caretColumn + insertedText.length
-    };
-    state.currentLine = pending.lineNumber;
-    state.currentColumn = state.selectionAnchor.column + 1;
-    if (targetElement?.getAttribute?.('contenteditable') === 'true') {
-        setNativeSelectionRangeInElement(
-            targetElement,
-            state.selectionAnchor.column,
-            state.selectionAnchor.column);
-    }
-    if (!cleanDirtyMarker(pending.lineNumber)) {
-        markDirty(pending.lineNumber, 'mod');
-    }
-    commitRangeCompositionEdit(pending.command, insertedText);
-    syncCustomSelectionClass();
-    queueRender(true);
+    commitRangeCompositionResult(pending, targetElement, insertedText, finalText);
 
     return true;
 }

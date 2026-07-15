@@ -559,7 +559,8 @@ function receiveLineBlock(startLine, lines) {
         if ((state.isComposing && (!state.compositionLine || state.compositionLine === lineNumber)) ||
             (state.isComposing && runtime.isLineInColumnComposition(lineNumber)) ||
             (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine === lineNumber) ||
-            (state.editingLine === lineNumber && document.activeElement?.closest?.('.line-text')?.dataset.line === String(lineNumber))) {
+            (document.hasFocus() && state.editingLine === lineNumber &&
+                document.activeElement?.closest?.('.line-text')?.dataset.line === String(lineNumber))) {
             continue;
         }
         state.cache.set(lineNumber, safeLines[i] ?? '');
@@ -590,7 +591,9 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
         return false;
     }
 
-    const activeLineElement = document.activeElement?.closest?.('.line-text');
+    const activeLineElement = document.hasFocus()
+        ? document.activeElement?.closest?.('.line-text')
+        : null;
     if (state.editingLine === line && activeLineElement?.dataset.line === String(line)) {
         return false;
     }
@@ -685,19 +688,20 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 
     queueRender(true);
 
-    if (caret && Number(caret.line || 0) > 0) {
+    const canRestoreHostCaret = document.hasFocus();
+    if (canRestoreHostCaret && caret && Number(caret.line || 0) > 0) {
         const caretLine = Math.min(state.lineCount, Math.max(1, Number(caret.line)));
         const caretColumn = Math.max(0, Number(caret.column || 1) - 1);
         setTimeout(() => {
-            if (!state.isComposing && !state.textareaImeBypassActive) {
+            if (document.hasFocus() && !state.isComposing && !state.textareaImeBypassActive) {
                 runtime.focusLine(caretLine, caretColumn);
             }
         }, 20);
-    } else if (savedCaretLine > 0) {
+    } else if (canRestoreHostCaret && savedCaretLine > 0) {
         const caretLine = Math.min(state.lineCount, Math.max(1, Number(savedCaretLine)));
         const caretColumn = Math.max(0, Number(savedCaretColumn || 1) - 1);
         setTimeout(() => {
-            if (!state.isComposing && !state.textareaImeBypassActive) {
+            if (document.hasFocus() && !state.isComposing && !state.textareaImeBypassActive) {
                 runtime.focusLine(caretLine, caretColumn);
             }
         }, 20);

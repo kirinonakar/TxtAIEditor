@@ -192,7 +192,12 @@ function createEditorRenderer({
             renderEnd = Math.min(Math.max(1, csvTableLineCount || state.lineCount), lastVisibleCsvLine + csvOverscan);
         }
         const activeEl = document.activeElement;
-        const isFocused = activeEl && activeEl.closest('.line-text') && activeEl.getAttribute('contenteditable') === 'true';
+        // Split view의 비활성 WebView도 마지막 document.activeElement를 계속 보존한다.
+        // 실제 창 포커스까지 확인하지 않으면 동기화 렌더가 비활성 pane에서 focus()를
+        // 호출해 활성 pane의 Windows IME 컨텍스트와 다음 한글 자소를 빼앗는다.
+        const isFocused = document.hasFocus() &&
+            activeEl && activeEl.closest('.line-text') &&
+            activeEl.getAttribute('contenteditable') === 'true';
         const activeLine = isFocused ? Number(activeEl.dataset.line) : null;
         const activeCaret = isFocused ? getCaretOffset(activeEl) : 0;
         const getCachedLine = lineNumber => state.cache.has(lineNumber) ? state.cache.get(lineNumber) : undefined;

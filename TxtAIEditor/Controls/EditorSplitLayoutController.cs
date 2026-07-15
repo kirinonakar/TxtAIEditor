@@ -137,6 +137,18 @@ namespace TxtAIEditor.Controls
                 activeTab.IsEncrypted,
                 activeTab.EncryptionPassword);
 
+            // Split panes are two views of the same document, so the new view must use
+            // the source view's resolved/manual language from its first render. The split
+            // tab is intentionally created with empty content before sharing the session;
+            // detecting its language at that point leaves extensionless/untitled files as
+            // plaintext until the pane is clicked and StatusBarController detects it again.
+            newTab.Language = activeTab.Language;
+            newTab.IsLanguageManuallySelected = activeTab.IsLanguageManuallySelected;
+            if (_tabBridges.TryGetValue(newTab.Id, out var newBridgeGroup) && newBridgeGroup.Bridge != null)
+            {
+                _ = newBridgeGroup.Bridge.SetLanguageAsync(newTab.Language);
+            }
+
             if (hasSourceSession && sourceSession != null &&
                 _editorSessions.TryGetValue(newTab.Id, out var splitViewSession))
             {
