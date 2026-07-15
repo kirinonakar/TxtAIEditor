@@ -216,12 +216,14 @@ namespace TxtAIEditor.Composition
                 callbacks.OpenEditorTab,
                 tabDirtyState.IsAnySameFileTabDirty,
                 tabDirtyState.SetDirtyStateForFileGroup,
+                tabDirtyState.ReconcileTabDirtyState,
                 callbacks.SyncEditsToOtherTabsAsync,
                 callbacks.CloseTabAndCleanup,
                 callbacks.CloseTabRequested,
                 tabSelection.QueueChanged,
                 tabSelection.ClearQueue,
-                callbacks.UpdateWindowTitle);
+                callbacks.UpdateWindowTitle,
+                initialEditorLineWarmupCount);
 
             return new MainWindowEditorRuntimeControllers(
                 toc,

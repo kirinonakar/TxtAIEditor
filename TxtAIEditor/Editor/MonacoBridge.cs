@@ -31,6 +31,8 @@ namespace TxtAIEditor.Editor
         private string _documentId = string.Empty;
         private string _viewId = string.Empty;
         private long _lastIncomingSequence;
+        private IReadOnlyList<string>? _currentOriginalLines;
+        private Dictionary<int, string>? _currentDirtyLines;
 
         public event Action<bool>? ContentChanged;
         public event Action<string, int, int, long?, long?>? SelectionReceived;
@@ -160,13 +162,15 @@ namespace TxtAIEditor.Editor
 
         public async Task ResetOriginalLinesAsync(IReadOnlyList<string> lines)
         {
-            var msg = new { action = "resetOriginalLines", lines = lines };
+            _currentOriginalLines = lines.ToArray();
+            var msg = new { action = "resetOriginalLines", lines = _currentOriginalLines };
             await SendMessageAsync(msg);
         }
 
         public async Task UpdateDirtyLinesAsync(Dictionary<int, string> dirtyLines)
         {
-            var msg = new { action = "updateDirtyLines", dirtyLines = dirtyLines };
+            _currentDirtyLines = new Dictionary<int, string>(dirtyLines);
+            var msg = new { action = "updateDirtyLines", dirtyLines = _currentDirtyLines };
             await SendMessageAsync(msg);
         }
 
@@ -259,6 +263,18 @@ namespace TxtAIEditor.Editor
                 csvJsonValueHeader = _localizationService?.GetString("CsvJsonValueHeader", "값") ?? "값"
             };
             await SendMessageAsync(msg);
+
+            // A split view can inherit its saved baseline and dirty markers before its
+            // WebView has finished initializing. Reapply the latest state after initModel,
+            // which clears both collections on the JavaScript side.
+            if (_currentOriginalLines != null)
+            {
+                await SendMessageAsync(new { action = "resetOriginalLines", lines = _currentOriginalLines });
+            }
+            if (_currentDirtyLines != null)
+            {
+                await SendMessageAsync(new { action = "updateDirtyLines", dirtyLines = _currentDirtyLines });
+            }
         }
 
         public async Task SendLinesAsync(int requestId, int startLine, IReadOnlyList<string> lines)

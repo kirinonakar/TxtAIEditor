@@ -34,12 +34,14 @@ namespace TxtAIEditor.Controls
         private readonly OpenEditorTabCallback _openEditorTab;
         private readonly Func<OpenedTab, bool> _isAnySameFileTabDirty;
         private readonly Action<OpenedTab, bool> _setDirtyStateForFileGroup;
+        private readonly Action<OpenedTab> _reconcileTabDirtyState;
         private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
         private readonly Action<OpenedTab, TabViewItem> _closeTabAndCleanup;
         private readonly Action<TabView, TabViewTabCloseRequestedEventArgs> _closeTabRequested;
         private readonly Action<TabView, TabViewItem> _queueTabSelectionChanged;
         private readonly Action _clearTabSelectionQueue;
         private readonly Action _updateWindowTitle;
+        private readonly int _initialEditorLineWarmupCount;
 
         public EditorSplitLayoutController(
             TopCommandBarPane topToolbar,
@@ -54,12 +56,14 @@ namespace TxtAIEditor.Controls
             OpenEditorTabCallback openEditorTab,
             Func<OpenedTab, bool> isAnySameFileTabDirty,
             Action<OpenedTab, bool> setDirtyStateForFileGroup,
+            Action<OpenedTab> reconcileTabDirtyState,
             Func<OpenedTab, Task> syncEditsToOtherTabsAsync,
             Action<OpenedTab, TabViewItem> closeTabAndCleanup,
             Action<TabView, TabViewTabCloseRequestedEventArgs> closeTabRequested,
             Action<TabView, TabViewItem> queueTabSelectionChanged,
             Action clearTabSelectionQueue,
-            Action updateWindowTitle)
+            Action updateWindowTitle,
+            int initialEditorLineWarmupCount)
         {
             _topToolbar = topToolbar;
             _editorWorkspace = editorWorkspace;
@@ -73,12 +77,14 @@ namespace TxtAIEditor.Controls
             _openEditorTab = openEditorTab;
             _isAnySameFileTabDirty = isAnySameFileTabDirty;
             _setDirtyStateForFileGroup = setDirtyStateForFileGroup;
+            _reconcileTabDirtyState = reconcileTabDirtyState;
             _syncEditsToOtherTabsAsync = syncEditsToOtherTabsAsync;
             _closeTabAndCleanup = closeTabAndCleanup;
             _closeTabRequested = closeTabRequested;
             _queueTabSelectionChanged = queueTabSelectionChanged;
             _clearTabSelectionQueue = clearTabSelectionQueue;
             _updateWindowTitle = updateWindowTitle;
+            _initialEditorLineWarmupCount = initialEditorLineWarmupCount;
 
             WireEvents();
         }
@@ -157,10 +163,17 @@ namespace TxtAIEditor.Controls
                 newTab.OriginalContent = activeTab.OriginalContent;
                 newTab.OriginalLineEnding = activeTab.OriginalLineEnding;
                 newTab.OriginalEncodingName = activeTab.OriginalEncodingName;
+
+                if (_tabBridges.TryGetValue(newTab.Id, out var splitBridgeGroup) && splitBridgeGroup.Bridge != null)
+                {
+                    _ = splitBridgeGroup.Bridge.ResetOriginalLinesAsync(
+                        newTab.OriginalLines.Take(_initialEditorLineWarmupCount).ToArray());
+                }
             }
 
             newTab.IsDirty = isDirty;
             _setDirtyStateForFileGroup(activeTab, isDirty);
+            _reconcileTabDirtyState(newTab);
         }
 
         private async void OnSplitNoneClick(object sender, RoutedEventArgs e)
