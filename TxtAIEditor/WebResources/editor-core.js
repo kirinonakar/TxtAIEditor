@@ -1639,9 +1639,6 @@ function isHangulImeKeyEvent(event) {
 function syncCustomSelectionClass() {
     const hasSelection = runtime.hasCustomSelection();
     document.body.classList.toggle('custom-selection-active', hasSelection);
-    if (hasSelection) {
-        runtime.focusImeBypassTextarea();
-    }
 }
 
 function clearCustomSelectionVisuals() {

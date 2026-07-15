@@ -169,11 +169,8 @@ function syncRenderedRowsAfterCompositionSelectionCollapse(startLine, endLine, n
 
     const oldTargetRect = targetRow ? targetRow.getBoundingClientRect() : null;
 
-    const startRow = viewport.querySelector(`.line-row[data-line="${start}"]`);
-    if (targetRow && startRow && targetRow !== startRow) {
-        viewport.insertBefore(targetRow, startRow);
-    }
-
+    // 선택의 focus 행을 DOM에서 이동시키면 WebView2가 현재 IME 키를 잃을 수 있다.
+    // 형제 행만 제거하면 focus 행은 연결된 상태로 선택 시작 위치까지 자연스럽게 당겨진다.
     for (const info of rowInfos) {
         if (!info.line) continue;
         if (info.row === targetRow) continue;
@@ -198,7 +195,6 @@ function syncRenderedRowsAfterCompositionSelectionCollapse(startLine, endLine, n
             const column = Math.max(0, Math.min(Number(caretColumn || 0), textElement.textContent.length));
             const textNode = textElement.firstChild;
             if (!state.textareaImeBypassActive) {
-                textElement.focus({ preventScroll: true });
                 const range = document.createRange();
                 if (textNode && textNode.nodeType === Node.TEXT_NODE) {
                     range.setStart(textNode, column);
@@ -351,23 +347,6 @@ function replaceSelectionForCompositionStart(element, markPendingImeStart = true
         command,
         lineNumber: command.start.line
     };
-
-    if (targetElement && targetElement.getAttribute?.('contenteditable') === 'true') {
-        targetElement.focus({ preventScroll: true });
-        const textNode = targetElement.firstChild;
-        const range = document.createRange();
-        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-            range.setStart(textNode, Math.max(0, Math.min(command.caretColumn, textNode.textContent.length)));
-        } else {
-            range.setStart(targetElement, 0);
-        }
-        range.collapse(true);
-        const domSelection = window.getSelection();
-        if (domSelection) {
-            domSelection.removeAllRanges();
-            domSelection.addRange(range);
-        }
-    }
 
     if (markPendingImeStart && targetElement && targetElement.getAttribute?.('contenteditable') === 'true') {
         beginPendingImeSelectionCollapse(targetElement, command.start.line, command.caretColumn);

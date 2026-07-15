@@ -16,12 +16,10 @@ import {
     syncCustomSelectionClass
 } from './editor-core.js';
 import {
-    activeColumnSelection,
     hasCustomSelection,
     normalizeSelection
 } from './editor-selection.js';
 import {
-    focusImeBypassTextarea,
     cancelImeBypassTextarea,
     changeLineIndent,
     clearPendingRepeatEdit,
@@ -38,7 +36,7 @@ import {
     moveCaretHorizontal,
     moveCaretVertical,
     normalizedModelRepeatKey,
-    replaceSelectionWith,
+    replaceSelectionForCompositionStart,
     pasteFromClipboard,
     scheduleModelRepeatEdit,
     selectAll,
@@ -56,15 +54,6 @@ import {
 import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
 
 export function bindKeyboardEvents({ openFindPanel }) {
-    function hasNativeSelectionInElement(element) {
-        const selection = window.getSelection();
-        if (!element || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
-            return false;
-        }
-
-        return element.contains(selection.anchorNode) && element.contains(selection.focusNode);
-    }
-
     function samePosition(a, b) {
         return !!a && !!b && a.line === b.line && a.column === b.column;
     }
@@ -433,6 +422,27 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
         }
 
+        // 일부 WebView2/한글 IME 조합에서는 첫 keydown이 Process/229가 아니라
+        // 물리 영문 문자로 노출된다. 일반 문자 입력도 여러 줄 선택을 미리 접어
+        // compositionstart가 같은 contenteditable에서 첫 키부터 시작되게 한다.
+        if (!state.isComposing && isPlainTextKey(event)) {
+            const active = document.activeElement;
+            const isFindOrInput = active && (
+                active.closest?.('#find-panel') ||
+                active.tagName === 'INPUT' ||
+                active.tagName === 'TEXTAREA'
+            );
+            if (!isFindOrInput) {
+                const inputElement = lineElementFromEvent(event) || activeEditableElement();
+                const pendingSelection = compositionSelectionRange();
+                if (inputElement && pendingSelection && !pendingSelection.isColumn &&
+                    pendingSelection.start.line !== pendingSelection.end.line) {
+                    const replacedElement = replaceSelectionForCompositionStart(inputElement, true) || inputElement;
+                    state.editingLine = Number(replacedElement.dataset.line || state.currentLine || 1);
+                }
+            }
+        }
+
         if (isHangulImeKeyEvent(event)) {
             const active = document.activeElement;
             const isFindOrInput = active && (
@@ -461,7 +471,11 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 const pendingSelection = compositionSelectionRange();
                 if (imeElement && pendingSelection && !pendingSelection.isColumn) {
                     if (pendingSelection.start.line !== pendingSelection.end.line) {
-                        focusImeBypassTextarea();
+                        // keydown은 compositionstart보다 먼저 도착한다. 이 시점에 선택 행을
+                        // 하나의 contenteditable IME 호스트로 접어 두면 조합 중에는 같은
+                        // DOM 노드와 네이티브 caret을 그대로 유지할 수 있다.
+                        const replacedElement = replaceSelectionForCompositionStart(imeElement, true) || imeElement;
+                        state.editingLine = Number(replacedElement.dataset.line || state.currentLine || 1);
                     } else {
                         // compositionstart/beforeinput가 실제로 도착한 뒤에만 선택을
                         // 조합용 로컬 편집으로 바꾼다. keyCode 229만으로 문서를 변경하면
@@ -602,13 +616,6 @@ export function bindKeyboardEvents({ openFindPanel }) {
         const element = activeEditableElement();
         if (state.csvTableEnabled || !element || element.getAttribute('contenteditable') !== 'true') return;
 
-        const columnSelection = activeColumnSelection();
-        if (columnSelection && isPlainTextKey(event)) {
-            event.preventDefault();
-            replaceSelectionWith(columnSelection, event.key);
-            return;
-        }
-
         if ((event.key === 'Home' || event.key === 'End') && event.ctrlKey) {
             event.preventDefault();
             if (event.key === 'Home') {
@@ -715,16 +722,9 @@ export function bindKeyboardEvents({ openFindPanel }) {
         }
 
         if (isPlainTextKey(event)) {
-            if (hasCustomSelection() && hasNativeSelectionInElement(element)) {
-                return;
-            }
-
-            event.preventDefault();
-            markNativeBeforeInputHandled(['insertText'], 120);
-            scheduleModelRepeatEdit(normalizedModelRepeatKey(event), event.repeat);
-            if (!event.repeat) {
-                triggerAutocomplete(activeEditableElement() || element);
-            }
+            // 한글 IME의 첫 keydown이 간헐적으로 물리 영문 키로 노출될 수 있다.
+            // 여기서 preventDefault 후 event.key를 직접 삽입하면 그 영문이 확정되므로,
+            // 문자 입력은 브라우저의 beforeinput/input 및 composition 흐름에 맡긴다.
             return;
         }
 
@@ -849,7 +849,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
         }
 
-        if ((state.autocompleteOnEnter || state.autocompleteOnTab) && element && element.getAttribute('contenteditable') === 'true') {
+        if ((state.autocompleteOnEnter || state.autocompleteOnTab) && !state.rangeComposition &&
+            element && element.getAttribute('contenteditable') === 'true') {
             const ignoredKeys = [
                 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
                 'Enter', 'Escape', 'Tab', ' ', 'Shift', 'Control', 'Alt', 'Meta',

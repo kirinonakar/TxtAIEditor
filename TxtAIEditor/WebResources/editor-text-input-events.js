@@ -26,7 +26,6 @@ import {
     compositionSelectionRange,
     finishColumnComposition,
     finishRangeComposition,
-    focusImeBypassTextarea,
     focusLine,
     getCaretOffset,
     inputRangeInElement,
@@ -62,13 +61,6 @@ export function bindTextInputEvents({ renderer }) {
         }, 0);
     }
 
-    function isSplitMultilineCompositionSelection(selection) {
-        return !!state.isSplitView &&
-            !!selection &&
-            !selection.isColumn &&
-            selection.start.line !== selection.end.line;
-    }
-
     viewport.addEventListener('input', event => {
         if (shouldSuppressNativeBeforeInput(event)) {
             return;
@@ -79,6 +71,14 @@ export function bindTextInputEvents({ renderer }) {
                 Number(element.dataset.line || 0) === postCompositionNavigationInputGuard.lineNumber) {
                 postCompositionNavigationInputGuard = null;
                 return;
+            }
+            if (!state.isComposing && state.rangeComposition) {
+                clearPendingImeSelectionCollapse();
+                const lineNumber = Number(element.dataset.line || state.currentLine || 1);
+                if (finishRangeComposition(element, lineNumber, event.data || '')) {
+                    completeImeCommit(state);
+                    return;
+                }
             }
             if (!state.isComposing && isPendingImeSelectionCollapseFor(element, event)) {
                 return;
@@ -108,7 +108,7 @@ export function bindTextInputEvents({ renderer }) {
         if (state.csvTableEnabled) return;
         setTimeout(() => {
             const hasLineTextFocus = !!document.activeElement?.closest?.('.line-text');
-            const shouldKeepSelectionEditContext = hasCustomSelection() || state.textareaImeBypassActive;
+            const shouldKeepSelectionEditContext = hasCustomSelection();
             if (state.inlineLivePreviewEnabled && !hasLineTextFocus) {
                 if (shouldKeepSelectionEditContext && state.inlineLivePreviewSourceLine) {
                     return;
@@ -136,12 +136,6 @@ export function bindTextInputEvents({ renderer }) {
         let element = lineElementFromEvent(event) || activeEditableElement();
         const pendingCompositionSelection = compositionSelectionRange();
         let collapsedSelectionForComposition = false;
-
-        if (isSplitMultilineCompositionSelection(pendingCompositionSelection)) {
-            focusImeBypassTextarea();
-            state.columnComposition = null;
-            return;
-        }
 
         if (pendingCompositionSelection && !pendingCompositionSelection.isColumn) {
             const isCollapsed = pendingCompositionSelection.start.line === pendingCompositionSelection.end.line &&
@@ -261,13 +255,6 @@ export function bindTextInputEvents({ renderer }) {
             event.inputType === 'insertCompositionText' ||
             event.inputType === 'deleteCompositionText') {
             const pendingCompositionSelection = compositionSelectionRange(!state.isComposing);
-            if (isSplitMultilineCompositionSelection(pendingCompositionSelection)) {
-                if (focusImeBypassTextarea()) {
-                    event.preventDefault();
-                }
-                state.columnComposition = null;
-                return;
-            }
 
             if (pendingCompositionSelection && !pendingCompositionSelection.isColumn) {
                 const replacedElement = replaceSelectionForCompositionStart(element || activeEditableElement());

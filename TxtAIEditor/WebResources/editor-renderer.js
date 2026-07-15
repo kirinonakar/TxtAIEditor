@@ -172,7 +172,7 @@ function createEditorRenderer({
         // WebView2 treats that disconnect as an IME commit boundary and Korean
         // syllables can be committed as separate jamo. Defer every DOM render
         // until compositionend instead of trying to detach/preserve the row.
-        if (state.isComposing && state.compositionLine) {
+        if ((state.isComposing && state.compositionLine) || state.rangeComposition) {
             return;
         }
 
