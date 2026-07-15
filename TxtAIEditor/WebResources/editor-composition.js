@@ -404,7 +404,10 @@ function commitRangeCompositionResult(pending, targetElement, insertedText, fina
     }
     commitRangeCompositionEdit(pending.command, insertedText);
     syncCustomSelectionClass();
-    queueRender(true);
+    // applyLocalRangeCompositionEdit already removed and renumbered the selected
+    // rows in place. A full render here would disconnect the same IME host between
+    // the first and second Korean syllables; let the next ordinary viewport update
+    // fill any newly visible rows without replacing the active contenteditable.
 }
 
 function finishRangeComposition(element, lineNumber, compositionText = '') {

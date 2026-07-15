@@ -108,9 +108,10 @@ namespace TxtAIEditor.Controls
 
         private void UpdateDirtyIndicator()
         {
-            DirtyIndicator.Visibility = _tab?.IsDirty == true
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            // Keep the indicator's layout slot stable. The first dirty transition
+            // happens on the IME commit path; collapsing/expanding both split-tab
+            // headers there forces a native layout pass between Korean syllables.
+            DirtyIndicator.Opacity = _tab?.IsDirty == true ? 1 : 0;
         }
 
         private void UpdateLockIcon()

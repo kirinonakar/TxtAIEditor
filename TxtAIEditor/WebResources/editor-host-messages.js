@@ -36,6 +36,16 @@ function syncLanguageClass() {
     document.body.classList.toggle('hex-view-mode', state.language === 'hex');
 }
 
+function syncRenderedDirtyLineClasses() {
+    for (const row of document.querySelectorAll('.line-row[data-line]')) {
+        row.classList.remove('dirty-mod', 'dirty-add', 'dirty-del');
+        const dirtyType = state.dirtyLines.get(Number(row.dataset.line || 0));
+        if (dirtyType === 'mod' || dirtyType === 'add' || dirtyType === 'del') {
+            row.classList.add(`dirty-${dirtyType}`);
+        }
+    }
+}
+
 function findSearchMatchIndexFromPosition(matches, line, column, reverse) {
     if (!Array.isArray(matches) || matches.length === 0) {
         return -1;
@@ -158,7 +168,11 @@ export function createHostMessageHandler({
                     }
                 }
                 state.dirtyLines = markers;
-                queueRender(true);
+                // Dirty reconciliation can arrive between two Korean IME syllables.
+                // Rebuilding viewport.innerHTML here disconnects the focused
+                // contenteditable, so update only the marker classes of rows that
+                // are already rendered. Future normal renders use state.dirtyLines.
+                syncRenderedDirtyLineClasses();
             }
             break;
         case 'setText':
