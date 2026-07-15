@@ -84,6 +84,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 tabBridges,
                 editorSessions,
+                () => services.SettingsService.CurrentSettings.ShowDirtyLines,
                 callbacks.UpdateWindowTitle);
 
             var activeEditorInsertion = new ActiveEditorInsertionController(

@@ -462,6 +462,12 @@ body.csv-table-mode .line-row {
     z-index: 1;
 }
 
+body.dirty-lines-hidden .line-row.dirty-mod::before,
+body.dirty-lines-hidden .line-row.dirty-add::before,
+body.dirty-lines-hidden .line-row.dirty-del::before {
+    display: none;
+}
+
 .line-text {
     position: relative;
     z-index: 1;

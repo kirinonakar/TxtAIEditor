@@ -396,7 +396,9 @@ function createEditorRenderer({
                             : ' live-preview-row';
                 }
             }
-            const dirtyType = state.language === 'hex' ? null : state.dirtyLines.get(line);
+            const dirtyType = !state.showDirtyLines || state.language === 'hex'
+                ? null
+                : state.dirtyLines.get(line);
             const dirtyClass = dirtyType ? ` dirty-${dirtyType}` : '';
             const editingClass = line === activeLine || line === state.editingLine || line === state.compositionLine
                 ? ' editing-row'

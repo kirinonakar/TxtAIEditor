@@ -317,6 +317,9 @@
   <data name="SettingsSyntaxHighlighting" xml:space="preserve">
     <value>構文の強調表示を有効にする</value>
   </data>
+  <data name="SettingsShowDirtyLines" xml:space="preserve">
+    <value>変更行を表示する</value>
+  </data>
   <data name="SettingsBracketPair" xml:space="preserve">
     <value>ブラケットペアのカラー表示</value>
   </data>

@@ -11,6 +11,7 @@ namespace TxtAIEditor.Core.Services
     {
         private readonly CheckBox _wordWrapCheck;
         private readonly CheckBox _syntaxHighlightingCheck;
+        private readonly CheckBox _showDirtyLinesCheck;
         private readonly CheckBox _bracketColorCheck;
         private readonly CheckBox _autocompleteEnterCheck;
         private readonly CheckBox _autocompleteTabCheck;
@@ -32,6 +33,7 @@ namespace TxtAIEditor.Core.Services
         {
             _wordWrapCheck = new CheckBox { Content = getString("SettingsWordWrap", "기본 Word Wrap 켜기"), IsChecked = settings.WordWrap };
             _syntaxHighlightingCheck = new CheckBox { Content = getString("SettingsSyntaxHighlighting", "구문 강조 활성화"), IsChecked = settings.SyntaxHighlighting };
+            _showDirtyLinesCheck = new CheckBox { Content = getString("SettingsShowDirtyLines", "Dirty line 표시"), IsChecked = settings.ShowDirtyLines };
             _bracketColorCheck = new CheckBox { Content = getString("SettingsBracketPair", "괄호 쌍 색상화 활성화"), IsChecked = settings.BracketPairColorization };
             _autocompleteEnterCheck = new CheckBox { Content = getString("SettingsAutocompleteEnter", "Enter로 자동완성"), IsChecked = settings.AutocompleteOnEnter };
             _autocompleteTabCheck = new CheckBox { Content = getString("SettingsAutocompleteTab", "Tab으로 자동완성"), IsChecked = settings.AutocompleteOnTab };
@@ -53,6 +55,7 @@ namespace TxtAIEditor.Core.Services
             var section = SettingsDialogUi.CreateSection();
             section.Children.Add(_wordWrapCheck);
             section.Children.Add(_syntaxHighlightingCheck);
+            section.Children.Add(_showDirtyLinesCheck);
             section.Children.Add(_bracketColorCheck);
             section.Children.Add(_autocompleteEnterCheck);
             section.Children.Add(_autocompleteTabCheck);
@@ -73,6 +76,7 @@ namespace TxtAIEditor.Core.Services
         {
             settings.WordWrap = _wordWrapCheck.IsChecked == true;
             settings.SyntaxHighlighting = _syntaxHighlightingCheck.IsChecked == true;
+            settings.ShowDirtyLines = _showDirtyLinesCheck.IsChecked == true;
             settings.BracketPairColorization = _bracketColorCheck.IsChecked == true;
             settings.AutocompleteOnEnter = _autocompleteEnterCheck.IsChecked == true;
             settings.AutocompleteOnTab = _autocompleteTabCheck.IsChecked == true;

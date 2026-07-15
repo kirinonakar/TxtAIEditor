@@ -317,6 +317,9 @@
   <data name="SettingsSyntaxHighlighting" xml:space="preserve">
     <value>Enable Syntax Highlighting</value>
   </data>
+  <data name="SettingsShowDirtyLines" xml:space="preserve">
+    <value>Show Dirty Lines</value>
+  </data>
   <data name="SettingsBracketPair" xml:space="preserve">
     <value>Bracket Pair Colorization</value>
   </data>

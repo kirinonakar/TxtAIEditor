@@ -507,9 +507,11 @@ function replaceJsonDocumentText(nextText) {
     state.searchDocumentVersion = -1;
     state.livePreviewLocalResourceVersion = String(Date.now());
     state.dirtyLines.clear();
-    for (let line = 1; line <= state.lineCount; line++) {
-        if (!cleanDirtyMarker(line)) {
-            state.dirtyLines.set(line, line <= state.originalLines.length ? 'mod' : 'add');
+    if (state.showDirtyLines) {
+        for (let line = 1; line <= state.lineCount; line++) {
+            if (!cleanDirtyMarker(line)) {
+                state.dirtyLines.set(line, line <= state.originalLines.length ? 'mod' : 'add');
+            }
         }
     }
     prepareCsvTableRenderModel();
@@ -1149,7 +1151,9 @@ function insertCsvLine(lineNumber, text = '') {
     state.lineCount++;
     state.cacheVersion++;
     state.csvTableVersion++;
-    state.dirtyLines.set(targetLine, 'add');
+    if (state.showDirtyLines) {
+        state.dirtyLines.set(targetLine, 'add');
+    }
     setupVirtualHeight();
     post({ type: 'insertLine', lineNumber: targetLine, text: String(text ?? '') });
     post({ type: 'contentChanged' });
@@ -1273,7 +1277,7 @@ function renderCsvTableRows(startLine, endLine, hoveredLineNumber) {
     for (let line = startLine; line <= endLine; line++) {
         const hasLine = jsonModel ? line <= jsonModel.rows.length : state.cache.has(line);
         const cells = hasLine ? csvCellsForLine(line) : [];
-        const dirtyType = jsonModel ? '' : state.dirtyLines.get(line);
+        const dirtyType = jsonModel || !state.showDirtyLines ? '' : state.dirtyLines.get(line);
         const dirtyClass = dirtyType ? ` dirty-${dirtyType}` : '';
         const hoveredClass = line === hoveredLineNumber ? ' hovered-row' : '';
         const rowSelected = isCsvRowSelected(line);

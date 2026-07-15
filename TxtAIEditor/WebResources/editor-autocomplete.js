@@ -503,7 +503,9 @@ function replaceWordWithAutocompleteText(element, wordStart, replaceEnd, insertT
         const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
         const nextLineNumber = lineNumber + i;
         state.cache.set(nextLineNumber, nextText);
-        state.dirtyLines.set(nextLineNumber, 'add');
+        if (state.showDirtyLines) {
+            state.dirtyLines.set(nextLineNumber, 'add');
+        }
         post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
     }
 

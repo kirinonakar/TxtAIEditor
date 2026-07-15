@@ -542,6 +542,7 @@ namespace TxtAIEditor.Composition
                 llmAssistantController,
                 agentController,
                 tabNavigationController,
+                editorFoundationControllers.TabDirtyState,
                 snippetsController,
                 favoritesRecentController,
                 fileOpenDropController,

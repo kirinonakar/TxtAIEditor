@@ -317,6 +317,9 @@
   <data name="SettingsSyntaxHighlighting" xml:space="preserve">
     <value>启用语法高亮</value>
   </data>
+  <data name="SettingsShowDirtyLines" xml:space="preserve">
+    <value>显示已修改行</value>
+  </data>
   <data name="SettingsBracketPair" xml:space="preserve">
     <value>括号对着色</value>
   </data>

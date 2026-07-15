@@ -499,7 +499,9 @@ function splitCurrentLine(element, options = {}) {
     if (!cleanDirtyMarker(lineNumber)) {
         markDirty(lineNumber, 'mod');
     }
-    state.dirtyLines.set(nextLineNumber, 'add');
+    if (state.showDirtyLines) {
+        state.dirtyLines.set(nextLineNumber, 'add');
+    }
     state.selection = null;
     clearCustomSelectionVisuals();
     syncCustomSelectionClass();
@@ -586,7 +588,9 @@ function insertTextAtCaret(text, options = {}) {
                     const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
                     const nextLineNumber = targetLine + i;
                     state.cache.set(nextLineNumber, nextText);
-                    state.dirtyLines.set(nextLineNumber, 'add');
+                    if (state.showDirtyLines) {
+                        state.dirtyLines.set(nextLineNumber, 'add');
+                    }
                     post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
                 }
                 post({ type: 'contentChanged' });
@@ -646,7 +650,9 @@ function insertTextAtCaret(text, options = {}) {
                 const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
                 const nextLineNumber = lineNumber + i;
                 state.cache.set(nextLineNumber, nextText);
-                state.dirtyLines.set(nextLineNumber, 'add');
+                if (state.showDirtyLines) {
+                    state.dirtyLines.set(nextLineNumber, 'add');
+                }
                 post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
             }
 
@@ -739,7 +745,9 @@ function applyMergeLineForward(lineNumber, text, nextText) {
     if (!cleanDirtyMarker(lineNumber)) {
         markDirty(lineNumber, 'mod');
     }
-    state.dirtyLines.delete(lineNumber + 1);
+    if (state.showDirtyLines) {
+        state.dirtyLines.delete(lineNumber + 1);
+    }
     setupVirtualHeight();
     restoreScrollTop(savedScrollTop);
     post({ type: 'mergeLineWithPrevious', lineNumber: lineNumber + 1 });
@@ -762,7 +770,9 @@ function applyMergeLineBackward(lineNumber, previous, current) {
     if (!cleanDirtyMarker(lineNumber - 1)) {
         markDirty(lineNumber - 1, 'mod');
     }
-    state.dirtyLines.delete(lineNumber);
+    if (state.showDirtyLines) {
+        state.dirtyLines.delete(lineNumber);
+    }
     setupVirtualHeight();
     post({ type: 'mergeLineWithPrevious', lineNumber });
     post({ type: 'contentChanged' });
@@ -1022,7 +1032,9 @@ function replaceSelectionWith(selection, text, editSelection = null) {
         markDirty(start.line, 'mod');
     }
     for (let i = 1; i < newLines.length; i++) {
-        state.dirtyLines.set(start.line + i, 'add');
+        if (state.showDirtyLines) {
+            state.dirtyLines.set(start.line + i, 'add');
+        }
     }
 
     const savedScrollTop = scrollContainer.scrollTop;
@@ -1145,7 +1157,9 @@ function deleteCurrentLine(element) {
         if (!cleanDirtyMarker(lineNumber)) {
             markDirty(lineNumber, 'mod');
         }
-        state.dirtyLines.delete(lineNumber + 1);
+        if (state.showDirtyLines) {
+            state.dirtyLines.delete(lineNumber + 1);
+        }
         setupVirtualHeight();
 
         // 삭제된 줄이 뷰포트 위쪽에 있을 때 스크롤 위치를 유지합니다.

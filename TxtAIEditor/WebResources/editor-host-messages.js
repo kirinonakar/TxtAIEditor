@@ -37,6 +37,10 @@ function syncLanguageClass() {
 }
 
 function syncRenderedDirtyLineClasses() {
+    if (!state.showDirtyLines) {
+        return;
+    }
+
     for (const row of document.querySelectorAll('.line-row[data-line]')) {
         row.classList.remove('dirty-mod', 'dirty-add', 'dirty-del');
         const dirtyType = state.dirtyLines.get(Number(row.dataset.line || 0));
@@ -155,12 +159,17 @@ export function createHostMessageHandler({
             {
                 const lines = Array.isArray(msg.lines) ? msg.lines : [];
                 setOriginalLines(lines);
-                recomputeDirtyLines();
-                queueRender(true);
+                if (state.showDirtyLines) {
+                    recomputeDirtyLines();
+                    queueRender(true);
+                }
             }
             break;
         case 'updateDirtyLines':
             {
+                if (!state.showDirtyLines) {
+                    break;
+                }
                 const markers = new Map();
                 if (msg.dirtyLines) {
                     for (const [key, value] of Object.entries(msg.dirtyLines)) {

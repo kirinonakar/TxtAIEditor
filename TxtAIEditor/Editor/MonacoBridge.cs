@@ -203,6 +203,7 @@ namespace TxtAIEditor.Editor
                 theme = settings.Theme,
                 wordWrap = isHexLanguage ? false : settings.WordWrap,
                 syntaxHighlighting = settings.SyntaxHighlighting,
+                showDirtyLines = settings.ShowDirtyLines,
                 bracketPairColorization = settings.BracketPairColorization,
                 fontSize = settings.FontSize,
                 fontFamily = isHexLanguage ? HexEditorFontFamily : settings.FontFamily,
@@ -271,7 +272,7 @@ namespace TxtAIEditor.Editor
             {
                 await SendMessageAsync(new { action = "resetOriginalLines", lines = _currentOriginalLines });
             }
-            if (_currentDirtyLines != null)
+            if (settings.ShowDirtyLines && _currentDirtyLines != null)
             {
                 await SendMessageAsync(new { action = "updateDirtyLines", dirtyLines = _currentDirtyLines });
             }
@@ -485,6 +486,11 @@ namespace TxtAIEditor.Editor
 
         public async Task UpdateOptionsAsync(EditorSettings settings, bool isReadOnly = false)
         {
+            if (!settings.ShowDirtyLines)
+            {
+                _currentDirtyLines = null;
+            }
+
             bool isHexLanguage = IsHexLanguage(_currentLanguage);
             var msg = new
             {
@@ -492,6 +498,7 @@ namespace TxtAIEditor.Editor
                 theme = settings.Theme,
                 wordWrap = isHexLanguage ? false : settings.WordWrap,
                 syntaxHighlighting = settings.SyntaxHighlighting,
+                showDirtyLines = settings.ShowDirtyLines,
                 bracketPairColorization = settings.BracketPairColorization,
                 fontSize = settings.FontSize,
                 fontFamily = isHexLanguage ? HexEditorFontFamily : settings.FontFamily,

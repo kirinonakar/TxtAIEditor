@@ -317,6 +317,9 @@
   <data name="SettingsSyntaxHighlighting" xml:space="preserve">
     <value>구문 강조 활성화</value>
   </data>
+  <data name="SettingsShowDirtyLines" xml:space="preserve">
+    <value>Dirty line 표시</value>
+  </data>
   <data name="SettingsBracketPair" xml:space="preserve">
     <value>괄호 쌍 색상화 활성화</value>
   </data>

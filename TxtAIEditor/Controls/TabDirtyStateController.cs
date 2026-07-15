@@ -16,17 +16,20 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowViewModel _viewModel;
         private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
+        private readonly Func<bool> _showDirtyLines;
         private readonly Action _updateWindowTitle;
 
         public TabDirtyStateController(
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
+            Func<bool> showDirtyLines,
             Action updateWindowTitle)
         {
             _viewModel = viewModel;
             _tabBridges = tabBridges;
             _editorSessions = editorSessions;
+            _showDirtyLines = showDirtyLines;
             _updateWindowTitle = updateWindowTitle;
         }
 
@@ -43,6 +46,22 @@ namespace TxtAIEditor.Controls
         public void ReconcileTabDirtyState(OpenedTab tab)
         {
             CheckAndUpdateDirtyState(tab);
+        }
+
+        public void RefreshAllDirtyLineMarkers()
+        {
+            if (!_showDirtyLines())
+            {
+                return;
+            }
+
+            foreach (var tab in _viewModel.Tabs.ToList())
+            {
+                if (_editorSessions.ContainsKey(tab.Id))
+                {
+                    CheckAndUpdateDirtyState(tab);
+                }
+            }
         }
 
         public List<OpenedTab> GetTabsForSameFile(OpenedTab sourceTab)
@@ -164,17 +183,25 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                var dirtyLines = ComputeDirtyLines(tab, session);
-                bool isDirtyCurrent = (dirtyLines.Count > 0) ||
+                var dirtyLines = _showDirtyLines()
+                    ? ComputeDirtyLines(tab, session)
+                    : null;
+                bool hasTextChanges = dirtyLines != null
+                    ? dirtyLines.Count > 0
+                    : HasTextChanges(tab, session);
+                bool isDirtyCurrent = hasTextChanges ||
                                (tab.OriginalLineEnding != null && session.Model.LineEnding != tab.OriginalLineEnding) ||
                                (tab.OriginalEncodingName != null && tab.EncodingName != tab.OriginalEncodingName);
                 SetDirtyStateForFileGroup(tab, isDirtyCurrent);
 
-                foreach (var t in GetTabsForSameFile(tab))
+                if (dirtyLines != null)
                 {
-                    if (_tabBridges.TryGetValue(t.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                    foreach (var t in GetTabsForSameFile(tab))
                     {
-                        _ = bridgeGroup.Bridge.UpdateDirtyLinesAsync(dirtyLines);
+                        if (_tabBridges.TryGetValue(t.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                        {
+                            _ = bridgeGroup.Bridge.UpdateDirtyLinesAsync(dirtyLines);
+                        }
                     }
                 }
             }
@@ -189,6 +216,25 @@ namespace TxtAIEditor.Controls
             var orig = tab.OriginalLines;
             var current = session.Model.GetLines(1, session.Model.LineCount);
             return ComputeDirtyLines(orig, current);
+        }
+
+        private static bool HasTextChanges(OpenedTab tab, EditorDocumentSession session)
+        {
+            var original = tab.OriginalLines;
+            if (original.Length != session.Model.LineCount)
+            {
+                return true;
+            }
+
+            for (int line = 1; line <= session.Model.LineCount; line++)
+            {
+                if (!string.Equals(original[line - 1], session.Model.GetLine(line), StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal static Dictionary<int, string> ComputeDirtyLines(IReadOnlyList<string> orig, IReadOnlyList<string> current)

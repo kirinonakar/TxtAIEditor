@@ -35,6 +35,7 @@ namespace TxtAIEditor.Controls
         private readonly CustomSplitter _leftSplitter;
         private readonly CustomSplitter _rightSplitter;
         private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly PdfViewerController _pdfViewerController;
         private readonly OfficeDocumentViewerController _officeDocumentViewerController;
         private readonly StatusBarController _statusBarController;
@@ -74,6 +75,7 @@ namespace TxtAIEditor.Controls
             CustomSplitter leftSplitter,
             CustomSplitter rightSplitter,
             IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            TabDirtyStateController tabDirtyStateController,
             PdfViewerController pdfViewerController,
             OfficeDocumentViewerController officeDocumentViewerController,
             StatusBarController statusBarController,
@@ -112,6 +114,7 @@ namespace TxtAIEditor.Controls
             _leftSplitter = leftSplitter;
             _rightSplitter = rightSplitter;
             _tabBridges = tabBridges;
+            _tabDirtyStateController = tabDirtyStateController;
             _pdfViewerController = pdfViewerController;
             _officeDocumentViewerController = officeDocumentViewerController;
             _statusBarController = statusBarController;
@@ -209,6 +212,10 @@ namespace TxtAIEditor.Controls
             }
 
             await ApplySettingsToOpenEditorsAsync(settings);
+            if (settings.ShowDirtyLines)
+            {
+                _tabDirtyStateController.RefreshAllDirtyLineMarkers();
+            }
             _livePreviewController.RenderActiveTab();
             return false;
         }
@@ -393,6 +400,7 @@ namespace TxtAIEditor.Controls
                 action = "updateOptions",
                 theme = settings.Theme,
                 wordWrap = settings.WordWrap,
+                showDirtyLines = settings.ShowDirtyLines,
                 bracketPairColorization = settings.BracketPairColorization,
                 fontSize = settings.FontSize,
                 fontFamily = settings.FontFamily,

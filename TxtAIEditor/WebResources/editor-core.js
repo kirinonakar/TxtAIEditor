@@ -40,6 +40,7 @@ const state = {
     readOnly: false,
     hexEditable: false,
     wordWrap: false,
+    showDirtyLines: true,
     syntaxHighlighting: true,
     language: 'plaintext',
     tabSize: 4,
@@ -328,6 +329,10 @@ function applyOptions(msg) {
     state.hexEditable = !!msg.hexEditable;
     state.wordWrap = !!msg.wordWrap;
     state.syntaxHighlighting = msg.hasOwnProperty('syntaxHighlighting') ? !!msg.syntaxHighlighting : true;
+    state.showDirtyLines = msg.hasOwnProperty('showDirtyLines') ? !!msg.showDirtyLines : true;
+    if (!state.showDirtyLines) {
+        state.dirtyLines.clear();
+    }
     state.bracketPairColorization = msg.hasOwnProperty('bracketPairColorization') ? !!msg.bracketPairColorization : true;
     state.autocompleteOnEnter = msg.hasOwnProperty('autocompleteOnEnter') ? !!msg.autocompleteOnEnter : true;
     state.autocompleteOnTab = msg.hasOwnProperty('autocompleteOnTab') ? !!msg.autocompleteOnTab : true;
@@ -344,6 +349,7 @@ function applyOptions(msg) {
     document.documentElement.style.setProperty('--line-height', `${state.lineHeight}px`);
     document.documentElement.style.setProperty('--wrap', state.wordWrap ? 'break-spaces' : 'pre');
     document.body.classList.toggle('wrap-enabled', state.wordWrap);
+    document.body.classList.toggle('dirty-lines-hidden', !state.showDirtyLines);
 
     const replaceRow = document.getElementById('replace-row');
     if (replaceRow) {
@@ -658,7 +664,9 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 
     for (let line = start; line < start + removeCount; line++) {
         state.cache.delete(line);
-        state.dirtyLines.delete(line);
+        if (state.showDirtyLines) {
+            state.dirtyLines.delete(line);
+        }
         deleteMeasuredLineHeight(line);
     }
 
@@ -1219,7 +1227,9 @@ function invalidateMeasuredLineHeightsAround(lineNumber, radius = 0) {
 function shiftCachedLines(fromLine, delta) {
     shiftLineMap(state.cache, fromLine, delta);
     shiftMeasuredLineHeights(fromLine, delta);
-    shiftLineMap(state.dirtyLines, fromLine, delta);
+    if (state.showDirtyLines) {
+        shiftLineMap(state.dirtyLines, fromLine, delta);
+    }
 }
 
 function shiftLineMap(map, fromLine, delta) {
@@ -1246,12 +1256,14 @@ function setOriginalLines(lines) {
 }
 
 function markDirty(lineNumber, type) {
+    if (!state.showDirtyLines) return;
     const existing = state.dirtyLines.get(lineNumber);
     if (existing === 'add') return;
     state.dirtyLines.set(lineNumber, type || 'mod');
 }
 
 function cleanDirtyMarker(lineNumber) {
+    if (!state.showDirtyLines) return true;
     const origIdx = lineNumber - 1;
     if (origIdx >= 0 && origIdx < state.originalLines.length) {
         const currentText = state.cache.get(lineNumber);
@@ -1263,6 +1275,11 @@ function cleanDirtyMarker(lineNumber) {
     return false;
 }
 function recomputeDirtyLines() {
+    if (!state.showDirtyLines) {
+        state.dirtyLines.clear();
+        return;
+    }
+
     const orig = state.originalLines || [];
     const current = [];
     for (let i = 1; i <= state.lineCount; i++) {
