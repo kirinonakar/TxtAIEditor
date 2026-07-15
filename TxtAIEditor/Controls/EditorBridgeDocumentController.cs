@@ -293,10 +293,15 @@ namespace TxtAIEditor.Controls
             int lineCount)
         {
             MarkDirty(tab, tabItem);
+
+            // Capture and propagate the structural document change before awaiting
+            // source-view UI work. A following IME input can otherwise commit a new
+            // LastChange while UpdateLineCountAsync is in flight, causing split views
+            // to advance past the range edit without ever applying its removed lines.
+            await _syncEditsToOtherTabsAsync(tab);
+
             await bridge.UpdateLineCountAsync(lineCount);
             _schedulePreview(tab);
-
-            await _syncEditsToOtherTabsAsync(tab);
 
             _statusBarController.UpdateTotalLines(tab);
         }
