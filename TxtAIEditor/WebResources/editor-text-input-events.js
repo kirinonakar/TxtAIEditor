@@ -8,6 +8,8 @@ import {
 } from './editor-ime-state.js';
 import {
     activeEditableElement,
+    cancelPendingColumnTextInputs,
+    consumePendingColumnTextInput,
     graphemeDeleteEnd,
     graphemeDeleteStart,
     queueRender,
@@ -68,6 +70,14 @@ export function bindTextInputEvents({ renderer }) {
         }
         const element = lineElementFromEvent(event);
         if (element) {
+            const pendingColumnText = !state.isComposing
+                ? consumePendingColumnTextInput(event.data)
+                : null;
+            const columnSelection = pendingColumnText ? activeColumnSelection() : null;
+            if (columnSelection) {
+                replaceSelectionWith(columnSelection, event.data || pendingColumnText);
+                return;
+            }
             if (postCompositionNavigationInputGuard &&
                 Number(element.dataset.line || 0) === postCompositionNavigationInputGuard.lineNumber) {
                 postCompositionNavigationInputGuard = null;
@@ -131,6 +141,7 @@ export function bindTextInputEvents({ renderer }) {
     });
 
     viewport.addEventListener('compositionstart', event => {
+        cancelPendingColumnTextInputs();
         cancelAutocompleteCaretRestore();
         postCompositionNavigationInputGuard = null;
         state.pendingImeVerticalNavigation = null;
@@ -257,6 +268,7 @@ export function bindTextInputEvents({ renderer }) {
         if (event.isComposing || state.isComposing ||
             event.inputType === 'insertCompositionText' ||
             event.inputType === 'deleteCompositionText') {
+            cancelPendingColumnTextInputs();
             if (state.rangeComposition?.deferred) {
                 return;
             }
@@ -290,7 +302,12 @@ export function bindTextInputEvents({ renderer }) {
             event.inputType !== 'insertFromPaste' &&
             event.inputType !== 'insertFromDrop') {
             event.preventDefault();
-            replaceSelectionWith(columnSelection, event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph' ? '\n' : (event.data || ''));
+            const pendingColumnText = consumePendingColumnTextInput(event.data);
+            replaceSelectionWith(
+                columnSelection,
+                event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph'
+                    ? '\n'
+                    : (event.data || pendingColumnText || ''));
             return;
         }
 

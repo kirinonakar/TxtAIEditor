@@ -104,6 +104,7 @@ const state = {
     lastManualDeleteAt: 0,
     editingLine: null,
     lastDeleteKeyDown: null,
+    pendingColumnTextInputs: [],
     preservedScrollTop: null,
     repeatEdit: {
         lastRunAt: 0,
@@ -1120,6 +1121,43 @@ function queueRender(force = false) {
     });
 }
 
+function queueColumnTextInputFallback(text, callback, delayMs = 40) {
+    const value = String(text ?? '');
+    if (!value || typeof callback !== 'function') return null;
+
+    const pending = { text: value, timer: 0 };
+    state.pendingColumnTextInputs.push(pending);
+    pending.timer = setTimeout(() => {
+        const index = state.pendingColumnTextInputs.indexOf(pending);
+        if (index < 0) return;
+        state.pendingColumnTextInputs.splice(index, 1);
+        callback(value);
+    }, Math.max(0, Number(delayMs || 0)));
+    return pending;
+}
+
+function consumePendingColumnTextInput(text = null) {
+    const pendingInputs = state.pendingColumnTextInputs;
+    if (!pendingInputs.length) return null;
+
+    const value = text === null || text === undefined ? '' : String(text);
+    const index = value
+        ? pendingInputs.findIndex(pending => pending.text === value)
+        : 0;
+    if (index < 0) return null;
+
+    const [pending] = pendingInputs.splice(index, 1);
+    if (pending.timer) clearTimeout(pending.timer);
+    return pending.text;
+}
+
+function cancelPendingColumnTextInputs() {
+    for (const pending of state.pendingColumnTextInputs) {
+        if (pending.timer) clearTimeout(pending.timer);
+    }
+    state.pendingColumnTextInputs.length = 0;
+}
+
 function measureRenderedRows(renderOnChange = true) {
     if (!usesMeasuredLineHeights()) return;
 
@@ -1804,11 +1842,13 @@ export {
     applyEditResultFromHost,
     activeEditableElement,
     captureScrollAnchor,
+    cancelPendingColumnTextInputs,
     cleanDirtyMarker,
     clearPreservedScrollTop,
     clearMeasuredLineHeights,
     clearCustomSelectionVisuals,
     comparePositions,
+    consumePendingColumnTextInput,
     compressedScrollMetrics,
     configureEditorCoreRuntime,
     containsHangulInputText,
@@ -1830,6 +1870,7 @@ export {
     post,
     prefetchAround,
     preserveScrollTop,
+    queueColumnTextInputFallback,
     queueRender,
     readClipboardText,
     receiveLineBlock,

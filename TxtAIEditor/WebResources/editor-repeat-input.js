@@ -16,9 +16,10 @@ export function createModelRepeatInputHandlers({
         if (event.key === ' ' || event.code === 'Space' || event.key === 'Spacebar') {
             return !event.ctrlKey && !event.metaKey && !event.altKey;
         }
-        if (isPlainTextKey(event)) {
-            return true;
-        }
+        // Plain text keys are handled by the browser's native
+        // beforeinput/input flow. Treating them as model-repeat keys makes
+        // keyup guard the next occurrence of the same character for 250 ms
+        // (for example, the final "t" in a quickly typed "test").
         if (event.key === 'Enter') {
             return !event.ctrlKey && !event.metaKey && !event.altKey;
         }

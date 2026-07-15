@@ -9,6 +9,7 @@ import {
     isPlainTextKey,
     lineTop,
     post,
+    queueColumnTextInputFallback,
     queueRender,
     reportCursorAndSelection,
     requestLines,
@@ -16,6 +17,7 @@ import {
     syncCustomSelectionClass
 } from './editor-core.js';
 import {
+    activeColumnSelection,
     hasCustomSelection,
     normalizeSelection
 } from './editor-selection.js';
@@ -705,6 +707,24 @@ export function bindKeyboardEvents({ openFindPanel }) {
         }
 
         if (isPlainTextKey(event)) {
+            const isPhysicalLetterKey = /^Key[A-Z]$/.test(String(event.code || '')) ||
+                /^[A-Za-z]$/.test(String(event.key || ''));
+            if (activeColumnSelection() && !isPhysicalLetterKey) {
+                // Keep the native path available for IME detection. WebView2 can
+                // omit beforeinput for punctuation in custom column selections,
+                // so use a short fallback that composition/input can cancel.
+                // Physical A-Z keys must never use this fallback: Korean IME can
+                // expose its first jamo key as a Latin key before compositionstart.
+                queueColumnTextInputFallback(event.key, text => {
+                    if (state.isComposing || !activeColumnSelection()) return;
+                    const target = activeEditableElement();
+                    if (target?.getAttribute('contenteditable') === 'true') {
+                        insertPlainTextByModel(target, text);
+                    }
+                });
+                return;
+            }
+
             // 한글 IME의 첫 keydown이 간헐적으로 물리 영문 키로 노출될 수 있다.
             // 여기서 preventDefault 후 event.key를 직접 삽입하면 그 영문이 확정되므로,
             // 문자 입력은 브라우저의 beforeinput/input 및 composition 흐름에 맡긴다.
