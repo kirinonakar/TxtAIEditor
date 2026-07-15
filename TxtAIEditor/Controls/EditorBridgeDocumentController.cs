@@ -108,19 +108,17 @@ namespace TxtAIEditor.Controls
         }
 
         public async Task HandleLineInsertRequestedAsync(
-            MonacoBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session,
             int lineNumber,
             string text)
         {
-            int lineCount = session.InsertLine(lineNumber, text);
-            await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
+            session.InsertLine(lineNumber, text);
+            await CompleteStructuralEditAsync(tab, tabItem);
         }
 
         public async Task HandleRangeEditRequestedAsync(
-            MonacoBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session,
@@ -130,17 +128,16 @@ namespace TxtAIEditor.Controls
             int endColumn,
             string text)
         {
-            int lineCount = session.ApplyRangeEdit(
+            session.ApplyRangeEdit(
                 startLine,
                 startColumn,
                 endLine,
                 endColumn,
                 text);
-            await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
+            await CompleteStructuralEditAsync(tab, tabItem);
         }
 
         public async Task HandleLineSplitRequestedAsync(
-            MonacoBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session,
@@ -148,23 +145,21 @@ namespace TxtAIEditor.Controls
             string before,
             string after)
         {
-            int lineCount = session.SplitLine(lineNumber, before, after);
-            await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
+            session.SplitLine(lineNumber, before, after);
+            await CompleteStructuralEditAsync(tab, tabItem);
         }
 
         public async Task HandleMergeLineWithPreviousRequestedAsync(
-            MonacoBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session,
             int lineNumber)
         {
-            int lineCount = session.MergeLineWithPrevious(lineNumber);
-            await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
+            session.MergeLineWithPrevious(lineNumber);
+            await CompleteStructuralEditAsync(tab, tabItem);
         }
 
         public async Task HandleDeleteLineRequestedAsync(
-            MonacoBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session,
@@ -172,8 +167,8 @@ namespace TxtAIEditor.Controls
             bool isComposing = false)
         {
             if (isComposing) return;
-            int lineCount = session.DeleteLine(lineNumber);
-            await CompleteStructuralEditAsync(bridge, tab, tabItem, lineCount);
+            session.DeleteLine(lineNumber);
+            await CompleteStructuralEditAsync(tab, tabItem);
         }
 
         public async Task HandleFindRequestedAsync(
@@ -287,20 +282,17 @@ namespace TxtAIEditor.Controls
         }
 
         private async Task CompleteStructuralEditAsync(
-            MonacoBridge bridge,
             OpenedTab tab,
-            TabViewItem tabItem,
-            int lineCount)
+            TabViewItem tabItem)
         {
             MarkDirty(tab, tabItem);
 
-            // Capture and propagate the structural document change before awaiting
-            // source-view UI work. A following IME input can otherwise commit a new
-            // LastChange while UpdateLineCountAsync is in flight, causing split views
-            // to advance past the range edit without ever applying its removed lines.
+            // The source WebView already applied this structural edit and its line
+            // count locally. Echoing lineCountChanged back to it queues a render that
+            // can replace the active contenteditable between Korean IME syllables.
+            // Propagate the shared-model change only to the other split views.
             await _syncEditsToOtherTabsAsync(tab);
 
-            await bridge.UpdateLineCountAsync(lineCount);
             _schedulePreview(tab);
 
             _statusBarController.UpdateTotalLines(tab);

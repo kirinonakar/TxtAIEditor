@@ -1239,7 +1239,6 @@ namespace TxtAIEditor.Controls
             bridge.RangeEditRequested += async (startLine, startColumn, endLine, endColumn, text) =>
             {
                 await _editorBridgeDocumentController.HandleRangeEditRequestedAsync(
-                    bridge,
                     tab,
                     tabItem,
                     getSession(),
@@ -1253,7 +1252,6 @@ namespace TxtAIEditor.Controls
             bridge.LineInsertRequested += async (lineNumber, text) =>
             {
                 await _editorBridgeDocumentController.HandleLineInsertRequestedAsync(
-                    bridge,
                     tab,
                     tabItem,
                     getSession(),
@@ -1264,7 +1262,6 @@ namespace TxtAIEditor.Controls
             bridge.LineSplitRequested += async (lineNumber, before, after) =>
             {
                 await _editorBridgeDocumentController.HandleLineSplitRequestedAsync(
-                    bridge,
                     tab,
                     tabItem,
                     getSession(),
@@ -1276,7 +1273,6 @@ namespace TxtAIEditor.Controls
             bridge.MergeLineWithPreviousRequested += async lineNumber =>
             {
                 await _editorBridgeDocumentController.HandleMergeLineWithPreviousRequestedAsync(
-                    bridge,
                     tab,
                     tabItem,
                     getSession(),
@@ -1286,7 +1282,6 @@ namespace TxtAIEditor.Controls
             bridge.DeleteLineRequested += async (lineNumber, isComposing) =>
             {
                 await _editorBridgeDocumentController.HandleDeleteLineRequestedAsync(
-                    bridge,
                     tab,
                     tabItem,
                     getSession(),
