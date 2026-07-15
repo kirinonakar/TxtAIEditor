@@ -27,12 +27,12 @@ namespace TxtAIEditor.Core.Services.LLM
             _tokenUsageTracker = tokenUsageTracker;
         }
 
-        public async Task<string> ExecuteAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
+        public async Task<string> ExecuteAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task>? onVisionFallbackResult = null)
         {
-            return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage);
+            return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult);
         }
 
-        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
+        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task>? onVisionFallbackResult = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
@@ -69,6 +69,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 _ => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName)
             };
 
+            bool emittedOutput = false;
             try
             {
                 LlmTokenUsage? observedUsage = null;
@@ -94,6 +95,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         userContent,
                         async chunk =>
                         {
+                            emittedOutput = true;
                             fullResponse.Append(chunk);
                             await onChunk(chunk);
                         },
@@ -143,9 +145,118 @@ namespace TxtAIEditor.Core.Services.LLM
             }
             catch (Exception ex)
             {
+                if (allowVisionFallback &&
+                    !emittedOutput &&
+                    attachments?.Count > 0 &&
+                    TryCreateVisionFallbackSettings(settings, out EditorSettings? fallbackSettings))
+                {
+                    string fallbackTaskContent =
+                        userContent +
+                        "\n\n[Vision fallback task]\n" +
+                        "The primary model could not process the attached image data. " +
+                        "Inspect the attached image using all prior conversation, workspace, selection, and tool-result context above. " +
+                        "Return only a concise, factual visual analysis relevant to the original task. " +
+                        "Do not call tools and do not continue the task beyond interpreting the image.";
+                    string fallbackAnalysis = await ExecuteAsync(
+                        fallbackSettings,
+                        systemPrompt,
+                        fallbackTaskContent,
+                        onChunk: null,
+                        cancellationToken,
+                        attachments,
+                        onReasoning: null,
+                        tools: null,
+                        onUsage,
+                        allowVisionFallback: false,
+                        onVisionFallbackResult: null);
+
+                    if (IsLlmErrorResponse(fallbackAnalysis))
+                    {
+                        return fallbackAnalysis;
+                    }
+
+                    string fallbackContext =
+                        $"[Vision fallback result: {fallbackSettings.LlmProvider} / {fallbackSettings.LlmModel}]\n" +
+                        fallbackAnalysis.Trim();
+                    if (onVisionFallbackResult != null)
+                    {
+                        await onVisionFallbackResult(fallbackContext);
+                    }
+
+                    string originalModelContent =
+                        userContent +
+                        "\n\n" + fallbackContext +
+                        "\n\n[Continuation after vision fallback]\n" +
+                        "Use the visual analysis above as the result of the image read, preserve its surrounding context, " +
+                        "and continue the original task with the normal tool-call or final-answer behavior.";
+                    return await ExecuteAsync(
+                        settings,
+                        systemPrompt,
+                        originalModelContent,
+                        onChunk,
+                        cancellationToken,
+                        attachments: null,
+                        onReasoning,
+                        tools,
+                        onUsage,
+                        allowVisionFallback: false,
+                        onVisionFallbackResult: null);
+                }
+
                 string errorPrefix = _localizationService.GetString("LlmErrorCommunicationPrefix", "AI 통신 오류가 발생했습니다: ");
                 return $"{errorPrefix}{ex.Message}";
             }
+        }
+
+        private bool IsLlmErrorResponse(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return true;
+            }
+
+            string communicationErrorPrefix = _localizationService.GetString(
+                "LlmErrorCommunicationPrefix",
+                "AI 통신 오류가 발생했습니다: ");
+            string missingCredentialError = _localizationService.GetString(
+                "LlmErrorNoApiKeyOrToken",
+                "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.");
+            return response.StartsWith(communicationErrorPrefix, StringComparison.Ordinal) ||
+                response.Equals(missingCredentialError, StringComparison.Ordinal);
+        }
+
+        private static bool TryCreateVisionFallbackSettings(
+            EditorSettings settings,
+            out EditorSettings fallbackSettings)
+        {
+            string fallbackProvider = settings.LlmVisionFallbackProvider?.Trim() ?? string.Empty;
+            string fallbackModel = settings.LlmVisionFallbackModel?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(fallbackProvider) ||
+                string.IsNullOrWhiteSpace(fallbackModel) ||
+                (fallbackProvider.Equals(settings.LlmProvider, StringComparison.OrdinalIgnoreCase) &&
+                    fallbackModel.Equals(settings.LlmModel, StringComparison.OrdinalIgnoreCase)))
+            {
+                fallbackSettings = null!;
+                return false;
+            }
+
+            bool sameProvider = fallbackProvider.Equals(settings.LlmProvider, StringComparison.OrdinalIgnoreCase);
+            fallbackSettings = new EditorSettings
+            {
+                Language = settings.Language,
+                LlmProvider = fallbackProvider,
+                LlmEndpoint = sameProvider
+                    ? settings.LlmEndpoint
+                    : SettingsLlmModelCatalog.GetDefaultEndpoint(fallbackProvider, settings.LlmEndpoint),
+                LlmModel = fallbackModel,
+                LlmThinkingLevel = settings.LlmThinkingLevel,
+                LlmAgentVerbose = settings.LlmAgentVerbose,
+                LlmSourceLanguage = settings.LlmSourceLanguage,
+                LlmTargetLanguage = settings.LlmTargetLanguage,
+                LlmVisionFallbackProvider = fallbackProvider,
+                LlmVisionFallbackModel = fallbackModel
+            };
+            return true;
         }
     }
 }

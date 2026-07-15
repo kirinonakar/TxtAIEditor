@@ -455,6 +455,12 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloud 从指定端点加载模型列表。</value>
   </data>
+  <data name="SettingsLlmVisionFallbackProvider" xml:space="preserve">
+    <value>视觉回退提供商</value>
+  </data>
+  <data name="SettingsLlmVisionFallbackModel" xml:space="preserve">
+    <value>视觉回退模型</value>
+  </data>
   <data name="SettingsLlmTokenUsageStatsLabel" xml:space="preserve">
     <value>Token 统计</value>
   </data>

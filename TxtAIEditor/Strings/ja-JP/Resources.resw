@@ -455,6 +455,12 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloudは、指定されたエンドポイントからモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmVisionFallbackProvider" xml:space="preserve">
+    <value>Vision フォールバックプロバイダー</value>
+  </data>
+  <data name="SettingsLlmVisionFallbackModel" xml:space="preserve">
+    <value>Vision フォールバックモデル</value>
+  </data>
   <data name="SettingsLlmTokenUsageStatsLabel" xml:space="preserve">
     <value>Token統計</value>
   </data>

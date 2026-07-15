@@ -483,6 +483,16 @@ namespace TxtAIEditor.Controls
                         _promptContextService.GetImageAttachmentsForRun(runContext),
                         cancellationToken);
 
+                    if (!string.IsNullOrWhiteSpace(runContext.PendingVisionFallbackContext))
+                    {
+                        string fallbackTranscriptPart =
+                            "\n\n" + runContext.PendingVisionFallbackContext.Trim();
+                        transcript += fallbackTranscriptPart;
+                        runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(fallbackTranscriptPart);
+                        runContext.PendingVisionFallbackContext = string.Empty;
+                        await _uiDispatcher.RunAsync(() => UpdateContextStatsImmediate(force: true));
+                    }
+
                     response = streamResult.Response;
                     bool truncated = streamResult.Truncated;
                     string cleanResponse = streamResult.CleanResponse;
@@ -1202,6 +1212,7 @@ namespace TxtAIEditor.Controls
             context.ImageToolAttachments.RemoveAll(existing =>
                 string.Equals(existing.DisplayName, attachment.DisplayName, StringComparison.OrdinalIgnoreCase));
             context.ImageToolAttachments.Add(attachment);
+            context.VisionFallbackPending = true;
         }
 
         private void AppendActivity(string message)

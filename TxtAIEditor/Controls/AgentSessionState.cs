@@ -43,6 +43,8 @@ namespace TxtAIEditor.Controls
         public double CurrentRunTranscriptTokens { get; set; }
         public List<AgentAttachmentState> Attachments { get; set; } = new();
         public List<LlmMessageAttachment> ImageToolAttachments { get; } = new();
+        public bool VisionFallbackPending { get; set; }
+        public string PendingVisionFallbackContext { get; set; } = string.Empty;
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
         public bool StreamToTabActive { get; set; }
         public bool StreamToTab { get; set; }

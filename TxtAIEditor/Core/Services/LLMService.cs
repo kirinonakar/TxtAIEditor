@@ -103,7 +103,9 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyList<LlmTool>? tools = null,
             bool hasEnabledSkills = false,
             bool hasEnabledMcp = false,
-            Func<LlmTokenUsage, Task>? onUsage = null)
+            Func<LlmTokenUsage, Task>? onUsage = null,
+            bool allowVisionFallback = false,
+            Func<string, Task>? onVisionFallbackResult = null)
         {
             return _agentService.RunAgentAsync(
                 instruction,
@@ -118,7 +120,9 @@ namespace TxtAIEditor.Core.Services
                 tools,
                 hasEnabledSkills,
                 hasEnabledMcp,
-                onUsage);
+                onUsage,
+                allowVisionFallback,
+                onVisionFallbackResult);
         }
 
         public Task<string> RunAgentAsync(
@@ -135,7 +139,9 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyList<LlmTool>? tools = null,
             bool hasEnabledSkills = false,
             bool hasEnabledMcp = false,
-            Func<LlmTokenUsage, Task>? onUsage = null)
+            Func<LlmTokenUsage, Task>? onUsage = null,
+            bool allowVisionFallback = false,
+            Func<string, Task>? onVisionFallbackResult = null)
         {
             return _agentService.RunAgentAsync(
                 settings,
@@ -151,7 +157,9 @@ namespace TxtAIEditor.Core.Services
                 tools,
                 hasEnabledSkills,
                 hasEnabledMcp,
-                onUsage);
+                onUsage,
+                allowVisionFallback,
+                onVisionFallbackResult);
         }
 
         public void ResetTokenUsageStats()

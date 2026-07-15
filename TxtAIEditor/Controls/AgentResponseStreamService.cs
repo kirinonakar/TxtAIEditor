@@ -113,6 +113,8 @@ namespace TxtAIEditor.Controls
 
             bool truncated = false;
             string response = string.Empty;
+            bool visionFallbackPending = runContext.VisionFallbackPending &&
+                runContext.ImageToolAttachments.Count > 0;
             try
             {
                 response = await _llmService.RunAgentAsync(
@@ -436,11 +438,25 @@ namespace TxtAIEditor.Controls
                     agentToolsList,
                     runContext.HasEnabledSkills,
                     runContext.HasEnabledMcp,
-                    onUsage);
+                    onUsage,
+                    allowVisionFallback: visionFallbackPending,
+                    onVisionFallbackResult: fallbackContext =>
+                    {
+                        runContext.PendingVisionFallbackContext = fallbackContext;
+                        return Task.CompletedTask;
+                    });
             }
             catch (ResponseTruncatedException)
             {
                 truncated = true;
+            }
+            finally
+            {
+                if (visionFallbackPending)
+                {
+                    runContext.VisionFallbackPending = false;
+                    runContext.ImageToolAttachments.Clear();
+                }
             }
 
             cancellationToken.ThrowIfCancellationRequested();

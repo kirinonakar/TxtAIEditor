@@ -19,6 +19,8 @@ namespace TxtAIEditor.Core.Services
         private readonly ComboBox _llmProviderCombo;
         private readonly TextBox _llmEndpointBox;
         private readonly ComboBox _llmModelCombo;
+        private readonly ComboBox _visionFallbackProviderCombo;
+        private readonly ComboBox _visionFallbackModelCombo;
         private readonly PasswordBox _llmApiKeyBox;
         private readonly TextBox _exaEndpointBox;
         private readonly PasswordBox _exaApiKeyBox;
@@ -46,6 +48,12 @@ namespace TxtAIEditor.Core.Services
             _llmEndpointBox = new TextBox { PlaceholderText = getString("SettingsLlmEndpointPlaceholder", "예: http://localhost:1234/v1"), Text = settings.LlmEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
             _llmModelCombo = new ComboBox { PlaceholderText = getString("SettingsLlmSelectModel", "모델 선택"), HorizontalAlignment = HorizontalAlignment.Stretch, IsEditable = true, Tag = "LlmModelCombo" };
             _llmModelCombo.Loaded += (_, __) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(_llmModelCombo);
+            string visionFallbackProvider = string.IsNullOrWhiteSpace(settings.LlmVisionFallbackProvider)
+                ? settings.LlmProvider
+                : settings.LlmVisionFallbackProvider;
+            _visionFallbackProviderCombo = CreateProviderCombo(visionFallbackProvider);
+            _visionFallbackModelCombo = new ComboBox { PlaceholderText = getString("SettingsLlmSelectModel", "모델 선택"), HorizontalAlignment = HorizontalAlignment.Stretch, IsEditable = true, Tag = "LlmVisionFallbackModelCombo" };
+            _visionFallbackModelCombo.Loaded += (_, __) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(_visionFallbackModelCombo);
             _llmApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsLlmCredentialPlaceholder", "API Key 입력 (비워두면 저장된 자격 증명 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
             _exaEndpointBox = new TextBox { PlaceholderText = getString("SettingsExaEndpointPlaceholder", "예: https://mcp.exa.ai/mcp"), Text = settings.ExaEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
             _exaApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsExaApiKeyPlaceholder", "Exa API Key 입력 (비워두면 저장된 Key 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -90,6 +98,9 @@ namespace TxtAIEditor.Core.Services
             };
 
             PopulateModelChoices(GetSelectedProviderName(), settings.LlmModel);
+            PopulateVisionFallbackModelChoices(
+                GetSelectedVisionFallbackProviderName(),
+                settings.LlmVisionFallbackModel);
             UpdateModelRefreshButtonVisibility();
             RefreshTokenUsageStatsDisplay();
             AddEventHandlers();
@@ -114,6 +125,11 @@ namespace TxtAIEditor.Core.Services
             settings.LlmEndpoint = _llmEndpointBox.Text.Trim();
             string selectedModelText = _llmModelCombo.Text?.Trim() ?? string.Empty;
             settings.LlmModel = (!string.IsNullOrEmpty(selectedModelText) ? selectedModelText : (_llmModelCombo.SelectedItem as string ?? settings.LlmModel)).Trim();
+            settings.LlmVisionFallbackProvider = GetSelectedVisionFallbackProviderName();
+            string selectedVisionFallbackModelText = _visionFallbackModelCombo.Text?.Trim() ?? string.Empty;
+            settings.LlmVisionFallbackModel = (!string.IsNullOrEmpty(selectedVisionFallbackModelText)
+                ? selectedVisionFallbackModelText
+                : (_visionFallbackModelCombo.SelectedItem as string ?? settings.LlmVisionFallbackModel)).Trim();
             settings.LlmConfirmBeforeSending = _confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = _agentVerboseCheck.IsChecked == true;
             settings.LlmAgentAutoApproveGitEdits = _agentAutoApproveGitEditsCheck.IsChecked == true;
@@ -227,6 +243,11 @@ namespace TxtAIEditor.Core.Services
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTargetLanguage", "번역 대상 언어 (Target Language)"));
             section.Children.Add(_targetLangCombo);
 
+            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmVisionFallbackProvider", "Vision fallback 공급자"));
+            section.Children.Add(_visionFallbackProviderCombo);
+            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmVisionFallbackModel", "Vision fallback 모델"));
+            section.Children.Add(_visionFallbackModelCombo);
+
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTokenUsageStatsLabel", "token 통계"));
             section.Children.Add(_tokenUsageSummaryText);
             section.Children.Add(_tokenUsageStatsButton);
@@ -249,6 +270,14 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 _llmApiKeyBox.Password = await _llmService.GetApiKeyAsync(provider);
+            };
+
+            _visionFallbackProviderCombo.SelectionChanged += (_, __) =>
+            {
+                string provider = GetSelectedVisionFallbackProviderName();
+                PopulateVisionFallbackModelChoices(
+                    provider,
+                    SettingsLlmModelCatalog.GetModelForProviderChange(_settings, provider));
             };
 
             _refreshModelsButton.Click += async (_, __) => await RefreshModelsAsync();
@@ -368,6 +397,11 @@ namespace TxtAIEditor.Core.Services
             return _llmProviderCombo.SelectedItem as string ?? "OpenAI";
         }
 
+        private string GetSelectedVisionFallbackProviderName()
+        {
+            return _visionFallbackProviderCombo.SelectedItem as string ?? "OpenAI";
+        }
+
         private void AddModelChoice(string model)
         {
             if (!string.IsNullOrWhiteSpace(model) && !_llmModelCombo.Items.Contains(model))
@@ -398,6 +432,35 @@ namespace TxtAIEditor.Core.Services
             }
 
             SelectModelChoice(SettingsLlmModelCatalog.GetInitialModel(_settings, provider, selectedModel));
+        }
+
+        private void PopulateVisionFallbackModelChoices(string provider, string selectedModel)
+        {
+            _visionFallbackModelCombo.Items.Clear();
+            foreach (string model in SettingsLlmModelCatalog.GetStaticModels(provider))
+            {
+                if (!string.IsNullOrWhiteSpace(model) && !_visionFallbackModelCombo.Items.Contains(model))
+                {
+                    _visionFallbackModelCombo.Items.Add(model);
+                }
+            }
+
+            string targetModel = string.IsNullOrWhiteSpace(selectedModel)
+                ? SettingsLlmModelCatalog.GetModelForProviderChange(_settings, provider)
+                : selectedModel;
+            if (!string.IsNullOrWhiteSpace(targetModel) && !_visionFallbackModelCombo.Items.Contains(targetModel))
+            {
+                _visionFallbackModelCombo.Items.Add(targetModel);
+            }
+
+            if (!string.IsNullOrWhiteSpace(targetModel))
+            {
+                _visionFallbackModelCombo.SelectedItem = targetModel;
+            }
+            else if (_visionFallbackModelCombo.Items.Count > 0)
+            {
+                _visionFallbackModelCombo.SelectedIndex = 0;
+            }
         }
 
         private void ApplyProviderDefaults(string provider)
@@ -512,13 +575,18 @@ namespace TxtAIEditor.Core.Services
 
         private ComboBox CreateProviderCombo(EditorSettings settings)
         {
+            return CreateProviderCombo(settings.LlmProvider);
+        }
+
+        private ComboBox CreateProviderCombo(string provider)
+        {
             var comboBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             foreach (var providerName in SettingsLlmModelCatalog.ProviderNames)
             {
                 comboBox.Items.Add(providerName);
             }
 
-            comboBox.SelectedIndex = SettingsLlmModelCatalog.GetProviderIndex(settings.LlmProvider);
+            comboBox.SelectedIndex = SettingsLlmModelCatalog.GetProviderIndex(provider);
             return comboBox;
         }
 

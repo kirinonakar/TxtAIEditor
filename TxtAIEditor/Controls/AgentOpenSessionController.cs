@@ -1026,6 +1026,8 @@ namespace TxtAIEditor.Controls
                 LlmModelOpenCodeZen = settings.LlmModelOpenCodeZen,
                 LlmModelOllama = settings.LlmModelOllama,
                 LlmModelOllamaCloud = settings.LlmModelOllamaCloud,
+                LlmVisionFallbackProvider = settings.LlmVisionFallbackProvider,
+                LlmVisionFallbackModel = settings.LlmVisionFallbackModel,
                 LlmThinkingLevel = settings.LlmThinkingLevel,
                 LlmConfirmBeforeSending = settings.LlmConfirmBeforeSending,
                 LlmAgentVerbose = settings.LlmAgentVerbose,

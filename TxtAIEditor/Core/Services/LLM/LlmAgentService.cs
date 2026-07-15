@@ -20,7 +20,7 @@ namespace TxtAIEditor.Core.Services.LLM
             _requestExecutor = requestExecutor;
         }
 
-        public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null)
+        public async Task<string> RunAgentAsync(string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task>? onVisionFallbackResult = null)
         {
             string langCode = LlmLanguageResolver.Resolve(_settingsService.CurrentSettings);
             string targetLanguage = _settingsService.CurrentSettings?.LlmTargetLanguage ?? "Default";
@@ -37,10 +37,10 @@ namespace TxtAIEditor.Core.Services.LLM
             }
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode, targetLanguage, hasEnabledSkills, hasEnabledMcp);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
-            return await _requestExecutor.ExecuteAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage);
+            return await _requestExecutor.ExecuteAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult);
         }
 
-        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null)
+        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task>? onVisionFallbackResult = null)
         {
             string langCode = LlmLanguageResolver.Resolve(settings);
             string targetLanguage = settings.LlmTargetLanguage ?? "Default";
@@ -57,7 +57,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(langCode, isPlanningMode, targetLanguage, hasEnabledSkills, hasEnabledMcp);
             string userContent = AgentPromptBuilder.BuildUserContent(instruction, workspaceContext, selectedText, string.Empty, langCode);
-            return await _requestExecutor.ExecuteAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage);
+            return await _requestExecutor.ExecuteAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult);
         }
 
     }

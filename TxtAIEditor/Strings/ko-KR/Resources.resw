@@ -455,6 +455,12 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloud는 지정된 endpoint에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmVisionFallbackProvider" xml:space="preserve">
+    <value>Vision fallback 공급자</value>
+  </data>
+  <data name="SettingsLlmVisionFallbackModel" xml:space="preserve">
+    <value>Vision fallback 모델</value>
+  </data>
   <data name="SettingsLlmTokenUsageStatsLabel" xml:space="preserve">
     <value>Token 통계</value>
   </data>
