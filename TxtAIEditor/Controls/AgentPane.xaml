@@ -187,6 +187,7 @@
                       ViewChanged="OnAgentOutputScrollViewerViewChanged">
             <RichTextBlock x:Name="AgentOutputText"
                            TextWrapping="Wrap"
+                           FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
                            FontSize="13"
                            Foreground="{ThemeResource AgentOutputForeground}"
                            IsTextSelectionEnabled="True"

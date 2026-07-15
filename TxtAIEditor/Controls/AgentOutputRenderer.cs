@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -225,15 +226,25 @@ namespace TxtAIEditor.Controls
         {
             string codeText = string.Join("\n", codeLines);
 
+            var codeForeground = GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.Black);
             var textBlock = new TextBlock
             {
-                Text = codeText,
-                FontFamily = new FontFamily("Consolas"),
                 FontSize = 12,
                 TextWrapping = TextWrapping.Wrap,
-                Foreground = GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.Black),
+                Foreground = codeForeground,
                 IsTextSelectionEnabled = true
             };
+
+            var codeFontFamily = new FontFamily("Consolas, Cascadia Mono, Segoe UI Emoji, Segoe UI Symbol");
+            string[] codeTextLines = codeText.Split('\n');
+            for (int li = 0; li < codeTextLines.Length; li++)
+            {
+                if (li > 0)
+                {
+                    textBlock.Inlines.Add(new LineBreak());
+                }
+                AddTextRunsWithEmojiSupport(codeTextLines[li], textBlock.Inlines, false, 0, codeFontFamily, codeForeground);
+            }
 
             textBlock.SelectionChanged += OnTextBlockSelectionChanged;
 
@@ -445,6 +456,7 @@ namespace TxtAIEditor.Controls
                 TextWrapping = TextWrapping.Wrap,
                 HorizontalAlignment = alignment,
                 VerticalAlignment = VerticalAlignment.Center,
+                FontFamily = new FontFamily("Segoe UI, Segoe UI Emoji, Segoe UI Symbol"),
                 FontSize = 12,
                 Foreground = GetBrushResource("AgentOutputForeground", Microsoft.UI.Colors.Black),
                 IsTextSelectionEnabled = true
@@ -481,7 +493,7 @@ namespace TxtAIEditor.Controls
             if (isHeading)
             {
                 paragraph.Margin = new Thickness(0, 8, 0, 4);
-                paragraph.Inlines.Add(CreateTextRun(line, isBold: true, headingFontSize));
+                AddTextRunsWithEmojiSupport(line, paragraph.Inlines, isBold: true, headingFontSize);
                 return paragraph;
             }
 
@@ -584,7 +596,7 @@ namespace TxtAIEditor.Controls
 
             if (string.IsNullOrEmpty(line))
             {
-                inlines.Add(CreateTextRun(string.Empty, isHeading, headingFontSize));
+                AddTextRunsWithEmojiSupport(string.Empty, inlines, isHeading, headingFontSize);
                 return;
             }
 
@@ -605,15 +617,13 @@ namespace TxtAIEditor.Controls
 
                 if (isCode)
                 {
-                    var run = CreateTextRun($"[{text}]", isHeading || isBold, headingFontSize);
-                    run.FontFamily = new FontFamily("Consolas");
-                    run.Foreground = GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.DarkRed);
-                    inlines.Add(run);
+                    AddTextRunsWithEmojiSupport($"[{text}]", inlines, isHeading || isBold, headingFontSize,
+                        new FontFamily("Consolas, Cascadia Mono, Segoe UI Emoji, Segoe UI Symbol"),
+                        GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.DarkRed));
                 }
                 else
                 {
-                    var run = CreateTextRun(text, isHeading || isBold, headingFontSize);
-                    inlines.Add(run);
+                    AddTextRunsWithEmojiSupport(text, inlines, isHeading || isBold, headingFontSize);
                 }
             }
 
@@ -694,6 +704,104 @@ namespace TxtAIEditor.Controls
             }
 
             return run;
+        }
+
+        private static readonly FontFamily EmojiFontFamily = new FontFamily("Segoe UI Emoji");
+
+        private static bool IsEmojiGrapheme(string grapheme)
+        {
+            for (int i = 0; i < grapheme.Length; i++)
+            {
+                char ch = grapheme[i];
+                uint code = ch;
+
+                if (char.IsHighSurrogate(ch) && i + 1 < grapheme.Length && char.IsLowSurrogate(grapheme[i + 1]))
+                {
+                    uint supplementary = 0x10000 + ((uint)(ch - 0xD800) << 10) + (uint)(grapheme[i + 1] - 0xDC00);
+                    if (supplementary >= 0x1F000 && supplementary <= 0x1FFFF) return true;
+                    i++;
+                    continue;
+                }
+
+                if (code == 0xFE0F) return true;
+                if (code == 0x20E3) return true;
+                if (code >= 0x2600 && code <= 0x27BF) return true;
+            }
+            return false;
+        }
+
+        private void AddTextRunsWithEmojiSupport(string text, InlineCollection inlines, bool isBold, double fontSize, FontFamily? fontFamily = null, Brush? foreground = null)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                var run = new Run { Text = text ?? string.Empty };
+                if (isBold) run.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
+                if (fontSize > 0) run.FontSize = fontSize;
+                if (fontFamily != null) run.FontFamily = fontFamily;
+                if (foreground != null) run.Foreground = foreground;
+                inlines.Add(run);
+                return;
+            }
+
+            var indexes = StringInfo.ParseCombiningCharacters(text);
+            if (indexes.Length == 0)
+            {
+                var run = CreateTextRun(text, isBold, fontSize);
+                if (fontFamily != null) run.FontFamily = fontFamily;
+                if (foreground != null) run.Foreground = foreground;
+                inlines.Add(run);
+                return;
+            }
+
+            var segment = new StringBuilder();
+            bool? segmentIsEmoji = null;
+
+            for (int i = 0; i < indexes.Length; i++)
+            {
+                int start = indexes[i];
+                int end = i + 1 < indexes.Length ? indexes[i + 1] : text.Length;
+                string grapheme = text.Substring(start, end - start);
+                bool isEmoji = IsEmojiGrapheme(grapheme);
+
+                if (segmentIsEmoji == null)
+                {
+                    segmentIsEmoji = isEmoji;
+                }
+
+                if (isEmoji != segmentIsEmoji)
+                {
+                    FlushEmojiSegment(segment.ToString(), segmentIsEmoji.Value, inlines, isBold, fontSize, fontFamily, foreground);
+                    segment.Clear();
+                    segmentIsEmoji = isEmoji;
+                }
+
+                segment.Append(grapheme);
+            }
+
+            if (segment.Length > 0 && segmentIsEmoji.HasValue)
+            {
+                FlushEmojiSegment(segment.ToString(), segmentIsEmoji.Value, inlines, isBold, fontSize, fontFamily, foreground);
+            }
+        }
+
+        private void FlushEmojiSegment(string text, bool isEmoji, InlineCollection inlines, bool isBold, double fontSize, FontFamily? fontFamily, Brush? foreground)
+        {
+            var run = new Run { Text = text };
+            if (isBold) run.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
+            if (fontSize > 0) run.FontSize = fontSize;
+            if (isEmoji)
+            {
+                run.FontFamily = EmojiFontFamily;
+            }
+            else if (fontFamily != null)
+            {
+                run.FontFamily = fontFamily;
+            }
+            if (foreground != null)
+            {
+                run.Foreground = foreground;
+            }
+            inlines.Add(run);
         }
 
         private static bool TryParseMarkdownHeading(string line, out int level, out string displayLine)
