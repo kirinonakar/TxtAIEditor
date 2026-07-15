@@ -38,6 +38,11 @@ namespace TxtAIEditor.Controls
                 AppendLine(context, runTranscript.Trim());
             }
 
+            if (context.RetryDebugHistory.Length > 0)
+            {
+                AppendLine(context, context.RetryDebugHistory.ToString().Trim());
+            }
+
             if (!string.IsNullOrEmpty(responseLine))
             {
                 AppendLine(context, responseLine);

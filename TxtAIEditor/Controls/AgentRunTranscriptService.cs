@@ -63,9 +63,13 @@ namespace TxtAIEditor.Controls
             builder.AppendLine();
             builder.AppendLine();
             builder.AppendLine($"[Retry detail: {retryType}]");
+            if (string.Equals(retryType, "tool_result_replay", StringComparison.Ordinal))
+            {
+                builder.AppendLine("[Tool execution: not executed; the model replayed a previous result]");
+            }
             if (!string.IsNullOrEmpty(previousResponse))
             {
-                builder.AppendLine(string.Equals(retryType, "tool_call_format", StringComparison.Ordinal)
+                builder.AppendLine(retryType is "tool_call_format" or "tool_result_replay"
                     ? "[Failed tool call response]"
                     : "[Previous response]");
                 builder.AppendLine(previousResponse);
@@ -75,6 +79,59 @@ namespace TxtAIEditor.Controls
             builder.AppendLine(retryInstruction);
             builder.Append("[End retry detail]");
             return builder.ToString();
+        }
+
+        public static string RemoveRetryDebugDetails(string history)
+        {
+            if (string.IsNullOrEmpty(history))
+            {
+                return string.Empty;
+            }
+
+            string[] lines = history.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var builder = new StringBuilder(history.Length);
+            bool inRetryDetail = false;
+            bool inLegacyRetryPayload = false;
+
+            foreach (string line in lines)
+            {
+                if (inRetryDetail)
+                {
+                    if (line.StartsWith("[End retry detail]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inRetryDetail = false;
+                    }
+
+                    continue;
+                }
+
+                if (line.StartsWith("[Retry detail:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inRetryDetail = true;
+                    continue;
+                }
+
+                if (inLegacyRetryPayload)
+                {
+                    if (!line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    inLegacyRetryPayload = false;
+                }
+
+                if (line.StartsWith("[Previous Tool Call]:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Previous Response]:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inLegacyRetryPayload = true;
+                    continue;
+                }
+
+                builder.AppendLine(line);
+            }
+
+            return builder.ToString().TrimEnd();
         }
 
         private static string BuildDiffLog(IReadOnlyList<AgentFileEditPreview> edits, int startIndex, int endIndex)

@@ -157,6 +157,12 @@ namespace TxtAIEditor.Controls
                 return string.Empty;
             }
 
+            history = AgentRunTranscriptService.RemoveRetryDebugDetails(history);
+            if (string.IsNullOrEmpty(history))
+            {
+                return string.Empty;
+            }
+
             int contextLimit = GetModelContextLimitForPromptBudget();
             if (contextLimit <= 0)
             {

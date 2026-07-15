@@ -40,6 +40,20 @@ namespace TxtAIEditor.Controls
                 StartsWithFenceLanguage(fenceInfo, "tool-call");
         }
 
+        public bool LooksLikeToolResultReplay(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return false;
+            }
+
+            string trimmed = response.TrimStart();
+            return trimmed.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("[Tool result]", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("[도구 결과:", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("[도구 결과]", StringComparison.OrdinalIgnoreCase);
+        }
+
         public bool ResponseMentionsSkillIntent(string response)
         {
             if (string.IsNullOrWhiteSpace(response)) return false;

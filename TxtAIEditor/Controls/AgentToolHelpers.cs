@@ -172,8 +172,7 @@ namespace TxtAIEditor.Controls
 
         public static bool ShouldSkipDuplicateSuccessfulTool(string normalizedToolName)
         {
-            return normalizedToolName is "read_file"
-                or "skill_use"
+            return normalizedToolName is "skill_use"
                 or "run_powershell"
                 or "run_rg"
                 or "run_rga"
@@ -194,6 +193,16 @@ namespace TxtAIEditor.Controls
                 or "web_search_exa"
                 or "web_fetch"
                 or "web_fetch_exa";
+        }
+
+        public static bool ShouldReuseCachedSuccessfulTool(
+            string normalizedToolName,
+            string toolInvocationKey,
+            string? lastSuccessfulToolInvocationKey)
+        {
+            return ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
+                (IsMutatingTool(normalizedToolName) ||
+                    string.Equals(lastSuccessfulToolInvocationKey, toolInvocationKey, StringComparison.Ordinal));
         }
 
         public static bool IsMutatingTool(string normalizedToolName)

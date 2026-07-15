@@ -455,6 +455,7 @@ namespace TxtAIEditor.Controls
                 const int maxSkillMentionRetries = 2;
                 int repeatedDuplicateToolSkipCount = 0;
                 string? lastDuplicateToolInvocationKey = null;
+                string? lastSuccessfulToolInvocationKey = null;
                 const int maxRepeatedDuplicateToolSkips = 3;
                 bool planningMode = requestedPlanningMode;
                 int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls > 0 ? runContext.LlmSettings.LlmMaxToolCalls : 50;
@@ -571,24 +572,33 @@ namespace TxtAIEditor.Controls
 
                     await _runOutputController.StopRunThinkingActivityAsync(runContext);
 
+                    bool responseLooksLikeToolResultReplay = _responseInspector.LooksLikeToolResultReplay(response);
                     bool responseHasToolSyntax = AgentToolCallParser.ContainsToolCallSyntax(response);
+                    bool responseRequiresToolHandling = responseHasToolSyntax || responseLooksLikeToolResultReplay;
 
                     int endLength = cleanResponse.Length;
-                    if (!runContext.LlmSettings.LlmAgentVerbose && responseHasToolSyntax)
+                    if (!runContext.LlmSettings.LlmAgentVerbose && responseRequiresToolHandling)
                     {
-                        int toolCallIndex = AgentToolCallParser.FindToolCallIndex(cleanResponse);
-                        if (toolCallIndex >= 0)
+                        if (responseLooksLikeToolResultReplay)
                         {
-                            endLength = toolCallIndex;
+                            endLength = 0;
+                        }
+                        else
+                        {
+                            int toolCallIndex = AgentToolCallParser.FindToolCallIndex(cleanResponse);
+                            if (toolCallIndex >= 0)
+                            {
+                                endLength = toolCallIndex;
+                            }
                         }
                     }
 
-                    if (!planningMode && !responseHasToolSyntax && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
+                    if (!planningMode && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
                     {
                         visibleTextFlushed = true;
                         await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, cleanResponse);
                     }
-                    else if (!planningMode && !responseHasToolSyntax && printedLength < endLength)
+                    else if (!planningMode && !responseRequiresToolHandling && printedLength < endLength)
                     {
                         string remainingText = cleanResponse.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;
@@ -598,22 +608,30 @@ namespace TxtAIEditor.Controls
                     cancellationToken.ThrowIfCancellationRequested();
 
                     bool parsedToolCall = AgentToolCallParser.TryParseMulti(response, out List<AgentToolCallParser.ToolCallInfo> toolCalls);
-                    if (!parsedToolCall || toolCalls.Count == 0)
+                    if (responseLooksLikeToolResultReplay || !parsedToolCall || toolCalls.Count == 0)
                     {
-                        if (responseHasToolSyntax)
+                        if (responseHasToolSyntax || responseLooksLikeToolResultReplay)
                         {
                             toolCallFormatRetryCount++;
                             AgentToolCallParser.TryGetToolCallFormatIssue(response, out string toolCallFormatIssue);
+                            if (responseLooksLikeToolResultReplay)
+                            {
+                                toolCallFormatIssue =
+                                    "The response replayed a previous tool result instead of emitting a new tool call or final answer. " +
+                                    "Do not repeat tool output from the transcript.";
+                            }
                             string retryNote = _responseInspector.BuildToolCallFormatRetryNote(
                                 !string.IsNullOrWhiteSpace(toolCallFormatIssue)
                                     ? toolCallFormatIssue
                                     : "The tool_call JSON could not be parsed.");
                             string retryDetail = _runTranscriptService.BuildRetryDetail(
-                                "tool_call_format",
+                                responseLooksLikeToolResultReplay ? "tool_result_replay" : "tool_call_format",
                                 response,
                                 retryNote);
-                            transcript += retryDetail;
-                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
+                            runContext.RetryDebugHistory.AppendLine(retryDetail);
+                            string retryPromptContext = "\n\n" + retryNote;
+                            transcript += retryPromptContext;
+                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryPromptContext);
 
                             string retryMessage = _getString(
                                 "AgentToolCallFormatRetry",
@@ -777,17 +795,22 @@ namespace TxtAIEditor.Controls
 
                         if (!planningMode && normalizedToolName == "make_plan")
                         {
+                            lastSuccessfulToolInvocationKey = null;
                             toolResult = "make_plan failed: this tool is only available when planning mode is enabled.";
                             toolResultForTranscript = toolResult;
                         }
                         else if (planningMode && IsMutatingTool(normalizedToolName) && normalizedToolName != "make_plan")
                         {
+                            lastSuccessfulToolInvocationKey = null;
                             toolResult =
                                 "blocked: planning mode is plan-only and cannot run file/editor mutation tools. " +
                                 "Continue with safe inspection if needed, or write the detailed Markdown plan as the final answer.";
                             toolResultForTranscript = toolResult;
                         }
-                        else if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
+                        else if (ShouldReuseCachedSuccessfulTool(
+                                normalizedToolName,
+                                toolInvocationKey,
+                                lastSuccessfulToolInvocationKey) &&
                             successfulToolResults.TryGetValue(toolInvocationKey, out string? cachedToolResult))
                         {
                             skippedDuplicateTool = true;
@@ -816,6 +839,7 @@ namespace TxtAIEditor.Controls
                         }
                         else
                         {
+                            lastSuccessfulToolInvocationKey = null;
                             lastDuplicateToolInvocationKey = null;
                             repeatedDuplicateToolSkipCount = 0;
                             await _toolExecutionSessionGate.WaitAsync(cancellationToken);
@@ -855,6 +879,7 @@ namespace TxtAIEditor.Controls
                                 if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
                                 {
                                     successfulToolResults[toolInvocationKey] = toolResult;
+                                    lastSuccessfulToolInvocationKey = toolInvocationKey;
                                 }
                             }
                         }
@@ -902,6 +927,9 @@ namespace TxtAIEditor.Controls
 
                         foreach (var tcRes in toolCallResults)
                         {
+                            addedPartBuilder.AppendLine();
+                            addedPartBuilder.AppendLine($"[Parsed tool call: {tcRes.Name}]");
+                            addedPartBuilder.AppendLine(tcRes.Args.GetRawText());
                             addedPartBuilder.AppendLine();
                             addedPartBuilder.AppendLine($"[Tool result: {tcRes.Name}]");
                             addedPartBuilder.AppendLine(tcRes.ResultForTranscript);

@@ -38,6 +38,7 @@ namespace TxtAIEditor.Controls
         public string SessionId { get; set; } = string.Empty;
         public CancellationTokenSource? Cancellation { get; set; }
         public StringBuilder SessionHistory { get; } = new();
+        public StringBuilder RetryDebugHistory { get; } = new();
         public double SessionHistoryTokenCount { get; set; }
         public double CurrentRunTranscriptTokens { get; set; }
         public List<AgentAttachmentState> Attachments { get; set; } = new();
