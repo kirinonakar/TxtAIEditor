@@ -44,24 +44,6 @@ namespace TxtAIEditor.Composition
             Task ToggleRightPanelAsync() =>
                 moduleBindings.ShellPane.ToggleRightPanelAsync();
 
-            void LoadDirectoryRoot(string folderPath) =>
-                moduleBindings.ExplorerNavigation.LoadDirectoryRoot(folderPath);
-
-            Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true) =>
-                moduleBindings.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel);
-
-            Task NavigateExplorerToFolderAndRevealAsync(string folderPath) =>
-                moduleBindings.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel: true);
-
-            void QueueGitStatusRefresh() =>
-                moduleBindings.GitStatusRefresh.QueueRefresh();
-
-            string GetSearchRoot() =>
-                MainWindowWorkspaceOperations.GetSearchRoot(state);
-
-            long GetLargeFileThresholdBytes() =>
-                MainWindowWorkspaceOperations.GetLargeFileThresholdBytes(services.SettingsService);
-
             void ApplyEditorSurfaceBackground(EditorSettings settings) =>
                 moduleBindings.Settings.ApplyEditorSurfaceBackground(settings);
 
@@ -103,49 +85,19 @@ namespace TxtAIEditor.Composition
             void TogglePreviewWidth() =>
                 shellPanelLayoutService.TogglePreviewWidth();
 
-            Task RefreshGitStatusUIAsync() =>
-                MainWindowWorkspaceOperations.RefreshGitStatusUiAsync(
-                    state,
-                    services.GitService,
-                    moduleBindings.GitAutoRefreshTimer,
-                    tabNavigationController,
-                    moduleBindings.GitStatusRefresh,
-                    moduleBindings.ExplorerNavigation,
-                    callbacks.SetCurrentRepoPath);
-
-            string GetCurrentRepoPathForGitRefresh() =>
-                MainWindowWorkspaceOperations.GetCurrentRepoPathForGitRefresh(
-                    state,
-                    services.GitService,
-                    tabNavigationController,
-                    callbacks.SetCurrentRepoPath);
-
-            var previewControllers = MainWindowPreviewComposition.Compose(
+            var previewModule = MainWindowPreviewModule.Compose(
                 ui,
                 services,
                 viewModel,
-                state.TabBridges,
-                tabNavigationController,
-                stickyNoteModeController,
-                dialogController,
-                tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
-                new MainWindowPreviewCompositionCallbacks(
-                    () => moduleBindings.ToolbarCommand?.Find(),
-                    () => moduleBindings.ToolbarCommand?.ToggleLivePreview(),
-                    () => moduleBindings.ToolbarCommand?.ToggleTheme(),
-                    callbacks.ToggleMaximize,
-                    () => moduleBindings.ToolbarCommand?.Print(),
-                    TogglePreviewWidth,
-                    callbacks.CloseActiveTab,
-                    callbacks.LoadFileIntoTabAsync,
-                    MainWindowMessageJson.Normalize,
-                    () => state.CurrentFolderPath,
-                    () => state.CurrentRepoPath,
-                    () => state.ScrollSyncEnabled,
-                    callbacks.UpdateRightPanelSelectionContext,
-                    NavigateExplorerToFolderAndRevealAsync,
-                    callbacks.GetLocalizedString));
-            moduleBindings.Bind(previewControllers);
+                state,
+                new MainWindowPreviewModuleDependencies(shellControllers),
+                callbacks,
+                () => moduleBindings.ToolbarCommand,
+                folderPath => moduleBindings.ExplorerNavigation.NavigateToFolderAsync(
+                    folderPath,
+                    revealInLeftPanel: true));
+            var previewControllers = previewModule.Controllers;
+            moduleBindings.Bind(previewModule);
             var compareTabController = previewControllers.CompareTab;
             var livePreviewController = previewControllers.LivePreview;
             var editorWebViewInitializationController = previewControllers.EditorWebViewInitialization;
@@ -153,6 +105,22 @@ namespace TxtAIEditor.Composition
             var pdfViewerController = previewControllers.PdfViewer;
             var officeDocumentViewerController = previewControllers.OfficeDocumentViewer;
             var editorLinkNavigationController = previewControllers.EditorLinkNavigation;
+
+            var workspaceModule = MainWindowWorkspaceModule.Compose(
+                window,
+                ui,
+                services,
+                viewModel,
+                state,
+                new MainWindowWorkspaceModuleDependencies(shellControllers, previewModule),
+                callbacks,
+                () => moduleBindings.ToolbarCommand);
+            var workspaceControllers = workspaceModule.Controllers;
+            moduleBindings.Bind(workspaceModule);
+            var functionKeyShortcutService = workspaceControllers.FunctionKeyShortcut;
+            var gitAutoRefreshTimer = workspaceControllers.GitAutoRefreshTimer;
+            var explorerNavigationController = workspaceControllers.ExplorerNavigation;
+            var favoritesRecentController = workspaceControllers.FavoritesRecent;
 
             var editorFoundationControllers = MainWindowEditorFoundationComposition.Compose(
                 ui,
@@ -188,9 +156,9 @@ namespace TxtAIEditor.Composition
                     callbacks.SchedulePreview,
                     callbacks.UpdateWindowTitle,
                     callbacks.LoadFileIntoTabAsync,
-                    GetSearchRoot,
-                    GetLargeFileThresholdBytes,
-                    RefreshGitStatusUIAsync,
+                    workspaceModule.GetSearchRoot,
+                    workspaceModule.GetLargeFileThresholdBytes,
+                    workspaceModule.RefreshGitStatusUiAsync,
                     callbacks.GetLocalizedString));
             var tabReloadController = editorFoundationControllers.TabReload;
             var tabDirtyStateController = editorFoundationControllers.TabDirtyState;
@@ -204,46 +172,6 @@ namespace TxtAIEditor.Composition
 
             Task SyncEditsToOtherTabsAsync(OpenedTab sourceTab, bool updateUi = true) =>
                 splitImeSyncController.SyncEditsToOtherTabsAsync(sourceTab, updateUi);
-
-            var workspaceControllers = MainWindowWorkspaceComposition.Compose(
-                window,
-                ui,
-                services,
-                viewModel,
-                state.TabBridges,
-                tabEncryptionController,
-                compareTabController,
-                dialogController,
-                new MainWindowWorkspaceCompositionCallbacks(
-                    stickyNoteModeController.ToggleTopMostFromShortcut,
-                    () => moduleBindings.ToolbarCommand?.ToggleTheme(),
-                    stickyNoteModeController.ToggleMode,
-                    GetCurrentRepoPathForGitRefresh,
-                    () => state.CurrentFolderPath,
-                    callbacks.GetLocalizedString,
-                    () => moduleBindings.ExplorerNavigation,
-                    callbacks.SetCurrentRepoPath,
-                    callbacks.SetCurrentFolderPath,
-                    RefreshGitStatusUIAsync,
-                    callbacks.EnsureLeftPanelVisible,
-                    callbacks.ShowLeftSidebarPage,
-                    callbacks.LoadFileIntoTabAsync,
-                    callbacks.InitializePickerWindow,
-                    NavigateExplorerToFolderAndRevealAsync,
-                    callbacks.OpenNewTabFromRequest,
-                    callbacks.OpenImageTab,
-                    callbacks.OpenMediaTab,
-                    callbacks.OpenPdfTab,
-                    callbacks.OpenOfficeDocumentTab,
-                    callbacks.OpenHexTab,
-                    QueueGitStatusRefresh));
-            moduleBindings.Bind(workspaceControllers);
-            var functionKeyShortcutService = workspaceControllers.FunctionKeyShortcut;
-            var gitAutoRefreshTimer = workspaceControllers.GitAutoRefreshTimer;
-            var gitPanelController = workspaceControllers.GitPanel;
-            gitPanelController.FileRestored += callbacks.GitFileRestored;
-            var explorerNavigationController = workspaceControllers.ExplorerNavigation;
-            var favoritesRecentController = workspaceControllers.FavoritesRecent;
 
             var documentCommandControllers = MainWindowDocumentCommandComposition.Compose(
                 window,
@@ -261,11 +189,11 @@ namespace TxtAIEditor.Composition
                 dialogController,
                 new MainWindowDocumentCommandCallbacks(
                     callbacks.UpdateLanguageUi,
-                    RefreshGitStatusUIAsync,
+                    workspaceModule.RefreshGitStatusUiAsync,
                     callbacks.UpdateWindowTitle,
                     () => state.CurrentFolderPath,
-                    LoadDirectoryRoot,
-                    GetSearchRoot,
+                    workspaceModule.LoadDirectoryRoot,
+                    workspaceModule.GetSearchRoot,
                     () => state.CurrentRepoPath,
                     callbacks.OpenNewTab,
                     callbacks.CloseReadOnlyViewer,
@@ -295,13 +223,15 @@ namespace TxtAIEditor.Composition
                     () => state.CurrentFolderPath,
                     () => state.CurrentRepoPath,
                     () => callbacks.OpenNewTab(),
-                    LoadDirectoryRoot,
+                    workspaceModule.LoadDirectoryRoot,
                     callbacks.LoadFileIntoTabAsync,
                     livePreviewController.OpenFileInExternalViewerAsync,
                     livePreviewController.OpenFileWithDefaultProgramAsync,
                     callbacks.LoadFileIntoTabAtLineAsync,
-                    NavigateExplorerToFolderAsync,
-                    NavigateExplorerToFolderAndRevealAsync,
+                    workspaceModule.NavigateExplorerToFolderAsync,
+                    folderPath => workspaceModule.NavigateExplorerToFolderAsync(
+                        folderPath,
+                        revealInLeftPanel: true),
                     callbacks.GetSelectedExplorerItem,
                     () => explorerNavigationController.IsViewingArchive,
                     ToggleLeftPanelAsync,
@@ -373,7 +303,7 @@ namespace TxtAIEditor.Composition
                     shellControllers,
                     editorFoundationControllers,
                     documentCommandControllers,
-                    previewControllers),
+                    previewModule),
                 workspaceControllers,
                 callbacks);
             var llmAssistantController = agentControllers.LlmAssistant;
@@ -495,7 +425,7 @@ namespace TxtAIEditor.Composition
                 new MainWindowStartupCallbacks(
                     () => state.CurrentRepoPath,
                     () => state.CurrentFolderPath,
-                    NavigateExplorerToFolderAsync,
+                    workspaceModule.NavigateExplorerToFolderAsync,
                     callbacks.LoadFileIntoTabAsync,
                     () => callbacks.OpenNewTab(),
                     ApplyLeftSidebarVisibility,
@@ -503,7 +433,7 @@ namespace TxtAIEditor.Composition
                     ApplySavedPanelWidths,
                     callbacks.LocalizeUi,
                     callbacks.SyncAgentSettingsAfterLoad,
-                    RefreshGitStatusUIAsync,
+                    workspaceModule.RefreshGitStatusUiAsync,
                     callbacks.UpdateAutoSaveStatus,
                     callbacks.GetLocalizedString,
                     callbacks.GetCurrentElementTheme,
@@ -528,9 +458,9 @@ namespace TxtAIEditor.Composition
                 new ShellControllers(shellControllers, interactionControllers),
                 new EditorControllers(editorFoundationControllers, editorRuntimeControllers),
                 DocumentControllers.From(documentCommandControllers),
-                previewControllers,
+                previewModule,
                 agentControllers,
-                workspaceControllers,
+                workspaceModule,
                 LifecycleControllers.From(startupControllers));
         }
 

@@ -1,5 +1,4 @@
 using System;
-using Microsoft.UI.Xaml;
 using TxtAIEditor.Controls;
 
 namespace TxtAIEditor.Composition
@@ -10,22 +9,16 @@ namespace TxtAIEditor.Composition
     /// </summary>
     internal sealed class MainWindowModuleBindings
     {
-        private MainWindowPreviewControllers? _preview;
-        private MainWindowWorkspaceControllers? _workspace;
+        private MainWindowPreviewModule? _preview;
+        private MainWindowWorkspaceModule? _workspace;
         private MainWindowEditorRuntimeControllers? _editorRuntime;
         private MainWindowStartupControllers? _startup;
 
         public LivePreviewController LivePreview =>
-            Require(_preview, nameof(MainWindowPreviewComposition)).LivePreview;
+            Require(_preview, nameof(MainWindowPreviewModule)).Controllers.LivePreview;
 
         public ExplorerNavigationController ExplorerNavigation =>
-            Require(_workspace, nameof(MainWindowWorkspaceComposition)).ExplorerNavigation;
-
-        public GitStatusRefreshController GitStatusRefresh =>
-            Require(_workspace, nameof(MainWindowWorkspaceComposition)).GitStatusRefresh;
-
-        public DispatcherTimer GitAutoRefreshTimer =>
-            Require(_workspace, nameof(MainWindowWorkspaceComposition)).GitAutoRefreshTimer;
+            Require(_workspace, nameof(MainWindowWorkspaceModule)).Controllers.ExplorerNavigation;
 
         public ShellPaneController ShellPane =>
             Require(_editorRuntime, nameof(MainWindowEditorRuntimeComposition)).ShellPane;
@@ -36,11 +29,11 @@ namespace TxtAIEditor.Composition
         public MainWindowToolbarCommandController? ToolbarCommand =>
             _startup?.ToolbarCommand;
 
-        public void Bind(MainWindowPreviewControllers preview) =>
-            _preview = BindOnce(_preview, preview, nameof(MainWindowPreviewComposition));
+        public void Bind(MainWindowPreviewModule preview) =>
+            _preview = BindOnce(_preview, preview, nameof(MainWindowPreviewModule));
 
-        public void Bind(MainWindowWorkspaceControllers workspace) =>
-            _workspace = BindOnce(_workspace, workspace, nameof(MainWindowWorkspaceComposition));
+        public void Bind(MainWindowWorkspaceModule workspace) =>
+            _workspace = BindOnce(_workspace, workspace, nameof(MainWindowWorkspaceModule));
 
         public void Bind(MainWindowEditorRuntimeControllers editorRuntime) =>
             _editorRuntime = BindOnce(_editorRuntime, editorRuntime, nameof(MainWindowEditorRuntimeComposition));
@@ -50,8 +43,8 @@ namespace TxtAIEditor.Composition
 
         public void ValidateComplete()
         {
-            _ = Require(_preview, nameof(MainWindowPreviewComposition));
-            _ = Require(_workspace, nameof(MainWindowWorkspaceComposition));
+            _ = Require(_preview, nameof(MainWindowPreviewModule));
+            _ = Require(_workspace, nameof(MainWindowWorkspaceModule));
             _ = Require(_editorRuntime, nameof(MainWindowEditorRuntimeComposition));
             _ = Require(_startup, nameof(MainWindowStartupComposition));
         }

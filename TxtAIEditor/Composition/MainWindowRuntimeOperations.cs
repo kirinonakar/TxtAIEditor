@@ -139,11 +139,11 @@ namespace TxtAIEditor.Composition
             Controllers.Editor.Foundation.SearchReplace.CancelActiveSearch();
             UpdateAutoSaveStatus();
             UpdateAllTabWorkspaceIndicators();
-            Controllers.Workspace.GitStatusRefresh.QueueRefresh();
+            Controllers.Workspace.QueueGitStatusRefresh();
 
-            if (Controllers?.Workspace?.FavoritesRecent != null && !string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+            if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
             {
-                Controllers.Workspace.FavoritesRecent.AddRecentFolder(folderPath);
+                Controllers.Workspace.AddRecentFolder(folderPath);
             }
         }
 
@@ -218,22 +218,22 @@ namespace TxtAIEditor.Composition
             }
         }
 
-        public void SchedulePreview(OpenedTab tab) => Controllers.Preview.LivePreview.Schedule(tab);
+        public void SchedulePreview(OpenedTab tab) => Controllers.Preview.Schedule(tab);
 
-        public void UpdateLivePreview(OpenedTab tab) => Controllers.Preview.LivePreview.Render(tab);
+        public void UpdateLivePreview(OpenedTab tab) => Controllers.Preview.Render(tab);
 
-        public string GetPreviewBaseHref(OpenedTab tab) => Controllers.Preview.LivePreview.GetPreviewBaseHref(tab);
+        public string GetPreviewBaseHref(OpenedTab tab) => Controllers.Preview.GetPreviewBaseHref(tab);
 
         public Task LoadFileIntoTabAsync(string filePath) => LoadFileIntoTabAsync(filePath, 0);
 
         public async Task LoadFileIntoTabAsync(string filePath, int lineNumber)
         {
-            if (Controllers.Workspace.ExplorerNavigation.TryOpenArchive(filePath))
+            if (Controllers.Workspace.TryOpenArchive(filePath))
             {
                 return;
             }
 
-            var loadedTab = await Controllers.Workspace.FileTabLoad.LoadAsync(filePath);
+            var loadedTab = await Controllers.Workspace.LoadFileAsync(filePath);
             if (loadedTab != null)
             {
                 ActivateLoadedTab(loadedTab);
@@ -242,13 +242,13 @@ namespace TxtAIEditor.Composition
             if (lineNumber >= 1)
             {
                 await Task.Delay(250);
-                await Controllers.Preview.EditorLineNavigation.RevealFileLineAsync(filePath, lineNumber);
+                await Controllers.Preview.RevealFileLineAsync(filePath, lineNumber);
             }
         }
 
         public async Task<AgentOpenFileResult> LoadFileIntoTabForAgentAsync(string filePath)
         {
-            var loadResult = await Controllers.Workspace.FileTabLoad.LoadWithResultAsync(filePath);
+            var loadResult = await Controllers.Workspace.LoadFileWithResultAsync(filePath);
             if (!loadResult.Success || loadResult.Tab == null)
             {
                 return AgentOpenFileResult.Failed(
@@ -310,14 +310,13 @@ namespace TxtAIEditor.Composition
             }
         }
 
-        public void RefreshActivePreview() => Controllers.Preview.LivePreview.EnsureVisiblePreviewRendered();
+        public void RefreshActivePreview() => Controllers.Preview.RefreshActivePreview();
 
         public Task OpenShellPathAsync(string path)
         {
-            return MainWindowWorkspaceOperations.OpenShellPathAsync(
+            return Controllers.Workspace.OpenShellPathAsync(
                 path,
                 Controllers.Shell.Core.ShellPanelLayout,
-                Controllers.Workspace.ExplorerNavigation,
                 LoadFileIntoTabAsync);
         }
 
@@ -334,8 +333,7 @@ namespace TxtAIEditor.Composition
 
         public void CloseReadOnlyViewer(string tabId)
         {
-            Controllers.Preview.PdfViewer.Close(tabId);
-            Controllers.Preview.OfficeDocumentViewer.Close(tabId);
+            Controllers.Preview.CloseReadOnlyViewer(tabId);
         }
 
         public void MarkTabDirtyFromStatusBar(OpenedTab tab)
@@ -398,7 +396,7 @@ namespace TxtAIEditor.Composition
 
                 if (!string.IsNullOrEmpty(_state.CurrentFolderPath) && Directory.Exists(_state.CurrentFolderPath))
                 {
-                    Controllers.Workspace.ExplorerNavigation.LoadDirectoryRoot(_state.CurrentFolderPath);
+                    Controllers.Workspace.RefreshCurrentFolder(_state.CurrentFolderPath);
                 }
             });
         }
@@ -444,7 +442,7 @@ namespace TxtAIEditor.Composition
 
         public async Task PerformLineNavigationAsync(string tabId, int targetLine)
         {
-            await Controllers.Preview.EditorLineNavigation.RevealTabLineAsync(tabId, targetLine);
+            await Controllers.Preview.RevealTabLineAsync(tabId, targetLine);
         }
 
         public void SyncAgentSettingsAfterLoad()
@@ -479,7 +477,7 @@ namespace TxtAIEditor.Composition
                 Controllers.Editor.Runtime.TabSelection.QueueChanged(tabView, tabItem);
             }
 
-            Controllers.Preview.LivePreview.Render(tab);
+            Controllers.Preview.Render(tab);
         }
 
         private void UpdateAllTabWorkspaceIndicators()

@@ -47,7 +47,7 @@ namespace TxtAIEditor.Composition
         MainWindowShellControllers Shell,
         MainWindowEditorFoundationControllers Editor,
         MainWindowDocumentCommandControllers Documents,
-        MainWindowPreviewControllers Preview);
+        MainWindowPreviewModule Preview);
 
     internal sealed record MainWindowAgentModuleFacade(
         LlmAssistantController LlmAssistant,
@@ -104,7 +104,7 @@ namespace TxtAIEditor.Composition
             var shell = dependencies.Shell;
             var editor = dependencies.Editor;
             var documents = dependencies.Documents;
-            var preview = dependencies.Preview;
+            var preview = dependencies.Preview.Controllers;
 
             var llmAssistant = new LlmAssistantController(
                 services.LlmService,

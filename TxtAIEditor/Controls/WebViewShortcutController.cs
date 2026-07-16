@@ -1,39 +1,12 @@
-using System;
-
 namespace TxtAIEditor.Controls
 {
     public sealed class WebViewShortcutController
     {
-        private readonly Action _find;
-        private readonly Action _toggleLivePreview;
-        private readonly Action _toggleTopMost;
-        private readonly Action _toggleTheme;
-        private readonly Action _toggleMaximize;
-        private readonly Action _toggleStickyNote;
-        private readonly Action _print;
-        private readonly Action _togglePreviewWidth;
-        private readonly Action _closeActiveTab;
+        private readonly IWebViewShortcutCommands _commands;
 
-        public WebViewShortcutController(
-            Action find,
-            Action toggleLivePreview,
-            Action toggleTopMost,
-            Action toggleTheme,
-            Action toggleMaximize,
-            Action toggleStickyNote,
-            Action print,
-            Action togglePreviewWidth,
-            Action closeActiveTab)
+        public WebViewShortcutController(IWebViewShortcutCommands commands)
         {
-            _find = find;
-            _toggleLivePreview = toggleLivePreview;
-            _toggleTopMost = toggleTopMost;
-            _toggleTheme = toggleTheme;
-            _toggleMaximize = toggleMaximize;
-            _toggleStickyNote = toggleStickyNote;
-            _print = print;
-            _togglePreviewWidth = togglePreviewWidth;
-            _closeActiveTab = closeActiveTab;
+            _commands = commands;
         }
 
         public void Handle(string name)
@@ -41,31 +14,31 @@ namespace TxtAIEditor.Controls
             switch (name)
             {
                 case "find":
-                    _find();
+                    _commands.Find();
                     break;
                 case "f4":
-                    _toggleLivePreview();
+                    _commands.ToggleLivePreview();
                     break;
                 case "f9":
-                    _toggleTopMost();
+                    _commands.ToggleTopMost();
                     break;
                 case "f10":
-                    _toggleTheme();
+                    _commands.ToggleTheme();
                     break;
                 case "f11":
-                    _toggleMaximize();
+                    _commands.ToggleMaximize();
                     break;
                 case "f12":
-                    _toggleStickyNote();
+                    _commands.ToggleStickyNote();
                     break;
                 case "print":
-                    _print();
+                    _commands.Print();
                     break;
                 case "expandRightPanel":
-                    _togglePreviewWidth();
+                    _commands.TogglePreviewWidth();
                     break;
                 case "closeTab":
-                    _closeActiveTab();
+                    _commands.CloseActiveTab();
                     break;
             }
         }

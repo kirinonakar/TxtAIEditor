@@ -46,8 +46,8 @@ namespace TxtAIEditor.Composition
         ShellControllers Shell,
         EditorControllers Editor,
         DocumentControllers Documents,
-        MainWindowPreviewControllers Preview,
+        MainWindowPreviewModule Preview,
         MainWindowAgentModuleFacade Agents,
-        MainWindowWorkspaceControllers Workspace,
+        MainWindowWorkspaceModule Workspace,
         LifecycleControllers Lifecycle);
 }

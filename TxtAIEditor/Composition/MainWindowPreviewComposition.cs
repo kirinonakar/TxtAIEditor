@@ -52,15 +52,7 @@ namespace TxtAIEditor.Composition
             MainWindowPreviewCompositionCallbacks callbacks)
         {
             var webViewShortcut = new WebViewShortcutController(
-                callbacks.FindRequested,
-                callbacks.ToggleLivePreviewRequested,
-                stickyNoteMode.ToggleTopMostFromShortcut,
-                callbacks.ToggleThemeRequested,
-                callbacks.ToggleMaximizeRequested,
-                stickyNoteMode.ToggleMode,
-                callbacks.PrintRequested,
-                callbacks.TogglePreviewWidthRequested,
-                callbacks.CloseActiveTabRequested);
+                new PreviewWebViewShortcutCommands(callbacks, stickyNoteMode));
 
             var previewScrollSync = new PreviewScrollSyncController(
                 ui.EditorWorkspace,
@@ -129,6 +121,38 @@ namespace TxtAIEditor.Composition
                 pdfViewer,
                 officeDocumentViewer,
                 editorLinkNavigation);
+        }
+
+        private sealed class PreviewWebViewShortcutCommands : IWebViewShortcutCommands
+        {
+            private readonly MainWindowPreviewCompositionCallbacks _callbacks;
+            private readonly StickyNoteModeController _stickyNoteMode;
+
+            public PreviewWebViewShortcutCommands(
+                MainWindowPreviewCompositionCallbacks callbacks,
+                StickyNoteModeController stickyNoteMode)
+            {
+                _callbacks = callbacks;
+                _stickyNoteMode = stickyNoteMode;
+            }
+
+            public void Find() => _callbacks.FindRequested();
+
+            public void ToggleLivePreview() => _callbacks.ToggleLivePreviewRequested();
+
+            public void ToggleTopMost() => _stickyNoteMode.ToggleTopMostFromShortcut();
+
+            public void ToggleTheme() => _callbacks.ToggleThemeRequested();
+
+            public void ToggleMaximize() => _callbacks.ToggleMaximizeRequested();
+
+            public void ToggleStickyNote() => _stickyNoteMode.ToggleMode();
+
+            public void Print() => _callbacks.PrintRequested();
+
+            public void TogglePreviewWidth() => _callbacks.TogglePreviewWidthRequested();
+
+            public void CloseActiveTab() => _callbacks.CloseActiveTabRequested();
         }
     }
 }
