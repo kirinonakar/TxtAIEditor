@@ -278,7 +278,7 @@ function createEditorRenderer({
             const isLong = hasLine && text.length > MAX_RENDER_CHARS;
             const shouldSkipSyntaxHighlighting = isLong ||
                 (hasLine && shouldSkipLineSyntaxHighlighting(text));
-            const isTruncatedLongLine = isLong && state.language === 'json';
+            const isTruncatedLongLine = isLong;
             const displayText = isTruncatedLongLine
                 ? text.slice(0, MAX_RENDER_CHARS)
                 : text;
@@ -287,7 +287,7 @@ function createEditorRenderer({
                     .replace('{0}', text.length.toLocaleString())
                 : '';
             // A truncated contenteditable would commit only the visible prefix and destroy the
-            // hidden JSON tail. Keep the model intact and expose this row as a protected preview.
+            // hidden tail. Keep the model intact and expose this row as a protected preview.
             const contentEditable = !state.readOnly && hasLine && !isTruncatedLongLine ? 'true' : 'false';
             const selectionBounds = selectionBoundsForLine(line, displayText.length);
             const isInSelection = !!selectionBounds;

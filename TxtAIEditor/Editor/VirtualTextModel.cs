@@ -55,6 +55,13 @@ namespace TxtAIEditor.Editor
         int GetOffsetAt(int lineNumber, int column);
         void ApplyEdit(TextEdit edit);
         void ReplaceLine(int lineNumber, string text);
+        void ApplyLinePatches(IReadOnlyList<TextLinePatch> patches)
+        {
+            foreach (TextLinePatch patch in patches)
+            {
+                ReplaceLine(patch.LineNumber, patch.Text);
+            }
+        }
         void InsertLine(int lineNumber, string text);
         void DeleteLine(int lineNumber);
         void SplitLine(int lineNumber, string before, string after);
@@ -301,6 +308,28 @@ namespace TxtAIEditor.Editor
             string previous = _lines[lineNumber - 1];
             _lines[lineNumber - 1] = normalized;
             _lineLengthIndex.UpdateLineLength(lineNumber, previous.Length, normalized.Length);
+        }
+
+        public void ApplyLinePatches(IReadOnlyList<TextLinePatch> patches)
+        {
+            foreach (TextLinePatch patch in patches)
+            {
+                int lineNumber = patch.LineNumber;
+                if (lineNumber < 1 || lineNumber > _lines.Count)
+                {
+                    continue;
+                }
+
+                string normalized = NormalizeSingleLine(patch.Text);
+                string previous = _lines[lineNumber - 1];
+                if (string.Equals(previous, normalized, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                _lines[lineNumber - 1] = normalized;
+                _lineLengthIndex.UpdateLineLength(lineNumber, previous.Length, normalized.Length);
+            }
         }
 
         public void InsertLine(int lineNumber, string text)
@@ -1405,6 +1434,8 @@ namespace TxtAIEditor.Editor
                 return new ReplaceAllResult(null, plan.Replacements, 0, plan.Elapsed);
             }
 
+            TextLinePatch[] patches = plan.Replacements.Select(replacement =>
+                new TextLinePatch(replacement.LineNumber, replacement.AfterText)).ToArray();
             _buffer.UndoManager.BeginTransaction("replaceAll");
             try
             {
@@ -1415,20 +1446,20 @@ namespace TxtAIEditor.Editor
                         replacement.LineNumber,
                         replacement.BeforeText,
                         replacement.AfterText));
-                    Model.ReplaceLine(replacement.LineNumber, replacement.AfterText);
                     if ((i + 1) % 256 == 0)
                     {
                         await Task.Yield();
                     }
                 }
+
+                Model.ApplyLinePatches(patches);
             }
             finally
             {
                 _buffer.UndoManager.EndTransaction();
             }
 
-            CommitLinePatches(plan.Replacements.Select(replacement =>
-                new TextLinePatch(replacement.LineNumber, replacement.AfterText)).ToArray());
+            CommitLinePatches(patches);
             RefreshTabContentPreview();
             return new ReplaceAllResult(LastChange, plan.Replacements, plan.MatchCount, plan.Elapsed);
         }
@@ -1436,8 +1467,7 @@ namespace TxtAIEditor.Editor
         public void ReplaceAll(string query, string replace, bool matchCase, bool isRegex)
         {
             int originalLineCount = Model.LineCount;
-            _buffer.UndoManager.BeginTransaction("replaceAll");
-            bool changed = false;
+            var replacements = new List<LineReplacement>();
             if (isRegex)
             {
                 try
@@ -1450,9 +1480,7 @@ namespace TxtAIEditor.Editor
                         string nextText = regex.Replace(original, replace);
                         if (nextText != original)
                         {
-                            _buffer.UndoManager.AddEdit(new ReplaceLineEdit(i, original, nextText));
-                            Model.ReplaceLine(i, nextText);
-                            changed = true;
+                            replacements.Add(new LineReplacement(i, original, nextText));
                         }
                     }
                 }
@@ -1470,16 +1498,32 @@ namespace TxtAIEditor.Editor
                     string nextText = ReplaceString(original, query, replace, comparison);
                     if (nextText != original)
                     {
-                        _buffer.UndoManager.AddEdit(new ReplaceLineEdit(i, original, nextText));
-                        Model.ReplaceLine(i, nextText);
-                        changed = true;
+                        replacements.Add(new LineReplacement(i, original, nextText));
                     }
                 }
             }
 
-            _buffer.UndoManager.EndTransaction();
-            if (changed)
+            if (replacements.Count > 0)
             {
+                TextLinePatch[] patches = replacements.Select(replacement =>
+                    new TextLinePatch(replacement.LineNumber, replacement.AfterText)).ToArray();
+                _buffer.UndoManager.BeginTransaction("replaceAll");
+                try
+                {
+                    foreach (LineReplacement replacement in replacements)
+                    {
+                        _buffer.UndoManager.AddEdit(new ReplaceLineEdit(
+                            replacement.LineNumber,
+                            replacement.BeforeText,
+                            replacement.AfterText));
+                    }
+                    Model.ApplyLinePatches(patches);
+                }
+                finally
+                {
+                    _buffer.UndoManager.EndTransaction();
+                }
+
                 CommitViewChange(1, originalLineCount, Model.LineCount);
                 RefreshTabContentPreview();
             }

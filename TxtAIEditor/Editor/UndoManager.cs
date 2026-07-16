@@ -260,9 +260,12 @@ namespace TxtAIEditor.Editor
         {
             int beforeLineCount = model.LineCount;
             UndoEditRange[] ranges = _edits.Select(edit => edit.RedoRange).ToArray();
-            foreach (IUndoableEdit edit in _edits)
+            if (!TryApplyReplaceLineBatch(model, undo: false))
             {
-                edit.Apply(model);
+                foreach (IUndoableEdit edit in _edits)
+                {
+                    edit.Apply(model);
+                }
             }
 
             return BuildResult(model, beforeLineCount, ranges, AfterCaret);
@@ -272,9 +275,12 @@ namespace TxtAIEditor.Editor
         {
             int beforeLineCount = model.LineCount;
             UndoEditRange[] ranges = _edits.Select(edit => edit.UndoRange).ToArray();
-            for (int i = _edits.Count - 1; i >= 0; i--)
+            if (!TryApplyReplaceLineBatch(model, undo: true))
             {
-                _edits[i].Unapply(model);
+                for (int i = _edits.Count - 1; i >= 0; i--)
+                {
+                    _edits[i].Unapply(model);
+                }
             }
 
             return BuildResult(model, beforeLineCount, ranges, BeforeCaret);
@@ -304,6 +310,12 @@ namespace TxtAIEditor.Editor
             long lastProgressReport = 0;
             int beforeLineCount = model.LineCount;
             UndoEditRange[] ranges = _edits.Select(edit => edit.RedoRange).ToArray();
+            if (TryApplyReplaceLineBatch(model, undo: false))
+            {
+                progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, stopwatch.Elapsed));
+                return BuildResult(model, beforeLineCount, ranges, AfterCaret);
+            }
+
             for (int i = 0; i < _edits.Count; i++)
             {
                 _edits[i].Apply(model);
@@ -330,6 +342,12 @@ namespace TxtAIEditor.Editor
             long lastProgressReport = 0;
             int beforeLineCount = model.LineCount;
             UndoEditRange[] ranges = _edits.Select(edit => edit.UndoRange).ToArray();
+            if (TryApplyReplaceLineBatch(model, undo: true))
+            {
+                progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, stopwatch.Elapsed));
+                return BuildResult(model, beforeLineCount, ranges, BeforeCaret);
+            }
+
             int processed = 0;
             for (int i = _edits.Count - 1; i >= 0; i--)
             {
@@ -348,6 +366,27 @@ namespace TxtAIEditor.Editor
 
             progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, stopwatch.Elapsed));
             return BuildResult(model, beforeLineCount, ranges, BeforeCaret);
+        }
+
+        private bool TryApplyReplaceLineBatch(ITextModel model, bool undo)
+        {
+            if (_edits.Count == 0 || _edits.Any(edit => edit is not ReplaceLineEdit))
+            {
+                return false;
+            }
+
+            var patches = new TextLinePatch[_edits.Count];
+            for (int i = 0; i < _edits.Count; i++)
+            {
+                int editIndex = undo ? _edits.Count - i - 1 : i;
+                var edit = (ReplaceLineEdit)_edits[editIndex];
+                patches[i] = new TextLinePatch(
+                    edit.LineNumber,
+                    undo ? edit.BeforeText : edit.AfterText);
+            }
+
+            model.ApplyLinePatches(patches);
+            return true;
         }
 
         private static void ReportProgressIfDue(

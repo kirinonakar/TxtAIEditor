@@ -49,8 +49,9 @@ namespace TxtAIEditor.Editor
         private const int TargetLeafLines = 512;
         private const int MaxLeafLines = 1_024;
         private readonly List<List<string>> _leaves = new();
-        private readonly List<int> _lineEnds = new();
-        private readonly List<long> _characterEnds = new();
+        private readonly List<long> _leafCharacterCounts = new();
+        private readonly FenwickIndex _lineIndex = new();
+        private readonly FenwickIndex _characterIndex = new();
         private string _lineEnding;
 
         public ChunkedLineTextModel(IEnumerable<string>? lines = null, string lineEnding = "\n")
@@ -58,10 +59,10 @@ namespace TxtAIEditor.Editor
             _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\n" : lineEnding;
             AppendLeaves(lines?.Select(NormalizeSingleLine) ?? Array.Empty<string>());
             EnsureAtLeastOneLine();
-            RebuildMetadata();
+            RebuildIndexes();
         }
 
-        public int LineCount => _lineEnds.Count == 0 ? 0 : _lineEnds[^1];
+        public int LineCount => (int)_lineIndex.Total;
 
         public string LineEnding
         {
@@ -70,8 +71,13 @@ namespace TxtAIEditor.Editor
             {
                 string next = string.IsNullOrEmpty(value) ? "\n" : value;
                 if (string.Equals(next, _lineEnding, StringComparison.Ordinal)) return;
+                int lineEndingLengthDelta = next.Length - _lineEnding.Length;
                 _lineEnding = next;
-                RebuildMetadata();
+                for (int i = 0; i < _leaves.Count; i++)
+                {
+                    _leafCharacterCounts[i] += (long)_leaves[i].Count * lineEndingLengthDelta;
+                }
+                _characterIndex.Rebuild(_leafCharacterCounts.Count, i => _leafCharacterCounts[i]);
             }
         }
 
@@ -141,9 +147,9 @@ namespace TxtAIEditor.Editor
         {
             long documentLength = Math.Max(0, TotalStoredCharacters - LineEnding.Length);
             long safeOffset = Math.Clamp((long)offset, 0, documentLength);
-            int leafIndex = FindFirstEndAfter(_characterEnds, safeOffset);
-            long leafStart = leafIndex == 0 ? 0 : _characterEnds[leafIndex - 1];
-            int lineStart = leafIndex == 0 ? 0 : _lineEnds[leafIndex - 1];
+            int leafIndex = _characterIndex.FindIndexContainingOffset(safeOffset);
+            long leafStart = _characterIndex.GetPrefixValue(leafIndex);
+            int lineStart = (int)_lineIndex.GetPrefixValue(leafIndex);
             long cursor = leafStart;
             List<string> leaf = _leaves[leafIndex];
             for (int i = 0; i < leaf.Count; i++)
@@ -162,7 +168,7 @@ namespace TxtAIEditor.Editor
         {
             int safeLine = Math.Clamp(lineNumber, 1, LineCount);
             (int leafIndex, int innerIndex) = LocateLine(safeLine);
-            long offset = leafIndex == 0 ? 0 : _characterEnds[leafIndex - 1];
+            long offset = _characterIndex.GetPrefixValue(leafIndex);
             List<string> leaf = _leaves[leafIndex];
             for (int i = 0; i < innerIndex; i++) offset += leaf[i].Length + LineEnding.Length;
             offset += ClampColumn(leaf[innerIndex], column) - 1L;
@@ -201,8 +207,36 @@ namespace TxtAIEditor.Editor
         {
             if (lineNumber < 1 || lineNumber > LineCount) return;
             (int leafIndex, int innerIndex) = LocateLine(lineNumber);
-            _leaves[leafIndex][innerIndex] = NormalizeSingleLine(text);
-            RebuildMetadata();
+            string normalized = NormalizeSingleLine(text);
+            string previous = _leaves[leafIndex][innerIndex];
+            if (string.Equals(previous, normalized, StringComparison.Ordinal)) return;
+            _leaves[leafIndex][innerIndex] = normalized;
+            long delta = normalized.Length - previous.Length;
+            _leafCharacterCounts[leafIndex] += delta;
+            _characterIndex.Add(leafIndex, delta);
+        }
+
+        public void ApplyLinePatches(IReadOnlyList<TextLinePatch> patches)
+        {
+            var leafDeltas = new Dictionary<int, long>();
+            foreach (TextLinePatch patch in patches)
+            {
+                if (patch.LineNumber < 1 || patch.LineNumber > LineCount) continue;
+                (int leafIndex, int innerIndex) = LocateLine(patch.LineNumber);
+                string normalized = NormalizeSingleLine(patch.Text);
+                string previous = _leaves[leafIndex][innerIndex];
+                if (string.Equals(previous, normalized, StringComparison.Ordinal)) continue;
+
+                _leaves[leafIndex][innerIndex] = normalized;
+                long delta = normalized.Length - previous.Length;
+                leafDeltas[leafIndex] = leafDeltas.GetValueOrDefault(leafIndex) + delta;
+            }
+
+            foreach ((int leafIndex, long delta) in leafDeltas)
+            {
+                _leafCharacterCounts[leafIndex] += delta;
+                _characterIndex.Add(leafIndex, delta);
+            }
         }
 
         public void InsertLine(int lineNumber, string text)
@@ -211,23 +245,53 @@ namespace TxtAIEditor.Editor
             if (target > LineCount)
             {
                 List<string> last = _leaves[^1];
-                last.Add(NormalizeSingleLine(text));
-                SplitOversizedLeaf(_leaves.Count - 1);
-                RebuildMetadata();
+                string normalized = NormalizeSingleLine(text);
+                last.Add(normalized);
+                int lastLeafIndex = _leaves.Count - 1;
+                long characterDelta = normalized.Length + LineEnding.Length;
+                _leafCharacterCounts[lastLeafIndex] += characterDelta;
+                _lineIndex.Add(lastLeafIndex, 1);
+                _characterIndex.Add(lastLeafIndex, characterDelta);
+                SplitOversizedLeaf(lastLeafIndex);
                 return;
             }
             (int leafIndex, int innerIndex) = LocateLine(target);
-            _leaves[leafIndex].Insert(innerIndex, NormalizeSingleLine(text));
+            string inserted = NormalizeSingleLine(text);
+            _leaves[leafIndex].Insert(innerIndex, inserted);
+            long delta = inserted.Length + LineEnding.Length;
+            _leafCharacterCounts[leafIndex] += delta;
+            _lineIndex.Add(leafIndex, 1);
+            _characterIndex.Add(leafIndex, delta);
             SplitOversizedLeaf(leafIndex);
-            RebuildMetadata();
         }
 
         public void DeleteLine(int lineNumber)
         {
             if (lineNumber < 1 || lineNumber > LineCount) return;
-            ReplaceLineRange(lineNumber, lineNumber, Array.Empty<string>());
-            EnsureAtLeastOneLine();
-            RebuildMetadata();
+            if (LineCount == 1)
+            {
+                ReplaceLine(1, string.Empty);
+                return;
+            }
+
+            (int leafIndex, int innerIndex) = LocateLine(lineNumber);
+            List<string> leaf = _leaves[leafIndex];
+            string removed = leaf[innerIndex];
+            leaf.RemoveAt(innerIndex);
+            long characterDelta = -(removed.Length + LineEnding.Length);
+            _leafCharacterCounts[leafIndex] += characterDelta;
+            _lineIndex.Add(leafIndex, -1);
+            _characterIndex.Add(leafIndex, characterDelta);
+
+            if (leaf.Count == 0)
+            {
+                _leaves.RemoveAt(leafIndex);
+                _leafCharacterCounts.RemoveAt(leafIndex);
+                RebuildIndexes();
+                return;
+            }
+
+            MergeSparseLeaf(leafIndex);
         }
 
         public void SplitLine(int lineNumber, string before, string after) =>
@@ -358,7 +422,7 @@ namespace TxtAIEditor.Editor
             }
         }
 
-        private long TotalStoredCharacters => _characterEnds.Count == 0 ? 0 : _characterEnds[^1];
+        private long TotalStoredCharacters => _characterIndex.Total;
 
         private void ReplaceLineRange(int startLine, int endLine, IReadOnlyList<string> replacement)
         {
@@ -371,9 +435,10 @@ namespace TxtAIEditor.Editor
             merged.AddRange(replacement.Select(NormalizeSingleLine));
             merged.AddRange(_leaves[endLeaf].Skip(endInner + 1));
             _leaves.RemoveRange(startLeaf, endLeaf - startLeaf + 1);
+            _leafCharacterCounts.RemoveRange(startLeaf, endLeaf - startLeaf + 1);
             InsertLeaves(startLeaf, merged);
             EnsureAtLeastOneLine();
-            RebuildMetadata();
+            RebuildIndexes();
         }
 
         private void AppendLeaves(IEnumerable<string> lines)
@@ -385,10 +450,15 @@ namespace TxtAIEditor.Editor
                 if (leaf.Count >= TargetLeafLines)
                 {
                     _leaves.Add(leaf);
+                    _leafCharacterCounts.Add(CalculateLeafCharacterCount(leaf));
                     leaf = new List<string>(TargetLeafLines);
                 }
             }
-            if (leaf.Count > 0) _leaves.Add(leaf);
+            if (leaf.Count > 0)
+            {
+                _leaves.Add(leaf);
+                _leafCharacterCounts.Add(CalculateLeafCharacterCount(leaf));
+            }
         }
 
         private void InsertLeaves(int index, IReadOnlyList<string> lines)
@@ -397,67 +467,95 @@ namespace TxtAIEditor.Editor
             for (int offset = 0; offset < lines.Count; offset += TargetLeafLines)
             {
                 int count = Math.Min(TargetLeafLines, lines.Count - offset);
-                _leaves.Insert(index++, lines.Skip(offset).Take(count).ToList());
+                List<string> leaf = lines.Skip(offset).Take(count).ToList();
+                _leaves.Insert(index, leaf);
+                _leafCharacterCounts.Insert(index, CalculateLeafCharacterCount(leaf));
+                index++;
             }
         }
 
-        private void SplitOversizedLeaf(int leafIndex)
+        private bool SplitOversizedLeaf(int leafIndex)
         {
             List<string> leaf = _leaves[leafIndex];
-            if (leaf.Count <= MaxLeafLines) return;
+            if (leaf.Count <= MaxLeafLines) return false;
             List<string> tail = leaf.GetRange(TargetLeafLines, leaf.Count - TargetLeafLines);
             leaf.RemoveRange(TargetLeafLines, leaf.Count - TargetLeafLines);
             _leaves.Insert(leafIndex + 1, tail);
+            _leafCharacterCounts[leafIndex] = CalculateLeafCharacterCount(leaf);
+            _leafCharacterCounts.Insert(leafIndex + 1, CalculateLeafCharacterCount(tail));
+            RebuildIndexes();
+            return true;
+        }
+
+        private void MergeSparseLeaf(int leafIndex)
+        {
+            if (_leaves.Count <= 1 || _leaves[leafIndex].Count >= TargetLeafLines / 2)
+            {
+                return;
+            }
+
+            int neighborIndex = leafIndex > 0 ? leafIndex - 1 : leafIndex + 1;
+            List<string> leaf = _leaves[leafIndex];
+            List<string> neighbor = _leaves[neighborIndex];
+            if (leaf.Count + neighbor.Count > MaxLeafLines)
+            {
+                return;
+            }
+
+            int targetIndex;
+            if (neighborIndex < leafIndex)
+            {
+                neighbor.AddRange(leaf);
+                targetIndex = neighborIndex;
+                _leaves.RemoveAt(leafIndex);
+                _leafCharacterCounts.RemoveAt(leafIndex);
+            }
+            else
+            {
+                leaf.AddRange(neighbor);
+                targetIndex = leafIndex;
+                _leaves.RemoveAt(neighborIndex);
+                _leafCharacterCounts.RemoveAt(neighborIndex);
+            }
+
+            _leafCharacterCounts[targetIndex] = CalculateLeafCharacterCount(_leaves[targetIndex]);
+            RebuildIndexes();
         }
 
         private void EnsureAtLeastOneLine()
         {
-            _leaves.RemoveAll(leaf => leaf.Count == 0);
-            if (_leaves.Count == 0) _leaves.Add(new List<string> { string.Empty });
+            for (int i = _leaves.Count - 1; i >= 0; i--)
+            {
+                if (_leaves[i].Count > 0) continue;
+                _leaves.RemoveAt(i);
+                _leafCharacterCounts.RemoveAt(i);
+            }
+            if (_leaves.Count == 0)
+            {
+                var leaf = new List<string> { string.Empty };
+                _leaves.Add(leaf);
+                _leafCharacterCounts.Add(CalculateLeafCharacterCount(leaf));
+            }
         }
 
-        private void RebuildMetadata()
+        private long CalculateLeafCharacterCount(IReadOnlyList<string> leaf)
         {
-            _lineEnds.Clear();
-            _characterEnds.Clear();
-            int lines = 0;
             long characters = 0;
-            foreach (List<string> leaf in _leaves)
-            {
-                lines += leaf.Count;
-                foreach (string line in leaf) characters += line.Length + LineEnding.Length;
-                _lineEnds.Add(lines);
-                _characterEnds.Add(characters);
-            }
+            foreach (string line in leaf) characters += line.Length + LineEnding.Length;
+            return characters;
+        }
+
+        private void RebuildIndexes()
+        {
+            _lineIndex.Rebuild(_leaves.Count, i => _leaves[i].Count);
+            _characterIndex.Rebuild(_leafCharacterCounts.Count, i => _leafCharacterCounts[i]);
         }
 
         private (int LeafIndex, int InnerIndex) LocateLine(int lineNumber)
         {
-            int leafIndex = FindFirstEndAtLeast(_lineEnds, lineNumber);
-            int previousEnd = leafIndex == 0 ? 0 : _lineEnds[leafIndex - 1];
+            int leafIndex = _lineIndex.FindIndexContainingOffset(lineNumber - 1L);
+            int previousEnd = (int)_lineIndex.GetPrefixValue(leafIndex);
             return (leafIndex, lineNumber - previousEnd - 1);
-        }
-
-        private static int FindFirstEndAtLeast(List<int> ends, int value)
-        {
-            int low = 0, high = ends.Count - 1;
-            while (low < high)
-            {
-                int mid = low + (high - low) / 2;
-                if (ends[mid] >= value) high = mid; else low = mid + 1;
-            }
-            return low;
-        }
-
-        private static int FindFirstEndAfter(List<long> ends, long value)
-        {
-            int low = 0, high = ends.Count - 1;
-            while (low < high)
-            {
-                int mid = low + (high - low) / 2;
-                if (ends[mid] > value) high = mid; else low = mid + 1;
-            }
-            return low;
         }
 
         private void NormalizeRange(ref int startLine, ref int startColumn, ref int endLine, ref int endColumn)
@@ -480,6 +578,72 @@ namespace TxtAIEditor.Editor
         {
             if (builder.Length >= maxChars) return;
             builder.Append(value.AsSpan(0, Math.Min(value.Length, maxChars - builder.Length)));
+        }
+
+        private sealed class FenwickIndex
+        {
+            private long[] _tree = new long[1];
+
+            public int Count => _tree.Length - 1;
+            public long Total => GetPrefixValue(Count);
+
+            public void Rebuild(int count, Func<int, long> valueAt)
+            {
+                _tree = new long[count + 1];
+                for (int i = 1; i <= count; i++)
+                {
+                    _tree[i] += valueAt(i - 1);
+                    int parent = i + (i & -i);
+                    if (parent <= count) _tree[parent] += _tree[i];
+                }
+            }
+
+            public void Add(int index, long delta)
+            {
+                for (int i = index + 1; i < _tree.Length; i += i & -i)
+                {
+                    _tree[i] += delta;
+                }
+            }
+
+            public long GetPrefixValue(int count)
+            {
+                int index = Math.Clamp(count, 0, Count);
+                long sum = 0;
+                while (index > 0)
+                {
+                    sum += _tree[index];
+                    index -= index & -index;
+                }
+                return sum;
+            }
+
+            public int FindIndexContainingOffset(long offset)
+            {
+                if (Count == 0) return 0;
+                long target = Math.Max(0, offset);
+                int index = 0;
+                long prefix = 0;
+                int bit = HighestPowerOfTwoAtMost(Count);
+                while (bit != 0)
+                {
+                    int next = index + bit;
+                    if (next <= Count && prefix + _tree[next] <= target)
+                    {
+                        index = next;
+                        prefix += _tree[next];
+                    }
+                    bit >>= 1;
+                }
+                return Math.Min(index, Count - 1);
+            }
+
+            private static int HighestPowerOfTwoAtMost(int value)
+            {
+                int bit = 1;
+                while (bit <= value / 2) bit <<= 1;
+                return bit;
+            }
         }
     }
 }

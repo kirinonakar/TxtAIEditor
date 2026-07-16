@@ -30,8 +30,6 @@ namespace TxtAIEditor.Core.Interfaces
     {
         public string FilePath { get; set; } = string.Empty;
         public long FileSize { get; set; } // Bytes
-        public bool IsLargeFile => FileSize >= 50 * 1024 * 1024; // 50MB 이상
-        public bool IsUltraLargeFile => FileSize >= 200 * 1024 * 1024; // 200MB 이상
     }
 
     public class TextFileReadResult
