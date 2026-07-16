@@ -32,6 +32,7 @@ namespace TxtAIEditor.Core.Services
         private readonly ComboBox _targetLangCombo;
         private readonly ComboBox _llmThinkingLevelCombo;
         private readonly Button _refreshModelsButton;
+        private readonly Button _visionFallbackRefreshModelsButton;
         private readonly TextBlock _modelStatusText;
         private readonly Button _tokenUsageStatsButton;
         private readonly Button _tokenUsageResetButton;
@@ -66,6 +67,7 @@ namespace TxtAIEditor.Core.Services
             _targetLangCombo = CreateTargetLanguageCombo(settings, getString);
             _llmThinkingLevelCombo = CreateThinkingLevelCombo(settings, getString);
             _refreshModelsButton = new Button { Content = getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기"), HorizontalAlignment = HorizontalAlignment.Stretch };
+            _visionFallbackRefreshModelsButton = new Button { Content = getString("SettingsLlmLoadModels", "모델 불러오기"), HorizontalAlignment = HorizontalAlignment.Stretch };
             _modelStatusText = new TextBlock
             {
                 Text = getString("SettingsLlmInfo", "LM Studio는 서버가 켜져 있을 때 http://localhost:1234/v1/models 에서 모델 목록을 불러옵니다."),
@@ -102,6 +104,7 @@ namespace TxtAIEditor.Core.Services
                 GetSelectedVisionFallbackProviderName(),
                 settings.LlmVisionFallbackModel);
             UpdateModelRefreshButtonVisibility();
+            UpdateVisionFallbackRefreshButtonVisibility();
             RefreshTokenUsageStatsDisplay();
             AddEventHandlers();
             Content = CreateSection();
@@ -247,6 +250,7 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(_visionFallbackProviderCombo);
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmVisionFallbackModel", "Vision fallback 모델"));
             section.Children.Add(_visionFallbackModelCombo);
+            section.Children.Add(_visionFallbackRefreshModelsButton);
 
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTokenUsageStatsLabel", "token 통계"));
             section.Children.Add(_tokenUsageSummaryText);
@@ -278,9 +282,11 @@ namespace TxtAIEditor.Core.Services
                 PopulateVisionFallbackModelChoices(
                     provider,
                     SettingsLlmModelCatalog.GetModelForProviderChange(_settings, provider));
+                UpdateVisionFallbackRefreshButtonVisibility();
             };
 
             _refreshModelsButton.Click += async (_, __) => await RefreshModelsAsync();
+            _visionFallbackRefreshModelsButton.Click += async (_, __) => await RefreshVisionFallbackModelsAsync();
             _tokenUsageStatsButton.Click += (_, __) => OpenTokenUsageStatsInEditor();
             _tokenUsageResetButton.Click += (_, __) =>
             {
@@ -512,6 +518,61 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        private async Task RefreshVisionFallbackModelsAsync()
+        {
+            string provider = GetSelectedVisionFallbackProviderName();
+            if (!SettingsLlmModelCatalog.SupportsRemoteModelFetch(provider))
+            {
+                return;
+            }
+
+            string currentModel = (_visionFallbackModelCombo.Text ??
+                _visionFallbackModelCombo.SelectedItem as string ??
+                string.Empty).Trim();
+
+            try
+            {
+                _visionFallbackRefreshModelsButton.IsEnabled = false;
+                bool sameProvider = provider.Equals(GetSelectedProviderName(), StringComparison.OrdinalIgnoreCase);
+                string endpoint = sameProvider
+                    ? _llmEndpointBox.Text.Trim()
+                    : SettingsLlmModelCatalog.GetDefaultEndpoint(provider, string.Empty);
+                string apiKey = sameProvider
+                    ? _llmApiKeyBox.Password.Trim()
+                    : await _llmService.GetApiKeyAsync(provider);
+                var models = await SettingsLlmModelFetcher.FetchModelsAsync(endpoint, apiKey);
+
+                _visionFallbackModelCombo.Items.Clear();
+                foreach (string model in models)
+                {
+                    if (!string.IsNullOrWhiteSpace(model) && !_visionFallbackModelCombo.Items.Contains(model))
+                    {
+                        _visionFallbackModelCombo.Items.Add(model);
+                    }
+                }
+
+                string targetModel = models.Contains(currentModel)
+                    ? currentModel
+                    : models.FirstOrDefault() ?? currentModel;
+                if (!string.IsNullOrWhiteSpace(targetModel))
+                {
+                    if (!_visionFallbackModelCombo.Items.Contains(targetModel))
+                    {
+                        _visionFallbackModelCombo.Items.Add(targetModel);
+                    }
+                    _visionFallbackModelCombo.SelectedItem = targetModel;
+                }
+            }
+            catch
+            {
+                PopulateVisionFallbackModelChoices(provider, currentModel);
+            }
+            finally
+            {
+                _visionFallbackRefreshModelsButton.IsEnabled = true;
+            }
+        }
+
         private void UpdateModelRefreshButtonVisibility()
         {
             string provider = GetSelectedProviderName();
@@ -570,6 +631,44 @@ namespace TxtAIEditor.Core.Services
             {
                 _refreshModelsButton.Visibility = Visibility.Collapsed;
                 _modelStatusText.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void UpdateVisionFallbackRefreshButtonVisibility()
+        {
+            string provider = GetSelectedVisionFallbackProviderName();
+            _visionFallbackRefreshModelsButton.Visibility =
+                SettingsLlmModelCatalog.SupportsRemoteModelFetch(provider)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+            if (provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase))
+            {
+                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOpenRouterModels", "OpenRouter 모델 불러오기");
+            }
+            else if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
+            {
+                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadCerebrasModels", "Cerebras 모델 불러오기");
+            }
+            else if (provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
+            {
+                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOpenCodeGoModels", "OpenCode Go 모델 불러오기");
+            }
+            else if (provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
+            {
+                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOpenCodeZenModels", "OpenCode Zen 모델 불러오기");
+            }
+            else if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOllamaModels", "Ollama 모델 불러오기");
+            }
+            else if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
+            {
+                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOllamaCloudModels", "Ollama Cloud 모델 불러오기");
+            }
+            else
+            {
+                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기");
             }
         }
 
