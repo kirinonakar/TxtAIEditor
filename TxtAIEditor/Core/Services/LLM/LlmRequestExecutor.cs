@@ -27,12 +27,12 @@ namespace TxtAIEditor.Core.Services.LLM
             _tokenUsageTracker = tokenUsageTracker;
         }
 
-        public async Task<string> ExecuteAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task>? onVisionFallbackResult = null)
+        public async Task<string> ExecuteAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null)
         {
             return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult);
         }
 
-        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task>? onVisionFallbackResult = null)
+        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
@@ -155,8 +155,9 @@ namespace TxtAIEditor.Core.Services.LLM
                         "\n\n[Vision fallback task]\n" +
                         "The primary model could not process the attached image data. " +
                         "Inspect the attached image using all prior conversation, workspace, selection, and tool-result context above. " +
-                        "Return only a concise, factual visual analysis relevant to the original task. " +
-                        "Do not call tools and do not continue the task beyond interpreting the image.";
+                        "Return a concise, factual visual analysis relevant to the original task. " +
+                        "If the original task requires an immediate tool action based on that analysis, emit the normal tool call after the analysis; " +
+                        "otherwise stop after the analysis.";
                     string fallbackAnalysis = await ExecuteAsync(
                         fallbackSettings,
                         systemPrompt,
@@ -165,7 +166,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         cancellationToken,
                         attachments,
                         onReasoning: null,
-                        tools: null,
+                        tools,
                         onUsage,
                         allowVisionFallback: false,
                         onVisionFallbackResult: null);
@@ -178,9 +179,11 @@ namespace TxtAIEditor.Core.Services.LLM
                     string fallbackContext =
                         $"[Vision fallback result: {fallbackSettings.LlmProvider} / {fallbackSettings.LlmModel}]\n" +
                         fallbackAnalysis.Trim();
-                    if (onVisionFallbackResult != null)
-                    {
+                    bool forwardFallbackResponse = onVisionFallbackResult != null &&
                         await onVisionFallbackResult(fallbackContext);
+                    if (forwardFallbackResponse)
+                    {
+                        return fallbackAnalysis;
                     }
 
                     string originalModelContent =

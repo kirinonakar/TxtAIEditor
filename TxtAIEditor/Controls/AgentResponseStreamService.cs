@@ -442,8 +442,13 @@ namespace TxtAIEditor.Controls
                     allowVisionFallback: visionFallbackPending,
                     onVisionFallbackResult: fallbackContext =>
                     {
+                        if (AgentToolCallParser.ContainsToolCallSyntax(fallbackContext))
+                        {
+                            return Task.FromResult(true);
+                        }
+
                         runContext.PendingVisionFallbackContext = fallbackContext;
-                        return Task.CompletedTask;
+                        return Task.FromResult(false);
                     });
             }
             catch (ResponseTruncatedException)

@@ -105,7 +105,7 @@ namespace TxtAIEditor.Core.Services
             bool hasEnabledMcp = false,
             Func<LlmTokenUsage, Task>? onUsage = null,
             bool allowVisionFallback = false,
-            Func<string, Task>? onVisionFallbackResult = null)
+            Func<string, Task<bool>>? onVisionFallbackResult = null)
         {
             return _agentService.RunAgentAsync(
                 instruction,
@@ -141,7 +141,7 @@ namespace TxtAIEditor.Core.Services
             bool hasEnabledMcp = false,
             Func<LlmTokenUsage, Task>? onUsage = null,
             bool allowVisionFallback = false,
-            Func<string, Task>? onVisionFallbackResult = null)
+            Func<string, Task<bool>>? onVisionFallbackResult = null)
         {
             return _agentService.RunAgentAsync(
                 settings,
