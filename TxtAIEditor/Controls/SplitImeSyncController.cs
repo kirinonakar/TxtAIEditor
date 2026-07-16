@@ -51,7 +51,7 @@ namespace TxtAIEditor.Controls
                 if (hasOtherSession && !sharesDocument)
                 {
                     string updatedText = sourceSession.GetText();
-                    otherSession!.UpdateContentFromSync(updatedText);
+                    otherSession!.UpdateContentFromSync(updatedText, markUnsaved: sourceDirty);
                     otherTab.Content = updatedText;
                 }
                 else if (hasOtherSession)

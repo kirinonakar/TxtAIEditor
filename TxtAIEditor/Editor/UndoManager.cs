@@ -43,6 +43,28 @@ namespace TxtAIEditor.Editor
         private UndoTransaction? _currentTransaction;
         private int _transactionDepth;
         private DateTime _lastEditTime = DateTime.MinValue;
+        private long _currentStateId;
+        private long _savedStateId;
+        private long _nextStateId = 1;
+        private bool _mergeBoundary;
+
+        public bool IsAtSavedState =>
+            _currentTransaction is not { HasEdits: true } &&
+            _currentStateId == _savedStateId;
+
+        public void MarkSavedState()
+        {
+            CloseOpenTransaction();
+            _savedStateId = _currentStateId;
+            _mergeBoundary = true;
+        }
+
+        public void MarkUnsavedState()
+        {
+            CloseOpenTransaction();
+            _savedStateId = long.MinValue;
+            _mergeBoundary = true;
+        }
 
         public void BeginTransaction(string reason, CaretState? beforeCaret = null)
         {
@@ -67,7 +89,9 @@ namespace TxtAIEditor.Editor
             }
 
             TimeSpan interval = LastEditInterval(now);
-            if (_undoStack.Count > 0 && _undoStack[^1].TryMergeWith(edit, interval))
+            if (!_mergeBoundary &&
+                _undoStack.Count > 0 &&
+                _undoStack[^1].TryMergeWith(edit, interval))
             {
                 _lastEditTime = now;
                 return;
@@ -116,6 +140,7 @@ namespace TxtAIEditor.Editor
             _undoStack.RemoveAt(_undoStack.Count - 1);
             UndoResult result = transaction.Unapply(model);
             _redoStack.Add(transaction);
+            _currentStateId = transaction.BeforeStateId;
             _lastEditTime = DateTime.MinValue;
             return result;
         }
@@ -132,6 +157,7 @@ namespace TxtAIEditor.Editor
             _redoStack.RemoveAt(_redoStack.Count - 1);
             UndoResult result = transaction.Apply(model);
             _undoStack.Add(transaction);
+            _currentStateId = transaction.AfterStateId;
             _lastEditTime = DateTime.MinValue;
             return result;
         }
@@ -150,6 +176,7 @@ namespace TxtAIEditor.Editor
             _undoStack.RemoveAt(_undoStack.Count - 1);
             UndoResult result = await transaction.UnapplyAsync(model, progress);
             _redoStack.Add(transaction);
+            _currentStateId = transaction.BeforeStateId;
             _lastEditTime = DateTime.MinValue;
             return result;
         }
@@ -168,6 +195,7 @@ namespace TxtAIEditor.Editor
             _redoStack.RemoveAt(_redoStack.Count - 1);
             UndoResult result = await transaction.ApplyAsync(model, progress);
             _undoStack.Add(transaction);
+            _currentStateId = transaction.AfterStateId;
             _lastEditTime = DateTime.MinValue;
             return result;
         }
@@ -179,6 +207,10 @@ namespace TxtAIEditor.Editor
             _currentTransaction = null;
             _transactionDepth = 0;
             _lastEditTime = DateTime.MinValue;
+            _currentStateId = 0;
+            _savedStateId = 0;
+            _nextStateId = 1;
+            _mergeBoundary = false;
         }
 
         private void CloseOpenTransaction()
@@ -199,6 +231,10 @@ namespace TxtAIEditor.Editor
                 return;
             }
 
+            transaction.BeforeStateId = _currentStateId;
+            transaction.AfterStateId = _nextStateId++;
+            _currentStateId = transaction.AfterStateId;
+            _mergeBoundary = false;
             _undoStack.Add(transaction);
             if (_undoStack.Count > MaxUndoDepth)
             {
@@ -228,6 +264,8 @@ namespace TxtAIEditor.Editor
         public CaretState? BeforeCaret { get; }
         public CaretState? AfterCaret { get; set; }
         public bool HasEdits => _edits.Count > 0;
+        internal long BeforeStateId { get; set; }
+        internal long AfterStateId { get; set; }
 
         public void AddEdit(IUndoableEdit edit, TimeSpan interval)
         {

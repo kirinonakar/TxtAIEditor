@@ -97,55 +97,73 @@ namespace TxtAIEditor.Controls
         public void SetDirtyStateForFileGroup(OpenedTab sourceTab, bool isDirty)
         {
             bool changed = false;
-            string? savedContent = null;
-            if (!isDirty)
+            foreach (var tab in GetTabsForSameFile(sourceTab))
             {
-                if (_editorSessions.TryGetValue(sourceTab.Id, out var session))
+                if (tab.IsDirty == isDirty)
                 {
-                    savedContent = session.Model is HexDumpTextModel ? string.Empty : session.GetText();
+                    continue;
                 }
-                else
-                {
-                    savedContent = sourceTab.Content;
-                }
+
+                tab.IsDirty = isDirty;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                _updateWindowTitle();
+            }
+        }
+
+        private void UpdateSavedBaselineForFileGroup(OpenedTab sourceTab)
+        {
+            bool changed = false;
+            string savedContent;
+            if (_editorSessions.TryGetValue(sourceTab.Id, out var sourceSession))
+            {
+                savedContent = sourceSession.Model is HexDumpTextModel ? string.Empty : sourceSession.GetText();
+            }
+            else
+            {
+                savedContent = sourceTab.Content;
             }
 
             foreach (var tab in GetTabsForSameFile(sourceTab))
             {
-                if (savedContent != null)
+                tab.OriginalContent = savedContent;
+                bool hasSession = _editorSessions.TryGetValue(tab.Id, out var session);
+                if (hasSession)
                 {
-                    tab.OriginalContent = savedContent;
-                    bool hasSession = _editorSessions.TryGetValue(tab.Id, out var session);
-                    tab.OriginalLineEnding = hasSession ? session!.Model.LineEnding : TextModelFactory.FromText(savedContent).LineEnding;
-                    tab.OriginalEncodingName = tab.EncodingName;
+                    session!.MarkSavedState();
+                }
+                tab.OriginalLineEnding = hasSession
+                    ? session!.Model.LineEnding
+                    : TextModelFactory.FromText(savedContent).LineEnding;
+                tab.OriginalEncodingName = tab.EncodingName;
 
-                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                {
+                    if (hasSession)
                     {
-                        if (hasSession)
+                        if (session!.Model is HexDumpTextModel)
                         {
-                            if (session!.Model is HexDumpTextModel)
-                            {
-                                _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(Array.Empty<string>());
-                            }
-                            else
-                            {
-                                var lines = session!.GetLines(1, session.Model.LineCount);
-                                _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
-                            }
+                            _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(Array.Empty<string>());
                         }
                         else
                         {
-                            var lines = savedContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+                            var lines = session!.GetLines(1, session.Model.LineCount);
                             _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
                         }
                     }
+                    else
+                    {
+                        var lines = savedContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+                        _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
+                    }
                 }
 
-                if (tab.IsDirty != isDirty)
-                {
-                    tab.IsDirty = isDirty;
-                    changed = true;
-                }
+                if (!tab.IsDirty) continue;
+                tab.IsDirty = false;
+                changed = true;
             }
 
             if (changed)
@@ -156,12 +174,12 @@ namespace TxtAIEditor.Controls
 
         public void PropagateDirtyStateToOtherTabs(OpenedTab sourceTab)
         {
-            CheckAndUpdateDirtyState(sourceTab);
+            SetDirtyStateForFileGroup(sourceTab, sourceTab.IsDirty);
         }
 
         public void CleanDirtyStateOnOtherTabs(OpenedTab sourceTab)
         {
-            SetDirtyStateForFileGroup(sourceTab, false);
+            UpdateSavedBaselineForFileGroup(sourceTab);
         }
 
         private void CheckAndUpdateDirtyState(OpenedTab tab)
@@ -183,12 +201,12 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
+                bool hasTextChanges = !session.IsAtSavedState;
                 var dirtyLines = _showDirtyLines()
-                    ? ComputeDirtyLines(tab, session)
+                    ? hasTextChanges
+                        ? ComputeDirtyLines(tab, session)
+                        : new Dictionary<int, string>()
                     : null;
-                bool hasTextChanges = dirtyLines != null
-                    ? dirtyLines.Count > 0
-                    : HasTextChanges(tab, session);
                 bool isDirtyCurrent = hasTextChanges ||
                                (tab.OriginalLineEnding != null && session.Model.LineEnding != tab.OriginalLineEnding) ||
                                (tab.OriginalEncodingName != null && tab.EncodingName != tab.OriginalEncodingName);
@@ -216,25 +234,6 @@ namespace TxtAIEditor.Controls
             var orig = tab.OriginalLines;
             var current = session.Model.GetLines(1, session.Model.LineCount);
             return ComputeDirtyLines(orig, current);
-        }
-
-        private static bool HasTextChanges(OpenedTab tab, EditorDocumentSession session)
-        {
-            var original = tab.OriginalLines;
-            if (original.Length != session.Model.LineCount)
-            {
-                return true;
-            }
-
-            for (int line = 1; line <= session.Model.LineCount; line++)
-            {
-                if (!string.Equals(original[line - 1], session.Model.GetLine(line), StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         internal static Dictionary<int, string> ComputeDirtyLines(IReadOnlyList<string> orig, IReadOnlyList<string> current)

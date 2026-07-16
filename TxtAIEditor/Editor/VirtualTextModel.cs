@@ -1021,6 +1021,8 @@ namespace TxtAIEditor.Editor
 
         public EditorDocumentChange? LastChange => _buffer.LastChange;
 
+        public bool IsAtSavedState => _buffer.UndoManager.IsAtSavedState;
+
         public bool TryGetChangesSince(
             long version,
             out IReadOnlyList<EditorDocumentChange> changes) =>
@@ -1039,6 +1041,16 @@ namespace TxtAIEditor.Editor
         public void MarkViewSynchronized(long version)
         {
             ViewVersion = Math.Max(ViewVersion, version);
+        }
+
+        public void MarkSavedState()
+        {
+            _buffer.UndoManager.MarkSavedState();
+        }
+
+        public void MarkUnsavedState()
+        {
+            _buffer.UndoManager.MarkUnsavedState();
         }
 
         public async Task<bool> WaitForDocumentVersionAsync(long version, int timeoutMs = 700)
@@ -1070,12 +1082,16 @@ namespace TxtAIEditor.Editor
             }
         }
 
-        public void UpdateContentFromSync(string text)
+        public void UpdateContentFromSync(string text, bool markUnsaved = false)
         {
             EditorDocumentChange change = _buffer.ReplaceModel(
                 Tab.Id,
                 TextModelFactory.FromText(text),
                 clearUndo: true);
+            if (markUnsaved)
+            {
+                _buffer.UndoManager.MarkUnsavedState();
+            }
             ViewVersion = change.Version;
             RefreshTabContentPreview();
         }

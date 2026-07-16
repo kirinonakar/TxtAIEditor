@@ -143,6 +143,7 @@ namespace TxtAIEditor.Controls
                 ClearArchiveReadOnlyState(tab);
                 await SaveTabContentAsync(tab);
                 tab.IsDirty = false;
+                _cleanDirtyStateOnOtherTabs(tab);
                 await CompleteSuccessfulSaveAsync(tab, syncLineEnding: false);
                 return true;
             }

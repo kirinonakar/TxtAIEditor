@@ -159,6 +159,7 @@ namespace TxtAIEditor.Editor
         public async Task ResetOriginalLinesAsync(IReadOnlyList<string> lines)
         {
             _currentOriginalLines = lines.ToArray();
+            _currentDirtyLines = new Dictionary<int, string>();
             var msg = new { action = "resetOriginalLines", lines = _currentOriginalLines };
             await SendMessageAsync(msg);
         }

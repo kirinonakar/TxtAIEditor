@@ -195,7 +195,7 @@ namespace TxtAIEditor.Composition
                     EditorDocumentSession? session = null;
                     if (editorSessions.TryGetValue(tab.Id, out session))
                     {
-                        session.UpdateContentFromSync(newContent);
+                        session.UpdateContentFromSync(newContent, markUnsaved: true);
                     }
 
                     if (tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)

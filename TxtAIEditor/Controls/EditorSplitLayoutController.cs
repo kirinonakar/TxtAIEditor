@@ -259,7 +259,7 @@ namespace TxtAIEditor.Controls
                 {
                     if (!keeperSession.SharesDocumentWith(duplicateSession))
                     {
-                        keeperSession.UpdateContentFromSync(duplicateText);
+                        keeperSession.UpdateContentFromSync(duplicateText, markUnsaved: true);
                     }
                     else
                     {
