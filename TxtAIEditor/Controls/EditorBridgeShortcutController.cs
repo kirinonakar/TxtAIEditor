@@ -166,8 +166,6 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
                 _schedulePreview(tab);
                 EditorDocumentChange? change = session.LastChange;
                 await bridge.ApplyEditResultAsync(
@@ -177,6 +175,11 @@ namespace TxtAIEditor.Controls
                     change?.Version,
                     change?.SourceViewId);
                 await _syncEditsToOtherTabsAsync(tab);
+                // Applying the undo/redo patch can optimistically add dirty markers in
+                // WebView, especially when a large document has only a partial original-line
+                // cache. Send the host's authoritative markers after every view is updated.
+                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
             }
             finally
             {
