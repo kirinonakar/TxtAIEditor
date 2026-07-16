@@ -155,6 +155,7 @@ namespace TxtAIEditor.Controls
             _undoRedoInProgress = true;
             var progress = new Progress<TextOperationProgress>(value =>
                 _statusBarController.ShowTextOperationProgress(isUndo ? "undo" : "redo", value));
+            await bridge.SetTextOperationLockAsync(locked: true);
             try
             {
                 UndoResult? result = isUndo
@@ -179,6 +180,7 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
+                await bridge.SetTextOperationLockAsync(locked: false);
                 _statusBarController.HideTextOperationProgress();
                 _undoRedoInProgress = false;
             }

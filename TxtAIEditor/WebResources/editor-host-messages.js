@@ -3,6 +3,8 @@ import {
     applyOptions,
     applyEditResultFromHost,
     clearMeasuredLineHeights,
+    cleanDirtyMarker,
+    markDirty,
     post,
     queueRender,
     receiveLineBlock,
@@ -295,6 +297,9 @@ export function createHostMessageHandler({
                     const lineNumber = Math.max(1, Number(replacement?.lineNumber || 1));
                     if (lineNumber <= state.lineCount) {
                         state.cache.set(lineNumber, String(replacement?.text ?? ''));
+                        if (!cleanDirtyMarker(lineNumber)) {
+                            markDirty(lineNumber, 'mod');
+                        }
                     }
                 }
                 state.pendingLinePatchBatch.nextIndex++;
@@ -303,7 +308,6 @@ export function createHostMessageHandler({
                     state.documentVersion++;
                     state.searchDocumentVersion = -1;
                     clearMeasuredLineHeights();
-                    recomputeDirtyLines();
                     markVersionedDocumentChangeApplied(msg);
                     state.pendingLinePatchBatch = null;
                     state.livePreviewLocalResourceVersion = String(Date.now());

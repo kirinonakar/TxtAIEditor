@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -213,6 +214,7 @@ namespace TxtAIEditor.Editor
 
     public sealed class UndoTransaction
     {
+        private const long ProgressIntervalMilliseconds = 50;
         private static readonly IReadOnlyList<string> EmptyLines = Array.Empty<string>();
         private readonly List<IUndoableEdit> _edits = new();
 
@@ -278,10 +280,28 @@ namespace TxtAIEditor.Editor
             return BuildResult(model, beforeLineCount, ranges, BeforeCaret);
         }
 
-        public async Task<UndoResult> ApplyAsync(
+        public Task<UndoResult> ApplyAsync(
             ITextModel model,
             IProgress<TextOperationProgress>? progress)
         {
+            progress?.Report(new TextOperationProgress(0, _edits.Count, TimeSpan.Zero));
+            return Task.Run(() => ApplyWithProgress(model, progress));
+        }
+
+        public Task<UndoResult> UnapplyAsync(
+            ITextModel model,
+            IProgress<TextOperationProgress>? progress)
+        {
+            progress?.Report(new TextOperationProgress(0, _edits.Count, TimeSpan.Zero));
+            return Task.Run(() => UnapplyWithProgress(model, progress));
+        }
+
+        private UndoResult ApplyWithProgress(
+            ITextModel model,
+            IProgress<TextOperationProgress>? progress)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            long lastProgressReport = 0;
             int beforeLineCount = model.LineCount;
             UndoEditRange[] ranges = _edits.Select(edit => edit.RedoRange).ToArray();
             for (int i = 0; i < _edits.Count; i++)
@@ -289,19 +309,25 @@ namespace TxtAIEditor.Editor
                 _edits[i].Apply(model);
                 if ((i + 1) % 256 == 0)
                 {
-                    progress?.Report(new TextOperationProgress(i + 1, _edits.Count, TimeSpan.Zero));
-                    await Task.Yield();
+                    ReportProgressIfDue(
+                        progress,
+                        i + 1,
+                        _edits.Count,
+                        stopwatch,
+                        ref lastProgressReport);
                 }
             }
 
-            progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, TimeSpan.Zero));
+            progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, stopwatch.Elapsed));
             return BuildResult(model, beforeLineCount, ranges, AfterCaret);
         }
 
-        public async Task<UndoResult> UnapplyAsync(
+        private UndoResult UnapplyWithProgress(
             ITextModel model,
             IProgress<TextOperationProgress>? progress)
         {
+            var stopwatch = Stopwatch.StartNew();
+            long lastProgressReport = 0;
             int beforeLineCount = model.LineCount;
             UndoEditRange[] ranges = _edits.Select(edit => edit.UndoRange).ToArray();
             int processed = 0;
@@ -311,13 +337,34 @@ namespace TxtAIEditor.Editor
                 processed++;
                 if (processed % 256 == 0)
                 {
-                    progress?.Report(new TextOperationProgress(processed, _edits.Count, TimeSpan.Zero));
-                    await Task.Yield();
+                    ReportProgressIfDue(
+                        progress,
+                        processed,
+                        _edits.Count,
+                        stopwatch,
+                        ref lastProgressReport);
                 }
             }
 
-            progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, TimeSpan.Zero));
+            progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, stopwatch.Elapsed));
             return BuildResult(model, beforeLineCount, ranges, BeforeCaret);
+        }
+
+        private static void ReportProgressIfDue(
+            IProgress<TextOperationProgress>? progress,
+            int processed,
+            int total,
+            Stopwatch stopwatch,
+            ref long lastProgressReport)
+        {
+            long elapsedMilliseconds = stopwatch.ElapsedMilliseconds;
+            if (elapsedMilliseconds - lastProgressReport < ProgressIntervalMilliseconds)
+            {
+                return;
+            }
+
+            lastProgressReport = elapsedMilliseconds;
+            progress?.Report(new TextOperationProgress(processed, total, stopwatch.Elapsed));
         }
 
         private UndoResult BuildResult(

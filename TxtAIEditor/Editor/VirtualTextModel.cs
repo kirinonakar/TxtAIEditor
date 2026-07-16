@@ -891,11 +891,11 @@ namespace TxtAIEditor.Editor
         {
             long baseVersion = Version;
             Version++;
-            TextLinePatch[] safePatches = patches
-                .Where(patch => patch.LineNumber >= 1 && patch.LineNumber <= _model.LineCount)
-                .OrderBy(patch => patch.LineNumber)
-                .ToArray();
-            int startLine = safePatches.Length > 0 ? safePatches[0].LineNumber : 1;
+            // All callers produce validated, line-number ordered patches. Reusing the
+            // collection avoids copying and sorting hundreds of thousands of entries
+            // on the UI thread after a large undo/redo operation.
+            IReadOnlyList<TextLinePatch> safePatches = patches;
+            int startLine = safePatches.Count > 0 ? safePatches[0].LineNumber : 1;
             var change = new EditorDocumentChange(
                 DocumentId,
                 sourceViewId,
