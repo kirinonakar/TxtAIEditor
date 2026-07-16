@@ -195,9 +195,7 @@ namespace TxtAIEditor.Composition
             var tabReloadController = editorFoundationControllers.TabReload;
             var tabDirtyStateController = editorFoundationControllers.TabDirtyState;
             var activeEditorInsertionController = editorFoundationControllers.ActiveEditorInsertion;
-            var tabTextContextProvider = editorFoundationControllers.TabTextContext;
             var editorBridgeShortcutController = editorFoundationControllers.EditorBridgeShortcut;
-            var searchReplaceTabSyncController = editorFoundationControllers.SearchReplaceTabSync;
             var searchReplaceController = editorFoundationControllers.SearchReplace;
             var splitImeSyncController = editorFoundationControllers.SplitImeSync;
 
@@ -370,31 +368,14 @@ namespace TxtAIEditor.Composition
                 ui,
                 services,
                 viewModel,
-                state.TabBridges,
-                state.EditorSessions,
-                tabNavigationController,
-                tabDirtyStateController,
-                tabCloseController,
-                searchReplaceTabSyncController,
-                compareTabController,
-                activeEditorInsertionController,
-                tabTextContextProvider,
-                dialogController,
-                new MainWindowAgentCompositionCallbacks(
-                    callbacks.GetSelectedExplorerItem,
-                    () => state.CurrentFolderPath,
-                    () => state.CurrentRepoPath,
-                    LoadDirectoryRoot,
-                    QueueGitStatusRefresh,
-                    callbacks.GetAgentSessionEdits,
-                    callbacks.LoadFileIntoTabForAgentAsync,
-                    NavigateExplorerToFolderAndRevealAsync,
-                    callbacks.OpenGeneratedTab,
-                    callbacks.SaveTabAsync,
-                    callbacks.InitializePickerWindow,
-                    () => explorerNavigationController.RefreshCurrentFolder(),
-                    callbacks.GetLocalizedString,
-                    callbacks.UpdateWindowTitle));
+                state,
+                new MainWindowAgentModuleDependencies(
+                    shellControllers,
+                    editorFoundationControllers,
+                    documentCommandControllers,
+                    previewControllers),
+                workspaceControllers,
+                callbacks);
             var llmAssistantController = agentControllers.LlmAssistant;
             var agentController = agentControllers.Agent;
 

@@ -25,50 +25,105 @@ namespace TxtAIEditor.Composition
         Action<object> InitializePickerWindow,
         Action RefreshCurrentExplorerFolder,
         Func<string, string, string> GetLocalizedString,
-        Action UpdateWindowTitle);
+        Action UpdateWindowTitle) : IAgentFileWorkflowHost
+    {
+        IReadOnlyList<AgentFileEditPreview> IAgentFileWorkflowHost.GetSessionEdits() => GetAgentSessionEdits();
 
-    internal sealed record MainWindowAgentControllers(
+        ExplorerItem? IAgentFileWorkflowHost.GetSelectedExplorerItem() => GetSelectedExplorerItem();
+
+        string IAgentFileWorkflowHost.GetCurrentFolderPath() => GetCurrentFolderPath();
+
+        string IAgentFileWorkflowHost.GetCurrentRepoPath() => GetCurrentRepoPath();
+
+        void IAgentFileWorkflowHost.LoadDirectoryRoot(string folderPath) => LoadDirectoryRoot(folderPath);
+
+        void IAgentFileWorkflowHost.QueueGitStatusRefresh() => QueueGitStatusRefresh();
+
+        string IAgentFileWorkflowHost.GetLocalizedString(string key, string fallback) =>
+            GetLocalizedString(key, fallback);
+    }
+
+    internal sealed record MainWindowAgentModuleDependencies(
+        MainWindowShellControllers Shell,
+        MainWindowEditorFoundationControllers Editor,
+        MainWindowDocumentCommandControllers Documents,
+        MainWindowPreviewControllers Preview);
+
+    internal sealed record MainWindowAgentModuleFacade(
         LlmAssistantController LlmAssistant,
-        AgentFileWorkflowController AgentFileWorkflow,
         AgentController Agent);
 
     internal static class MainWindowAgentComposition
     {
-        public static MainWindowAgentControllers Compose(
+        public static MainWindowAgentModuleFacade Compose(
+            MainWindow window,
+            MainWindowUiRefs ui,
+            MainWindowServices services,
+            MainWindowViewModel viewModel,
+            MainWindowState state,
+            MainWindowAgentModuleDependencies dependencies,
+            MainWindowWorkspaceControllers workspace,
+            MainWindowCompositionRootCallbacks callbacks)
+        {
+            var explorerNavigation = workspace.ExplorerNavigation;
+            return Compose(
+                window,
+                ui,
+                services,
+                viewModel,
+                state.TabBridges,
+                state.EditorSessions,
+                dependencies,
+                new MainWindowAgentCompositionCallbacks(
+                    callbacks.GetSelectedExplorerItem,
+                    () => state.CurrentFolderPath,
+                    () => state.CurrentRepoPath,
+                    explorerNavigation.LoadDirectoryRoot,
+                    workspace.GitStatusRefresh.QueueRefresh,
+                    callbacks.GetAgentSessionEdits,
+                    callbacks.LoadFileIntoTabForAgentAsync,
+                    folderPath => explorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel: true),
+                    callbacks.OpenGeneratedTab,
+                    callbacks.SaveTabAsync,
+                    callbacks.InitializePickerWindow,
+                    explorerNavigation.RefreshCurrentFolder,
+                    callbacks.GetLocalizedString,
+                    callbacks.UpdateWindowTitle));
+        }
+
+        public static MainWindowAgentModuleFacade Compose(
             MainWindow window,
             MainWindowUiRefs ui,
             MainWindowServices services,
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
-            TabNavigationController tabNavigation,
-            TabDirtyStateController tabDirtyState,
-            TabCloseController tabClose,
-            SearchReplaceTabSyncController searchReplaceTabSync,
-            CompareTabController compareTab,
-            ActiveEditorInsertionController activeEditorInsertion,
-            TabTextContextProvider tabTextContext,
-            WindowDialogController dialog,
+            MainWindowAgentModuleDependencies dependencies,
             MainWindowAgentCompositionCallbacks callbacks)
         {
+            var shell = dependencies.Shell;
+            var editor = dependencies.Editor;
+            var documents = dependencies.Documents;
+            var preview = dependencies.Preview;
+
             var llmAssistant = new LlmAssistantController(
                 services.LlmService,
                 services.SettingsService,
                 services.LanguageDetectionService,
                 ui.PreviewGrid,
                 () => ui.RootElement.XamlRoot,
-                tabNavigation.GetActiveTab,
-                tabTextContext.GetText,
-                activeEditorInsertion.InsertTextAsync,
+                shell.TabNavigation.GetActiveTab,
+                editor.TabTextContext.GetText,
+                editor.ActiveEditorInsertion.InsertTextAsync,
                 (title, content) => CreateGeneratedTab(
                     title,
                     content,
                     ensureUniqueUntitledName: false,
                     viewModel,
                     services,
-                    tabDirtyState,
+                    editor.TabDirtyState,
                     callbacks),
-                dialog.ShowErrorMessage,
+                shell.Dialog.ShowErrorMessage,
                 callbacks.GetLocalizedString,
                 callbacks.InitializePickerWindow,
                 beforeDialog: () => { if (ui.EditorWorkspace.IsTerminalVisible) ui.TerminalPane.SuspendNativeWindows(); },
@@ -87,35 +142,29 @@ namespace TxtAIEditor.Composition
                 ui.EditorTabView2,
                 tabBridges,
                 editorSessions,
-                tabClose,
-                searchReplaceTabSync,
-                compareTab,
-                callbacks.GetAgentSessionEdits,
-                callbacks.GetSelectedExplorerItem,
-                callbacks.GetCurrentFolderPath,
-                callbacks.GetCurrentRepoPath,
-                callbacks.LoadDirectoryRoot,
-                callbacks.QueueGitStatusRefresh,
-                callbacks.GetLocalizedString);
+                documents.TabClose,
+                editor.SearchReplaceTabSync,
+                preview.CompareTab,
+                callbacks);
 
             var agent = new AgentController(
                 services.LlmService,
                 services.SettingsService,
                 services.CredentialService,
                 ui.PreviewGrid.AgentPane,
-                tabNavigation.GetActiveTab,
+                shell.TabNavigation.GetActiveTab,
                 () => viewModel.Tabs.ToList(),
-                tabTextContext.GetText,
-                activeEditorInsertion.InsertTextAsync,
+                editor.TabTextContext.GetText,
+                editor.ActiveEditorInsertion.InsertTextAsync,
                 (title, content) => CreateGeneratedTab(
                     title,
                     content,
                     ensureUniqueUntitledName: true,
                     viewModel,
                     services,
-                    tabDirtyState,
+                    editor.TabDirtyState,
                     callbacks),
-                dialog.ShowErrorMessage,
+                shell.Dialog.ShowErrorMessage,
                 callbacks.GetLocalizedString,
                 new AgentFileToolService(agentFileWorkflow.GetWorkspaceRoot, callbacks.GetLocalizedString),
                 services.PdfTextExtractionService,
@@ -160,15 +209,15 @@ namespace TxtAIEditor.Composition
                         session?.MarkViewSynchronized(session.DocumentVersion);
                     }
 
-                    tabDirtyState.MarkTabDirty(tab);
+                    editor.TabDirtyState.MarkTabDirty(tab);
                     callbacks.UpdateWindowTitle();
                     return true;
                 },
-                beginStreamIntoActiveEditorAsync: activeEditorInsertion.BeginStreamAsync,
-                streamTextIntoActiveEditorAsync: activeEditorInsertion.InsertStreamTextAsync,
-                endStreamIntoActiveEditorAsync: activeEditorInsertion.EndStreamAsync);
+                beginStreamIntoActiveEditorAsync: editor.ActiveEditorInsertion.BeginStreamAsync,
+                streamTextIntoActiveEditorAsync: editor.ActiveEditorInsertion.InsertStreamTextAsync,
+                endStreamIntoActiveEditorAsync: editor.ActiveEditorInsertion.EndStreamAsync);
 
-            return new MainWindowAgentControllers(llmAssistant, agentFileWorkflow, agent);
+            return new MainWindowAgentModuleFacade(llmAssistant, agent);
         }
 
         private static OpenedTab CreateGeneratedTab(

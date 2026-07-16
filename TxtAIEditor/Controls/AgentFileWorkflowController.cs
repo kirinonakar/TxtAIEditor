@@ -20,13 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly TabCloseController _tabCloseController;
         private readonly SearchReplaceTabSyncController _tabSyncController;
         private readonly CompareTabController _compareTabController;
-        private readonly Func<IReadOnlyList<AgentFileEditPreview>> _sessionEditsProvider;
-        private readonly Func<ExplorerItem?> _selectedExplorerItemProvider;
-        private readonly Func<string> _currentFolderProvider;
-        private readonly Func<string> _currentRepoProvider;
-        private readonly Action<string> _loadDirectoryRoot;
-        private readonly Action _queueGitStatusRefresh;
-        private readonly Func<string, string, string> _getString;
+        private readonly IAgentFileWorkflowHost _host;
 
         public AgentFileWorkflowController(
             MainWindowViewModel viewModel,
@@ -37,13 +31,7 @@ namespace TxtAIEditor.Controls
             TabCloseController tabCloseController,
             SearchReplaceTabSyncController tabSyncController,
             CompareTabController compareTabController,
-            Func<IReadOnlyList<AgentFileEditPreview>> sessionEditsProvider,
-            Func<ExplorerItem?> selectedExplorerItemProvider,
-            Func<string> currentFolderProvider,
-            Func<string> currentRepoProvider,
-            Action<string> loadDirectoryRoot,
-            Action queueGitStatusRefresh,
-            Func<string, string, string> getString)
+            IAgentFileWorkflowHost host)
         {
             _viewModel = viewModel;
             _primaryTabView = primaryTabView;
@@ -53,13 +41,7 @@ namespace TxtAIEditor.Controls
             _tabCloseController = tabCloseController;
             _tabSyncController = tabSyncController;
             _compareTabController = compareTabController;
-            _sessionEditsProvider = sessionEditsProvider;
-            _selectedExplorerItemProvider = selectedExplorerItemProvider;
-            _currentFolderProvider = currentFolderProvider;
-            _currentRepoProvider = currentRepoProvider;
-            _loadDirectoryRoot = loadDirectoryRoot;
-            _queueGitStatusRefresh = queueGitStatusRefresh;
-            _getString = getString;
+            _host = host;
         }
 
         private async Task RunOnUiAsync(Func<Task> action)
@@ -94,30 +76,30 @@ namespace TxtAIEditor.Controls
             {
                 await _tabSyncController.HandleFileModifiedAsync(filePath);
 
-                string currentFolder = _currentFolderProvider();
+                string currentFolder = _host.GetCurrentFolderPath();
                 if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
                 {
-                    _loadDirectoryRoot(currentFolder);
+                    _host.LoadDirectoryRoot(currentFolder);
                 }
 
-                _queueGitStatusRefresh();
+                _host.QueueGitStatusRefresh();
 
-                var edit = _sessionEditsProvider()
+                var edit = _host.GetSessionEdits()
                     .LastOrDefault(e => string.Equals(e.FullPath, filePath, StringComparison.OrdinalIgnoreCase));
                 if (edit != null)
                 {
                     string displayName = edit.TotalModifications > 1
                         ? $"({edit.ModificationNumber}) {Path.GetFileName(edit.RelativePath)}"
                         : Path.GetFileName(edit.RelativePath);
-                    string title = $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}";
+                    string title = $"{_host.GetLocalizedString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}";
                     await _compareTabController.UpdateCompareTabIfOpenAsync(
                         title,
                         edit.FullPath,
                         edit.FullPath,
                         edit.OldContent,
                         edit.NewContent,
-                        labelA: _getString("DiffOriginalLabel", "원본"),
-                        labelB: _getString("DiffModifiedLabel", "수정본"));
+                        labelA: _host.GetLocalizedString("DiffOriginalLabel", "원본"),
+                        labelB: _host.GetLocalizedString("DiffModifiedLabel", "수정본"));
                 }
             });
         }
@@ -135,9 +117,9 @@ namespace TxtAIEditor.Controls
                     preview.FullPath,
                     preview.OldContent,
                     preview.NewContent,
-                    customTitle: $"{_getString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}",
-                    labelA: _getString("DiffOriginalLabel", "원본"),
-                    labelB: _getString("DiffModifiedLabel", "수정본"));
+                    customTitle: $"{_host.GetLocalizedString("AgentDiffTitle", "Agent 변경 비교")}: {displayName}",
+                    labelA: _host.GetLocalizedString("DiffOriginalLabel", "원본"),
+                    labelB: _host.GetLocalizedString("DiffModifiedLabel", "수정본"));
             });
         }
 
@@ -197,19 +179,19 @@ namespace TxtAIEditor.Controls
 
         public string GetWorkspaceRoot()
         {
-            string currentFolder = _currentFolderProvider();
+            string currentFolder = _host.GetCurrentFolderPath();
             if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
             {
                 return currentFolder;
             }
 
-            string currentRepo = _currentRepoProvider();
+            string currentRepo = _host.GetCurrentRepoPath();
             if (!string.IsNullOrWhiteSpace(currentRepo) && Directory.Exists(currentRepo))
             {
                 return currentRepo;
             }
 
-            if (_selectedExplorerItemProvider() is ExplorerItem selectedItem)
+            if (_host.GetSelectedExplorerItem() is ExplorerItem selectedItem)
             {
                 if (selectedItem.IsFolder && Directory.Exists(selectedItem.Path))
                 {

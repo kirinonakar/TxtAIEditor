@@ -47,7 +47,7 @@ namespace TxtAIEditor.Composition
         EditorControllers Editor,
         DocumentControllers Documents,
         MainWindowPreviewControllers Preview,
-        MainWindowAgentControllers Agents,
+        MainWindowAgentModuleFacade Agents,
         MainWindowWorkspaceControllers Workspace,
         LifecycleControllers Lifecycle);
 }
