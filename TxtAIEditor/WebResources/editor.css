@@ -556,16 +556,16 @@ body.hex-view-mode #hex-sticky-header {
     border-radius: 2px;
 }
 
-.line-text[contenteditable="true"]:focus {
+body:not(.hex-view-mode) .line-text[contenteditable="true"]:focus {
     background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
-body .line-row.editing-row .line-text[contenteditable="true"] {
+body:not(.hex-view-mode) .line-row.editing-row .line-text[contenteditable="true"] {
     background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
-body:not(.wrap-enabled):not(.csv-table-mode) .line-row:focus-within,
-body:not(.wrap-enabled):not(.csv-table-mode) .line-row.editing-row {
+body:not(.hex-view-mode):not(.wrap-enabled):not(.csv-table-mode) .line-row:focus-within,
+body:not(.hex-view-mode):not(.wrap-enabled):not(.csv-table-mode) .line-row.editing-row {
     background: linear-gradient(
         to right,
         transparent 0 var(--gutter-width),
