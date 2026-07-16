@@ -13,7 +13,7 @@ using WinRT.Interop;
 namespace TxtAIEditor.Composition
 {
     internal sealed record MainWindowShellCompositionCallbacks(
-        Func<Task> SaveUiLayoutSettingsAsync,
+        Func<ShellPanelLayoutService, Task> SaveUiLayoutSettingsAsync,
         Action ToggleTerminalRequested,
         Func<ElementTheme> GetCurrentElementTheme,
         Func<string, string, string> GetLocalizedString,
@@ -54,7 +54,8 @@ namespace TxtAIEditor.Composition
                 ui.RightSplitter,
                 ui.LeftSidebar,
                 ui.PreviewGrid);
-            shellPanelLayout.PanelWidthsChanged += async (_, _) => await callbacks.SaveUiLayoutSettingsAsync();
+            shellPanelLayout.PanelWidthsChanged += async (_, _) =>
+                await callbacks.SaveUiLayoutSettingsAsync(shellPanelLayout);
 
             var tabNavigation = new TabNavigationController(
                 viewModel,

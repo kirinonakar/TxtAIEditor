@@ -19,109 +19,42 @@ namespace TxtAIEditor.Composition
             int initialEditorLineWarmupCount,
             MainWindowCompositionRootCallbacks callbacks)
         {
-            ShellPanelLayoutService? shellPanelLayoutService = null;
-            TerminalShortcutService? terminalShortcutService = null;
-            FunctionKeyShortcutService? functionKeyShortcutService = null;
-            SearchReplaceController? searchReplaceController = null;
-            SearchReplaceTabSyncController? searchReplaceTabSyncController = null;
-            GitPanelController? gitPanelController = null;
-            GitStatusRefreshController? gitStatusRefreshController = null;
-            FavoritesRecentController? favoritesRecentController = null;
-            TabContextMenuController? tabContextMenuController = null;
-            TabNavigationController? tabNavigationController = null;
-            TabEncryptionController? tabEncryptionController = null;
-            FileOpenDropController? fileOpenDropController = null;
-            RootKeyboardShortcutController? rootKeyboardShortcutController = null;
-            SnippetsController? snippetsController = null;
-            LlmAssistantController? llmAssistantController = null;
-            AgentController? agentController = null;
-            ShellPaneController? shellPaneController = null;
-            StickyNoteModeController? stickyNoteModeController = null;
-            StatusBarController? statusBarController = null;
-            TabReloadController? tabReloadController = null;
-            CompareTabController? compareTabController = null;
-            LivePreviewController? livePreviewController = null;
-            PdfViewerController? pdfViewerController = null;
-            OfficeDocumentViewerController? officeDocumentViewerController = null;
-            EditorBridgeShortcutController? editorBridgeShortcutController = null;
-            EditorLinkNavigationController? editorLinkNavigationController = null;
-            EditorWebViewInitializationController? editorWebViewInitializationController = null;
-            EditorLineNavigationController? editorLineNavigationController = null;
-            ActiveEditorInsertionController? activeEditorInsertionController = null;
-            TabTextContextProvider? tabTextContextProvider = null;
-            SplitImeSyncController? splitImeSyncController = null;
-            TabDirtyStateController? tabDirtyStateController = null;
-            TabSaveController? tabSaveController = null;
-            TabCloseController? tabCloseController = null;
-            TabMoveController? tabMoveController = null;
-            AutoSaveController? autoSaveController = null;
-            TerminalPanelController? terminalPanelController = null;
-            ExplorerNavigationController? explorerNavigationController = null;
-            WindowDialogController? dialogController = null;
-            MainWindowSettingsController? settingsController = null;
-            MainWindowToolbarCommandController? toolbarCommandController = null;
-            DispatcherTimer? gitAutoRefreshTimer = null;
+            var moduleBindings = new MainWindowModuleBindings();
 
-            Task SaveUiLayoutSettingsAsync() =>
+            Task SaveUiLayoutSettingsAsync(ShellPanelLayoutService shellPanelLayout) =>
                 MainWindowLayoutOperations.SaveUiLayoutSettingsAsync(
                     window.AppWindow,
                     services.SettingsService,
                     ui.EditorWorkspace,
-                    shellPanelLayoutService!);
-
-            Task SaveSidebarVisibilitySettingsAsync() =>
-                MainWindowLayoutOperations.SaveSidebarVisibilitySettingsAsync(services.SettingsService, shellPanelLayoutService!);
+                    shellPanelLayout);
 
             void ApplyLeftSidebarVisibility(bool show) =>
-                shellPaneController!.ApplyLeftSidebarVisibility(show);
+                moduleBindings.ShellPane.ApplyLeftSidebarVisibility(show);
 
             void ApplyPreviewVisibility(bool show) =>
                 MainWindowLayoutOperations.ApplyPreviewVisibility(
                     show,
-                    shellPaneController!,
+                    moduleBindings.ShellPane,
                     callbacks.IsStartupInitializationComplete(),
-                    livePreviewController!);
-
-            void ApplySavedPanelWidths(EditorSettings settings) =>
-                shellPanelLayoutService!.ApplySavedPanelWidths(settings.LeftSidebarWidth, settings.RightSidebarWidth);
+                    moduleBindings.LivePreview);
 
             Task ToggleLeftPanelAsync() =>
-                shellPaneController!.ToggleLeftPanelAsync();
+                moduleBindings.ShellPane.ToggleLeftPanelAsync();
 
             Task ToggleRightPanelAsync() =>
-                shellPaneController!.ToggleRightPanelAsync();
-
-            void TogglePreviewWidth() =>
-                shellPanelLayoutService!.TogglePreviewWidth();
+                moduleBindings.ShellPane.ToggleRightPanelAsync();
 
             void LoadDirectoryRoot(string folderPath) =>
-                explorerNavigationController!.LoadDirectoryRoot(folderPath);
+                moduleBindings.ExplorerNavigation.LoadDirectoryRoot(folderPath);
 
             Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true) =>
-                explorerNavigationController!.NavigateToFolderAsync(folderPath, revealInLeftPanel);
+                moduleBindings.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel);
 
             Task NavigateExplorerToFolderAndRevealAsync(string folderPath) =>
-                explorerNavigationController!.NavigateToFolderAsync(folderPath, revealInLeftPanel: true);
-
-            Task RefreshGitStatusUIAsync() =>
-                MainWindowWorkspaceOperations.RefreshGitStatusUiAsync(
-                    state,
-                    services.GitService,
-                    gitAutoRefreshTimer!,
-                    tabNavigationController!,
-                    gitStatusRefreshController!,
-                    explorerNavigationController!,
-                    callbacks.SetCurrentRepoPath);
+                moduleBindings.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel: true);
 
             void QueueGitStatusRefresh() =>
-                gitStatusRefreshController!.QueueRefresh();
-
-            string GetCurrentRepoPathForGitRefresh() =>
-                MainWindowWorkspaceOperations.GetCurrentRepoPathForGitRefresh(
-                    state,
-                    services.GitService,
-                    tabNavigationController!,
-                    callbacks.SetCurrentRepoPath);
+                moduleBindings.GitStatusRefresh.QueueRefresh();
 
             string GetSearchRoot() =>
                 MainWindowWorkspaceOperations.GetSearchRoot(state);
@@ -129,20 +62,8 @@ namespace TxtAIEditor.Composition
             long GetLargeFileThresholdBytes() =>
                 MainWindowWorkspaceOperations.GetLargeFileThresholdBytes(services.SettingsService);
 
-            Task SyncLineChangeToOtherTabsAsync(OpenedTab sourceTab, int lineNumber, string text, bool isComposing) =>
-                splitImeSyncController!.SyncLineChangeToOtherTabsAsync(sourceTab, lineNumber, text, isComposing);
-
-            Task SyncEditsToOtherTabsAsync(OpenedTab sourceTab, bool updateUi = true) =>
-                splitImeSyncController!.SyncEditsToOtherTabsAsync(sourceTab, updateUi);
-
-            void ApplyUiPersonalization(EditorSettings settings) =>
-                settingsController!.ApplyUiPersonalization(settings);
-
-            void ApplyToolbarSettings(EditorSettings settings) =>
-                settingsController!.ApplyToolbarSettings(settings);
-
             void ApplyEditorSurfaceBackground(EditorSettings settings) =>
-                settingsController!.ApplyEditorSurfaceBackground(settings);
+                moduleBindings.Settings.ApplyEditorSurfaceBackground(settings);
 
             var shellControllers = MainWindowShellComposition.Compose(
                 window,
@@ -153,7 +74,7 @@ namespace TxtAIEditor.Composition
                 tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
                 new MainWindowShellCompositionCallbacks(
                     SaveUiLayoutSettingsAsync,
-                    () => toolbarCommandController?.ToggleTerminal(),
+                    () => moduleBindings.ToolbarCommand?.ToggleTerminal(),
                     callbacks.GetCurrentElementTheme,
                     callbacks.GetLocalizedString,
                     callbacks.UpdateWindowTitle,
@@ -163,13 +84,41 @@ namespace TxtAIEditor.Composition
                     callbacks.MarkTabDirtyFromStatusBar,
                     callbacks.PerformLineNavigationAsync,
                     callbacks.UpdateLivePreview));
-            shellPanelLayoutService = shellControllers.ShellPanelLayout;
-            tabNavigationController = shellControllers.TabNavigation;
-            terminalShortcutService = shellControllers.TerminalShortcut;
-            dialogController = shellControllers.Dialog;
-            tabEncryptionController = shellControllers.TabEncryption;
-            stickyNoteModeController = shellControllers.StickyNoteMode;
-            statusBarController = shellControllers.StatusBar;
+            var shellPanelLayoutService = shellControllers.ShellPanelLayout;
+            var tabNavigationController = shellControllers.TabNavigation;
+            var terminalShortcutService = shellControllers.TerminalShortcut;
+            var dialogController = shellControllers.Dialog;
+            var tabEncryptionController = shellControllers.TabEncryption;
+            var stickyNoteModeController = shellControllers.StickyNoteMode;
+            var statusBarController = shellControllers.StatusBar;
+
+            Task SaveSidebarVisibilitySettingsAsync() =>
+                MainWindowLayoutOperations.SaveSidebarVisibilitySettingsAsync(
+                    services.SettingsService,
+                    shellPanelLayoutService);
+
+            void ApplySavedPanelWidths(EditorSettings settings) =>
+                shellPanelLayoutService.ApplySavedPanelWidths(settings.LeftSidebarWidth, settings.RightSidebarWidth);
+
+            void TogglePreviewWidth() =>
+                shellPanelLayoutService.TogglePreviewWidth();
+
+            Task RefreshGitStatusUIAsync() =>
+                MainWindowWorkspaceOperations.RefreshGitStatusUiAsync(
+                    state,
+                    services.GitService,
+                    moduleBindings.GitAutoRefreshTimer,
+                    tabNavigationController,
+                    moduleBindings.GitStatusRefresh,
+                    moduleBindings.ExplorerNavigation,
+                    callbacks.SetCurrentRepoPath);
+
+            string GetCurrentRepoPathForGitRefresh() =>
+                MainWindowWorkspaceOperations.GetCurrentRepoPathForGitRefresh(
+                    state,
+                    services.GitService,
+                    tabNavigationController,
+                    callbacks.SetCurrentRepoPath);
 
             var previewControllers = MainWindowPreviewComposition.Compose(
                 ui,
@@ -181,11 +130,11 @@ namespace TxtAIEditor.Composition
                 dialogController,
                 tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
                 new MainWindowPreviewCompositionCallbacks(
-                    () => toolbarCommandController?.Find(),
-                    () => toolbarCommandController?.ToggleLivePreview(),
-                    () => toolbarCommandController?.ToggleTheme(),
+                    () => moduleBindings.ToolbarCommand?.Find(),
+                    () => moduleBindings.ToolbarCommand?.ToggleLivePreview(),
+                    () => moduleBindings.ToolbarCommand?.ToggleTheme(),
                     callbacks.ToggleMaximize,
-                    () => toolbarCommandController?.Print(),
+                    () => moduleBindings.ToolbarCommand?.Print(),
                     TogglePreviewWidth,
                     callbacks.CloseActiveTab,
                     callbacks.LoadFileIntoTabAsync,
@@ -196,13 +145,14 @@ namespace TxtAIEditor.Composition
                     callbacks.UpdateRightPanelSelectionContext,
                     NavigateExplorerToFolderAndRevealAsync,
                     callbacks.GetLocalizedString));
-            compareTabController = previewControllers.CompareTab;
-            livePreviewController = previewControllers.LivePreview;
-            editorWebViewInitializationController = previewControllers.EditorWebViewInitialization;
-            editorLineNavigationController = previewControllers.EditorLineNavigation;
-            pdfViewerController = previewControllers.PdfViewer;
-            officeDocumentViewerController = previewControllers.OfficeDocumentViewer;
-            editorLinkNavigationController = previewControllers.EditorLinkNavigation;
+            moduleBindings.Bind(previewControllers);
+            var compareTabController = previewControllers.CompareTab;
+            var livePreviewController = previewControllers.LivePreview;
+            var editorWebViewInitializationController = previewControllers.EditorWebViewInitialization;
+            var editorLineNavigationController = previewControllers.EditorLineNavigation;
+            var pdfViewerController = previewControllers.PdfViewer;
+            var officeDocumentViewerController = previewControllers.OfficeDocumentViewer;
+            var editorLinkNavigationController = previewControllers.EditorLinkNavigation;
 
             var editorFoundationControllers = MainWindowEditorFoundationComposition.Compose(
                 ui,
@@ -220,37 +170,42 @@ namespace TxtAIEditor.Composition
                 initialEditorLineWarmupCount,
                 tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
                 new MainWindowEditorFoundationCallbacks(
-                    () => toolbarCommandController?.ToggleLivePreview(),
-                    () => toolbarCommandController?.ToggleTheme(),
+                    () => moduleBindings.ToolbarCommand?.ToggleLivePreview(),
+                    () => moduleBindings.ToolbarCommand?.ToggleTheme(),
                     callbacks.ToggleMaximize,
                     ToggleLeftPanelAsync,
                     ToggleRightPanelAsync,
                     TogglePreviewWidth,
                     () => callbacks.OpenNewTab(),
-                    () => toolbarCommandController?.SaveActive(),
-                    () => toolbarCommandController?.SaveActiveAs(),
-                    () => toolbarCommandController?.OpenFile(),
+                    () => moduleBindings.ToolbarCommand?.SaveActive(),
+                    () => moduleBindings.ToolbarCommand?.SaveActiveAs(),
+                    () => moduleBindings.ToolbarCommand?.OpenFile(),
                     callbacks.CloseActiveTab,
-                    () => toolbarCommandController?.Print(),
+                    () => moduleBindings.ToolbarCommand?.Print(),
                     callbacks.FocusSearchPanel,
                     callbacks.UpdateLivePreview,
                     callbacks.UpdateLanguageUi,
                     callbacks.SchedulePreview,
                     callbacks.UpdateWindowTitle,
-                    tab => SyncEditsToOtherTabsAsync(tab),
                     callbacks.LoadFileIntoTabAsync,
                     GetSearchRoot,
                     GetLargeFileThresholdBytes,
                     RefreshGitStatusUIAsync,
                     callbacks.GetLocalizedString));
-            tabReloadController = editorFoundationControllers.TabReload;
-            tabDirtyStateController = editorFoundationControllers.TabDirtyState;
-            activeEditorInsertionController = editorFoundationControllers.ActiveEditorInsertion;
-            tabTextContextProvider = editorFoundationControllers.TabTextContext;
-            editorBridgeShortcutController = editorFoundationControllers.EditorBridgeShortcut;
-            searchReplaceTabSyncController = editorFoundationControllers.SearchReplaceTabSync;
-            searchReplaceController = editorFoundationControllers.SearchReplace;
-            splitImeSyncController = editorFoundationControllers.SplitImeSync;
+            var tabReloadController = editorFoundationControllers.TabReload;
+            var tabDirtyStateController = editorFoundationControllers.TabDirtyState;
+            var activeEditorInsertionController = editorFoundationControllers.ActiveEditorInsertion;
+            var tabTextContextProvider = editorFoundationControllers.TabTextContext;
+            var editorBridgeShortcutController = editorFoundationControllers.EditorBridgeShortcut;
+            var searchReplaceTabSyncController = editorFoundationControllers.SearchReplaceTabSync;
+            var searchReplaceController = editorFoundationControllers.SearchReplace;
+            var splitImeSyncController = editorFoundationControllers.SplitImeSync;
+
+            Task SyncLineChangeToOtherTabsAsync(OpenedTab sourceTab, int lineNumber, string text, bool isComposing) =>
+                splitImeSyncController.SyncLineChangeToOtherTabsAsync(sourceTab, lineNumber, text, isComposing);
+
+            Task SyncEditsToOtherTabsAsync(OpenedTab sourceTab, bool updateUi = true) =>
+                splitImeSyncController.SyncEditsToOtherTabsAsync(sourceTab, updateUi);
 
             var workspaceControllers = MainWindowWorkspaceComposition.Compose(
                 window,
@@ -263,12 +218,12 @@ namespace TxtAIEditor.Composition
                 dialogController,
                 new MainWindowWorkspaceCompositionCallbacks(
                     stickyNoteModeController.ToggleTopMostFromShortcut,
-                    () => toolbarCommandController?.ToggleTheme(),
+                    () => moduleBindings.ToolbarCommand?.ToggleTheme(),
                     stickyNoteModeController.ToggleMode,
                     GetCurrentRepoPathForGitRefresh,
                     () => state.CurrentFolderPath,
                     callbacks.GetLocalizedString,
-                    () => explorerNavigationController,
+                    () => moduleBindings.ExplorerNavigation,
                     callbacks.SetCurrentRepoPath,
                     callbacks.SetCurrentFolderPath,
                     RefreshGitStatusUIAsync,
@@ -284,13 +239,13 @@ namespace TxtAIEditor.Composition
                     callbacks.OpenOfficeDocumentTab,
                     callbacks.OpenHexTab,
                     QueueGitStatusRefresh));
-            functionKeyShortcutService = workspaceControllers.FunctionKeyShortcut;
-            gitAutoRefreshTimer = workspaceControllers.GitAutoRefreshTimer;
-            gitPanelController = workspaceControllers.GitPanel;
+            moduleBindings.Bind(workspaceControllers);
+            var functionKeyShortcutService = workspaceControllers.FunctionKeyShortcut;
+            var gitAutoRefreshTimer = workspaceControllers.GitAutoRefreshTimer;
+            var gitPanelController = workspaceControllers.GitPanel;
             gitPanelController.FileRestored += callbacks.GitFileRestored;
-            gitStatusRefreshController = workspaceControllers.GitStatusRefresh;
-            explorerNavigationController = workspaceControllers.ExplorerNavigation;
-            favoritesRecentController = workspaceControllers.FavoritesRecent;
+            var explorerNavigationController = workspaceControllers.ExplorerNavigation;
+            var favoritesRecentController = workspaceControllers.FavoritesRecent;
 
             var documentCommandControllers = MainWindowDocumentCommandComposition.Compose(
                 window,
@@ -316,13 +271,13 @@ namespace TxtAIEditor.Composition
                     () => state.CurrentRepoPath,
                     callbacks.OpenNewTab,
                     callbacks.CloseReadOnlyViewer,
-                    SaveUiLayoutSettingsAsync,
+                    () => SaveUiLayoutSettingsAsync(shellPanelLayoutService),
                     callbacks.GetCurrentElementTheme,
                     callbacks.GetLocalizedString));
-            tabSaveController = documentCommandControllers.TabSave;
-            autoSaveController = documentCommandControllers.AutoSave;
-            tabCloseController = documentCommandControllers.TabClose;
-            tabMoveController = documentCommandControllers.TabMove;
+            var tabSaveController = documentCommandControllers.TabSave;
+            var autoSaveController = documentCommandControllers.AutoSave;
+            var tabCloseController = documentCommandControllers.TabClose;
+            var tabMoveController = documentCommandControllers.TabMove;
 
             var interactionControllers = MainWindowInteractionComposition.Compose(
                 window,
@@ -350,20 +305,20 @@ namespace TxtAIEditor.Composition
                     NavigateExplorerToFolderAsync,
                     NavigateExplorerToFolderAndRevealAsync,
                     callbacks.GetSelectedExplorerItem,
-                    () => explorerNavigationController?.IsViewingArchive == true,
+                    () => explorerNavigationController.IsViewingArchive,
                     ToggleLeftPanelAsync,
                     ToggleRightPanelAsync,
                     callbacks.FocusSearchPanel,
                     callbacks.CloseActiveTab,
-                    () => toolbarCommandController?.SaveActive(),
-                    () => toolbarCommandController?.SaveActiveAs(),
-                    () => toolbarCommandController?.OpenFile(),
-                    () => toolbarCommandController?.Find(),
-                    () => toolbarCommandController?.Print(),
+                    () => moduleBindings.ToolbarCommand?.SaveActive(),
+                    () => moduleBindings.ToolbarCommand?.SaveActiveAs(),
+                    () => moduleBindings.ToolbarCommand?.OpenFile(),
+                    () => moduleBindings.ToolbarCommand?.Find(),
+                    () => moduleBindings.ToolbarCommand?.Print(),
                     stickyNoteModeController.ToggleTopMostFromShortcut,
-                    () => toolbarCommandController?.ToggleTheme(),
+                    () => moduleBindings.ToolbarCommand?.ToggleTheme(),
                     stickyNoteModeController.ToggleMode,
-                    () => toolbarCommandController?.ToggleLivePreview(),
+                    () => moduleBindings.ToolbarCommand?.ToggleLivePreview(),
                     TogglePreviewWidth,
                     callbacks.ToggleMaximize,
                     callbacks.ShowLeftSidebarPage,
@@ -384,13 +339,14 @@ namespace TxtAIEditor.Composition
                     async (tab, enabled) =>
                     {
                         await callbacks.SetHexViewModeAsync(tab, enabled);
-                        toolbarCommandController?.SyncCsvTableMode(tab);
+                        moduleBindings.ToolbarCommand?.SyncCsvTableMode(tab);
                     },
                     async (tab, enabled) =>
                     {
-                        if (toolbarCommandController != null)
+                        var toolbarCommand = moduleBindings.ToolbarCommand;
+                        if (toolbarCommand != null)
                         {
-                            await toolbarCommandController.SetCsvTableModeAsync(tab, enabled);
+                            await toolbarCommand.SetCsvTableModeAsync(tab, enabled);
                             return;
                         }
 
@@ -403,11 +359,11 @@ namespace TxtAIEditor.Composition
                     (_, tabItem, tabView) => tabCloseController.CloseRightTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseLeftTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseOtherTabs(tabItem, tabView)));
-            tabContextMenuController = interactionControllers.TabContextMenu;
-            fileOpenDropController = interactionControllers.FileOpenDrop;
-            rootKeyboardShortcutController = interactionControllers.RootKeyboardShortcut;
-            terminalPanelController = interactionControllers.TerminalPanel;
-            snippetsController = interactionControllers.Snippets;
+            var tabContextMenuController = interactionControllers.TabContextMenu;
+            var fileOpenDropController = interactionControllers.FileOpenDrop;
+            var rootKeyboardShortcutController = interactionControllers.RootKeyboardShortcut;
+            var terminalPanelController = interactionControllers.TerminalPanel;
+            var snippetsController = interactionControllers.Snippets;
 
             var agentControllers = MainWindowAgentComposition.Compose(
                 window,
@@ -439,8 +395,8 @@ namespace TxtAIEditor.Composition
                     () => explorerNavigationController.RefreshCurrentFolder(),
                     callbacks.GetLocalizedString,
                     callbacks.UpdateWindowTitle));
-            llmAssistantController = agentControllers.LlmAssistant;
-            agentController = agentControllers.Agent;
+            var llmAssistantController = agentControllers.LlmAssistant;
+            var agentController = agentControllers.Agent;
 
             var editorRuntimeControllers = MainWindowEditorRuntimeComposition.Compose(
                 window,
@@ -490,8 +446,8 @@ namespace TxtAIEditor.Composition
                         }
                     },
                     () => state.CurrentFolderPath,
-                    () => toolbarCommandController?.LivePreviewEnabled == true,
-                    tab => toolbarCommandController?.SyncCsvTableMode(tab),
+                    () => moduleBindings.ToolbarCommand?.LivePreviewEnabled == true,
+                    tab => moduleBindings.ToolbarCommand?.SyncCsvTableMode(tab),
                     callbacks.GetCurrentElementTheme,
                     callbacks.SaveTabAsync,
                     callbacks.GetPreviewBaseHref,
@@ -513,7 +469,8 @@ namespace TxtAIEditor.Composition
                     callbacks.CloseTabAndCleanup,
                     (_, args) => tabCloseController.CloseRequested(args)));
             tabCloseController.SetAdditionalTabCleanup(editorRuntimeControllers.EditorTabOpen.ForgetHexViewState);
-            shellPaneController = editorRuntimeControllers.ShellPane;
+            moduleBindings.Bind(editorRuntimeControllers);
+            var shellPaneController = editorRuntimeControllers.ShellPane;
 
             void OpenTextInEditor(string title, string content)
             {
@@ -563,9 +520,7 @@ namespace TxtAIEditor.Composition
                     ApplyLeftSidebarVisibility,
                     ApplyPreviewVisibility,
                     ApplySavedPanelWidths,
-                    ApplyUiPersonalization,
                     callbacks.LocalizeUi,
-                    ApplyToolbarSettings,
                     callbacks.SyncAgentSettingsAfterLoad,
                     RefreshGitStatusUIAsync,
                     callbacks.UpdateAutoSaveStatus,
@@ -574,8 +529,10 @@ namespace TxtAIEditor.Composition
                     callbacks.InitializePickerWindow,
                     OpenTextInEditor,
                     callbacks.GetPreviewBaseHref));
-            settingsController = startupControllers.Settings;
-            toolbarCommandController = startupControllers.ToolbarCommand;
+            moduleBindings.Bind(startupControllers);
+            var toolbarCommandController = startupControllers.ToolbarCommand;
+
+            moduleBindings.ValidateComplete();
 
             MainWindowEventBinder.Bind(
                 ui,
@@ -584,7 +541,7 @@ namespace TxtAIEditor.Composition
                 tabCloseController,
                 toolbarCommandController,
                 () => callbacks.OpenNewTab(),
-                SaveUiLayoutSettingsAsync);
+                () => SaveUiLayoutSettingsAsync(shellPanelLayoutService));
 
             return new MainWindowControllers(
                 new ShellControllers(shellControllers, interactionControllers),

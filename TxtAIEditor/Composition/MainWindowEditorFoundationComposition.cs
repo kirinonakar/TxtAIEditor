@@ -28,7 +28,6 @@ namespace TxtAIEditor.Composition
         Action<OpenedTab> UpdateLanguageUi,
         Action<OpenedTab> SchedulePreview,
         Action UpdateWindowTitle,
-        Func<OpenedTab, Task> SyncEditsToOtherTabsAsync,
         Func<string, Task> LoadFileAsync,
         Func<string> GetSearchRoot,
         Func<long> GetLargeFileThresholdBytes,
@@ -97,6 +96,13 @@ namespace TxtAIEditor.Composition
                 services.PdfTextExtractionService,
                 getEditorSession);
 
+            var splitImeSync = new SplitImeSyncController(
+                tabBridges,
+                editorSessions,
+                tabDirtyState.GetTabsForSameFile,
+                callbacks.SchedulePreview,
+                tabDirtyState.SetDirtyStateForFileGroup);
+
             var editorBridgeShortcut = new EditorBridgeShortcutController(
                 callbacks.ToggleLivePreviewRequested,
                 stickyNoteMode.ToggleTopMostFromShortcut,
@@ -116,7 +122,7 @@ namespace TxtAIEditor.Composition
                 callbacks.FocusSearchPanelRequested,
                 tabDirtyState,
                 callbacks.SchedulePreview,
-                callbacks.SyncEditsToOtherTabsAsync);
+                tab => splitImeSync.SyncEditsToOtherTabsAsync(tab));
 
             var searchReplaceTabSync = new SearchReplaceTabSyncController(
                 viewModel,
@@ -151,13 +157,6 @@ namespace TxtAIEditor.Composition
                 beforeDialog: () => { if (ui.EditorWorkspace.IsTerminalVisible) ui.TerminalPane.SuspendNativeWindows(); },
                 afterDialog: () => { if (ui.EditorWorkspace.IsTerminalVisible) ui.TerminalPane.ResumeNativeWindows(); });
             searchReplace.FileModified += searchReplaceTabSync.HandleFileModifiedAsync;
-
-            var splitImeSync = new SplitImeSyncController(
-                tabBridges,
-                editorSessions,
-                tabDirtyState.GetTabsForSameFile,
-                callbacks.SchedulePreview,
-                tabDirtyState.SetDirtyStateForFileGroup);
 
             return new MainWindowEditorFoundationControllers(
                 tabReload,
