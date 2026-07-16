@@ -170,7 +170,11 @@ namespace TxtAIEditor.Controls
             session.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             UpdateSessionTitle(session, session.PromptText);
             session.UpdatedAt = DateTime.Now;
-            UpdateUI();
+
+            // TextChanged fires for every keystroke. Rebuilding the open-session menu here
+            // clears and recreates its controls and queues more UI-thread work, which makes
+            // the prompt itself feel delayed. The menu is refreshed when it is opened and
+            // by the existing session lifecycle operations instead.
         }
 
         public void SaveActiveFromUI()

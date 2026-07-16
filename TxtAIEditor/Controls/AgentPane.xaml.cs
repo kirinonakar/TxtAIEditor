@@ -1011,9 +1011,13 @@ namespace TxtAIEditor.Controls
 
         private void OnPromptTextChanged(object sender, TextChangedEventArgs e)
         {
-            AgentClearPromptButton.Visibility = string.IsNullOrEmpty(AgentPromptInput.Text)
+            Visibility visibility = string.IsNullOrEmpty(AgentPromptInput.Text)
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+            if (AgentClearPromptButton.Visibility != visibility)
+            {
+                AgentClearPromptButton.Visibility = visibility;
+            }
         }
 
         private void OnAgentHistoryFlyoutOpened(object sender, object e)
