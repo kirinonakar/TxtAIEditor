@@ -2412,6 +2412,9 @@ Plan: {0}</value>
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>Auto-approve file changes/creation in Git folders</value>
   </data>
+  <data name="SettingsLlmAgentAutoApprovePowerShell" xml:space="preserve">
+    <value>Auto-approve PowerShell except high-risk commands</value>
+  </data>
   <data name="SettingsLlmAgentAutoApprovePlanning" xml:space="preserve">
     <value>Auto-approve plan execution (Planning mode)</value>
   </data>

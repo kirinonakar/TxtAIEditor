@@ -99,6 +99,14 @@ namespace TxtAIEditor.Controls
 
         public async Task<bool> ConfirmPowerShellAsync(string command)
         {
+            var settings = _settingsService.CurrentSettings;
+            if (settings.LlmAgentAutoApprovePowerShell &&
+                !AgentToolHelpers.IsDangerousPowerShellCommand(command))
+            {
+                _appendActivity(_getString("AgentActivityPowerShellApproved", "PowerShell 실행 승인됨"));
+                return true;
+            }
+
             _appendActivity(_getString("AgentActivityPowerShellConfirmationPending", "PowerShell 실행 승인 대기 중"));
 
             return await _runOnUIThreadAsync(async () =>

@@ -1430,10 +1430,7 @@ namespace TxtAIEditor.Controls
             AgentDiffConfirmDescription.Text = description;
             AgentPowerShellConfirmCommand.Text = command;
 
-            bool isDanger = command != null && System.Text.RegularExpressions.Regex.IsMatch(
-                command,
-                @"\b(Remove\w*|rm\w*|Clear-Content|Clear-Disk|Initialize-Disk|Resize-Partition|Set-Disk|format|diskpart|del|delete|erase|rd|ri)\b",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            bool isDanger = AgentToolHelpers.IsDangerousPowerShellCommand(command);
 
             if (isDanger)
             {

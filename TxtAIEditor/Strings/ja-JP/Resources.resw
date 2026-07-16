@@ -2412,6 +2412,9 @@
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>Gitフォルダー内でのファイル変更・作成を自動承認する</value>
   </data>
+  <data name="SettingsLlmAgentAutoApprovePowerShell" xml:space="preserve">
+    <value>高リスクのPowerShellコマンド以外を自動承認する</value>
+  </data>
   <data name="SettingsLlmAgentAutoApprovePlanning" xml:space="preserve">
     <value>計画実行を自動承認する (Planningモード)</value>
   </data>

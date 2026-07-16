@@ -2412,6 +2412,9 @@
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>自動核准 Git 資料夾內的檔案變更/建立</value>
   </data>
+  <data name="SettingsLlmAgentAutoApprovePowerShell" xml:space="preserve">
+    <value>自動核准高風險命令以外的 PowerShell 命令</value>
+  </data>
   <data name="SettingsLlmAgentAutoApprovePlanning" xml:space="preserve">
     <value>自動核准計畫執行</value>
   </data>
