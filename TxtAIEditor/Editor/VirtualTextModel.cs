@@ -151,7 +151,7 @@ namespace TxtAIEditor.Editor
             }
 
             return new EditorDocumentLoadResult(
-                new LineArrayTextModel(lines, lineEnding),
+                TextModelFactory.Create(lines, lineEnding),
                 displayEncoding,
                 isAuto);
         }
@@ -825,7 +825,9 @@ namespace TxtAIEditor.Editor
 
     public sealed class EditorDocumentBuffer
     {
+        private const int ChangeLogCapacity = 1_000;
         private ITextModel _model;
+        private readonly Queue<EditorDocumentChange> _changeLog = new(ChangeLogCapacity);
 
         public EditorDocumentBuffer(ITextModel model)
         {
@@ -880,7 +882,7 @@ namespace TxtAIEditor.Editor
                 Math.Max(0, oldLineCount),
                 Math.Max(1, _model.LineCount),
                 lines);
-            LastChange = change;
+            RecordChange(change);
             Changed?.Invoke(this, change);
             return change;
         }
@@ -908,9 +910,59 @@ namespace TxtAIEditor.Editor
             {
                 LinePatches = safePatches
             };
-            LastChange = change;
+            RecordChange(change);
             Changed?.Invoke(this, change);
             return change;
+        }
+
+        internal bool TryGetChangesSince(
+            long version,
+            out IReadOnlyList<EditorDocumentChange> changes)
+        {
+            if (version == Version)
+            {
+                changes = Array.Empty<EditorDocumentChange>();
+                return true;
+            }
+
+            if (version < 0 || version > Version || _changeLog.Count == 0)
+            {
+                changes = Array.Empty<EditorDocumentChange>();
+                return false;
+            }
+
+            EditorDocumentChange[] replay = _changeLog
+                .Where(change => change.Version > version)
+                .ToArray();
+            if (replay.Length == 0 ||
+                replay[0].BaseVersion != version ||
+                replay[^1].Version != Version)
+            {
+                changes = Array.Empty<EditorDocumentChange>();
+                return false;
+            }
+
+            for (int i = 1; i < replay.Length; i++)
+            {
+                if (replay[i].BaseVersion != replay[i - 1].Version)
+                {
+                    changes = Array.Empty<EditorDocumentChange>();
+                    return false;
+                }
+            }
+
+            changes = replay;
+            return true;
+        }
+
+        private void RecordChange(EditorDocumentChange change)
+        {
+            LastChange = change;
+            _changeLog.Enqueue(change);
+            while (_changeLog.Count > ChangeLogCapacity)
+            {
+                _changeLog.Dequeue();
+            }
         }
     }
 
@@ -939,6 +991,11 @@ namespace TxtAIEditor.Editor
         public long ViewVersion { get; private set; }
 
         public EditorDocumentChange? LastChange => _buffer.LastChange;
+
+        public bool TryGetChangesSince(
+            long version,
+            out IReadOnlyList<EditorDocumentChange> changes) =>
+            _buffer.TryGetChangesSince(version, out changes);
 
         public bool SharesDocumentWith(EditorDocumentSession other) =>
             ReferenceEquals(_buffer, other._buffer);
@@ -988,7 +1045,7 @@ namespace TxtAIEditor.Editor
         {
             EditorDocumentChange change = _buffer.ReplaceModel(
                 Tab.Id,
-                LineArrayTextModel.FromText(text),
+                TextModelFactory.FromText(text),
                 clearUndo: true);
             ViewVersion = change.Version;
             RefreshTabContentPreview();
@@ -1124,6 +1181,40 @@ namespace TxtAIEditor.Editor
                 oldLineCount: safeEndLine - safeStartLine + 1,
                 newLineCount: normalizedText.Split('\n').Length);
             return Model.LineCount;
+        }
+
+        public EditorEditCommandResult ApplyEditCommand(EditorEditCommand command)
+        {
+            if (!string.Equals(command.DocumentId, DocumentId, StringComparison.Ordinal) ||
+                !string.Equals(command.ViewId, Tab.Id, StringComparison.Ordinal) ||
+                command.BaseVersion != DocumentVersion)
+            {
+                return new EditorEditCommandResult(
+                    command.EditId,
+                    IsAccepted: false,
+                    DocumentVersion,
+                    Math.Min(Math.Max(0, command.BaseVersion), DocumentVersion),
+                    Change: null);
+            }
+
+            long previousVersion = DocumentVersion;
+            TextEdit edit = command.Edit;
+            ApplyRangeEdit(
+                edit.StartLine,
+                edit.StartColumn,
+                edit.EndLine,
+                edit.EndColumn,
+                edit.Text);
+
+            EditorDocumentChange? change = DocumentVersion > previousVersion
+                ? LastChange
+                : null;
+            return new EditorEditCommandResult(
+                command.EditId,
+                IsAccepted: true,
+                DocumentVersion,
+                DocumentVersion,
+                change);
         }
 
         public int MergeLineWithPrevious(int lineNumber)

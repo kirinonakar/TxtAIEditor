@@ -143,7 +143,8 @@ function commitRangeCompositionEdit(command, insertedText) {
         startColumn: start.column + 1,
         endLine: end.line,
         endColumn: end.column + 1,
-        text: String(insertedText ?? '')
+        text: String(insertedText ?? ''),
+        isCompositionCommit: true
     });
     post({ type: 'contentChanged' });
     return true;

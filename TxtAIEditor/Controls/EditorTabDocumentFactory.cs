@@ -58,7 +58,7 @@ namespace TxtAIEditor.Controls
                 tab.Content = content;
             }
 
-            var documentModel = textModel ?? LineArrayTextModel.FromText(content);
+            var documentModel = textModel ?? TextModelFactory.FromText(content);
             var session = new EditorDocumentSession(tab, documentModel);
             tab.OriginalContent = documentModel.GetText();
             tab.OriginalLineEnding = documentModel.LineEnding;

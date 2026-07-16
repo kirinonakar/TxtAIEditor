@@ -261,7 +261,7 @@ namespace TxtAIEditor.Controls
                 Content = decryptedText,
                 EncodingName = "UTF-8",
                 EncodingWasAutoDetected = false,
-                TextModel = LineArrayTextModel.FromText(decryptedText),
+                TextModel = TextModelFactory.FromText(decryptedText),
                 IsEncrypted = true,
                 EncryptionPassword = password
             });
@@ -345,7 +345,7 @@ namespace TxtAIEditor.Controls
                 Content = extractedText,
                 EncodingName = "UTF-8",
                 EncodingWasAutoDetected = false,
-                TextModel = LineArrayTextModel.FromText(extractedText),
+                TextModel = TextModelFactory.FromText(extractedText),
                 IsReadOnly = true
             });
         }
@@ -405,7 +405,7 @@ namespace TxtAIEditor.Controls
             string text = encoding.GetString(bytes);
 
             return new EditorDocumentLoadResult(
-                LineArrayTextModel.FromText(text),
+                TextModelFactory.FromText(text),
                 TextEncodingService.GetDisplayName(encoding, TextEncodingService.HasUtf8Bom(sample)),
                 EncodingWasAutoDetected: true);
         }

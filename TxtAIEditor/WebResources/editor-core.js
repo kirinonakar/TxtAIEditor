@@ -187,24 +187,23 @@ function invalidateHtmlLineEndContexts(startLine) {
 
 function post(msg) {
     const baseVersion = state.hostDocumentVersion;
+    const isMutation = ['edit', 'lineChanged', 'lineEdit', 'rangeEdit', 'insertLine', 'splitLine',
+        'mergeLineWithPrevious', 'deleteLine', 'hexEdit', 'replaceAll'].includes(msg?.type);
     if (msg?.type === 'contentChanged') {
         state.documentVersion++;
-        if (!msg.isComposing && state.hostDocumentId) {
-            state.hostDocumentVersion++;
-        }
         state.searchDocumentVersion = -1;
     }
 
+    const sequence = state.hostDocumentId ? ++state.messageSequence : 0;
     const outgoing = state.hostDocumentId
         ? {
             protocolVersion: 1,
             documentId: state.hostDocumentId,
             viewId: state.viewId,
             documentVersion: state.hostDocumentVersion,
-            sequence: ++state.messageSequence,
-            ...(['lineChanged', 'lineEdit', 'rangeEdit', 'insertLine', 'splitLine',
-                'mergeLineWithPrevious', 'deleteLine', 'hexEdit', 'replaceAll'].includes(msg?.type)
-                ? { baseVersion }
+            sequence,
+            ...(isMutation
+                ? { editId: sequence, baseVersion }
                 : {}),
             ...msg
         }
@@ -212,6 +211,13 @@ function post(msg) {
 
     if (window.chrome && window.chrome.webview) {
         window.chrome.webview.postMessage(outgoing);
+    }
+
+    // Each mutation is applied optimistically in the DOM. Advance the expected
+    // host version per command so a transaction containing several edits still
+    // carries a contiguous base-version chain.
+    if (isMutation && state.hostDocumentId) {
+        state.hostDocumentVersion = baseVersion + 1;
     }
 }
 

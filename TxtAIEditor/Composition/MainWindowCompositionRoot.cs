@@ -167,9 +167,6 @@ namespace TxtAIEditor.Composition
             var searchReplaceController = editorFoundationControllers.SearchReplace;
             var splitImeSyncController = editorFoundationControllers.SplitImeSync;
 
-            Task SyncLineChangeToOtherTabsAsync(OpenedTab sourceTab, int lineNumber, string text, bool isComposing) =>
-                splitImeSyncController.SyncLineChangeToOtherTabsAsync(sourceTab, lineNumber, text, isComposing);
-
             Task SyncEditsToOtherTabsAsync(OpenedTab sourceTab, bool updateUi = true) =>
                 splitImeSyncController.SyncEditsToOtherTabsAsync(sourceTab, updateUi);
 
@@ -339,7 +336,6 @@ namespace TxtAIEditor.Composition
                 new MainWindowEditorRuntimeCallbacks(
                     callbacks.SchedulePreview,
                     callbacks.UpdateLanguageUi,
-                    SyncLineChangeToOtherTabsAsync,
                     tab => SyncEditsToOtherTabsAsync(tab),
                     SaveSidebarVisibilitySettingsAsync,
                     callbacks.RefreshActivePreview,

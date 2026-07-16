@@ -30,61 +30,6 @@ namespace TxtAIEditor.Controls
             _setDirtyStateForFileGroup = setDirtyStateForFileGroup;
         }
 
-        public async Task SyncLineChangeToOtherTabsAsync(OpenedTab sourceTab, int lineNumber, string text, bool isComposing)
-        {
-            if (string.IsNullOrEmpty(sourceTab.FilePath)) return;
-            if (!_editorSessions.TryGetValue(sourceTab.Id, out var sourceSession)) return;
-
-            var otherTabs = _getTabsForSameFile(sourceTab)
-                .Where(t => t.Id != sourceTab.Id)
-                .ToList();
-
-            if (otherTabs.Count == 0) return;
-
-            bool sourceDirty = sourceTab.IsDirty;
-            EditorDocumentChange? change = sourceSession.LastChange;
-
-            foreach (var otherTab in otherTabs)
-            {
-                if (_editorSessions.TryGetValue(otherTab.Id, out var otherSession))
-                {
-                    if (!otherSession.SharesDocumentWith(sourceSession))
-                    {
-                        otherSession.ReplaceLine(lineNumber, text, trackUndo: !isComposing, isComposing: isComposing);
-                    }
-                    otherSession.RefreshTabContentPreview();
-                }
-                else
-                {
-                    otherTab.Content = text;
-                }
-
-                if (_tabBridges.TryGetValue(otherTab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
-                {
-                    if (!_editorSessions.TryGetValue(otherTab.Id, out var targetSession) ||
-                        !targetSession.SharesDocumentWith(sourceSession) ||
-                        targetSession.ViewVersion < sourceSession.DocumentVersion)
-                    {
-                        await bridgeGroup.Bridge.UpdateLineAsync(
-                            lineNumber,
-                            text,
-                            isComposing,
-                            sourceSession.DocumentId,
-                            change?.BaseVersion,
-                            change?.Version ?? sourceSession.DocumentVersion);
-                        targetSession?.MarkViewSynchronized(sourceSession.DocumentVersion);
-                    }
-                }
-
-                if (!isComposing)
-                {
-                    _schedulePreview(otherTab);
-                }
-            }
-
-            _setDirtyStateForFileGroup(sourceTab, sourceDirty);
-        }
-
         public async Task SyncEditsToOtherTabsAsync(OpenedTab sourceTab, bool updateUi = true)
         {
             if (string.IsNullOrEmpty(sourceTab.FilePath)) return;
@@ -97,7 +42,6 @@ namespace TxtAIEditor.Controls
 
             if (!_editorSessions.TryGetValue(sourceTab.Id, out var sourceSession)) return;
             bool sourceDirty = sourceTab.IsDirty;
-            EditorDocumentChange? change = sourceSession.LastChange;
 
             foreach (var otherTab in otherTabs)
             {
@@ -117,35 +61,20 @@ namespace TxtAIEditor.Controls
 
                 if (updateUi && _tabBridges.TryGetValue(otherTab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {
-                    if (sharesDocument && otherSession != null && change != null &&
-                        otherSession.ViewVersion == change.BaseVersion)
+                    if (sharesDocument && otherSession != null &&
+                        otherSession.ViewVersion < sourceSession.DocumentVersion &&
+                        sourceSession.TryGetChangesSince(
+                            otherSession.ViewVersion,
+                            out IReadOnlyList<EditorDocumentChange> replayChanges))
                     {
-                        if (change.LinePatches is { Count: > 0 } patches)
+                        foreach (EditorDocumentChange replayChange in replayChanges)
                         {
-                            await bridgeGroup.Bridge.ApplyLinePatchesAsync(
-                                patches,
-                                change.DocumentId,
-                                change.BaseVersion,
-                                change.Version,
-                                change.SourceViewId);
+                            await ApplyDocumentChangeAsync(bridgeGroup.Bridge, replayChange);
+                            otherSession.MarkViewSynchronized(replayChange.Version);
                         }
-                        else
-                        {
-                            await bridgeGroup.Bridge.ApplyEditResultAsync(new UndoResult(
-                                change.StartLine,
-                                change.OldLineCount,
-                                change.DocumentLineCount,
-                                change.Lines,
-                                null),
-                                change.DocumentId,
-                                change.BaseVersion,
-                                change.Version,
-                                change.SourceViewId);
-                        }
-                        otherSession.MarkViewSynchronized(change.Version);
                     }
                     else if (!sharesDocument ||
-                        (otherSession != null && change != null && otherSession.ViewVersion < change.Version))
+                        (otherSession != null && otherSession.ViewVersion < sourceSession.DocumentVersion))
                     {
                         string updatedText = sourceSession.GetText();
                         await bridgeGroup.Bridge.SetTextAsync(
@@ -165,6 +94,32 @@ namespace TxtAIEditor.Controls
             }
 
             _setDirtyStateForFileGroup(sourceTab, sourceDirty);
+        }
+
+        private static Task ApplyDocumentChangeAsync(
+            MonacoBridge bridge,
+            EditorDocumentChange change)
+        {
+            if (change.LinePatches is { Count: > 0 } patches)
+            {
+                return bridge.ApplyLinePatchesAsync(
+                    patches,
+                    change.DocumentId,
+                    change.BaseVersion,
+                    change.Version,
+                    change.SourceViewId);
+            }
+
+            return bridge.ApplyEditResultAsync(new UndoResult(
+                    change.StartLine,
+                    change.OldLineCount,
+                    change.DocumentLineCount,
+                    change.Lines,
+                    null),
+                change.DocumentId,
+                change.BaseVersion,
+                change.Version,
+                change.SourceViewId);
         }
 
     }

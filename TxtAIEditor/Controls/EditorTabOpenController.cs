@@ -327,7 +327,7 @@ namespace TxtAIEditor.Controls
 
             byte[] fileBytes = await File.ReadAllBytesAsync(tab.FilePath);
             string diskText = DecodeText(fileBytes, tab.EncodingName);
-            var diskSession = new EditorDocumentSession(tab, LineArrayTextModel.FromText(diskText));
+            var diskSession = new EditorDocumentSession(tab, TextModelFactory.FromText(diskText));
             diskSession.RefreshTabContentPreview();
             _editorSessions[tab.Id] = diskSession;
             tab.OriginalContent = diskText;
@@ -434,7 +434,7 @@ namespace TxtAIEditor.Controls
                 (!ReferenceEquals(hexModel, state.InitialHexModel) || hexModel.HasEverBeenEdited))
             {
                 string restoredText = DecodeText(hexModel.GetCurrentBytes(), state.EncodingName);
-                restoredSession = new EditorDocumentSession(tab, LineArrayTextModel.FromText(restoredText));
+                restoredSession = new EditorDocumentSession(tab, TextModelFactory.FromText(restoredText));
             }
             else
             {
@@ -1183,15 +1183,14 @@ namespace TxtAIEditor.Controls
                 }
             };
 
-            bridge.LineChanged += async (lineNumber, text, isComposing) =>
+            bridge.EditRequested += async request =>
             {
-                await _editorBridgeDocumentController.HandleLineChangedAsync(
+                await _editorBridgeDocumentController.HandleEditRequestedAsync(
+                    bridge,
                     tab,
                     tabItem,
                     getSession(),
-                    lineNumber,
-                    text,
-                    isComposing);
+                    request);
             };
 
             bridge.HexEditRequested += async (offset, hex) =>
@@ -1221,72 +1220,6 @@ namespace TxtAIEditor.Controls
                 {
                     Debug.WriteLine($"Failed to apply hex edit: {ex.Message}");
                 }
-            };
-
-            bridge.LineEditRequested += async (lineNumber, startColumn, endColumn, text, isComposing) =>
-            {
-                await _editorBridgeDocumentController.HandleLineEditAsync(
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber,
-                    startColumn,
-                    endColumn,
-                    text,
-                    isComposing);
-            };
-
-            bridge.RangeEditRequested += async (startLine, startColumn, endLine, endColumn, text) =>
-            {
-                await _editorBridgeDocumentController.HandleRangeEditRequestedAsync(
-                    tab,
-                    tabItem,
-                    getSession(),
-                    startLine,
-                    startColumn,
-                    endLine,
-                    endColumn,
-                    text);
-            };
-
-            bridge.LineInsertRequested += async (lineNumber, text) =>
-            {
-                await _editorBridgeDocumentController.HandleLineInsertRequestedAsync(
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber,
-                    text);
-            };
-
-            bridge.LineSplitRequested += async (lineNumber, before, after) =>
-            {
-                await _editorBridgeDocumentController.HandleLineSplitRequestedAsync(
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber,
-                    before,
-                    after);
-            };
-
-            bridge.MergeLineWithPreviousRequested += async lineNumber =>
-            {
-                await _editorBridgeDocumentController.HandleMergeLineWithPreviousRequestedAsync(
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber);
-            };
-
-            bridge.DeleteLineRequested += async (lineNumber, isComposing) =>
-            {
-                await _editorBridgeDocumentController.HandleDeleteLineRequestedAsync(
-                    tab,
-                    tabItem,
-                    getSession(),
-                    lineNumber,
-                    isComposing);
             };
 
             bridge.EditTransactionStarted += () =>

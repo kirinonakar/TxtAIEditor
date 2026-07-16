@@ -42,14 +42,8 @@ namespace TxtAIEditor.Editor
         public event Action? EditorReady;
         public event Action<string>? ShortcutPressed;
         public event Action<int, int, int>? LinesRequested;
-        public event Action<int, string, bool>? LineChanged;
+        public event Action<EditorEditRequest>? EditRequested;
         public event Action<long, string>? HexEditRequested;
-        public event Action<int, int, int, string, bool>? LineEditRequested;
-        public event Action<int, int, int, int, string>? RangeEditRequested;
-        public event Action<int, string>? LineInsertRequested;
-        public event Action<int, string, string>? LineSplitRequested;
-        public event Action<int>? MergeLineWithPreviousRequested;
-        public event Action<int, bool>? DeleteLineRequested;
         public event Action? EditTransactionStarted;
         public event Action? EditTransactionEnded;
         public event Action<string, int, int, bool, bool, bool>? FindRequested;
@@ -361,6 +355,38 @@ namespace TxtAIEditor.Editor
                 caret = result.Caret is CaretState caret
                     ? new { line = Math.Max(1, caret.LineNumber), column = Math.Max(1, caret.Column) }
                     : null
+            });
+        }
+
+        public Task SendEditAcceptedAsync(EditorEditCommandResult result)
+        {
+            EditorDocumentChange? change = result.Change;
+            return SendMessageAsync(new
+            {
+                protocolVersion = EditorProtocol.CurrentVersion,
+                action = "editAccepted",
+                editId = result.EditId,
+                newVersion = result.CurrentVersion,
+                changePatch = change == null ? null : new
+                {
+                    startLine = change.StartLine,
+                    oldLineCount = change.OldLineCount,
+                    lineCount = change.DocumentLineCount,
+                    lines = change.Lines,
+                    linePatches = change.LinePatches
+                }
+            });
+        }
+
+        public Task SendEditRejectedAsync(EditorEditCommandResult result)
+        {
+            return SendMessageAsync(new
+            {
+                protocolVersion = EditorProtocol.CurrentVersion,
+                action = "editRejected",
+                editId = result.EditId,
+                currentVersion = result.CurrentVersion,
+                resyncFromVersion = result.ResyncFromVersion
             });
         }
 
@@ -931,13 +957,41 @@ namespace TxtAIEditor.Editor
                             }
                             break;
 
+                        case "edit":
+                            if (root.TryGetProperty("edit", out JsonElement editProp) &&
+                                editProp.ValueKind == JsonValueKind.Object &&
+                                editProp.TryGetProperty("startLine", out JsonElement canonicalStartLineProp) &&
+                                editProp.TryGetProperty("startColumn", out JsonElement canonicalStartColumnProp) &&
+                                editProp.TryGetProperty("endLine", out JsonElement canonicalEndLineProp) &&
+                                editProp.TryGetProperty("endColumn", out JsonElement canonicalEndColumnProp) &&
+                                editProp.TryGetProperty("text", out JsonElement canonicalTextProp))
+                            {
+                                EditRequested?.Invoke(CreateEditRequest(
+                                    root,
+                                    EditorEditRequestKind.TextEdit,
+                                    edit: new TextEdit(
+                                        canonicalStartLineProp.GetInt32(),
+                                        canonicalStartColumnProp.GetInt32(),
+                                        canonicalEndLineProp.GetInt32(),
+                                        canonicalEndColumnProp.GetInt32(),
+                                        canonicalTextProp.GetString() ?? string.Empty)));
+                            }
+                            break;
+
                         case "lineChanged":
                             if (root.TryGetProperty("lineNumber", out JsonElement lineNumberProp) &&
                                 root.TryGetProperty("text", out JsonElement textProp))
                             {
                                 bool isComposing = root.TryGetProperty("isComposing", out JsonElement isComposingProp) &&
                                     isComposingProp.ValueKind == JsonValueKind.True;
-                                LineChanged?.Invoke(lineNumberProp.GetInt32(), textProp.GetString() ?? string.Empty, isComposing);
+                                if (!isComposing)
+                                {
+                                    EditRequested?.Invoke(CreateEditRequest(
+                                        root,
+                                        EditorEditRequestKind.ReplaceLine,
+                                        lineNumber: lineNumberProp.GetInt32(),
+                                        after: textProp.GetString() ?? string.Empty));
+                                }
                             }
                             break;
 
@@ -959,12 +1013,19 @@ namespace TxtAIEditor.Editor
                             {
                                 bool isComposing = root.TryGetProperty("isComposing", out JsonElement editComposingProp) &&
                                     editComposingProp.ValueKind == JsonValueKind.True;
-                                LineEditRequested?.Invoke(
-                                    editLineNumberProp.GetInt32(),
-                                    editStartColumnProp.GetInt32(),
-                                    editEndColumnProp.GetInt32(),
-                                    editTextProp.GetString() ?? string.Empty,
-                                    isComposing);
+                                if (!isComposing)
+                                {
+                                    int lineNumber = editLineNumberProp.GetInt32();
+                                    EditRequested?.Invoke(CreateEditRequest(
+                                        root,
+                                        EditorEditRequestKind.TextEdit,
+                                        edit: new TextEdit(
+                                            lineNumber,
+                                            editStartColumnProp.GetInt32(),
+                                            lineNumber,
+                                            editEndColumnProp.GetInt32(),
+                                            editTextProp.GetString() ?? string.Empty)));
+                                }
                             }
                             break;
 
@@ -975,12 +1036,15 @@ namespace TxtAIEditor.Editor
                                 root.TryGetProperty("endColumn", out JsonElement rangeEndColumnProp) &&
                                 root.TryGetProperty("text", out JsonElement rangeTextProp))
                             {
-                                RangeEditRequested?.Invoke(
-                                    rangeStartLineProp.GetInt32(),
-                                    rangeStartColumnProp.GetInt32(),
-                                    rangeEndLineProp.GetInt32(),
-                                    rangeEndColumnProp.GetInt32(),
-                                    rangeTextProp.GetString() ?? string.Empty);
+                                EditRequested?.Invoke(CreateEditRequest(
+                                    root,
+                                    EditorEditRequestKind.TextEdit,
+                                    edit: new TextEdit(
+                                        rangeStartLineProp.GetInt32(),
+                                        rangeStartColumnProp.GetInt32(),
+                                        rangeEndLineProp.GetInt32(),
+                                        rangeEndColumnProp.GetInt32(),
+                                        rangeTextProp.GetString() ?? string.Empty)));
                             }
                             break;
 
@@ -988,7 +1052,11 @@ namespace TxtAIEditor.Editor
                             if (root.TryGetProperty("lineNumber", out JsonElement insertLineProp) &&
                                 root.TryGetProperty("text", out JsonElement insertTextProp))
                             {
-                                LineInsertRequested?.Invoke(insertLineProp.GetInt32(), insertTextProp.GetString() ?? string.Empty);
+                                EditRequested?.Invoke(CreateEditRequest(
+                                    root,
+                                    EditorEditRequestKind.InsertLine,
+                                    lineNumber: insertLineProp.GetInt32(),
+                                    after: insertTextProp.GetString() ?? string.Empty));
                             }
                             break;
 
@@ -997,17 +1065,22 @@ namespace TxtAIEditor.Editor
                                 root.TryGetProperty("before", out JsonElement beforeProp) &&
                                 root.TryGetProperty("after", out JsonElement afterProp))
                             {
-                                LineSplitRequested?.Invoke(
-                                    splitLineProp.GetInt32(),
-                                    beforeProp.GetString() ?? string.Empty,
-                                    afterProp.GetString() ?? string.Empty);
+                                EditRequested?.Invoke(CreateEditRequest(
+                                    root,
+                                    EditorEditRequestKind.SplitLine,
+                                    lineNumber: splitLineProp.GetInt32(),
+                                    before: beforeProp.GetString() ?? string.Empty,
+                                    after: afterProp.GetString() ?? string.Empty));
                             }
                             break;
 
                         case "mergeLineWithPrevious":
                             if (root.TryGetProperty("lineNumber", out JsonElement mergeLineProp))
                             {
-                                MergeLineWithPreviousRequested?.Invoke(mergeLineProp.GetInt32());
+                                EditRequested?.Invoke(CreateEditRequest(
+                                    root,
+                                    EditorEditRequestKind.MergeLineWithPrevious,
+                                    lineNumber: mergeLineProp.GetInt32()));
                             }
                             break;
 
@@ -1016,7 +1089,13 @@ namespace TxtAIEditor.Editor
                             {
                                 bool isComposing = root.TryGetProperty("isComposing", out JsonElement delComposingProp) &&
                                     delComposingProp.ValueKind == JsonValueKind.True;
-                                DeleteLineRequested?.Invoke(deleteLineProp.GetInt32(), isComposing);
+                                if (!isComposing)
+                                {
+                                    EditRequested?.Invoke(CreateEditRequest(
+                                        root,
+                                        EditorEditRequestKind.DeleteLine,
+                                        lineNumber: deleteLineProp.GetInt32()));
+                                }
                             }
                             break;
 
@@ -1195,6 +1274,39 @@ namespace TxtAIEditor.Editor
             {
                 System.Diagnostics.Debug.WriteLine($"Error receiving web message: {ex.Message}");
             }
+        }
+
+        private static EditorEditRequest CreateEditRequest(
+            JsonElement root,
+            EditorEditRequestKind kind,
+            TextEdit? edit = null,
+            int lineNumber = 0,
+            string before = "",
+            string after = "")
+        {
+            string documentId = root.GetProperty("documentId").GetString() ?? string.Empty;
+            string viewId = root.GetProperty("viewId").GetString() ?? string.Empty;
+            long baseVersion = root.GetProperty("baseVersion").GetInt64();
+            long editId = root.TryGetProperty("editId", out JsonElement editIdProperty) &&
+                editIdProperty.TryGetInt64(out long explicitEditId)
+                    ? explicitEditId
+                    : root.GetProperty("sequence").GetInt64();
+            bool isCompositionCommit = root.TryGetProperty(
+                "isCompositionCommit",
+                out JsonElement compositionProperty) &&
+                compositionProperty.ValueKind == JsonValueKind.True;
+
+            return new EditorEditRequest(
+                documentId,
+                viewId,
+                editId,
+                baseVersion,
+                kind,
+                edit ?? new TextEdit(1, 1, 1, 1, string.Empty),
+                lineNumber,
+                before,
+                after,
+                isCompositionCommit);
         }
 
         private static string NormalizeWebMessageJson(CoreWebView2WebMessageReceivedEventArgs args)

@@ -10,6 +10,7 @@ namespace TxtAIEditor.Editor
 
         private static readonly HashSet<string> MutationMessageTypes = new(StringComparer.Ordinal)
         {
+            "edit",
             "lineChanged",
             "lineEdit",
             "rangeEdit",

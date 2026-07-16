@@ -14,7 +14,6 @@ namespace TxtAIEditor.Composition
     internal sealed record MainWindowEditorRuntimeCallbacks(
         Action<OpenedTab> SchedulePreview,
         Action<OpenedTab> UpdateLanguageUi,
-        Func<OpenedTab, int, string, bool, Task> SyncLineChangeToOtherTabsAsync,
         Func<OpenedTab, Task> SyncEditsToOtherTabsAsync,
         Func<Task> SaveSidebarVisibilitySettingsAsync,
         Action RefreshActivePreview,
@@ -106,7 +105,6 @@ namespace TxtAIEditor.Composition
                 toc,
                 callbacks.SchedulePreview,
                 callbacks.UpdateLanguageUi,
-                callbacks.SyncLineChangeToOtherTabsAsync,
                 tab => callbacks.SyncEditsToOtherTabsAsync(tab));
 
             var shellPane = new ShellPaneController(

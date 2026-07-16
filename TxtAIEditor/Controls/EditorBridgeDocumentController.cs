@@ -18,7 +18,6 @@ namespace TxtAIEditor.Controls
         private readonly TocController _tocController;
         private readonly Action<OpenedTab> _schedulePreview;
         private readonly Action<OpenedTab> _updateLanguage;
-        private readonly Func<OpenedTab, int, string, bool, Task> _syncLineChangeToOtherTabsAsync;
         private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
         private readonly Dictionary<string, DeferredContentRefresh> _contentRefreshTimers = new();
         private readonly Dictionary<MonacoBridge, CancellationTokenSource> _textOperationCancellations = new();
@@ -49,7 +48,6 @@ namespace TxtAIEditor.Controls
             TocController tocController,
             Action<OpenedTab> schedulePreview,
             Action<OpenedTab> updateLanguage,
-            Func<OpenedTab, int, string, bool, Task> syncLineChangeToOtherTabsAsync,
             Func<OpenedTab, Task> syncEditsToOtherTabsAsync)
         {
             _tabDirtyStateController = tabDirtyStateController;
@@ -57,122 +55,42 @@ namespace TxtAIEditor.Controls
             _tocController = tocController;
             _schedulePreview = schedulePreview;
             _updateLanguage = updateLanguage;
-            _syncLineChangeToOtherTabsAsync = syncLineChangeToOtherTabsAsync;
             _syncEditsToOtherTabsAsync = syncEditsToOtherTabsAsync;
         }
 
-        public async Task HandleLineChangedAsync(
+        public async Task HandleEditRequestedAsync(
+            MonacoBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session,
-            int lineNumber,
-            string text,
-            bool isComposing)
+            EditorEditRequest request)
         {
-            if (isComposing)
+            if (!request.TryNormalize(session.Model, out EditorEditCommand command))
             {
-                // compositionstart~compositionupdate는 WebView 로컬 투영이다.
-                // compositionend에서 오는 확정 편집만 공유 DocumentBuffer에 적용한다.
+                var invalidResult = new EditorEditCommandResult(
+                    request.EditId,
+                    IsAccepted: false,
+                    session.DocumentVersion,
+                    Math.Min(Math.Max(0, request.BaseVersion), session.DocumentVersion),
+                    Change: null);
+                await bridge.SendEditRejectedAsync(invalidResult);
+                await ResynchronizeRejectedEditAsync(bridge, tab, session);
                 return;
             }
 
-            session.ReplaceLine(lineNumber, text);
+            EditorEditCommandResult result = session.ApplyEditCommand(command);
+            if (!result.IsAccepted)
+            {
+                await bridge.SendEditRejectedAsync(result);
+                await ResynchronizeRejectedEditAsync(bridge, tab, session);
+                return;
+            }
 
+            await bridge.SendEditAcceptedAsync(result);
             MarkDirty(tab, tabItem);
-
+            await _syncEditsToOtherTabsAsync(tab);
             _schedulePreview(tab);
-            await _syncLineChangeToOtherTabsAsync(tab, lineNumber, text, false);
-        }
-
-        public Task HandleLineEditAsync(
-            OpenedTab tab,
-            TabViewItem tabItem,
-            EditorDocumentSession session,
-            int lineNumber,
-            int startColumn,
-            int endColumn,
-            string replacementText,
-            bool isComposing)
-        {
-            string currentText = session.Model.GetLine(lineNumber);
-            int start = Math.Clamp(startColumn - 1, 0, currentText.Length);
-            int end = Math.Clamp(endColumn - 1, start, currentText.Length);
-            string updatedText = string.Concat(
-                currentText.AsSpan(0, start),
-                replacementText.AsSpan(),
-                currentText.AsSpan(end));
-
-            return HandleLineChangedAsync(
-                tab,
-                tabItem,
-                session,
-                lineNumber,
-                updatedText,
-                isComposing);
-        }
-
-        public async Task HandleLineInsertRequestedAsync(
-            OpenedTab tab,
-            TabViewItem tabItem,
-            EditorDocumentSession session,
-            int lineNumber,
-            string text)
-        {
-            session.InsertLine(lineNumber, text);
-            await CompleteStructuralEditAsync(tab, tabItem);
-        }
-
-        public async Task HandleRangeEditRequestedAsync(
-            OpenedTab tab,
-            TabViewItem tabItem,
-            EditorDocumentSession session,
-            int startLine,
-            int startColumn,
-            int endLine,
-            int endColumn,
-            string text)
-        {
-            session.ApplyRangeEdit(
-                startLine,
-                startColumn,
-                endLine,
-                endColumn,
-                text);
-            await CompleteStructuralEditAsync(tab, tabItem);
-        }
-
-        public async Task HandleLineSplitRequestedAsync(
-            OpenedTab tab,
-            TabViewItem tabItem,
-            EditorDocumentSession session,
-            int lineNumber,
-            string before,
-            string after)
-        {
-            session.SplitLine(lineNumber, before, after);
-            await CompleteStructuralEditAsync(tab, tabItem);
-        }
-
-        public async Task HandleMergeLineWithPreviousRequestedAsync(
-            OpenedTab tab,
-            TabViewItem tabItem,
-            EditorDocumentSession session,
-            int lineNumber)
-        {
-            session.MergeLineWithPrevious(lineNumber);
-            await CompleteStructuralEditAsync(tab, tabItem);
-        }
-
-        public async Task HandleDeleteLineRequestedAsync(
-            OpenedTab tab,
-            TabViewItem tabItem,
-            EditorDocumentSession session,
-            int lineNumber,
-            bool isComposing = false)
-        {
-            if (isComposing) return;
-            session.DeleteLine(lineNumber);
-            await CompleteStructuralEditAsync(tab, tabItem);
+            _statusBarController.UpdateTotalLines(tab);
         }
 
         public async Task HandleFindRequestedAsync(
@@ -425,21 +343,17 @@ namespace TxtAIEditor.Controls
             _statusBarController.UpdateTotalLines(tab);
         }
 
-        private async Task CompleteStructuralEditAsync(
+        private static Task ResynchronizeRejectedEditAsync(
+            MonacoBridge bridge,
             OpenedTab tab,
-            TabViewItem tabItem)
+            EditorDocumentSession session)
         {
-            MarkDirty(tab, tabItem);
-
-            // The source WebView already applied this structural edit and its line
-            // count locally. Echoing lineCountChanged back to it queues a render that
-            // can replace the active contenteditable between Korean IME syllables.
-            // Propagate the shared-model change only to the other split views.
-            await _syncEditsToOtherTabsAsync(tab);
-
-            _schedulePreview(tab);
-
-            _statusBarController.UpdateTotalLines(tab);
+            return bridge.SetTextAsync(
+                session.GetText(),
+                shouldFocus: false,
+                session.DocumentId,
+                session.DocumentVersion,
+                tab.Id);
         }
 
         private void MarkDirty(OpenedTab tab, TabViewItem tabItem)

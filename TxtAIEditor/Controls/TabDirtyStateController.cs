@@ -116,7 +116,7 @@ namespace TxtAIEditor.Controls
                 {
                     tab.OriginalContent = savedContent;
                     bool hasSession = _editorSessions.TryGetValue(tab.Id, out var session);
-                    tab.OriginalLineEnding = hasSession ? session!.Model.LineEnding : LineArrayTextModel.FromText(savedContent).LineEnding;
+                    tab.OriginalLineEnding = hasSession ? session!.Model.LineEnding : TextModelFactory.FromText(savedContent).LineEnding;
                     tab.OriginalEncodingName = tab.EncodingName;
 
                     if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)

@@ -267,6 +267,22 @@ export function createHostMessageHandler({
                 }
             }
             break;
+        case 'editAccepted':
+            {
+                const version = Number(msg.newVersion);
+                if (Number.isFinite(version)) {
+                    state.hostDocumentVersion = Math.max(state.hostDocumentVersion, version);
+                }
+            }
+            break;
+        case 'editRejected':
+            {
+                const version = Number(msg.currentVersion);
+                if (Number.isFinite(version)) {
+                    state.hostDocumentVersion = Math.max(0, version);
+                }
+            }
+            break;
         case 'updateLine':
             {
                 if (!canApplyVersionedDocumentChange(msg)) break;

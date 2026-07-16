@@ -92,7 +92,7 @@ namespace TxtAIEditor.Controls
                     }
 
                     string decryptedText = await _secureNoteEncryptionService.DecryptFileAsync(tab.FilePath, password);
-                    var encryptedModel = LineArrayTextModel.FromText(decryptedText);
+                    var encryptedModel = TextModelFactory.FromText(decryptedText);
                     tab.EncryptionPassword = password;
                     ApplyTabReloadState(tab, encryptedModel, "UTF-8", false, decryptedText);
 
@@ -150,7 +150,7 @@ namespace TxtAIEditor.Controls
                 {
                     var documentService = new DocumentTextExtractionService();
                     string extractedText = await documentService.ExtractTextAsync(tab.FilePath, 50_000_000);
-                    var docxModel = LineArrayTextModel.FromText(extractedText);
+                    var docxModel = TextModelFactory.FromText(extractedText);
                     ApplyTabReloadState(tab, docxModel, "UTF-8", false, extractedText);
 
                     if (_editorSessions.TryGetValue(tab.Id, out var docxSession))
@@ -172,7 +172,7 @@ namespace TxtAIEditor.Controls
                     }
 
                     string decryptedText = await _secureNoteEncryptionService.DecryptFileAsync(tab.FilePath, password);
-                    var encryptedModel = LineArrayTextModel.FromText(decryptedText);
+                    var encryptedModel = TextModelFactory.FromText(decryptedText);
                     tab.EncryptionPassword = password;
                     ApplyTabReloadState(tab, encryptedModel, "UTF-8", false, decryptedText);
 
@@ -272,7 +272,7 @@ namespace TxtAIEditor.Controls
                                    encodingName.Equals("Auto", StringComparison.OrdinalIgnoreCase);
 
             return new EditorDocumentLoadResult(
-                LineArrayTextModel.FromText(text),
+                TextModelFactory.FromText(text),
                 TextEncodingService.GetDisplayName(encoding, TextEncodingService.HasUtf8Bom(bytes)),
                 wasAutoDetected);
         }
