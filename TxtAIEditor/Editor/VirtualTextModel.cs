@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -26,6 +27,22 @@ namespace TxtAIEditor.Editor
         int MatchLength,
         string LineContent);
 
+    public readonly record struct TextOperationProgress(
+        int ProcessedLines,
+        int TotalLines,
+        TimeSpan Elapsed);
+
+    public sealed record LineReplacement(
+        int LineNumber,
+        string BeforeText,
+        string AfterText);
+
+    public sealed record ReplaceAllResult(
+        EditorDocumentChange? Change,
+        IReadOnlyList<LineReplacement> Replacements,
+        long ReplacementCount,
+        TimeSpan Elapsed);
+
     public interface ITextModel
     {
         int LineCount { get; }
@@ -49,7 +66,10 @@ namespace TxtAIEditor.Editor
 
     public sealed class LineArrayTextModel : ITextModel
     {
+        internal static readonly TimeSpan UserRegexTimeout = TimeSpan.FromMilliseconds(250);
         private readonly List<string> _lines;
+        private readonly LineLengthIndex _lineLengthIndex = new();
+        private string _lineEnding;
 
         public LineArrayTextModel(IEnumerable<string>? lines = null, string lineEnding = "\n")
         {
@@ -59,18 +79,38 @@ namespace TxtAIEditor.Editor
                 _lines.Add(string.Empty);
             }
 
-            LineEnding = string.IsNullOrEmpty(lineEnding) ? "\n" : lineEnding;
+            _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\n" : lineEnding;
+            RebuildLineLengthIndex();
         }
 
         public int LineCount => _lines.Count;
 
-        public string LineEnding { get; set; }
+        public string LineEnding
+        {
+            get => _lineEnding;
+            set
+            {
+                string next = string.IsNullOrEmpty(value) ? "\n" : value;
+                if (string.Equals(_lineEnding, next, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                _lineEnding = next;
+                RebuildLineLengthIndex();
+            }
+        }
 
         public static LineArrayTextModel FromText(string text)
         {
             string lineEnding = DetectLineEnding(text);
             string normalized = (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
             return new LineArrayTextModel(normalized.Split('\n'), lineEnding);
+        }
+
+        internal string[] CaptureLines()
+        {
+            return _lines.ToArray();
         }
 
         public static async Task<EditorDocumentLoadResult> LoadFromFileAsync(
@@ -199,34 +239,21 @@ namespace TxtAIEditor.Editor
 
         public TextPosition GetPositionAt(int offset)
         {
-            offset = Math.Max(0, offset);
-            int remaining = offset;
-            for (int i = 0; i < _lines.Count; i++)
-            {
-                int lineLengthWithBreak = _lines[i].Length + LineEnding.Length;
-                if (remaining <= _lines[i].Length || i == _lines.Count - 1)
-                {
-                    return new TextPosition(i + 1, Math.Min(remaining, _lines[i].Length) + 1);
-                }
-
-                remaining -= lineLengthWithBreak;
-            }
-
-            string last = _lines[^1];
-            return new TextPosition(_lines.Count, last.Length + 1);
+            long documentLength = Math.Max(0, _lineLengthIndex.TotalLength - LineEnding.Length);
+            long safeOffset = Math.Clamp((long)offset, 0, documentLength);
+            int lineNumber = _lineLengthIndex.FindLineContainingOffset(safeOffset);
+            long lineStartOffset = _lineLengthIndex.GetPrefixLength(lineNumber - 1);
+            string line = _lines[lineNumber - 1];
+            int columnOffset = (int)Math.Clamp(safeOffset - lineStartOffset, 0, line.Length);
+            return new TextPosition(lineNumber, columnOffset + 1);
         }
 
         public int GetOffsetAt(int lineNumber, int column)
         {
             int safeLine = Math.Clamp(lineNumber, 1, _lines.Count);
-            int offset = 0;
-            for (int i = 0; i < safeLine - 1; i++)
-            {
-                offset += _lines[i].Length + LineEnding.Length;
-            }
-
             string line = _lines[safeLine - 1];
-            return offset + ClampColumn(line, column) - 1;
+            long offset = _lineLengthIndex.GetPrefixLength(safeLine - 1) + ClampColumn(line, column) - 1L;
+            return (int)Math.Min(int.MaxValue, offset);
         }
 
         public void ApplyEdit(TextEdit edit)
@@ -260,6 +287,7 @@ namespace TxtAIEditor.Editor
             _lines.RemoveRange(startLine - 1, endLine - startLine + 1);
             _lines.InsertRange(startLine - 1, replacement);
             EnsureAtLeastOneLine();
+            RebuildLineLengthIndex();
         }
 
         public void ReplaceLine(int lineNumber, string text)
@@ -269,13 +297,17 @@ namespace TxtAIEditor.Editor
                 return;
             }
 
-            _lines[lineNumber - 1] = NormalizeSingleLine(text);
+            string normalized = NormalizeSingleLine(text);
+            string previous = _lines[lineNumber - 1];
+            _lines[lineNumber - 1] = normalized;
+            _lineLengthIndex.UpdateLineLength(lineNumber, previous.Length, normalized.Length);
         }
 
         public void InsertLine(int lineNumber, string text)
         {
             int index = Math.Clamp(lineNumber - 1, 0, _lines.Count);
             _lines.Insert(index, NormalizeSingleLine(text));
+            RebuildLineLengthIndex();
         }
 
         public void DeleteLine(int lineNumber)
@@ -287,6 +319,7 @@ namespace TxtAIEditor.Editor
 
             _lines.RemoveAt(lineNumber - 1);
             EnsureAtLeastOneLine();
+            RebuildLineLengthIndex();
         }
 
         public void SplitLine(int lineNumber, string before, string after)
@@ -298,6 +331,7 @@ namespace TxtAIEditor.Editor
 
             _lines[lineNumber - 1] = NormalizeSingleLine(before);
             _lines.Insert(lineNumber, NormalizeSingleLine(after));
+            RebuildLineLengthIndex();
         }
 
         public void MergeLineWithPrevious(int lineNumber)
@@ -310,6 +344,7 @@ namespace TxtAIEditor.Editor
             _lines[lineNumber - 2] += _lines[lineNumber - 1];
             _lines.RemoveAt(lineNumber - 1);
             EnsureAtLeastOneLine();
+            RebuildLineLengthIndex();
         }
 
         public TextSearchResult? Find(string query, int startLine, int startColumn, bool reverse, bool matchCase, bool isRegex = false)
@@ -325,7 +360,7 @@ namespace TxtAIEditor.Editor
                 try
                 {
                     var regexOptions = matchCase ? RegexOptions.None : RegexOptions.IgnoreCase;
-                    regex = new Regex(query, regexOptions);
+                    regex = new Regex(query, regexOptions, UserRegexTimeout);
                 }
                 catch (ArgumentException)
                 {
@@ -423,6 +458,27 @@ namespace TxtAIEditor.Editor
 
         public List<TextSearchResult> FindAll(string query, bool matchCase, bool isRegex = false, int currentLine = 1, int maxMatches = 50000)
         {
+            return FindAllWithLimits(
+                query,
+                matchCase,
+                isRegex,
+                currentLine,
+                maxMatches,
+                CancellationToken.None,
+                progress: null,
+                maxElapsed: Timeout.InfiniteTimeSpan);
+        }
+
+        internal List<TextSearchResult> FindAllWithLimits(
+            string query,
+            bool matchCase,
+            bool isRegex,
+            int currentLine,
+            int maxMatches,
+            CancellationToken cancellationToken,
+            IProgress<TextOperationProgress>? progress,
+            TimeSpan maxElapsed)
+        {
             if (string.IsNullOrEmpty(query))
             {
                 return new List<TextSearchResult>();
@@ -432,6 +488,23 @@ namespace TxtAIEditor.Editor
             int winStart = Math.Max(1, startLine - 200);
             int winEnd = Math.Min(_lines.Count, startLine + 200);
             var results = new List<TextSearchResult>();
+            var stopwatch = Stopwatch.StartNew();
+            int processedLines = 0;
+
+            void ReportProgress(bool force = false)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (maxElapsed != Timeout.InfiniteTimeSpan && stopwatch.Elapsed > maxElapsed)
+                {
+                    throw new OperationCanceledException("텍스트 검색 제한 시간을 초과했습니다.", cancellationToken);
+                }
+
+                processedLines++;
+                if (force || processedLines % 512 == 0 || processedLines == _lines.Count)
+                {
+                    progress?.Report(new TextOperationProgress(processedLines, _lines.Count, stopwatch.Elapsed));
+                }
+            }
 
             if (isRegex)
             {
@@ -439,7 +512,7 @@ namespace TxtAIEditor.Editor
                 try
                 {
                     var regexOptions = matchCase ? RegexOptions.None : RegexOptions.IgnoreCase;
-                    regex = new Regex(query, regexOptions);
+                    regex = new Regex(query, regexOptions, UserRegexTimeout);
                 }
                 catch (ArgumentException)
                 {
@@ -469,6 +542,7 @@ namespace TxtAIEditor.Editor
                 for (int lineNumber = winStart; lineNumber <= winEnd; lineNumber++)
                 {
                     SearchRegexLine(lineNumber);
+                    ReportProgress();
                     if (results.Count >= maxMatches) break;
                 }
 
@@ -478,6 +552,7 @@ namespace TxtAIEditor.Editor
                     for (int lineNumber = winEnd + 1; lineNumber <= _lines.Count; lineNumber++)
                     {
                         SearchRegexLine(lineNumber);
+                        ReportProgress();
                         if (results.Count >= maxMatches) break;
                     }
                 }
@@ -488,10 +563,12 @@ namespace TxtAIEditor.Editor
                     for (int lineNumber = 1; lineNumber < winStart; lineNumber++)
                     {
                         SearchRegexLine(lineNumber);
+                        ReportProgress();
                         if (results.Count >= maxMatches) break;
                     }
                 }
 
+                progress?.Report(new TextOperationProgress(processedLines, _lines.Count, stopwatch.Elapsed));
                 return results.OrderBy(r => r.LineNumber).ThenBy(r => r.IndexOfMatch).ToList();
             }
 
@@ -521,6 +598,7 @@ namespace TxtAIEditor.Editor
             for (int lineNumber = winStart; lineNumber <= winEnd; lineNumber++)
             {
                 SearchNormalLine(lineNumber);
+                ReportProgress();
                 if (results.Count >= maxMatches) break;
             }
 
@@ -530,6 +608,7 @@ namespace TxtAIEditor.Editor
                 for (int lineNumber = winEnd + 1; lineNumber <= _lines.Count; lineNumber++)
                 {
                     SearchNormalLine(lineNumber);
+                    ReportProgress();
                     if (results.Count >= maxMatches) break;
                 }
             }
@@ -540,14 +619,25 @@ namespace TxtAIEditor.Editor
                 for (int lineNumber = 1; lineNumber < winStart; lineNumber++)
                 {
                     SearchNormalLine(lineNumber);
+                    ReportProgress();
                     if (results.Count >= maxMatches) break;
                 }
             }
 
+            progress?.Report(new TextOperationProgress(processedLines, _lines.Count, stopwatch.Elapsed));
             return results.OrderBy(r => r.LineNumber).ThenBy(r => r.IndexOfMatch).ToList();
         }
 
-        public async Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)
+        public Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)
+        {
+            return SaveWithProgressAsync(filePath, encodingName, cancellationToken, progress: null);
+        }
+
+        internal async Task SaveWithProgressAsync(
+            string filePath,
+            string encodingName,
+            CancellationToken cancellationToken,
+            IProgress<TextOperationProgress>? progress)
         {
             string? directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
@@ -561,11 +651,26 @@ namespace TxtAIEditor.Editor
 
             try
             {
-                using (var writer = new StreamWriter(tempFilePath, append: false, encoding))
+                using (var stream = new FileStream(
+                    tempFilePath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 128 * 1024,
+                    options: FileOptions.Asynchronous | FileOptions.SequentialScan))
+                using (var writer = new StreamWriter(
+                    stream,
+                    encoding,
+                    bufferSize: 128 * 1024,
+                    leaveOpen: false))
                 {
                     for (int i = 0; i < _lines.Count; i++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        if (i % 512 == 0)
+                        {
+                            progress?.Report(new TextOperationProgress(i, _lines.Count, TimeSpan.Zero));
+                        }
                         if (i > 0)
                         {
                         await writer.WriteAsync(LineEnding.AsMemory(), cancellationToken).ConfigureAwait(false);
@@ -573,6 +678,8 @@ namespace TxtAIEditor.Editor
 
                         await writer.WriteAsync(_lines[i].AsMemory(), cancellationToken).ConfigureAwait(false);
                     }
+
+                    progress?.Report(new TextOperationProgress(_lines.Count, _lines.Count, TimeSpan.Zero));
                 }
 
                 if (File.Exists(filePath))
@@ -621,9 +728,29 @@ namespace TxtAIEditor.Editor
                 return "\n";
             }
 
-            int crlf = Regex.Matches(text, "\r\n").Count;
-            int lf = Regex.Matches(text.Replace("\r\n", string.Empty), "\n").Count;
-            int cr = Regex.Matches(text.Replace("\r\n", string.Empty), "\r").Count;
+            int crlf = 0;
+            int lf = 0;
+            int cr = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\r')
+                {
+                    if (i + 1 < text.Length && text[i + 1] == '\n')
+                    {
+                        crlf++;
+                        i++;
+                    }
+                    else
+                    {
+                        cr++;
+                    }
+                }
+                else if (text[i] == '\n')
+                {
+                    lf++;
+                }
+            }
+
             if (crlf >= lf && crlf >= cr && crlf > 0) return "\r\n";
             if (cr > lf && cr > 0) return "\r";
             return "\n";
@@ -671,6 +798,11 @@ namespace TxtAIEditor.Editor
                 _lines.Add(string.Empty);
             }
         }
+
+        private void RebuildLineLengthIndex()
+        {
+            _lineLengthIndex.Rebuild(_lines, LineEnding.Length);
+        }
     }
 
     public sealed record EditorDocumentLoadResult(
@@ -686,7 +818,10 @@ namespace TxtAIEditor.Editor
         int StartLine,
         int OldLineCount,
         int DocumentLineCount,
-        IReadOnlyList<string> Lines);
+        IReadOnlyList<string> Lines)
+    {
+        public IReadOnlyList<TextLinePatch>? LinePatches { get; init; }
+    }
 
     public sealed class EditorDocumentBuffer
     {
@@ -749,10 +884,40 @@ namespace TxtAIEditor.Editor
             Changed?.Invoke(this, change);
             return change;
         }
+
+        internal EditorDocumentChange CommitLinePatches(
+            string sourceViewId,
+            IReadOnlyList<TextLinePatch> patches)
+        {
+            long baseVersion = Version;
+            Version++;
+            TextLinePatch[] safePatches = patches
+                .Where(patch => patch.LineNumber >= 1 && patch.LineNumber <= _model.LineCount)
+                .OrderBy(patch => patch.LineNumber)
+                .ToArray();
+            int startLine = safePatches.Length > 0 ? safePatches[0].LineNumber : 1;
+            var change = new EditorDocumentChange(
+                DocumentId,
+                sourceViewId,
+                baseVersion,
+                Version,
+                startLine,
+                0,
+                Math.Max(1, _model.LineCount),
+                Array.Empty<string>())
+            {
+                LinePatches = safePatches
+            };
+            LastChange = change;
+            Changed?.Invoke(this, change);
+            return change;
+        }
     }
 
     public sealed class EditorDocumentSession
     {
+        private const int MaxSearchMatches = 50_000;
+        private static readonly TimeSpan MaxSearchElapsed = TimeSpan.FromSeconds(8);
         private EditorDocumentBuffer _buffer;
 
         public EditorDocumentSession(OpenedTab tab, ITextModel model)
@@ -1015,7 +1180,7 @@ namespace TxtAIEditor.Editor
                 return null;
             }
 
-            CommitViewChange(result.StartLine, result.OldLineCount, result.NewLineCount);
+            CommitUndoRedoChange(result);
             RefreshTabContentPreview();
             return result;
         }
@@ -1028,7 +1193,33 @@ namespace TxtAIEditor.Editor
                 return null;
             }
 
-            CommitViewChange(result.StartLine, result.OldLineCount, result.NewLineCount);
+            CommitUndoRedoChange(result);
+            RefreshTabContentPreview();
+            return result;
+        }
+
+        public async Task<UndoResult?> UndoAsync(IProgress<TextOperationProgress>? progress = null)
+        {
+            UndoResult? result = await _buffer.UndoManager.UndoAsync(Model, progress);
+            if (result == null)
+            {
+                return null;
+            }
+
+            CommitUndoRedoChange(result);
+            RefreshTabContentPreview();
+            return result;
+        }
+
+        public async Task<UndoResult?> RedoAsync(IProgress<TextOperationProgress>? progress = null)
+        {
+            UndoResult? result = await _buffer.UndoManager.RedoAsync(Model, progress);
+            if (result == null)
+            {
+                return null;
+            }
+
+            CommitUndoRedoChange(result);
             RefreshTabContentPreview();
             return result;
         }
@@ -1043,6 +1234,114 @@ namespace TxtAIEditor.Editor
             return Model.FindAll(query, matchCase, isRegex, currentLine);
         }
 
+        public Task<List<TextSearchResult>> FindAllAsync(
+            string query,
+            bool matchCase,
+            bool isRegex = false,
+            int currentLine = 1,
+            CancellationToken cancellationToken = default,
+            IProgress<TextOperationProgress>? progress = null)
+        {
+            if (Model is LineArrayTextModel lineModel)
+            {
+                string[] lines = lineModel.CaptureLines();
+                string lineEnding = lineModel.LineEnding;
+                return Task.Run(
+                    () => new LineArrayTextModel(lines, lineEnding)
+                        .FindAllWithLimits(
+                            query,
+                            matchCase,
+                            isRegex,
+                            currentLine,
+                            MaxSearchMatches,
+                            cancellationToken,
+                            progress,
+                            MaxSearchElapsed),
+                    cancellationToken);
+            }
+
+            return Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                List<TextSearchResult> results = Model.FindAll(
+                    query,
+                    matchCase,
+                    isRegex,
+                    currentLine,
+                    MaxSearchMatches);
+                cancellationToken.ThrowIfCancellationRequested();
+                return results;
+            }, cancellationToken);
+        }
+
+        public async Task<ReplaceAllResult> ReplaceAllAsync(
+            string query,
+            string replace,
+            bool matchCase,
+            bool isRegex,
+            CancellationToken cancellationToken = default,
+            IProgress<TextOperationProgress>? progress = null)
+        {
+            if (string.IsNullOrEmpty(query))
+            {
+                return new ReplaceAllResult(null, Array.Empty<LineReplacement>(), 0, TimeSpan.Zero);
+            }
+
+            long baseVersion = DocumentVersion;
+            int lineCount = Model.LineCount;
+            string[] snapshot = Model is LineArrayTextModel lineModel
+                ? lineModel.CaptureLines()
+                : Model.GetLines(1, lineCount).ToArray();
+            (List<LineReplacement> Replacements, long MatchCount, TimeSpan Elapsed) plan = await Task.Run(() =>
+                BuildReplaceAllPlan(
+                    snapshot,
+                    query,
+                    replace,
+                    matchCase,
+                    isRegex,
+                    cancellationToken,
+                    progress),
+                cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (DocumentVersion != baseVersion)
+            {
+                throw new OperationCanceledException("문서가 변경되어 모두 바꾸기 결과를 폐기했습니다.", cancellationToken);
+            }
+
+            if (plan.Replacements.Count == 0)
+            {
+                return new ReplaceAllResult(null, plan.Replacements, 0, plan.Elapsed);
+            }
+
+            _buffer.UndoManager.BeginTransaction("replaceAll");
+            try
+            {
+                for (int i = 0; i < plan.Replacements.Count; i++)
+                {
+                    LineReplacement replacement = plan.Replacements[i];
+                    _buffer.UndoManager.AddEdit(new ReplaceLineEdit(
+                        replacement.LineNumber,
+                        replacement.BeforeText,
+                        replacement.AfterText));
+                    Model.ReplaceLine(replacement.LineNumber, replacement.AfterText);
+                    if ((i + 1) % 256 == 0)
+                    {
+                        await Task.Yield();
+                    }
+                }
+            }
+            finally
+            {
+                _buffer.UndoManager.EndTransaction();
+            }
+
+            CommitLinePatches(plan.Replacements.Select(replacement =>
+                new TextLinePatch(replacement.LineNumber, replacement.AfterText)).ToArray());
+            RefreshTabContentPreview();
+            return new ReplaceAllResult(LastChange, plan.Replacements, plan.MatchCount, plan.Elapsed);
+        }
+
         public void ReplaceAll(string query, string replace, bool matchCase, bool isRegex)
         {
             int originalLineCount = Model.LineCount;
@@ -1053,7 +1352,7 @@ namespace TxtAIEditor.Editor
                 try
                 {
                     var options = matchCase ? RegexOptions.None : RegexOptions.IgnoreCase;
-                    var regex = new Regex(query, options);
+                    var regex = new Regex(query, options, LineArrayTextModel.UserRegexTimeout);
                     for (int i = 1; i <= Model.LineCount; i++)
                     {
                         string original = Model.GetLine(i);
@@ -1116,9 +1415,134 @@ namespace TxtAIEditor.Editor
             return sb.ToString();
         }
 
+        private static (List<LineReplacement> Replacements, long MatchCount, TimeSpan Elapsed) BuildReplaceAllPlan(
+            IReadOnlyList<string> lines,
+            string query,
+            string replace,
+            bool matchCase,
+            bool isRegex,
+            CancellationToken cancellationToken,
+            IProgress<TextOperationProgress>? progress)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var replacements = new List<LineReplacement>();
+            long matchCount = 0;
+            Regex? regex = null;
+            if (isRegex)
+            {
+                var options = matchCase ? RegexOptions.None : RegexOptions.IgnoreCase;
+                regex = new Regex(query, options, LineArrayTextModel.UserRegexTimeout);
+            }
+
+            StringComparison comparison = matchCase
+                ? StringComparison.Ordinal
+                : StringComparison.OrdinalIgnoreCase;
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (i % 256 == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    progress?.Report(new TextOperationProgress(i, lines.Count, stopwatch.Elapsed));
+                }
+
+                string original = lines[i];
+                int lineMatchCount = 0;
+                string nextText;
+                if (regex != null)
+                {
+                    nextText = regex.Replace(original, match =>
+                    {
+                        lineMatchCount++;
+                        return match.Result(replace);
+                    });
+                }
+                else
+                {
+                    nextText = ReplaceStringAndCount(original, query, replace, comparison, out lineMatchCount);
+                }
+
+                if (lineMatchCount == 0 || string.Equals(original, nextText, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                matchCount += lineMatchCount;
+                replacements.Add(new LineReplacement(i + 1, original, nextText));
+            }
+
+            progress?.Report(new TextOperationProgress(lines.Count, lines.Count, stopwatch.Elapsed));
+            return (replacements, matchCount, stopwatch.Elapsed);
+        }
+
+        private static string ReplaceStringAndCount(
+            string value,
+            string oldValue,
+            string newValue,
+            StringComparison comparison,
+            out int replacementCount)
+        {
+            replacementCount = 0;
+            if (string.IsNullOrEmpty(oldValue))
+            {
+                return value;
+            }
+
+            int index = value.IndexOf(oldValue, comparison);
+            if (index < 0)
+            {
+                return value;
+            }
+
+            var builder = new StringBuilder(value.Length);
+            int previousIndex = 0;
+            while (index >= 0)
+            {
+                builder.Append(value, previousIndex, index - previousIndex);
+                builder.Append(newValue);
+                replacementCount++;
+                previousIndex = index + oldValue.Length;
+                index = value.IndexOf(oldValue, previousIndex, comparison);
+            }
+
+            builder.Append(value, previousIndex, value.Length - previousIndex);
+            return builder.ToString();
+        }
+
         public Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)
         {
             return Model.SaveAsync(filePath, encodingName, cancellationToken);
+        }
+
+        public Task SaveAsync(
+            string filePath,
+            string encodingName,
+            CancellationToken cancellationToken,
+            IProgress<TextOperationProgress>? progress)
+        {
+            if (Model is LineArrayTextModel lineModel)
+            {
+                return lineModel.SaveWithProgressAsync(filePath, encodingName, cancellationToken, progress);
+            }
+
+            progress?.Report(new TextOperationProgress(0, 1, TimeSpan.Zero));
+            return SaveNonLineModelWithProgressAsync(
+                Model,
+                filePath,
+                encodingName,
+                cancellationToken,
+                progress);
+        }
+
+        private static async Task SaveNonLineModelWithProgressAsync(
+            ITextModel model,
+            string filePath,
+            string encodingName,
+            CancellationToken cancellationToken,
+            IProgress<TextOperationProgress>? progress)
+        {
+            await model.SaveAsync(filePath, encodingName, cancellationToken);
+            progress?.Report(new TextOperationProgress(1, 1, TimeSpan.Zero));
         }
 
         public void RefreshTabContentPreview()
@@ -1139,6 +1563,23 @@ namespace TxtAIEditor.Editor
                 oldLineCount,
                 newLineCount);
             ViewVersion = change.Version;
+        }
+
+        private void CommitLinePatches(IReadOnlyList<TextLinePatch> patches)
+        {
+            EditorDocumentChange change = _buffer.CommitLinePatches(Tab.Id, patches);
+            ViewVersion = change.Version;
+        }
+
+        private void CommitUndoRedoChange(UndoResult result)
+        {
+            if (result.LinePatches is { Count: > 0 } patches)
+            {
+                CommitLinePatches(patches);
+                return;
+            }
+
+            CommitViewChange(result.StartLine, result.OldLineCount, result.NewLineCount);
         }
     }
 }

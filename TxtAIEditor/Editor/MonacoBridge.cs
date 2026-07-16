@@ -13,6 +13,8 @@ namespace TxtAIEditor.Editor
 {
     public class MonacoBridge
     {
+        private const int LinePatchBatchMaxLines = 256;
+        private const int LinePatchBatchMaxChars = 256 * 1024;
         private const string HexLanguageName = "hex";
         private const string HexEditorFontFamily = "Consolas, \"Cascadia Mono\", \"Courier New\", monospace";
         private readonly WebView2 _webView;
@@ -149,7 +151,7 @@ namespace TxtAIEditor.Editor
 
             var msg = new
             {
-                protocolVersion = 1,
+                protocolVersion = EditorProtocol.CurrentVersion,
                 action = "setText",
                 documentId,
                 viewId,
@@ -191,7 +193,7 @@ namespace TxtAIEditor.Editor
             bool isHexLanguage = IsHexLanguage(_currentLanguage);
             var msg = new
             {
-                protocolVersion = 1,
+                protocolVersion = EditorProtocol.CurrentVersion,
                 action = "initModel",
                 documentId,
                 viewId,
@@ -305,7 +307,7 @@ namespace TxtAIEditor.Editor
         {
             await SendMessageAsync(new
             {
-                protocolVersion = 1,
+                protocolVersion = EditorProtocol.CurrentVersion,
                 action = "updateLine",
                 documentId,
                 baseVersion,
@@ -333,9 +335,20 @@ namespace TxtAIEditor.Editor
             long? documentVersion = null,
             string? sourceViewId = null)
         {
+            if (result.LinePatches is { Count: > 0 } patches)
+            {
+                await ApplyLinePatchesAsync(
+                    patches,
+                    documentId,
+                    baseVersion,
+                    documentVersion,
+                    sourceViewId);
+                return;
+            }
+
             await SendMessageAsync(new
             {
-                protocolVersion = 1,
+                protocolVersion = EditorProtocol.CurrentVersion,
                 action = "applyEditResult",
                 documentId,
                 baseVersion,
@@ -349,6 +362,103 @@ namespace TxtAIEditor.Editor
                     ? new { line = Math.Max(1, caret.LineNumber), column = Math.Max(1, caret.Column) }
                     : null
             });
+        }
+
+        public Task SetTextOperationLockAsync(bool locked)
+        {
+            return SendMessageAsync(new
+            {
+                action = "setTextOperationLock",
+                locked
+            });
+        }
+
+        public async Task ApplyLineReplacementsAsync(
+            IReadOnlyList<LineReplacement> replacements,
+            string documentId,
+            long baseVersion,
+            long documentVersion,
+            string sourceViewId)
+        {
+            await SendLinePatchBatchesAsync(
+                replacements.Select(item => new TextLinePatch(item.LineNumber, item.AfterText)),
+                documentId,
+                baseVersion,
+                documentVersion,
+                sourceViewId);
+        }
+
+        public async Task ApplyLinePatchesAsync(
+            IReadOnlyList<TextLinePatch> patches,
+            string? documentId,
+            long? baseVersion,
+            long? documentVersion,
+            string? sourceViewId)
+        {
+            await SendLinePatchBatchesAsync(
+                patches,
+                documentId,
+                baseVersion,
+                documentVersion,
+                sourceViewId);
+        }
+
+        private async Task SendLinePatchBatchesAsync(
+            IEnumerable<TextLinePatch> patches,
+            string? documentId,
+            long? baseVersion,
+            long? documentVersion,
+            string? sourceViewId)
+        {
+            string batchId = Guid.NewGuid().ToString("N");
+            int batchIndex = 0;
+            int batchChars = 0;
+            var batch = new List<TextLinePatch>(LinePatchBatchMaxLines);
+
+            async Task FlushBatchAsync(bool isFinal)
+            {
+                await SendRequiredMessageAsync(new
+                {
+                    protocolVersion = EditorProtocol.CurrentVersion,
+                    action = "applyLineReplacements",
+                    documentId,
+                    baseVersion,
+                    documentVersion,
+                    sourceViewId,
+                    batchId,
+                    batchIndex,
+                    isFinal,
+                    replacements = batch.Select(item => new
+                    {
+                        lineNumber = item.LineNumber,
+                        text = item.Text
+                    }).ToArray()
+                });
+                batchIndex++;
+                batch.Clear();
+                batchChars = 0;
+                await Task.Yield();
+            }
+
+            foreach (TextLinePatch patch in patches)
+            {
+                int patchChars = patch.Text?.Length ?? 0;
+                if (batch.Count > 0 &&
+                    (batch.Count >= LinePatchBatchMaxLines || batchChars + patchChars > LinePatchBatchMaxChars))
+                {
+                    await FlushBatchAsync(isFinal: false);
+                }
+
+                batch.Add(patch);
+                batchChars += patchChars;
+            }
+
+            if (batch.Count > 0)
+            {
+                await FlushBatchAsync(isFinal: false);
+            }
+
+            await FlushBatchAsync(isFinal: true);
         }
 
         public async Task SendFindResultAsync(TextSearchResult? result, string query)
@@ -748,6 +858,18 @@ namespace TxtAIEditor.Editor
             }
         }
 
+        private async Task SendRequiredMessageAsync(object obj)
+        {
+            if (!_isReady || _webView.CoreWebView2 == null)
+            {
+                throw new InvalidOperationException("편집기 WebView가 준비되지 않았습니다.");
+            }
+
+            string json = JsonSerializer.Serialize(obj);
+            _webView.CoreWebView2.PostWebMessageAsJson(json);
+            await Task.CompletedTask;
+        }
+
         private void OnWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
         {
             try
@@ -756,29 +878,12 @@ namespace TxtAIEditor.Editor
                 using (JsonDocument doc = JsonDocument.Parse(json))
                 {
                     JsonElement root = doc.RootElement;
-                    if (!root.TryGetProperty("type", out JsonElement typeProp)) return;
-
-                    string type = typeProp.GetString() ?? string.Empty;
-                    if (root.TryGetProperty("documentId", out JsonElement documentIdProp) &&
-                        documentIdProp.ValueKind == JsonValueKind.String &&
-                        !string.IsNullOrEmpty(_documentId) &&
-                        !string.Equals(documentIdProp.GetString(), _documentId, StringComparison.Ordinal))
-                    {
-                        return;
-                    }
-                    if (root.TryGetProperty("viewId", out JsonElement viewIdProp) &&
-                        viewIdProp.ValueKind == JsonValueKind.String &&
-                        !string.IsNullOrEmpty(_viewId) &&
-                        !string.Equals(viewIdProp.GetString(), _viewId, StringComparison.Ordinal))
-                    {
-                        return;
-                    }
-                    if (root.TryGetProperty("sequence", out JsonElement sequenceProp) &&
-                        sequenceProp.TryGetInt64(out long sequence))
-                    {
-                        if (sequence <= _lastIncomingSequence) return;
-                        _lastIncomingSequence = sequence;
-                    }
+                    if (!EditorProtocol.TryAcceptIncoming(
+                        root,
+                        _documentId,
+                        _viewId,
+                        ref _lastIncomingSequence,
+                        out string type)) return;
 
                     switch (type)
                     {

@@ -25,8 +25,10 @@ namespace TxtAIEditor.Controls
         private readonly Action _print;
         private readonly Action _focusSearchPanel;
         private readonly TabDirtyStateController _tabDirtyStateController;
+        private readonly StatusBarController _statusBarController;
         private readonly Action<OpenedTab> _schedulePreview;
         private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
+        private bool _undoRedoInProgress;
 
         public EditorBridgeShortcutController(
             Action toggleLivePreview,
@@ -46,6 +48,7 @@ namespace TxtAIEditor.Controls
             Action print,
             Action focusSearchPanel,
             TabDirtyStateController tabDirtyStateController,
+            StatusBarController statusBarController,
             Action<OpenedTab> schedulePreview,
             Func<OpenedTab, Task> syncEditsToOtherTabsAsync)
         {
@@ -66,6 +69,7 @@ namespace TxtAIEditor.Controls
             _print = print;
             _focusSearchPanel = focusSearchPanel;
             _tabDirtyStateController = tabDirtyStateController;
+            _statusBarController = statusBarController;
             _schedulePreview = schedulePreview;
             _syncEditsToOtherTabsAsync = syncEditsToOtherTabsAsync;
         }
@@ -128,37 +132,56 @@ namespace TxtAIEditor.Controls
                     _focusSearchPanel();
                     break;
                 case "undo":
-                    _ = ApplyUndoRedoAsync(session, session.Undo(), bridge, tab, tabItem);
+                    _ = ApplyUndoRedoAsync(session, isUndo: true, bridge, tab, tabItem);
                     break;
                 case "redo":
-                    _ = ApplyUndoRedoAsync(session, session.Redo(), bridge, tab, tabItem);
+                    _ = ApplyUndoRedoAsync(session, isUndo: false, bridge, tab, tabItem);
                     break;
             }
         }
 
         private async Task ApplyUndoRedoAsync(
             EditorDocumentSession session,
-            UndoResult? result,
+            bool isUndo,
             MonacoBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem)
         {
-            if (result == null)
+            if (_undoRedoInProgress)
             {
                 return;
             }
 
-            _tabDirtyStateController.MarkTabDirty(tab, tabItem);
-            _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
-            _schedulePreview(tab);
-            EditorDocumentChange? change = session.LastChange;
-            await bridge.ApplyEditResultAsync(
-                result,
-                change?.DocumentId,
-                change?.BaseVersion,
-                change?.Version,
-                change?.SourceViewId);
-            await _syncEditsToOtherTabsAsync(tab);
+            _undoRedoInProgress = true;
+            var progress = new Progress<TextOperationProgress>(value =>
+                _statusBarController.ShowTextOperationProgress(isUndo ? "undo" : "redo", value));
+            try
+            {
+                UndoResult? result = isUndo
+                    ? await session.UndoAsync(progress)
+                    : await session.RedoAsync(progress);
+                if (result == null)
+                {
+                    return;
+                }
+
+                _tabDirtyStateController.MarkTabDirty(tab, tabItem);
+                _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
+                _schedulePreview(tab);
+                EditorDocumentChange? change = session.LastChange;
+                await bridge.ApplyEditResultAsync(
+                    result,
+                    change?.DocumentId,
+                    change?.BaseVersion,
+                    change?.Version,
+                    change?.SourceViewId);
+                await _syncEditsToOtherTabsAsync(tab);
+            }
+            finally
+            {
+                _statusBarController.HideTextOperationProgress();
+                _undoRedoInProgress = false;
+            }
         }
     }
 }

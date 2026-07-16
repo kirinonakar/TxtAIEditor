@@ -180,6 +180,35 @@ namespace TxtAIEditor.Controls
             _statusBar.StatusSelectionStatsText.Visibility = Visibility.Visible;
         }
 
+        public void ShowTextOperationProgress(
+            string operation,
+            TextOperationProgress progress,
+            Action? cancelAction = null)
+        {
+            string format = operation switch
+            {
+                "replaceAll" => _getString("EditorReplaceAllProgressFormat", "바꾸는 중: {0} / {1}"),
+                "save" => _getString("EditorSaveProgressFormat", "저장 중: {0} / {1}"),
+                "undo" => _getString("EditorUndoProgressFormat", "실행 취소 중: {0} / {1}"),
+                "redo" => _getString("EditorRedoProgressFormat", "다시 실행 중: {0} / {1}"),
+                _ => _getString("EditorFindAllProgressFormat", "검색 중: {0} / {1}")
+            };
+            string statusText = string.Format(
+                CultureInfo.CurrentCulture,
+                format,
+                progress.ProcessedLines.ToString("N0", CultureInfo.CurrentCulture),
+                progress.TotalLines.ToString("N0", CultureInfo.CurrentCulture));
+            double percent = progress.TotalLines <= 0
+                ? 0
+                : Math.Clamp(progress.ProcessedLines * 100d / progress.TotalLines, 0, 100);
+            _statusBar.ShowProgress(statusText, percent, cancelAction);
+        }
+
+        public void HideTextOperationProgress()
+        {
+            _statusBar.HideProgress();
+        }
+
         public void SyncEncodingCombo(OpenedTab tab)
         {
             if (tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile)

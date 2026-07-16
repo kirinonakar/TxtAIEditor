@@ -120,16 +120,28 @@ namespace TxtAIEditor.Controls
                     if (sharesDocument && otherSession != null && change != null &&
                         otherSession.ViewVersion == change.BaseVersion)
                     {
-                        await bridgeGroup.Bridge.ApplyEditResultAsync(new UndoResult(
-                            change.StartLine,
-                            change.OldLineCount,
-                            change.DocumentLineCount,
-                            change.Lines,
-                            null),
-                            change.DocumentId,
-                            change.BaseVersion,
-                            change.Version,
-                            change.SourceViewId);
+                        if (change.LinePatches is { Count: > 0 } patches)
+                        {
+                            await bridgeGroup.Bridge.ApplyLinePatchesAsync(
+                                patches,
+                                change.DocumentId,
+                                change.BaseVersion,
+                                change.Version,
+                                change.SourceViewId);
+                        }
+                        else
+                        {
+                            await bridgeGroup.Bridge.ApplyEditResultAsync(new UndoResult(
+                                change.StartLine,
+                                change.OldLineCount,
+                                change.DocumentLineCount,
+                                change.Lines,
+                                null),
+                                change.DocumentId,
+                                change.BaseVersion,
+                                change.Version,
+                                change.SourceViewId);
+                        }
                         otherSession.MarkViewSynchronized(change.Version);
                     }
                     else if (!sharesDocument ||

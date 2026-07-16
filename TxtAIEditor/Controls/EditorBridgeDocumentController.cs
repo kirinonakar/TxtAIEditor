@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
@@ -18,6 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab, int, string, bool, Task> _syncLineChangeToOtherTabsAsync;
         private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
         private readonly Dictionary<string, DeferredContentRefresh> _contentRefreshTimers = new();
+        private readonly Dictionary<MonacoBridge, CancellationTokenSource> _textOperationCancellations = new();
         private static readonly TimeSpan ContentRefreshDebounce = TimeSpan.FromMilliseconds(350);
 
         private sealed class DeferredContentRefresh
@@ -193,8 +197,42 @@ namespace TxtAIEditor.Controls
             bool isRegex,
             int currentLine)
         {
-            var results = session.FindAll(query, matchCase, isRegex, currentLine);
-            await bridge.SendFindAllResultsAsync(results, query);
+            CancellationTokenSource cancellation = BeginTextOperation(bridge);
+            var progress = new Progress<TextOperationProgress>(value =>
+            {
+                if (IsCurrentTextOperation(bridge, cancellation))
+                {
+                    _statusBarController.ShowTextOperationProgress(
+                        "findAll",
+                        value,
+                        () => TryCancelTextOperation(cancellation));
+                }
+            });
+            try
+            {
+                var results = await session.FindAllAsync(
+                    query,
+                    matchCase,
+                    isRegex,
+                    currentLine,
+                    cancellation.Token,
+                    progress);
+                if (IsCurrentTextOperation(bridge, cancellation))
+                {
+                    await bridge.SendFindAllResultsAsync(results, query);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (RegexMatchTimeoutException ex)
+            {
+                Debug.WriteLine($"Find All regex timeout: {ex.Message}");
+            }
+            finally
+            {
+                CompleteTextOperation(bridge, cancellation);
+            }
         }
 
         public async Task HandleReplaceAllRequestedAsync(
@@ -207,20 +245,126 @@ namespace TxtAIEditor.Controls
             bool matchCase,
             bool isRegex)
         {
-            session.ReplaceAll(query, replace, matchCase, isRegex);
-            string updatedText = session.GetText();
-            await bridge.SetTextAsync(
-                updatedText,
-                shouldFocus: false,
-                session.DocumentId,
-                session.DocumentVersion,
-                tab.Id);
-            await _syncEditsToOtherTabsAsync(tab);
-            await bridge.SendFindAllResultsAsync(session.FindAll(query, matchCase, isRegex, 1), query);
+            CancellationTokenSource cancellation = BeginTextOperation(bridge);
+            var progress = new Progress<TextOperationProgress>(value =>
+            {
+                if (IsCurrentTextOperation(bridge, cancellation))
+                {
+                    _statusBarController.ShowTextOperationProgress(
+                        "replaceAll",
+                        value);
+                }
+            });
+            await bridge.SetTextOperationLockAsync(locked: true);
+            try
+            {
+                ReplaceAllResult result = await session.ReplaceAllAsync(
+                    query,
+                    replace,
+                    matchCase,
+                    isRegex,
+                    cancellation.Token,
+                    progress);
+                if (result.Change == null)
+                {
+                    return;
+                }
 
-            MarkDirty(tab, tabItem);
-            _schedulePreview(tab);
-            _statusBarController.UpdateTotalLines(tab);
+                await bridge.ApplyLineReplacementsAsync(
+                    result.Replacements,
+                    result.Change.DocumentId,
+                    result.Change.BaseVersion,
+                    result.Change.Version,
+                    result.Change.SourceViewId);
+                await _syncEditsToOtherTabsAsync(tab);
+
+                MarkDirty(tab, tabItem);
+                _schedulePreview(tab);
+                _statusBarController.UpdateTotalLines(tab);
+
+                try
+                {
+                    var matches = await session.FindAllAsync(
+                        query,
+                        matchCase,
+                        isRegex,
+                        1,
+                        CancellationToken.None);
+                    await bridge.SendFindAllResultsAsync(matches, query);
+                }
+                catch (OperationCanceledException)
+                {
+                    await bridge.SendFindAllResultsAsync(Array.Empty<TextSearchResult>(), query);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (RegexMatchTimeoutException ex)
+            {
+                Debug.WriteLine($"Replace All regex timeout: {ex.Message}");
+            }
+            catch (ArgumentException ex)
+            {
+                Debug.WriteLine($"Replace All invalid regex: {ex.Message}");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Debug.WriteLine($"Replace All stopped by safety limit: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Replace All failed: {ex.Message}");
+            }
+            finally
+            {
+                await bridge.SetTextOperationLockAsync(locked: false);
+                CompleteTextOperation(bridge, cancellation);
+            }
+        }
+
+        private CancellationTokenSource BeginTextOperation(MonacoBridge bridge)
+        {
+            if (_textOperationCancellations.Remove(bridge, out CancellationTokenSource? previous))
+            {
+                previous.Cancel();
+                previous.Dispose();
+            }
+
+            var current = new CancellationTokenSource();
+            _textOperationCancellations[bridge] = current;
+            return current;
+        }
+
+        private bool IsCurrentTextOperation(MonacoBridge bridge, CancellationTokenSource cancellation)
+        {
+            return !cancellation.IsCancellationRequested &&
+                _textOperationCancellations.TryGetValue(bridge, out CancellationTokenSource? current) &&
+                ReferenceEquals(current, cancellation);
+        }
+
+        private void CompleteTextOperation(
+            MonacoBridge bridge,
+            CancellationTokenSource cancellation)
+        {
+            if (IsCurrentTextOperation(bridge, cancellation))
+            {
+                _textOperationCancellations.Remove(bridge);
+                _statusBarController.HideTextOperationProgress();
+            }
+
+            cancellation.Dispose();
+        }
+
+        private static void TryCancelTextOperation(CancellationTokenSource cancellation)
+        {
+            try
+            {
+                cancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
 
         public void HandleContentChanged(

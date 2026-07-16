@@ -3384,4 +3384,19 @@
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
     <value>[ツール実行]: {0}</value>
   </data>
+  <data name="EditorFindAllProgressFormat" xml:space="preserve">
+    <value>検索中: {0} / {1}</value>
+  </data>
+  <data name="EditorReplaceAllProgressFormat" xml:space="preserve">
+    <value>置換中: {0} / {1}</value>
+  </data>
+  <data name="EditorSaveProgressFormat" xml:space="preserve">
+    <value>保存中: {0} / {1}</value>
+  </data>
+  <data name="EditorUndoProgressFormat" xml:space="preserve">
+    <value>元に戻しています: {0} / {1}</value>
+  </data>
+  <data name="EditorRedoProgressFormat" xml:space="preserve">
+    <value>やり直しています: {0} / {1}</value>
+  </data>
 </root>

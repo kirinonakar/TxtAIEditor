@@ -121,6 +121,7 @@ namespace TxtAIEditor.Composition
                 callbacks.PrintRequested,
                 callbacks.FocusSearchPanelRequested,
                 tabDirtyState,
+                statusBar,
                 callbacks.SchedulePreview,
                 tab => splitImeSync.SyncEditsToOtherTabsAsync(tab));
 

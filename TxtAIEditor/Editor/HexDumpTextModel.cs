@@ -315,7 +315,10 @@ namespace TxtAIEditor.Editor
             {
                 try
                 {
-                    regex = new Regex(query, matchCase ? RegexOptions.None : RegexOptions.IgnoreCase);
+                    regex = new Regex(
+                        query,
+                        matchCase ? RegexOptions.None : RegexOptions.IgnoreCase,
+                        LineArrayTextModel.UserRegexTimeout);
                 }
                 catch (ArgumentException)
                 {
@@ -373,7 +376,10 @@ namespace TxtAIEditor.Editor
             {
                 try
                 {
-                    regex = new Regex(query, matchCase ? RegexOptions.None : RegexOptions.IgnoreCase);
+                    regex = new Regex(
+                        query,
+                        matchCase ? RegexOptions.None : RegexOptions.IgnoreCase,
+                        LineArrayTextModel.UserRegexTimeout);
                 }
                 catch (ArgumentException)
                 {

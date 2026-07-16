@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace TxtAIEditor.Editor
 {
     public readonly record struct CaretState(int LineNumber, int Column);
 
     public readonly record struct UndoEditRange(int StartLine, int OldLineCount, int NewLineCount);
+
+    public readonly record struct TextLinePatch(int LineNumber, string Text);
 
     public sealed record UndoResult(
         int StartLine,
@@ -16,6 +19,8 @@ namespace TxtAIEditor.Editor
         CaretState? Caret)
     {
         public int NewLineCount => LinesToRefresh.Count;
+
+        public IReadOnlyList<TextLinePatch>? LinePatches { get; init; }
     }
 
     public interface IUndoableEdit
@@ -130,6 +135,42 @@ namespace TxtAIEditor.Editor
             return result;
         }
 
+        public async Task<UndoResult?> UndoAsync(
+            ITextModel model,
+            IProgress<TextOperationProgress>? progress = null)
+        {
+            CloseOpenTransaction();
+            if (_undoStack.Count == 0)
+            {
+                return null;
+            }
+
+            UndoTransaction transaction = _undoStack[^1];
+            _undoStack.RemoveAt(_undoStack.Count - 1);
+            UndoResult result = await transaction.UnapplyAsync(model, progress);
+            _redoStack.Add(transaction);
+            _lastEditTime = DateTime.MinValue;
+            return result;
+        }
+
+        public async Task<UndoResult?> RedoAsync(
+            ITextModel model,
+            IProgress<TextOperationProgress>? progress = null)
+        {
+            CloseOpenTransaction();
+            if (_redoStack.Count == 0)
+            {
+                return null;
+            }
+
+            UndoTransaction transaction = _redoStack[^1];
+            _redoStack.RemoveAt(_redoStack.Count - 1);
+            UndoResult result = await transaction.ApplyAsync(model, progress);
+            _undoStack.Add(transaction);
+            _lastEditTime = DateTime.MinValue;
+            return result;
+        }
+
         public void Clear()
         {
             _undoStack.Clear();
@@ -237,6 +278,48 @@ namespace TxtAIEditor.Editor
             return BuildResult(model, beforeLineCount, ranges, BeforeCaret);
         }
 
+        public async Task<UndoResult> ApplyAsync(
+            ITextModel model,
+            IProgress<TextOperationProgress>? progress)
+        {
+            int beforeLineCount = model.LineCount;
+            UndoEditRange[] ranges = _edits.Select(edit => edit.RedoRange).ToArray();
+            for (int i = 0; i < _edits.Count; i++)
+            {
+                _edits[i].Apply(model);
+                if ((i + 1) % 256 == 0)
+                {
+                    progress?.Report(new TextOperationProgress(i + 1, _edits.Count, TimeSpan.Zero));
+                    await Task.Yield();
+                }
+            }
+
+            progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, TimeSpan.Zero));
+            return BuildResult(model, beforeLineCount, ranges, AfterCaret);
+        }
+
+        public async Task<UndoResult> UnapplyAsync(
+            ITextModel model,
+            IProgress<TextOperationProgress>? progress)
+        {
+            int beforeLineCount = model.LineCount;
+            UndoEditRange[] ranges = _edits.Select(edit => edit.UndoRange).ToArray();
+            int processed = 0;
+            for (int i = _edits.Count - 1; i >= 0; i--)
+            {
+                _edits[i].Unapply(model);
+                processed++;
+                if (processed % 256 == 0)
+                {
+                    progress?.Report(new TextOperationProgress(processed, _edits.Count, TimeSpan.Zero));
+                    await Task.Yield();
+                }
+            }
+
+            progress?.Report(new TextOperationProgress(_edits.Count, _edits.Count, TimeSpan.Zero));
+            return BuildResult(model, beforeLineCount, ranges, BeforeCaret);
+        }
+
         private UndoResult BuildResult(
             ITextModel model,
             int beforeLineCount,
@@ -246,6 +329,26 @@ namespace TxtAIEditor.Editor
             if (ranges.Count == 0)
             {
                 return new UndoResult(1, 0, model.LineCount, EmptyLines, caret);
+            }
+
+            if (ranges.Count > 1 && ranges.All(range =>
+                range.OldLineCount == 1 && range.NewLineCount == 1))
+            {
+                TextLinePatch[] patches = ranges
+                    .Select(range => Math.Clamp(range.StartLine, 1, model.LineCount))
+                    .Distinct()
+                    .OrderBy(lineNumber => lineNumber)
+                    .Select(lineNumber => new TextLinePatch(lineNumber, model.GetLine(lineNumber)))
+                    .ToArray();
+                return new UndoResult(
+                    patches[0].LineNumber,
+                    0,
+                    model.LineCount,
+                    EmptyLines,
+                    caret)
+                {
+                    LinePatches = patches
+                };
             }
 
             int startLine = ranges.Min(range => Math.Max(1, range.StartLine));

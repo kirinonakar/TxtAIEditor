@@ -69,6 +69,9 @@ const state = {
     messageSequence: 0,
     searchDocumentVersion: -1,
     pendingSearchNavigation: null,
+    pendingLinePatchBatch: null,
+    textOperationLocked: false,
+    textOperationPreviousReadOnly: false,
     renderQueued: false,
     clipboardRequests: new Map(),
     pendingLineActions: [],
@@ -183,6 +186,7 @@ function invalidateHtmlLineEndContexts(startLine) {
 }
 
 function post(msg) {
+    const baseVersion = state.hostDocumentVersion;
     if (msg?.type === 'contentChanged') {
         state.documentVersion++;
         if (!msg.isComposing && state.hostDocumentId) {
@@ -198,6 +202,10 @@ function post(msg) {
             viewId: state.viewId,
             documentVersion: state.hostDocumentVersion,
             sequence: ++state.messageSequence,
+            ...(['lineChanged', 'lineEdit', 'rangeEdit', 'insertLine', 'splitLine',
+                'mergeLineWithPrevious', 'deleteLine', 'hexEdit', 'replaceAll'].includes(msg?.type)
+                ? { baseVersion }
+                : {}),
             ...msg
         }
         : msg;

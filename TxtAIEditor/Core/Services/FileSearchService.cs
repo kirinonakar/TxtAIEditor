@@ -70,7 +70,7 @@ namespace TxtAIEditor.Core.Services
                 regexOptions |= RegexOptions.IgnoreCase;
             }
 
-            return new Regex(pattern, regexOptions);
+            return new Regex(pattern, regexOptions, TimeSpan.FromSeconds(2));
         }
 
         public async Task<FileSearchSummary> SearchAsync(

@@ -32,6 +32,15 @@ import {
     updateCsvLocalization
 } from './editor-csv-table.js';
 
+const EDITOR_PROTOCOL_VERSION = 1;
+const VERSIONED_HOST_ACTIONS = new Set([
+    'initModel',
+    'setText',
+    'updateLine',
+    'applyEditResult',
+    'applyLineReplacements'
+]);
+
 function syncLanguageClass() {
     document.body.classList.toggle('hex-view-mode', state.language === 'hex');
 }
@@ -118,6 +127,35 @@ function markVersionedDocumentChangeApplied(msg) {
     }
 }
 
+function canApplyLinePatchBatch(msg) {
+    const batchId = String(msg.batchId || '');
+    const batchIndex = Number(msg.batchIndex);
+    const version = Number(msg.documentVersion);
+    if (!batchId || !Number.isInteger(batchIndex) || batchIndex < 0 || !Number.isFinite(version)) {
+        return false;
+    }
+
+    if (batchIndex === 0) {
+        if (!canApplyVersionedDocumentChange(msg)) {
+            return false;
+        }
+
+        state.pendingLinePatchBatch = {
+            batchId,
+            documentId: String(msg.documentId || ''),
+            documentVersion: version,
+            nextIndex: 0
+        };
+    }
+
+    const pending = state.pendingLinePatchBatch;
+    return !!pending &&
+        pending.batchId === batchId &&
+        pending.documentId === String(msg.documentId || '') &&
+        pending.documentVersion === version &&
+        pending.nextIndex === batchIndex;
+}
+
 export function createHostMessageHandler({
     revealLine,
     revealHexOffset,
@@ -129,6 +167,11 @@ export function createHostMessageHandler({
     handleOpenableHoverResult
 }) {
     return function handleCsharpMessage(msg) {
+    if (!msg ||
+        (msg.protocolVersion !== undefined && Number(msg.protocolVersion) !== EDITOR_PROTOCOL_VERSION) ||
+        (VERSIONED_HOST_ACTIONS.has(msg.action) && Number(msg.protocolVersion) !== EDITOR_PROTOCOL_VERSION)) {
+        return;
+    }
     switch (msg.action) {
         case 'initModel':
             state.initialized = true;
@@ -136,6 +179,7 @@ export function createHostMessageHandler({
             state.hostDocumentVersion = Math.max(0, Number(msg.documentVersion || 0));
             state.viewId = String(msg.viewId || '');
             state.messageSequence = 0;
+            state.pendingLinePatchBatch = null;
             state.language = msg.language || 'plaintext';
             syncLanguageClass();
             state.isSplitView = !!msg.isSplitView;
@@ -243,6 +287,30 @@ export function createHostMessageHandler({
                 }
             }
             break;
+        case 'applyLineReplacements':
+            {
+                if (state.isComposing || !canApplyLinePatchBatch(msg)) break;
+                const replacements = Array.isArray(msg.replacements) ? msg.replacements : [];
+                for (const replacement of replacements) {
+                    const lineNumber = Math.max(1, Number(replacement?.lineNumber || 1));
+                    if (lineNumber <= state.lineCount) {
+                        state.cache.set(lineNumber, String(replacement?.text ?? ''));
+                    }
+                }
+                state.pendingLinePatchBatch.nextIndex++;
+                if (msg.isFinal === true) {
+                    state.cacheVersion++;
+                    state.documentVersion++;
+                    state.searchDocumentVersion = -1;
+                    clearMeasuredLineHeights();
+                    recomputeDirtyLines();
+                    markVersionedDocumentChangeApplied(msg);
+                    state.pendingLinePatchBatch = null;
+                    state.livePreviewLocalResourceVersion = String(Date.now());
+                    queueRender(true);
+                }
+            }
+            break;
         case 'receiveLines':
             {
                 receiveLineBlock(msg.startLine || 1, msg.lines || []);
@@ -280,6 +348,28 @@ export function createHostMessageHandler({
             break;
         case 'setSplitView':
             state.isSplitView = !!msg.enabled;
+            break;
+        case 'setTextOperationLock':
+            {
+                const locked = !!msg.locked;
+                if (locked && !state.textOperationLocked) {
+                    state.textOperationPreviousReadOnly = state.readOnly;
+                    state.textOperationLocked = true;
+                    state.readOnly = true;
+                } else if (!locked && state.textOperationLocked) {
+                    state.readOnly = state.textOperationPreviousReadOnly;
+                    state.textOperationLocked = false;
+                }
+
+                for (const id of ['find-input', 'replace-input', 'find-match-case', 'find-regex',
+                    'find-prev', 'find-next', 'replace-btn', 'replace-all-btn']) {
+                    const element = document.getElementById(id);
+                    if (element) element.disabled = locked;
+                }
+                if (!state.isComposing) {
+                    queueRender(true);
+                }
+            }
             break;
         case 'setCsvTableMode':
             setCsvTableMode(!!msg.enabled, msg);

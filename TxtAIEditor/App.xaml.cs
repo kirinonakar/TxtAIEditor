@@ -59,6 +59,9 @@ namespace TxtAIEditor
 
         public App()
         {
+            AppDomain.CurrentDomain.SetData(
+                "REGEX_DEFAULT_MATCH_TIMEOUT",
+                TimeSpan.FromSeconds(2));
             ApplyLanguageSettings();
             Environment.SetEnvironmentVariable("MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
             InitializeComponent();

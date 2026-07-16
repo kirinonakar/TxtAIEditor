@@ -121,6 +121,7 @@ function executeReplaceAll() {
     const query = findInput.value;
     if (!query) return;
 
+    clearTimeout(findDebounceTimer);
     const replaceText = replaceInput.value || '';
     post({
         type: 'replaceAll',

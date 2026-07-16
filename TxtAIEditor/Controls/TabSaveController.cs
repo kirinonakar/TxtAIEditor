@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -96,6 +97,10 @@ namespace TxtAIEditor.Controls
                 await CompleteSuccessfulSaveAsync(tab, syncLineEnding: true);
                 return true;
             }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
             catch (Exception ex)
             {
                 _showErrorMessage(_getString("SaveFailedTitle", "저장 실패"), ex.Message);
@@ -140,6 +145,17 @@ namespace TxtAIEditor.Controls
                 tab.IsDirty = false;
                 await CompleteSuccessfulSaveAsync(tab, syncLineEnding: false);
                 return true;
+            }
+            catch (OperationCanceledException)
+            {
+                tab.FilePath = oldFilePath;
+                tab.Title = oldTitle;
+                tab.Language = oldLanguage;
+                tab.EncodingName = oldEncodingName;
+                tab.IsReadOnlyTextFile = oldIsReadOnlyTextFile;
+                tab.ArchiveSourcePath = oldArchiveSourcePath;
+                tab.ArchiveEntryPath = oldArchiveEntryPath;
+                return false;
             }
             catch (Exception ex)
             {
@@ -285,7 +301,31 @@ namespace TxtAIEditor.Controls
 
             if (session != null)
             {
-                await session.SaveAsync(tab.FilePath!, tab.EncodingName);
+                using var cancellation = new CancellationTokenSource();
+                bool saveProgressActive = true;
+                var progress = new Progress<TextOperationProgress>(value =>
+                {
+                    if (saveProgressActive)
+                    {
+                        _statusBarController.ShowTextOperationProgress(
+                            "save",
+                            value,
+                            cancellation.Cancel);
+                    }
+                });
+                try
+                {
+                    await session.SaveAsync(
+                        tab.FilePath!,
+                        tab.EncodingName,
+                        cancellation.Token,
+                        progress);
+                }
+                finally
+                {
+                    saveProgressActive = false;
+                    _statusBarController.HideTextOperationProgress();
+                }
                 tab.Content = session.Model is HexDumpTextModel ? string.Empty : session.GetText(120_000);
                 return;
             }

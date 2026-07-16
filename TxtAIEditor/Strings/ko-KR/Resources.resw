@@ -3384,4 +3384,19 @@
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
     <value>[도구 실행]: {0}</value>
   </data>
+  <data name="EditorFindAllProgressFormat" xml:space="preserve">
+    <value>검색 중: {0} / {1}</value>
+  </data>
+  <data name="EditorReplaceAllProgressFormat" xml:space="preserve">
+    <value>바꾸는 중: {0} / {1}</value>
+  </data>
+  <data name="EditorSaveProgressFormat" xml:space="preserve">
+    <value>저장 중: {0} / {1}</value>
+  </data>
+  <data name="EditorUndoProgressFormat" xml:space="preserve">
+    <value>실행 취소 중: {0} / {1}</value>
+  </data>
+  <data name="EditorRedoProgressFormat" xml:space="preserve">
+    <value>다시 실행 중: {0} / {1}</value>
+  </data>
 </root>
