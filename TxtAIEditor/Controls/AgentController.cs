@@ -191,6 +191,11 @@ namespace TxtAIEditor.Controls
             _statsDebounceTimer.Tick += (s, e) =>
             {
                 _statsDebounceTimer.Stop();
+                if (_agentPane.IsPromptInputFocused)
+                {
+                    return;
+                }
+
                 UpdateContextStatsImmediate();
             };
 
@@ -210,7 +215,8 @@ namespace TxtAIEditor.Controls
                 _sessionEditController,
                 _confirmationController,
                 _openDiffViewAsync,
-                UpdateContextStats);
+                UpdateContextStats,
+                UpdatePromptTokenEstimate);
             _openSessionController.EnsureSession(_currentSessionId);
             _openSessionController.UpdateUI();
             UpdateContextStatsImmediate();
@@ -1246,6 +1252,16 @@ namespace TxtAIEditor.Controls
             UpdateContextStatsAfterDelay(DefaultContextStatsDelayMs);
         }
 
+        private void UpdatePromptTokenEstimate()
+        {
+            if (IsCurrentSessionRunning())
+            {
+                return;
+            }
+
+            _contextStatsController.UpdatePromptTokenEstimate();
+        }
+
         private void UpdateContextStatsSlow()
         {
             UpdateContextStatsAfterDelay(SlowContextStatsDelayMs);
@@ -1259,6 +1275,11 @@ namespace TxtAIEditor.Controls
             }
 
             _statsDebounceTimer.Stop();
+            if (_agentPane.IsPromptInputFocused)
+            {
+                return;
+            }
+
             _statsDebounceTimer.Interval = TimeSpan.FromMilliseconds(delayMilliseconds);
             _statsDebounceTimer.Start();
         }
@@ -1275,6 +1296,11 @@ namespace TxtAIEditor.Controls
 
         private void UpdateContextStatsImmediate(bool force = false)
         {
+            if (_agentPane.IsPromptInputFocused)
+            {
+                return;
+            }
+
             _contextStatsController.Update(force);
         }
 

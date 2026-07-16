@@ -28,6 +28,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<double> _toolCatalogTokensProvider;
         private readonly Func<bool> _hasEnabledSkillsProvider;
         private readonly Func<bool> _hasEnabledMcpProvider;
+        private double _estimatedTokensExcludingPrompt;
+        private bool _hasFullTokenEstimate;
 
         public AgentContextStatsController(
             ISettingsService settingsService,
@@ -78,6 +80,15 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            // Some model-limit callbacks invoke this controller directly. Keep the focus
+            // guard here as well so no full workspace/history calculation can slip through
+            // while the user is typing.
+            if (_agentPane.IsPromptInputFocused)
+            {
+                UpdatePromptTokenEstimate();
+                return;
+            }
+
             var activeTab = _activeTabProvider();
             string tabPart;
             if (activeTab == null)
@@ -103,19 +114,54 @@ namespace TxtAIEditor.Controls
                 selectionPart = $"{selectionPart} · {_displayText.FormatAttachmentCount(_attachmentController.Count)}";
             }
 
-            _agentPane.ContextStats.Text = string.Format(
+            string contextStatsText = string.Format(
                 _getString("AgentContextStatsFormat", "맥락: {0} · {1}"),
                 tabPart,
                 selectionPart);
+            if (!string.Equals(_agentPane.ContextStats.Text, contextStatsText, StringComparison.Ordinal))
+            {
+                _agentPane.ContextStats.Text = contextStatsText;
+            }
 
-            double estimatedTokens = EstimateContextTokens();
+            string promptText = GetPromptText();
+            double estimatedTokens = EstimateContextTokens(promptText);
+            _estimatedTokensExcludingPrompt = Math.Max(
+                0,
+                estimatedTokens - AgentTokenEstimator.Estimate(promptText));
+            _hasFullTokenEstimate = true;
+            UpdateTokenCount(estimatedTokens);
+
+            UpdateModelDisplay();
+        }
+
+        public void UpdatePromptTokenEstimate()
+        {
+            if (_isRunningProvider())
+            {
+                return;
+            }
+
+            if (!_hasFullTokenEstimate)
+            {
+                UpdateTokenCount(AgentTokenEstimator.Estimate(GetPromptText()));
+                return;
+            }
+
+            double estimatedTokens = _estimatedTokensExcludingPrompt +
+                AgentTokenEstimator.Estimate(GetPromptText());
+            UpdateTokenCount(estimatedTokens);
+        }
+
+        private void UpdateTokenCount(double estimatedTokens)
+        {
             int maxTokens = GetModelContextLimit();
+            string tokenCountText;
 
             if (maxTokens > 0)
             {
                 string currentStr = AgentTokenEstimator.Format(estimatedTokens);
                 string maxStr = AgentTokenEstimator.Format(maxTokens);
-                _agentPane.TokenCount.Text = string.Format(
+                tokenCountText = string.Format(
                     _getString("AgentTokenCountWithLimitFormat", "{0} / {1} tokens"),
                     currentStr,
                     maxStr);
@@ -123,12 +169,15 @@ namespace TxtAIEditor.Controls
             else
             {
                 double kTokens = estimatedTokens / 1000.0;
-                _agentPane.TokenCount.Text = string.Format(
+                tokenCountText = string.Format(
                     _getString("AgentTokenCountFormat", "{0:F1}k tokens"),
                     kTokens);
             }
 
-            UpdateModelDisplay();
+            if (!string.Equals(_agentPane.TokenCount.Text, tokenCountText, StringComparison.Ordinal))
+            {
+                _agentPane.TokenCount.Text = tokenCountText;
+            }
         }
 
         public void UpdateModelDisplay(bool forceClearCache = false)
@@ -161,7 +210,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private double EstimateContextTokens()
+        private double EstimateContextTokens(string promptText)
         {
             string langCode = _displayText.LanguageCode;
             string targetLanguage = _settingsProvider()?.ResolveTargetLanguage() ?? "Korean";
@@ -172,7 +221,7 @@ namespace TxtAIEditor.Controls
                 _hasEnabledSkillsProvider(),
                 _hasEnabledMcpProvider());
 
-            string instruction = _buildAgentInstruction(_agentPane.Prompt.Text?.Trim() ?? string.Empty);
+            string instruction = _buildAgentInstruction(promptText);
             string workspaceContext = _buildWorkspaceContext(instruction);
             string selectedText = _activeSelectionContextProvider();
 
@@ -199,6 +248,11 @@ namespace TxtAIEditor.Controls
             }
 
             return tokens + _currentRunTranscriptTokensProvider() + _attachmentController.EstimatedImageTokens + _toolCatalogTokensProvider();
+        }
+
+        private string GetPromptText()
+        {
+            return _agentPane.Prompt.Text?.Trim() ?? string.Empty;
         }
 
         private int GetModelContextLimit()

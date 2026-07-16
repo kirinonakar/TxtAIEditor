@@ -198,6 +198,7 @@ namespace TxtAIEditor.Controls
 
         public AgentOutputWrapper Output => new AgentOutputWrapper(this);
         public TextBox Prompt => AgentPromptInput;
+        public bool IsPromptInputFocused => AgentPromptInput.FocusState != FocusState.Unfocused;
         public TextBox Activity => AgentActivityText;
         public TextBlock ContextStats => AgentContextStatsText;
         public TextBlock TokenCount => AgentTokenCountText;
@@ -1538,7 +1539,10 @@ namespace TxtAIEditor.Controls
 
         public void UpdateModelName(string text)
         {
-            AgentModelNameText.Text = text;
+            if (!string.Equals(AgentModelNameText.Text, text, StringComparison.Ordinal))
+            {
+                AgentModelNameText.Text = text;
+            }
         }
 
         public void UpdateHistoryItems(List<AgentHistoryItemViewModel> items, string? selectedId)

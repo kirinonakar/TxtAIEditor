@@ -20,7 +20,8 @@ namespace TxtAIEditor.Controls
             AgentSessionEditController sessionEditController,
             AgentConfirmationController confirmationController,
             Func<AgentFileEditPreview, Task> openDiffViewAsync,
-            Action updateContextStats)
+            Action updateContextStats,
+            Action updatePromptTokenEstimate)
         {
             agentPane.RunRequested += async (_, _) => await runAgentAsync();
             agentPane.StopRequested += (_, _) => stopAgent();
@@ -68,8 +69,9 @@ namespace TxtAIEditor.Controls
             agentPane.Prompt.TextChanged += (_, _) =>
             {
                 openSessionController.SavePromptTitleFromUI();
-                updateContextStats();
+                updatePromptTokenEstimate();
             };
+            agentPane.Prompt.LostFocus += (_, _) => updateContextStats();
             agentPane.PlanningModeCheckBox.Checked += (_, _) => updateContextStats();
             agentPane.PlanningModeCheckBox.Unchecked += (_, _) => updateContextStats();
 

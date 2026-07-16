@@ -1046,15 +1046,29 @@ namespace TxtAIEditor.Controls
 
         private static string BuildOpenSessionTitle(string prompt)
         {
-            if (string.IsNullOrWhiteSpace(prompt))
+            if (string.IsNullOrEmpty(prompt))
             {
                 return string.Empty;
             }
 
-            return prompt
-                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .FirstOrDefault()
-                ?.Trim() ?? string.Empty;
+            int lineStart = 0;
+            while (lineStart < prompt.Length)
+            {
+                int lineEnd = lineStart;
+                while (lineEnd < prompt.Length && prompt[lineEnd] != '\r' && prompt[lineEnd] != '\n')
+                {
+                    lineEnd++;
+                }
+
+                if (lineEnd > lineStart)
+                {
+                    return prompt.Substring(lineStart, lineEnd - lineStart).Trim();
+                }
+
+                lineStart = lineEnd + 1;
+            }
+
+            return string.Empty;
         }
 
         private static int FindLastLineStart(string text)
