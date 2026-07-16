@@ -603,12 +603,26 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    if (!planningMode && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
+                    if (planningMode && responseHasToolSyntax && !responseLooksLikeToolResultReplay)
+                    {
+                        int toolCallIndex = AgentToolCallParser.FindToolCallIndex(cleanResponse);
+                        if (toolCallIndex > 0)
+                        {
+                            string visiblePrefix = cleanResponse.Substring(0, toolCallIndex);
+                            if (!string.IsNullOrWhiteSpace(visiblePrefix))
+                            {
+                                visibleTextFlushed = true;
+                                await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, visiblePrefix);
+                                await _runOutputController.EndStreamedAnswerAsync(runContext);
+                            }
+                        }
+                    }
+                    else if (!planningMode && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
                     {
                         visibleTextFlushed = true;
                         await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, cleanResponse);
                     }
-                    else if (!planningMode && !responseRequiresToolHandling && printedLength < endLength)
+                    else if (!planningMode && printedLength < endLength)
                     {
                         string remainingText = cleanResponse.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;

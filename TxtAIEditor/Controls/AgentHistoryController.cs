@@ -236,12 +236,14 @@ namespace TxtAIEditor.Controls
             var lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var result = new StringBuilder();
             bool inToolCall = false;
+            bool toolCallSyntaxReached = false;
             bool inToolResult = false;
             bool inRetryDetail = false;
             bool inLegacyRetryPayload = false;
             bool inUserPromptInstructionMetadata = false;
             bool suppressInstructionMetadataSection = false;
             bool afterUserRequest = false;
+            bool inPlanningModeTaskDetails = false;
 
             foreach (var line in lines)
             {
@@ -258,11 +260,13 @@ namespace TxtAIEditor.Controls
                 if (line.StartsWith("[Retry detail:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
+                    toolCallSyntaxReached = false;
                     inToolResult = false;
                     inRetryDetail = true;
                     inUserPromptInstructionMetadata = false;
                     suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
+                    inPlanningModeTaskDetails = false;
                     continue;
                 }
 
@@ -276,45 +280,83 @@ namespace TxtAIEditor.Controls
                     inLegacyRetryPayload = false;
                 }
 
+                if (inPlanningModeTaskDetails &&
+                    !line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (line.StartsWith("[Original user request]", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inPlanningModeTaskDetails = false;
+                        suppressInstructionMetadataSection = false;
+                        afterUserRequest = true;
+                        result.AppendLine(line);
+                        continue;
+                    }
+
+                    bool reachedTranscriptBoundary =
+                        line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Previous Tool Call]:", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Previous Response]:", StringComparison.OrdinalIgnoreCase);
+                    if (!reachedTranscriptBoundary)
+                    {
+                        continue;
+                    }
+
+                    inPlanningModeTaskDetails = false;
+                }
+
                 if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
+                    toolCallSyntaxReached = false;
                     inToolResult = false;
                     inUserPromptInstructionMetadata =
+                        line.Contains("[Workspace agent rules]", StringComparison.OrdinalIgnoreCase) ||
                         line.Contains("[Agent persona/instruction presets]", StringComparison.OrdinalIgnoreCase) ||
                         line.Contains("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase) ||
                         line.Contains("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase);
-                    suppressInstructionMetadataSection = line.Contains("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase);
+                    suppressInstructionMetadataSection =
+                        line.Contains("[Workspace agent rules]", StringComparison.OrdinalIgnoreCase) ||
+                        line.Contains("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase);
                     afterUserRequest = false;
+                    inPlanningModeTaskDetails = line.Contains("[Planning-mode task]", StringComparison.OrdinalIgnoreCase);
                     result.AppendLine(inUserPromptInstructionMetadata ? "[User Prompt]:" : line);
                 }
                 else if (line.StartsWith("[Previous Tool Call]:", StringComparison.OrdinalIgnoreCase) ||
                     line.StartsWith("[Previous Response]:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
+                    toolCallSyntaxReached = false;
                     inToolResult = false;
                     inLegacyRetryPayload = true;
                     inUserPromptInstructionMetadata = false;
                     suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
+                    inPlanningModeTaskDetails = false;
                     continue;
                 }
                 else if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = true;
+                    toolCallSyntaxReached = false;
                     inToolResult = false;
                     inUserPromptInstructionMetadata = false;
                     suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
+                    inPlanningModeTaskDetails = false;
                     continue;
                 }
                 else if (line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
+                    toolCallSyntaxReached = false;
                     inToolResult = true;
                     inUserPromptInstructionMetadata = false;
                     suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
+                    inPlanningModeTaskDetails = false;
 
                     string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
                     string completedFormat = getString?.Invoke(
@@ -326,10 +368,17 @@ namespace TxtAIEditor.Controls
                 else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
+                    toolCallSyntaxReached = false;
                     inToolResult = false;
                     inUserPromptInstructionMetadata = false;
                     suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
+                    inPlanningModeTaskDetails = false;
+                    result.AppendLine(line);
+                }
+                else if (line.StartsWith("[Planning-mode task]", StringComparison.OrdinalIgnoreCase))
+                {
+                    inPlanningModeTaskDetails = true;
                     result.AppendLine(line);
                 }
                 else if (inUserPromptInstructionMetadata)
@@ -340,7 +389,8 @@ namespace TxtAIEditor.Controls
                         afterUserRequest = true;
                         result.AppendLine(line);
                     }
-                    else if (line.StartsWith("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase))
+                    else if (line.StartsWith("[Workspace agent rules]", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase))
                     {
                         suppressInstructionMetadataSection = true;
                     }
@@ -360,7 +410,30 @@ namespace TxtAIEditor.Controls
                 }
                 else
                 {
-                    if (!inToolCall && !inToolResult)
+                    if (inToolCall && !toolCallSyntaxReached)
+                    {
+                        int toolCallIndex = AgentToolCallParser.FindToolCallIndex(line);
+                        if (toolCallIndex >= 0)
+                        {
+                            string visiblePrefix = line.Substring(0, toolCallIndex).TrimEnd();
+                            if (!string.IsNullOrWhiteSpace(visiblePrefix))
+                            {
+                                result.AppendLine(visiblePrefix);
+                            }
+
+                            toolCallSyntaxReached = true;
+                        }
+                        else if (line.StartsWith("[Parsed tool call:", StringComparison.OrdinalIgnoreCase) ||
+                            AgentToolCallParser.ContainsToolCallSyntax(line))
+                        {
+                            toolCallSyntaxReached = true;
+                        }
+                        else
+                        {
+                            result.AppendLine(line);
+                        }
+                    }
+                    else if (!inToolCall && !inToolResult)
                     {
                         result.AppendLine(line);
                     }
