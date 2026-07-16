@@ -91,7 +91,9 @@
                         Style="{StaticResource AgentButtonStyle}">
                     <FontIcon Glyph="&#xE70D;" FontSize="12"/>
                     <Button.Flyout>
-                        <Flyout x:Name="AgentOpenSessionsFlyout" Opened="OnAgentOpenSessionsFlyoutOpened">
+                        <Flyout x:Name="AgentOpenSessionsFlyout"
+                                Placement="Bottom"
+                                Opened="OnAgentOpenSessionsFlyoutOpened">
                             <Grid Width="280" RowSpacing="8">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
