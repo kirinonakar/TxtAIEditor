@@ -131,6 +131,7 @@ namespace TxtAIEditor.Controls
             bool migratedPlaintextHeaders = false;
             bool migratedPlaintextOAuth = false;
             bool migratedPlaintextEnvironment = false;
+            bool migratedInlineStdioCommands = false;
             try
             {
                 if (File.Exists(_mcpFilePath))
@@ -154,6 +155,10 @@ namespace TxtAIEditor.Controls
                                 s.Endpoint = s.Endpoint?.Trim() ?? string.Empty;
                                 s.Command = s.Command?.Trim() ?? string.Empty;
                                 s.Arguments = NormalizeArguments(s.Arguments);
+                                if (AgentMcpTransportTypes.IsStdio(s.Transport))
+                                {
+                                    migratedInlineStdioCommands |= NormalizeStdioCommand(s);
+                                }
                                 s.WorkingDirectory = s.WorkingDirectory?.Trim() ?? string.Empty;
                                 s.Environment = NormalizeEnvironment(s.Environment);
                                 s.Headers = NormalizeHeaders(s.Headers);
@@ -180,7 +185,10 @@ namespace TxtAIEditor.Controls
                 !_comfyUiTool.IsServerId(id) &&
                 !_browserUseTool.IsServerId(id) &&
                 _servers.All(server => !server.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
-            if (migratedPlaintextHeaders || migratedPlaintextOAuth || migratedPlaintextEnvironment)
+            if (migratedPlaintextHeaders ||
+                migratedPlaintextOAuth ||
+                migratedPlaintextEnvironment ||
+                migratedInlineStdioCommands)
             {
                 await SaveAsync();
                 return;
@@ -505,6 +513,10 @@ namespace TxtAIEditor.Controls
                     item.Endpoint = item.Endpoint?.Trim() ?? string.Empty;
                     item.Command = item.Command?.Trim() ?? string.Empty;
                     item.Arguments = NormalizeArguments(item.Arguments);
+                    if (AgentMcpTransportTypes.IsStdio(item.Transport))
+                    {
+                        NormalizeStdioCommand(item);
+                    }
                     item.WorkingDirectory = item.WorkingDirectory?.Trim() ?? string.Empty;
                     item.Environment = NormalizeEnvironment(item.Environment);
                     if (string.IsNullOrWhiteSpace(name) || !HasValidConnectionSettings(item))
@@ -1854,6 +1866,9 @@ namespace TxtAIEditor.Controls
                     .EnumerateArray()
                     .Select(item => item.GetString() ?? string.Empty)
                     .ToList();
+                NormalizeStdioCommandLine(settings.Command, settings.Arguments, out string command, out var arguments);
+                settings.Command = command;
+                settings.Arguments = arguments;
             }
             catch (JsonException)
             {
@@ -1886,6 +1901,37 @@ namespace TxtAIEditor.Controls
             }
 
             return true;
+        }
+
+        private static bool NormalizeStdioCommand(AgentMcpServer server)
+        {
+            string originalCommand = server.Command;
+            int originalArgumentCount = server.Arguments.Count;
+            NormalizeStdioCommandLine(server.Command, server.Arguments, out string command, out var arguments);
+            server.Command = command;
+            server.Arguments = arguments;
+            return !string.Equals(originalCommand, command, StringComparison.Ordinal) ||
+                originalArgumentCount != arguments.Count;
+        }
+
+        private static void NormalizeStdioCommandLine(
+            string commandLine,
+            IReadOnlyList<string> configuredArguments,
+            out string command,
+            out List<string> arguments)
+        {
+            commandLine = commandLine?.Trim() ?? string.Empty;
+            string expandedPath = Environment.ExpandEnvironmentVariables(commandLine.Trim('"'));
+            if (File.Exists(expandedPath))
+            {
+                command = commandLine.Trim('"');
+                arguments = configuredArguments.ToList();
+                return;
+            }
+
+            IReadOnlyList<string> tokens = AgentMcpCommandLineParser.Split(commandLine);
+            command = tokens.Count > 0 ? tokens[0] : commandLine;
+            arguments = tokens.Skip(1).Concat(configuredArguments).ToList();
         }
 
         private void ApplyConnectionSettings(AgentMcpServer server, AgentMcpConnectionSettings settings)

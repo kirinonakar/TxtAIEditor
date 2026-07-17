@@ -2982,8 +2982,8 @@
   <data name="AgentMcpTransportLabel" xml:space="preserve"><value>连接方式</value></data>
   <data name="AgentMcpTransportHttp" xml:space="preserve"><value>HTTP / SSE</value></data>
   <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（本地进程）</value></data>
-  <data name="AgentMcpCommandLabel" xml:space="preserve"><value>执行命令</value></data>
-  <data name="AgentMcpCommandPlaceholder" xml:space="preserve"><value>npx</value></data>
+  <data name="AgentMcpCommandLabel" xml:space="preserve"><value>执行命令（支持完整命令行）</value></data>
+  <data name="AgentMcpCommandPlaceholder" xml:space="preserve"><value>npx -y @modelcontextprotocol/server-memory</value></data>
   <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>参数（JSON 数组）</value></data>
   <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
   <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>工作目录（可选）</value></data>

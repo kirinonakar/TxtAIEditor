@@ -2989,10 +2989,10 @@ Plan: {0}</value>
     <value>stdio (local process)</value>
   </data>
   <data name="AgentMcpCommandLabel" xml:space="preserve">
-    <value>Command</value>
+    <value>Command (full command line supported)</value>
   </data>
   <data name="AgentMcpCommandPlaceholder" xml:space="preserve">
-    <value>npx</value>
+    <value>npx -y @modelcontextprotocol/server-memory</value>
   </data>
   <data name="AgentMcpArgumentsLabel" xml:space="preserve">
     <value>Arguments (JSON array)</value>

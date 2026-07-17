@@ -2989,10 +2989,10 @@
     <value>stdio (로컬 프로세스)</value>
   </data>
   <data name="AgentMcpCommandLabel" xml:space="preserve">
-    <value>실행 명령</value>
+    <value>실행 명령 (전체 명령줄 입력 가능)</value>
   </data>
   <data name="AgentMcpCommandPlaceholder" xml:space="preserve">
-    <value>npx</value>
+    <value>npx -y @modelcontextprotocol/server-memory</value>
   </data>
   <data name="AgentMcpArgumentsLabel" xml:space="preserve">
     <value>인수 (JSON 배열)</value>

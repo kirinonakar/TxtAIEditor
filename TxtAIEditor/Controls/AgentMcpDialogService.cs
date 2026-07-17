@@ -224,8 +224,8 @@ namespace TxtAIEditor.Controls
             var endpointLabel = CreateLabel(_getString("AgentMcpEndpointLabel", "MCP 주소"));
             var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
             endpointBox.Text = initial.Endpoint;
-            var commandLabel = CreateLabel(_getString("AgentMcpCommandLabel", "실행 명령"));
-            var commandBox = CreateTextBox(_getString("AgentMcpCommandPlaceholder", "npx"));
+            var commandLabel = CreateLabel(_getString("AgentMcpCommandLabel", "실행 명령 (전체 명령줄 입력 가능)"));
+            var commandBox = CreateTextBox(_getString("AgentMcpCommandPlaceholder", "npx -y @modelcontextprotocol/server-memory"));
             commandBox.Text = initial.Command;
             var argumentsLabel = CreateLabel(_getString("AgentMcpArgumentsLabel", "인수 (JSON 배열)"));
             var argumentsBox = CreateJsonTextBox(_getString("AgentMcpArgumentsPlaceholder", "[\"-y\", \"@modelcontextprotocol/server-filesystem\", \"D:\\\\workspace\"]"));
