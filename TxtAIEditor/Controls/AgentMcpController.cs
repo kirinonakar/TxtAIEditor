@@ -87,7 +87,7 @@ namespace TxtAIEditor.Controls
         private readonly List<AgentMcpServer> _servers = new();
         private readonly HashSet<string> _selectedServerIds = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AgentMcpSession> _sessions = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, CancellationTokenSource> _serverStartCancellations = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, ServerStartOperation> _serverStartOperations = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AgentMcpToolAlias> _toolAliases = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _serverStatus = new(StringComparer.OrdinalIgnoreCase);
         private string _comfyUiStatus = string.Empty;
@@ -200,11 +200,11 @@ namespace TxtAIEditor.Controls
 
         public void Close()
         {
-            foreach (var cancellation in _serverStartCancellations.Values)
+            foreach (var operation in _serverStartOperations.Values)
             {
-                cancellation.Cancel();
+                operation.Cancel();
             }
-            _serverStartCancellations.Clear();
+            _serverStartOperations.Clear();
             DisposeAllSessions();
         }
 
@@ -881,17 +881,31 @@ namespace TxtAIEditor.Controls
 
         private async Task StartServerAsync(AgentMcpServer server, CancellationToken cancellationToken)
         {
-            CancellationTokenSource startCancellation = BeginServerStart(server.Id);
-            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                startCancellation.Token);
+            if (!_serverStartOperations.TryGetValue(server.Id, out var operation))
+            {
+                operation = new ServerStartOperation();
+                _serverStartOperations[server.Id] = operation;
+                operation.Task = RunServerStartAsync(server, operation);
+            }
+
+            await operation.Task.WaitAsync(cancellationToken);
+        }
+
+        private async Task RunServerStartAsync(AgentMcpServer server, ServerStartOperation operation)
+        {
             try
             {
-                await RefreshServerToolsAsync(server, linkedCancellation.Token);
+                await RefreshServerToolsAsync(server, operation.Token);
             }
             finally
             {
-                CompleteServerStart(server.Id, startCancellation);
+                if (_serverStartOperations.TryGetValue(server.Id, out var current) &&
+                    ReferenceEquals(current, operation))
+                {
+                    _serverStartOperations.Remove(server.Id);
+                }
+
+                operation.Dispose();
             }
         }
 
@@ -1498,30 +1512,11 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private CancellationTokenSource BeginServerStart(string serverId)
-        {
-            CancelServerStart(serverId);
-            var cancellation = new CancellationTokenSource();
-            _serverStartCancellations[serverId] = cancellation;
-            return cancellation;
-        }
-
-        private void CompleteServerStart(string serverId, CancellationTokenSource cancellation)
-        {
-            if (_serverStartCancellations.TryGetValue(serverId, out var current) &&
-                ReferenceEquals(current, cancellation))
-            {
-                _serverStartCancellations.Remove(serverId);
-            }
-
-            cancellation.Dispose();
-        }
-
         private void CancelServerStart(string serverId)
         {
-            if (_serverStartCancellations.Remove(serverId, out var cancellation))
+            if (_serverStartOperations.Remove(serverId, out var operation))
             {
-                cancellation.Cancel();
+                operation.Cancel();
             }
         }
 
@@ -2354,6 +2349,24 @@ namespace TxtAIEditor.Controls
                 }
 
                 process?.Dispose();
+            }
+        }
+
+        private sealed class ServerStartOperation : IDisposable
+        {
+            private readonly CancellationTokenSource _cancellation = new();
+
+            public CancellationToken Token => _cancellation.Token;
+            public Task Task { get; set; } = Task.CompletedTask;
+
+            public void Cancel()
+            {
+                _cancellation.Cancel();
+            }
+
+            public void Dispose()
+            {
+                _cancellation.Dispose();
             }
         }
 
