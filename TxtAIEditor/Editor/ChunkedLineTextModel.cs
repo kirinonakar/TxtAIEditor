@@ -13,6 +13,7 @@ namespace TxtAIEditor.Editor
     public static class TextModelFactory
     {
         public const int ChunkedLineThreshold = 50_000;
+        public const long ChunkedFileSizeThresholdBytes = 4L * 1024 * 1024;
 
         public static ITextModel Create(IEnumerable<string>? lines, string lineEnding = "\n")
         {
@@ -36,6 +37,9 @@ namespace TxtAIEditor.Editor
             return Create(normalized.Split('\n'), lineEnding);
         }
 
+        public static bool ShouldUseChunkedModelForFile(long fileSizeBytes) =>
+            fileSizeBytes >= ChunkedFileSizeThresholdBytes;
+
         private static string DetectLineEnding(string text)
         {
             int crlf = text.IndexOf("\r\n", StringComparison.Ordinal);
@@ -44,11 +48,59 @@ namespace TxtAIEditor.Editor
         }
     }
 
+    public sealed class ChunkedLineTextModelBuilder
+    {
+        private readonly string _lineEnding;
+        private List<List<string>>? _leaves = new();
+        private List<string>? _currentLeaf = new(ChunkedLineTextModel.TargetLeafLineCount);
+
+        public ChunkedLineTextModelBuilder(string lineEnding = "\n")
+        {
+            _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\n" : lineEnding;
+        }
+
+        public int LineCount { get; private set; }
+
+        public void AddLine(string? line)
+        {
+            List<List<string>> leaves = _leaves ??
+                throw new InvalidOperationException("The builder has already created a model.");
+            List<string> currentLeaf = _currentLeaf!;
+            currentLeaf.Add(NormalizeSingleLine(line));
+            LineCount++;
+            if (currentLeaf.Count < ChunkedLineTextModel.TargetLeafLineCount)
+            {
+                return;
+            }
+
+            leaves.Add(currentLeaf);
+            _currentLeaf = new List<string>(ChunkedLineTextModel.TargetLeafLineCount);
+        }
+
+        public ChunkedLineTextModel Build()
+        {
+            List<List<string>> leaves = _leaves ??
+                throw new InvalidOperationException("The builder has already created a model.");
+            if (_currentLeaf!.Count > 0)
+            {
+                leaves.Add(_currentLeaf);
+            }
+
+            _leaves = null;
+            _currentLeaf = null;
+            return new ChunkedLineTextModel(leaves, _lineEnding);
+        }
+
+        private static string NormalizeSingleLine(string? text) =>
+            (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
+    }
+
     public sealed class ChunkedLineTextModel : ITextModel
     {
-        private const int TargetLeafLines = 512;
+        internal const int TargetLeafLineCount = 512;
+        private const int TargetLeafLines = TargetLeafLineCount;
         private const int MaxLeafLines = 1_024;
-        private readonly List<List<string>> _leaves = new();
+        private readonly List<List<string>> _leaves;
         private readonly List<long> _leafCharacterCounts = new();
         private readonly FenwickIndex _lineIndex = new();
         private readonly FenwickIndex _characterIndex = new();
@@ -56,8 +108,21 @@ namespace TxtAIEditor.Editor
 
         public ChunkedLineTextModel(IEnumerable<string>? lines = null, string lineEnding = "\n")
         {
+            _leaves = new List<List<string>>();
             _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\n" : lineEnding;
             AppendLeaves(lines?.Select(NormalizeSingleLine) ?? Array.Empty<string>());
+            EnsureAtLeastOneLine();
+            RebuildIndexes();
+        }
+
+        internal ChunkedLineTextModel(List<List<string>> leaves, string lineEnding)
+        {
+            _leaves = leaves ?? throw new ArgumentNullException(nameof(leaves));
+            _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\n" : lineEnding;
+            foreach (List<string> leaf in _leaves)
+            {
+                _leafCharacterCounts.Add(CalculateLeafCharacterCount(leaf));
+            }
             EnsureAtLeastOneLine();
             RebuildIndexes();
         }

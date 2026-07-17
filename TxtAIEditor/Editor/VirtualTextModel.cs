@@ -90,6 +90,21 @@ namespace TxtAIEditor.Editor
             RebuildLineLengthIndex();
         }
 
+        private LineArrayTextModel(List<string> ownedLines, string lineEnding)
+        {
+            _lines = ownedLines;
+            if (_lines.Count == 0)
+            {
+                _lines.Add(string.Empty);
+            }
+
+            _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\n" : lineEnding;
+            RebuildLineLengthIndex();
+        }
+
+        internal static LineArrayTextModel FromOwnedLines(List<string> lines, string lineEnding) =>
+            new(lines, lineEnding);
+
         public int LineCount => _lines.Count;
 
         public string LineEnding
@@ -123,7 +138,8 @@ namespace TxtAIEditor.Editor
         public static async Task<EditorDocumentLoadResult> LoadFromFileAsync(
             string filePath,
             string encodingName,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            IProgress<EditorDocumentLoadProgress>? progress = null)
         {
             if (!File.Exists(filePath))
             {
@@ -140,7 +156,11 @@ namespace TxtAIEditor.Editor
 
             string sampleText = encoding.GetString(sample);
             string lineEnding = DetectLineEnding(sampleText);
-            var lines = new List<string>();
+            long fileSizeBytes = new FileInfo(filePath).Length;
+            bool useChunkedModel = TextModelFactory.ShouldUseChunkedModelForFile(fileSizeBytes);
+            var chunkedBuilder = useChunkedModel ? new ChunkedLineTextModelBuilder(lineEnding) : null;
+            var lines = useChunkedModel ? null : new List<string>();
+            int linesRead = 0;
 
             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 128 * 1024, useAsync: true))
             using (var reader = new StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: true, bufferSize: 128 * 1024))
@@ -148,17 +168,26 @@ namespace TxtAIEditor.Editor
                 string? line;
                 while ((line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) != null)
                 {
-                    lines.Add(line);
+                    chunkedBuilder?.AddLine(line);
+                    lines?.Add(line);
+                    linesRead++;
+                    if (linesRead % ChunkedLineTextModel.TargetLeafLineCount == 0)
+                    {
+                        progress?.Report(new EditorDocumentLoadProgress(
+                            Math.Min(stream.Position, fileSizeBytes),
+                            fileSizeBytes,
+                            linesRead));
+                    }
                 }
             }
 
-            if (lines.Count == 0)
-            {
-                lines.Add(string.Empty);
-            }
+            ITextModel model = chunkedBuilder != null
+                ? chunkedBuilder.Build()
+                : LineArrayTextModel.FromOwnedLines(lines!, lineEnding);
+            progress?.Report(new EditorDocumentLoadProgress(fileSizeBytes, fileSizeBytes, model.LineCount));
 
             return new EditorDocumentLoadResult(
-                TextModelFactory.Create(lines, lineEnding),
+                model,
                 displayEncoding,
                 isAuto);
         }
@@ -838,6 +867,11 @@ namespace TxtAIEditor.Editor
         ITextModel Model,
         string EncodingName,
         bool EncodingWasAutoDetected);
+
+    public sealed record EditorDocumentLoadProgress(
+        long BytesRead,
+        long TotalBytes,
+        int LinesRead);
 
     public sealed record EditorDocumentChange(
         string DocumentId,

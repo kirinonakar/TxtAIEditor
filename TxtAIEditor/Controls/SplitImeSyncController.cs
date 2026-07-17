@@ -67,11 +67,10 @@ namespace TxtAIEditor.Controls
                             otherSession.ViewVersion,
                             out IReadOnlyList<EditorDocumentChange> replayChanges))
                     {
-                        foreach (EditorDocumentChange replayChange in replayChanges)
-                        {
-                            await ApplyDocumentChangeAsync(bridgeGroup.Bridge, replayChange);
-                            otherSession.MarkViewSynchronized(replayChange.Version);
-                        }
+                        await ReplayDocumentChangesAsync(
+                            bridgeGroup.Bridge,
+                            otherSession,
+                            replayChanges);
                     }
                     else if (!sharesDocument ||
                         (otherSession != null && otherSession.ViewVersion < sourceSession.DocumentVersion))
@@ -120,6 +119,50 @@ namespace TxtAIEditor.Controls
                 change.BaseVersion,
                 change.Version,
                 change.SourceViewId);
+        }
+
+        private static async Task ReplayDocumentChangesAsync(
+            MonacoBridge bridge,
+            EditorDocumentSession targetSession,
+            IReadOnlyList<EditorDocumentChange> changes)
+        {
+            int changeIndex = 0;
+            while (changeIndex < changes.Count)
+            {
+                EditorDocumentChange change = changes[changeIndex];
+                if (change.LinePatches is not { Count: > 0 })
+                {
+                    await ApplyDocumentChangeAsync(bridge, change);
+                    targetSession.MarkViewSynchronized(change.Version);
+                    changeIndex++;
+                    continue;
+                }
+
+                long baseVersion = change.BaseVersion;
+                EditorDocumentChange finalChange = change;
+                var latestPatchByLine = new Dictionary<int, TextLinePatch>();
+                while (changeIndex < changes.Count &&
+                    changes[changeIndex].LinePatches is { Count: > 0 } patches)
+                {
+                    finalChange = changes[changeIndex];
+                    foreach (TextLinePatch patch in patches)
+                    {
+                        latestPatchByLine[patch.LineNumber] = patch;
+                    }
+                    changeIndex++;
+                }
+
+                TextLinePatch[] coalescedPatches = latestPatchByLine.Values
+                    .OrderBy(patch => patch.LineNumber)
+                    .ToArray();
+                await bridge.ApplyLinePatchesAsync(
+                    coalescedPatches,
+                    finalChange.DocumentId,
+                    baseVersion,
+                    finalChange.Version,
+                    finalChange.SourceViewId);
+                targetSession.MarkViewSynchronized(finalChange.Version);
+            }
         }
 
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
@@ -14,7 +15,7 @@ namespace TxtAIEditor.Editor
     public class MonacoBridge
     {
         private const int LinePatchBatchMaxLines = 256;
-        private const int LinePatchBatchMaxChars = 256 * 1024;
+        private const int LinePatchBatchMaxBytes = 256 * 1024;
         private const string HexLanguageName = "hex";
         private const string HexEditorFontFamily = "Consolas, \"Cascadia Mono\", \"Courier New\", monospace";
         private readonly WebView2 _webView;
@@ -437,13 +438,42 @@ namespace TxtAIEditor.Editor
             long? documentVersion,
             string? sourceViewId)
         {
+            var latestPatchByLine = new Dictionary<int, TextLinePatch>();
+            foreach (TextLinePatch patch in patches)
+            {
+                latestPatchByLine[patch.LineNumber] = patch;
+            }
+
+            TextLinePatch[] coalescedPatches = latestPatchByLine.Values
+                .OrderBy(patch => patch.LineNumber)
+                .ToArray();
+            if (coalescedPatches.Length == 0)
+            {
+                return;
+            }
+
             string batchId = Guid.NewGuid().ToString("N");
             int batchIndex = 0;
-            int batchChars = 0;
-            var batch = new List<TextLinePatch>(LinePatchBatchMaxLines);
-
-            async Task FlushBatchAsync(bool isFinal)
+            int patchIndex = 0;
+            while (patchIndex < coalescedPatches.Length)
             {
+                int batchBytes = 0;
+                var batch = new List<TextLinePatch>(LinePatchBatchMaxLines);
+                while (patchIndex < coalescedPatches.Length && batch.Count < LinePatchBatchMaxLines)
+                {
+                    TextLinePatch patch = coalescedPatches[patchIndex];
+                    int patchBytes = Encoding.UTF8.GetByteCount(patch.Text ?? string.Empty);
+                    if (batch.Count > 0 && batchBytes + patchBytes > LinePatchBatchMaxBytes)
+                    {
+                        break;
+                    }
+
+                    batch.Add(patch);
+                    batchBytes += patchBytes;
+                    patchIndex++;
+                }
+
+                bool isFinal = patchIndex >= coalescedPatches.Length;
                 await SendRequiredMessageAsync(new
                 {
                     protocolVersion = EditorProtocol.CurrentVersion,
@@ -462,30 +492,11 @@ namespace TxtAIEditor.Editor
                     }).ToArray()
                 });
                 batchIndex++;
-                batch.Clear();
-                batchChars = 0;
-                await Task.Yield();
-            }
-
-            foreach (TextLinePatch patch in patches)
-            {
-                int patchChars = patch.Text?.Length ?? 0;
-                if (batch.Count > 0 &&
-                    (batch.Count >= LinePatchBatchMaxLines || batchChars + patchChars > LinePatchBatchMaxChars))
+                if (!isFinal)
                 {
-                    await FlushBatchAsync(isFinal: false);
+                    await Task.Yield();
                 }
-
-                batch.Add(patch);
-                batchChars += patchChars;
             }
-
-            if (batch.Count > 0)
-            {
-                await FlushBatchAsync(isFinal: false);
-            }
-
-            await FlushBatchAsync(isFinal: true);
         }
 
         public async Task SendFindResultAsync(TextSearchResult? result, string query)
