@@ -83,6 +83,8 @@ namespace TxtAIEditor.Controls
                 return "run_powershell failed: command is empty.";
             }
 
+            command = NormalizePowerShellTextWriteSafety(command);
+
             if (!IsClearlySafePowerShell(command) && !await _confirmPowerShellAsync(command))
             {
                 return "run_powershell cancelled by user.";
@@ -552,6 +554,38 @@ namespace TxtAIEditor.Controls
 
             string escapedShellPath = shellPath.Replace("'", "''", StringComparison.Ordinal);
             return $"try {{ Set-Alias -Name powershell -Value '{escapedShellPath}' -Scope Script; Set-Alias -Name powershell.exe -Value '{escapedShellPath}' -Scope Script }} catch {{}}; ";
+        }
+
+        private static string NormalizePowerShellTextWriteSafety(string command)
+        {
+            bool writesText = Regex.IsMatch(command, @"(?i)\bSet-Content\b");
+            if (!writesText)
+            {
+                return command;
+            }
+
+            if (Regex.IsMatch(command, @"(?i)\bGet-Content\b"))
+            {
+                command = AddMissingPowerShellSwitch(command, "Get-Content", "-Raw");
+            }
+
+            return AddMissingPowerShellSwitch(command, "Set-Content", "-NoNewline");
+        }
+
+        private static string AddMissingPowerShellSwitch(string command, string cmdletName, string switchName)
+        {
+            string invocationPattern = $@"(?is)\b{Regex.Escape(cmdletName)}\b(?<arguments>.*?)(?=(?:[;|\r\n]|$))";
+            string escapedSwitch = Regex.Escape(switchName);
+
+            return Regex.Replace(command, invocationPattern, match =>
+            {
+                if (Regex.IsMatch(match.Value, $@"(?i)(?<![\p{{L}}\p{{N}}_]){escapedSwitch}\b"))
+                {
+                    return match.Value;
+                }
+
+                return match.Value.Insert(cmdletName.Length, " " + switchName);
+            });
         }
     }
 }
