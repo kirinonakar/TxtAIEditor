@@ -87,6 +87,7 @@ namespace TxtAIEditor.Controls
         private readonly List<AgentMcpServer> _servers = new();
         private readonly HashSet<string> _selectedServerIds = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AgentMcpSession> _sessions = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, CancellationTokenSource> _serverStartCancellations = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AgentMcpToolAlias> _toolAliases = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _serverStatus = new(StringComparer.OrdinalIgnoreCase);
         private string _comfyUiStatus = string.Empty;
@@ -199,6 +200,11 @@ namespace TxtAIEditor.Controls
 
         public void Close()
         {
+            foreach (var cancellation in _serverStartCancellations.Values)
+            {
+                cancellation.Cancel();
+            }
+            _serverStartCancellations.Clear();
             DisposeAllSessions();
         }
 
@@ -612,15 +618,14 @@ namespace TxtAIEditor.Controls
             if (!_selectedServerIds.Add(server.Id))
             {
                 _selectedServerIds.Remove(server.Id);
-                RemoveSession(server.Id);
-                _serverStatus.Remove(server.Id);
+                StopServer(server.Id);
                 RebuildAliases();
                 UpdateUI();
                 return;
             }
 
             UpdateUI();
-            await RefreshServerToolsAsync(server, CancellationToken.None);
+            await StartServerAsync(server, CancellationToken.None);
         }
 
         public async Task DeleteMcpAsync(string serverName)
@@ -639,8 +644,7 @@ namespace TxtAIEditor.Controls
             _credentialStore.DeleteAllCredentials(server);
             _servers.Remove(server);
             _selectedServerIds.Remove(server.Id);
-            RemoveSession(server.Id);
-            _serverStatus.Remove(server.Id);
+            StopServer(server.Id);
             await SaveAsync();
         }
 
@@ -669,8 +673,7 @@ namespace TxtAIEditor.Controls
             }
 
             _selectedServerIds.Remove(server.Id);
-            RemoveSession(server.Id);
-            _serverStatus.Remove(server.Id);
+            StopServer(server.Id);
             RebuildAliases();
             UpdateUI();
         }
@@ -712,7 +715,7 @@ namespace TxtAIEditor.Controls
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!_sessions.TryGetValue(server.Id, out var session) || session.Tools.Count == 0)
                 {
-                    await RefreshServerToolsAsync(server, cancellationToken);
+                    await StartServerAsync(server, cancellationToken);
                 }
             }
         }
@@ -876,13 +879,30 @@ namespace TxtAIEditor.Controls
             return $"MCP tool failed: unknown built-in MCP tool alias: {alias.Alias}";
         }
 
+        private async Task StartServerAsync(AgentMcpServer server, CancellationToken cancellationToken)
+        {
+            CancellationTokenSource startCancellation = BeginServerStart(server.Id);
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                startCancellation.Token);
+            try
+            {
+                await RefreshServerToolsAsync(server, linkedCancellation.Token);
+            }
+            finally
+            {
+                CompleteServerStart(server.Id, startCancellation);
+            }
+        }
+
         private async Task RefreshServerToolsAsync(AgentMcpServer server, CancellationToken cancellationToken)
         {
+            AgentMcpSession? session = null;
             try
             {
                 _serverStatus[server.Id] = _getString("AgentMcpStatusConnecting", "연결 중");
                 UpdateUI();
-                AgentMcpSession session = await EnsureSessionAsync(server, cancellationToken, forceRefresh: true);
+                session = await EnsureSessionAsync(server, cancellationToken, forceRefresh: true);
                 session.Tools.Clear();
 
                 string? cursor = null;
@@ -928,16 +948,30 @@ namespace TxtAIEditor.Controls
                 }
                 while (!string.IsNullOrEmpty(cursor));
 
-                _serverStatus[server.Id] = string.Format(
-                    _getString("AgentMcpStatusToolCount", "{0:N0}개 도구"),
-                    session.Tools.Count);
+                if (_selectedServerIds.Contains(server.Id) && !cancellationToken.IsCancellationRequested)
+                {
+                    _serverStatus[server.Id] = string.Format(
+                        _getString("AgentMcpStatusToolCount", "{0:N0}개 도구"),
+                        session.Tools.Count);
+                }
+                else
+                {
+                    RemoveSession(server.Id, session);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                RemoveSession(server.Id, session);
             }
             catch (Exception ex)
             {
-                RemoveSession(server.Id);
-                _serverStatus[server.Id] = string.Format(
-                    _getString("AgentMcpStatusFailedFormat", "연결 실패: {0}"),
-                    ex.Message);
+                RemoveSession(server.Id, session);
+                if (_selectedServerIds.Contains(server.Id) && !cancellationToken.IsCancellationRequested)
+                {
+                    _serverStatus[server.Id] = string.Format(
+                        _getString("AgentMcpStatusFailedFormat", "연결 실패: {0}"),
+                        ex.Message);
+                }
             }
 
             RebuildAliases();
@@ -965,30 +999,38 @@ namespace TxtAIEditor.Controls
             }
             _sessions[server.Id] = session;
 
-            using JsonDocument initializeResponse = await SendJsonRpcAsync(
-                server,
-                session,
-                "initialize",
-                new Dictionary<string, object?>
-                {
-                    ["protocolVersion"] = ProtocolVersion,
-                    ["capabilities"] = new Dictionary<string, object?>(),
-                    ["clientInfo"] = new Dictionary<string, object?>
-                    {
-                        ["name"] = "TxtAIEditor",
-                        ["version"] = "1.0"
-                    }
-                },
-                cancellationToken);
-
-            if (TryGetRpcError(initializeResponse.RootElement, out string error))
+            try
             {
-                throw new InvalidOperationException(error);
-            }
+                using JsonDocument initializeResponse = await SendJsonRpcAsync(
+                    server,
+                    session,
+                    "initialize",
+                    new Dictionary<string, object?>
+                    {
+                        ["protocolVersion"] = ProtocolVersion,
+                        ["capabilities"] = new Dictionary<string, object?>(),
+                        ["clientInfo"] = new Dictionary<string, object?>
+                        {
+                            ["name"] = "TxtAIEditor",
+                            ["version"] = "1.0"
+                        }
+                    },
+                    cancellationToken);
 
-            await SendJsonRpcNotificationAsync(server, session, "notifications/initialized", cancellationToken);
-            session.Initialized = true;
-            return session;
+                if (TryGetRpcError(initializeResponse.RootElement, out string error))
+                {
+                    throw new InvalidOperationException(error);
+                }
+
+                await SendJsonRpcNotificationAsync(server, session, "notifications/initialized", cancellationToken);
+                session.Initialized = true;
+                return session;
+            }
+            catch
+            {
+                RemoveSession(server.Id, session);
+                throw;
+            }
         }
 
         private async Task<JsonDocument> SendJsonRpcAsync(
@@ -1456,10 +1498,46 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void RemoveSession(string serverId)
+        private CancellationTokenSource BeginServerStart(string serverId)
         {
-            if (_sessions.Remove(serverId, out var session))
+            CancelServerStart(serverId);
+            var cancellation = new CancellationTokenSource();
+            _serverStartCancellations[serverId] = cancellation;
+            return cancellation;
+        }
+
+        private void CompleteServerStart(string serverId, CancellationTokenSource cancellation)
+        {
+            if (_serverStartCancellations.TryGetValue(serverId, out var current) &&
+                ReferenceEquals(current, cancellation))
             {
+                _serverStartCancellations.Remove(serverId);
+            }
+
+            cancellation.Dispose();
+        }
+
+        private void CancelServerStart(string serverId)
+        {
+            if (_serverStartCancellations.Remove(serverId, out var cancellation))
+            {
+                cancellation.Cancel();
+            }
+        }
+
+        private void StopServer(string serverId)
+        {
+            CancelServerStart(serverId);
+            RemoveSession(serverId);
+            _serverStatus.Remove(serverId);
+        }
+
+        private void RemoveSession(string serverId, AgentMcpSession? expectedSession = null)
+        {
+            if (_sessions.TryGetValue(serverId, out var session) &&
+                (expectedSession == null || ReferenceEquals(session, expectedSession)))
+            {
+                _sessions.Remove(serverId);
                 session.Dispose();
             }
         }
@@ -2223,6 +2301,8 @@ namespace TxtAIEditor.Controls
 
         private sealed class AgentMcpSession : IDisposable
         {
+            private int _disposed;
+
             public string SessionId { get; set; } = string.Empty;
             public bool Initialized { get; set; }
             public int NextId { get; set; } = 1;
@@ -2236,25 +2316,44 @@ namespace TxtAIEditor.Controls
 
             public void Dispose()
             {
+                if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                {
+                    return;
+                }
+
+                Process? process = Process;
+                try
+                {
+                    if (process is { HasExited: false })
+                    {
+                        process.Kill(entireProcessTree: true);
+                        process.WaitForExit(2000);
+                    }
+                }
+                catch (Exception ex) when (
+                    ex is InvalidOperationException or
+                    System.ComponentModel.Win32Exception or
+                    NotSupportedException)
+                {
+                }
+
                 try
                 {
                     StandardInput?.Dispose();
+                }
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+                {
+                }
+
+                try
+                {
                     StandardOutput?.Dispose();
-                    if (Process is { HasExited: false })
-                    {
-                        Process.Kill(entireProcessTree: true);
-                    }
                 }
-                catch (InvalidOperationException)
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException)
                 {
                 }
-                catch (System.ComponentModel.Win32Exception)
-                {
-                }
-                finally
-                {
-                    Process?.Dispose();
-                }
+
+                process?.Dispose();
             }
         }
 
