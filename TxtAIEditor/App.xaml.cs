@@ -27,6 +27,7 @@ namespace TxtAIEditor
         private static int _comActiveCallCount;
         private static int _comServerLockCount;
         private static int _comInvokeCompleted;
+        private int _appCleanupStarted;
         private static long _comStartedTicks;
         private static long _lastActivityTicks;
         private static TxtAIEditorExplorerCommandFactory? _commandFactory;
@@ -85,7 +86,7 @@ namespace TxtAIEditor
 
             if (!createdNew)
             {
-                CleanupWindowlessBackgroundProcesses();
+                CleanupWindowlessBackgroundProcesses(TimeSpan.FromSeconds(2));
                 _singleInstanceMutex.Dispose();
                 _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out createdNew);
             }
@@ -122,22 +123,22 @@ namespace TxtAIEditor
             _ = Task.Run(FileAssociationService.RegisterUnpackagedFileAssociations);
         }
 
-        private static void CleanupWindowlessBackgroundProcesses()
+        private static void CleanupWindowlessBackgroundProcesses(TimeSpan minimumAge)
         {
             try
             {
-                var currentProc = System.Diagnostics.Process.GetCurrentProcess();
+                int currentProcessId = Environment.ProcessId;
                 var existingProcs = System.Diagnostics.Process.GetProcessesByName("TxtAIEditor");
                 foreach (var p in existingProcs)
                 {
-                    if (p.Id == currentProc.Id || p.MainWindowHandle != IntPtr.Zero)
-                    {
-                        continue;
-                    }
-
                     try
                     {
-                        if ((DateTime.Now - p.StartTime).TotalSeconds > 2)
+                        if (p.Id == currentProcessId || p.MainWindowHandle != IntPtr.Zero)
+                        {
+                            continue;
+                        }
+
+                        if (DateTime.Now - p.StartTime >= minimumAge)
                         {
                             p.Kill();
                             p.WaitForExit(1000);
@@ -145,6 +146,10 @@ namespace TxtAIEditor
                     }
                     catch
                     {
+                    }
+                    finally
+                    {
+                        p.Dispose();
                     }
                 }
             }
@@ -405,9 +410,15 @@ namespace TxtAIEditor
 
         public void CleanupAppResources()
         {
+            if (Interlocked.Exchange(ref _appCleanupStarted, 1) != 0)
+            {
+                return;
+            }
+
             if (_ipcWatcher != null)
             {
                 _ipcWatcher.EnableRaisingEvents = false;
+                _ipcWatcher.Created -= OnIpcFileCreated;
                 _ipcWatcher.Dispose();
                 _ipcWatcher = null;
             }
@@ -421,8 +432,10 @@ namespace TxtAIEditor
 
             DocumentTextExtractionService.KillRunningPdftotextProcesses();
             CleanupTemporaryFiles();
+            CleanupWindowlessBackgroundProcesses(TimeSpan.Zero);
 
-            // Force terminate the process to ensure no background processes are left running
+            // The packaged Explorer command runs as a separate windowless -Embedding process.
+            // Stop it together with the main instance so RuntimeBroker can release the COM activation.
             Environment.Exit(0);
         }
 
