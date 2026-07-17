@@ -347,7 +347,12 @@ namespace TxtAIEditor.Controls
             authTypeBox.SelectionChanged += (_, _) => UpdateFieldVisibility();
             UpdateFieldVisibility();
 
-            var stack = new StackPanel { Spacing = 10, Width = 420 };
+            var stack = new StackPanel
+            {
+                Spacing = 10,
+                Width = 420,
+                Margin = new Thickness(0, 0, 16, 0)
+            };
             stack.Children.Add(CreateLabel(_getString("AgentMcpNameLabel", "MCP 이름")));
             stack.Children.Add(nameBox);
             stack.Children.Add(CreateLabel(_getString("AgentMcpTransportLabel", "연결 방식")));
@@ -386,7 +391,7 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(CreateInfoText(_getString("AgentMcpCredentialInfo", "API Key, OAuth Client Secret, OAuth 토큰, stdio 환경 변수는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
 
             double availableHeight = _agentPane.XamlRoot?.Size.Height ?? 720;
-            double contentHeight = Math.Clamp(availableHeight - 220, 360, 680);
+            double contentHeight = Math.Clamp(availableHeight - 280, 320, 560);
             var scrollViewer = new ScrollViewer
             {
                 Content = stack,
