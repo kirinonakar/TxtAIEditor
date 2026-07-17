@@ -217,6 +217,8 @@ namespace TxtAIEditor.Composition
                 streamTextIntoActiveEditorAsync: editor.ActiveEditorInsertion.InsertStreamTextAsync,
                 endStreamIntoActiveEditorAsync: editor.ActiveEditorInsertion.EndStreamAsync);
 
+            window.Closed += (_, _) => agent.CloseMcpSessions();
+
             return new MainWindowAgentModuleFacade(llmAssistant, agent);
         }
 

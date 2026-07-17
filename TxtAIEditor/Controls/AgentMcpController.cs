@@ -119,7 +119,6 @@ namespace TxtAIEditor.Controls
             _dialogService = new AgentMcpDialogService(_agentPane, _initializePickerWindow, _getString, _beforeDialog, _afterDialog);
             _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, () => _settingsService.CurrentSettings, fileModifiedAsync);
             _browserUseTool = new AgentMcpBrowserUseTool(() => _settingsService.CurrentSettings, addImageAttachment);
-            _agentPane.Unloaded += (_, _) => DisposeAllSessions();
 
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
@@ -196,6 +195,11 @@ namespace TxtAIEditor.Controls
 
             RebuildAliases();
             UpdateUI();
+        }
+
+        public void Close()
+        {
+            DisposeAllSessions();
         }
 
         public async Task AddMcpAsync()
@@ -2250,7 +2254,6 @@ namespace TxtAIEditor.Controls
                 finally
                 {
                     Process?.Dispose();
-                    StdioLock.Dispose();
                 }
             }
         }

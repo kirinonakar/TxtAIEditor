@@ -316,6 +316,11 @@ namespace TxtAIEditor.Controls
             return _selectionContextController.BuildActiveSelectionContext(IsCurrentSessionRunning());
         }
 
+        internal void CloseMcpSessions()
+        {
+            _mcpController.Close();
+        }
+
         private AgentSelectionSnapshot CaptureActiveSelectionSnapshot()
         {
             return _selectionContextController.CaptureActiveSelectionSnapshot(IsCurrentSessionRunning());

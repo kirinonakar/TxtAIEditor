@@ -233,6 +233,23 @@ namespace TxtAIEditor.Controls
             var workingDirectoryLabel = CreateLabel(_getString("AgentMcpWorkingDirectoryLabel", "작업 폴더 (선택)"));
             var workingDirectoryBox = CreateTextBox(_getString("AgentMcpWorkingDirectoryPlaceholder", "비워두면 현재 작업 영역 사용"));
             workingDirectoryBox.Text = initial.WorkingDirectory;
+            var workingDirectoryBrowseButton = CreateBrowseButton();
+            workingDirectoryBrowseButton.Click += async (_, _) =>
+            {
+                var picker = new FolderPicker
+                {
+                    SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+                };
+                _initializePickerWindow(picker);
+                picker.FileTypeFilter.Add("*");
+
+                var folder = await picker.PickSingleFolderAsync();
+                if (folder != null)
+                {
+                    workingDirectoryBox.Text = folder.Path;
+                }
+            };
+            var workingDirectoryRow = CreatePickerRow(workingDirectoryBox, workingDirectoryBrowseButton);
             var environmentLabel = CreateLabel(_getString("AgentMcpEnvironmentLabel", "환경 변수 (JSON 객체, 선택)"));
             var environmentBox = CreateJsonTextBox(_getString("AgentMcpEnvironmentPlaceholder", "{\"KEY\": \"value\"}"));
             environmentBox.Text = initial.EnvironmentJson;
@@ -276,7 +293,7 @@ namespace TxtAIEditor.Controls
                 SetVisible(argumentsLabel, isStdio);
                 SetVisible(argumentsBox, isStdio);
                 SetVisible(workingDirectoryLabel, isStdio);
-                SetVisible(workingDirectoryBox, isStdio);
+                SetVisible(workingDirectoryRow, isStdio);
                 SetVisible(environmentLabel, isStdio);
                 SetVisible(environmentBox, isStdio);
                 SetVisible(stdioInfo, isStdio);
@@ -319,7 +336,7 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(argumentsLabel);
             stack.Children.Add(argumentsBox);
             stack.Children.Add(workingDirectoryLabel);
-            stack.Children.Add(workingDirectoryBox);
+            stack.Children.Add(workingDirectoryRow);
             stack.Children.Add(environmentLabel);
             stack.Children.Add(environmentBox);
             stack.Children.Add(stdioInfo);
