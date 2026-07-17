@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
 {
@@ -70,7 +71,8 @@ namespace TxtAIEditor.Controls
                 string[] lines;
                 try
                 {
-                    lines = await File.ReadAllLinesAsync(filePath);
+                    Encoding encoding = await DetectFileEncodingAsync(filePath);
+                    lines = await File.ReadAllLinesAsync(filePath, encoding);
                 }
                 catch
                 {
@@ -121,7 +123,8 @@ namespace TxtAIEditor.Controls
             int currentLine = 0;
             int endLine = start + count - 1;
 
-            using (var reader = new StreamReader(fullPath, Encoding.UTF8))
+            Encoding encoding = await DetectFileEncodingAsync(fullPath);
+            using (var reader = new StreamReader(fullPath, encoding, detectEncodingFromByteOrderMarks: true))
             {
                 string? line;
                 while ((line = await reader.ReadLineAsync()) != null)
@@ -194,6 +197,39 @@ namespace TxtAIEditor.Controls
             }
 
             return true;
+        }
+
+        private static async Task<Encoding> DetectFileEncodingAsync(string filePath)
+        {
+            const int sampleSize = 128 * 1024;
+            using var stream = new FileStream(
+                filePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                sampleSize,
+                useAsync: true);
+
+            int length = (int)Math.Min(stream.Length, sampleSize);
+            byte[] sample = new byte[length];
+            int totalRead = 0;
+            while (totalRead < length)
+            {
+                int read = await stream.ReadAsync(sample.AsMemory(totalRead, length - totalRead));
+                if (read == 0)
+                {
+                    break;
+                }
+
+                totalRead += read;
+            }
+
+            if (totalRead != sample.Length)
+            {
+                Array.Resize(ref sample, totalRead);
+            }
+
+            return TextEncodingService.GetTextEncoding(sample, "Auto");
         }
 
         private static string FormatWorkspaceEntry(string root, string path)

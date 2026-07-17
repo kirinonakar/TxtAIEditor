@@ -2,14 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Services;
 using static TxtAIEditor.Controls.AgentTextContentUtilities;
 
 namespace TxtAIEditor.Controls
 {
     internal sealed class AgentFileEditToolService
     {
+        private static readonly Encoding Utf8NoBom = new UTF8Encoding(
+            encoderShouldEmitUTF8Identifier: false,
+            throwOnInvalidBytes: true);
+
+        private sealed class TextFileSnapshot
+        {
+            public string Content { get; init; } = string.Empty;
+            public Encoding Encoding { get; init; } = Utf8NoBom;
+        }
+
         private readonly AgentWorkspaceFileResolver _workspace;
         private readonly Func<AgentFileEditPreview, Task<bool>> _confirmEditAsync;
         private readonly Func<string, Task> _notifyFileModifiedAsync;
@@ -77,7 +89,7 @@ namespace TxtAIEditor.Controls
             }
 
             string finalRelativePath = _workspace.RelativePath(fullPath);
-            await File.WriteAllTextAsync(fullPath, newContent);
+            await WriteTextFileAsync(fullPath, newContent, Utf8NoBom);
             if (!File.Exists(fullPath))
             {
                 return $"create_file failed: file was not found after write: {finalRelativePath}";
@@ -105,7 +117,8 @@ namespace TxtAIEditor.Controls
                 return "replace_in_file failed: oldText is empty.";
             }
 
-            string rawText = await File.ReadAllTextAsync(fullPath);
+            TextFileSnapshot file = await ReadTextFileAsync(fullPath);
+            string rawText = file.Content;
             string lineEnding = DetectLineEnding(rawText);
             string content = NormalizeNewlines(rawText);
             string normalizedOldText = NormalizeNewlines(oldText);
@@ -208,7 +221,7 @@ namespace TxtAIEditor.Controls
                 return $"replace_in_file cancelled: {path}";
             }
 
-            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await WriteTextFileAsync(fullPath, RestoreLineEndings(updated, lineEnding), file.Encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"modified: {_workspace.RelativePath(fullPath)}";
@@ -238,7 +251,8 @@ namespace TxtAIEditor.Controls
                 return "search_replace failed: search text is empty.";
             }
 
-            string rawText = await File.ReadAllTextAsync(fullPath);
+            TextFileSnapshot file = await ReadTextFileAsync(fullPath);
+            string rawText = file.Content;
             string lineEnding = DetectLineEnding(rawText);
             string content = NormalizeNewlines(rawText);
             string[] lines = content.Split('\n');
@@ -356,7 +370,7 @@ namespace TxtAIEditor.Controls
                 return $"search_replace cancelled: {path}";
             }
 
-            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await WriteTextFileAsync(fullPath, RestoreLineEndings(updated, lineEnding), file.Encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
 
@@ -382,7 +396,8 @@ namespace TxtAIEditor.Controls
                 return $"replace_range failed: file not found: {path}";
             }
 
-            string rawText = await File.ReadAllTextAsync(fullPath);
+            TextFileSnapshot file = await ReadTextFileAsync(fullPath);
+            string rawText = file.Content;
             string lineEnding = DetectLineEnding(rawText);
             string content = NormalizeNewlines(rawText);
             string[] lines = content.Split('\n');
@@ -508,7 +523,7 @@ namespace TxtAIEditor.Controls
                 return $"replace_range cancelled: {path}";
             }
 
-            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await WriteTextFileAsync(fullPath, RestoreLineEndings(updated, lineEnding), file.Encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"modified: {_workspace.RelativePath(fullPath)}{rangeAdjustmentNote}";
@@ -547,7 +562,8 @@ namespace TxtAIEditor.Controls
                 return "apply_patch failed: patch content is empty.";
             }
 
-            string rawText = await File.ReadAllTextAsync(fullPath);
+            TextFileSnapshot file = await ReadTextFileAsync(fullPath);
+            string rawText = file.Content;
             string lineEnding = DetectLineEnding(rawText);
             string content = NormalizeNewlines(rawText);
             List<string> lines = content.Split('\n').ToList();
@@ -642,7 +658,7 @@ namespace TxtAIEditor.Controls
                 return $"apply_patch cancelled: {path}";
             }
 
-            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await WriteTextFileAsync(fullPath, RestoreLineEndings(updated, lineEnding), file.Encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"modified: {_workspace.RelativePath(fullPath)}";
@@ -651,14 +667,20 @@ namespace TxtAIEditor.Controls
         public async Task<string> OverwriteFileAsync(string path, string content)
         {
             string fullPath = _workspace.ResolveInsideWorkspace(path);
-            string rawText = File.Exists(fullPath)
-                ? await File.ReadAllTextAsync(fullPath)
-                : string.Empty;
+            bool isNewFile = !File.Exists(fullPath);
+            Encoding encoding = Utf8NoBom;
+            string rawText = string.Empty;
+            if (!isNewFile)
+            {
+                TextFileSnapshot file = await ReadTextFileAsync(fullPath);
+                rawText = file.Content;
+                encoding = file.Encoding;
+            }
+
             string lineEnding = DetectLineEnding(rawText);
 
             string oldContent = NormalizeNewlines(rawText);
             string newContent = NormalizeNewlines(content);
-            bool isNewFile = !File.Exists(fullPath);
             if (!isNewFile && string.Equals(newContent, oldContent, StringComparison.Ordinal))
             {
                 return BuildUnchangedEditResult("overwrite_file", fullPath);
@@ -685,7 +707,10 @@ namespace TxtAIEditor.Controls
                 Directory.CreateDirectory(dir);
             }
 
-            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(newContent, lineEnding));
+            await WriteTextFileAsync(
+                fullPath,
+                RestoreLineEndings(newContent, lineEnding),
+                encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"overwritten: {_workspace.RelativePath(fullPath)}";
@@ -694,9 +719,11 @@ namespace TxtAIEditor.Controls
         public async Task<string> AppendToFileAsync(string path, string content)
         {
             string fullPath = _workspace.ResolveInsideWorkspace(path);
-            string rawText = File.Exists(fullPath)
-                ? await File.ReadAllTextAsync(fullPath)
-                : string.Empty;
+            bool isNewFile = !File.Exists(fullPath);
+            TextFileSnapshot file = isNewFile
+                ? new TextFileSnapshot()
+                : await ReadTextFileAsync(fullPath);
+            string rawText = file.Content;
             string lineEnding = DetectLineEnding(rawText);
 
             string oldContent = NormalizeNewlines(rawText);
@@ -707,7 +734,6 @@ namespace TxtAIEditor.Controls
             }
             newContent += NormalizeNewlines(content);
 
-            bool isNewFile = !File.Exists(fullPath);
             if (!isNewFile && string.Equals(newContent, oldContent, StringComparison.Ordinal))
             {
                 return BuildUnchangedEditResult("append_to_file", fullPath);
@@ -734,7 +760,7 @@ namespace TxtAIEditor.Controls
                 Directory.CreateDirectory(dir);
             }
 
-            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(newContent, lineEnding));
+            await WriteTextFileAsync(fullPath, RestoreLineEndings(newContent, lineEnding), file.Encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"appended: {_workspace.RelativePath(fullPath)}";
@@ -765,7 +791,8 @@ namespace TxtAIEditor.Controls
                     return $"merge_files failed: source file not found: {path}";
                 }
 
-                string rawText = await File.ReadAllTextAsync(fullPath);
+                TextFileSnapshot sourceFile = await ReadTextFileAsync(fullPath);
+                string rawText = sourceFile.Content;
                 if (firstFile)
                 {
                     lineEnding = DetectLineEnding(rawText);
@@ -780,11 +807,11 @@ namespace TxtAIEditor.Controls
             }
 
             string newContent = string.Join("\n", mergedLines);
-            string oldContent = File.Exists(targetFullPath)
-                ? NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath))
-                : string.Empty;
-
             bool isNewFile = !File.Exists(targetFullPath);
+            TextFileSnapshot targetFile = isNewFile
+                ? new TextFileSnapshot()
+                : await ReadTextFileAsync(targetFullPath);
+            string oldContent = NormalizeNewlines(targetFile.Content);
             if (!isNewFile && string.Equals(newContent, oldContent, StringComparison.Ordinal))
             {
                 return BuildUnchangedEditResult("merge_files", targetFullPath);
@@ -811,7 +838,7 @@ namespace TxtAIEditor.Controls
                 Directory.CreateDirectory(dir);
             }
 
-            await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+            await WriteTextFileAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding), targetFile.Encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(targetFullPath);
             return $"merged: {_workspace.RelativePath(targetFullPath)}";
@@ -830,7 +857,8 @@ namespace TxtAIEditor.Controls
                 return "insert_to_file failed: content is empty.";
             }
 
-            string rawText = await File.ReadAllTextAsync(fullPath);
+            TextFileSnapshot file = await ReadTextFileAsync(fullPath);
+            string rawText = file.Content;
             string lineEnding = DetectLineEnding(rawText);
             string fileContent = NormalizeNewlines(rawText);
 
@@ -879,7 +907,7 @@ namespace TxtAIEditor.Controls
                 return $"insert_to_file cancelled: {path}";
             }
 
-            await File.WriteAllTextAsync(fullPath, RestoreLineEndings(updated, lineEnding));
+            await WriteTextFileAsync(fullPath, RestoreLineEndings(updated, lineEnding), file.Encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
             return $"inserted: {_workspace.RelativePath(fullPath)}";
@@ -991,7 +1019,8 @@ namespace TxtAIEditor.Controls
                 return _workspace.BuildMissingFileMessage("split_file", path);
             }
 
-            string rawText = await File.ReadAllTextAsync(fullPath);
+            TextFileSnapshot sourceFile = await ReadTextFileAsync(fullPath);
+            string rawText = sourceFile.Content;
             string lineEnding = DetectLineEnding(rawText);
             string content = NormalizeNewlines(rawText);
             string[] lines = content.Split('\n');
@@ -1028,11 +1057,11 @@ namespace TxtAIEditor.Controls
 
                     string newContent = string.Join("\n", rangeLines);
                     string targetFullPath = _workspace.ResolveInsideWorkspace(range.Path);
-                    string oldContent = File.Exists(targetFullPath)
-                        ? NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath))
-                        : string.Empty;
-
                     bool isNewFile = !File.Exists(targetFullPath);
+                    TextFileSnapshot targetFile = isNewFile
+                        ? new TextFileSnapshot { Encoding = sourceFile.Encoding }
+                        : await ReadTextFileAsync(targetFullPath);
+                    string oldContent = NormalizeNewlines(targetFile.Content);
                     if (isNewFile || !string.Equals(newContent, oldContent, StringComparison.Ordinal))
                     {
                         var preview = new AgentFileEditPreview
@@ -1057,7 +1086,7 @@ namespace TxtAIEditor.Controls
                             Directory.CreateDirectory(dir);
                         }
 
-                        await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+                        await WriteTextFileAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding), targetFile.Encoding);
                         await _notifyFileEditCommittedAsync(preview);
                         await _notifyFileModifiedAsync(targetFullPath);
                         outputResults.Add($"created: {_workspace.RelativePath(targetFullPath)} (lines {start}-{endIdx})");
@@ -1091,11 +1120,11 @@ namespace TxtAIEditor.Controls
 
                     string targetFullPath = _workspace.ResolveInsideWorkspace(partRelativePath);
                     string newContent = string.Join("\n", chunkLines);
-                    string oldContent = File.Exists(targetFullPath)
-                        ? NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath))
-                        : string.Empty;
-
                     bool isNewFile = !File.Exists(targetFullPath);
+                    TextFileSnapshot targetFile = isNewFile
+                        ? new TextFileSnapshot { Encoding = sourceFile.Encoding }
+                        : await ReadTextFileAsync(targetFullPath);
+                    string oldContent = NormalizeNewlines(targetFile.Content);
                     if (isNewFile || !string.Equals(newContent, oldContent, StringComparison.Ordinal))
                     {
                         var preview = new AgentFileEditPreview
@@ -1115,7 +1144,7 @@ namespace TxtAIEditor.Controls
                             continue;
                         }
 
-                        await File.WriteAllTextAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding));
+                        await WriteTextFileAsync(targetFullPath, RestoreLineEndings(newContent, lineEnding), targetFile.Encoding);
                         await _notifyFileEditCommittedAsync(preview);
                         await _notifyFileModifiedAsync(targetFullPath);
                         outputResults.Add($"created: {partRelativePath} (lines {i + 1}-{i + chunkCount})");
@@ -1139,6 +1168,81 @@ namespace TxtAIEditor.Controls
         private string BuildUnchangedEditResult(string toolName, string fullPath)
         {
             return $"{toolName} unchanged: {_workspace.RelativePath(fullPath)} requested change is already applied; no additional edit was needed.";
+        }
+
+        private static async Task<TextFileSnapshot> ReadTextFileAsync(string fullPath)
+        {
+            byte[] bytes = await File.ReadAllBytesAsync(fullPath);
+            Encoding encoding = TextEncodingService.GetTextEncoding(bytes, "Auto");
+            using var stream = new MemoryStream(bytes);
+            using var reader = new StreamReader(
+                stream,
+                encoding,
+                detectEncodingFromByteOrderMarks: true);
+
+            return new TextFileSnapshot
+            {
+                Content = await reader.ReadToEndAsync(),
+                Encoding = encoding
+            };
+        }
+
+        private static async Task WriteTextFileAsync(string fullPath, string content, Encoding encoding)
+        {
+            Encoding strictEncoding = (Encoding)encoding.Clone();
+            strictEncoding.EncoderFallback = EncoderFallback.ExceptionFallback;
+            strictEncoding.DecoderFallback = DecoderFallback.ExceptionFallback;
+
+            string? directory = Path.GetDirectoryName(fullPath);
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                throw new IOException($"Cannot determine the target directory for '{fullPath}'.");
+            }
+
+            string tempPath = Path.Combine(
+                directory,
+                $"._{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+
+            try
+            {
+                await File.WriteAllTextAsync(tempPath, content, strictEncoding);
+                if (File.Exists(fullPath))
+                {
+                    File.Replace(tempPath, fullPath, destinationBackupFileName: null);
+                }
+                else
+                {
+                    File.Move(tempPath, fullPath);
+                }
+
+                using var stream = new FileStream(
+                    fullPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite);
+                using var reader = new StreamReader(
+                    stream,
+                    strictEncoding,
+                    detectEncodingFromByteOrderMarks: true);
+                string savedContent = await reader.ReadToEndAsync();
+                if (!string.Equals(savedContent, content, StringComparison.Ordinal))
+                {
+                    throw new IOException($"Text verification failed after writing '{fullPath}'.");
+                }
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                {
+                    try
+                    {
+                        File.Delete(tempPath);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
         }
 
         private static int GetLineStartOffset(string[] lines, int oneBasedLine)
