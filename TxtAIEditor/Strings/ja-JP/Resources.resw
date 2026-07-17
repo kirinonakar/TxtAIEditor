@@ -2984,13 +2984,15 @@
   <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（ローカル プロセス）</value></data>
   <data name="AgentMcpCommandLabel" xml:space="preserve"><value>実行コマンド（完全なコマンドラインを入力可能）</value></data>
   <data name="AgentMcpCommandPlaceholder" xml:space="preserve"><value>npx -y @modelcontextprotocol/server-memory</value></data>
-  <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>引数（JSON 配列）</value></data>
-  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
-  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>作業フォルダー（省略可能）</value></data>
-  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve"><value>空の場合は現在のワークスペースを使用</value></data>
+  <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>サーバー引数（JSON 配列）</value></data>
+  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-memory"]</value></data>
+  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>プロセス作業フォルダー（cwd、省略可能）</value></data>
+  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve"><value>空の場合は現在のワークスペースで実行</value></data>
+  <data name="AgentMcpTargetDirectoryLabel" xml:space="preserve"><value>サーバー対象フォルダー（省略可能）</value></data>
+  <data name="AgentMcpTargetDirectoryPlaceholder" xml:space="preserve"><value>memory、filesystem などのサーバーが使用するフォルダー</value></data>
   <data name="AgentMcpEnvironmentLabel" xml:space="preserve"><value>環境変数（省略可能な JSON オブジェクト）</value></data>
   <data name="AgentMcpEnvironmentPlaceholder" xml:space="preserve"><value>{"KEY": "value"}</value></data>
-  <data name="AgentMcpStdioInfo" xml:space="preserve"><value>コマンドはローカル プロセスとして実行されます。例: npx と ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
+  <data name="AgentMcpStdioInfo" xml:space="preserve"><value>コマンドに完全なコマンドラインを入力した場合、サーバー引数は [] にしてください。cwd はプロセスの実行場所です。対象フォルダーは memory サーバーでは memory.jsonl に、その他のサーバーでは最後の位置引数になります。</value></data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key ヘッダー名</value>
   </data>

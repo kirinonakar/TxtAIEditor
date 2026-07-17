@@ -2995,16 +2995,22 @@
     <value>npx -y @modelcontextprotocol/server-memory</value>
   </data>
   <data name="AgentMcpArgumentsLabel" xml:space="preserve">
-    <value>인수 (JSON 배열)</value>
+    <value>서버 인수 (JSON 배열)</value>
   </data>
   <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve">
-    <value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value>
+    <value>["-y", "@modelcontextprotocol/server-memory"]</value>
   </data>
   <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve">
-    <value>작업 폴더 (선택)</value>
+    <value>프로세스 실행 폴더 (cwd, 선택)</value>
   </data>
   <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve">
-    <value>비워두면 현재 작업 영역 사용</value>
+    <value>비워두면 현재 작업 영역에서 실행</value>
+  </data>
+  <data name="AgentMcpTargetDirectoryLabel" xml:space="preserve">
+    <value>서버 대상 폴더 (선택)</value>
+  </data>
+  <data name="AgentMcpTargetDirectoryPlaceholder" xml:space="preserve">
+    <value>memory, filesystem 서버 등이 사용할 폴더</value>
   </data>
   <data name="AgentMcpEnvironmentLabel" xml:space="preserve">
     <value>환경 변수 (JSON 객체, 선택)</value>
@@ -3013,7 +3019,7 @@
     <value>{"KEY": "value"}</value>
   </data>
   <data name="AgentMcpStdioInfo" xml:space="preserve">
-    <value>명령은 로컬 프로세스로 실행됩니다. 예: npx와 인수 ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value>
+    <value>명령 칸에 전체 명령줄을 입력했다면 서버 인수는 []로 두세요. cwd는 프로세스 실행 위치입니다. 대상 폴더는 memory 서버에서 memory.jsonl 경로로, 그 외 서버에서는 마지막 위치 인수로 전달됩니다.</value>
   </data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key Header 이름</value>

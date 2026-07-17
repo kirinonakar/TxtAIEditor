@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         public string Command { get; set; } = string.Empty;
         public List<string> Arguments { get; set; } = new();
         public string WorkingDirectory { get; set; } = string.Empty;
+        public string TargetDirectory { get; set; } = string.Empty;
         public Dictionary<string, string> Environment { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string AuthType { get; set; } = string.Empty;
         public string OAuthAccessToken { get; set; } = string.Empty;
@@ -160,6 +161,7 @@ namespace TxtAIEditor.Controls
                                     migratedInlineStdioCommands |= NormalizeStdioCommand(s);
                                 }
                                 s.WorkingDirectory = s.WorkingDirectory?.Trim() ?? string.Empty;
+                                s.TargetDirectory = s.TargetDirectory?.Trim() ?? string.Empty;
                                 s.Environment = NormalizeEnvironment(s.Environment);
                                 s.Headers = NormalizeHeaders(s.Headers);
                                 s.AuthType = NormalizeAuthType(s.AuthType, s.Headers);
@@ -338,6 +340,7 @@ namespace TxtAIEditor.Controls
                 Command = server.Command,
                 ArgumentsJson = JsonSerializer.Serialize(server.Arguments),
                 WorkingDirectory = server.WorkingDirectory,
+                TargetDirectory = server.TargetDirectory,
                 EnvironmentJson = JsonSerializer.Serialize(server.Environment.ToDictionary(
                     item => item.Key,
                     item => _credentialStore.GetEnvironmentSecret(server, item.Key, item.Value),
@@ -528,6 +531,7 @@ namespace TxtAIEditor.Controls
                         NormalizeStdioCommand(item);
                     }
                     item.WorkingDirectory = item.WorkingDirectory?.Trim() ?? string.Empty;
+                    item.TargetDirectory = item.TargetDirectory?.Trim() ?? string.Empty;
                     item.Environment = NormalizeEnvironment(item.Environment);
                     if (string.IsNullOrWhiteSpace(name) || !HasValidConnectionSettings(item))
                     {
@@ -545,6 +549,7 @@ namespace TxtAIEditor.Controls
                         existing.Command = item.Command;
                         existing.Arguments = item.Arguments;
                         existing.WorkingDirectory = item.WorkingDirectory;
+                        existing.TargetDirectory = item.TargetDirectory;
                         existing.Environment = _credentialStore.StoreEnvironmentSecrets(existing, item.Environment);
                         existing.Headers = _credentialStore.StoreHeaderSecrets(existing, headers);
                         RemoveSession(existing.Id);
@@ -559,7 +564,8 @@ namespace TxtAIEditor.Controls
                             Endpoint = item.Endpoint,
                             Command = item.Command,
                             Arguments = item.Arguments,
-                            WorkingDirectory = item.WorkingDirectory
+                            WorkingDirectory = item.WorkingDirectory,
+                            TargetDirectory = item.TargetDirectory
                         };
                         server.Environment = _credentialStore.StoreEnvironmentSecrets(server, item.Environment);
                         server.Headers = _credentialStore.StoreHeaderSecrets(server, NormalizeHeaders(item.Headers));
@@ -715,7 +721,16 @@ namespace TxtAIEditor.Controls
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!_sessions.TryGetValue(server.Id, out var session) || session.Tools.Count == 0)
                 {
-                    await StartServerAsync(server, cancellationToken);
+                    using var readinessCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    readinessCancellation.CancelAfter(TimeSpan.FromSeconds(5));
+                    try
+                    {
+                        await StartServerAsync(server, readinessCancellation.Token);
+                    }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Keep the shared MCP start running, but do not block the Agent prompt indefinitely.
+                    }
                 }
             }
         }
@@ -1193,7 +1208,7 @@ namespace TxtAIEditor.Controls
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
-                StandardInputEncoding = Encoding.UTF8,
+                StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8
             };
@@ -1201,6 +1216,14 @@ namespace TxtAIEditor.Controls
             foreach (string argument in server.Arguments)
             {
                 startInfo.ArgumentList.Add(argument);
+            }
+            string targetDirectory = string.IsNullOrWhiteSpace(server.TargetDirectory)
+                ? string.Empty
+                : Path.GetFullPath(Environment.ExpandEnvironmentVariables(server.TargetDirectory.Trim().Trim('"')));
+            bool isMemoryServer = IsMemoryServer(server);
+            if (!string.IsNullOrWhiteSpace(targetDirectory) && !isMemoryServer)
+            {
+                startInfo.ArgumentList.Add(targetDirectory);
             }
 
             string workingDirectory = string.IsNullOrWhiteSpace(server.WorkingDirectory)
@@ -1215,8 +1238,33 @@ namespace TxtAIEditor.Controls
             {
                 startInfo.Environment[variable.Key] = _credentialStore.GetEnvironmentSecret(server, variable.Key, variable.Value);
             }
+            if (!string.IsNullOrWhiteSpace(targetDirectory) && isMemoryServer)
+            {
+                startInfo.Environment["MEMORY_FILE_PATH"] = Path.Combine(targetDirectory, "memory.jsonl");
+            }
 
             return startInfo;
+        }
+
+        private static bool IsMemoryServer(AgentMcpServer server)
+        {
+            const string packageName = "@modelcontextprotocol/server-memory";
+
+            static bool IsMemoryPackage(string value, string expectedPackage)
+            {
+                string normalized = value.Trim().Trim('"');
+                return normalized.Equals(expectedPackage, StringComparison.OrdinalIgnoreCase) ||
+                    normalized.StartsWith(expectedPackage + "@", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (IsMemoryPackage(server.Command, packageName) ||
+                server.Arguments.Any(argument => IsMemoryPackage(argument, packageName)))
+            {
+                return true;
+            }
+
+            string executableName = Path.GetFileNameWithoutExtension(server.Command.Trim().Trim('"'));
+            return executableName.Equals("mcp-server-memory", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<string> SendStdioRequestAsync(
@@ -1559,9 +1607,19 @@ namespace TxtAIEditor.Controls
                 .OrderBy(server => server.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(server =>
                 {
+                    bool isMemoryServer = IsMemoryServer(server);
+                    IEnumerable<string> displayArguments = isMemoryServer
+                        ? server.Arguments
+                        : server.Arguments.Append(server.TargetDirectory);
+                    string connectionArguments = string.Join(" ", displayArguments
+                        .Where(argument => !string.IsNullOrWhiteSpace(argument)));
                     string connectionDetail = AgentMcpTransportTypes.IsStdio(server.Transport)
-                        ? $"stdio: {server.Command} {string.Join(" ", server.Arguments)}".TrimEnd()
+                        ? $"stdio: {server.Command} {connectionArguments}".TrimEnd()
                         : server.Endpoint;
+                    if (isMemoryServer && !string.IsNullOrWhiteSpace(server.TargetDirectory))
+                    {
+                        connectionDetail += $" - memory: {Path.Combine(server.TargetDirectory, "memory.jsonl")}";
+                    }
                     string detail = _serverStatus.TryGetValue(server.Id, out string? status) && !string.IsNullOrWhiteSpace(status)
                         ? $"{connectionDetail} - {status}"
                         : connectionDetail;
@@ -1793,6 +1851,7 @@ namespace TxtAIEditor.Controls
                     WorkingDirectory = FirstNonEmpty(
                         TryGetStringProperty(property.Value, "cwd"),
                         TryGetStringProperty(property.Value, "workingDirectory")),
+                    TargetDirectory = TryGetStringProperty(property.Value, "targetDirectory"),
                     Environment = ReadStringDictionaryProperty(property.Value, "env"),
                     Headers = ReadHeadersProperty(property.Value)
                 });
@@ -1908,7 +1967,8 @@ namespace TxtAIEditor.Controls
                 Transport = AgentMcpTransportTypes.Normalize(input.Transport, input.Command),
                 Endpoint = input.Endpoint?.Trim() ?? string.Empty,
                 Command = input.Command?.Trim() ?? string.Empty,
-                WorkingDirectory = input.WorkingDirectory?.Trim() ?? string.Empty
+                WorkingDirectory = input.WorkingDirectory?.Trim() ?? string.Empty,
+                TargetDirectory = input.TargetDirectory?.Trim() ?? string.Empty
             };
             error = string.Empty;
 
@@ -2018,6 +2078,7 @@ namespace TxtAIEditor.Controls
             server.Command = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.Command : string.Empty;
             server.Arguments = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.Arguments : new List<string>();
             server.WorkingDirectory = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.WorkingDirectory : string.Empty;
+            server.TargetDirectory = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.TargetDirectory : string.Empty;
             server.Environment = AgentMcpTransportTypes.IsStdio(settings.Transport)
                 ? _credentialStore.StoreEnvironmentSecrets(server, settings.Environment, deleteEmptySecrets: true)
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -2398,6 +2459,7 @@ namespace TxtAIEditor.Controls
             public string Command { get; set; } = string.Empty;
             public List<string> Arguments { get; set; } = new();
             public string WorkingDirectory { get; set; } = string.Empty;
+            public string TargetDirectory { get; set; } = string.Empty;
             public Dictionary<string, string> Environment { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         }
 

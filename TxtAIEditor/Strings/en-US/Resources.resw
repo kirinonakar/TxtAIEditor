@@ -2995,16 +2995,22 @@ Plan: {0}</value>
     <value>npx -y @modelcontextprotocol/server-memory</value>
   </data>
   <data name="AgentMcpArgumentsLabel" xml:space="preserve">
-    <value>Arguments (JSON array)</value>
+    <value>Server arguments (JSON array)</value>
   </data>
   <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve">
-    <value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value>
+    <value>["-y", "@modelcontextprotocol/server-memory"]</value>
   </data>
   <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve">
-    <value>Working directory (optional)</value>
+    <value>Process working directory (cwd, optional)</value>
   </data>
   <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve">
-    <value>Uses the current workspace when empty</value>
+    <value>Runs in the current workspace when empty</value>
+  </data>
+  <data name="AgentMcpTargetDirectoryLabel" xml:space="preserve">
+    <value>Server target folder (optional)</value>
+  </data>
+  <data name="AgentMcpTargetDirectoryPlaceholder" xml:space="preserve">
+    <value>Folder used by memory, filesystem, and similar servers</value>
   </data>
   <data name="AgentMcpEnvironmentLabel" xml:space="preserve">
     <value>Environment variables (optional JSON object)</value>
@@ -3013,7 +3019,7 @@ Plan: {0}</value>
     <value>{"KEY": "value"}</value>
   </data>
   <data name="AgentMcpStdioInfo" xml:space="preserve">
-    <value>The command runs as a local process. Example: npx with ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value>
+    <value>If Command contains the full command line, leave Server arguments as []. cwd is the process launch location. The target folder becomes memory.jsonl for the memory server and the final positional argument for other servers.</value>
   </data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key Header Name</value>

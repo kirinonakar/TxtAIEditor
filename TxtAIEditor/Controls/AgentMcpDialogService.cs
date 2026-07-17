@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         public string Command { get; set; } = string.Empty;
         public string ArgumentsJson { get; set; } = "[]";
         public string WorkingDirectory { get; set; } = string.Empty;
+        public string TargetDirectory { get; set; } = string.Empty;
         public string EnvironmentJson { get; set; } = "{}";
         public string AuthType { get; set; } = AuthTypeNone;
         public string HeaderName { get; set; } = string.Empty;
@@ -227,11 +228,11 @@ namespace TxtAIEditor.Controls
             var commandLabel = CreateLabel(_getString("AgentMcpCommandLabel", "실행 명령 (전체 명령줄 입력 가능)"));
             var commandBox = CreateTextBox(_getString("AgentMcpCommandPlaceholder", "npx -y @modelcontextprotocol/server-memory"));
             commandBox.Text = initial.Command;
-            var argumentsLabel = CreateLabel(_getString("AgentMcpArgumentsLabel", "인수 (JSON 배열)"));
-            var argumentsBox = CreateJsonTextBox(_getString("AgentMcpArgumentsPlaceholder", "[\"-y\", \"@modelcontextprotocol/server-filesystem\", \"D:\\\\workspace\"]"));
+            var argumentsLabel = CreateLabel(_getString("AgentMcpArgumentsLabel", "서버 인수 (JSON 배열)"));
+            var argumentsBox = CreateJsonTextBox(_getString("AgentMcpArgumentsPlaceholder", "[\"-y\", \"@modelcontextprotocol/server-memory\"]"));
             argumentsBox.Text = initial.ArgumentsJson;
-            var workingDirectoryLabel = CreateLabel(_getString("AgentMcpWorkingDirectoryLabel", "작업 폴더 (선택)"));
-            var workingDirectoryBox = CreateTextBox(_getString("AgentMcpWorkingDirectoryPlaceholder", "비워두면 현재 작업 영역 사용"));
+            var workingDirectoryLabel = CreateLabel(_getString("AgentMcpWorkingDirectoryLabel", "프로세스 실행 폴더 (cwd, 선택)"));
+            var workingDirectoryBox = CreateTextBox(_getString("AgentMcpWorkingDirectoryPlaceholder", "비워두면 현재 작업 영역에서 실행"));
             workingDirectoryBox.Text = initial.WorkingDirectory;
             var workingDirectoryBrowseButton = CreateBrowseButton();
             workingDirectoryBrowseButton.Click += async (_, _) =>
@@ -250,12 +251,32 @@ namespace TxtAIEditor.Controls
                 }
             };
             var workingDirectoryRow = CreatePickerRow(workingDirectoryBox, workingDirectoryBrowseButton);
+            var targetDirectoryLabel = CreateLabel(_getString("AgentMcpTargetDirectoryLabel", "서버 대상 폴더 (선택)"));
+            var targetDirectoryBox = CreateTextBox(_getString("AgentMcpTargetDirectoryPlaceholder", "memory, filesystem 서버 등이 사용할 폴더"));
+            targetDirectoryBox.Text = initial.TargetDirectory;
+            var targetDirectoryBrowseButton = CreateBrowseButton();
+            targetDirectoryBrowseButton.Click += async (_, _) =>
+            {
+                var picker = new FolderPicker
+                {
+                    SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+                };
+                _initializePickerWindow(picker);
+                picker.FileTypeFilter.Add("*");
+
+                var folder = await picker.PickSingleFolderAsync();
+                if (folder != null)
+                {
+                    targetDirectoryBox.Text = folder.Path;
+                }
+            };
+            var targetDirectoryRow = CreatePickerRow(targetDirectoryBox, targetDirectoryBrowseButton);
             var environmentLabel = CreateLabel(_getString("AgentMcpEnvironmentLabel", "환경 변수 (JSON 객체, 선택)"));
             var environmentBox = CreateJsonTextBox(_getString("AgentMcpEnvironmentPlaceholder", "{\"KEY\": \"value\"}"));
             environmentBox.Text = initial.EnvironmentJson;
             var stdioInfo = CreateInfoText(_getString(
                 "AgentMcpStdioInfo",
-                "명령은 로컬 프로세스로 실행됩니다. 예: npx와 JSON 인수 [\"-y\", \"@modelcontextprotocol/server-filesystem\", \"D:\\\\workspace\"]"));
+                "명령 칸에 전체 명령줄을 입력했다면 서버 인수는 []로 두세요. cwd는 프로세스 실행 위치입니다. 대상 폴더는 memory 서버에서 memory.jsonl 경로로, 그 외 서버에서는 마지막 위치 인수로 전달됩니다."));
             var authTypeBox = CreateAuthTypeComboBox(initial.AuthType);
             var authTypeLabel = CreateLabel(_getString("AgentMcpAuthTypeLabel", "인증 방식"));
             var headerNameLabel = CreateLabel(_getString("AgentMcpHeaderNameLabel", "API Key Header 이름"));
@@ -294,6 +315,8 @@ namespace TxtAIEditor.Controls
                 SetVisible(argumentsBox, isStdio);
                 SetVisible(workingDirectoryLabel, isStdio);
                 SetVisible(workingDirectoryRow, isStdio);
+                SetVisible(targetDirectoryLabel, isStdio);
+                SetVisible(targetDirectoryRow, isStdio);
                 SetVisible(environmentLabel, isStdio);
                 SetVisible(environmentBox, isStdio);
                 SetVisible(stdioInfo, isStdio);
@@ -337,6 +360,8 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(argumentsBox);
             stack.Children.Add(workingDirectoryLabel);
             stack.Children.Add(workingDirectoryRow);
+            stack.Children.Add(targetDirectoryLabel);
+            stack.Children.Add(targetDirectoryRow);
             stack.Children.Add(environmentLabel);
             stack.Children.Add(environmentBox);
             stack.Children.Add(stdioInfo);
@@ -360,10 +385,21 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(oauthScopesBox);
             stack.Children.Add(CreateInfoText(_getString("AgentMcpCredentialInfo", "API Key, OAuth Client Secret, OAuth 토큰, stdio 환경 변수는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
 
+            double availableHeight = _agentPane.XamlRoot?.Size.Height ?? 720;
+            double contentHeight = Math.Clamp(availableHeight - 220, 360, 680);
+            var scrollViewer = new ScrollViewer
+            {
+                Content = stack,
+                Height = contentHeight,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollMode = ScrollMode.Auto
+            };
+
             var dialog = new ContentDialog
             {
                 Title = title,
-                Content = stack,
+                Content = scrollViewer,
                 PrimaryButtonText = primaryButtonText,
                 CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
                 DefaultButton = ContentDialogButton.None,
@@ -385,6 +421,7 @@ namespace TxtAIEditor.Controls
                 Command = commandBox.Text?.Trim() ?? string.Empty,
                 ArgumentsJson = argumentsBox.Text?.Trim() ?? "[]",
                 WorkingDirectory = workingDirectoryBox.Text?.Trim() ?? string.Empty,
+                TargetDirectory = targetDirectoryBox.Text?.Trim() ?? string.Empty,
                 EnvironmentJson = environmentBox.Text?.Trim() ?? "{}",
                 AuthType = GetSelectedAuthType(authTypeBox),
                 HeaderName = headerNameBox.Text,

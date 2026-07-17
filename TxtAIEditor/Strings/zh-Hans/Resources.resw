@@ -2984,13 +2984,15 @@
   <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（本地进程）</value></data>
   <data name="AgentMcpCommandLabel" xml:space="preserve"><value>执行命令（支持完整命令行）</value></data>
   <data name="AgentMcpCommandPlaceholder" xml:space="preserve"><value>npx -y @modelcontextprotocol/server-memory</value></data>
-  <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>参数（JSON 数组）</value></data>
-  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
-  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>工作目录（可选）</value></data>
-  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve"><value>留空时使用当前工作区</value></data>
+  <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>服务器参数（JSON 数组）</value></data>
+  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-memory"]</value></data>
+  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>进程工作目录（cwd，可选）</value></data>
+  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve"><value>留空时在当前工作区中运行</value></data>
+  <data name="AgentMcpTargetDirectoryLabel" xml:space="preserve"><value>服务器目标文件夹（可选）</value></data>
+  <data name="AgentMcpTargetDirectoryPlaceholder" xml:space="preserve"><value>memory、filesystem 等服务器使用的文件夹</value></data>
   <data name="AgentMcpEnvironmentLabel" xml:space="preserve"><value>环境变量（可选 JSON 对象）</value></data>
   <data name="AgentMcpEnvironmentPlaceholder" xml:space="preserve"><value>{"KEY": "value"}</value></data>
-  <data name="AgentMcpStdioInfo" xml:space="preserve"><value>命令将作为本地进程运行。示例：npx 与 ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
+  <data name="AgentMcpStdioInfo" xml:space="preserve"><value>如果命令中已填写完整命令行，请将服务器参数留为 []。cwd 是进程启动位置。目标文件夹在 memory 服务器中映射为 memory.jsonl，在其他服务器中作为最后一个位置参数传递。</value></data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key 标头名称</value>
   </data>

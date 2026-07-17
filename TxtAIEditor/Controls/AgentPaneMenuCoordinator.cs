@@ -196,7 +196,10 @@ namespace TxtAIEditor.Controls
                 ToolTipService.SetToolTip(selectBtn, itemTooltip);
 
                 string currentName = item.Name;
-                selectBtn.Click += (_, _) => _callbacks.AgentMcpToggled?.Invoke(currentName);
+                selectBtn.Click += (_, _) =>
+                {
+                    _callbacks.AgentMcpToggled?.Invoke(currentName);
+                };
                 Grid.SetColumn(selectBtn, 0);
                 rowGrid.Children.Add(selectBtn);
 

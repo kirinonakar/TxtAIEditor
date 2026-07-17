@@ -2984,13 +2984,15 @@
   <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（本機處理程序）</value></data>
   <data name="AgentMcpCommandLabel" xml:space="preserve"><value>執行命令（支援完整命令列）</value></data>
   <data name="AgentMcpCommandPlaceholder" xml:space="preserve"><value>npx -y @modelcontextprotocol/server-memory</value></data>
-  <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>引數（JSON 陣列）</value></data>
-  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
-  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>工作目錄（選用）</value></data>
-  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve"><value>留空時使用目前工作區</value></data>
+  <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>伺服器引數（JSON 陣列）</value></data>
+  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-memory"]</value></data>
+  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>處理程序工作目錄（cwd，選用）</value></data>
+  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve"><value>留空時在目前工作區中執行</value></data>
+  <data name="AgentMcpTargetDirectoryLabel" xml:space="preserve"><value>伺服器目標資料夾（選用）</value></data>
+  <data name="AgentMcpTargetDirectoryPlaceholder" xml:space="preserve"><value>memory、filesystem 等伺服器使用的資料夾</value></data>
   <data name="AgentMcpEnvironmentLabel" xml:space="preserve"><value>環境變數（選用 JSON 物件）</value></data>
   <data name="AgentMcpEnvironmentPlaceholder" xml:space="preserve"><value>{"KEY": "value"}</value></data>
-  <data name="AgentMcpStdioInfo" xml:space="preserve"><value>命令會以本機處理程序執行。範例：npx 與 ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
+  <data name="AgentMcpStdioInfo" xml:space="preserve"><value>如果命令已填入完整命令列，請將伺服器引數保留為 []。cwd 是處理程序啟動位置。目標資料夾在 memory 伺服器中對應為 memory.jsonl，在其他伺服器中作為最後一個位置引數傳遞。</value></data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key 標頭名稱</value>
   </data>
