@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -20,7 +21,12 @@ namespace TxtAIEditor.Controls
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Name { get; set; } = string.Empty;
+        public string Transport { get; set; } = AgentMcpTransportTypes.Http;
         public string Endpoint { get; set; } = string.Empty;
+        public string Command { get; set; } = string.Empty;
+        public List<string> Arguments { get; set; } = new();
+        public string WorkingDirectory { get; set; } = string.Empty;
+        public Dictionary<string, string> Environment { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string AuthType { get; set; } = string.Empty;
         public string OAuthAccessToken { get; set; } = string.Empty;
         public string OAuthRefreshToken { get; set; } = string.Empty;
@@ -72,6 +78,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly Action _contextChanged;
+        private readonly Func<string> _workspaceRootProvider;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
         private readonly AgentMcpComfyUiTool _comfyUiTool;
@@ -106,11 +113,13 @@ namespace TxtAIEditor.Controls
             _credentialStore = new AgentMcpCredentialStore(credentialService);
             _oauthService = new AgentMcpOAuthService(_credentialStore, _getString, SaveAsync);
             _contextChanged = contextChanged;
+            _workspaceRootProvider = workspaceRootProvider;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
             _dialogService = new AgentMcpDialogService(_agentPane, _initializePickerWindow, _getString, _beforeDialog, _afterDialog);
             _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, () => _settingsService.CurrentSettings, fileModifiedAsync);
             _browserUseTool = new AgentMcpBrowserUseTool(() => _settingsService.CurrentSettings, addImageAttachment);
+            _agentPane.Unloaded += (_, _) => DisposeAllSessions();
 
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
@@ -121,6 +130,7 @@ namespace TxtAIEditor.Controls
         {
             bool migratedPlaintextHeaders = false;
             bool migratedPlaintextOAuth = false;
+            bool migratedPlaintextEnvironment = false;
             try
             {
                 if (File.Exists(_mcpFilePath))
@@ -131,7 +141,7 @@ namespace TxtAIEditor.Controls
                     {
                         _servers.Clear();
                         _servers.AddRange(loaded
-                            .Where(s => !string.IsNullOrWhiteSpace(s.Name) && !string.IsNullOrWhiteSpace(s.Endpoint))
+                            .Where(s => !string.IsNullOrWhiteSpace(s.Name) && HasValidConnectionSettings(s))
                             .Select(s =>
                             {
                                 if (string.IsNullOrWhiteSpace(s.Id))
@@ -140,15 +150,22 @@ namespace TxtAIEditor.Controls
                                 }
 
                                 s.Name = s.Name.Trim();
-                                s.Endpoint = s.Endpoint.Trim();
+                                s.Transport = AgentMcpTransportTypes.Normalize(s.Transport, s.Command);
+                                s.Endpoint = s.Endpoint?.Trim() ?? string.Empty;
+                                s.Command = s.Command?.Trim() ?? string.Empty;
+                                s.Arguments = NormalizeArguments(s.Arguments);
+                                s.WorkingDirectory = s.WorkingDirectory?.Trim() ?? string.Empty;
+                                s.Environment = NormalizeEnvironment(s.Environment);
                                 s.Headers = NormalizeHeaders(s.Headers);
                                 s.AuthType = NormalizeAuthType(s.AuthType, s.Headers);
                                 migratedPlaintextHeaders |= s.Headers.Values.Any(value => !string.IsNullOrWhiteSpace(value));
                                 migratedPlaintextOAuth |= !string.IsNullOrWhiteSpace(s.OAuthAccessToken) ||
                                     !string.IsNullOrWhiteSpace(s.OAuthRefreshToken) ||
                                     !string.IsNullOrWhiteSpace(s.OAuthClientSecret);
+                                migratedPlaintextEnvironment |= s.Environment.Values.Any(value => !string.IsNullOrEmpty(value));
                                 _credentialStore.MoveInlineHeaderValuesToCredential(s);
                                 _credentialStore.MoveInlineOAuthSecretsToCredential(s);
+                                _credentialStore.MoveInlineEnvironmentValuesToCredential(s);
                                 return s;
                             }));
                     }
@@ -163,7 +180,7 @@ namespace TxtAIEditor.Controls
                 !_comfyUiTool.IsServerId(id) &&
                 !_browserUseTool.IsServerId(id) &&
                 _servers.All(server => !server.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
-            if (migratedPlaintextHeaders || migratedPlaintextOAuth)
+            if (migratedPlaintextHeaders || migratedPlaintextOAuth || migratedPlaintextEnvironment)
             {
                 await SaveAsync();
                 return;
@@ -182,24 +199,23 @@ namespace TxtAIEditor.Controls
             }
 
             string name = input.Name.Trim();
-            string endpoint = input.Endpoint.Trim();
-            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(endpoint))
+            if (string.IsNullOrWhiteSpace(name))
             {
                 _showError(
                     _getString("AgentMcpAddErrorTitle", "MCP 추가 오류"),
-                    _getString("AgentMcpNameEndpointRequired", "MCP 이름과 주소를 입력해주세요."));
+                    _getString("AgentMcpNameRequired", "MCP 이름을 입력해주세요."));
                 return;
             }
 
-            if (!IsValidHttpEndpoint(endpoint))
+            if (!TryParseConnectionInput(input, out var connection, out string connectionError))
             {
                 _showError(
                     _getString("AgentMcpAddErrorTitle", "MCP 추가 오류"),
-                    _getString("AgentMcpEndpointInvalid", "MCP 주소는 http 또는 https URL이어야 합니다."));
+                    connectionError);
                 return;
             }
 
-            string authType = input.AuthType;
+            string authType = AgentMcpTransportTypes.IsStdio(connection.Transport) ? AuthTypeNone : input.AuthType;
             if (!TryBuildAuthSettings(
                 authType,
                 input.HeaderName,
@@ -224,14 +240,15 @@ namespace TxtAIEditor.Controls
             if (existing != null)
             {
                 _credentialStore.DeleteCredentialsForRemovedHeaders(existing, authSettings.Headers);
+                _credentialStore.DeleteCredentialsForRemovedEnvironment(existing, connection.Environment);
                 if (!IsOAuthAuthType(existing.AuthType) || !IsOAuthAuthType(authType))
                 {
                     _credentialStore.DeleteOAuthCredentials(existing);
                 }
 
-                existing.Endpoint = endpoint;
+                ApplyConnectionSettings(existing, connection);
                 ApplyAuthSettings(existing, authSettings, deleteEmptySecrets: true);
-                _sessions.Remove(existing.Id);
+                RemoveSession(existing.Id);
                 _serverStatus.Remove(existing.Id);
                 savedServer = existing;
             }
@@ -239,9 +256,9 @@ namespace TxtAIEditor.Controls
             {
                 var server = new AgentMcpServer
                 {
-                    Name = name,
-                    Endpoint = endpoint,
+                    Name = name
                 };
+                ApplyConnectionSettings(server, connection);
                 ApplyAuthSettings(server, authSettings, deleteEmptySecrets: true);
                 _servers.Add(server);
                 savedServer = server;
@@ -298,7 +315,15 @@ namespace TxtAIEditor.Controls
             AgentMcpDialogInput? input = await _dialogService.ShowEditAsync(new AgentMcpDialogInput
             {
                 Name = server.Name,
+                Transport = server.Transport,
                 Endpoint = server.Endpoint,
+                Command = server.Command,
+                ArgumentsJson = JsonSerializer.Serialize(server.Arguments),
+                WorkingDirectory = server.WorkingDirectory,
+                EnvironmentJson = JsonSerializer.Serialize(server.Environment.ToDictionary(
+                    item => item.Key,
+                    item => _credentialStore.GetEnvironmentSecret(server, item.Key, item.Value),
+                    StringComparer.OrdinalIgnoreCase)),
                 AuthType = server.AuthType,
                 HeaderName = existingHeader.Key ?? string.Empty,
                 ApiKey = string.IsNullOrWhiteSpace(existingHeader.Key)
@@ -317,24 +342,23 @@ namespace TxtAIEditor.Controls
             }
 
             string name = input.Name.Trim();
-            string endpoint = input.Endpoint.Trim();
-            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(endpoint))
+            if (string.IsNullOrWhiteSpace(name))
             {
                 _showError(
                     _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"),
-                    _getString("AgentMcpNameEndpointRequired", "MCP 이름과 주소를 입력해주세요."));
+                    _getString("AgentMcpNameRequired", "MCP 이름을 입력해주세요."));
                 return;
             }
 
-            if (!IsValidHttpEndpoint(endpoint))
+            if (!TryParseConnectionInput(input, out var connection, out string connectionError))
             {
                 _showError(
                     _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"),
-                    _getString("AgentMcpEndpointInvalid", "MCP 주소는 http 또는 https URL이어야 합니다."));
+                    connectionError);
                 return;
             }
 
-            string authType = input.AuthType;
+            string authType = AgentMcpTransportTypes.IsStdio(connection.Transport) ? AuthTypeNone : input.AuthType;
             if (!TryBuildAuthSettings(
                 authType,
                 input.HeaderName,
@@ -362,20 +386,21 @@ namespace TxtAIEditor.Controls
                 _credentialStore.DeleteAllCredentials(duplicate);
                 _servers.Remove(duplicate);
                 _selectedServerIds.Remove(duplicate.Id);
-                _sessions.Remove(duplicate.Id);
+                RemoveSession(duplicate.Id);
                 _serverStatus.Remove(duplicate.Id);
             }
 
             server.Name = name;
-            server.Endpoint = endpoint;
             _credentialStore.DeleteCredentialsForRemovedHeaders(server, authSettings.Headers);
+            _credentialStore.DeleteCredentialsForRemovedEnvironment(server, connection.Environment);
             if (!IsOAuthAuthType(server.AuthType) || !IsOAuthAuthType(authType))
             {
                 _credentialStore.DeleteOAuthCredentials(server);
             }
 
+            ApplyConnectionSettings(server, connection);
             ApplyAuthSettings(server, authSettings, deleteEmptySecrets: true);
-            _sessions.Remove(server.Id);
+            RemoveSession(server.Id);
             _serverStatus.Remove(server.Id);
             await SaveAsync();
             await _oauthService.RunInitialLoginIfNeededAsync(server, _getString("AgentMcpEditErrorTitle", "MCP 수정 오류"), _showError);
@@ -476,10 +501,13 @@ namespace TxtAIEditor.Controls
                 foreach (var item in imported)
                 {
                     string name = item.Name?.Trim() ?? string.Empty;
-                    string endpoint = item.Endpoint?.Trim() ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(name) ||
-                        string.IsNullOrWhiteSpace(endpoint) ||
-                        !IsValidHttpEndpoint(endpoint))
+                    item.Transport = AgentMcpTransportTypes.Normalize(item.Transport, item.Command);
+                    item.Endpoint = item.Endpoint?.Trim() ?? string.Empty;
+                    item.Command = item.Command?.Trim() ?? string.Empty;
+                    item.Arguments = NormalizeArguments(item.Arguments);
+                    item.WorkingDirectory = item.WorkingDirectory?.Trim() ?? string.Empty;
+                    item.Environment = NormalizeEnvironment(item.Environment);
+                    if (string.IsNullOrWhiteSpace(name) || !HasValidConnectionSettings(item))
                     {
                         continue;
                     }
@@ -489,9 +517,15 @@ namespace TxtAIEditor.Controls
                     {
                         var headers = NormalizeHeaders(item.Headers);
                         _credentialStore.DeleteCredentialsForRemovedHeaders(existing, headers);
-                        existing.Endpoint = endpoint;
+                        _credentialStore.DeleteCredentialsForRemovedEnvironment(existing, item.Environment);
+                        existing.Transport = item.Transport;
+                        existing.Endpoint = item.Endpoint;
+                        existing.Command = item.Command;
+                        existing.Arguments = item.Arguments;
+                        existing.WorkingDirectory = item.WorkingDirectory;
+                        existing.Environment = _credentialStore.StoreEnvironmentSecrets(existing, item.Environment);
                         existing.Headers = _credentialStore.StoreHeaderSecrets(existing, headers);
-                        _sessions.Remove(existing.Id);
+                        RemoveSession(existing.Id);
                         _serverStatus.Remove(existing.Id);
                     }
                     else
@@ -499,8 +533,13 @@ namespace TxtAIEditor.Controls
                         var server = new AgentMcpServer
                         {
                             Name = name,
-                            Endpoint = endpoint
+                            Transport = item.Transport,
+                            Endpoint = item.Endpoint,
+                            Command = item.Command,
+                            Arguments = item.Arguments,
+                            WorkingDirectory = item.WorkingDirectory
                         };
+                        server.Environment = _credentialStore.StoreEnvironmentSecrets(server, item.Environment);
                         server.Headers = _credentialStore.StoreHeaderSecrets(server, NormalizeHeaders(item.Headers));
                         _servers.Add(server);
                     }
@@ -557,7 +596,7 @@ namespace TxtAIEditor.Controls
             if (!_selectedServerIds.Add(server.Id))
             {
                 _selectedServerIds.Remove(server.Id);
-                _sessions.Remove(server.Id);
+                RemoveSession(server.Id);
                 _serverStatus.Remove(server.Id);
                 RebuildAliases();
                 UpdateUI();
@@ -584,7 +623,7 @@ namespace TxtAIEditor.Controls
             _credentialStore.DeleteAllCredentials(server);
             _servers.Remove(server);
             _selectedServerIds.Remove(server.Id);
-            _sessions.Remove(server.Id);
+            RemoveSession(server.Id);
             _serverStatus.Remove(server.Id);
             await SaveAsync();
         }
@@ -614,7 +653,7 @@ namespace TxtAIEditor.Controls
             }
 
             _selectedServerIds.Remove(server.Id);
-            _sessions.Remove(server.Id);
+            RemoveSession(server.Id);
             _serverStatus.Remove(server.Id);
             RebuildAliases();
             UpdateUI();
@@ -879,6 +918,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
+                RemoveSession(server.Id);
                 _serverStatus[server.Id] = string.Format(
                     _getString("AgentMcpStatusFailedFormat", "연결 실패: {0}"),
                     ex.Message);
@@ -893,12 +933,20 @@ namespace TxtAIEditor.Controls
             CancellationToken cancellationToken,
             bool forceRefresh = false)
         {
-            if (!forceRefresh && _sessions.TryGetValue(server.Id, out var existing) && existing.Initialized)
+            if (!forceRefresh &&
+                _sessions.TryGetValue(server.Id, out var existing) &&
+                existing.Initialized &&
+                (!AgentMcpTransportTypes.IsStdio(server.Transport) || existing.Process?.HasExited == false))
             {
                 return existing;
             }
 
+            RemoveSession(server.Id);
             var session = new AgentMcpSession();
+            if (AgentMcpTransportTypes.IsStdio(server.Transport))
+            {
+                StartStdioProcess(server, session);
+            }
             _sessions[server.Id] = session;
 
             using JsonDocument initializeResponse = await SendJsonRpcAsync(
@@ -959,6 +1007,12 @@ namespace TxtAIEditor.Controls
                 ["method"] = method
             };
 
+            if (AgentMcpTransportTypes.IsStdio(server.Transport))
+            {
+                await WriteStdioMessageAsync(server, session, payload, cancellationToken);
+                return;
+            }
+
             try
             {
                 await PostAsync(server, session, payload, cancellationToken);
@@ -975,6 +1029,11 @@ namespace TxtAIEditor.Controls
             object payload,
             CancellationToken cancellationToken)
         {
+            if (AgentMcpTransportTypes.IsStdio(server.Transport))
+            {
+                return await SendStdioRequestAsync(server, session, payload, cancellationToken);
+            }
+
             string json = JsonSerializer.Serialize(payload);
             using var request = new HttpRequestMessage(HttpMethod.Post, server.Endpoint)
             {
@@ -1020,6 +1079,268 @@ namespace TxtAIEditor.Controls
             }
 
             return body;
+        }
+
+        private void StartStdioProcess(AgentMcpServer server, AgentMcpSession session)
+        {
+            if (string.IsNullOrWhiteSpace(server.Command))
+            {
+                throw new InvalidOperationException(_getString("AgentMcpCommandRequired", "stdio 실행 명령을 입력해주세요."));
+            }
+
+            var startInfo = CreateStdioStartInfo(server);
+            var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+            try
+            {
+                if (!process.Start())
+                {
+                    throw new InvalidOperationException($"Failed to start MCP command: {server.Command}");
+                }
+            }
+            catch
+            {
+                process.Dispose();
+                throw;
+            }
+
+            session.Process = process;
+            session.StandardInput = process.StandardInput;
+            session.StandardOutput = process.StandardOutput;
+            session.StandardInput.AutoFlush = true;
+            session.StderrPump = PumpStderrAsync(session, process.StandardError);
+        }
+
+        private ProcessStartInfo CreateStdioStartInfo(AgentMcpServer server)
+        {
+            string command = ResolveCommand(server.Command);
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = command,
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardInputEncoding = Encoding.UTF8,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            foreach (string argument in server.Arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            string workingDirectory = string.IsNullOrWhiteSpace(server.WorkingDirectory)
+                ? _workspaceRootProvider()
+                : Environment.ExpandEnvironmentVariables(server.WorkingDirectory.Trim().Trim('"'));
+            if (!string.IsNullOrWhiteSpace(workingDirectory))
+            {
+                startInfo.WorkingDirectory = Path.GetFullPath(workingDirectory);
+            }
+
+            foreach (var variable in server.Environment)
+            {
+                startInfo.Environment[variable.Key] = _credentialStore.GetEnvironmentSecret(server, variable.Key, variable.Value);
+            }
+
+            return startInfo;
+        }
+
+        private async Task<string> SendStdioRequestAsync(
+            AgentMcpServer server,
+            AgentMcpSession session,
+            object payload,
+            CancellationToken cancellationToken)
+        {
+            if (session.Process == null ||
+                session.StandardInput == null ||
+                session.StandardOutput == null ||
+                session.Process.HasExited)
+            {
+                throw new InvalidOperationException("MCP stdio process is not running.");
+            }
+
+            int expectedId = GetPayloadId(payload);
+            await session.StdioLock.WaitAsync(cancellationToken);
+            try
+            {
+                await WriteStdioMessageCoreAsync(session, payload, cancellationToken);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromMinutes(2));
+                while (true)
+                {
+                    string? line;
+                    try
+                    {
+                        line = await session.StandardOutput.ReadLineAsync(timeout.Token);
+                    }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        throw new TimeoutException("MCP stdio server did not respond within 2 minutes.");
+                    }
+
+                    if (line == null)
+                    {
+                        throw new InvalidOperationException(BuildStdioExitMessage(server, session));
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        continue;
+                    }
+
+                    JsonDocument response;
+                    try
+                    {
+                        response = JsonDocument.Parse(line);
+                    }
+                    catch (JsonException)
+                    {
+                        throw new InvalidOperationException($"MCP stdio server wrote invalid JSON to stdout: {line}");
+                    }
+
+                    if (RpcIdMatches(response.RootElement, expectedId))
+                    {
+                        return response.RootElement.GetRawText();
+                    }
+
+                    response.Dispose();
+                }
+            }
+            finally
+            {
+                session.StdioLock.Release();
+            }
+        }
+
+        private async Task WriteStdioMessageAsync(
+            AgentMcpServer server,
+            AgentMcpSession session,
+            object payload,
+            CancellationToken cancellationToken)
+        {
+            if (session.Process == null || session.StandardInput == null || session.Process.HasExited)
+            {
+                throw new InvalidOperationException(BuildStdioExitMessage(server, session));
+            }
+
+            await session.StdioLock.WaitAsync(cancellationToken);
+            try
+            {
+                await WriteStdioMessageCoreAsync(session, payload, cancellationToken);
+            }
+            finally
+            {
+                session.StdioLock.Release();
+            }
+        }
+
+        private static async Task WriteStdioMessageCoreAsync(
+            AgentMcpSession session,
+            object payload,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string json = JsonSerializer.Serialize(payload);
+            await session.StandardInput!.WriteLineAsync(json.AsMemory(), cancellationToken);
+            await session.StandardInput.FlushAsync(cancellationToken);
+        }
+
+        private static async Task PumpStderrAsync(AgentMcpSession session, StreamReader reader)
+        {
+            try
+            {
+                while (await reader.ReadLineAsync() is string line)
+                {
+                    lock (session.StderrLines)
+                    {
+                        session.StderrLines.Enqueue(line);
+                        while (session.StderrLines.Count > 20)
+                        {
+                            session.StderrLines.Dequeue();
+                        }
+                    }
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        private static int GetPayloadId(object payload)
+        {
+            using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+            if (document.RootElement.TryGetProperty("id", out var id) && id.TryGetInt32(out int value))
+            {
+                return value;
+            }
+
+            throw new InvalidOperationException("MCP JSON-RPC request has no numeric id.");
+        }
+
+        private static bool RpcIdMatches(JsonElement element, int expectedId)
+        {
+            return element.ValueKind == JsonValueKind.Object &&
+                element.TryGetProperty("id", out var id) &&
+                id.ValueKind == JsonValueKind.Number &&
+                id.TryGetInt32(out int value) &&
+                value == expectedId;
+        }
+
+        private static string ResolveCommand(string command)
+        {
+            command = Environment.ExpandEnvironmentVariables(command.Trim().Trim('"'));
+            if (Path.IsPathRooted(command) || command.Contains(Path.DirectorySeparatorChar) || command.Contains(Path.AltDirectorySeparatorChar))
+            {
+                return command;
+            }
+
+            string[] extensions = (Environment.GetEnvironmentVariable("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                string normalizedDirectory = directory.Trim('"');
+                string directCandidate = Path.Combine(normalizedDirectory, command);
+                if (File.Exists(directCandidate))
+                {
+                    return directCandidate;
+                }
+
+                if (!Path.HasExtension(command))
+                {
+                    foreach (string extension in extensions)
+                    {
+                        string candidate = directCandidate + extension.ToLowerInvariant();
+                        if (File.Exists(candidate))
+                        {
+                            return candidate;
+                        }
+                    }
+                }
+            }
+
+            return command;
+        }
+
+        private static string BuildStdioExitMessage(AgentMcpServer server, AgentMcpSession session)
+        {
+            string stderr;
+            lock (session.StderrLines)
+            {
+                stderr = string.Join(Environment.NewLine, session.StderrLines);
+            }
+
+            string exit = session.Process?.HasExited == true
+                ? $" (exit code {session.Process.ExitCode})"
+                : string.Empty;
+            return string.IsNullOrWhiteSpace(stderr)
+                ? $"MCP stdio process '{server.Command}' closed{exit}."
+                : $"MCP stdio process '{server.Command}' closed{exit}: {stderr}";
         }
 
         private static JsonDocument ParseRpcResponse(string responseText)
@@ -1119,6 +1440,24 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private void RemoveSession(string serverId)
+        {
+            if (_sessions.Remove(serverId, out var session))
+            {
+                session.Dispose();
+            }
+        }
+
+        private void DisposeAllSessions()
+        {
+            foreach (var session in _sessions.Values)
+            {
+                session.Dispose();
+            }
+
+            _sessions.Clear();
+        }
+
         private void UpdateUI()
         {
             var items = new List<AgentMcpItem>
@@ -1131,10 +1470,13 @@ namespace TxtAIEditor.Controls
                 .OrderBy(server => server.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(server =>
                 {
-                    string detail = _serverStatus.TryGetValue(server.Id, out string? status) && !string.IsNullOrWhiteSpace(status)
-                        ? $"{server.Endpoint} - {status}"
+                    string connectionDetail = AgentMcpTransportTypes.IsStdio(server.Transport)
+                        ? $"stdio: {server.Command} {string.Join(" ", server.Arguments)}".TrimEnd()
                         : server.Endpoint;
-                    if (server.Headers.Count > 0)
+                    string detail = _serverStatus.TryGetValue(server.Id, out string? status) && !string.IsNullOrWhiteSpace(status)
+                        ? $"{connectionDetail} - {status}"
+                        : connectionDetail;
+                    if (!AgentMcpTransportTypes.IsStdio(server.Transport) && server.Headers.Count > 0)
                     {
                         detail += $" - headers: {string.Join(", ", server.Headers.Keys)}";
                     }
@@ -1142,7 +1484,7 @@ namespace TxtAIEditor.Controls
                     return new AgentMcpItem
                     {
                         Name = server.Name,
-                        Endpoint = server.Endpoint,
+                        Endpoint = connectionDetail,
                         Detail = detail,
                         IsSelected = _selectedServerIds.Contains(server.Id)
                     };
@@ -1348,10 +1690,21 @@ namespace TxtAIEditor.Controls
                     endpoint = TryGetStringProperty(property.Value, "endpoint");
                 }
 
+                string command = TryGetStringProperty(property.Value, "command");
+
                 servers.Add(new AgentMcpServer
                 {
                     Name = property.Name,
+                    Transport = AgentMcpTransportTypes.Normalize(
+                        TryGetStringProperty(property.Value, "transport"),
+                        command),
                     Endpoint = endpoint,
+                    Command = command,
+                    Arguments = ReadStringArrayProperty(property.Value, "args"),
+                    WorkingDirectory = FirstNonEmpty(
+                        TryGetStringProperty(property.Value, "cwd"),
+                        TryGetStringProperty(property.Value, "workingDirectory")),
+                    Environment = ReadStringDictionaryProperty(property.Value, "env"),
                     Headers = ReadHeadersProperty(property.Value)
                 });
             }
@@ -1361,27 +1714,53 @@ namespace TxtAIEditor.Controls
 
         private static Dictionary<string, string> ReadHeadersProperty(JsonElement element)
         {
+            return ReadStringDictionaryProperty(element, "headers");
+        }
+
+        private static Dictionary<string, string> ReadStringDictionaryProperty(JsonElement element, string propertyName)
+        {
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (element.ValueKind != JsonValueKind.Object ||
-                !element.TryGetProperty("headers", out var headersElement) ||
-                headersElement.ValueKind != JsonValueKind.Object)
+                !element.TryGetProperty(propertyName, out var objectElement) ||
+                objectElement.ValueKind != JsonValueKind.Object)
             {
-                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                return values;
             }
 
-            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var property in headersElement.EnumerateObject())
+            foreach (var property in objectElement.EnumerateObject())
             {
-                string key = property.Name?.Trim() ?? string.Empty;
+                string key = property.Name.Trim();
                 string value = property.Value.ValueKind == JsonValueKind.String
                     ? property.Value.GetString() ?? string.Empty
                     : property.Value.GetRawText();
                 if (!string.IsNullOrWhiteSpace(key))
                 {
-                    headers[key] = value.Trim();
+                    values[key] = value;
                 }
             }
 
-            return headers;
+            return values;
+        }
+
+        private static List<string> ReadStringArrayProperty(JsonElement element, string propertyName)
+        {
+            var values = new List<string>();
+            if (element.ValueKind != JsonValueKind.Object ||
+                !element.TryGetProperty(propertyName, out var arrayElement) ||
+                arrayElement.ValueKind != JsonValueKind.Array)
+            {
+                return values;
+            }
+
+            foreach (var item in arrayElement.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    values.Add(item.GetString() ?? string.Empty);
+                }
+            }
+
+            return values;
         }
 
         private static Dictionary<string, string> NormalizeHeaders(Dictionary<string, string>? headers)
@@ -1403,6 +1782,135 @@ namespace TxtAIEditor.Controls
             }
 
             return normalized;
+        }
+
+        private static Dictionary<string, string> NormalizeEnvironment(Dictionary<string, string>? environment)
+        {
+            var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (environment == null)
+            {
+                return normalized;
+            }
+
+            foreach (var variable in environment)
+            {
+                string key = variable.Key?.Trim() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    normalized[key] = variable.Value ?? string.Empty;
+                }
+            }
+
+            return normalized;
+        }
+
+        private static List<string> NormalizeArguments(IEnumerable<string>? arguments)
+        {
+            return arguments?.Where(argument => argument != null).ToList() ?? new List<string>();
+        }
+
+        private bool TryParseConnectionInput(
+            AgentMcpDialogInput input,
+            out AgentMcpConnectionSettings settings,
+            out string error)
+        {
+            settings = new AgentMcpConnectionSettings
+            {
+                Transport = AgentMcpTransportTypes.Normalize(input.Transport, input.Command),
+                Endpoint = input.Endpoint?.Trim() ?? string.Empty,
+                Command = input.Command?.Trim() ?? string.Empty,
+                WorkingDirectory = input.WorkingDirectory?.Trim() ?? string.Empty
+            };
+            error = string.Empty;
+
+            if (!AgentMcpTransportTypes.IsStdio(settings.Transport))
+            {
+                if (!IsValidHttpEndpoint(settings.Endpoint))
+                {
+                    error = _getString("AgentMcpEndpointInvalid", "MCP 주소는 http 또는 https URL이어야 합니다.");
+                    return false;
+                }
+
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.Command))
+            {
+                error = _getString("AgentMcpCommandRequired", "stdio 실행 명령을 입력해주세요.");
+                return false;
+            }
+
+            try
+            {
+                using JsonDocument argumentsDocument = JsonDocument.Parse(
+                    string.IsNullOrWhiteSpace(input.ArgumentsJson) ? "[]" : input.ArgumentsJson);
+                if (argumentsDocument.RootElement.ValueKind != JsonValueKind.Array ||
+                    argumentsDocument.RootElement.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
+                {
+                    throw new JsonException();
+                }
+
+                settings.Arguments = argumentsDocument.RootElement
+                    .EnumerateArray()
+                    .Select(item => item.GetString() ?? string.Empty)
+                    .ToList();
+            }
+            catch (JsonException)
+            {
+                error = _getString("AgentMcpArgumentsInvalid", "stdio 인수는 문자열로 구성된 JSON 배열이어야 합니다.");
+                return false;
+            }
+
+            try
+            {
+                using JsonDocument environmentDocument = JsonDocument.Parse(
+                    string.IsNullOrWhiteSpace(input.EnvironmentJson) ? "{}" : input.EnvironmentJson);
+                if (environmentDocument.RootElement.ValueKind != JsonValueKind.Object ||
+                    environmentDocument.RootElement.EnumerateObject().Any(item => item.Value.ValueKind != JsonValueKind.String))
+                {
+                    throw new JsonException();
+                }
+
+                settings.Environment = environmentDocument.RootElement
+                    .EnumerateObject()
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+                    .ToDictionary(
+                        item => item.Name,
+                        item => item.Value.GetString() ?? string.Empty,
+                        StringComparer.OrdinalIgnoreCase);
+            }
+            catch (JsonException)
+            {
+                error = _getString("AgentMcpEnvironmentInvalid", "환경 변수는 문자열 값으로 구성된 JSON 객체여야 합니다.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private void ApplyConnectionSettings(AgentMcpServer server, AgentMcpConnectionSettings settings)
+        {
+            server.Transport = settings.Transport;
+            server.Endpoint = AgentMcpTransportTypes.IsStdio(settings.Transport) ? string.Empty : settings.Endpoint;
+            server.Command = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.Command : string.Empty;
+            server.Arguments = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.Arguments : new List<string>();
+            server.WorkingDirectory = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.WorkingDirectory : string.Empty;
+            server.Environment = AgentMcpTransportTypes.IsStdio(settings.Transport)
+                ? _credentialStore.StoreEnvironmentSecrets(server, settings.Environment, deleteEmptySecrets: true)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static bool HasValidConnectionSettings(AgentMcpServer server)
+        {
+            string transport = AgentMcpTransportTypes.Normalize(server.Transport, server.Command);
+            return AgentMcpTransportTypes.IsStdio(transport)
+                ? !string.IsNullOrWhiteSpace(server.Command)
+                : IsValidHttpEndpoint(server.Endpoint);
+        }
+
+        private static string FirstNonEmpty(string first, string second)
+        {
+            return !string.IsNullOrWhiteSpace(first) ? first : second;
         }
 
         private bool TryBuildAuthSettings(
@@ -1663,12 +2171,42 @@ namespace TxtAIEditor.Controls
             return string.IsNullOrWhiteSpace(normalized) ? "server" : normalized;
         }
 
-        private sealed class AgentMcpSession
+        private sealed class AgentMcpSession : IDisposable
         {
             public string SessionId { get; set; } = string.Empty;
             public bool Initialized { get; set; }
             public int NextId { get; set; } = 1;
             public List<AgentMcpTool> Tools { get; } = new();
+            public Process? Process { get; set; }
+            public StreamWriter? StandardInput { get; set; }
+            public StreamReader? StandardOutput { get; set; }
+            public SemaphoreSlim StdioLock { get; } = new(1, 1);
+            public Queue<string> StderrLines { get; } = new();
+            public Task? StderrPump { get; set; }
+
+            public void Dispose()
+            {
+                try
+                {
+                    StandardInput?.Dispose();
+                    StandardOutput?.Dispose();
+                    if (Process is { HasExited: false })
+                    {
+                        Process.Kill(entireProcessTree: true);
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                }
+                catch (System.ComponentModel.Win32Exception)
+                {
+                }
+                finally
+                {
+                    Process?.Dispose();
+                    StdioLock.Dispose();
+                }
+            }
         }
 
         private sealed class AgentMcpTool
@@ -1690,6 +2228,16 @@ namespace TxtAIEditor.Controls
             public string OAuthTokenEndpoint { get; set; } = string.Empty;
             public string OAuthScopes { get; set; } = string.Empty;
             public DateTimeOffset OAuthAccessTokenExpiresAt { get; set; }
+        }
+
+        private sealed class AgentMcpConnectionSettings
+        {
+            public string Transport { get; set; } = AgentMcpTransportTypes.Http;
+            public string Endpoint { get; set; } = string.Empty;
+            public string Command { get; set; } = string.Empty;
+            public List<string> Arguments { get; set; } = new();
+            public string WorkingDirectory { get; set; } = string.Empty;
+            public Dictionary<string, string> Environment { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         }
 
     }

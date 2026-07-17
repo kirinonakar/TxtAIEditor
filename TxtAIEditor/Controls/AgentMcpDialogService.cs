@@ -12,7 +12,12 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentMcpDialogInput
     {
         public string Name { get; set; } = string.Empty;
+        public string Transport { get; set; } = AgentMcpTransportTypes.Http;
         public string Endpoint { get; set; } = string.Empty;
+        public string Command { get; set; } = string.Empty;
+        public string ArgumentsJson { get; set; } = "[]";
+        public string WorkingDirectory { get; set; } = string.Empty;
+        public string EnvironmentJson { get; set; } = "{}";
         public string AuthType { get; set; } = AuthTypeNone;
         public string HeaderName { get; set; } = string.Empty;
         public string ApiKey { get; set; } = string.Empty;
@@ -215,9 +220,27 @@ namespace TxtAIEditor.Controls
         {
             var nameBox = CreateTextBox(_getString("AgentMcpNamePlaceholder", "MCP 이름 입력..."));
             nameBox.Text = initial.Name;
+            var transportBox = CreateTransportComboBox(initial.Transport);
+            var endpointLabel = CreateLabel(_getString("AgentMcpEndpointLabel", "MCP 주소"));
             var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
             endpointBox.Text = initial.Endpoint;
+            var commandLabel = CreateLabel(_getString("AgentMcpCommandLabel", "실행 명령"));
+            var commandBox = CreateTextBox(_getString("AgentMcpCommandPlaceholder", "npx"));
+            commandBox.Text = initial.Command;
+            var argumentsLabel = CreateLabel(_getString("AgentMcpArgumentsLabel", "인수 (JSON 배열)"));
+            var argumentsBox = CreateJsonTextBox(_getString("AgentMcpArgumentsPlaceholder", "[\"-y\", \"@modelcontextprotocol/server-filesystem\", \"D:\\\\workspace\"]"));
+            argumentsBox.Text = initial.ArgumentsJson;
+            var workingDirectoryLabel = CreateLabel(_getString("AgentMcpWorkingDirectoryLabel", "작업 폴더 (선택)"));
+            var workingDirectoryBox = CreateTextBox(_getString("AgentMcpWorkingDirectoryPlaceholder", "비워두면 현재 작업 영역 사용"));
+            workingDirectoryBox.Text = initial.WorkingDirectory;
+            var environmentLabel = CreateLabel(_getString("AgentMcpEnvironmentLabel", "환경 변수 (JSON 객체, 선택)"));
+            var environmentBox = CreateJsonTextBox(_getString("AgentMcpEnvironmentPlaceholder", "{\"KEY\": \"value\"}"));
+            environmentBox.Text = initial.EnvironmentJson;
+            var stdioInfo = CreateInfoText(_getString(
+                "AgentMcpStdioInfo",
+                "명령은 로컬 프로세스로 실행됩니다. 예: npx와 JSON 인수 [\"-y\", \"@modelcontextprotocol/server-filesystem\", \"D:\\\\workspace\"]"));
             var authTypeBox = CreateAuthTypeComboBox(initial.AuthType);
+            var authTypeLabel = CreateLabel(_getString("AgentMcpAuthTypeLabel", "인증 방식"));
             var headerNameLabel = CreateLabel(_getString("AgentMcpHeaderNameLabel", "API Key Header 이름"));
             var headerNameBox = CreateTextBox(_getString("AgentMcpHeaderNamePlaceholder", "Authorization"));
             headerNameBox.Text = initial.HeaderName;
@@ -243,8 +266,25 @@ namespace TxtAIEditor.Controls
             var oauthScopesBox = CreateTextBox(_getString("AgentMcpOAuthScopesPlaceholder", "scope1 scope2"));
             oauthScopesBox.Text = initial.OAuthScopes;
 
-            authTypeBox.SelectionChanged += (_, _) => UpdateAuthFieldVisibility(
+            void UpdateFieldVisibility()
+            {
+                bool isStdio = GetSelectedTransport(transportBox).Equals(AgentMcpTransportTypes.Stdio, StringComparison.OrdinalIgnoreCase);
+                SetVisible(endpointLabel, !isStdio);
+                SetVisible(endpointBox, !isStdio);
+                SetVisible(commandLabel, isStdio);
+                SetVisible(commandBox, isStdio);
+                SetVisible(argumentsLabel, isStdio);
+                SetVisible(argumentsBox, isStdio);
+                SetVisible(workingDirectoryLabel, isStdio);
+                SetVisible(workingDirectoryBox, isStdio);
+                SetVisible(environmentLabel, isStdio);
+                SetVisible(environmentBox, isStdio);
+                SetVisible(stdioInfo, isStdio);
+                SetVisible(authTypeLabel, !isStdio);
+                SetVisible(authTypeBox, !isStdio);
+                UpdateAuthFieldVisibility(
                 authTypeBox,
+                !isStdio,
                 headerNameLabel,
                 headerNameBox,
                 apiKeyLabel,
@@ -259,33 +299,31 @@ namespace TxtAIEditor.Controls
                 oauthAuthorizationEndpointBox,
                 oauthTokenEndpointLabel,
                 oauthTokenEndpointBox,
-                oauthScopesLabel,
-                oauthScopesBox);
-            UpdateAuthFieldVisibility(
-                authTypeBox,
-                headerNameLabel,
-                headerNameBox,
-                apiKeyLabel,
-                apiKeyBox,
-                oauthTokenLabel,
-                oauthTokenBox,
-                oauthClientIdLabel,
-                oauthClientIdBox,
-                oauthClientSecretLabel,
-                oauthClientSecretBox,
-                oauthAuthorizationEndpointLabel,
-                oauthAuthorizationEndpointBox,
-                oauthTokenEndpointLabel,
-                oauthTokenEndpointBox,
-                oauthScopesLabel,
-                oauthScopesBox);
+                    oauthScopesLabel,
+                    oauthScopesBox);
+            }
+
+            transportBox.SelectionChanged += (_, _) => UpdateFieldVisibility();
+            authTypeBox.SelectionChanged += (_, _) => UpdateFieldVisibility();
+            UpdateFieldVisibility();
 
             var stack = new StackPanel { Spacing = 10, Width = 420 };
             stack.Children.Add(CreateLabel(_getString("AgentMcpNameLabel", "MCP 이름")));
             stack.Children.Add(nameBox);
-            stack.Children.Add(CreateLabel(_getString("AgentMcpEndpointLabel", "MCP 주소")));
+            stack.Children.Add(CreateLabel(_getString("AgentMcpTransportLabel", "연결 방식")));
+            stack.Children.Add(transportBox);
+            stack.Children.Add(endpointLabel);
             stack.Children.Add(endpointBox);
-            stack.Children.Add(CreateLabel(_getString("AgentMcpAuthTypeLabel", "인증 방식")));
+            stack.Children.Add(commandLabel);
+            stack.Children.Add(commandBox);
+            stack.Children.Add(argumentsLabel);
+            stack.Children.Add(argumentsBox);
+            stack.Children.Add(workingDirectoryLabel);
+            stack.Children.Add(workingDirectoryBox);
+            stack.Children.Add(environmentLabel);
+            stack.Children.Add(environmentBox);
+            stack.Children.Add(stdioInfo);
+            stack.Children.Add(authTypeLabel);
             stack.Children.Add(authTypeBox);
             stack.Children.Add(headerNameLabel);
             stack.Children.Add(headerNameBox);
@@ -303,7 +341,7 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(oauthTokenEndpointBox);
             stack.Children.Add(oauthScopesLabel);
             stack.Children.Add(oauthScopesBox);
-            stack.Children.Add(CreateInfoText(_getString("AgentMcpCredentialInfo", "API Key, OAuth Client Secret, OAuth 토큰은 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
+            stack.Children.Add(CreateInfoText(_getString("AgentMcpCredentialInfo", "API Key, OAuth Client Secret, OAuth 토큰, stdio 환경 변수는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
 
             var dialog = new ContentDialog
             {
@@ -325,7 +363,12 @@ namespace TxtAIEditor.Controls
             return new AgentMcpDialogInput
             {
                 Name = nameBox.Text?.Trim() ?? string.Empty,
+                Transport = GetSelectedTransport(transportBox),
                 Endpoint = endpointBox.Text?.Trim() ?? string.Empty,
+                Command = commandBox.Text?.Trim() ?? string.Empty,
+                ArgumentsJson = argumentsBox.Text?.Trim() ?? "[]",
+                WorkingDirectory = workingDirectoryBox.Text?.Trim() ?? string.Empty,
+                EnvironmentJson = environmentBox.Text?.Trim() ?? "{}",
                 AuthType = GetSelectedAuthType(authTypeBox),
                 HeaderName = headerNameBox.Text,
                 ApiKey = apiKeyBox.Password,
@@ -336,6 +379,36 @@ namespace TxtAIEditor.Controls
                 OAuthTokenEndpoint = oauthTokenEndpointBox.Text,
                 OAuthScopes = oauthScopesBox.Text
             };
+        }
+
+        private ComboBox CreateTransportComboBox(string selectedTransport)
+        {
+            var comboBox = new ComboBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = 32
+            };
+            comboBox.Items.Add(CreateTransportItem(AgentMcpTransportTypes.Http, _getString("AgentMcpTransportHttp", "HTTP / SSE")));
+            comboBox.Items.Add(CreateTransportItem(AgentMcpTransportTypes.Stdio, _getString("AgentMcpTransportStdio", "stdio (로컬 프로세스)")));
+
+            selectedTransport = AgentMcpTransportTypes.Normalize(selectedTransport, null);
+            comboBox.SelectedItem = comboBox.Items
+                .OfType<ComboBoxItem>()
+                .FirstOrDefault(item => string.Equals(item.Tag as string, selectedTransport, StringComparison.OrdinalIgnoreCase));
+            comboBox.SelectedIndex = comboBox.SelectedIndex < 0 ? 0 : comboBox.SelectedIndex;
+            return comboBox;
+        }
+
+        private static ComboBoxItem CreateTransportItem(string transport, string label)
+        {
+            return new ComboBoxItem { Tag = transport, Content = label };
+        }
+
+        private static string GetSelectedTransport(ComboBox comboBox)
+        {
+            return comboBox.SelectedItem is ComboBoxItem item && item.Tag is string transport
+                ? transport
+                : AgentMcpTransportTypes.Http;
         }
 
         private ComboBox CreateAuthTypeComboBox(string selectedAuthType)
@@ -382,6 +455,7 @@ namespace TxtAIEditor.Controls
 
         private static void UpdateAuthFieldVisibility(
             ComboBox authTypeBox,
+            bool authEnabled,
             TextBlock headerNameLabel,
             TextBox headerNameBox,
             TextBlock apiKeyLabel,
@@ -400,9 +474,9 @@ namespace TxtAIEditor.Controls
             TextBox oauthScopesBox)
         {
             string authType = GetSelectedAuthType(authTypeBox);
-            bool showApiKey = authType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase);
-            bool showBearer = authType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase);
-            bool showBrowserOAuth = authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase);
+            bool showApiKey = authEnabled && authType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase);
+            bool showBearer = authEnabled && authType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase);
+            bool showBrowserOAuth = authEnabled && authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase);
 
             SetVisible(headerNameLabel, showApiKey);
             SetVisible(headerNameBox, showApiKey);
@@ -446,6 +520,23 @@ namespace TxtAIEditor.Controls
                 IsTextPredictionEnabled = false,
                 FontFamily = new FontFamily("Segoe UI, Malgun Gothic"),
                 VerticalContentAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private static TextBox CreateJsonTextBox(string placeholder)
+        {
+            return new TextBox
+            {
+                PlaceholderText = placeholder,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                MinHeight = 56,
+                MaxHeight = 110,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                IsSpellCheckEnabled = false,
+                IsTextPredictionEnabled = false,
+                FontFamily = new FontFamily("Cascadia Mono, Consolas"),
+                VerticalContentAlignment = VerticalAlignment.Top
             };
         }
 

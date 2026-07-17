@@ -2979,6 +2979,18 @@
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP アドレス</value>
   </data>
+  <data name="AgentMcpTransportLabel" xml:space="preserve"><value>接続方式</value></data>
+  <data name="AgentMcpTransportHttp" xml:space="preserve"><value>HTTP / SSE</value></data>
+  <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（ローカル プロセス）</value></data>
+  <data name="AgentMcpCommandLabel" xml:space="preserve"><value>実行コマンド</value></data>
+  <data name="AgentMcpCommandPlaceholder" xml:space="preserve"><value>npx</value></data>
+  <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>引数（JSON 配列）</value></data>
+  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
+  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>作業フォルダー（省略可能）</value></data>
+  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve"><value>空の場合は現在のワークスペースを使用</value></data>
+  <data name="AgentMcpEnvironmentLabel" xml:space="preserve"><value>環境変数（省略可能な JSON オブジェクト）</value></data>
+  <data name="AgentMcpEnvironmentPlaceholder" xml:space="preserve"><value>{"KEY": "value"}</value></data>
+  <data name="AgentMcpStdioInfo" xml:space="preserve"><value>コマンドはローカル プロセスとして実行されます。例: npx と ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key ヘッダー名</value>
   </data>
@@ -2995,7 +3007,7 @@
     <value>API Key は MCP 設定ファイルには保存せず、Windows 資格情報マネージャーに保存します。</value>
   </data>
   <data name="AgentMcpCredentialInfo" xml:space="preserve">
-    <value>API Key、OAuth Client Secret、OAuth トークンは MCP 設定ファイルには保存せず、Windows 資格情報マネージャーに保存します。</value>
+    <value>API Key、OAuth シークレットとトークン、stdio 環境変数は MCP 設定ファイルには保存せず、Windows 資格情報マネージャーに保存します。</value>
   </data>
   <data name="AgentMcpAuthTypeLabel" xml:space="preserve">
     <value>認証方式</value>
@@ -3066,6 +3078,10 @@
   <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
     <value>MCP 名とアドレスを入力してください。</value>
   </data>
+  <data name="AgentMcpNameRequired" xml:space="preserve"><value>MCP 名を入力してください。</value></data>
+  <data name="AgentMcpCommandRequired" xml:space="preserve"><value>stdio 実行コマンドを入力してください。</value></data>
+  <data name="AgentMcpArgumentsInvalid" xml:space="preserve"><value>stdio 引数は文字列の JSON 配列である必要があります。</value></data>
+  <data name="AgentMcpEnvironmentInvalid" xml:space="preserve"><value>環境変数は文字列値を持つ JSON オブジェクトである必要があります。</value></data>
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>MCP アドレスは http または https URL である必要があります。</value>
   </data>

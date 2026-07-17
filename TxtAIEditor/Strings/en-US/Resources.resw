@@ -2979,6 +2979,42 @@ Plan: {0}</value>
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP Address</value>
   </data>
+  <data name="AgentMcpTransportLabel" xml:space="preserve">
+    <value>Transport</value>
+  </data>
+  <data name="AgentMcpTransportHttp" xml:space="preserve">
+    <value>HTTP / SSE</value>
+  </data>
+  <data name="AgentMcpTransportStdio" xml:space="preserve">
+    <value>stdio (local process)</value>
+  </data>
+  <data name="AgentMcpCommandLabel" xml:space="preserve">
+    <value>Command</value>
+  </data>
+  <data name="AgentMcpCommandPlaceholder" xml:space="preserve">
+    <value>npx</value>
+  </data>
+  <data name="AgentMcpArgumentsLabel" xml:space="preserve">
+    <value>Arguments (JSON array)</value>
+  </data>
+  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve">
+    <value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value>
+  </data>
+  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve">
+    <value>Working directory (optional)</value>
+  </data>
+  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve">
+    <value>Uses the current workspace when empty</value>
+  </data>
+  <data name="AgentMcpEnvironmentLabel" xml:space="preserve">
+    <value>Environment variables (optional JSON object)</value>
+  </data>
+  <data name="AgentMcpEnvironmentPlaceholder" xml:space="preserve">
+    <value>{"KEY": "value"}</value>
+  </data>
+  <data name="AgentMcpStdioInfo" xml:space="preserve">
+    <value>The command runs as a local process. Example: npx with ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value>
+  </data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key Header Name</value>
   </data>
@@ -2995,7 +3031,7 @@ Plan: {0}</value>
     <value>API keys are stored in Windows Credential Manager, not in the MCP settings file.</value>
   </data>
   <data name="AgentMcpCredentialInfo" xml:space="preserve">
-    <value>API keys, OAuth client secrets, and OAuth tokens are stored in Windows Credential Manager, not in the MCP settings file.</value>
+    <value>API keys, OAuth secrets and tokens, and stdio environment variables are stored in Windows Credential Manager, not in the MCP settings file.</value>
   </data>
   <data name="AgentMcpAuthTypeLabel" xml:space="preserve">
     <value>Authentication</value>
@@ -3065,6 +3101,18 @@ Plan: {0}</value>
   </data>
   <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
     <value>Enter both the MCP name and address.</value>
+  </data>
+  <data name="AgentMcpNameRequired" xml:space="preserve">
+    <value>Enter the MCP name.</value>
+  </data>
+  <data name="AgentMcpCommandRequired" xml:space="preserve">
+    <value>Enter the stdio command.</value>
+  </data>
+  <data name="AgentMcpArgumentsInvalid" xml:space="preserve">
+    <value>stdio arguments must be a JSON array of strings.</value>
+  </data>
+  <data name="AgentMcpEnvironmentInvalid" xml:space="preserve">
+    <value>Environment variables must be a JSON object with string values.</value>
   </data>
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>The MCP address must be an http or https URL.</value>

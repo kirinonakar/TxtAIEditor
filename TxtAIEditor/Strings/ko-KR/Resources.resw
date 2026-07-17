@@ -2979,6 +2979,42 @@
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP 주소</value>
   </data>
+  <data name="AgentMcpTransportLabel" xml:space="preserve">
+    <value>연결 방식</value>
+  </data>
+  <data name="AgentMcpTransportHttp" xml:space="preserve">
+    <value>HTTP / SSE</value>
+  </data>
+  <data name="AgentMcpTransportStdio" xml:space="preserve">
+    <value>stdio (로컬 프로세스)</value>
+  </data>
+  <data name="AgentMcpCommandLabel" xml:space="preserve">
+    <value>실행 명령</value>
+  </data>
+  <data name="AgentMcpCommandPlaceholder" xml:space="preserve">
+    <value>npx</value>
+  </data>
+  <data name="AgentMcpArgumentsLabel" xml:space="preserve">
+    <value>인수 (JSON 배열)</value>
+  </data>
+  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve">
+    <value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value>
+  </data>
+  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve">
+    <value>작업 폴더 (선택)</value>
+  </data>
+  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve">
+    <value>비워두면 현재 작업 영역 사용</value>
+  </data>
+  <data name="AgentMcpEnvironmentLabel" xml:space="preserve">
+    <value>환경 변수 (JSON 객체, 선택)</value>
+  </data>
+  <data name="AgentMcpEnvironmentPlaceholder" xml:space="preserve">
+    <value>{"KEY": "value"}</value>
+  </data>
+  <data name="AgentMcpStdioInfo" xml:space="preserve">
+    <value>명령은 로컬 프로세스로 실행됩니다. 예: npx와 인수 ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value>
+  </data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key Header 이름</value>
   </data>
@@ -2995,7 +3031,7 @@
     <value>API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
   <data name="AgentMcpCredentialInfo" xml:space="preserve">
-    <value>API Key, OAuth Client Secret, OAuth 토큰은 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
+    <value>API Key, OAuth Secret 및 토큰, stdio 환경 변수는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.</value>
   </data>
   <data name="AgentMcpAuthTypeLabel" xml:space="preserve">
     <value>인증 방식</value>
@@ -3065,6 +3101,18 @@
   </data>
   <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
     <value>MCP 이름과 주소를 입력해주세요.</value>
+  </data>
+  <data name="AgentMcpNameRequired" xml:space="preserve">
+    <value>MCP 이름을 입력해주세요.</value>
+  </data>
+  <data name="AgentMcpCommandRequired" xml:space="preserve">
+    <value>stdio 실행 명령을 입력해주세요.</value>
+  </data>
+  <data name="AgentMcpArgumentsInvalid" xml:space="preserve">
+    <value>stdio 인수는 문자열로 구성된 JSON 배열이어야 합니다.</value>
+  </data>
+  <data name="AgentMcpEnvironmentInvalid" xml:space="preserve">
+    <value>환경 변수는 문자열 값으로 구성된 JSON 객체여야 합니다.</value>
   </data>
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>MCP 주소는 http 또는 https URL이어야 합니다.</value>

@@ -54,6 +54,43 @@ namespace TxtAIEditor.Controls
             server.Headers = StoreHeaderSecrets(server, NormalizeHeaders(server.Headers));
         }
 
+        public Dictionary<string, string> StoreEnvironmentSecrets(
+            AgentMcpServer server,
+            Dictionary<string, string> environment,
+            bool deleteEmptySecrets = false)
+        {
+            var storedEnvironment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var variable in environment)
+            {
+                string key = variable.Key?.Trim() ?? string.Empty;
+                string value = variable.Value ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                storedEnvironment[key] = string.Empty;
+                if (!string.IsNullOrEmpty(value))
+                {
+                    _credentialService.WriteCredential(
+                        GetEnvironmentCredentialTarget(server, key),
+                        CredentialUserName,
+                        value);
+                }
+                else if (deleteEmptySecrets)
+                {
+                    _credentialService.DeleteCredential(GetEnvironmentCredentialTarget(server, key));
+                }
+            }
+
+            return storedEnvironment;
+        }
+
+        public void MoveInlineEnvironmentValuesToCredential(AgentMcpServer server)
+        {
+            server.Environment = StoreEnvironmentSecrets(server, NormalizeEnvironment(server.Environment));
+        }
+
         public void DeleteCredentialsForRemovedHeaders(AgentMcpServer server, Dictionary<string, string> nextHeaders)
         {
             var nextHeaderNames = new HashSet<string>(nextHeaders.Keys, StringComparer.OrdinalIgnoreCase);
@@ -66,11 +103,28 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public void DeleteCredentialsForRemovedEnvironment(AgentMcpServer server, Dictionary<string, string> nextEnvironment)
+        {
+            var nextNames = new HashSet<string>(nextEnvironment.Keys, StringComparer.OrdinalIgnoreCase);
+            foreach (string oldName in server.Environment.Keys.ToList())
+            {
+                if (!nextNames.Contains(oldName))
+                {
+                    _credentialService.DeleteCredential(GetEnvironmentCredentialTarget(server, oldName));
+                }
+            }
+        }
+
         public void DeleteAllCredentials(AgentMcpServer server)
         {
             foreach (string headerName in server.Headers.Keys.ToList())
             {
                 _credentialService.DeleteCredential(GetHeaderCredentialTarget(server, headerName));
+            }
+
+            foreach (string variableName in server.Environment.Keys.ToList())
+            {
+                _credentialService.DeleteCredential(GetEnvironmentCredentialTarget(server, variableName));
             }
 
             DeleteOAuthCredentials(server);
@@ -90,6 +144,17 @@ namespace TxtAIEditor.Controls
             }
 
             return fallbackValue ?? string.Empty;
+        }
+
+        public string GetEnvironmentSecret(AgentMcpServer server, string variableName, string fallbackValue)
+        {
+            if (string.IsNullOrWhiteSpace(variableName))
+            {
+                return string.Empty;
+            }
+
+            string? credential = _credentialService.ReadCredential(GetEnvironmentCredentialTarget(server, variableName));
+            return credential ?? fallbackValue ?? string.Empty;
         }
 
         public string StoreOAuthSecret(AgentMcpServer server, string secretName, string value, bool deleteEmptySecret)
@@ -162,6 +227,11 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            foreach (var variable in server.Environment)
+            {
+                AddSecretIfPresent(secrets, GetEnvironmentSecret(server, variable.Key, variable.Value));
+            }
+
             AddSecretIfPresent(secrets, GetOAuthSecret(server, "access_token", server.OAuthAccessToken));
             AddSecretIfPresent(secrets, GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken));
             AddSecretIfPresent(secrets, GetOAuthSecret(server, "client_secret", server.OAuthClientSecret));
@@ -201,6 +271,26 @@ namespace TxtAIEditor.Controls
             return normalized;
         }
 
+        private static Dictionary<string, string> NormalizeEnvironment(Dictionary<string, string>? environment)
+        {
+            var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (environment == null)
+            {
+                return normalized;
+            }
+
+            foreach (var variable in environment)
+            {
+                string key = variable.Key?.Trim() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    normalized[key] = variable.Value ?? string.Empty;
+                }
+            }
+
+            return normalized;
+        }
+
         private static void AddSecretIfPresent(List<string> secrets, string value)
         {
             if (!string.IsNullOrWhiteSpace(value))
@@ -217,6 +307,11 @@ namespace TxtAIEditor.Controls
         private static string GetOAuthCredentialTarget(AgentMcpServer server, string secretName)
         {
             return $"TxtAIEditor_MCP_{server.Id}_oauth_{SanitizeCredentialSegment(secretName)}";
+        }
+
+        private static string GetEnvironmentCredentialTarget(AgentMcpServer server, string variableName)
+        {
+            return $"TxtAIEditor_MCP_{server.Id}_env_{SanitizeCredentialSegment(variableName)}";
         }
 
         private static string SanitizeCredentialSegment(string value)

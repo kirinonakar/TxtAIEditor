@@ -2979,6 +2979,18 @@
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP 位址</value>
   </data>
+  <data name="AgentMcpTransportLabel" xml:space="preserve"><value>連線方式</value></data>
+  <data name="AgentMcpTransportHttp" xml:space="preserve"><value>HTTP / SSE</value></data>
+  <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（本機處理程序）</value></data>
+  <data name="AgentMcpCommandLabel" xml:space="preserve"><value>執行命令</value></data>
+  <data name="AgentMcpCommandPlaceholder" xml:space="preserve"><value>npx</value></data>
+  <data name="AgentMcpArgumentsLabel" xml:space="preserve"><value>引數（JSON 陣列）</value></data>
+  <data name="AgentMcpArgumentsPlaceholder" xml:space="preserve"><value>["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
+  <data name="AgentMcpWorkingDirectoryLabel" xml:space="preserve"><value>工作目錄（選用）</value></data>
+  <data name="AgentMcpWorkingDirectoryPlaceholder" xml:space="preserve"><value>留空時使用目前工作區</value></data>
+  <data name="AgentMcpEnvironmentLabel" xml:space="preserve"><value>環境變數（選用 JSON 物件）</value></data>
+  <data name="AgentMcpEnvironmentPlaceholder" xml:space="preserve"><value>{"KEY": "value"}</value></data>
+  <data name="AgentMcpStdioInfo" xml:space="preserve"><value>命令會以本機處理程序執行。範例：npx 與 ["-y", "@modelcontextprotocol/server-filesystem", "D:\\workspace"]</value></data>
   <data name="AgentMcpHeaderNameLabel" xml:space="preserve">
     <value>API Key 標頭名稱</value>
   </data>
@@ -2995,7 +3007,7 @@
     <value>API 金鑰儲存在 Windows Credential Manager 中，而不是儲存在 MCP 設定檔中。</value>
   </data>
   <data name="AgentMcpCredentialInfo" xml:space="preserve">
-    <value>API 金鑰、OAuth 用戶端金鑰和 OAuth 令牌儲存在 Windows Credential Manager 中，而不是儲存在 MCP 設定檔中。</value>
+    <value>API 金鑰、OAuth 金鑰和權杖以及 stdio 環境變數會儲存在 Windows Credential Manager，而不是 MCP 設定檔中。</value>
   </data>
   <data name="AgentMcpAuthTypeLabel" xml:space="preserve">
     <value>認證</value>
@@ -3066,6 +3078,10 @@
   <data name="AgentMcpNameEndpointRequired" xml:space="preserve">
     <value>Enter MCP 名稱及位址。</value>
   </data>
+  <data name="AgentMcpNameRequired" xml:space="preserve"><value>請輸入 MCP 名稱。</value></data>
+  <data name="AgentMcpCommandRequired" xml:space="preserve"><value>請輸入 stdio 執行命令。</value></data>
+  <data name="AgentMcpArgumentsInvalid" xml:space="preserve"><value>stdio 引數必須是由字串組成的 JSON 陣列。</value></data>
+  <data name="AgentMcpEnvironmentInvalid" xml:space="preserve"><value>環境變數必須是值為字串的 JSON 物件。</value></data>
   <data name="AgentMcpEndpointInvalid" xml:space="preserve">
     <value>MCP 位址必須是 http 或 https URL。</value>
   </data>
