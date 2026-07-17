@@ -1318,21 +1318,21 @@ namespace TxtAIEditor.Controls
             {
                 string normalizedDirectory = directory.Trim('"');
                 string directCandidate = Path.Combine(normalizedDirectory, command);
-                if (File.Exists(directCandidate))
-                {
-                    return directCandidate;
-                }
-
                 if (!Path.HasExtension(command))
                 {
                     foreach (string extension in extensions)
                     {
-                        string candidate = directCandidate + extension.ToLowerInvariant();
+                        string candidate = directCandidate + extension;
                         if (File.Exists(candidate))
                         {
                             return candidate;
                         }
                     }
+                }
+
+                if (File.Exists(directCandidate))
+                {
+                    return directCandidate;
                 }
             }
 
