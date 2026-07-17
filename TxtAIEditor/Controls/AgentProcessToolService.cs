@@ -88,15 +88,16 @@ namespace TxtAIEditor.Controls
                 return "run_powershell cancelled by user.";
             }
 
+            var profile = TerminalShellProfile.Resolve("PowerShell");
+            string shellPath = profile.ExecutablePath;
             string normalizedCommand = command.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n");
-            string utf8Command = "$OutputEncoding = [System.Text.Encoding]::UTF8; " +
-                "try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::UTF8 } catch {}; " +
+            string utf8Command = "$utf8NoBom = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = $utf8NoBom; " +
+                "try { [Console]::OutputEncoding = $utf8NoBom; [Console]::InputEncoding = $utf8NoBom } catch {}; " +
+                "try { $PSDefaultParameterValues['*:Encoding'] = 'utf8' } catch {}; " +
+                BuildPowerShell7RedirectPrelude(shellPath) +
                 "$env:PYTHONUTF8 = '1'; $env:PYTHONIOENCODING = 'utf-8'; " +
                 normalizedCommand;
             string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(utf8Command));
-
-            var profile = TerminalShellProfile.Resolve("PowerShell");
-            string shellPath = profile.ExecutablePath;
 
             var environmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -540,6 +541,17 @@ namespace TxtAIEditor.Controls
             }
 
             return true;
+        }
+
+        private static string BuildPowerShell7RedirectPrelude(string shellPath)
+        {
+            if (!string.Equals(Path.GetFileName(shellPath), "pwsh.exe", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            string escapedShellPath = shellPath.Replace("'", "''", StringComparison.Ordinal);
+            return $"try {{ Set-Alias -Name powershell -Value '{escapedShellPath}' -Scope Script; Set-Alias -Name powershell.exe -Value '{escapedShellPath}' -Scope Script }} catch {{}}; ";
         }
     }
 }
