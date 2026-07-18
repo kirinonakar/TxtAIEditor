@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -13,159 +12,57 @@ using System.Threading.Tasks;
 using Microsoft.Win32;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services.LLM;
-using Windows.Graphics.Imaging;
-using Windows.Storage.Streams;
 
 namespace TxtAIEditor.Controls
 {
     internal sealed class AgentMcpBrowserUseTool
     {
-        private const string BuiltInBrowserUseId = "builtin-browser-use";
-        private const string BuiltInBrowserUseName = "Browser Use & Computer Use";
         private const int MaxPageTextLength = 60_000;
         private const int DefaultAccessibilityNodeLimit = 180;
-        private const int MaxCaptureDimension = 1024;
-        private const uint InputKeyboard = 1;
-        private const uint InputMouse = 0;
-        private const uint KeyEventKeyUp = 0x0002;
-        private const uint KeyEventUnicode = 0x0004;
-        private const uint MouseEventLeftDown = 0x0002;
-        private const uint MouseEventLeftUp = 0x0004;
-        private const uint MouseEventRightDown = 0x0008;
-        private const uint MouseEventRightUp = 0x0010;
-        private const uint MouseEventMiddleDown = 0x0020;
-        private const uint MouseEventMiddleUp = 0x0040;
-        private const uint MouseEventWheel = 0x0800;
-        private const uint CfUnicodeText = 13;
-        private const uint Srccopy = 0x00CC0020;
-        private const uint CaptureBlt = 0x40000000;
-        private const uint DibRgbColors = 0;
-        private const int Halftone = 4;
 
         private readonly Func<EditorSettings> _settingsProvider;
-        private readonly Action<LlmMessageAttachment>? _addImageAttachment;
         private readonly AgentBrowserAccessibilityService _accessibility = new();
+        private readonly AgentBrowserCaptureService _captureService;
+        private readonly AgentWindowsInputService _inputService = new();
         private IntPtr _browserWindow;
         private bool _controlledWindowIsBrowser = true;
         private string _defaultBrowserProcessName = string.Empty;
         private string _defaultBrowserExecutablePath = string.Empty;
-        private BrowserCapture? _lastCapture;
+        private AgentBrowserCapture? _lastCapture;
 
         public AgentMcpBrowserUseTool(Func<EditorSettings> settingsProvider, Action<LlmMessageAttachment>? addImageAttachment = null)
         {
             _settingsProvider = settingsProvider;
-            _addImageAttachment = addImageAttachment;
+            _captureService = new AgentBrowserCaptureService(addImageAttachment);
         }
 
-        public string ServerId => BuiltInBrowserUseId;
+        public string ServerId => AgentMcpBrowserUseCatalog.ServerId;
 
-        public string ServerName => BuiltInBrowserUseName;
+        public string ServerName => AgentMcpBrowserUseCatalog.ServerName;
 
         public bool IsServerName(string serverName)
         {
-            return serverName.Equals(BuiltInBrowserUseName, StringComparison.OrdinalIgnoreCase);
+            return serverName.Equals(AgentMcpBrowserUseCatalog.ServerName, StringComparison.OrdinalIgnoreCase);
         }
 
         public bool IsServerId(string serverId)
         {
-            return serverId.Equals(BuiltInBrowserUseId, StringComparison.OrdinalIgnoreCase);
+            return serverId.Equals(AgentMcpBrowserUseCatalog.ServerId, StringComparison.OrdinalIgnoreCase);
         }
 
         public bool CanHandleAlias(AgentMcpToolAlias alias)
         {
-            return alias.ServerId.Equals(BuiltInBrowserUseId, StringComparison.OrdinalIgnoreCase);
+            return alias.ServerId.Equals(AgentMcpBrowserUseCatalog.ServerId, StringComparison.OrdinalIgnoreCase);
         }
 
         public AgentMcpItem CreateMenuItem(bool isSelected, Func<string, string, string> getString)
         {
-            return new AgentMcpItem
-            {
-                Name = BuiltInBrowserUseName,
-                Endpoint = "windows-default-browser",
-                Detail = getString("AgentMcpBrowserUseDetail", "내장 플러그인 - Windows 기본 브라우저 조작"),
-                IsSelected = isSelected,
-                IsBuiltIn = true,
-                CanEdit = false,
-                CanDelete = false
-            };
+            return AgentMcpBrowserUseCatalog.CreateMenuItem(isSelected, getString);
         }
 
         public IReadOnlyList<AgentMcpToolAlias> CreateAliases()
         {
-            var aliases = new List<AgentMcpToolAlias>
-            {
-                CreateAlias("mcp_browser_use_open_url", "open_url", "Open an http, https, file, or about:blank URL in the Windows default browser.", """
-                {"type":"object","properties":{"url":{"type":"string","description":"Absolute URL to open."},"newWindow":{"type":"boolean","default":false}},"required":["url"]}
-                """),
-                CreateAlias("mcp_browser_use_status", "status", "Get the controlled default browser window title, process, bounds, and current URL.", """
-                {"type":"object","properties":{}}
-                """),
-                CreateAlias("mcp_browser_use_snapshot", "snapshot", "Return a concise accessibility tree for the currently controlled browser or Computer Use application window. Every emitted element has a stable ref that can be passed to mcp_browser_use_click. Set includeScreenshot only when visual context is needed.", """
-                {"type":"object","properties":{"maxNodes":{"type":"integer","minimum":20,"maximum":500,"default":180},"includeScreenshot":{"type":"boolean","default":false}}}
-                """),
-                CreateAlias("mcp_browser_use_read_page", "read_page", "Copy and return selectable text from the current page, together with the current URL and window title. This is browser-agnostic and may not expose canvas or protected page content.", """
-                {"type":"object","properties":{"maxCharacters":{"type":"integer","minimum":1000,"maximum":60000,"default":30000}}}
-                """),
-                CreateAlias("mcp_browser_use_click", "click", "Click an element by stable ref from mcp_browser_use_snapshot (preferred), or by coordinates from an existing explicit capture. Returns a fresh accessibility snapshot.", """
-                {"type":"object","properties":{"ref":{"type":"string","description":"Stable element ref returned by mcp_browser_use_snapshot."},"x":{"type":"integer","description":"X coordinate in the latest explicit capture image."},"y":{"type":"integer","description":"Y coordinate in the latest explicit capture image."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot only for coordinates from a prior mcp_browser_use_capture. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1}},"anyOf":[{"required":["ref"]},{"required":["x","y"]}]}
-                """),
-                CreateAlias("mcp_browser_use_type_text", "type_text", "Type Unicode text into the focused browser control. Can replace the current field selection and optionally press Enter.", """
-                {"type":"object","properties":{"text":{"type":"string"},"replace":{"type":"boolean","default":false},"pressEnter":{"type":"boolean","default":false}},"required":["text"]}
-                """),
-                CreateAlias("mcp_browser_use_key", "key", "Press a browser key or shortcut. Supported keys: enter, escape, tab, space, backspace, delete, home, end, pageup, pagedown, up, down, left, right, f5, f6, f11; modifiers are optional.", """
-                {"type":"object","properties":{"key":{"type":"string"},"ctrl":{"type":"boolean","default":false},"alt":{"type":"boolean","default":false},"shift":{"type":"boolean","default":false}},"required":["key"]}
-                """),
-                CreateAlias("mcp_browser_use_scroll", "scroll", "Scroll the current browser page vertically or horizontally.", """
-                {"type":"object","properties":{"deltaY":{"type":"integer","description":"Vertical wheel delta; negative scrolls down, positive scrolls up.","default":-720},"deltaX":{"type":"integer","description":"Horizontal wheel delta; implemented with Shift+wheel.","default":0}}}
-                """),
-                CreateAlias("mcp_browser_use_navigate", "navigate", "Run a browser navigation command.", """
-                {"type":"object","properties":{"action":{"type":"string","enum":["back","forward","refresh","stop","home"]}},"required":["action"]}
-                """),
-                CreateAlias("mcp_browser_use_tab", "tab", "Manage default browser tabs.", """
-                {"type":"object","properties":{"action":{"type":"string","enum":["new","close","next","previous","reopen"]}},"required":["action"]}
-                """),
-                CreateAlias("mcp_browser_use_find", "find", "Open the browser find box and search for text on the current page.", """
-                {"type":"object","properties":{"text":{"type":"string"},"next":{"type":"boolean","default":false}},"required":["text"]}
-                """)
-            };
-
-            if (_settingsProvider().BrowserUseCaptureEnabled)
-            {
-                aliases.Insert(2, CreateAlias(
-                    "mcp_browser_use_capture",
-                    "capture",
-                    "Capture the controlled browser window as a PNG for visual inspection. The captured image is automatically attached to the model context. Do NOT call read_image.",
-                    """
-                    {"type":"object","properties":{}}
-                    """));
-            }
-
-            if (_settingsProvider().BrowserUseComputerUseEnabled)
-            {
-                aliases.Add(CreateAlias(
-                    "mcp_browser_use_list_windows",
-                    "list_windows",
-                    "List visible application windows that can be selected for Computer Use. The TxtAIEditor host window is excluded.",
-                    """
-                    {"type":"object","properties":{"maxResults":{"type":"integer","minimum":1,"maximum":100,"default":40}}}
-                    """));
-                aliases.Add(CreateAlias(
-                    "mcp_browser_use_focus_window",
-                    "focus_window",
-                    "Select and focus an open application window for capture, clicking, typing, keys, and scrolling. Use a windowId from list_windows when possible.",
-                    """
-                    {"type":"object","properties":{"windowId":{"type":"string","description":"Window id returned by list_windows."},"title":{"type":"string","description":"Case-insensitive title substring."},"process":{"type":"string","description":"Case-insensitive process name."}}}
-                    """));
-                aliases.Add(CreateAlias(
-                    "mcp_browser_use_open_app",
-                    "open_app",
-                    "Launch a Windows program, friendly application name, document, or registered URI and select its visible window for Computer Use. Common names such as excel, word, powerpoint, outlook, calculator, and their Korean names are resolved automatically.",
-                    """
-                    {"type":"object","properties":{"target":{"type":"string","description":"Friendly app name, executable name/path, document path, or registered URI. Examples: excel, 엑셀, word, powerpoint, calculator."},"arguments":{"type":"string","description":"Optional program arguments."}},"required":["target"]}
-                    """));
-            }
-
-            return aliases;
+            return AgentMcpBrowserUseCatalog.CreateAliases(_settingsProvider());
         }
 
         public async Task<string> ExecuteAsync(AgentMcpToolAlias alias, JsonElement arguments, CancellationToken cancellationToken)
@@ -200,20 +97,6 @@ namespace TxtAIEditor.Controls
             {
                 return $"MCP tool failed: Browser Use: {ex.Message}";
             }
-        }
-
-        private static AgentMcpToolAlias CreateAlias(string alias, string toolName, string description, string schema)
-        {
-            return new AgentMcpToolAlias
-            {
-                Alias = alias,
-                ServerId = BuiltInBrowserUseId,
-                ServerName = BuiltInBrowserUseName,
-                ToolName = toolName,
-                Description = description,
-                InputSchemaJson = schema,
-                IsBuiltIn = true
-            };
         }
 
         private async Task<string> OpenUrlAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -354,7 +237,7 @@ namespace TxtAIEditor.Controls
             }
 
             string processArguments = AgentToolHelpers.GetFirstStringArgument(arguments, "arguments", "args");
-            string resolvedTarget = ResolveApplicationTarget(target);
+            string resolvedTarget = AgentWindowsApplicationResolver.Resolve(target);
             IntPtr foregroundBefore = GetForegroundWindow();
             Process? launchedProcess;
             try
@@ -462,118 +345,6 @@ namespace TxtAIEditor.Controls
             throw new InvalidOperationException($"The application was launched but no visible window was found: {target}");
         }
 
-        private static string ResolveApplicationTarget(string target)
-        {
-            string trimmed = target.Trim();
-            if (string.IsNullOrWhiteSpace(trimmed) ||
-                File.Exists(trimmed) ||
-                Path.IsPathRooted(trimmed) ||
-                trimmed.Contains(Path.DirectorySeparatorChar) ||
-                trimmed.Contains(Path.AltDirectorySeparatorChar) ||
-                Uri.TryCreate(trimmed, UriKind.Absolute, out _))
-            {
-                return trimmed;
-            }
-
-            string executableName = MapFriendlyApplicationName(trimmed);
-            string? appPath = TryResolveRegisteredAppPath(executableName);
-            if (!string.IsNullOrWhiteSpace(appPath))
-            {
-                return appPath;
-            }
-
-            string? officePath = TryResolveOfficeExecutable(executableName);
-            return !string.IsNullOrWhiteSpace(officePath) ? officePath : trimmed;
-        }
-
-        private static string MapFriendlyApplicationName(string target)
-        {
-            string normalized = target.Trim().ToLowerInvariant();
-            return normalized switch
-            {
-                "excel" or "excel.exe" or "엑셀" => "EXCEL.EXE",
-                "word" or "winword" or "winword.exe" or "워드" => "WINWORD.EXE",
-                "powerpoint" or "powerpnt" or "powerpnt.exe" or "ppt" or "파워포인트" => "POWERPNT.EXE",
-                "outlook" or "outlook.exe" or "아웃룩" => "OUTLOOK.EXE",
-                "onenote" or "onenote.exe" or "원노트" => "ONENOTE.EXE",
-                "access" or "msaccess" or "msaccess.exe" or "액세스" => "MSACCESS.EXE",
-                "publisher" or "mspub" or "mspub.exe" or "퍼블리셔" => "MSPUB.EXE",
-                "calculator" or "calc" or "calc.exe" or "계산기" => "calc.exe",
-                "notepad" or "notepad.exe" or "메모장" => "notepad.exe",
-                "paint" or "mspaint" or "mspaint.exe" or "그림판" => "mspaint.exe",
-                _ when Path.HasExtension(target) => target,
-                _ => target + ".exe"
-            };
-        }
-
-        private static string? TryResolveRegisteredAppPath(string executableName)
-        {
-            RegistryHive[] hives = { RegistryHive.CurrentUser, RegistryHive.LocalMachine };
-            RegistryView[] views = { RegistryView.Registry64, RegistryView.Registry32 };
-            foreach (RegistryHive hive in hives)
-            {
-                foreach (RegistryView view in views)
-                {
-                    try
-                    {
-                        using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, view);
-                        using RegistryKey? appPathKey = baseKey.OpenSubKey(
-                            @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + executableName);
-                        string value = appPathKey?.GetValue(null) as string ?? string.Empty;
-                        string expanded = Environment.ExpandEnvironmentVariables(value.Trim().Trim('"'));
-                        if (File.Exists(expanded))
-                        {
-                            return expanded;
-                        }
-                    }
-                    catch
-                    {
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        private static string? TryResolveOfficeExecutable(string executableName)
-        {
-            string[] officeExecutables =
-            {
-                "EXCEL.EXE", "WINWORD.EXE", "POWERPNT.EXE", "OUTLOOK.EXE",
-                "ONENOTE.EXE", "MSACCESS.EXE", "MSPUB.EXE"
-            };
-            if (!officeExecutables.Contains(executableName, StringComparer.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            string[] programFilesRoots =
-            {
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
-            };
-            foreach (string programFiles in programFilesRoots.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                for (int version = 16; version >= 12; version--)
-                {
-                    string[] candidates =
-                    {
-                        Path.Combine(programFiles, "Microsoft Office", "root", $"Office{version}", executableName),
-                        Path.Combine(programFiles, "Microsoft Office", $"Office{version}", executableName)
-                    };
-                    foreach (string candidate in candidates)
-                    {
-                        if (File.Exists(candidate))
-                        {
-                            return candidate;
-                        }
-                    }
-                }
-            }
-
-            return null;
-        }
-
         private async Task<string> CaptureInitialAccessibilitySnapshotAsync(
             IntPtr window,
             CancellationToken cancellationToken)
@@ -614,68 +385,14 @@ namespace TxtAIEditor.Controls
             IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken);
             FocusBrowserWindow(browserWindow);
             await Task.Delay(200, cancellationToken);
-            if (!GetWindowRect(browserWindow, out Rect rect))
-            {
-                throw new InvalidOperationException("Cannot read the controlled window bounds.");
-            }
-
-            int windowWidth = rect.Right - rect.Left;
-            int windowHeight = rect.Bottom - rect.Top;
-            if (windowWidth <= 0 || windowHeight <= 0)
-            {
-                throw new InvalidOperationException("The controlled window has invalid bounds.");
-            }
-
-            double scale = Math.Min(1.0, MaxCaptureDimension / (double)Math.Max(windowWidth, windowHeight));
-            int imageWidth = Math.Max(1, (int)Math.Round(windowWidth * scale));
-            int imageHeight = Math.Max(1, (int)Math.Round(windowHeight * scale));
-            byte[] pixels = CaptureWindowPixels(rect, windowWidth, windowHeight, imageWidth, imageHeight);
-
-            int targetWidth = MaxCaptureDimension;
-            int targetHeight = MaxCaptureDimension;
-            byte[] paddedPixels = new byte[targetWidth * targetHeight * 4];
-            for (int i = 3; i < paddedPixels.Length; i += 4)
-            {
-                paddedPixels[i] = 255; // Alpha channel to make it opaque black
-            }
-
-            int offsetX = (targetWidth - imageWidth) / 2;
-            int offsetY = (targetHeight - imageHeight) / 2;
-            for (int y = 0; y < imageHeight; y++)
-            {
-                int srcOffset = y * imageWidth * 4;
-                int destOffset = ((y + offsetY) * targetWidth + offsetX) * 4;
-                Array.Copy(pixels, srcOffset, paddedPixels, destOffset, imageWidth * 4);
-            }
-
-            string captureDirectory = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "BrowserUse");
-            Directory.CreateDirectory(captureDirectory);
-            string imagePath = Path.Combine(
-                captureDirectory,
-                $"browser-{DateTime.Now:yyyyMMdd-HHmmss-fff}.png");
-            await SavePngAsync(imagePath, targetWidth, targetHeight, paddedPixels, cancellationToken);
-            CleanupOldCaptures(captureDirectory);
-
-            _lastCapture = new BrowserCapture
-            {
-                Window = browserWindow,
-                ImagePath = imagePath,
-                ImageWidth = targetWidth,
-                ImageHeight = targetHeight,
-                OriginalImageWidth = imageWidth,
-                OriginalImageHeight = imageHeight,
-                PaddingLeft = offsetX,
-                PaddingTop = offsetY
-            };
-
-            await AttachCaptureImageAsync(imagePath, cancellationToken);
+            _lastCapture = await _captureService.CaptureAsync(browserWindow, cancellationToken);
 
             return
                 "MCP tool result: Browser Use captured the current controlled window.\n" +
                 $"window_id: {FormatWindowId(browserWindow)}\n" +
                 $"window_title: {SanitizeWindowTitle(GetWindowTitle(browserWindow))}\n" +
-                $"image_dimensions: {targetWidth}x{targetHeight}\n" +
-                $"controlled_window_dimensions: {windowWidth}x{windowHeight}\n" +
+                $"image_dimensions: {_lastCapture.ImageWidth}x{_lastCapture.ImageHeight}\n" +
+                $"controlled_window_dimensions: {_lastCapture.WindowWidth}x{_lastCapture.WindowHeight}\n" +
                 "next_action: The captured image is automatically attached. You can use coordinates from this image or accessibility refs, and interaction tools will return a fresh accessibility snapshot.";
         }
 
@@ -787,7 +504,7 @@ namespace TxtAIEditor.Controls
 
                 if (coordinateSpace == "screenshot")
                 {
-                    BrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
+                    AgentBrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
                         ? _lastCapture
                         : null;
                     if (capture == null)
@@ -840,16 +557,9 @@ namespace TxtAIEditor.Controls
                 throw new InvalidOperationException("Windows did not activate the target window, so the click was cancelled to avoid clicking another application.");
             }
 
-            if (!SetCursorPos(screenX, screenY))
-            {
-                throw new InvalidOperationException($"Windows could not move the mouse cursor to ({screenX}, {screenY}).");
-            }
-
+            _inputService.SetCursorPosition(screenX, screenY);
             await Task.Delay(75, cancellationToken);
-            if (!GetCursorPos(out Point cursor) || Math.Abs(cursor.X - screenX) > 1 || Math.Abs(cursor.Y - screenY) > 1)
-            {
-                throw new InvalidOperationException($"Mouse cursor coordinate verification failed. requested=({screenX}, {screenY}), actual=({cursor.X}, {cursor.Y}).");
-            }
+            _inputService.VerifyCursorPosition(screenX, screenY);
 
             for (int i = 0; i < clickCount; i++)
             {
@@ -914,7 +624,9 @@ namespace TxtAIEditor.Controls
             FocusBrowserWindow(browserWindow);
             if (GetWindowRect(browserWindow, out Rect rect))
             {
-                SetCursorPos(rect.Left + ((rect.Right - rect.Left) / 2), rect.Top + ((rect.Bottom - rect.Top) / 2));
+                _inputService.PositionCursor(
+                    rect.Left + ((rect.Right - rect.Left) / 2),
+                    rect.Top + ((rect.Bottom - rect.Top) / 2));
             }
 
             int deltaY = AgentToolHelpers.GetIntArgument(arguments, "deltaY", -720);
@@ -1016,141 +728,6 @@ namespace TxtAIEditor.Controls
             }
 
             return context;
-        }
-
-        private static byte[] CaptureWindowPixels(
-            Rect windowBounds,
-            int windowWidth,
-            int windowHeight,
-            int imageWidth,
-            int imageHeight)
-        {
-            IntPtr screenDc = GetDC(IntPtr.Zero);
-            if (screenDc == IntPtr.Zero)
-            {
-                throw new InvalidOperationException("Cannot acquire the Windows screen drawing surface.");
-            }
-
-            IntPtr memoryDc = IntPtr.Zero;
-            IntPtr bitmap = IntPtr.Zero;
-            IntPtr oldBitmap = IntPtr.Zero;
-            try
-            {
-                memoryDc = CreateCompatibleDC(screenDc);
-                bitmap = CreateCompatibleBitmap(screenDc, imageWidth, imageHeight);
-                if (memoryDc == IntPtr.Zero || bitmap == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("Cannot allocate the browser capture surface.");
-                }
-
-                oldBitmap = SelectObject(memoryDc, bitmap);
-                SetStretchBltMode(memoryDc, Halftone);
-                if (!StretchBlt(
-                    memoryDc,
-                    0,
-                    0,
-                    imageWidth,
-                    imageHeight,
-                    screenDc,
-                    windowBounds.Left,
-                    windowBounds.Top,
-                    windowWidth,
-                    windowHeight,
-                    Srccopy | CaptureBlt))
-                {
-                    throw new InvalidOperationException("Windows failed to capture the browser window.");
-                }
-
-                var bitmapInfo = new BitmapInfo
-                {
-                    Header = new BitmapInfoHeader
-                    {
-                        Size = (uint)Marshal.SizeOf<BitmapInfoHeader>(),
-                        Width = imageWidth,
-                        Height = -imageHeight,
-                        Planes = 1,
-                        BitCount = 32,
-                        Compression = 0,
-                        SizeImage = (uint)(imageWidth * imageHeight * 4)
-                    }
-                };
-                byte[] pixels = new byte[imageWidth * imageHeight * 4];
-                int scanLines = GetDIBits(
-                    memoryDc,
-                    bitmap,
-                    0,
-                    (uint)imageHeight,
-                    pixels,
-                    ref bitmapInfo,
-                    DibRgbColors);
-                if (scanLines != imageHeight)
-                {
-                    throw new InvalidOperationException("Windows returned an incomplete browser capture.");
-                }
-
-                return pixels;
-            }
-            finally
-            {
-                if (oldBitmap != IntPtr.Zero && memoryDc != IntPtr.Zero)
-                {
-                    SelectObject(memoryDc, oldBitmap);
-                }
-
-                if (bitmap != IntPtr.Zero)
-                {
-                    DeleteObject(bitmap);
-                }
-
-                if (memoryDc != IntPtr.Zero)
-                {
-                    DeleteDC(memoryDc);
-                }
-
-                ReleaseDC(IntPtr.Zero, screenDc);
-            }
-        }
-
-        private static async Task SavePngAsync(
-            string imagePath,
-            int imageWidth,
-            int imageHeight,
-            byte[] pixels,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            using var output = new InMemoryRandomAccessStream();
-            BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, output);
-            encoder.SetPixelData(
-                BitmapPixelFormat.Bgra8,
-                BitmapAlphaMode.Ignore,
-                (uint)imageWidth,
-                (uint)imageHeight,
-                96,
-                96,
-                pixels);
-            await encoder.FlushAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            output.Seek(0);
-            await using var source = output.AsStreamForRead();
-            await using var destination = new FileStream(imagePath, FileMode.Create, FileAccess.Write, FileShare.Read);
-            await source.CopyToAsync(destination, cancellationToken);
-        }
-
-        private static void CleanupOldCaptures(string captureDirectory)
-        {
-            try
-            {
-                foreach (string path in Directory.EnumerateFiles(captureDirectory, "browser-*.png")
-                    .OrderByDescending(File.GetCreationTimeUtc)
-                    .Skip(20))
-                {
-                    File.Delete(path);
-                }
-            }
-            catch
-            {
-            }
         }
 
         private static List<WindowInfo> EnumerateControllableWindows()
@@ -1404,13 +981,13 @@ namespace TxtAIEditor.Controls
                 await Task.Delay(80, cancellationToken);
             }
 
-            uint sequence = GetClipboardSequenceNumber();
+            uint sequence = _inputService.GetClipboardSequence();
             SendShortcut(0x11, 0x43);
             DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(2);
             while (DateTimeOffset.UtcNow < deadline)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (GetClipboardSequenceNumber() != sequence && TryReadClipboardText(out string text))
+                if (_inputService.GetClipboardSequence() != sequence && TryReadClipboardText(out string text))
                 {
                     return text;
                 }
@@ -1463,62 +1040,9 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static void FocusBrowserWindow(IntPtr browserWindow)
+        private void FocusBrowserWindow(IntPtr browserWindow)
         {
-            if (IsIconic(browserWindow))
-            {
-                ShowWindow(browserWindow, 9);
-            }
-
-            IntPtr foreground = GetForegroundWindow();
-            if (foreground == browserWindow)
-            {
-                return;
-            }
-
-            uint currentThread = GetCurrentThreadId();
-            uint targetThread = GetWindowThreadProcessId(browserWindow, out _);
-            uint foregroundThread = foreground == IntPtr.Zero
-                ? 0
-                : GetWindowThreadProcessId(foreground, out _);
-            bool attachedTarget = targetThread != 0 &&
-                targetThread != currentThread &&
-                AttachThreadInput(currentThread, targetThread, true);
-            bool attachedForeground = foregroundThread != 0 &&
-                foregroundThread != currentThread &&
-                foregroundThread != targetThread &&
-                AttachThreadInput(currentThread, foregroundThread, true);
-            try
-            {
-                BringWindowToTop(browserWindow);
-                SetForegroundWindow(browserWindow);
-                SetActiveWindow(browserWindow);
-                SetFocus(browserWindow);
-            }
-            finally
-            {
-                if (attachedForeground)
-                {
-                    AttachThreadInput(currentThread, foregroundThread, false);
-                }
-
-                if (attachedTarget)
-                {
-                    AttachThreadInput(currentThread, targetThread, false);
-                }
-            }
-
-            Thread.Sleep(50);
-            if (GetForegroundWindow() != browserWindow)
-            {
-                SetForegroundWindow(browserWindow);
-                Thread.Sleep(50);
-            }
-
-            if (GetForegroundWindow() != browserWindow)
-            {
-                throw new InvalidOperationException("Windows did not activate the target window. Input was cancelled to avoid controlling another application.");
-            }
+            _inputService.FocusWindow(browserWindow);
         }
 
         private string GetDefaultBrowserExecutablePath()
@@ -1621,210 +1145,55 @@ namespace TxtAIEditor.Controls
                 element.TryGetInt32(out value);
         }
 
-        private static bool TryMapKey(string key, out ushort virtualKey)
+        private bool TryMapKey(string key, out ushort virtualKey)
         {
-            if (key.Length == 1 && char.IsLetterOrDigit(key[0]))
-            {
-                virtualKey = char.ToUpperInvariant(key[0]);
-                return true;
-            }
-
-            virtualKey = key.ToLowerInvariant() switch
-            {
-                "enter" => 0x0D,
-                "escape" or "esc" => 0x1B,
-                "tab" => 0x09,
-                "space" => 0x20,
-                "backspace" => 0x08,
-                "delete" => 0x2E,
-                "home" => 0x24,
-                "end" => 0x23,
-                "pageup" => 0x21,
-                "pagedown" => 0x22,
-                "up" => 0x26,
-                "down" => 0x28,
-                "left" => 0x25,
-                "right" => 0x27,
-                "f5" => 0x74,
-                "f6" => 0x75,
-                "f11" => 0x7A,
-                _ => 0
-            };
-            return virtualKey != 0;
+            return _inputService.TryMapKey(key, out virtualKey);
         }
 
-        private static void SendUnicodeText(string text)
+        private void SendUnicodeText(string text)
         {
-            foreach (char character in text)
-            {
-                if (character == '\r')
-                {
-                    continue;
-                }
-
-                if (character == '\n')
-                {
-                    SendVirtualKey(0x0D);
-                    continue;
-                }
-
-                if (character == '\t')
-                {
-                    SendVirtualKey(0x09);
-                    continue;
-                }
-
-                var inputs = new[]
-                {
-                    CreateKeyboardInput(0, character, KeyEventUnicode),
-                    CreateKeyboardInput(0, character, KeyEventUnicode | KeyEventKeyUp)
-                };
-                SendInputs(inputs);
-            }
+            _inputService.SendUnicodeText(text);
         }
 
-        private static void SendShortcut(ushort modifier, ushort key)
+        private void SendShortcut(ushort modifier, ushort key)
         {
-            SendVirtualKeyDown(modifier);
-            SendVirtualKey(key);
-            SendVirtualKeyUp(modifier);
+            _inputService.SendShortcut(modifier, key);
         }
 
-        private static void SendKeyWithModifiers(ushort key, bool ctrl, bool alt, bool shift)
+        private void SendKeyWithModifiers(ushort key, bool ctrl, bool alt, bool shift)
         {
-            if (ctrl) SendVirtualKeyDown(0x11);
-            if (alt) SendVirtualKeyDown(0x12);
-            if (shift) SendVirtualKeyDown(0x10);
-            SendVirtualKey(key);
-            if (shift) SendVirtualKeyUp(0x10);
-            if (alt) SendVirtualKeyUp(0x12);
-            if (ctrl) SendVirtualKeyUp(0x11);
+            _inputService.SendKeyWithModifiers(key, ctrl, alt, shift);
         }
 
-        private static void SendVirtualKey(ushort key)
+        private void SendVirtualKey(ushort key)
         {
-            SendInputs(new[] { CreateKeyboardInput(key, 0, 0), CreateKeyboardInput(key, 0, KeyEventKeyUp) });
+            _inputService.SendVirtualKey(key);
         }
 
-        private static void SendVirtualKeyDown(ushort key)
+        private void SendVirtualKeyDown(ushort key)
         {
-            SendInputs(new[] { CreateKeyboardInput(key, 0, 0) });
+            _inputService.SendVirtualKeyDown(key);
         }
 
-        private static void SendVirtualKeyUp(ushort key)
+        private void SendVirtualKeyUp(ushort key)
         {
-            SendInputs(new[] { CreateKeyboardInput(key, 0, KeyEventKeyUp) });
+            _inputService.SendVirtualKeyUp(key);
         }
 
-        private static Input CreateKeyboardInput(ushort virtualKey, ushort scanCode, uint flags)
+        private void SendMouseClick(string button)
         {
-            return new Input
-            {
-                Type = InputKeyboard,
-                Union = new InputUnion
-                {
-                    Keyboard = new KeyboardInput
-                    {
-                        VirtualKey = virtualKey,
-                        ScanCode = scanCode,
-                        Flags = flags
-                    }
-                }
-            };
+            _inputService.SendMouseClick(button);
         }
 
-        private static void SendMouseClick(string button)
-        {
-            (uint down, uint up) = button switch
-            {
-                "left" => (MouseEventLeftDown, MouseEventLeftUp),
-                "right" => (MouseEventRightDown, MouseEventRightUp),
-                "middle" => (MouseEventMiddleDown, MouseEventMiddleUp),
-                _ => throw new InvalidOperationException($"Unsupported mouse button: {button}")
-            };
-            SendInputs(new[] { CreateMouseInput(down, 0) });
-            Thread.Sleep(25);
-            SendInputs(new[] { CreateMouseInput(up, 0) });
-        }
-
-        private static void SendMouseWheel(int delta, bool horizontal)
+        private void SendMouseWheel(int delta, bool horizontal)
         {
             _ = horizontal;
-            SendInputs(new[] { CreateMouseInput(MouseEventWheel, unchecked((uint)delta)) });
+            _inputService.SendMouseWheel(delta);
         }
 
-        private static Input CreateMouseInput(uint flags, uint data)
+        private bool TryReadClipboardText(out string text)
         {
-            return new Input
-            {
-                Type = InputMouse,
-                Union = new InputUnion
-                {
-                    Mouse = new MouseInput
-                    {
-                        MouseData = data,
-                        Flags = flags
-                    }
-                }
-            };
-        }
-
-        private static void SendInputs(Input[] inputs)
-        {
-            if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>()) != inputs.Length)
-            {
-                throw new InvalidOperationException("Windows rejected browser input automation.");
-            }
-        }
-
-        private static bool TryReadClipboardText(out string text)
-        {
-            text = string.Empty;
-            if (!OpenClipboard(IntPtr.Zero))
-            {
-                return false;
-            }
-
-            try
-            {
-                IntPtr handle = GetClipboardData(CfUnicodeText);
-                if (handle == IntPtr.Zero)
-                {
-                    return false;
-                }
-
-                IntPtr pointer = GlobalLock(handle);
-                if (pointer == IntPtr.Zero)
-                {
-                    return false;
-                }
-
-                try
-                {
-                    text = Marshal.PtrToStringUni(pointer) ?? string.Empty;
-                    return true;
-                }
-                finally
-                {
-                    GlobalUnlock(handle);
-                }
-            }
-            finally
-            {
-                CloseClipboard();
-            }
-        }
-
-        private sealed class BrowserCapture
-        {
-            public IntPtr Window { get; set; }
-            public string ImagePath { get; set; } = string.Empty;
-            public int ImageWidth { get; set; }
-            public int ImageHeight { get; set; }
-            public int OriginalImageWidth { get; set; }
-            public int OriginalImageHeight { get; set; }
-            public int PaddingLeft { get; set; }
-            public int PaddingTop { get; set; }
+            return _inputService.TryReadClipboardText(out text);
         }
 
         private sealed class WindowInfo
@@ -1847,89 +1216,6 @@ namespace TxtAIEditor.Controls
             public int Bottom;
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct Point
-        {
-            public int X;
-            public int Y;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct Input
-        {
-            public uint Type;
-            public InputUnion Union;
-        }
-
-        [StructLayout(LayoutKind.Explicit)]
-        private struct InputUnion
-        {
-            [FieldOffset(0)] public MouseInput Mouse;
-            [FieldOffset(0)] public KeyboardInput Keyboard;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct MouseInput
-        {
-            public int X;
-            public int Y;
-            public uint MouseData;
-            public uint Flags;
-            public uint Time;
-            public UIntPtr ExtraInfo;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct BitmapInfoHeader
-        {
-            public uint Size;
-            public int Width;
-            public int Height;
-            public ushort Planes;
-            public ushort BitCount;
-            public uint Compression;
-            public uint SizeImage;
-            public int XPixelsPerMeter;
-            public int YPixelsPerMeter;
-            public uint ColorsUsed;
-            public uint ColorsImportant;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct BitmapInfo
-        {
-            public BitmapInfoHeader Header;
-            public uint Colors;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct KeyboardInput
-        {
-            public ushort VirtualKey;
-            public ushort ScanCode;
-            public uint Flags;
-            public uint Time;
-            public UIntPtr ExtraInfo;
-        }
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern uint SendInput(uint inputCount, Input[] inputs, int inputSize);
-
-        [DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr window);
-
-        [DllImport("user32.dll")]
-        private static extern bool BringWindowToTop(IntPtr window);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr SetActiveWindow(IntPtr window);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr SetFocus(IntPtr window);
-
-        [DllImport("user32.dll")]
-        private static extern bool AttachThreadInput(uint attachThread, uint attachToThread, bool attach);
-
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
@@ -1943,25 +1229,7 @@ namespace TxtAIEditor.Controls
         private static extern bool IsWindowVisible(IntPtr window);
 
         [DllImport("user32.dll")]
-        private static extern bool IsIconic(IntPtr window);
-
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr window, int command);
-
-        [DllImport("user32.dll")]
-        private static extern bool SetCursorPos(int x, int y);
-
-        [DllImport("user32.dll")]
-        private static extern bool GetCursorPos(out Point point);
-
-        [DllImport("user32.dll")]
         private static extern bool GetWindowRect(IntPtr window, out Rect rect);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetDC(IntPtr window);
-
-        [DllImport("user32.dll")]
-        private static extern int ReleaseDC(IntPtr window, IntPtr deviceContext);
 
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
@@ -1972,101 +1240,5 @@ namespace TxtAIEditor.Controls
         [DllImport("user32.dll")]
         private static extern int GetWindowTextLength(IntPtr window);
 
-        [DllImport("user32.dll")]
-        private static extern uint GetClipboardSequenceNumber();
-
-        [DllImport("user32.dll")]
-        private static extern bool OpenClipboard(IntPtr newOwner);
-
-        [DllImport("user32.dll")]
-        private static extern bool CloseClipboard();
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetClipboardData(uint format);
-
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GlobalLock(IntPtr memory);
-
-        [DllImport("kernel32.dll")]
-        private static extern bool GlobalUnlock(IntPtr memory);
-
-        [DllImport("kernel32.dll")]
-        private static extern uint GetCurrentThreadId();
-
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateCompatibleDC(IntPtr deviceContext);
-
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateCompatibleBitmap(IntPtr deviceContext, int width, int height);
-
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr SelectObject(IntPtr deviceContext, IntPtr gdiObject);
-
-        [DllImport("gdi32.dll")]
-        private static extern bool DeleteObject(IntPtr gdiObject);
-
-        [DllImport("gdi32.dll")]
-        private static extern bool DeleteDC(IntPtr deviceContext);
-
-        [DllImport("gdi32.dll")]
-        private static extern int SetStretchBltMode(IntPtr deviceContext, int stretchMode);
-
-        [DllImport("gdi32.dll")]
-        private static extern bool StretchBlt(
-            IntPtr destinationDeviceContext,
-            int destinationX,
-            int destinationY,
-            int destinationWidth,
-            int destinationHeight,
-            IntPtr sourceDeviceContext,
-            int sourceX,
-            int sourceY,
-            int sourceWidth,
-            int sourceHeight,
-            uint rasterOperation);
-
-        [DllImport("gdi32.dll")]
-        private static extern int GetDIBits(
-            IntPtr deviceContext,
-            IntPtr bitmap,
-            uint startScan,
-            uint scanLineCount,
-            [Out] byte[] bits,
-            ref BitmapInfo bitmapInfo,
-            uint usage);
-
-        private async Task AttachCaptureImageAsync(string imagePath, CancellationToken cancellationToken)
-        {
-            if (_addImageAttachment == null || !File.Exists(imagePath))
-            {
-                return;
-            }
-
-            try
-            {
-                byte[] bytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
-                var attachment = new LlmMessageAttachment
-                {
-                    DisplayName = Path.GetFileName(imagePath),
-                    MimeType = "image/png",
-                    Base64Data = Convert.ToBase64String(bytes),
-                    Width = MaxCaptureDimension,
-                    Height = MaxCaptureDimension,
-                    EstimatedTokens = EstimateImageTokens(MaxCaptureDimension, MaxCaptureDimension)
-                };
-                _addImageAttachment(attachment);
-            }
-            catch
-            {
-                // Ignore attachment errors to prevent tool failure
-            }
-        }
-
-        private static int EstimateImageTokens(int width, int height)
-        {
-            int tilesWide = Math.Max(1, (int)Math.Ceiling(width / 512.0));
-            int tilesHigh = Math.Max(1, (int)Math.Ceiling(height / 512.0));
-            return 85 + (tilesWide * tilesHigh * 170);
-        }
     }
 }
