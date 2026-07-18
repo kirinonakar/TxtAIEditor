@@ -355,7 +355,7 @@
                                     <ToggleButton x:Name="FavoritesFileTab" Grid.Column="0" Content="파일" FontSize="13" Height="30" Padding="10,0" Margin="15,0,0,0" IsChecked="True" Click="OnFavoritesTabClick"/>
                                     <ToggleButton x:Name="FavoritesFolderTab" Grid.Column="1" Content="폴더" FontSize="13" Height="30" Padding="10,0" Margin="6,0,0,0" Click="OnFavoritesTabClick"/>
                                 </Grid>
-                                <ListView x:Name="FavoritesListView" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFavoriteItemClick" AllowDrop="True" CanReorderItems="True">
+                                <ListView x:Name="FavoritesListView" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFavoriteItemClick" AllowDrop="True" CanDragItems="True" CanReorderItems="True">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding Path}">
