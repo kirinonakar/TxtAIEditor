@@ -484,7 +484,7 @@
                                                             <TextBlock Text="{x:Bind RelativeDirectory}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                                         </StackPanel>
                                                         <Border Grid.Column="2" Background="{ThemeResource SystemControlBackgroundAccentBrush}" CornerRadius="10" Padding="6,1,6,1" VerticalAlignment="Center">
-                                                            <TextBlock Text="{x:Bind MatchCount}" FontSize="8" FontWeight="Bold" Foreground="White"/>
+                                                            <TextBlock Text="{x:Bind MatchCount, Mode=OneWay}" FontSize="8" FontWeight="Bold" Foreground="White"/>
                                                         </Border>
                                                     </Grid>
                                                 </DataTemplate>

@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using Microsoft.UI.Xaml;
 
 namespace TxtAIEditor.Core.Models
@@ -70,7 +73,7 @@ namespace TxtAIEditor.Core.Models
         public Visibility ReplaceButtonVisibility => CanReplace ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    public class SearchResultGroup : System.Collections.Generic.List<SearchResultItem>
+    public class SearchResultGroup : ObservableCollection<SearchResultItem>
     {
         public string Path { get; set; } = string.Empty;
         public string FileName => System.IO.Path.GetFileName(Path);
@@ -82,6 +85,12 @@ namespace TxtAIEditor.Core.Models
         {
             Path = path;
             RelativeDirectory = relativeDirectory;
+        }
+
+        protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+        {
+            base.OnCollectionChanged(e);
+            OnPropertyChanged(new PropertyChangedEventArgs(nameof(MatchCount)));
         }
     }
 }

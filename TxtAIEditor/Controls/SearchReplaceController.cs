@@ -36,7 +36,6 @@ namespace TxtAIEditor.Controls
         private string _lastSearchQuery = string.Empty;
         private CancellationTokenSource? _searchCancellationTokenSource;
         private int _searchVersion;
-        private int _groupedResultsUpdateQueued;
         public event Func<string, Task>? FileModified;
 
         public SearchReplaceController(
@@ -449,69 +448,100 @@ namespace TxtAIEditor.Controls
                         _viewModel.SearchResults.Add(item);
                     }
                 }
-                QueueGroupedResultsUpdate();
+
+                AppendGroupedResults(results);
             });
         }
 
         private void UpdateGroupedResults()
         {
-            QueueGroupedResultsUpdate();
+            SynchronizeGroupedResults();
         }
 
-        private void QueueGroupedResultsUpdate()
+        private void AppendGroupedResults(System.Collections.Generic.IReadOnlyList<SearchResultItem> results)
         {
-            if (Interlocked.Exchange(ref _groupedResultsUpdateQueued, 1) == 1)
+            foreach (var resultGroup in results.GroupBy(item => item.Path))
             {
-                return;
-            }
+                SearchResultGroup? existingGroup = _viewModel.SearchResultsGrouped.FirstOrDefault(
+                    group => string.Equals(group.Path, resultGroup.Key, StringComparison.OrdinalIgnoreCase));
 
-            bool queued = _searchResultsList.DispatcherQueue.TryEnqueue(() =>
-            {
-                Interlocked.Exchange(ref _groupedResultsUpdateQueued, 0);
-                RebuildGroupedResults();
-            });
+                if (existingGroup == null)
+                {
+                    _viewModel.SearchResultsGrouped.Add(new SearchResultGroup(
+                        resultGroup.Key,
+                        resultGroup,
+                        GetRelativeDirectory(resultGroup.Key)));
+                    continue;
+                }
 
-            if (!queued)
-            {
-                Interlocked.Exchange(ref _groupedResultsUpdateQueued, 0);
+                foreach (SearchResultItem item in resultGroup)
+                {
+                    existingGroup.Add(item);
+                }
             }
         }
 
-        private void RebuildGroupedResults()
+        private void SynchronizeGroupedResults()
+        {
+            var currentItemsByPath = _viewModel.SearchResults
+                .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+            for (int groupIndex = _viewModel.SearchResultsGrouped.Count - 1; groupIndex >= 0; groupIndex--)
+            {
+                SearchResultGroup group = _viewModel.SearchResultsGrouped[groupIndex];
+                if (!currentItemsByPath.TryGetValue(group.Path, out var currentItems))
+                {
+                    _viewModel.SearchResultsGrouped.RemoveAt(groupIndex);
+                    continue;
+                }
+
+                for (int itemIndex = group.Count - 1; itemIndex >= 0; itemIndex--)
+                {
+                    if (!currentItems.Contains(group[itemIndex]))
+                    {
+                        group.RemoveAt(itemIndex);
+                    }
+                }
+
+                foreach (SearchResultItem item in currentItems)
+                {
+                    if (!group.Contains(item))
+                    {
+                        group.Add(item);
+                    }
+                }
+
+                currentItemsByPath.Remove(group.Path);
+            }
+
+            foreach (var remainingGroup in currentItemsByPath)
+            {
+                _viewModel.SearchResultsGrouped.Add(new SearchResultGroup(
+                    remainingGroup.Key,
+                    remainingGroup.Value,
+                    GetRelativeDirectory(remainingGroup.Key)));
+            }
+        }
+
+        private string GetRelativeDirectory(string path)
         {
             string searchRoot = _searchRootProvider();
-            var groups = _viewModel.SearchResults
-                .GroupBy(item => item.Path)
-                .Select(g =>
-                {
-                    string relDir = "";
-                    try
-                    {
-                        if (!string.IsNullOrEmpty(searchRoot) && g.Key.StartsWith(searchRoot, StringComparison.OrdinalIgnoreCase))
-                        {
-                            string relPath = Path.GetRelativePath(searchRoot, g.Key);
-                            string? dir = Path.GetDirectoryName(relPath);
-                            relDir = string.IsNullOrEmpty(dir) || dir == "." ? "" : dir.Replace('\\', '/');
-                        }
-                        else
-                        {
-                            string? dir = Path.GetDirectoryName(g.Key);
-                            relDir = string.IsNullOrEmpty(dir) ? "" : dir.Replace('\\', '/');
-                        }
-                    }
-                    catch
-                    {
-                        relDir = Path.GetDirectoryName(g.Key) ?? "";
-                    }
-
-                    return new SearchResultGroup(g.Key, g.ToList(), relDir);
-                })
-                .ToList();
-
-            _viewModel.SearchResultsGrouped.Clear();
-            foreach (var grp in groups)
+            try
             {
-                _viewModel.SearchResultsGrouped.Add(grp);
+                if (!string.IsNullOrEmpty(searchRoot) && path.StartsWith(searchRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    string relPath = Path.GetRelativePath(searchRoot, path);
+                    string? directory = Path.GetDirectoryName(relPath);
+                    return string.IsNullOrEmpty(directory) || directory == "." ? "" : directory.Replace('\\', '/');
+                }
+
+                string? fullDirectory = Path.GetDirectoryName(path);
+                return string.IsNullOrEmpty(fullDirectory) ? "" : fullDirectory.Replace('\\', '/');
+            }
+            catch
+            {
+                return Path.GetDirectoryName(path) ?? "";
             }
         }
     }
