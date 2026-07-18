@@ -95,7 +95,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   **Instruction Presets:** Save instructions as custom prompt presets for quick access.
 
 ### 🤖 AI Agent
-*   **Autonomous Problem Solving:** Executes multi-step workspace tasks using tools (file I/O, terminal execution, web search/fetch, and document text extraction).
+*   **Complex Workspace Tasks:** Executes multi-step workspace tasks using tools (file I/O, terminal execution, web search/fetch, and document text extraction).
 *   **Multisession Management:** Runs and manages parallel, fully isolated agent environments (workspace paths, settings, history, and background execution).
 *   **Model Context Protocol (MCP) Support:** Dynamically connects HTTP or stdio MCP servers to expose custom tools to the agent, with built-in support for:
     *   **Browser Use & Computer Use Plugin:** Control the Windows default browser and interact with PC-level application windows using screen capture, clicks, and keyboard inputs.
