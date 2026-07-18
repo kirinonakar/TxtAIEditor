@@ -144,8 +144,10 @@ namespace TxtAIEditor.Core.Services
             {
                 return new[]
                 {
+                    "grok-4.5",
                     "glm-5.2",
                     "glm-5.1",
+                    "kimi-k3",
                     "kimi-k2.7-code",
                     "kimi-k2.6",
                     "mimo-v2.5",
