@@ -20,19 +20,20 @@ namespace TxtAIEditor
         private FileSystemWatcher? _ipcWatcher;
         private uint _comCookie;
         private static bool _isComActivation;
-        private static Timer? _exitTimer;
+        private static Timer? _idleExitTimer;
+        private static Timer? _maxLifetimeExitTimer;
         private static Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue;
         private static int _comExitRequested;
         private static int _comExitCompleted;
+        private static int _comForceExitRequested;
         private static int _comActiveCallCount;
         private static int _comServerLockCount;
         private static int _comInvokeCompleted;
         private int _appCleanupStarted;
-        private static long _comStartedTicks;
-        private static long _lastActivityTicks;
         private static TxtAIEditorExplorerCommandFactory? _commandFactory;
-        private const int ComIdleExitTimeoutMs = 60000;
-        private const int ComMaxLifetimeMs = 300000;
+        private const int ComIdleExitTimeoutMs = 15000;
+        private const int ComMaxLifetimeMs = 60000;
+        private const int ComActiveCallRetryDelayMs = 250;
         private const int ComExitFallbackDelayMs = 1500;
         private const int ComPostInvokeExitDelayMs = 3000;
         private const string ExplorerCommandClsid = "8D0B4C32-6D84-4B8A-8F3B-7E5408BEF1A1";
@@ -161,7 +162,6 @@ namespace TxtAIEditor
         private void StartExplorerCommandServer()
         {
             _isComActivation = true;
-            _comStartedTicks = DateTime.UtcNow.Ticks;
 
             try
             {
@@ -181,7 +181,16 @@ namespace TxtAIEditor
                     Marshal.Release(factoryPtr);
                 }
 
-                _exitTimer = new Timer(_ => RequestComExit(0), null, ComIdleExitTimeoutMs, Timeout.Infinite);
+                _idleExitTimer = new Timer(
+                    _ => RequestComExit(0, force: false),
+                    null,
+                    ComIdleExitTimeoutMs,
+                    Timeout.Infinite);
+                _maxLifetimeExitTimer = new Timer(
+                    _ => RequestComExit(0, force: true),
+                    null,
+                    ComMaxLifetimeMs,
+                    Timeout.Infinite);
             }
             catch (Exception ex)
             {
@@ -190,16 +199,22 @@ namespace TxtAIEditor
             }
         }
 
-        private void RequestComExit(int exitCode)
+        private void RequestComExit(int exitCode, bool force)
         {
             if (Volatile.Read(ref _comExitCompleted) != 0)
             {
                 return;
             }
 
-            if (ShouldDeferComExit())
+            if (force)
             {
-                ScheduleComExitTimer();
+                Interlocked.Exchange(ref _comForceExitRequested, 1);
+            }
+
+            bool forceExit = Volatile.Read(ref _comForceExitRequested) != 0;
+            if (ShouldDeferComExit(forceExit))
+            {
+                ScheduleComExitTimer(forceExit ? ComActiveCallRetryDelayMs : ComIdleExitTimeoutMs);
                 return;
             }
 
@@ -235,10 +250,11 @@ namespace TxtAIEditor
 
         private void CompleteComExit(int exitCode)
         {
-            if (ShouldDeferComExit())
+            bool forceExit = Volatile.Read(ref _comForceExitRequested) != 0;
+            if (ShouldDeferComExit(forceExit))
             {
                 Interlocked.Exchange(ref _comExitRequested, 0);
-                ScheduleComExitTimer();
+                ScheduleComExitTimer(forceExit ? ComActiveCallRetryDelayMs : ComIdleExitTimeoutMs);
                 return;
             }
 
@@ -247,7 +263,8 @@ namespace TxtAIEditor
                 return;
             }
 
-            Interlocked.Exchange(ref _exitTimer, null)?.Dispose();
+            Interlocked.Exchange(ref _idleExitTimer, null)?.Dispose();
+            Interlocked.Exchange(ref _maxLifetimeExitTimer, null)?.Dispose();
 
             try
             {
@@ -269,43 +286,31 @@ namespace TxtAIEditor
         {
             try
             {
-                TerminateProcess(GetCurrentProcess(), unchecked((uint)exitCode));
+                if (TerminateProcess(GetCurrentProcess(), unchecked((uint)exitCode)))
+                {
+                    return;
+                }
             }
             catch
             {
-                Environment.Exit(exitCode);
             }
+
+            Environment.Exit(exitCode);
         }
 
-        private static bool ShouldDeferComExit()
+        private static bool ShouldDeferComExit(bool force)
         {
-            if (IsComMaxLifetimeExceeded())
-            {
-                return false;
-            }
-
             if (Volatile.Read(ref _comActiveCallCount) > 0)
             {
                 return true;
             }
 
-            return Volatile.Read(ref _comInvokeCompleted) == 0 &&
+            return !force &&
+                Volatile.Read(ref _comInvokeCompleted) == 0 &&
                 Volatile.Read(ref _comServerLockCount) > 0;
         }
 
-        private static bool IsComMaxLifetimeExceeded()
-        {
-            long startedTicks = Volatile.Read(ref _comStartedTicks);
-            if (startedTicks <= 0)
-            {
-                return false;
-            }
-
-            long elapsedTicks = DateTime.UtcNow.Ticks - startedTicks;
-            return elapsedTicks >= TimeSpan.FromMilliseconds(ComMaxLifetimeMs).Ticks;
-        }
-
-        private static void ScheduleComExitTimer()
+        private static void ScheduleComExitTimer(int delayMs)
         {
             if (!_isComActivation || Volatile.Read(ref _comExitCompleted) != 0)
             {
@@ -314,7 +319,7 @@ namespace TxtAIEditor
 
             try
             {
-                _exitTimer?.Change(ComIdleExitTimeoutMs, Timeout.Infinite);
+                _idleExitTimer?.Change(delayMs, Timeout.Infinite);
             }
             catch
             {
@@ -339,9 +344,17 @@ namespace TxtAIEditor
                 return;
             }
 
-            if (Interlocked.Decrement(ref _comActiveCallCount) < 0)
+            int remainingCalls = Interlocked.Decrement(ref _comActiveCallCount);
+            if (remainingCalls < 0)
             {
                 Interlocked.Exchange(ref _comActiveCallCount, 0);
+                remainingCalls = 0;
+            }
+
+            if (remainingCalls == 0 && Volatile.Read(ref _comForceExitRequested) != 0)
+            {
+                ScheduleComExitTimer(ComActiveCallRetryDelayMs);
+                return;
             }
 
             MarkComActivity();
@@ -377,7 +390,10 @@ namespace TxtAIEditor
 
             try
             {
-                _exitTimer?.Change(ComPostInvokeExitDelayMs, Timeout.Infinite);
+                int delayMs = Volatile.Read(ref _comForceExitRequested) != 0
+                    ? ComActiveCallRetryDelayMs
+                    : ComPostInvokeExitDelayMs;
+                _idleExitTimer?.Change(delayMs, Timeout.Infinite);
             }
             catch
             {
@@ -391,17 +407,14 @@ namespace TxtAIEditor
                 return;
             }
 
-            long now = DateTime.UtcNow.Ticks;
-            if (now - Volatile.Read(ref _lastActivityTicks) < TimeSpan.TicksPerSecond)
+            if (Volatile.Read(ref _comForceExitRequested) != 0)
             {
                 return;
             }
 
-            Volatile.Write(ref _lastActivityTicks, now);
-
             try
             {
-                _exitTimer?.Change(ComIdleExitTimeoutMs, Timeout.Infinite);
+                _idleExitTimer?.Change(ComIdleExitTimeoutMs, Timeout.Infinite);
             }
             catch
             {
