@@ -157,9 +157,9 @@ namespace TxtAIEditor.Controls
                 .ToDictionary(group => group.Key, group => group.First().index, StringComparer.OrdinalIgnoreCase);
 
             var sorted = items
-                .OrderByDescending(i => i.IsPinned)
-                .ThenBy(i => i.IsPinned && pinnedOrder.TryGetValue(i.Path, out int index) ? index : int.MaxValue)
-                .ThenBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Where(item => item.IsPinned)
+                .OrderBy(item => pinnedOrder.TryGetValue(item.Path, out int index) ? index : int.MaxValue)
+                .Concat(items.Where(item => !item.IsPinned).Reverse())
                 .ToList();
 
             sorted = sorted.Where(i => i.IsFolder == !showFiles).ToList();
