@@ -57,14 +57,17 @@ namespace TxtAIEditor.Controls
         {
             _allRecentItems.Clear();
             _recentFilesService.LoadInto(_allRecentItems);
-            bool showFiles = _leftSidebar.RecentFileTabButton.IsChecked == true;
-            RefreshRecentFiles(showFiles);
+            RefreshRecentFiles();
         }
 
-        public void RefreshRecentFiles(bool filterFiles)
+        public void RefreshRecentFiles(bool? filterFiles = null)
         {
+            bool showFiles = filterFiles ?? IsFileTabSelected(
+                _leftSidebar.RecentFileTabButton,
+                _leftSidebar.RecentFolderTabButton);
+
             _viewModel.RecentFiles.Clear();
-            var filtered = _allRecentItems.Where(i => i.IsFolder == !filterFiles).ToList();
+            var filtered = _allRecentItems.Where(i => i.IsFolder == !showFiles).ToList();
             foreach (var item in filtered)
             {
                 _viewModel.RecentFiles.Add(item);
@@ -76,8 +79,7 @@ namespace TxtAIEditor.Controls
             _enqueueOnUiThread(() =>
             {
                 _recentFilesService.Add(_allRecentItems, filePath, isFolder: false);
-                bool showFiles = _leftSidebar.RecentFileTabButton.IsChecked == true;
-                RefreshRecentFiles(showFiles);
+                RefreshRecentFiles();
             });
         }
 
@@ -86,8 +88,7 @@ namespace TxtAIEditor.Controls
             _enqueueOnUiThread(() =>
             {
                 _recentFilesService.Add(_allRecentItems, folderPath, isFolder: true);
-                bool showFiles = _leftSidebar.RecentFileTabButton.IsChecked == true;
-                RefreshRecentFiles(showFiles);
+                RefreshRecentFiles();
             });
         }
 
@@ -124,11 +125,17 @@ namespace TxtAIEditor.Controls
 
         public void RefreshFavorites()
         {
-            RefreshFavorites(null);
+            RefreshFavorites(IsFileTabSelected(
+                _leftSidebar.FavoritesFileTabButton,
+                _leftSidebar.FavoritesFolderTabButton));
         }
 
         public void RefreshFavorites(bool? filterFiles)
         {
+            bool showFiles = filterFiles ?? IsFileTabSelected(
+                _leftSidebar.FavoritesFileTabButton,
+                _leftSidebar.FavoritesFolderTabButton);
+
             _viewModel.Favorites.Clear();
             var settings = _settingsService.CurrentSettings;
             var items = new List<FavoriteItem>();
@@ -144,15 +151,17 @@ namespace TxtAIEditor.Controls
                 .ThenBy(i => i.Name)
                 .ToList();
 
-            if (filterFiles.HasValue)
-            {
-                sorted = sorted.Where(i => i.IsFolder == !filterFiles.Value).ToList();
-            }
+            sorted = sorted.Where(i => i.IsFolder == !showFiles).ToList();
 
             foreach (var item in sorted)
             {
                 _viewModel.Favorites.Add(item);
             }
+        }
+
+        private static bool IsFileTabSelected(ToggleButton fileTab, ToggleButton folderTab)
+        {
+            return fileTab.IsChecked == true || folderTab.IsChecked != true;
         }
 
         private void WireEvents()
@@ -367,8 +376,7 @@ namespace TxtAIEditor.Controls
             if (sender is Button { Tag: string path })
             {
                 _recentFilesService.Remove(_allRecentItems, path);
-                bool showFiles = _leftSidebar.RecentFileTabButton.IsChecked == true;
-                RefreshRecentFiles(showFiles);
+                RefreshRecentFiles();
             }
         }
 
