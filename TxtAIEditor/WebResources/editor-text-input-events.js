@@ -12,10 +12,12 @@ import {
     consumePendingColumnTextInput,
     graphemeDeleteEnd,
     graphemeDeleteStart,
+    MAX_RENDER_CHARS,
     queueRender,
     state,
     syncCustomSelectionClass
 } from './editor-core.js';
+import { renderLineContent } from './editor-highlighter.js';
 import {
     activeColumnSelection,
     hasCustomSelection,
@@ -42,6 +44,7 @@ import {
     moveCaretVertical,
     replaceSelectionForCompositionStart,
     replaceSelectionWith,
+    setCaret,
     shouldSuppressNativeBeforeInput,
     updateSingleLine
 } from './editor-commands.js';
@@ -53,6 +56,27 @@ import {
 export function bindTextInputEvents({ renderer }) {
     const { clearPendingInlineLivePreviewFocusForLine } = renderer;
     let postCompositionNavigationInputGuard = null;
+
+    function restoreInputLineHighlighting(element, inputSnapshot) {
+        if (!element?.isConnected || !inputSnapshot ||
+            state.isComposing || state.rangeComposition || state.columnComposition) {
+            return;
+        }
+
+        const lineNumber = Number(element.dataset.line || 0);
+        if (!lineNumber || lineNumber !== inputSnapshot.lineNumber ||
+            element.getAttribute('contenteditable') !== 'true') {
+            return;
+        }
+
+        const text = inputSnapshot.text || '';
+        if (text.length > MAX_RENDER_CHARS) {
+            element.textContent = text;
+        } else {
+            element.innerHTML = renderLineContent(lineNumber, text);
+        }
+        setCaret(element, inputSnapshot.caretOffset);
+    }
 
     function guardNextCompositionInput(lineNumber) {
         const guard = { lineNumber: Number(lineNumber || 0) };
@@ -100,6 +124,7 @@ export function bindTextInputEvents({ renderer }) {
             }
             const inputSnapshot = commitLine(element);
             if (!state.isComposing && !state.rangeComposition) {
+                restoreInputLineHighlighting(element, inputSnapshot);
                 triggerAutocomplete(element, inputSnapshot);
             }
         }
