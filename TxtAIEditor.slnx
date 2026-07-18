@@ -12,5 +12,4 @@
     <Build Solution="*|x86" Project="false" />
     <Deploy Solution="*|x64" />
   </Project>
-  <Project Path="TxtAIEditor.Tests/TxtAIEditor.Tests.csproj" />
 </Solution>
