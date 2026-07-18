@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
@@ -25,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string> _currentFolderProvider;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Action<string> _loadDirectoryRoot;
+        private readonly Action<string> _refreshTreeFolder;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Func<string, Task> _openFileInExternalViewerAsync;
         private readonly Func<string, Task> _openFileWithDefaultProgramAsync;
@@ -41,6 +43,7 @@ namespace TxtAIEditor.Controls
         private readonly ConditionalWeakTable<MenuFlyout, object> _localizedFlyouts = new ConditionalWeakTable<MenuFlyout, object>();
 
         private System.Threading.CancellationTokenSource? _archiveCts;
+        private string _treeDropTargetFolderPath = string.Empty;
 
         public ExplorerFileActionsController(
             LeftSidebarPane leftSidebar,
@@ -52,6 +55,7 @@ namespace TxtAIEditor.Controls
             Func<string> currentFolderProvider,
             Func<OpenedTab?> activeTabProvider,
             Action<string> loadDirectoryRoot,
+            Action<string> refreshTreeFolder,
             Func<string, Task> loadFileIntoTabAsync,
             Func<string, Task> openFileInExternalViewerAsync,
             Func<string, Task> openFileWithDefaultProgramAsync,
@@ -75,6 +79,7 @@ namespace TxtAIEditor.Controls
             _currentFolderProvider = currentFolderProvider;
             _activeTabProvider = activeTabProvider;
             _loadDirectoryRoot = loadDirectoryRoot;
+            _refreshTreeFolder = refreshTreeFolder;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _openFileInExternalViewerAsync = openFileInExternalViewerAsync;
             _openFileWithDefaultProgramAsync = openFileWithDefaultProgramAsync;
@@ -111,6 +116,8 @@ namespace TxtAIEditor.Controls
             _leftSidebar.FileListViewDrop += OnFileListViewDrop;
             _leftSidebar.FileListViewItemDragOver += OnFileListViewItemDragOver;
             _leftSidebar.FileListViewItemDrop += OnFileListViewItemDrop;
+            _leftSidebar.ExplorerTreeDragOver += OnExplorerTreeDragOver;
+            _leftSidebar.ExplorerTreeDrop += OnExplorerTreeDrop;
         }
 
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -1042,6 +1049,175 @@ namespace TxtAIEditor.Controls
             {
                 deferral.Complete();
             }
+        }
+
+        private void OnExplorerTreeDragOver(object sender, DragEventArgs e)
+        {
+            ExplorerItem? item = FindExplorerItemAtTreePosition(e);
+            string targetDir = GetTreeDropTargetFolderPath(
+                item,
+                useProjectRootWhenNoItem: true);
+            _treeDropTargetFolderPath = targetDir;
+            if (string.IsNullOrWhiteSpace(targetDir) ||
+                !Directory.Exists(targetDir) ||
+                !e.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                e.AcceptedOperation = DataPackageOperation.None;
+                e.Handled = true;
+                return;
+            }
+
+            e.AcceptedOperation = DataPackageOperation.Copy;
+            string targetName = Path.GetFileName(
+                targetDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            string format = _getString("DragDropCopyItemCaptionFormat", "'{0}' 위치로 복사");
+            e.DragUIOverride.Caption = string.Format(
+                format,
+                string.IsNullOrWhiteSpace(targetName) ? targetDir : targetName);
+            e.DragUIOverride.IsCaptionVisible = true;
+            e.DragUIOverride.IsContentVisible = true;
+            e.Handled = true;
+        }
+
+        private async void OnExplorerTreeDrop(object sender, DragEventArgs e)
+        {
+            e.Handled = true;
+            if (!e.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                return;
+            }
+
+            ExplorerItem? targetItem = FindExplorerItemAtTreePosition(e);
+            string targetDir = GetTreeDropTargetFolderPath(targetItem, useProjectRootWhenNoItem: false);
+            if (string.IsNullOrWhiteSpace(targetDir))
+            {
+                targetDir = _treeDropTargetFolderPath;
+            }
+
+            _treeDropTargetFolderPath = string.Empty;
+            if (string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(targetDir))
+            {
+                e.AcceptedOperation = DataPackageOperation.None;
+                return;
+            }
+
+            var deferral = e.GetDeferral();
+            try
+            {
+                var items = await e.DataView.GetStorageItemsAsync();
+                foreach (var item in items)
+                {
+                    await CopyStorageItemAsync(item.Path, targetDir);
+                }
+
+                _refreshTreeFolder(targetDir);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("DragDropCopyErrorTitle", "드래그 앤 드롭 복사 오류"),
+                    ex.Message);
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        }
+
+        private string GetTreeDropTargetFolderPath(
+            ExplorerItem? item,
+            bool useProjectRootWhenNoItem)
+        {
+            if (item == null)
+            {
+                if (!useProjectRootWhenNoItem)
+                {
+                    return string.Empty;
+                }
+
+                string currentFolder = _currentFolderProvider();
+                return Directory.Exists(currentFolder) ? currentFolder : string.Empty;
+            }
+
+            if (item.IsArchiveEntry || item.IsArchive)
+            {
+                return string.Empty;
+            }
+
+            string targetDir = item.IsFolder
+                ? item.Path
+                : Path.GetDirectoryName(item.Path) ?? string.Empty;
+            return Directory.Exists(targetDir) ? targetDir : string.Empty;
+        }
+
+        private ExplorerItem? FindExplorerItemAtTreePosition(DragEventArgs e)
+        {
+            TreeView tree = _leftSidebar.ExplorerTree;
+            Windows.Foundation.Point position = e.GetPosition(tree);
+            TreeViewItem? hitItem = null;
+            FindTreeViewItemAtPosition(tree, tree, position, ref hitItem);
+            if (hitItem == null)
+            {
+                return null;
+            }
+
+            return GetTreeExplorerItem(hitItem.DataContext)
+                ?? GetTreeExplorerItem(hitItem.Content);
+        }
+
+        private static void FindTreeViewItemAtPosition(
+            DependencyObject parent,
+            TreeView tree,
+            Windows.Foundation.Point position,
+            ref TreeViewItem? hitItem)
+        {
+            int childCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (int index = 0; index < childCount; index++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(parent, index);
+                if (child is TreeViewItem treeViewItem &&
+                    treeViewItem.Visibility == Visibility.Visible &&
+                    IsPositionInsideElement(treeViewItem, tree, position))
+                {
+                    hitItem = treeViewItem;
+                }
+
+                FindTreeViewItemAtPosition(child, tree, position, ref hitItem);
+            }
+        }
+
+        private static bool IsPositionInsideElement(
+            FrameworkElement element,
+            TreeView tree,
+            Windows.Foundation.Point position)
+        {
+            if (element.ActualWidth <= 0 || element.ActualHeight <= 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                Windows.Foundation.Point topLeft = element
+                    .TransformToVisual(tree)
+                    .TransformPoint(new Windows.Foundation.Point(0, 0));
+                var bounds = new Windows.Foundation.Rect(
+                    topLeft.X,
+                    topLeft.Y,
+                    element.ActualWidth,
+                    element.ActualHeight);
+                return bounds.Contains(position);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static ExplorerItem? GetTreeExplorerItem(object? value)
+        {
+            return value as ExplorerItem
+                ?? (value as TreeViewNode)?.Content as ExplorerItem;
         }
 
         private async Task CopyStorageItemAsync(string sourcePath, string targetDir)

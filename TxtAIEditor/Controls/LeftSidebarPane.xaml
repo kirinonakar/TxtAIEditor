@@ -267,6 +267,9 @@
                                           Margin="0,5,0,5"
                                           Visibility="Collapsed"
                                           SelectionMode="Single"
+                                          AllowDrop="True"
+                                          DragOver="OnExplorerTreeDragOver"
+                                          Drop="OnExplorerTreeDrop"
                                           Expanding="OnExplorerTreeExpanding"
                                           ItemInvoked="OnExplorerTreeItemInvoked">
                                     <TreeView.ItemTemplate>

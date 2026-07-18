@@ -69,6 +69,8 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExplorerTreeModeClick;
         public event EventHandler<TreeViewExpandingEventArgs>? ExplorerTreeExpanding;
         public event EventHandler<TreeViewItemInvokedEventArgs>? ExplorerTreeItemInvoked;
+        public event DragEventHandler? ExplorerTreeDragOver;
+        public event DragEventHandler? ExplorerTreeDrop;
         public event ItemClickEventHandler? FileListViewItemClick;
         public event RightTappedEventHandler? FileListViewItemRightTapped;
         public event RoutedEventHandler? AddFileToFavoritesClick;
@@ -368,6 +370,8 @@ namespace TxtAIEditor.Controls
         private void OnExplorerTreeModeClick(object sender, RoutedEventArgs e) => ExplorerTreeModeClick?.Invoke(sender, e);
         private void OnExplorerTreeExpanding(TreeView sender, TreeViewExpandingEventArgs e) => ExplorerTreeExpanding?.Invoke(sender, e);
         private void OnExplorerTreeItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs e) => ExplorerTreeItemInvoked?.Invoke(sender, e);
+        private void OnExplorerTreeDragOver(object sender, DragEventArgs e) => ExplorerTreeDragOver?.Invoke(sender, e);
+        private void OnExplorerTreeDrop(object sender, DragEventArgs e) => ExplorerTreeDrop?.Invoke(sender, e);
         private void OnFileListViewItemClick(object sender, ItemClickEventArgs e) => FileListViewItemClick?.Invoke(sender, e);
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e) => FileListViewItemRightTapped?.Invoke(sender, e);
         private void OnAddFileToFavoritesClick(object sender, RoutedEventArgs e) => AddFileToFavoritesClick?.Invoke(sender, e);

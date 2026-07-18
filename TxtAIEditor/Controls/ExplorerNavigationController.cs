@@ -235,6 +235,26 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public void RefreshTreeFolder(string folderPath)
+        {
+            if (!IsTreeMode)
+            {
+                RefreshCurrentFolder();
+                return;
+            }
+
+            Microsoft.UI.Xaml.Controls.TreeViewNode? node = FindTreeNodeByPath(folderPath);
+            if (node == null)
+            {
+                LoadTreeRoot(CurrentFolderPath);
+                return;
+            }
+
+            node.IsExpanded = false;
+            PopulateTreeNode(node, forceReload: true);
+            node.IsExpanded = true;
+        }
+
         private void RefreshExplorerItemThemeColors()
         {
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
@@ -442,9 +462,12 @@ namespace TxtAIEditor.Controls
             _ = UpdateGitStatusesAsync();
         }
 
-        private void PopulateTreeNode(Microsoft.UI.Xaml.Controls.TreeViewNode node)
+        private void PopulateTreeNode(
+            Microsoft.UI.Xaml.Controls.TreeViewNode node,
+            bool forceReload = false)
         {
-            if (!node.HasUnrealizedChildren || node.Content is not ExplorerItem item)
+            if ((!forceReload && !node.HasUnrealizedChildren) ||
+                node.Content is not ExplorerItem item)
             {
                 return;
             }
@@ -492,6 +515,42 @@ namespace TxtAIEditor.Controls
             foreach (var rootNode in _leftSidebar.ExplorerTree.RootNodes)
             {
                 var match = FindTreeNode(rootNode, item);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private Microsoft.UI.Xaml.Controls.TreeViewNode? FindTreeNodeByPath(string folderPath)
+        {
+            foreach (var rootNode in _leftSidebar.ExplorerTree.RootNodes)
+            {
+                var match = FindTreeNodeByPath(rootNode, folderPath);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private static Microsoft.UI.Xaml.Controls.TreeViewNode? FindTreeNodeByPath(
+            Microsoft.UI.Xaml.Controls.TreeViewNode node,
+            string folderPath)
+        {
+            if (node.Content is ExplorerItem item &&
+                string.Equals(item.Path, folderPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return node;
+            }
+
+            foreach (var child in node.Children)
+            {
+                var match = FindTreeNodeByPath(child, folderPath);
                 if (match != null)
                 {
                     return match;

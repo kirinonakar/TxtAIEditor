@@ -222,6 +222,7 @@ namespace TxtAIEditor.Composition
                     () => state.CurrentRepoPath,
                     () => callbacks.OpenNewTab(),
                     workspaceModule.LoadDirectoryRoot,
+                    explorerNavigationController.RefreshTreeFolder,
                     callbacks.LoadFileIntoTabAsync,
                     livePreviewController.OpenFileInExternalViewerAsync,
                     livePreviewController.OpenFileWithDefaultProgramAsync,
