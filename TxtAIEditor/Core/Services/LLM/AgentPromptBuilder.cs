@@ -92,7 +92,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 builder.AppendLine("- Skill descriptions are routing summaries only. Do not treat a description as the full skill instructions, and do not infer missing skill rules from it.");
                 builder.AppendLine("- If an enabled skill is relevant to the task, call skill_use with the skill name before applying the skill, and treat the returned SKILL.md as the full skill instructions.");
                 builder.AppendLine("- Treat the returned Skill directory and the workspace as separate roots. Resolve every relative path from SKILL.md, including scripts/, references/, assets, modules, and schemas, against the Skill directory unless the skill explicitly says otherwise. Never search the workspace for bundled skill files merely because the current location is the workspace.");
-                builder.AppendLine("- Run skill scripts by absolute path or from the Skill directory so sibling files resolve correctly. Pass workspace or user files as separate absolute input/output paths.");
+                builder.AppendLine("- Always invoke a skill script by its absolute path under the returned Skill directory; never use a workspace-relative or Skill-directory-relative script path. If sibling files require it, set the working directory to the Skill directory but keep the script path absolute. Pass workspace or user files as separate absolute input/output paths.");
                 builder.AppendLine("- If an enabled skill is not relevant, ignore it.");
                 builder.AppendLine("- If a skill file cannot be read, state that briefly and continue with the best fallback.");
                 builder.AppendLine();
