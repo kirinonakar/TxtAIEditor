@@ -185,6 +185,17 @@ export function createHostMessageHandler({
             state.language = msg.language || 'plaintext';
             syncLanguageClass();
             state.isSplitView = !!msg.isSplitView;
+            if (msg.inlineLivePreviewEnabled !== undefined && msg.inlineLivePreviewEnabled !== null) {
+                state.inlineLivePreviewEnabled = !!msg.inlineLivePreviewEnabled;
+                state.livePreviewBaseHref = msg.livePreviewBaseHref || '';
+                state.inlineLivePreviewSourceLine = state.inlineLivePreviewEnabled
+                    ? Math.min(
+                        Math.max(1, Number(msg.lineCount || 1)),
+                        Math.max(1, Number(state.currentLine || 1)))
+                    : null;
+                state.inlineLivePreviewEditableBlock = null;
+                document.body.classList.toggle('inline-live-preview-enabled', state.inlineLivePreviewEnabled);
+            }
             state.livePreviewLocalResourceVersion = String(Date.now());
             applyOptions(msg);
             updateCsvLocalization(msg);

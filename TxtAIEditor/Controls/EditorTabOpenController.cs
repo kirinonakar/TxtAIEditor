@@ -776,11 +776,10 @@ namespace TxtAIEditor.Controls
                     session.GetLines(1, _initialEditorLineWarmupCount),
                     session.DocumentId,
                     session.DocumentVersion,
-                    tab.Id);
-                await bridgeGroup.Bridge.SetCsvTableModeAsync(tab.IsCsvTableModeEnabled);
-                await bridgeGroup.Bridge.SetInlineLivePreviewAsync(
+                    tab.Id,
                     tab.InlineLivePreviewEnabled,
                     _getPreviewBaseHref(tab));
+                await bridgeGroup.Bridge.SetCsvTableModeAsync(tab.IsCsvTableModeEnabled);
             }
             catch
             {
@@ -1149,7 +1148,9 @@ namespace TxtAIEditor.Controls
                     currentSession.GetLines(1, _initialEditorLineWarmupCount),
                     currentSession.DocumentId,
                     currentSession.DocumentVersion,
-                    tab.Id);
+                    tab.Id,
+                    tab.InlineLivePreviewEnabled,
+                    _getPreviewBaseHref(tab));
             };
 
             bridge.EditorRendered += () =>
@@ -1345,8 +1346,10 @@ namespace TxtAIEditor.Controls
             try
             {
                 await bridge.UpdateScrollSyncStateAsync(_isScrollSyncEnabled());
-                await bridge.SetInlineLivePreviewAsync(!tab.IsHexViewer && _isLivePreviewEnabled(), _getPreviewBaseHref(tab));
-                await bridge.SetCsvTableModeAsync(!tab.IsHexViewer && tab.IsCsvTableModeEnabled);
+                if (!tab.IsHexViewer && tab.IsCsvTableModeEnabled)
+                {
+                    await bridge.SetCsvTableModeAsync(true);
+                }
 
                 var snippets = _snippetService.GetSnippets();
                 var autocompleteWords = _snippetService.GetAutocompleteWords();

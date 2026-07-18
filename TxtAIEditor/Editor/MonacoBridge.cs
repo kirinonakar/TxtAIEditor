@@ -180,7 +180,9 @@ namespace TxtAIEditor.Editor
             IReadOnlyList<string>? initialLines = null,
             string? documentId = null,
             long documentVersion = 0,
-            string? viewId = null)
+            string? viewId = null,
+            bool? inlineLivePreviewEnabled = null,
+            string? livePreviewBaseHref = null)
         {
             _documentId = documentId ?? string.Empty;
             _viewId = viewId ?? string.Empty;
@@ -210,6 +212,8 @@ namespace TxtAIEditor.Editor
                 customForegroundColor = settings.CustomForegroundColor,
                 autocompleteOnEnter = settings.AutocompleteOnEnter,
                 autocompleteOnTab = settings.AutocompleteOnTab,
+                inlineLivePreviewEnabled,
+                livePreviewBaseHref,
                 readOnly = isReadOnly,
                 hexEditable = isHexLanguage,
                 isSplitView = _isSplitView,
