@@ -60,12 +60,13 @@ namespace TxtAIEditor.Core.Services
             EditorSettings settings,
             ILLMService llmService,
             Func<string, string, string> getString,
+            Microsoft.UI.WindowId pickerWindowId,
             Action<object>? initializePickerWindow,
             string? initialTab)
         {
             var fontFamilies = SettingsFontCatalog.GetInstalledFontFamilies();
             var appearancePanel = new SettingsAppearancePanel(settings, fontFamilies, getString);
-            var editingPanel = new SettingsEditingPanel(settings, getString, initializePickerWindow);
+            var editingPanel = new SettingsEditingPanel(settings, getString, pickerWindowId, initializePickerWindow);
             var terminalPanel = new SettingsTerminalPanel(settings, fontFamilies, getString);
             var toolbarPanel = new SettingsToolbarPanel(settings, getString);
             var llmPanel = await SettingsLlmPanel.CreateAsync(settings, llmService, getString);

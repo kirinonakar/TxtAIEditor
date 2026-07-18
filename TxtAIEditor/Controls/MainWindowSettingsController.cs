@@ -165,7 +165,7 @@ namespace TxtAIEditor.Controls
             var settings = _settingsService.CurrentSettings;
             string oldLanguage = settings.Language;
 
-            var result = await _settingsDialogService.ShowAsync(settings, _xamlRootProvider(), _getLocalizedString, _initializePickerWindow, initialTab, _openTextInEditor);
+            var result = await _settingsDialogService.ShowAsync(settings, _xamlRootProvider(), _appWindow.Id, _getLocalizedString, _initializePickerWindow, initialTab, _openTextInEditor);
             ResumeTerminalIfNeeded(terminalWasSuspended);
             if (result.SettingsImported)
             {

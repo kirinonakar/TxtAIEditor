@@ -17,6 +17,7 @@ namespace TxtAIEditor.Core.Interfaces
         Task<SettingsDialogResult> ShowAsync(
             EditorSettings settings,
             XamlRoot xamlRoot,
+            Microsoft.UI.WindowId pickerWindowId,
             Func<string, string, string> getString,
             Action<object>? initializePickerWindow = null,
             string? initialTab = null,

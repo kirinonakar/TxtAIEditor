@@ -19,6 +19,7 @@ namespace TxtAIEditor.Core.Services
         public async Task<SettingsDialogResult> ShowAsync(
             EditorSettings settings,
             XamlRoot xamlRoot,
+            Microsoft.UI.WindowId pickerWindowId,
             Func<string, string, string> getString,
             Action<object>? initializePickerWindow = null,
             string? initialTab = null,
@@ -28,6 +29,7 @@ namespace TxtAIEditor.Core.Services
                 settings,
                 _llmService,
                 getString,
+                pickerWindowId,
                 initializePickerWindow,
                 initialTab);
 

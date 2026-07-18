@@ -4,6 +4,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Models;
 using Windows.Storage.Pickers;
+using AppFileOpenPicker = Microsoft.Windows.Storage.Pickers.FileOpenPicker;
+using AppFileSavePicker = Microsoft.Windows.Storage.Pickers.FileSavePicker;
+using AppPickerLocationId = Microsoft.Windows.Storage.Pickers.PickerLocationId;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -29,6 +32,7 @@ namespace TxtAIEditor.Core.Services
         public SettingsEditingPanel(
             EditorSettings settings,
             Func<string, string, string> getString,
+            Microsoft.UI.WindowId pickerWindowId,
             Action<object>? initializePickerWindow)
         {
             _wordWrapCheck = new CheckBox { Content = getString("SettingsWordWrap", "기본 Word Wrap 켜기"), IsChecked = settings.WordWrap };
@@ -68,7 +72,7 @@ namespace TxtAIEditor.Core.Services
 
             AddHomeFolderPicker(section, getString, initializePickerWindow);
             AddExternalViewerPicker(section, getString, initializePickerWindow);
-            AddSettingsBackupActions(section, getString, initializePickerWindow);
+            AddSettingsBackupActions(section, getString, pickerWindowId);
             Content = section;
         }
 
@@ -169,7 +173,7 @@ namespace TxtAIEditor.Core.Services
         private void AddSettingsBackupActions(
             StackPanel section,
             Func<string, string, string> getString,
-            Action<object>? initializePickerWindow)
+            Microsoft.UI.WindowId pickerWindowId)
         {
             SettingsDialogUi.AddLabel(section, getString("SettingsBackupTitle", "전체 설정"));
 
@@ -201,34 +205,36 @@ namespace TxtAIEditor.Core.Services
             };
             section.Children.Add(statusText);
 
+            bool backupOperationActive = false;
+
             exportButton.Click += async (_, _) =>
             {
-                if (initializePickerWindow == null)
-                {
-                    statusText.Text = getString("SettingsBackupPickerUnavailable", "파일 선택기를 열 수 없습니다.");
-                    return;
-                }
-
-                var picker = new FileSavePicker
-                {
-                    SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-                    SuggestedFileName = SettingsBackupService.ArchiveFileName
-                };
-                picker.FileTypeChoices.Add(
-                    getString("SettingsBackupZipFileType", "ZIP archive"),
-                    new List<string> { ".zip" });
-                initializePickerWindow(picker);
-
-                var file = await picker.PickSaveFileAsync();
-                if (file == null)
+                if (backupOperationActive)
                 {
                     return;
                 }
 
+                backupOperationActive = true;
+                exportButton.IsEnabled = false;
+                importButton.IsEnabled = false;
                 try
                 {
-                    exportButton.IsEnabled = false;
-                    importButton.IsEnabled = false;
+                    var picker = new AppFileSavePicker(pickerWindowId)
+                    {
+                        SuggestedStartLocation = AppPickerLocationId.DocumentsLibrary,
+                        SuggestedFileName = SettingsBackupService.ArchiveFileName,
+                        DefaultFileExtension = ".zip"
+                    };
+                    picker.FileTypeChoices.Add(
+                        getString("SettingsBackupZipFileType", "ZIP archive"),
+                        new List<string> { ".zip" });
+
+                    var file = await picker.PickSaveFileAsync();
+                    if (file == null)
+                    {
+                        return;
+                    }
+
                     statusText.Text = getString("SettingsBackupExporting", "전체 설정을 내보내는 중...");
                     await SettingsBackupService.ExportAsync(file.Path);
                     statusText.Text = string.Format(
@@ -243,6 +249,7 @@ namespace TxtAIEditor.Core.Services
                 }
                 finally
                 {
+                    backupOperationActive = false;
                     exportButton.IsEnabled = true;
                     importButton.IsEnabled = true;
                 }
@@ -250,29 +257,28 @@ namespace TxtAIEditor.Core.Services
 
             importButton.Click += async (_, _) =>
             {
-                if (initializePickerWindow == null)
-                {
-                    statusText.Text = getString("SettingsBackupPickerUnavailable", "파일 선택기를 열 수 없습니다.");
-                    return;
-                }
-
-                var picker = new FileOpenPicker
-                {
-                    SuggestedStartLocation = PickerLocationId.DocumentsLibrary
-                };
-                picker.FileTypeFilter.Add(".zip");
-                initializePickerWindow(picker);
-
-                var file = await picker.PickSingleFileAsync();
-                if (file == null)
+                if (backupOperationActive)
                 {
                     return;
                 }
 
+                backupOperationActive = true;
+                exportButton.IsEnabled = false;
+                importButton.IsEnabled = false;
                 try
                 {
-                    exportButton.IsEnabled = false;
-                    importButton.IsEnabled = false;
+                    var picker = new AppFileOpenPicker(pickerWindowId)
+                    {
+                        SuggestedStartLocation = AppPickerLocationId.DocumentsLibrary
+                    };
+                    picker.FileTypeFilter.Add(".zip");
+
+                    var file = await picker.PickSingleFileAsync();
+                    if (file == null)
+                    {
+                        return;
+                    }
+
                     statusText.Text = getString("SettingsBackupImporting", "전체 설정을 불러오는 중...");
                     await SettingsBackupService.ImportAsync(file.Path);
                     statusText.Text = getString("SettingsBackupImported", "전체 설정을 불러왔습니다.");
@@ -286,6 +292,7 @@ namespace TxtAIEditor.Core.Services
                 }
                 finally
                 {
+                    backupOperationActive = false;
                     exportButton.IsEnabled = true;
                     importButton.IsEnabled = true;
                 }
