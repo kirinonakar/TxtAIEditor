@@ -145,13 +145,21 @@ namespace TxtAIEditor.Controls
 
             foreach (var path in settings.FavoritePaths)
             {
-                var item = CreateFavoriteItem(path, settings.PinnedFavoritePaths.Contains(path));
+                var item = CreateFavoriteItem(
+                    path,
+                    settings.PinnedFavoritePaths.Contains(path, StringComparer.OrdinalIgnoreCase));
                 items.Add(item);
             }
 
+            var pinnedOrder = settings.PinnedFavoritePaths
+                .Select((path, index) => new { path, index })
+                .GroupBy(entry => entry.path, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First().index, StringComparer.OrdinalIgnoreCase);
+
             var sorted = items
                 .OrderByDescending(i => i.IsPinned)
-                .ThenBy(i => i.Name)
+                .ThenBy(i => i.IsPinned && pinnedOrder.TryGetValue(i.Path, out int index) ? index : int.MaxValue)
+                .ThenBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
 
             sorted = sorted.Where(i => i.IsFolder == !showFiles).ToList();
@@ -175,6 +183,8 @@ namespace TxtAIEditor.Controls
             _leftSidebar.RemoveFavoriteClick += OnRemoveFavoriteClick;
             _leftSidebar.FavoritePinClick += OnFavoritePinClick;
             _leftSidebar.FavoritesTabClick += OnFavoritesTabClick;
+            _leftSidebar.FavoritesList.DragItemsStarting += OnFavoritesDragItemsStarting;
+            _leftSidebar.FavoritesList.DragItemsCompleted += OnFavoritesDragItemsCompleted;
             _leftSidebar.RecentFileItemClick += OnRecentFileItemClick;
             _leftSidebar.RemoveRecentFileClick += OnRemoveRecentFileClick;
             _leftSidebar.RecentTabClick += OnRecentTabClick;
@@ -346,6 +356,51 @@ namespace TxtAIEditor.Controls
             
             bool showFiles = _leftSidebar.FavoritesFileTabButton.IsChecked == true;
             RefreshFavorites(showFiles);
+        }
+
+        private static void OnFavoritesDragItemsStarting(object sender, DragItemsStartingEventArgs e)
+        {
+            if (e.Items.OfType<FavoriteItem>().Any(item => !item.IsPinned))
+            {
+                e.Cancel = true;
+            }
+        }
+
+        private async void OnFavoritesDragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs e)
+        {
+            var visiblePinnedPaths = _viewModel.Favorites
+                .Where(item => item.IsPinned)
+                .Select(item => item.Path)
+                .ToList();
+            if (visiblePinnedPaths.Count < 2)
+            {
+                return;
+            }
+
+            var visiblePinnedSet = new HashSet<string>(visiblePinnedPaths, StringComparer.OrdinalIgnoreCase);
+            var settings = _settingsService.CurrentSettings;
+            var reorderedPinnedPaths = settings.PinnedFavoritePaths.ToList();
+            var visiblePositions = reorderedPinnedPaths
+                .Select((path, index) => new { path, index })
+                .Where(entry => visiblePinnedSet.Contains(entry.path))
+                .Select(entry => entry.index)
+                .ToList();
+
+            if (visiblePositions.Count != visiblePinnedPaths.Count)
+            {
+                RefreshFavorites();
+                return;
+            }
+
+            for (int index = 0; index < visiblePositions.Count; index++)
+            {
+                reorderedPinnedPaths[visiblePositions[index]] = visiblePinnedPaths[index];
+            }
+
+            settings.PinnedFavoritePaths = reorderedPinnedPaths;
+            bool showFiles = _leftSidebar.FavoritesFileTabButton.IsChecked == true;
+            RefreshFavorites(showFiles);
+            await _settingsService.SaveSettingsAsync(settings);
         }
 
         private void OnFavoritesTabClick(object sender, RoutedEventArgs e)
