@@ -48,6 +48,7 @@ namespace TxtAIEditor.Controls
             _root.KeyDown += OnRootKeyDown;
             _wordWrapKeyboardAccelerator.Invoked += OnWordWrapKeyboardAcceleratorInvoked;
             _root.KeyboardAccelerators.Add(_wordWrapKeyboardAccelerator);
+            _root.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
 
             _dragOverlay.DragOver += OnDragOverlayOver;
             _dragOverlay.Drop += OnDragOverlayDrop;
