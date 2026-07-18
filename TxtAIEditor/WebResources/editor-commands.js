@@ -434,16 +434,34 @@ function splitCurrentLine(element, options = {}) {
     // restoration has fired.  Invalidate older restorations so they cannot move
     // focus/scroll back to an earlier line and make the caret appear to climb.
     const splitRestoreToken = ++splitScrollRestoreToken;
+    let preferStateCaret = options?.preferStateCaret === true;
 
     if (hasCustomSelection()) {
         const sel = normalizeSelection();
         if (sel) {
-            replaceSelectionWith(sel, '\n');
-            return;
+            if (sel.isColumn) {
+                // Column input leaves a zero-width selection across all edited
+                // rows. A newline cannot stay rectangular, so collapse it to the
+                // active endpoint and split that line with the normal Enter path.
+                // Passing "\n" to replaceColumnSelectionWith would otherwise put
+                // embedded newlines in cached rows (or delete a two-row selection).
+                const caretLine = Math.min(Math.max(1, Number(state.currentLine || sel.end.line)), state.lineCount);
+                const caretText = state.cache.get(caretLine) || '';
+                const caretColumn = Math.max(0, Math.min(Number(state.currentColumn || 1) - 1, caretText.length));
+                state.selection = null;
+                state.selectionAnchor = { line: caretLine, column: caretColumn };
+                state.currentLine = caretLine;
+                state.currentColumn = caretColumn + 1;
+                syncCustomSelectionClass();
+                clearCustomSelectionVisuals();
+                preferStateCaret = true;
+            } else {
+                replaceSelectionWith(sel, '\n');
+                return;
+            }
         }
     }
 
-    const preferStateCaret = options?.preferStateCaret === true;
     const elementLineNumber = Number(element?.dataset?.line || 0);
     const stateLineNumber = Math.min(Math.max(1, Number(state.currentLine || elementLineNumber || 1)), state.lineCount);
     const useElementCaret = !preferStateCaret &&
