@@ -497,6 +497,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
 
         if (event.altKey && !event.ctrlKey && !event.metaKey && key === 'z') {
             event.preventDefault();
+            hideAutocomplete(300);
             post({ type: 'shortcut', name: 'wordWrap' });
             return;
         }
@@ -870,7 +871,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 'CapsLock', 'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete',
                 'Process', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
             ];
-            if (!ignoredKeys.includes(event.key) && event.keyCode !== 229 && !event.ctrlKey && !event.metaKey) {
+            if (!ignoredKeys.includes(event.key) && event.keyCode !== 229 &&
+                !event.ctrlKey && !event.metaKey && !event.altKey) {
                 triggerAutocomplete(element);
             }
         }
