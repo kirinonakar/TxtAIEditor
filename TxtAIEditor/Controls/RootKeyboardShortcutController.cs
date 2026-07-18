@@ -24,6 +24,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _toggleLivePreview;
         private readonly Action _togglePreviewWidth;
         private readonly Action _toggleMaximize;
+        private readonly Action _toggleWordWrap;
 
         public RootKeyboardShortcutController(
             Action openNewTab,
@@ -42,7 +43,8 @@ namespace TxtAIEditor.Controls
             TerminalShortcutService terminalShortcutService,
             Action toggleLivePreview,
             Action togglePreviewWidth,
-            Action toggleMaximize)
+            Action toggleMaximize,
+            Action toggleWordWrap)
         {
             _openNewTab = openNewTab;
             _toggleLeftPanelAsync = toggleLeftPanelAsync;
@@ -61,6 +63,7 @@ namespace TxtAIEditor.Controls
             _toggleLivePreview = toggleLivePreview;
             _togglePreviewWidth = togglePreviewWidth;
             _toggleMaximize = toggleMaximize;
+            _toggleWordWrap = toggleWordWrap;
         }
 
         public void HandleKeyDown(KeyRoutedEventArgs e)
@@ -73,6 +76,14 @@ namespace TxtAIEditor.Controls
 
             var ctrl = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
             var shift = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+
+            var alt = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Menu) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+            if (alt && !ctrl && e.Key == Windows.System.VirtualKey.Z)
+            {
+                e.Handled = true;
+                _toggleWordWrap();
+                return;
+            }
 
             if (!ctrl)
             {

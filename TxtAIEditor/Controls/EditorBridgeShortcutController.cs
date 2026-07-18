@@ -13,6 +13,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _toggleTheme;
         private readonly Action _toggleMaximize;
         private readonly Action _toggleStickyNote;
+        private readonly Action _toggleWordWrap;
         private readonly Func<Task> _toggleLeftPanelAsync;
         private readonly Func<Task> _toggleRightPanelAsync;
         private readonly Action _togglePreviewWidth;
@@ -36,6 +37,7 @@ namespace TxtAIEditor.Controls
             Action toggleTheme,
             Action toggleMaximize,
             Action toggleStickyNote,
+            Action toggleWordWrap,
             Func<Task> toggleLeftPanelAsync,
             Func<Task> toggleRightPanelAsync,
             Action togglePreviewWidth,
@@ -57,6 +59,7 @@ namespace TxtAIEditor.Controls
             _toggleTheme = toggleTheme;
             _toggleMaximize = toggleMaximize;
             _toggleStickyNote = toggleStickyNote;
+            _toggleWordWrap = toggleWordWrap;
             _toggleLeftPanelAsync = toggleLeftPanelAsync;
             _toggleRightPanelAsync = toggleRightPanelAsync;
             _togglePreviewWidth = togglePreviewWidth;
@@ -97,6 +100,9 @@ namespace TxtAIEditor.Controls
                     break;
                 case "f12":
                     _toggleStickyNote();
+                    break;
+                case "wordWrap":
+                    _toggleWordWrap();
                     break;
                 case "toggleLeftPanel":
                     _ = _toggleLeftPanelAsync();

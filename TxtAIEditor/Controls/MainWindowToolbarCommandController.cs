@@ -126,6 +126,13 @@ namespace TxtAIEditor.Controls
             _ = ApplyLivePreviewToggleAsync();
         }
 
+
+        public void ToggleWordWrap()
+        {
+            _topToolbar.WordWrapIsChecked = !_topToolbar.WordWrapIsChecked;
+            _ = ToggleWordWrapAsync();
+        }
+
         public void SyncCsvTableMode(OpenedTab tab)
         {
             _topToolbar.CsvTableIsChecked = tab.IsCsvTableModeEnabled;

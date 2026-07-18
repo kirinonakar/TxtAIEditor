@@ -37,6 +37,7 @@ namespace TxtAIEditor.Composition
         Action ToggleLivePreview,
         Action TogglePreviewWidth,
         Action ToggleMaximize,
+        Action ToggleWordWrap,
         Action<int> ShowLeftSidebarPage,
         Action<OpenedTab, TabViewItem> CloseTabAndCleanup,
         Func<Task> SyncSnippetsToOpenEditorsAsync,
@@ -179,7 +180,8 @@ namespace TxtAIEditor.Composition
                 terminalShortcut,
                 callbacks.ToggleLivePreview,
                 callbacks.TogglePreviewWidth,
-                callbacks.ToggleMaximize);
+                callbacks.ToggleMaximize,
+                callbacks.ToggleWordWrap);
 
             var terminalPanel = new TerminalPanelController(
                 window,

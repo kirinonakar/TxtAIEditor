@@ -495,6 +495,12 @@ export function bindKeyboardEvents({ openFindPanel }) {
         const ctrl = event.ctrlKey || event.metaKey;
         const key = event.key ? event.key.toLowerCase() : '';
 
+        if (event.altKey && !event.ctrlKey && !event.metaKey && key === 'z') {
+            event.preventDefault();
+            post({ type: 'shortcut', name: 'wordWrap' });
+            return;
+        }
+
         if (ctrl) {
             if (key === 'c' || key === 'x' || key === 'v') {
                 const target = event.target;
