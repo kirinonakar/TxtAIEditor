@@ -22,6 +22,7 @@ namespace TxtAIEditor.Composition
         Func<string, Task> NavigateExplorerToFolderAndRevealAsync,
         Func<TxtAIEditor.ExplorerItem?> GetSelectedExplorerItem,
         Func<bool> IsExplorerArchiveView,
+        Func<bool> IsExplorerTreeMode,
         Func<Task> ToggleLeftPanelAsync,
         Func<Task> ToggleRightPanelAsync,
         Action FocusSearchPanel,
@@ -159,6 +160,7 @@ namespace TxtAIEditor.Composition
                 callbacks.InitializePickerWindow,
                 callbacks.LoadFileIntoTabAsync,
                 callbacks.NavigateExplorerToFolderAsync,
+                callbacks.IsExplorerTreeMode,
                 () => shellPanelLayout.IsLeftSidebarVisible,
                 dialog.ShowErrorMessage,
                 callbacks.GetLocalizedString);

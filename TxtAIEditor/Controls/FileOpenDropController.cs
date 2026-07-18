@@ -15,6 +15,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<object> _initializePickerWindow;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Func<string, bool, Task> _navigateExplorerToFolderAsync;
+        private readonly Func<bool> _isExplorerTreeMode;
         private readonly Func<bool> _isLeftSidebarVisible;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
@@ -26,6 +27,7 @@ namespace TxtAIEditor.Controls
             Action<object> initializePickerWindow,
             Func<string, Task> loadFileIntoTabAsync,
             Func<string, bool, Task> navigateExplorerToFolderAsync,
+            Func<bool> isExplorerTreeMode,
             Func<bool> isLeftSidebarVisible,
             Action<string, string> showError,
             Func<string, string, string> getString)
@@ -36,6 +38,7 @@ namespace TxtAIEditor.Controls
             _initializePickerWindow = initializePickerWindow;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
+            _isExplorerTreeMode = isExplorerTreeMode;
             _isLeftSidebarVisible = isLeftSidebarVisible;
             _showError = showError;
             _getString = getString;
@@ -201,7 +204,7 @@ namespace TxtAIEditor.Controls
                     if (File.Exists(item.Path))
                     {
                         string? folderPath = Path.GetDirectoryName(item.Path);
-                        if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+                        if (!_isExplorerTreeMode() && !string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
                         {
                             await _navigateExplorerToFolderAsync(folderPath, _isLeftSidebarVisible());
                         }

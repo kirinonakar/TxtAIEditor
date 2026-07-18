@@ -85,8 +85,20 @@ namespace TxtAIEditor.Controls
         public string CurrentArchivePath { get; private set; } = string.Empty;
         public string CurrentArchiveDirectory { get; private set; } = string.Empty;
         public bool IsViewingArchive => !string.IsNullOrWhiteSpace(CurrentArchivePath);
+        public bool IsTreeMode { get; private set; }
 
         public void LoadDirectoryRoot(string folderPath)
+        {
+            if (IsTreeMode)
+            {
+                LoadTreeRoot(ResolveTreeRoot(folderPath));
+                return;
+            }
+
+            LoadFlatDirectoryRoot(folderPath);
+        }
+
+        private void LoadFlatDirectoryRoot(string folderPath)
         {
             _viewModel.ExplorerItems.Clear();
             CurrentArchivePath = string.Empty;
@@ -231,6 +243,12 @@ namespace TxtAIEditor.Controls
                 item.IsDark = isDark;
                 item.RefreshThemeColors();
             }
+
+            foreach (var item in EnumerateTreeItems())
+            {
+                item.IsDark = isDark;
+                item.RefreshThemeColors();
+            }
         }
 
         private void WireEvents()
@@ -241,6 +259,9 @@ namespace TxtAIEditor.Controls
             _leftSidebar.SortClick += OnExplorerSortClick;
             _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
             _leftSidebar.ExplorerHomeClick += OnExplorerHomeClick;
+            _leftSidebar.ExplorerTreeModeClick += OnExplorerTreeModeClick;
+            _leftSidebar.ExplorerTreeExpanding += OnExplorerTreeExpanding;
+            _leftSidebar.ExplorerTreeItemInvoked += OnExplorerTreeItemInvoked;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
             _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
         }
@@ -304,6 +325,201 @@ namespace TxtAIEditor.Controls
             {
                 await NavigateToFolderAsync(homeFolderPath);
             }
+        }
+
+        private void OnExplorerTreeModeClick(object? sender, RoutedEventArgs e)
+        {
+            bool enableTreeMode = _leftSidebar.ExplorerTreeModeBtn.IsChecked == true;
+            if (enableTreeMode == IsTreeMode)
+            {
+                return;
+            }
+
+            IsTreeMode = enableTreeMode;
+            _lastFilterQuery = string.Empty;
+            _leftSidebar.ClearExplorerFilter();
+            _leftSidebar.SetExplorerTreeMode(IsTreeMode);
+
+            if (string.IsNullOrWhiteSpace(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
+            {
+                _leftSidebar.ExplorerTree.RootNodes.Clear();
+                return;
+            }
+
+            if (IsTreeMode)
+            {
+                LoadTreeRoot(ResolveTreeRoot(CurrentFolderPath));
+            }
+            else
+            {
+                LoadFlatDirectoryRoot(CurrentFolderPath);
+            }
+        }
+
+        private void OnExplorerTreeExpanding(object? sender, Microsoft.UI.Xaml.Controls.TreeViewExpandingEventArgs e)
+        {
+            PopulateTreeNode(e.Node);
+        }
+
+        private void OnExplorerTreeItemInvoked(object? sender, Microsoft.UI.Xaml.Controls.TreeViewItemInvokedEventArgs e)
+        {
+            Microsoft.UI.Xaml.Controls.TreeViewNode? node = e.InvokedItem as Microsoft.UI.Xaml.Controls.TreeViewNode;
+            ExplorerItem? item = e.InvokedItem as ExplorerItem
+                ?? node?.Content as ExplorerItem;
+            if (item == null)
+            {
+                return;
+            }
+
+            node ??= FindTreeNode(item);
+            if (item.IsFolder || item.IsArchive)
+            {
+                if (node != null)
+                {
+                    if (node.HasUnrealizedChildren)
+                    {
+                        PopulateTreeNode(node);
+                    }
+
+                    node.IsExpanded = !node.IsExpanded;
+                }
+
+                return;
+            }
+
+            if (item.IsArchiveEntry)
+            {
+                _ = _loadArchiveEntryIntoTabAsync(item.ArchivePath, item.ArchiveEntryPath);
+                return;
+            }
+
+            _ = _loadFileIntoTabAsync(item.Path);
+        }
+
+        private string ResolveTreeRoot(string folderPath)
+        {
+            string? repositoryRoot = _gitService.FindRepositoryRoot(folderPath);
+            return !string.IsNullOrWhiteSpace(repositoryRoot) && Directory.Exists(repositoryRoot)
+                ? repositoryRoot
+                : folderPath;
+        }
+
+        private void LoadTreeRoot(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+            {
+                return;
+            }
+
+            _viewModel.ExplorerItems.Clear();
+            CurrentArchivePath = string.Empty;
+            CurrentArchiveDirectory = string.Empty;
+            SetCurrentFolderPath(folderPath);
+            UpdateRepoPath(folderPath);
+
+            var directoryInfo = new DirectoryInfo(folderPath);
+            var rootItem = new ExplorerItem
+            {
+                Name = string.IsNullOrWhiteSpace(directoryInfo.Name) ? directoryInfo.FullName : directoryInfo.Name,
+                Path = directoryInfo.FullName,
+                IsFolder = true,
+                ModifiedTime = directoryInfo.LastWriteTime,
+                IsDark = _leftSidebar.ActualTheme == ElementTheme.Dark
+            };
+
+            var rootNode = new Microsoft.UI.Xaml.Controls.TreeViewNode
+            {
+                Content = rootItem,
+                HasUnrealizedChildren = true
+            };
+
+            _leftSidebar.ExplorerTree.RootNodes.Clear();
+            _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
+            PopulateTreeNode(rootNode);
+            rootNode.IsExpanded = true;
+
+            _leftSidebar.ExplorerStatus.Text = $"{folderPath}\n{FormatExplorerItemCount(rootNode.Children.Count)}";
+            _ = UpdateGitStatusesAsync();
+        }
+
+        private void PopulateTreeNode(Microsoft.UI.Xaml.Controls.TreeViewNode node)
+        {
+            if (!node.HasUnrealizedChildren || node.Content is not ExplorerItem item)
+            {
+                return;
+            }
+
+            node.Children.Clear();
+            bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+            System.Collections.Generic.IEnumerable<ExplorerItem> childItems;
+            if (item.IsArchive)
+            {
+                childItems = _archiveExplorerService.CreateArchiveItems(item.Path, string.Empty);
+            }
+            else if (item.IsFolder && item.IsArchiveEntry)
+            {
+                childItems = _archiveExplorerService.CreateArchiveItems(item.ArchivePath, item.ArchiveEntryPath);
+            }
+            else if (item.IsFolder)
+            {
+                childItems = _directoryService.CreateDirectoryItems(item.Path);
+            }
+            else
+            {
+                node.HasUnrealizedChildren = false;
+                return;
+            }
+
+            foreach (var childItem in SortItems(childItems))
+            {
+                childItem.IsDark = isDark;
+                childItem.IsArchive = !childItem.IsArchiveEntry &&
+                                      !childItem.IsFolder &&
+                                      _archiveExplorerService.IsSupportedArchiveFile(childItem.Path);
+                node.Children.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
+                {
+                    Content = childItem,
+                    HasUnrealizedChildren = childItem.IsFolder || childItem.IsArchive
+                });
+            }
+
+            node.HasUnrealizedChildren = false;
+            _ = UpdateGitStatusesAsync();
+        }
+
+        private Microsoft.UI.Xaml.Controls.TreeViewNode? FindTreeNode(ExplorerItem item)
+        {
+            foreach (var rootNode in _leftSidebar.ExplorerTree.RootNodes)
+            {
+                var match = FindTreeNode(rootNode, item);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private static Microsoft.UI.Xaml.Controls.TreeViewNode? FindTreeNode(
+            Microsoft.UI.Xaml.Controls.TreeViewNode node,
+            ExplorerItem item)
+        {
+            if (ReferenceEquals(node.Content, item))
+            {
+                return node;
+            }
+
+            foreach (var child in node.Children)
+            {
+                var match = FindTreeNode(child, item);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
         }
 
         private void OnExplorerUpClick(object sender, RoutedEventArgs e)
@@ -407,7 +623,7 @@ namespace TxtAIEditor.Controls
             {
                 _leftSidebar.DispatcherQueue.TryEnqueue(() =>
                 {
-                    foreach (var item in _viewModel.ExplorerItems)
+                    foreach (var item in GetVisibleExplorerItems())
                     {
                         item.IsDark = isDark;
                         item.GitStatus = ExplorerItem.GitStatusType.Clean;
@@ -421,7 +637,7 @@ namespace TxtAIEditor.Controls
             {
                 _leftSidebar.DispatcherQueue.TryEnqueue(() =>
                 {
-                    foreach (var item in _viewModel.ExplorerItems)
+                    foreach (var item in GetVisibleExplorerItems())
                     {
                         item.IsDark = isDark;
                         item.GitStatus = ExplorerItem.GitStatusType.Clean;
@@ -433,7 +649,7 @@ namespace TxtAIEditor.Controls
             var statuses = await _gitService.GetFileStatusesAsync(repoPath);
             _leftSidebar.DispatcherQueue.TryEnqueue(() =>
             {
-                UpdateItemsGitStatus(statuses, isDark);
+                UpdateItemsGitStatus(GetVisibleExplorerItems(), statuses, isDark);
             });
         }
 
@@ -463,9 +679,12 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
-        private void UpdateItemsGitStatus(System.Collections.Generic.Dictionary<string, string> statuses, bool isDark)
+        private void UpdateItemsGitStatus(
+            System.Collections.Generic.IEnumerable<ExplorerItem> items,
+            System.Collections.Generic.Dictionary<string, string> statuses,
+            bool isDark)
         {
-            foreach (var item in _viewModel.ExplorerItems)
+            foreach (var item in items)
             {
                 item.IsDark = isDark;
                 if (item.IsFolder)
@@ -551,6 +770,12 @@ namespace TxtAIEditor.Controls
             };
 
             UpdateSortButtonVisuals();
+
+            if (IsTreeMode && !string.IsNullOrWhiteSpace(CurrentFolderPath))
+            {
+                LoadTreeRoot(CurrentFolderPath);
+                return;
+            }
 
             if (_viewModel.ExplorerItems.Count > 0)
             {
@@ -869,6 +1094,39 @@ namespace TxtAIEditor.Controls
             string fallback = "{0:N0}개 결과";
             string format = _localizationService.GetString(key, fallback);
             return string.Format(format, matchCount);
+        }
+
+        private System.Collections.Generic.IEnumerable<ExplorerItem> GetVisibleExplorerItems()
+        {
+            return IsTreeMode ? EnumerateTreeItems() : _viewModel.ExplorerItems;
+        }
+
+        private System.Collections.Generic.IEnumerable<ExplorerItem> EnumerateTreeItems()
+        {
+            foreach (var rootNode in _leftSidebar.ExplorerTree.RootNodes)
+            {
+                foreach (var item in EnumerateTreeItems(rootNode))
+                {
+                    yield return item;
+                }
+            }
+        }
+
+        private static System.Collections.Generic.IEnumerable<ExplorerItem> EnumerateTreeItems(
+            Microsoft.UI.Xaml.Controls.TreeViewNode node)
+        {
+            if (node.Content is ExplorerItem item)
+            {
+                yield return item;
+            }
+
+            foreach (var child in node.Children)
+            {
+                foreach (var descendant in EnumerateTreeItems(child))
+                {
+                    yield return descendant;
+                }
+            }
         }
 
         [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, ExactSpelling = true)]

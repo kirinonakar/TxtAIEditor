@@ -3459,4 +3459,7 @@ Plan: {0}</value>
   <data name="EditorRedoProgressFormat" xml:space="preserve">
     <value>Redoing: {0} / {1}</value>
   </data>
+  <data name="ExplorerTreeModeTooltip" xml:space="preserve">
+    <value>Tree mode</value>
+  </data>
 </root>

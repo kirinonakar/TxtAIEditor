@@ -66,6 +66,9 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? SortClick;
         public event RoutedEventHandler? OpenInWindowsExplorerClick;
         public event RoutedEventHandler? ExplorerHomeClick;
+        public event RoutedEventHandler? ExplorerTreeModeClick;
+        public event EventHandler<TreeViewExpandingEventArgs>? ExplorerTreeExpanding;
+        public event EventHandler<TreeViewItemInvokedEventArgs>? ExplorerTreeItemInvoked;
         public event ItemClickEventHandler? FileListViewItemClick;
         public event RightTappedEventHandler? FileListViewItemRightTapped;
         public event RoutedEventHandler? AddFileToFavoritesClick;
@@ -172,6 +175,8 @@ namespace TxtAIEditor.Controls
         public Button ExplorerSortBtn => ExplorerSortButton;
         public Button ExplorerOpenInWindowsBtn => ExplorerOpenInWindowsButton;
         public Button ExplorerHomeBtn => ExplorerHomeButton;
+        public ToggleButton ExplorerTreeModeBtn => ExplorerTreeModeButton;
+        public TreeView ExplorerTree => ExplorerTreeView;
 
         public ListView FileList => FileListView;
         public ListView FavoritesList => FavoritesListView;
@@ -198,6 +203,20 @@ namespace TxtAIEditor.Controls
         public ToggleButton FavoritesFolderTabButton => FavoritesFolderTab;
         public ToggleButton RecentFileTabButton => RecentFileTab;
         public ToggleButton RecentFolderTabButton => RecentFolderTab;
+
+        public void SetExplorerTreeMode(bool isTreeMode)
+        {
+            ExplorerTreeModeButton.IsChecked = isTreeMode;
+            FileListView.Visibility = isTreeMode ? Visibility.Collapsed : Visibility.Visible;
+            ExplorerTreeView.Visibility = isTreeMode ? Visibility.Visible : Visibility.Collapsed;
+            ExplorerFilterPanel.Visibility = isTreeMode ? Visibility.Collapsed : Visibility.Visible;
+            ExplorerUpButton.IsEnabled = !isTreeMode;
+        }
+
+        public void ClearExplorerFilter()
+        {
+            ExplorerFilterBox.Text = string.Empty;
+        }
 
         public void Localize(Func<string, string, string> getString, bool updateEmptyFolderStatus)
         {
@@ -241,6 +260,10 @@ namespace TxtAIEditor.Controls
             var homeFolderText = getString("ExplorerHomeFolderTooltip", "홈 폴더로 이동");
             ToolTipService.SetToolTip(ExplorerHomeButton, homeFolderText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerHomeButton, homeFolderText);
+
+            var treeModeText = getString("ExplorerTreeModeTooltip", "트리 모드");
+            ToolTipService.SetToolTip(ExplorerTreeModeButton, treeModeText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerTreeModeButton, treeModeText);
 
             FavoritesFileTab.Content = getString("FavoritesFileTab", "파일");
             FavoritesFolderTab.Content = getString("FavoritesFolderTab", "폴더");
@@ -342,6 +365,9 @@ namespace TxtAIEditor.Controls
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e) => OpenInWindowsExplorerClick?.Invoke(sender, e);
         private void OnExplorerHomeClick(object sender, RoutedEventArgs e) => ExplorerHomeClick?.Invoke(sender, e);
+        private void OnExplorerTreeModeClick(object sender, RoutedEventArgs e) => ExplorerTreeModeClick?.Invoke(sender, e);
+        private void OnExplorerTreeExpanding(TreeView sender, TreeViewExpandingEventArgs e) => ExplorerTreeExpanding?.Invoke(sender, e);
+        private void OnExplorerTreeItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs e) => ExplorerTreeItemInvoked?.Invoke(sender, e);
         private void OnFileListViewItemClick(object sender, ItemClickEventArgs e) => FileListViewItemClick?.Invoke(sender, e);
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e) => FileListViewItemRightTapped?.Invoke(sender, e);
         private void OnAddFileToFavoritesClick(object sender, RoutedEventArgs e) => AddFileToFavoritesClick?.Invoke(sender, e);

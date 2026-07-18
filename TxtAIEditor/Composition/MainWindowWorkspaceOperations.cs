@@ -54,7 +54,9 @@ namespace TxtAIEditor.Composition
             if (File.Exists(cleanedPath))
             {
                 string? folderPath = Path.GetDirectoryName(cleanedPath);
-                if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+                if (!explorerNavigation.IsTreeMode &&
+                    !string.IsNullOrWhiteSpace(folderPath) &&
+                    Directory.Exists(folderPath))
                 {
                     await explorerNavigation.NavigateToFolderAsync(
                         folderPath,

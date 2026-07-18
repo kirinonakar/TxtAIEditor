@@ -135,6 +135,8 @@ namespace TxtAIEditor.Composition
                 services.LocalizationService,
                 () => services.SettingsService.CurrentSettings.HomeFolderPath);
 
+            fileTabLoad.PreserveWorkspaceOnFileOpenProvider = () => explorerNavigation.IsTreeMode;
+
             var favoritesRecent = new FavoritesRecentController(
                 services.SettingsService,
                 services.RecentFilesService,
@@ -142,6 +144,7 @@ namespace TxtAIEditor.Composition
                 ui.LeftSidebar,
                 callback => window.DispatcherQueue.TryEnqueue(() => callback()),
                 callbacks.NavigateExplorerToFolderAndRevealAsync,
+                () => explorerNavigation.IsTreeMode,
                 callbacks.LoadFileIntoTabAsync,
                 dialog.ShowErrorMessage,
                 callbacks.GetLocalizedString);

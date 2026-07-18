@@ -3459,4 +3459,7 @@
   <data name="EditorRedoProgressFormat" xml:space="preserve">
     <value>다시 실행 중: {0} / {1}</value>
   </data>
+  <data name="ExplorerTreeModeTooltip" xml:space="preserve">
+    <value>트리 모드</value>
+  </data>
 </root>

@@ -17,6 +17,8 @@ namespace TxtAIEditor.Controls
 {
     public sealed class FileTabLoadController
     {
+        public Func<bool>? PreserveWorkspaceOnFileOpenProvider { get; set; }
+
         private readonly IGitService _gitService;
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
         private readonly ArchiveExplorerService _archiveExplorerService;
@@ -89,7 +91,7 @@ namespace TxtAIEditor.Controls
             try
             {
                 string? repoRoot = _gitService.FindRepositoryRoot(Path.GetDirectoryName(filePath));
-                if (!string.IsNullOrEmpty(repoRoot))
+                if (PreserveWorkspaceOnFileOpenProvider?.Invoke() != true && !string.IsNullOrEmpty(repoRoot))
                 {
                     _currentRepoPathChanged(repoRoot);
                 }

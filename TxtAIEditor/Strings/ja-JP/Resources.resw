@@ -3423,4 +3423,7 @@
   <data name="EditorRedoProgressFormat" xml:space="preserve">
     <value>やり直しています: {0} / {1}</value>
   </data>
+  <data name="ExplorerTreeModeTooltip" xml:space="preserve">
+    <value>ツリーモード</value>
+  </data>
 </root>

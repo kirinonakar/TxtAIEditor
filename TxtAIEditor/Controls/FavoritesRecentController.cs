@@ -21,6 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly LeftSidebarPane _leftSidebar;
         private readonly Action<Action> _enqueueOnUiThread;
         private readonly Func<string, Task> _navigateExplorerToFolderAsync;
+        private readonly Func<bool> _isExplorerTreeMode;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
@@ -34,6 +35,7 @@ namespace TxtAIEditor.Controls
             LeftSidebarPane leftSidebar,
             Action<Action> enqueueOnUiThread,
             Func<string, Task> navigateExplorerToFolderAsync,
+            Func<bool> isExplorerTreeMode,
             Func<string, Task> loadFileIntoTabAsync,
             Action<string, string> showError,
             Func<string, string, string>? getString = null)
@@ -44,6 +46,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar = leftSidebar;
             _enqueueOnUiThread = enqueueOnUiThread;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
+            _isExplorerTreeMode = isExplorerTreeMode;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _showError = showError;
             _getString = getString ?? ((_, fallback) => fallback);
@@ -291,7 +294,7 @@ namespace TxtAIEditor.Controls
             }
 
             string? parentDir = Path.GetDirectoryName(item.Path);
-            if (!string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
+            if (!_isExplorerTreeMode() && !string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
             {
                 await _navigateExplorerToFolderAsync(parentDir);
             }
@@ -412,7 +415,7 @@ namespace TxtAIEditor.Controls
             }
 
             string? folderPath = Path.GetDirectoryName(item.Path);
-            if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+            if (!_isExplorerTreeMode() && !string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
             {
                 await _navigateExplorerToFolderAsync(folderPath);
             }
