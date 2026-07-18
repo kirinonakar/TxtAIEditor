@@ -122,17 +122,24 @@ namespace TxtAIEditor.Controls
 
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e)
         {
-            if (sender is FrameworkElement { DataContext: ExplorerItem item })
+            ExplorerItem? contextItem = null;
+            if (sender is FrameworkElement element)
             {
-                _leftSidebar.FileList.SelectedItem = item;
-            }
+                contextItem = GetTreeExplorerItem(element.DataContext);
+                if (element.DataContext is ExplorerItem listItem)
+                {
+                    _leftSidebar.FileList.SelectedItem = listItem;
+                }
 
-            if (sender is FrameworkElement element && element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 15)
-            {
-                LocalizeContextFlyout(flyout);
-                ConfigureContextFlyout(flyout, _leftSidebar.FileList.SelectedItem as ExplorerItem);
-                CursorResetHelper.AttachToFlyout(flyout, element);
-                CursorResetHelper.ResetToArrow(element);
+                if (element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 15)
+                {
+                    LocalizeContextFlyout(flyout);
+                    ConfigureContextFlyout(
+                        flyout,
+                        contextItem ?? _leftSidebar.FileList.SelectedItem as ExplorerItem);
+                    CursorResetHelper.AttachToFlyout(flyout, element);
+                    CursorResetHelper.ResetToArrow(element);
+                }
             }
 
             e.Handled = true;
@@ -795,7 +802,8 @@ namespace TxtAIEditor.Controls
         {
             if (sender is FrameworkElement element)
             {
-                if (element.DataContext is ExplorerItem dataContextItem)
+                ExplorerItem? dataContextItem = GetTreeExplorerItem(element.DataContext);
+                if (dataContextItem != null)
                 {
                     return dataContextItem;
                 }
@@ -806,7 +814,8 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            return _leftSidebar.FileList.SelectedItem as ExplorerItem;
+            return GetTreeExplorerItem(_leftSidebar.ExplorerTree.SelectedItem)
+                ?? _leftSidebar.FileList.SelectedItem as ExplorerItem;
         }
 
         private static bool CanOpenExplorerFile(ExplorerItem? item)

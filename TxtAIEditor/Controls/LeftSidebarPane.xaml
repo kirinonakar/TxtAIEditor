@@ -274,7 +274,46 @@
                                           ItemInvoked="OnExplorerTreeItemInvoked">
                                     <TreeView.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Padding="0,3,8,3" ToolTipService.ToolTip="{Binding Content.Path}">
+                                            <Grid Padding="0,3,8,3" ToolTipService.ToolTip="{Binding Content.Path}" RightTapped="OnFileListViewItemRightTapped">
+                                                <Grid.ContextFlyout>
+                                                    <MenuFlyout>
+                                                        <MenuFlyoutItem Text="즐겨찾기에 추가" Icon="Favorite" Click="OnAddFileToFavoritesClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutItem Text="폴더를 즐겨찾기에 추가" Icon="OutlineStar" Click="OnAddFolderToFavoritesClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutItem Text="마크다운 삽입" Icon="Pictures" Click="OnInsertMarkdownImageClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutItem Text="외부 뷰어로 열기" Click="OnOpenExternalViewerClick" Tag="{Binding Content}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE8A7;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutItem Text="기본 프로그램으로 열기" Click="OnOpenWithDefaultProgramClick" Tag="{Binding Content}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE163;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutItem Text="폴더에 풀기" Click="OnExtractArchiveToFolderClick" Tag="{Binding Content}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE896;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutItem Text="" Click="OnCompressFolderToZipClick" Tag="{Binding Content}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutItem Text="" Click="OnCompressFolderToSevenZipClick" Tag="{Binding Content}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutSeparator/>
+                                                        <MenuFlyoutItem Text="파일이름 복사" Icon="Copy" Click="OnCopyFileNameClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutItem Text="경로 복사" Icon="Link" Click="OnCopyFilePathClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutItem Text="폴더 경로 복사" Icon="Link" Click="OnCopyFolderPathClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutSeparator/>
+                                                        <MenuFlyoutItem Text="이름 바꾸기" Icon="Rename" Click="OnRenameClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutItem Text="삭제" Icon="Delete" Click="OnDeleteClick" Tag="{Binding Content}"/>
+                                                    </MenuFlyout>
+                                                </Grid.ContextFlyout>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
