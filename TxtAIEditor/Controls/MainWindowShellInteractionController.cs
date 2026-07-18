@@ -13,6 +13,7 @@ namespace TxtAIEditor.Controls
         private readonly FileOpenDropController _fileOpenDropController;
         private readonly ShellPanelLayoutService _shellPanelLayoutService;
         private readonly RootKeyboardShortcutController _rootKeyboardShortcutController;
+        private readonly KeyboardAccelerator _wordWrapKeyboardAccelerator;
 
         public MainWindowShellInteractionController(
             UIElement root,
@@ -30,6 +31,11 @@ namespace TxtAIEditor.Controls
             _fileOpenDropController = fileOpenDropController;
             _shellPanelLayoutService = shellPanelLayoutService;
             _rootKeyboardShortcutController = rootKeyboardShortcutController;
+            _wordWrapKeyboardAccelerator = new KeyboardAccelerator
+            {
+                Key = Windows.System.VirtualKey.Z,
+                Modifiers = Windows.System.VirtualKeyModifiers.Menu
+            };
 
             WireEvents();
         }
@@ -40,6 +46,8 @@ namespace TxtAIEditor.Controls
             _root.DragLeave += OnRootDragLeave;
             _root.Drop += OnRootDrop;
             _root.KeyDown += OnRootKeyDown;
+            _wordWrapKeyboardAccelerator.Invoked += OnWordWrapKeyboardAcceleratorInvoked;
+            _root.KeyboardAccelerators.Add(_wordWrapKeyboardAccelerator);
 
             _dragOverlay.DragOver += OnDragOverlayOver;
             _dragOverlay.Drop += OnDragOverlayDrop;
@@ -124,6 +132,11 @@ namespace TxtAIEditor.Controls
         private void OnRootKeyDown(object sender, KeyRoutedEventArgs e)
         {
             _rootKeyboardShortcutController.HandleKeyDown(e);
+        }
+
+        private void OnWordWrapKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
+        {
+            _rootKeyboardShortcutController.HandleWordWrapKeyboardAccelerator(e);
         }
     }
 }

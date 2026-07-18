@@ -77,14 +77,6 @@ namespace TxtAIEditor.Controls
             var ctrl = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
             var shift = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
 
-            var alt = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Menu) & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
-            if (alt && !ctrl && e.Key == Windows.System.VirtualKey.Z)
-            {
-                e.Handled = true;
-                _toggleWordWrap();
-                return;
-            }
-
             if (!ctrl)
             {
                 return;
@@ -152,6 +144,12 @@ namespace TxtAIEditor.Controls
                 e.Handled = true;
                 _terminalShortcutService.RequestToggle();
             }
+        }
+
+        public void HandleWordWrapKeyboardAccelerator(KeyboardAcceleratorInvokedEventArgs e)
+        {
+            e.Handled = true;
+            _toggleWordWrap();
         }
 
         private bool TryHandleFunctionKeyShortcut(Windows.System.VirtualKey key)
