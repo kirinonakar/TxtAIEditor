@@ -153,6 +153,7 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 | `Ctrl + X` | Cut |
 | `Ctrl + Mouse Wheel` | Zoom In / Out |
 | `Ctrl + Enter` | Send AI Prompt |
+| `Alt + Z` | Toggle Word Wrap |
 | `F4` | Toggle Live Preview |
 | `F9` | Toggle Always on Top |
 | `F10` | Toggle Theme (Light / Dark / Pastel Dark) |

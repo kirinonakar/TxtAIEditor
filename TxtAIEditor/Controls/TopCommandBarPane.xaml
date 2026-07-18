@@ -50,7 +50,7 @@
                 </AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator/>
-            <AppBarToggleButton x:Name="WordWrapToggle" Label="Word Wrap" Click="OnWordWrapToggleClick" IsChecked="True">
+            <AppBarToggleButton x:Name="WordWrapToggle" Label="Word Wrap" Click="OnWordWrapToggleClick" IsChecked="True" ToolTipService.ToolTip="Word Wrap (Alt+Z)">
                 <AppBarToggleButton.Icon>
                     <FontIcon Glyph="&#xE751;"/>
                 </AppBarToggleButton.Icon>

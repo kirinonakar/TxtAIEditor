@@ -1256,6 +1256,9 @@
   <data name="ShortcutDescLivePreview" xml:space="preserve">
     <value>ライブプレビュー切り替え</value>
   </data>
+  <data name="ShortcutDescWordWrap" xml:space="preserve">
+    <value>右端折り返しの切り替え</value>
+  </data>
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>右パネルの拡大</value>
   </data>

@@ -118,6 +118,7 @@ namespace TxtAIEditor.Core.Services
                 ("Ctrl + V", getString("ShortcutDescPaste", "붙여넣기")),
                 ("Ctrl + X", getString("ShortcutDescCut", "잘라내기")),
                 ("Ctrl + Enter", getString("ShortcutDescAiPrompt", "AI 프롬프트 전송")),
+                ("Alt + Z", getString("ShortcutDescWordWrap", "Word Wrap 토글")),
                 ("F4", getString("ShortcutDescLivePreview", "라이브 프리뷰 토글")),
                 ("F9", getString("ShortcutDescTopMost", "항상위 토글")),
                 ("F10", getString("ShortcutDescTheme", "테마 토글")),

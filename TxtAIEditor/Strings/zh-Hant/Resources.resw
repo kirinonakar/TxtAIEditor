@@ -1256,6 +1256,9 @@
   <data name="ShortcutDescLivePreview" xml:space="preserve">
     <value>切換即時預覽</value>
   </data>
+  <data name="ShortcutDescWordWrap" xml:space="preserve">
+    <value>切換自動換行</value>
+  </data>
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>展開右側面板</value>
   </data>
