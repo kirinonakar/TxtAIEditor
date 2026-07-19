@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly ISettingsService _settingsService;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Action<string, OpenedTab, int, int> _selectionContextUpdater;
+        private readonly Action<string> _shortcutHandler;
         private readonly Func<string, string, string> _getString;
         private readonly HookProc _findShortcutHookProc;
         private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
@@ -37,11 +38,13 @@ namespace TxtAIEditor.Controls
             ISettingsService settingsService,
             Func<OpenedTab?> activeTabProvider,
             Action<string, OpenedTab, int, int> selectionContextUpdater,
+            Action<string> shortcutHandler,
             Func<string, string, string> getString)
         {
             _settingsService = settingsService;
             _activeTabProvider = activeTabProvider;
             _selectionContextUpdater = selectionContextUpdater;
+            _shortcutHandler = shortcutHandler;
             _getString = getString;
             _findShortcutHookProc = OnFindShortcutHook;
             _findShortcutHook = SetWindowsHookEx(
@@ -333,6 +336,17 @@ namespace TxtAIEditor.Controls
                 }
 
                 string type = typeProp.GetString() ?? string.Empty;
+                if (string.Equals(type, "shortcut", StringComparison.Ordinal) &&
+                    root.TryGetProperty("name", out var nameProp))
+                {
+                    string name = nameProp.GetString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        pdfWebView.DispatcherQueue.TryEnqueue(() => _shortcutHandler(name));
+                    }
+                    return;
+                }
+
                 if (string.Equals(type, "pdfFindTrigger", StringComparison.Ordinal))
                 {
                     if (_findControls.TryGetValue(tab.Id, out var findControl))
@@ -405,6 +419,15 @@ namespace TxtAIEditor.Controls
             event.stopImmediatePropagation?.();
             try {
                 chrome.webview.postMessage({ type: 'pdfFindTrigger' });
+            } catch {}
+            return;
+        }
+        if (ctrl && key === 'w') {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation?.();
+            try {
+                chrome.webview.postMessage({ type: 'shortcut', name: 'closeTab' });
             } catch {}
             return;
         }

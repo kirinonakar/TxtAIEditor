@@ -74,7 +74,10 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        public async Task<Dictionary<string, string>> GetFileStatusesAsync(string repoPath, bool includeAllUntrackedFiles = false)
+        public async Task<Dictionary<string, string>> GetFileStatusesAsync(
+            string repoPath,
+            bool includeAllUntrackedFiles = false,
+            bool matchIgnoredDirectories = false)
         {
             var statuses = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(repoPath) || !Directory.Exists(repoPath))
@@ -86,9 +89,10 @@ namespace TxtAIEditor.Core.Services
                 if (!Directory.Exists(workingDir))
                     return statuses;
 
+                string ignoredOption = matchIgnoredDirectories ? "--ignored=matching" : "--ignored";
                 string command = includeAllUntrackedFiles
-                    ? "status --porcelain=v1 -z --ignored --untracked-files=all"
-                    : "status --porcelain=v1 -z --ignored";
+                    ? $"status --porcelain=v1 -z {ignoredOption} --untracked-files=all"
+                    : $"status --porcelain=v1 -z {ignoredOption}";
                 string output = await RunGitCommandAsync(workingDir, command);
                 if (string.IsNullOrEmpty(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
                     return statuses;

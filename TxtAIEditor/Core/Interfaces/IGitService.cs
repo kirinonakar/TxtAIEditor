@@ -8,7 +8,10 @@ namespace TxtAIEditor.Core.Interfaces
     {
         string? FindRepositoryRoot(string? startPath);
         Task<string> GetCurrentBranchAsync(string repoPath);
-        Task<Dictionary<string, string>> GetFileStatusesAsync(string repoPath, bool includeAllUntrackedFiles = false);
+        Task<Dictionary<string, string>> GetFileStatusesAsync(
+            string repoPath,
+            bool includeAllUntrackedFiles = false,
+            bool matchIgnoredDirectories = false);
         Task<string> GetFileDiffAsync(string repoPath, string filePath);
         Task<string> GetGitFileContentAsync(string repoPath, string filePath);
         Task<bool> StageFileAsync(string repoPath, string filePath);

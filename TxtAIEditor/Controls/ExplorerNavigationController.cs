@@ -705,7 +705,10 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var statuses = await _gitService.GetFileStatusesAsync(repoPath, includeAllUntrackedFiles: true);
+            var statuses = await _gitService.GetFileStatusesAsync(
+                repoPath,
+                includeAllUntrackedFiles: true,
+                matchIgnoredDirectories: true);
             _leftSidebar.DispatcherQueue.TryEnqueue(() =>
             {
                 UpdateItemsGitStatus(GetVisibleExplorerItems(), statuses, isDark);

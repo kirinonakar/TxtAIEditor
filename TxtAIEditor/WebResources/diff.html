@@ -388,6 +388,9 @@
                 if (ctrl && key === '3') {
                     event.preventDefault();
                     post({ type: 'shortcut', name: 'expandRightPanel' });
+                } else if (ctrl && key === 'w') {
+                    event.preventDefault();
+                    post({ type: 'shortcut', name: 'closeTab' });
                 }
             }
         });

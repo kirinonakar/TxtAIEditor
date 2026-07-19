@@ -99,6 +99,7 @@ namespace TxtAIEditor.Composition
                 services.SettingsService,
                 tabNavigation.GetActiveTab,
                 callbacks.UpdateRightPanelSelectionContext,
+                webViewShortcut.Handle,
                 callbacks.GetLocalizedString);
 
             var officeDocumentViewer = new OfficeDocumentViewerController(
