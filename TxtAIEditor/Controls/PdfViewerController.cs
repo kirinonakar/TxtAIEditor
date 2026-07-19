@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
@@ -16,6 +17,7 @@ namespace TxtAIEditor.Controls
     public sealed class PdfViewerController
     {
         private const int FindVirtualKey = 0x46;
+        private const int CloseTabVirtualKey = 0x57;
         private const int ControlVirtualKey = 0x11;
         private const int LeftControlVirtualKey = 0xA2;
         private const int RightControlVirtualKey = 0xA3;
@@ -28,11 +30,13 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, OpenedTab, int, int> _selectionContextUpdater;
         private readonly Action<string> _shortcutHandler;
         private readonly Func<string, string, string> _getString;
-        private readonly HookProc _findShortcutHookProc;
+        private readonly DispatcherQueue _dispatcherQueue;
+        private readonly HookProc _viewerShortcutHookProc;
         private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
         private readonly Dictionary<string, PdfFindControl> _findControls = new Dictionary<string, PdfFindControl>();
-        private IntPtr _findShortcutHook;
+        private IntPtr _viewerShortcutHook;
         private bool _findShortcutWasDown;
+        private bool _closeTabShortcutWasDown;
 
         public PdfViewerController(
             ISettingsService settingsService,
@@ -46,20 +50,21 @@ namespace TxtAIEditor.Controls
             _selectionContextUpdater = selectionContextUpdater;
             _shortcutHandler = shortcutHandler;
             _getString = getString;
-            _findShortcutHookProc = OnFindShortcutHook;
-            _findShortcutHook = SetWindowsHookEx(
+            _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+            _viewerShortcutHookProc = OnViewerShortcutHook;
+            _viewerShortcutHook = SetWindowsHookEx(
                 KeyboardHookType,
-                _findShortcutHookProc,
+                _viewerShortcutHookProc,
                 IntPtr.Zero,
                 GetCurrentThreadId());
         }
 
         ~PdfViewerController()
         {
-            if (_findShortcutHook != IntPtr.Zero)
+            if (_viewerShortcutHook != IntPtr.Zero)
             {
-                UnhookWindowsHookEx(_findShortcutHook);
-                _findShortcutHook = IntPtr.Zero;
+                UnhookWindowsHookEx(_viewerShortcutHook);
+                _viewerShortcutHook = IntPtr.Zero;
             }
         }
 
@@ -229,14 +234,51 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private IntPtr OnFindShortcutHook(int code, IntPtr wParam, IntPtr lParam)
+        private IntPtr OnViewerShortcutHook(int code, IntPtr wParam, IntPtr lParam)
         {
-            if (code >= 0 && TryHandleFindShortcutMessage((int)wParam, lParam))
+            if (code >= 0 && TryHandleViewerShortcutMessage((int)wParam, lParam))
             {
                 return new IntPtr(1);
             }
 
-            return CallNextHookEx(_findShortcutHook, code, wParam, lParam);
+            return CallNextHookEx(_viewerShortcutHook, code, wParam, lParam);
+        }
+
+        private bool TryHandleViewerShortcutMessage(int virtualKey, IntPtr lParam)
+        {
+            if (virtualKey == CloseTabVirtualKey)
+            {
+                return TryHandleCloseTabShortcutMessage(lParam);
+            }
+
+            return TryHandleFindShortcutMessage(virtualKey, lParam);
+        }
+
+        private bool TryHandleCloseTabShortcutMessage(IntPtr lParam)
+        {
+            bool isKeyUp = (((int)lParam) & KeyTransitionStateMask) != 0;
+            if (isKeyUp)
+            {
+                _closeTabShortcutWasDown = false;
+                return false;
+            }
+
+            var activeTab = _activeTabProvider();
+            if (!IsCtrlDown() ||
+                activeTab == null ||
+                (!activeTab.IsPdfViewer && !activeTab.IsMediaViewer))
+            {
+                return false;
+            }
+
+            if (_closeTabShortcutWasDown)
+            {
+                return true;
+            }
+
+            _closeTabShortcutWasDown = true;
+            _dispatcherQueue.TryEnqueue(() => _shortcutHandler("closeTab"));
+            return true;
         }
 
         private bool TryHandleFindShortcutMessage(int virtualKey, IntPtr lParam)
