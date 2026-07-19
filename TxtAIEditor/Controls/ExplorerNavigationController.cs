@@ -705,7 +705,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var statuses = await _gitService.GetFileStatusesAsync(repoPath);
+            var statuses = await _gitService.GetFileStatusesAsync(repoPath, includeAllUntrackedFiles: true);
             _leftSidebar.DispatcherQueue.TryEnqueue(() =>
             {
                 UpdateItemsGitStatus(GetVisibleExplorerItems(), statuses, isDark);
@@ -750,6 +750,19 @@ namespace TxtAIEditor.Controls
                 {
                     bool hasModified = false;
                     bool hasAdded = false;
+
+                    if (statuses.TryGetValue(item.Path, out string? folderStatus))
+                    {
+                        string trimmedFolderStatus = folderStatus.Trim();
+                        if (trimmedFolderStatus == "??")
+                        {
+                            hasAdded = true;
+                        }
+                        else if (trimmedFolderStatus != "!!")
+                        {
+                            hasModified = true;
+                        }
+                    }
 
                     string folderPathWithSlash = item.Path.EndsWith(Path.DirectorySeparatorChar)
                         ? item.Path
