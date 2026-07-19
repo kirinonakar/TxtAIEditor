@@ -67,9 +67,16 @@ namespace TxtAIEditor.Controls
                 aliases.Insert(2, CreateAlias(
                     "mcp_browser_use_capture",
                     "capture",
-                    "Capture the controlled browser window as a PNG for visual inspection. The captured image is automatically attached to the model context. Do NOT call read_image.",
+                    "Capture the controlled browser or Computer Use window as a PNG for visual inspection. The captured image is automatically attached to the model context. Before a coordinate click, call mcp_browser_use_capture_target to verify the chosen point. Do NOT call read_image.",
                     """
                     {"type":"object","properties":{}}
+                    """));
+                aliases.Insert(3, CreateAlias(
+                    "mcp_browser_use_capture_target",
+                    "capture_target",
+                    "Mark a proposed point on the latest explicit capture with a red plus and attach the marked image for visual verification. This does not click or otherwise interact with the controlled window. After confirming the marker, pass the same coordinates to mcp_browser_use_click with coordinateSpace=screenshot.",
+                    """
+                    {"type":"object","properties":{"x":{"type":"integer","description":"X coordinate in the latest explicit capture image."},"y":{"type":"integer","description":"Y coordinate in the latest explicit capture image."}},"required":["x","y"]}
                     """));
             }
 

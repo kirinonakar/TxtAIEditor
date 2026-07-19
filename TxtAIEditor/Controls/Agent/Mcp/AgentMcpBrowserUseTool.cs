@@ -75,6 +75,7 @@ namespace TxtAIEditor.Controls
                     "status" => await GetStatusAsync(cancellationToken),
                     "snapshot" => await SnapshotAsync(arguments, cancellationToken),
                     "capture" => await CaptureAsync(cancellationToken),
+                    "capture_target" => await CaptureTargetAsync(arguments, cancellationToken),
                     "read_page" => await ReadPageAsync(arguments, cancellationToken),
                     "click" => await ClickAsync(arguments, cancellationToken),
                     "type_text" => await TypeTextAsync(arguments, cancellationToken),
@@ -413,6 +414,38 @@ namespace TxtAIEditor.Controls
             }
 
             return snapshot + "\n\n" + await CaptureAsync(cancellationToken);
+        }
+
+        private async Task<string> CaptureTargetAsync(JsonElement arguments, CancellationToken cancellationToken)
+        {
+            if (!_settingsProvider().BrowserUseCaptureEnabled)
+            {
+                throw new InvalidOperationException("Browser image capture is disabled in Browser Use settings.");
+            }
+
+            IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken);
+            AgentBrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
+                ? _lastCapture
+                : null;
+            if (capture == null)
+            {
+                throw new InvalidOperationException(
+                    "capture_target requires a prior explicit mcp_browser_use_capture result for the current controlled window.");
+            }
+
+            if (!TryGetInt(arguments, "x", out int x) || !TryGetInt(arguments, "y", out int y))
+            {
+                throw new InvalidOperationException("capture_target requires integer x and y screenshot coordinates.");
+            }
+
+            await _captureService.MarkTargetAsync(capture, x, y, cancellationToken);
+            return
+                "MCP tool result: Browser Use marked the selected target with a red plus and attached the verification image.\n" +
+                $"window_id: {FormatWindowId(browserWindow)}\n" +
+                $"target_screenshot_coordinates: ({x}, {y})\n" +
+                $"image_dimensions: {capture.ImageWidth}x{capture.ImageHeight}\n" +
+                "interaction_performed: false\n" +
+                "next_action: Inspect the attached image. If the red plus is centered on the intended target, call mcp_browser_use_click with the same x and y in screenshot coordinateSpace. Otherwise call mcp_browser_use_capture_target again with corrected coordinates.";
         }
 
         private async Task<string> ReadPageAsync(JsonElement arguments, CancellationToken cancellationToken)

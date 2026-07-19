@@ -18,6 +18,8 @@ namespace TxtAIEditor.Controls
         private const uint CaptureBlt = 0x40000000;
         private const uint DibRgbColors = 0;
         private const int Halftone = 4;
+        private const int TargetMarkerArmLength = 24;
+        private const int TargetMarkerThickness = 5;
 
         private readonly Action<LlmMessageAttachment>? _addImageAttachment;
 
@@ -78,6 +80,7 @@ namespace TxtAIEditor.Controls
             {
                 Window = window,
                 ImagePath = imagePath,
+                PixelData = paddedPixels,
                 ImageWidth = MaxCaptureDimension,
                 ImageHeight = MaxCaptureDimension,
                 OriginalImageWidth = imageWidth,
@@ -87,6 +90,104 @@ namespace TxtAIEditor.Controls
                 WindowWidth = windowWidth,
                 WindowHeight = windowHeight
             };
+        }
+
+        public async Task<string> MarkTargetAsync(
+            AgentBrowserCapture capture,
+            int x,
+            int y,
+            CancellationToken cancellationToken)
+        {
+            if (capture.PixelData.Length != capture.ImageWidth * capture.ImageHeight * 4)
+            {
+                throw new InvalidOperationException("The latest browser capture pixel data is unavailable. Capture the window again.");
+            }
+
+            if (x < 0 || x >= capture.ImageWidth || y < 0 || y >= capture.ImageHeight)
+            {
+                throw new InvalidOperationException(
+                    $"Target coordinates ({x}, {y}) are outside the {capture.ImageWidth}x{capture.ImageHeight} capture.");
+            }
+
+            int contentRight = capture.PaddingLeft + capture.OriginalImageWidth;
+            int contentBottom = capture.PaddingTop + capture.OriginalImageHeight;
+            if (x < capture.PaddingLeft || x >= contentRight || y < capture.PaddingTop || y >= contentBottom)
+            {
+                throw new InvalidOperationException(
+                    $"Target coordinates ({x}, {y}) are in the capture padding. Choose a point inside the controlled window content: " +
+                    $"x={capture.PaddingLeft}..{contentRight - 1}, y={capture.PaddingTop}..{contentBottom - 1}.");
+            }
+
+            byte[] markedPixels = (byte[])capture.PixelData.Clone();
+            DrawTargetMarker(markedPixels, capture.ImageWidth, capture.ImageHeight, x, y);
+
+            string captureDirectory = Path.GetDirectoryName(capture.ImagePath)
+                ?? Path.Combine(Path.GetTempPath(), "TxtAIEditor", "BrowserUse");
+            Directory.CreateDirectory(captureDirectory);
+            string imagePath = Path.Combine(
+                captureDirectory,
+                $"browser-target-{DateTime.Now:yyyyMMdd-HHmmss-fff}.png");
+            await SavePngAsync(
+                imagePath,
+                capture.ImageWidth,
+                capture.ImageHeight,
+                markedPixels,
+                cancellationToken);
+            CleanupOldCaptures(captureDirectory);
+            bool attached = await AttachImageAsync(imagePath, cancellationToken);
+            if (!attached)
+            {
+                throw new InvalidOperationException("The target marker image was created but could not be attached to the model context.");
+            }
+
+            return imagePath;
+        }
+
+        private static void DrawTargetMarker(byte[] pixels, int width, int height, int centerX, int centerY)
+        {
+            int halfThickness = TargetMarkerThickness / 2;
+            FillRectangle(
+                pixels,
+                width,
+                height,
+                centerX - TargetMarkerArmLength,
+                centerY - halfThickness,
+                centerX + TargetMarkerArmLength,
+                centerY + halfThickness);
+            FillRectangle(
+                pixels,
+                width,
+                height,
+                centerX - halfThickness,
+                centerY - TargetMarkerArmLength,
+                centerX + halfThickness,
+                centerY + TargetMarkerArmLength);
+        }
+
+        private static void FillRectangle(
+            byte[] pixels,
+            int width,
+            int height,
+            int left,
+            int top,
+            int right,
+            int bottom)
+        {
+            int clippedLeft = Math.Clamp(left, 0, width - 1);
+            int clippedTop = Math.Clamp(top, 0, height - 1);
+            int clippedRight = Math.Clamp(right, 0, width - 1);
+            int clippedBottom = Math.Clamp(bottom, 0, height - 1);
+            for (int y = clippedTop; y <= clippedBottom; y++)
+            {
+                for (int x = clippedLeft; x <= clippedRight; x++)
+                {
+                    int offset = ((y * width) + x) * 4;
+                    pixels[offset] = 0;
+                    pixels[offset + 1] = 0;
+                    pixels[offset + 2] = 255;
+                    pixels[offset + 3] = 255;
+                }
+            }
         }
 
         private static byte[] CaptureWindowPixels(
@@ -224,11 +325,11 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task AttachImageAsync(string imagePath, CancellationToken cancellationToken)
+        private async Task<bool> AttachImageAsync(string imagePath, CancellationToken cancellationToken)
         {
             if (_addImageAttachment == null || !File.Exists(imagePath))
             {
-                return;
+                return false;
             }
 
             try
@@ -243,10 +344,16 @@ namespace TxtAIEditor.Controls
                     Height = MaxCaptureDimension,
                     EstimatedTokens = EstimateImageTokens(MaxCaptureDimension, MaxCaptureDimension)
                 });
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch
             {
                 // Image attachment failure should not fail the Browser Use capture itself.
+                return false;
             }
         }
 
@@ -345,6 +452,7 @@ namespace TxtAIEditor.Controls
     {
         public IntPtr Window { get; set; }
         public string ImagePath { get; set; } = string.Empty;
+        public byte[] PixelData { get; set; } = Array.Empty<byte>();
         public int ImageWidth { get; set; }
         public int ImageHeight { get; set; }
         public int OriginalImageWidth { get; set; }
