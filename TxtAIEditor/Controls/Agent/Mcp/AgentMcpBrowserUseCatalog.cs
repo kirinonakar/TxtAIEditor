@@ -74,7 +74,7 @@ namespace TxtAIEditor.Controls
                 aliases.Insert(3, CreateAlias(
                     "mcp_browser_use_capture_target",
                     "capture_target",
-                    "Mark a proposed point on the latest explicit capture with a red plus and attach the marked image for visual verification. This does not click or otherwise interact with the controlled window. After confirming the marker, pass the same coordinates to mcp_browser_use_click with coordinateSpace=screenshot.",
+                    "Mark a proposed point on the latest explicit capture with a red plus and attach the marked image for visual verification. This does not interact with the controlled window. Check that the plus is centered on the intended button or input field. If it is off-center, move x left or right and y up or down as needed and call this tool again until centered. Then pass the same verified coordinates to mcp_browser_use_click with coordinateSpace=screenshot.",
                     """
                     {"type":"object","properties":{"x":{"type":"integer","description":"X coordinate in the latest explicit capture image."},"y":{"type":"integer","description":"Y coordinate in the latest explicit capture image."}},"required":["x","y"]}
                     """));

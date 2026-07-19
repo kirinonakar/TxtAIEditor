@@ -445,7 +445,7 @@ namespace TxtAIEditor.Controls
                 $"target_screenshot_coordinates: ({x}, {y})\n" +
                 $"image_dimensions: {capture.ImageWidth}x{capture.ImageHeight}\n" +
                 "interaction_performed: false\n" +
-                "next_action: Inspect the attached image. If the red plus is centered on the intended target, call mcp_browser_use_click with the same x and y in screenshot coordinateSpace. Otherwise call mcp_browser_use_capture_target again with corrected coordinates.";
+                "next_action: Inspect the attached image and verify that the red plus is centered on the intended button or input field, not merely inside its bounds. If it is off-center, move x left or right and y up or down as needed, then call mcp_browser_use_capture_target again. Repeat until centered; only then call mcp_browser_use_click with the same verified x and y in screenshot coordinateSpace.";
         }
 
         private async Task<string> ReadPageAsync(JsonElement arguments, CancellationToken cancellationToken)

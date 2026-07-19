@@ -716,6 +716,7 @@ namespace TxtAIEditor.Controls
                 {
                     builder.AppendLine("Accessibility snapshots provide stable refs, and interaction tools return a fresh snapshot.");
                     builder.AppendLine("mcp_browser_use_capture is available whenever you determine that screenshot context would help with the task.");
+                    builder.AppendLine("Before clicking screenshot coordinates, call mcp_browser_use_capture_target and inspect the attached marked image. Verify that the red plus is centered on the intended button or input field, not merely somewhere inside it. If it is off-center, adjust x left or right and y up or down as needed, call mcp_browser_use_capture_target again, and repeat until the marker is centered. Only then click using the same verified screenshot coordinates.");
                 }
                 else
                 {
