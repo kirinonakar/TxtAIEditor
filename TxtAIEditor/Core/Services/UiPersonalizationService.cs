@@ -393,6 +393,21 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        private static bool IsIconFont(Microsoft.UI.Xaml.Media.FontFamily? font)
+        {
+            if (font?.Source == null)
+            {
+                return false;
+            }
+
+            string src = font.Source;
+            return src.Contains("Segoe MDL2 Assets", StringComparison.OrdinalIgnoreCase) ||
+                   src.Contains("Segoe Fluent Icons", StringComparison.OrdinalIgnoreCase) ||
+                   src.Contains("Segoe UI Symbol", StringComparison.OrdinalIgnoreCase) ||
+                   src.Contains("Segoe UI Emoji", StringComparison.OrdinalIgnoreCase) ||
+                   src.Contains("Symbol", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static void ApplyFontFamilyRecursively(DependencyObject parent, Microsoft.UI.Xaml.Media.FontFamily fontFamily)
         {
             if (parent == null)
@@ -405,16 +420,21 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
+            if (parent is Microsoft.UI.Xaml.Controls.TreeView || parent is Microsoft.UI.Xaml.Controls.TreeViewItem)
+            {
+                return;
+            }
+
             if (parent is FrameworkElement fe)
             {
-                // Force font family resource overrides on all FrameworkElements
+                // Force font family resource overrides on FrameworkElements (except icon/tree elements)
                 fe.Resources["ContentControlThemeFontFamily"] = fontFamily;
                 fe.Resources["SystemControlFontFamily"] = fontFamily;
             }
 
             if (parent is Control ctrl)
             {
-                if (ctrl.FontFamily.Source.Contains("Segoe MDL2 Assets", StringComparison.OrdinalIgnoreCase))
+                if (IsIconFont(ctrl.FontFamily))
                 {
                     return;
                 }
@@ -430,6 +450,16 @@ namespace TxtAIEditor.Core.Services
             }
             else if (parent is TextBlock tb)
             {
+                if (IsIconFont(tb.FontFamily))
+                {
+                    return;
+                }
+
+                if (!string.IsNullOrEmpty(tb.Text) && tb.Text.Any(ch => ch >= '\uE000' && ch <= '\uF8FF'))
+                {
+                    return;
+                }
+
                 tb.FontFamily = fontFamily;
             }
 
