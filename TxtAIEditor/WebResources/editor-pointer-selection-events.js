@@ -31,6 +31,7 @@ import {
     setCaret,
     setNativeSelectionRangeInElement
 } from './editor-commands.js';
+import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
 import { showContextMenu, hideContextMenu } from './editor-context-menu.js';
 import { autocompleteState, hideAutocomplete } from './editor-autocomplete.js';
 import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
@@ -1527,8 +1528,9 @@ export function bindPointerSelectionEvents({
         }
     });
 
-    viewport.addEventListener('contextmenu', event => {
+    scrollContainer.addEventListener('contextmenu', event => {
         if (findPanel.contains(event.target)) return;
+        if (isPointOnScrollContainerScrollbar(event.clientX, event.clientY)) return;
         event.preventDefault();
 
         if (isHexView()) {
