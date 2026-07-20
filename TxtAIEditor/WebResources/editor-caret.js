@@ -241,6 +241,9 @@ function positionFromPointer(event) {
     if (!element) return null;
     const line = Number(element.dataset.line || 1);
     const textLength = (state.cache.get(line) ?? lineTextFromElement(element)).length;
+    if (line >= state.lineCount && event.clientY >= element.getBoundingClientRect().bottom) {
+        return { line, column: textLength, element };
+    }
     const column = Math.max(0, Math.min(getCaretOffsetFromPoint(element, event.clientX, event.clientY), textLength));
     return { line, column, element };
 }
