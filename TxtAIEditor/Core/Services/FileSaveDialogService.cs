@@ -79,7 +79,8 @@ namespace TxtAIEditor.Core.Services
             {
                 if (ofn.nFilterIndex == 1)
                 {
-                    if (!selectedPath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                    if (!selectedPath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) &&
+                        !Path.HasExtension(selectedPath))
                     {
                         selectedPath += ".txt";
                     }
