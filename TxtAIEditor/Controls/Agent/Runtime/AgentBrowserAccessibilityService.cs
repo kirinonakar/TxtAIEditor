@@ -173,7 +173,7 @@ namespace TxtAIEditor.Controls
                 PruneOldRefs();
                 var builder = new StringBuilder();
                 builder.AppendLine("MCP tool result: Browser Use accessibility snapshot.");
-                builder.AppendLine("Use ref with mcp_browser_use_click. Refs remain stable while the matching accessible element remains available.");
+                builder.AppendLine("Use ref with mcp_browser_use_click or mcp_browser_use_drag. Refs remain stable while the matching accessible element remains available.");
                 builder.AppendLine("accessibility_tree:");
                 if (lines.Count == 0)
                 {

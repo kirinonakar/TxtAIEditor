@@ -78,6 +78,7 @@ namespace TxtAIEditor.Controls
                     "capture_target" => await CaptureTargetAsync(arguments, cancellationToken),
                     "read_page" => await ReadPageAsync(arguments, cancellationToken),
                     "click" => await ClickAsync(arguments, cancellationToken),
+                    "drag" => await DragAsync(arguments, cancellationToken),
                     "type_text" => await TypeTextAsync(arguments, cancellationToken),
                     "key" => await PressKeyAsync(arguments, cancellationToken),
                     "scroll" => await ScrollAsync(arguments, cancellationToken),
@@ -494,13 +495,8 @@ namespace TxtAIEditor.Controls
             EnsureInteractionAllowed();
             IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken);
             string elementRef = AgentToolHelpers.GetFirstStringArgument(arguments, "ref", "elementRef", "element_ref").Trim();
-            bool hasX = TryGetInt(arguments, "x", out int x);
-            bool hasY = TryGetInt(arguments, "y", out int y);
-            bool hasCoordinates = hasX && hasY;
-            if (string.IsNullOrWhiteSpace(elementRef) && !hasCoordinates)
-            {
-                throw new InvalidOperationException("click requires a snapshot ref or integer x and y coordinates.");
-            }
+            bool hasX = TryGetFirstInt(arguments, out int x, "x");
+            bool hasY = TryGetFirstInt(arguments, out int y, "y");
 
             if (!GetWindowRect(browserWindow, out Rect rect))
             {
@@ -509,72 +505,18 @@ namespace TxtAIEditor.Controls
 
             int windowWidth = rect.Right - rect.Left;
             int windowHeight = rect.Bottom - rect.Top;
-            int screenX;
-            int screenY;
-            string coordinateSpace;
-            if (!string.IsNullOrWhiteSpace(elementRef))
-            {
-                if (!_accessibility.TryResolveRef(elementRef, browserWindow, out AgentBrowserAccessibilityService.AccessibilityTarget target))
-                {
-                    throw new InvalidOperationException($"Accessibility ref '{elementRef}' is stale or unavailable. Call mcp_browser_use_snapshot and retry with a current ref.");
-                }
 
-                coordinateSpace = "ref";
-                screenX = target.ScreenX;
-                screenY = target.ScreenY;
-                x = screenX - rect.Left;
-                y = screenY - rect.Top;
+            string coordinateSpace = AgentToolHelpers.GetFirstStringArgument(arguments, "coordinateSpace", "coordinate_space")
+                .Trim()
+                .ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(coordinateSpace))
+            {
+                coordinateSpace = "screenshot";
             }
-            else
+
+            if (!TryResolvePoint(elementRef, hasX, x, hasY, y, coordinateSpace, browserWindow, rect, windowWidth, windowHeight, out int screenX, out int screenY, out string targetDescription))
             {
-                coordinateSpace = AgentToolHelpers.GetFirstStringArgument(arguments, "coordinateSpace", "coordinate_space")
-                    .Trim()
-                    .ToLowerInvariant();
-                if (string.IsNullOrWhiteSpace(coordinateSpace))
-                {
-                    coordinateSpace = "screenshot";
-                }
-
-                if (coordinateSpace == "screenshot")
-                {
-                    AgentBrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
-                        ? _lastCapture
-                        : null;
-                    if (capture == null)
-                    {
-                        throw new InvalidOperationException("Screenshot coordinates require a prior explicit mcp_browser_use_capture result. Prefer a stable accessibility ref when available.");
-                    }
-
-                    x = Math.Clamp(x, 0, capture.ImageWidth - 1);
-                    y = Math.Clamp(y, 0, capture.ImageHeight - 1);
-
-                    int origX = x - capture.PaddingLeft;
-                    int origY = y - capture.PaddingTop;
-
-                    origX = Math.Clamp(origX, 0, capture.OriginalImageWidth - 1);
-                    origY = Math.Clamp(origY, 0, capture.OriginalImageHeight - 1);
-
-                    screenX = rect.Left + Math.Clamp(
-                        (int)Math.Round((origX + 0.5) * (windowWidth / (double)capture.OriginalImageWidth)),
-                        0,
-                        windowWidth - 1);
-                    screenY = rect.Top + Math.Clamp(
-                        (int)Math.Round((origY + 0.5) * (windowHeight / (double)capture.OriginalImageHeight)),
-                        0,
-                        windowHeight - 1);
-                }
-                else if (coordinateSpace == "window")
-                {
-                    x = Math.Clamp(x, 0, windowWidth - 1);
-                    y = Math.Clamp(y, 0, windowHeight - 1);
-
-                    screenX = rect.Left + x;
-                    screenY = rect.Top + y;
-                }
-                else
-                {
-                    throw new InvalidOperationException($"Unsupported coordinate space: {coordinateSpace}");
-                }
+                throw new InvalidOperationException("click requires a snapshot ref or integer x and y coordinates.");
             }
 
             string button = AgentToolHelpers.GetFirstStringArgument(arguments, "button").Trim().ToLowerInvariant();
@@ -603,8 +545,193 @@ namespace TxtAIEditor.Controls
             await Task.Delay(350, cancellationToken);
             string postActionContext = BuildPostActionContext(browserWindow);
 
-            string targetDescription = coordinateSpace == "ref" ? $"ref {elementRef}" : $"{coordinateSpace} ({x}, {y})";
             return $"MCP tool result: Browser Use clicked {button} at {targetDescription}, mapped to screen ({screenX}, {screenY})." + postActionContext;
+        }
+
+        private async Task<string> DragAsync(JsonElement arguments, CancellationToken cancellationToken)
+        {
+            EnsureInteractionAllowed();
+            IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken);
+
+            string startRef = AgentToolHelpers.GetFirstStringArgument(arguments, "startRef", "fromRef", "start_ref", "from_ref").Trim();
+            string endRef = AgentToolHelpers.GetFirstStringArgument(arguments, "endRef", "toRef", "end_ref", "to_ref", "targetRef", "target_ref").Trim();
+
+            bool hasStartX = TryGetFirstInt(arguments, out int startX, "startX", "fromX", "start_x", "from_x");
+            bool hasStartY = TryGetFirstInt(arguments, out int startY, "startY", "fromY", "start_y", "from_y");
+
+            bool hasEndX = TryGetFirstInt(arguments, out int endX, "endX", "toX", "end_x", "to_x", "targetX", "target_x");
+            bool hasEndY = TryGetFirstInt(arguments, out int endY, "endY", "toY", "end_y", "to_y", "targetY", "target_y");
+
+            if (string.IsNullOrWhiteSpace(startRef) && !hasStartX && !hasStartY)
+            {
+                startRef = AgentToolHelpers.GetFirstStringArgument(arguments, "ref", "elementRef", "element_ref").Trim();
+                if (string.IsNullOrWhiteSpace(startRef))
+                {
+                    hasStartX = TryGetFirstInt(arguments, out startX, "x");
+                    hasStartY = TryGetFirstInt(arguments, out startY, "y");
+                }
+            }
+
+            if (!GetWindowRect(browserWindow, out Rect rect))
+            {
+                throw new InvalidOperationException("Cannot read the controlled window bounds.");
+            }
+
+            int windowWidth = rect.Right - rect.Left;
+            int windowHeight = rect.Bottom - rect.Top;
+
+            string coordinateSpace = AgentToolHelpers.GetFirstStringArgument(arguments, "coordinateSpace", "coordinate_space")
+                .Trim()
+                .ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(coordinateSpace))
+            {
+                coordinateSpace = "screenshot";
+            }
+
+            if (!TryResolvePoint(startRef, hasStartX, startX, hasStartY, startY, coordinateSpace, browserWindow, rect, windowWidth, windowHeight, out int startScreenX, out int startScreenY, out string startDesc))
+            {
+                throw new InvalidOperationException("drag requires a valid start location (startRef or startX and startY coordinates).");
+            }
+
+            if (!TryResolvePoint(endRef, hasEndX, endX, hasEndY, endY, coordinateSpace, browserWindow, rect, windowWidth, windowHeight, out int endScreenX, out int endScreenY, out string endDesc))
+            {
+                throw new InvalidOperationException("drag requires a valid end location (endRef or endX and endY coordinates).");
+            }
+
+            string button = AgentToolHelpers.GetFirstStringArgument(arguments, "button").Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(button))
+            {
+                button = "left";
+            }
+
+            FocusBrowserWindow(browserWindow);
+            if (GetForegroundWindow() != browserWindow)
+            {
+                throw new InvalidOperationException("Windows did not activate the target window, so drag was cancelled to avoid controlling another application.");
+            }
+
+            _inputService.SetCursorPosition(startScreenX, startScreenY);
+            await Task.Delay(75, cancellationToken);
+            _inputService.VerifyCursorPosition(startScreenX, startScreenY);
+
+            _inputService.SendMouseDown(button);
+            await Task.Delay(50, cancellationToken);
+
+            const int steps = 15;
+            for (int step = 1; step <= steps; step++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int currentX = startScreenX + (int)Math.Round((endScreenX - startScreenX) * ((double)step / steps));
+                int currentY = startScreenY + (int)Math.Round((endScreenY - startScreenY) * ((double)step / steps));
+                _inputService.PositionCursor(currentX, currentY);
+                await Task.Delay(15, cancellationToken);
+            }
+
+            _inputService.SetCursorPosition(endScreenX, endScreenY);
+            await Task.Delay(50, cancellationToken);
+
+            _inputService.SendMouseUp(button);
+            await Task.Delay(100, cancellationToken);
+
+            await Task.Delay(350, cancellationToken);
+            string postActionContext = BuildPostActionContext(browserWindow);
+
+            return $"MCP tool result: Browser Use dragged {button} mouse button from {startDesc} (screen {startScreenX}, {startScreenY}) to {endDesc} (screen {endScreenX}, {endScreenY})." + postActionContext;
+        }
+
+        private bool TryResolvePoint(
+            string elementRef,
+            bool hasX,
+            int x,
+            bool hasY,
+            int y,
+            string coordinateSpace,
+            IntPtr browserWindow,
+            Rect rect,
+            int windowWidth,
+            int windowHeight,
+            out int screenX,
+            out int screenY,
+            out string description)
+        {
+            screenX = 0;
+            screenY = 0;
+            description = string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(elementRef))
+            {
+                if (!_accessibility.TryResolveRef(elementRef, browserWindow, out AgentBrowserAccessibilityService.AccessibilityTarget target))
+                {
+                    throw new InvalidOperationException($"Accessibility ref '{elementRef}' is stale or unavailable. Call mcp_browser_use_snapshot and retry with a current ref.");
+                }
+
+                screenX = target.ScreenX;
+                screenY = target.ScreenY;
+                description = $"ref {elementRef}";
+                return true;
+            }
+
+            if (!hasX || !hasY)
+            {
+                return false;
+            }
+
+            if (coordinateSpace == "screenshot")
+            {
+                AgentBrowserCapture? capture = _lastCapture != null && _lastCapture.Window == browserWindow
+                    ? _lastCapture
+                    : null;
+                if (capture == null)
+                {
+                    throw new InvalidOperationException("Screenshot coordinates require a prior explicit mcp_browser_use_capture result. Prefer a stable accessibility ref when available.");
+                }
+
+                x = Math.Clamp(x, 0, capture.ImageWidth - 1);
+                y = Math.Clamp(y, 0, capture.ImageHeight - 1);
+
+                int origX = x - capture.PaddingLeft;
+                int origY = y - capture.PaddingTop;
+
+                origX = Math.Clamp(origX, 0, capture.OriginalImageWidth - 1);
+                origY = Math.Clamp(origY, 0, capture.OriginalImageHeight - 1);
+
+                screenX = rect.Left + Math.Clamp(
+                    (int)Math.Round((origX + 0.5) * (windowWidth / (double)capture.OriginalImageWidth)),
+                    0,
+                    windowWidth - 1);
+                screenY = rect.Top + Math.Clamp(
+                    (int)Math.Round((origY + 0.5) * (windowHeight / (double)capture.OriginalImageHeight)),
+                    0,
+                    windowHeight - 1);
+                description = $"screenshot ({x}, {y})";
+                return true;
+            }
+            else if (coordinateSpace == "window")
+            {
+                x = Math.Clamp(x, 0, windowWidth - 1);
+                y = Math.Clamp(y, 0, windowHeight - 1);
+
+                screenX = rect.Left + x;
+                screenY = rect.Top + y;
+                description = $"window ({x}, {y})";
+                return true;
+            }
+
+            throw new InvalidOperationException($"Unsupported coordinate space: {coordinateSpace}");
+        }
+
+        private static bool TryGetFirstInt(JsonElement arguments, out int value, params string[] names)
+        {
+            foreach (string name in names)
+            {
+                if (AgentToolHelpers.TryGetIntArgument(arguments, name, out value))
+                {
+                    return true;
+                }
+            }
+
+            value = 0;
+            return false;
         }
 
         private async Task<string> TypeTextAsync(JsonElement arguments, CancellationToken cancellationToken)

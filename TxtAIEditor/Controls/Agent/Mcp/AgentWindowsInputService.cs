@@ -206,6 +206,30 @@ namespace TxtAIEditor.Controls
             SendInputs(new[] { CreateMouseInput(up, 0) });
         }
 
+        public void SendMouseDown(string button)
+        {
+            uint down = button switch
+            {
+                "left" => MouseEventLeftDown,
+                "right" => MouseEventRightDown,
+                "middle" => MouseEventMiddleDown,
+                _ => throw new InvalidOperationException($"Unsupported mouse button: {button}")
+            };
+            SendInputs(new[] { CreateMouseInput(down, 0) });
+        }
+
+        public void SendMouseUp(string button)
+        {
+            uint up = button switch
+            {
+                "left" => MouseEventLeftUp,
+                "right" => MouseEventRightUp,
+                "middle" => MouseEventMiddleUp,
+                _ => throw new InvalidOperationException($"Unsupported mouse button: {button}")
+            };
+            SendInputs(new[] { CreateMouseInput(up, 0) });
+        }
+
         public void SendMouseWheel(int delta)
         {
             SendInputs(new[] { CreateMouseInput(MouseEventWheel, unchecked((uint)delta)) });
