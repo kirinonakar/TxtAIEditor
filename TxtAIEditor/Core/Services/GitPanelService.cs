@@ -122,6 +122,21 @@ namespace TxtAIEditor.Core.Services
             return _gitService.RebaseAsync(repoPath);
         }
 
+        public Task<bool> GitGcAsync(string repoPath)
+        {
+            return _gitService.GitGcAsync(repoPath);
+        }
+
+        public Task<bool> HardResetAsync(string repoPath)
+        {
+            return _gitService.HardResetAsync(repoPath);
+        }
+
+        public Task<bool> PushForceAsync(string repoPath)
+        {
+            return _gitService.PushForceAsync(repoPath);
+        }
+
         public Task<bool> RestoreAllAsync(string repoPath)
         {
             return _gitService.RestoreAllAsync(repoPath);

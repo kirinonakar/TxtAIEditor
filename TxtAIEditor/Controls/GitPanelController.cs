@@ -492,6 +492,57 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public async Task GitGcAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+                return;
+
+            bool success = await _gitService.GitGcAsync(repoPath);
+            if (success)
+            {
+                await RefreshAsync(repoPath);
+                _showError("git gc", "git gc completed successfully.");
+            }
+            else
+            {
+                _showError("git gc failure", "git gc operation failed.");
+            }
+        }
+
+        public async Task HardResetAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+                return;
+
+            bool success = await _gitService.HardResetAsync(repoPath);
+            if (success)
+            {
+                await RefreshAsync(repoPath);
+                _showError("hard reset", "git reset --hard HEAD~1 completed successfully.");
+            }
+            else
+            {
+                _showError("hard reset failure", "git reset --hard HEAD~1 operation failed.");
+            }
+        }
+
+        public async Task PushForceAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+                return;
+
+            bool success = await _gitService.PushForceAsync(repoPath);
+            if (success)
+            {
+                await RefreshAsync(repoPath);
+                _showError("push force", "git push -u origin main --force completed successfully.");
+            }
+            else
+            {
+                _showError("push force failure", "git push -u origin main --force operation failed.");
+            }
+        }
+
         public async Task CreateBranchAsync(string repoPath)
         {
             if (string.IsNullOrEmpty(repoPath))
@@ -1116,6 +1167,9 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitRebaseClick += OnGitRebaseClick;
             _leftSidebar.GitCreateBranchClick += OnGitCreateBranchClick;
             _leftSidebar.GitMergeClick += OnGitMergeClick;
+            _leftSidebar.GitGcClick += OnGitGcClick;
+            _leftSidebar.GitHardResetClick += OnGitHardResetClick;
+            _leftSidebar.GitPushForceClick += OnGitPushForceClick;
             _leftSidebar.GitRemoteClick += OnGitRemoteClick;
             _leftSidebar.GitScpClick += OnGitScpClick;
             _leftSidebar.GitRefreshClick += OnGitRefreshClick;
@@ -1174,6 +1228,21 @@ namespace TxtAIEditor.Controls
         private async void OnGitMergeClick(object sender, RoutedEventArgs e)
         {
             await MergeBranchAsync(_repoPathProvider());
+        }
+
+        private async void OnGitGcClick(object sender, RoutedEventArgs e)
+        {
+            await GitGcAsync(_repoPathProvider());
+        }
+
+        private async void OnGitHardResetClick(object sender, RoutedEventArgs e)
+        {
+            await HardResetAsync(_repoPathProvider());
+        }
+
+        private async void OnGitPushForceClick(object sender, RoutedEventArgs e)
+        {
+            await PushForceAsync(_repoPathProvider());
         }
 
         private async void OnGitRemoteClick(object sender, RoutedEventArgs e)

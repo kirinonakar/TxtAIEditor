@@ -34,6 +34,9 @@ namespace TxtAIEditor.Core.Interfaces
         Task<bool> PushAsync(string repoPath);
         Task<bool> PullAsync(string repoPath);
         Task<bool> RebaseAsync(string repoPath);
+        Task<bool> GitGcAsync(string repoPath);
+        Task<bool> HardResetAsync(string repoPath);
+        Task<bool> PushForceAsync(string repoPath);
         Task<bool> RestoreAllAsync(string repoPath);
     }
 }

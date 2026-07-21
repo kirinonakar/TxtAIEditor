@@ -110,6 +110,9 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? GitRebaseClick;
         public event RoutedEventHandler? GitCreateBranchClick;
         public event RoutedEventHandler? GitMergeClick;
+        public event RoutedEventHandler? GitGcClick;
+        public event RoutedEventHandler? GitHardResetClick;
+        public event RoutedEventHandler? GitPushForceClick;
         public event RoutedEventHandler? GitRemoteClick;
         public event RoutedEventHandler? GitScpClick;
         public event RoutedEventHandler? GitRefreshClick;
@@ -310,6 +313,9 @@ namespace TxtAIEditor.Controls
             GitRebaseMenuItem.Text = getString("GitRebase", "Rebase");
             GitCreateBranchMenuItem.Text = getString("GitCreateBranch", "Create Branch");
             GitMergeMenuItem.Text = getString("GitMerge", "Merge");
+            GitGcMenuItem.Text = "git gc";
+            GitHardResetMenuItem.Text = "hard reset";
+            GitPushForceMenuItem.Text = "push force";
             GitRemoteButton.Content = getString("GitRemote", "Remote");
             GitScpButton.Content = getString("GitScp", "S/C/P");
             ToolTipService.SetToolTip(GitScpButton, getString("GitScpTooltip", "Stage/Commit/Push"));
@@ -411,6 +417,9 @@ namespace TxtAIEditor.Controls
         private void OnGitRebaseClick(object sender, RoutedEventArgs e) => GitRebaseClick?.Invoke(sender, e);
         private void OnGitCreateBranchClick(object sender, RoutedEventArgs e) => GitCreateBranchClick?.Invoke(sender, e);
         private void OnGitMergeClick(object sender, RoutedEventArgs e) => GitMergeClick?.Invoke(sender, e);
+        private void OnGitGcClick(object sender, RoutedEventArgs e) => GitGcClick?.Invoke(sender, e);
+        private void OnGitHardResetClick(object sender, RoutedEventArgs e) => GitHardResetClick?.Invoke(sender, e);
+        private void OnGitPushForceClick(object sender, RoutedEventArgs e) => GitPushForceClick?.Invoke(sender, e);
         private void OnGitRemoteClick(object sender, RoutedEventArgs e) => GitRemoteClick?.Invoke(sender, e);
         private void OnGitScpClick(object sender, RoutedEventArgs e) => GitScpClick?.Invoke(sender, e);
         private void OnGitRefreshClick(object sender, RoutedEventArgs e) => GitRefreshClick?.Invoke(sender, e);

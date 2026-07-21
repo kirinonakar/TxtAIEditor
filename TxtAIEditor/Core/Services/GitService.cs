@@ -468,6 +468,33 @@ namespace TxtAIEditor.Core.Services
             return !output.StartsWith("fatal:");
         }
 
+        public async Task<bool> GitGcAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+                return false;
+
+            string output = await RunGitCommandAsync(repoPath, "gc --aggressive --prune=now");
+            return !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public async Task<bool> HardResetAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+                return false;
+
+            string output = await RunGitCommandAsync(repoPath, "reset --hard HEAD~1");
+            return !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public async Task<bool> PushForceAsync(string repoPath)
+        {
+            if (string.IsNullOrEmpty(repoPath))
+                return false;
+
+            string output = await RunGitCommandAsync(repoPath, "push -u origin main --force");
+            return !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
+        }
+
         public async Task<bool> CheckoutBranchAsync(string repoPath, string branchName)
         {
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrWhiteSpace(branchName))
