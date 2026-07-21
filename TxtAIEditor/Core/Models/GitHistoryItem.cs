@@ -8,6 +8,8 @@ namespace TxtAIEditor.Core.Models
         public string MessageText { get; set; } = string.Empty;
         public string DecorationText { get; set; } = string.Empty;
         public string DateText { get; set; } = string.Empty;
+        public bool IsUnpushed { get; set; }
+        public bool IsRemoteOnly { get; set; }
 
         public bool HasStructuredDisplay =>
             !string.IsNullOrEmpty(MessageText) ||

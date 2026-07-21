@@ -626,13 +626,14 @@ namespace TxtAIEditor.Core.Services
                 .Where(item => !string.IsNullOrWhiteSpace(item.DisplayText))
                 .ToArray();
             var unpushedHashes = await GetUnpushedCommitShortHashesAsync(repoPath, safeSkipCount + safeMaxCount);
-            if (unpushedHashes.Count == 0)
+            var remoteOnlyHashes = await GetRemoteOnlyCommitShortHashesAsync(repoPath, safeSkipCount + safeMaxCount);
+            if (unpushedHashes.Count == 0 && remoteOnlyHashes.Count == 0)
             {
                 return historyItems;
             }
 
             return historyItems
-                .Select(item => MarkUnpushedHistoryItem(item, unpushedHashes))
+                .Select(item => ProcessHistoryItemStatus(item, unpushedHashes, remoteOnlyHashes))
                 .ToArray();
         }
 
@@ -745,7 +746,7 @@ namespace TxtAIEditor.Core.Services
                 return hashes;
             }
 
-            string output = await RunGitCommandAsync(repoPath, $"log --format:%h -n {Math.Max(1, maxCount)} HEAD --not --remotes");
+            string output = await RunGitCommandAsync(repoPath, $"log --format=%H -n {Math.Max(1, maxCount)} HEAD --not --remotes");
             if (string.IsNullOrWhiteSpace(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
             {
                 return hashes;
@@ -774,14 +775,105 @@ namespace TxtAIEditor.Core.Services
             return !string.IsNullOrWhiteSpace(output) && !output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static GitHistoryItem MarkUnpushedHistoryItem(GitHistoryItem item, HashSet<string> unpushedHashes)
+        private async Task<HashSet<string>> GetRemoteOnlyCommitShortHashesAsync(string repoPath, int maxCount)
         {
-            bool isUnpushed = unpushedHashes.Any(hash => item.CommitHash.StartsWith(hash, StringComparison.OrdinalIgnoreCase));
-            if (!isUnpushed)
+            var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!await HasRemoteAsync(repoPath))
+            {
+                return hashes;
+            }
+
+            int count = Math.Max(1, maxCount);
+            string output = await RunGitCommandAsync(repoPath, $"log --format=%H -n {count} --remotes --not --branches");
+            if (string.IsNullOrWhiteSpace(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                output = await RunGitCommandAsync(repoPath, $"log --format=%H -n {count} --remotes --not HEAD");
+            }
+
+            AddHashesFromOutput(hashes, output);
+
+            string outputMain = await RunGitCommandAsync(repoPath, $"log --format=%H -n {count} origin/main --not main");
+            AddHashesFromOutput(hashes, outputMain);
+
+            string outputMaster = await RunGitCommandAsync(repoPath, $"log --format=%H -n {count} origin/master --not master");
+            AddHashesFromOutput(hashes, outputMaster);
+
+            return hashes;
+        }
+
+        private static void AddHashesFromOutput(HashSet<string> target, string output)
+        {
+            if (string.IsNullOrWhiteSpace(output) || output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            foreach (string line in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string hash = line.Trim();
+                if (!string.IsNullOrEmpty(hash))
+                {
+                    target.Add(hash);
+                }
+            }
+        }
+
+        private static GitHistoryItem ProcessHistoryItemStatus(
+            GitHistoryItem item,
+            HashSet<string> unpushedHashes,
+            HashSet<string> remoteOnlyHashes)
+        {
+            bool isUnpushed = unpushedHashes.Count > 0 &&
+                !string.IsNullOrEmpty(item.CommitHash) &&
+                unpushedHashes.Any(hash => item.CommitHash.StartsWith(hash, StringComparison.OrdinalIgnoreCase));
+
+            bool isRemoteOnly = (remoteOnlyHashes.Count > 0 &&
+                !string.IsNullOrEmpty(item.CommitHash) &&
+                remoteOnlyHashes.Any(hash => item.CommitHash.StartsWith(hash, StringComparison.OrdinalIgnoreCase))) ||
+                (!string.IsNullOrEmpty(item.DecorationText) &&
+                 (item.DecorationText.Contains("origin/main", StringComparison.OrdinalIgnoreCase) ||
+                  item.DecorationText.Contains("origin/master", StringComparison.OrdinalIgnoreCase) ||
+                  item.DecorationText.Contains("remotes/origin/", StringComparison.OrdinalIgnoreCase)) &&
+                 !item.DecorationText.Contains("HEAD", StringComparison.OrdinalIgnoreCase) &&
+                 !item.DecorationText.Contains("main", StringComparison.OrdinalIgnoreCase) &&
+                 !item.DecorationText.Contains("master", StringComparison.OrdinalIgnoreCase));
+
+            if (!isUnpushed && !isRemoteOnly)
             {
                 return item;
             }
 
+            GitHistoryItem result = item;
+
+            if (isUnpushed)
+            {
+                result = MarkUnpushedHistoryItem(result);
+            }
+
+            if (isRemoteOnly)
+            {
+                if (result == item)
+                {
+                    result = new GitHistoryItem
+                    {
+                        CommitHash = item.CommitHash,
+                        DisplayText = item.DisplayText,
+                        GraphText = item.GraphText,
+                        MessageText = item.MessageText,
+                        DecorationText = item.DecorationText,
+                        DateText = item.DateText,
+                        IsUnpushed = item.IsUnpushed
+                    };
+                }
+
+                result.IsRemoteOnly = true;
+            }
+
+            return result;
+        }
+
+        private static GitHistoryItem MarkUnpushedHistoryItem(GitHistoryItem item)
+        {
             int insertIndex = 0;
             while (insertIndex < item.DisplayText.Length && IsGitGraphCharacter(item.DisplayText[insertIndex]))
             {
@@ -811,7 +903,9 @@ namespace TxtAIEditor.Core.Services
                 GraphText = graphText,
                 MessageText = item.MessageText,
                 DecorationText = item.DecorationText,
-                DateText = item.DateText
+                DateText = item.DateText,
+                IsUnpushed = true,
+                IsRemoteOnly = item.IsRemoteOnly
             };
         }
 

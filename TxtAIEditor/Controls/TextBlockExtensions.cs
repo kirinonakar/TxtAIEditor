@@ -100,7 +100,7 @@ namespace TxtAIEditor.Controls
 
             // Draw the graph
             var canvas = new Canvas();
-            DrawGraph(canvas, graphStr, isDark);
+            DrawGraph(canvas, graphStr, isDark, item);
             Grid.SetColumn(canvas, 0);
             grid.Children.Add(canvas);
 
@@ -122,7 +122,7 @@ namespace TxtAIEditor.Controls
             grid.Children.Add(textBlock);
         }
 
-        private static void DrawGraph(Canvas canvas, string graphStr, bool isDark)
+        private static void DrawGraph(Canvas canvas, string graphStr, bool isDark, GitHistoryItem? item = null)
         {
             canvas.Children.Clear();
             if (string.IsNullOrEmpty(graphStr)) return;
@@ -157,6 +157,10 @@ namespace TxtAIEditor.Controls
                 Color.FromArgb(255, 0, 121, 107)    // Teal
             };
 
+            Color purpleMainColor = isDark
+                ? Color.FromArgb(255, 171, 71, 188)   // VS Code Purple in Dark mode
+                : Color.FromArgb(255, 123, 31, 162);  // VS Code Purple in Light mode
+
             Color unpushedColor = isDark ? Color.FromArgb(255, 255, 215, 0) : Color.FromArgb(255, 184, 134, 11);
             var unpushedBrush = new SolidColorBrush(unpushedColor);
             
@@ -168,7 +172,18 @@ namespace TxtAIEditor.Controls
             {
                 char c = graphStr[i];
                 double x = i * cellWidth + cellWidth / 2;
-                var color = graphLineColors[i % graphLineColors.Length];
+
+                Color color;
+                if (i % graphLineColors.Length == 0 && item != null && item.IsRemoteOnly)
+                {
+                    // Main branch vertical line connecting server-only commits is rendered in VS Code Purple
+                    color = purpleMainColor;
+                }
+                else
+                {
+                    color = graphLineColors[i % graphLineColors.Length];
+                }
+
                 var brush = new SolidColorBrush(color);
 
                 if (c == '|')
