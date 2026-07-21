@@ -232,14 +232,10 @@ namespace TxtAIEditor.Controls
                 skillController,
                 mcpController,
                 workspaceContextBuilder,
-                attachmentController,
-                displayText,
-                modelContextLimits,
                 callbacks.GetActiveTabForContext,
                 callbacks.CaptureActiveSelectionSnapshot,
                 callbacks.GetCurrentSessionSettings,
                 sessionHistoryTextProvider,
-                () => callbacks.UpdateContextStatsImmediate(true),
                 getString);
             var contextStatsController = new AgentContextStatsController(
                 settingsService,

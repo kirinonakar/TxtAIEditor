@@ -3429,4 +3429,7 @@
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
     <value>ツリーモード</value>
   </data>
+  <data name="AgentContextCompressedNotice" xml:space="preserve">
+    <value>コンテキストの圧縮が実行されました。</value>
+  </data>
 </root>

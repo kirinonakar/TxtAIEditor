@@ -52,6 +52,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentLlmToolCatalog _llmToolCatalog = new();
         private readonly AgentResponseInspector _responseInspector = new();
         private readonly AgentResponseStreamService _responseStreamService;
+        private readonly AgentContextCompressionService _contextCompressionService;
         private readonly AgentSessionHistoryCoordinator _sessionHistoryCoordinator;
         private readonly Dictionary<string, AgentRunContext> _runningSessions = new(StringComparer.Ordinal);
         private readonly SemaphoreSlim _toolExecutionSessionGate = new(1, 1);
@@ -182,6 +183,7 @@ namespace TxtAIEditor.Controls
             _llmToolCatalog = composition.LlmToolCatalog;
             _responseInspector = composition.ResponseInspector;
             _responseStreamService = composition.ResponseStreamService;
+            _contextCompressionService = new AgentContextCompressionService(llmService, _modelContextLimits);
             _sessionHistoryCoordinator = composition.SessionHistoryCoordinator;
 
             _statsDebounceTimer = new DispatcherTimer
@@ -409,6 +411,7 @@ namespace TxtAIEditor.Controls
 
             string initialTranscript = string.Empty;
             string transcript = string.Empty;
+            string modelTranscript = string.Empty;
             string approvedPlanExecutionPrompt = string.Empty;
             string approvedPlanWorkspaceRoot = activeOpenSession.WorkspaceRoot;
 
@@ -450,6 +453,7 @@ namespace TxtAIEditor.Controls
                 initialTranscript = initialTranscriptBuilder.ToString();
 
                 transcript = initialTranscript;
+                modelTranscript = initialTranscript;
                 string response = string.Empty;
 
                 bool completed = false;
@@ -477,9 +481,44 @@ namespace TxtAIEditor.Controls
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string currentTranscript = _runTranscriptService.BuildWithEditLedger(
-                        transcript,
+                        modelTranscript,
                         currentTaskStartEditIndex,
                         runContext.SessionEdits);
+                    IReadOnlyList<LlmTool> agentTools = _llmToolCatalog.Build(
+                        planningMode,
+                        _mcpController.GetActiveToolAliases(),
+                        runContext.HasEnabledSkills);
+                    IReadOnlyList<LlmMessageAttachment> imageAttachments =
+                        _promptContextService.GetImageAttachmentsForRun(runContext);
+                    AgentContextCompressionResult compressionResult =
+                        await _contextCompressionService.CompressIfNeededAsync(
+                            runContext.LlmSettings,
+                            instruction,
+                            modelTranscript,
+                            currentTranscript,
+                            runSelectionContext,
+                            planningMode,
+                            runContext.HasEnabledSkills,
+                            runContext.HasEnabledMcp,
+                            agentTools,
+                            imageAttachments,
+                            cancellationToken);
+                    if (compressionResult.Compressed)
+                    {
+                        modelTranscript = compressionResult.Transcript;
+                        currentTranscript = _runTranscriptService.BuildWithEditLedger(
+                            modelTranscript,
+                            currentTaskStartEditIndex,
+                            runContext.SessionEdits);
+                        string compressionNotice = _getString(
+                            "AgentContextCompressedNotice",
+                            "context 압축이 시행되었습니다.");
+                        transcript += Environment.NewLine + Environment.NewLine + compressionNotice;
+                        await _runOutputController.AppendRunOutputLineAsync(
+                            runContext,
+                            compressionNotice);
+                        await _uiDispatcher.RunAsync(() => UpdateContextStatsImmediate(force: true));
+                    }
 
                     AgentResponseStreamResult streamResult = await _responseStreamService.RunAsync(
                         runContext,
@@ -487,11 +526,8 @@ namespace TxtAIEditor.Controls
                         currentTranscript,
                         runSelectionContext,
                         planningMode,
-                        _llmToolCatalog.Build(
-                            planningMode,
-                            _mcpController.GetActiveToolAliases(),
-                            runContext.HasEnabledSkills),
-                        _promptContextService.GetImageAttachmentsForRun(runContext),
+                        agentTools,
+                        imageAttachments,
                         cancellationToken);
 
                     if (!string.IsNullOrWhiteSpace(runContext.PendingVisionFallbackContext))
@@ -499,6 +535,7 @@ namespace TxtAIEditor.Controls
                         string fallbackTranscriptPart =
                             "\n\n" + runContext.PendingVisionFallbackContext.Trim();
                         transcript += fallbackTranscriptPart;
+                        modelTranscript += fallbackTranscriptPart;
                         runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(fallbackTranscriptPart);
                         runContext.PendingVisionFallbackContext = string.Empty;
                         await _uiDispatcher.RunAsync(() => UpdateContextStatsImmediate(force: true));
@@ -531,6 +568,7 @@ namespace TxtAIEditor.Controls
                             await _uiDispatcher.RunAsync(() =>
                             {
                                 transcript += retryDetail;
+                                modelTranscript += retryDetail;
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
                                 UpdateContextStatsImmediate(force: true);
                             });
@@ -560,6 +598,7 @@ namespace TxtAIEditor.Controls
                             await _uiDispatcher.RunAsync(() =>
                             {
                                 transcript += retryDetail;
+                                modelTranscript += retryDetail;
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
                                 UpdateContextStatsImmediate(force: true);
                             });
@@ -666,6 +705,7 @@ namespace TxtAIEditor.Controls
                             runContext.RetryDebugHistory.AppendLine(retryDetail);
                             string retryPromptContext = "\n\n" + retryNote;
                             transcript += retryPromptContext;
+                            modelTranscript += retryPromptContext;
                             runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryPromptContext);
 
                             string retryMessage = _getString(
@@ -714,6 +754,7 @@ namespace TxtAIEditor.Controls
                                 retryNote);
 
                             transcript += retryDetail;
+                            modelTranscript += retryDetail;
                             runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
 
                             string retryMessage = _getString(
@@ -769,6 +810,7 @@ namespace TxtAIEditor.Controls
                             await _uiDispatcher.RunAsync(() =>
                             {
                                 transcript += retryDetail;
+                                modelTranscript += retryDetail;
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
                                 UpdateContextStatsImmediate(force: true);
                             });
@@ -980,6 +1022,7 @@ namespace TxtAIEditor.Controls
 
                         string addedPart = addedPartBuilder.ToString();
                         transcript += addedPart;
+                        modelTranscript += addedPart;
                         runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(addedPart);
                         UpdateContextStatsImmediate(force: true);
                     });
@@ -1054,7 +1097,9 @@ namespace TxtAIEditor.Controls
                                 "AgentFileEditAlreadyComplete",
                                 "요청한 작업을 완료하였습니다.");
 
-                            transcript += "\n\n[File edit verification: requested content already matches the current file. Task complete.]";
+                            string verificationPart = "\n\n[File edit verification: requested content already matches the current file. Task complete.]";
+                            transcript += verificationPart;
+                            modelTranscript += verificationPart;
 
                             await _runOutputController.AppendRunOutputLineAsync(runContext, completeMsg);
 

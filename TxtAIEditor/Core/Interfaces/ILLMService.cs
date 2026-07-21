@@ -14,6 +14,7 @@ namespace TxtAIEditor.Core.Interfaces
 
         Task<string> ExplainCodeAsync(string code, string language, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
         Task<string> SummarizeTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
+        Task<string> CompressAgentContextAsync(EditorSettings settings, string context, int targetTokens, CancellationToken cancellationToken = default);
         Task<string> TranslateTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
         Task<string> ImproveTextAsync(string text, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);
         Task<string> CustomPromptAsync(string prompt, string fileContext, string selectedText, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default);

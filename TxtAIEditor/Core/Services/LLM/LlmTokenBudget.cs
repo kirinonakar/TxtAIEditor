@@ -49,7 +49,7 @@ namespace TxtAIEditor.Core.Services.LLM
             return (int)Math.Min(outputLimit, Math.Max(MinimumMaxOutputTokens, availableTokens));
         }
 
-        private static int EstimateRequestTokens(
+        internal static int EstimateRequestTokens(
             string systemPrompt,
             string userContent,
             IReadOnlyList<LlmMessageAttachment>? attachments,

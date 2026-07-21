@@ -3429,4 +3429,7 @@
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
     <value>树状模式</value>
   </data>
+  <data name="AgentContextCompressedNotice" xml:space="preserve">
+    <value>已执行上下文压缩。</value>
+  </data>
 </root>

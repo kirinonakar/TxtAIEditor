@@ -10,23 +10,16 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentPromptContextService
     {
-        private const int FallbackSessionHistoryPromptChars = 80_000;
-        private const double PromptContextSafetyRatio = 0.95;
-
         private readonly AgentPane _agentPane;
         private readonly AgentFileToolService _fileTools;
         private readonly AgentPresetController _presetController;
         private readonly AgentSkillController _skillController;
         private readonly AgentMcpController _mcpController;
         private readonly AgentWorkspaceContextBuilder _workspaceContextBuilder;
-        private readonly AgentAttachmentController _attachmentController;
-        private readonly AgentDisplayLocalizer _displayText;
-        private readonly AgentModelContextLimitProvider _modelContextLimits;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<AgentSelectionSnapshot> _selectionSnapshotProvider;
         private readonly Func<EditorSettings> _settingsProvider;
         private readonly Func<string> _sessionHistoryProvider;
-        private readonly Action _contextStatsChanged;
         private readonly Func<string, string, string> _getString;
         private readonly Dictionary<(bool PlanningMode, bool HasEnabledSkills), double> _baseToolTokenCache = new();
 
@@ -37,14 +30,10 @@ namespace TxtAIEditor.Controls
             AgentSkillController skillController,
             AgentMcpController mcpController,
             AgentWorkspaceContextBuilder workspaceContextBuilder,
-            AgentAttachmentController attachmentController,
-            AgentDisplayLocalizer displayText,
-            AgentModelContextLimitProvider modelContextLimits,
             Func<OpenedTab?> activeTabProvider,
             Func<AgentSelectionSnapshot> selectionSnapshotProvider,
             Func<EditorSettings> settingsProvider,
             Func<string> sessionHistoryProvider,
-            Action contextStatsChanged,
             Func<string, string, string> getString)
         {
             _agentPane = agentPane;
@@ -53,14 +42,10 @@ namespace TxtAIEditor.Controls
             _skillController = skillController;
             _mcpController = mcpController;
             _workspaceContextBuilder = workspaceContextBuilder;
-            _attachmentController = attachmentController;
-            _displayText = displayText;
-            _modelContextLimits = modelContextLimits;
             _activeTabProvider = activeTabProvider;
             _selectionSnapshotProvider = selectionSnapshotProvider;
             _settingsProvider = settingsProvider;
             _sessionHistoryProvider = sessionHistoryProvider;
-            _contextStatsChanged = contextStatsChanged;
             _getString = getString;
         }
 
@@ -164,44 +149,7 @@ namespace TxtAIEditor.Controls
                 return string.Empty;
             }
 
-            int contextLimit = GetModelContextLimitForPromptBudget();
-            if (contextLimit <= 0)
-            {
-                if (IsLmStudioProvider())
-                {
-                    return string.Empty;
-                }
-
-                return BuildSessionHistoryTail(history, FallbackSessionHistoryPromptChars);
-            }
-
-            double maxPromptTokens = Math.Floor(contextLimit * PromptContextSafetyRatio);
-            double basePromptTokens = EstimateAgentPromptTokens(
-                instruction,
-                workspaceContext,
-                selectedText);
-            double sessionHistoryWrapperTokens = AgentTokenEstimator.Estimate(
-                "[Session History]" + Environment.NewLine +
-                Environment.NewLine +
-                "=================================" + Environment.NewLine + Environment.NewLine);
-            double availableHistoryTokens = maxPromptTokens - basePromptTokens - sessionHistoryWrapperTokens;
-
-            if (availableHistoryTokens <= 0)
-            {
-                return string.Empty;
-            }
-
-            int maxHistoryCharsCap = contextLimit > FallbackSessionHistoryPromptChars
-                ? (int)Math.Floor(contextLimit * 0.9)
-                : FallbackSessionHistoryPromptChars;
-            int hardCharCap = Math.Min(history.Length, maxHistoryCharsCap);
-            string cappedHistory = BuildSessionHistoryTail(history, hardCharCap);
-            if (AgentTokenEstimator.Estimate(cappedHistory) <= availableHistoryTokens)
-            {
-                return cappedHistory;
-            }
-
-            return TrimSessionHistoryToTokenBudget(history, hardCharCap, availableHistoryTokens);
+            return history;
         }
 
         public string BuildWorkspaceContext(string instruction)
@@ -272,59 +220,6 @@ namespace TxtAIEditor.Controls
             {
                 return string.Empty;
             }
-        }
-
-        private string BuildSessionHistoryTail(string history, int maxChars)
-        {
-            if (string.IsNullOrEmpty(history) || maxChars <= 0)
-            {
-                return string.Empty;
-            }
-
-            if (history.Length <= maxChars)
-            {
-                return history;
-            }
-
-            string tail = history.Substring(history.Length - maxChars);
-            int firstLineBreak = tail.IndexOf('\n');
-            if (firstLineBreak >= 0 && firstLineBreak + 1 < tail.Length)
-            {
-                tail = tail.Substring(firstLineBreak + 1);
-            }
-
-            return "[... earlier session history omitted to keep the prompt compact ...]" +
-                Environment.NewLine +
-                tail;
-        }
-
-        private string TrimSessionHistoryToTokenBudget(
-            string history,
-            int maxChars,
-            double tokenBudget)
-        {
-            string best = string.Empty;
-            int low = 1;
-            int high = Math.Min(history.Length, maxChars);
-
-            while (low <= high)
-            {
-                int mid = low + ((high - low) / 2);
-                string candidate = BuildSessionHistoryTail(history, mid);
-                double candidateTokens = AgentTokenEstimator.Estimate(candidate);
-
-                if (candidateTokens <= tokenBudget)
-                {
-                    best = candidate;
-                    low = mid + 1;
-                }
-                else
-                {
-                    high = mid - 1;
-                }
-            }
-
-            return best;
         }
 
         public double EstimateToolCatalogTokens()
@@ -405,7 +300,7 @@ namespace TxtAIEditor.Controls
             return tokens;
         }
 
-        private static bool SupportsNativeToolCatalog(EditorSettings? settings)
+        internal static bool SupportsNativeToolCatalog(EditorSettings? settings)
         {
             string provider = NormalizeProviderName(settings?.LlmProvider);
             string model = settings?.LlmModel ?? string.Empty;
@@ -431,41 +326,5 @@ namespace TxtAIEditor.Controls
                 .ToLowerInvariant();
         }
 
-        private double EstimateAgentPromptTokens(
-            string instruction,
-            string workspaceContext,
-            string selectedText)
-        {
-            string languageCode = _displayText.LanguageCode;
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(
-                languageCode,
-                hasEnabledSkills: _skillController.HasSelectedSkills(),
-                hasEnabledMcp: _mcpController.HasSelectedMcpServers());
-            string userContent = AgentPromptBuilder.BuildUserContent(
-                instruction,
-                workspaceContext,
-                selectedText,
-                string.Empty,
-                languageCode);
-
-            return AgentTokenEstimator.Estimate(systemPrompt) +
-                AgentTokenEstimator.Estimate(userContent) +
-                _attachmentController.EstimatedImageTokens +
-                EstimateToolCatalogTokens();
-        }
-
-        private int GetModelContextLimitForPromptBudget()
-        {
-            return _modelContextLimits.GetContextLimit(
-                _settingsProvider(),
-                () => _agentPane.DispatcherQueue.TryEnqueue(() => _contextStatsChanged()));
-        }
-
-        private bool IsLmStudioProvider()
-        {
-            string provider = _settingsProvider().LlmProvider ?? string.Empty;
-            return provider.Contains("lm studio", StringComparison.OrdinalIgnoreCase) ||
-                provider.Contains("lmstudio", StringComparison.OrdinalIgnoreCase);
-        }
     }
 }

@@ -59,6 +59,19 @@ namespace TxtAIEditor.Core.Services
             return _textOperationService.SummarizeTextAsync(text, onChunk, cancellationToken);
         }
 
+        public Task<string> CompressAgentContextAsync(
+            EditorSettings settings,
+            string context,
+            int targetTokens,
+            CancellationToken cancellationToken = default)
+        {
+            return _textOperationService.CompressAgentContextAsync(
+                settings,
+                context,
+                targetTokens,
+                cancellationToken);
+        }
+
         public Task<string> TranslateTextAsync(
             string text,
             Func<string, Task>? onChunk = null,

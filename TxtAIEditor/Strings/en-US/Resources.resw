@@ -3465,4 +3465,7 @@ Plan: {0}</value>
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
     <value>Tree mode</value>
   </data>
+  <data name="AgentContextCompressedNotice" xml:space="preserve">
+    <value>Context compression was performed.</value>
+  </data>
 </root>
