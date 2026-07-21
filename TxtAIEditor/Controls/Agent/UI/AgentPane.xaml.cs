@@ -95,6 +95,14 @@ namespace TxtAIEditor.Controls
         public AgentPane()
         {
             InitializeComponent();
+            AgentMcpFlyout.OverlayInputPassThroughElement = AgentPromptInput;
+            AgentPromptInput.GotFocus += (_, _) =>
+            {
+                if (AgentMcpFlyout.IsOpen)
+                {
+                    AgentMcpFlyout.Hide();
+                }
+            };
             _menuCoordinator = new AgentPaneMenuCoordinator(
                 this,
                 AgentMcpListPanel,

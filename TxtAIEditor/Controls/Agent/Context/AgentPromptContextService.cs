@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string> _sessionHistoryProvider;
         private readonly Action _contextStatsChanged;
         private readonly Func<string, string, string> _getString;
+        private readonly Dictionary<(bool PlanningMode, bool HasEnabledSkills), double> _baseToolTokenCache = new();
 
         public AgentPromptContextService(
             AgentPane agentPane,
@@ -333,12 +334,75 @@ namespace TxtAIEditor.Controls
                 return 0;
             }
 
+            bool planningMode = _agentPane.PlanningMode;
+            bool hasEnabledSkills = _skillController.HasSelectedSkills();
+            var baseCacheKey = (planningMode, hasEnabledSkills);
+            if (!_baseToolTokenCache.TryGetValue(baseCacheKey, out double tokens))
+            {
+                var baseTools = new AgentLlmToolCatalog().Build(
+                    planningMode,
+                    Array.Empty<AgentMcpToolAlias>(),
+                    hasEnabledSkills);
+                tokens = AgentTokenEstimator.EstimateToolsTokens(baseTools);
+                _baseToolTokenCache[baseCacheKey] = tokens;
+            }
+
             var mcpAliases = _mcpController.GetActiveToolAliases();
-            var tools = new AgentLlmToolCatalog().Build(
-                _agentPane.PlanningMode,
-                mcpAliases,
-                _skillController.HasSelectedSkills());
-            return AgentTokenEstimator.EstimateToolsTokens(tools);
+            foreach (AgentMcpToolAlias alias in mcpAliases)
+            {
+                tokens += 12;
+                tokens += AgentTokenEstimator.Estimate(alias.Alias);
+                tokens += AgentTokenEstimator.Estimate(string.IsNullOrEmpty(alias.Description)
+                    ? $"MCP tool '{alias.ToolName}' from server '{alias.ServerName}'."
+                    : alias.Description);
+                tokens += EstimateCompactJsonTokens(alias.InputSchemaJson);
+            }
+
+            return tokens;
+        }
+
+        private static double EstimateCompactJsonTokens(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return AgentTokenEstimator.Estimate("{\"type\":\"object\",\"properties\":{}}");
+            }
+
+            double tokens = 0;
+            bool insideString = false;
+            bool escaped = false;
+            foreach (char character in json)
+            {
+                if (!insideString && character is ' ' or '\t' or '\r' or '\n')
+                {
+                    continue;
+                }
+
+                tokens += character <= 127 ? 0.25 : 0.7;
+                if (!insideString)
+                {
+                    if (character == '"')
+                    {
+                        insideString = true;
+                    }
+                    continue;
+                }
+
+                if (escaped)
+                {
+                    escaped = false;
+                }
+                else if (character == '\\')
+                {
+                    escaped = true;
+                }
+                else if (character == '"')
+                {
+                    insideString = false;
+                }
+            }
+
+            return tokens;
         }
 
         private static bool SupportsNativeToolCatalog(EditorSettings? settings)
