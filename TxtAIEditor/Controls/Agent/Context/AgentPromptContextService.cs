@@ -241,11 +241,6 @@ namespace TxtAIEditor.Controls
 
         private string BuildWorkspaceAgentsMdSection()
         {
-            if (!_agentPane.PlanningMode)
-            {
-                return string.Empty;
-            }
-
             string workspaceRoot = _fileTools.WorkspaceRoot;
             if (string.IsNullOrWhiteSpace(workspaceRoot))
             {
