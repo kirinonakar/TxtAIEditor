@@ -312,7 +312,7 @@ namespace TxtAIEditor.Controls
             GitPullMenuItem.Text = getString("GitPull", "Pull");
             GitRebaseMenuItem.Text = getString("GitRebase", "Rebase");
             GitCreateBranchMenuItem.Text = getString("GitCreateBranch", "Create Branch");
-            GitMergeMenuItem.Text = getString("GitMerge", "Merge");
+            GitMergeMenuItem.Text = getString("GitMerge", "Merge Branch");
             GitGcMenuItem.Text = "git gc";
             GitHardResetMenuItem.Text = "hard reset";
             GitPushForceMenuItem.Text = "push force";

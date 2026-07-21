@@ -657,7 +657,7 @@
     <value>创建分支</value>
   </data>
   <data name="GitMerge" xml:space="preserve">
-    <value>合并</value>
+    <value>合并分支</value>
   </data>
   <data name="GitCreateBranchTitle" xml:space="preserve">
     <value>创建新分支</value>

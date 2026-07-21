@@ -657,7 +657,7 @@
     <value>ブランチ作成</value>
   </data>
   <data name="GitMerge" xml:space="preserve">
-    <value>マージ</value>
+    <value>ブランチのマージ</value>
   </data>
   <data name="GitCreateBranchTitle" xml:space="preserve">
     <value>新しいブランチの作成</value>

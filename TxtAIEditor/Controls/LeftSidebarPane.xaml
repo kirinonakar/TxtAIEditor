@@ -593,7 +593,7 @@
                                                     <MenuFlyoutItem x:Name="GitPullMenuItem" Text="Pull" Click="OnGitPullClick"/>
                                                     <MenuFlyoutItem x:Name="GitRebaseMenuItem" Text="Rebase" Click="OnGitRebaseClick"/>
                                                     <MenuFlyoutItem x:Name="GitCreateBranchMenuItem" Text="Create Branch" Click="OnGitCreateBranchClick"/>
-                                                    <MenuFlyoutItem x:Name="GitMergeMenuItem" Text="Merge" Click="OnGitMergeClick"/>
+                                                    <MenuFlyoutItem x:Name="GitMergeMenuItem" Text="Merge Branch" Click="OnGitMergeClick"/>
                                                     <MenuFlyoutSeparator/>
                                                     <MenuFlyoutItem x:Name="GitGcMenuItem" Text="git gc" Click="OnGitGcClick"/>
                                                     <MenuFlyoutItem x:Name="GitHardResetMenuItem" Text="hard reset" Click="OnGitHardResetClick"/>

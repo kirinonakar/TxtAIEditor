@@ -657,7 +657,7 @@
     <value>브랜치 생성</value>
   </data>
   <data name="GitMerge" xml:space="preserve">
-    <value>병합</value>
+    <value>브랜치 병합</value>
   </data>
   <data name="GitCreateBranchTitle" xml:space="preserve">
     <value>새 브랜치 생성</value>

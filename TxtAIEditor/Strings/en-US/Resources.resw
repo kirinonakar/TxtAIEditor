@@ -657,7 +657,7 @@
     <value>Create Branch</value>
   </data>
   <data name="GitMerge" xml:space="preserve">
-    <value>Merge</value>
+    <value>Merge Branch</value>
   </data>
   <data name="GitCreateBranchTitle" xml:space="preserve">
     <value>Create New Branch</value>
