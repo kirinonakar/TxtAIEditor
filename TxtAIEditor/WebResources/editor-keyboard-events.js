@@ -188,8 +188,12 @@ export function bindKeyboardEvents({ openFindPanel }) {
         }
     }
 
-    const KEYBOARD_VERTICAL_REPEAT_INITIAL_DELAY_MS = 140;
-    const KEYBOARD_VERTICAL_REPEAT_INTERVAL_MS = 32;
+    // 초기 대기 시간을 300ms로 설정하여 살짝 누른 단일 키에서 반복이 시작되지 않도록 한다.
+    // Windows 기본 키 반복 지연(~250–500ms)과 비슷한 값으로, 의도적인 길게 누름만 반복시킨다.
+    const KEYBOARD_VERTICAL_REPEAT_INITIAL_DELAY_MS = 300;
+    // 반복 간격을 50ms(초당 약 20줄)로 설정하여 반복 중에도 줄 단위 이동을 제어하기 쉽게 한다.
+    // 이전 값 32ms는 너무 빨라서 반복이 시작되면 2–3줄이 순식간에 이동했다.
+    const KEYBOARD_VERTICAL_REPEAT_INTERVAL_MS = 50;
     let keyboardVerticalRepeat = {
         key: '',
         direction: 0,
