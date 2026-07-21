@@ -31,7 +31,6 @@ namespace TxtAIEditor.Controls
             string initialTranscript,
             string? responseLine)
         {
-            AppendLine(context, $"[User Prompt]: {instruction}");
             string runTranscript = transcript.Substring(initialTranscript.Length);
             if (!string.IsNullOrWhiteSpace(runTranscript))
             {
@@ -45,7 +44,16 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrEmpty(responseLine))
             {
-                AppendLine(context, responseLine);
+                const string legacyPrefix = "[Agent Response]:";
+                if (responseLine.StartsWith(legacyPrefix, StringComparison.Ordinal))
+                {
+                    AppendLine(context, "[assistant: final answer]");
+                    AppendLine(context, responseLine.Substring(legacyPrefix.Length).TrimStart());
+                }
+                else
+                {
+                    AppendLine(context, responseLine);
+                }
             }
 
             AppendLine(context);

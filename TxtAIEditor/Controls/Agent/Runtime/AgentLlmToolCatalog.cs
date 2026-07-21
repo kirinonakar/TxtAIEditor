@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using TxtAIEditor.Core.Services.LLM;
 
@@ -382,23 +383,20 @@ namespace TxtAIEditor.Controls
                 }
             };
 
-            if (hasEnabledSkills)
+            tools.Add(new LlmTool
             {
-                tools.Add(new LlmTool
+                Name = "skill_use",
+                Description = "Read the full SKILL.md for an enabled skill by name or path. The result includes the SKILL.md path and Skill directory; relative scripts/assets in the skill are rooted there.",
+                Parameters = new
                 {
-                    Name = "skill_use",
-                    Description = "Read the full SKILL.md for an enabled skill by name or path. The result includes the SKILL.md path and Skill directory; relative scripts/assets in the skill are rooted there.",
-                    Parameters = new
+                    type = "object",
+                    properties = new
                     {
-                        type = "object",
-                        properties = new
-                        {
-                            name = new { type = "string", description = "Name of the skill, e.g., skill-name" }
-                        },
-                        required = new[] { "name" }
-                    }
-                });
-            }
+                        name = new { type = "string", description = "Name of the skill, e.g., skill-name" }
+                    },
+                    required = new[] { "name" }
+                }
+            });
 
             if (planningMode)
             {
@@ -418,7 +416,7 @@ namespace TxtAIEditor.Controls
                 });
             }
 
-            foreach (var alias in mcpAliases)
+            foreach (var alias in mcpAliases.OrderBy(item => item.Alias, System.StringComparer.Ordinal))
             {
                 object parametersObj = new { type = "object", properties = new { } };
                 try

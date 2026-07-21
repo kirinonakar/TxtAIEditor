@@ -349,10 +349,10 @@ namespace TxtAIEditor.Controls
 
             await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
             string targetLanguage = settings?.ResolveTargetLanguage() ?? "Korean";
-            string instruction = _promptContextService.BuildAgentInstruction(requestedPlanningMode
+            string conversationTurn = _promptContextService.BuildConversationTurn(requestedPlanningMode
                 ? AgentPlanController.BuildPlanningModeRequest(userInstruction, targetLanguage)
                 : userInstruction);
-            if (string.IsNullOrWhiteSpace(instruction))
+            if (string.IsNullOrWhiteSpace(conversationTurn))
             {
                 _showError(
                     _getString("AgentErrorTitle", "Agent 오류"),
@@ -423,37 +423,35 @@ namespace TxtAIEditor.Controls
             _activeWorkspaceRunContext.Value = runContext;
             try
             {
+                string fixedPromptContext = _promptContextService.BuildFixedPromptContext();
                 OpenedTab? currentRunActiveTab = await CaptureActiveTabForRunAsync();
                 AgentSelectionSnapshot currentRunSelectionSnapshot = _selectionContextController.CaptureSelectionForRun(_isRunning);
                 runContext.StreamToTabTargetTabId = currentRunActiveTab?.Id;
                 _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab);
-                string workspaceContext = _promptContextService.BuildWorkspaceContext(
-                    instruction,
+                string currentWorkspaceContext = _promptContextService.BuildWorkspaceContext(
+                    conversationTurn,
                     currentRunActiveTab,
                     currentRunSelectionSnapshot,
                     runContext.Attachments,
                     runContext.WorkspaceRoot);
-                string lastWorkspaceContext = workspaceContext;
                 string runSelectionContext = _selectionContextController.BuildSelectionContext(currentRunSelectionSnapshot);
-                runContext.PlanWorkspaceContext = workspaceContext;
+                runContext.PlanWorkspaceContext = currentWorkspaceContext;
                 runContext.PlanSelectionContext = runSelectionContext;
                 var initialTranscriptBuilder = new StringBuilder();
                 string sessionHistoryForPrompt = _promptContextService.BuildSessionHistoryForPrompt(
-                    instruction,
-                    workspaceContext,
+                    conversationTurn,
+                    currentWorkspaceContext,
                     runSelectionContext);
                 if (!string.IsNullOrWhiteSpace(sessionHistoryForPrompt))
                 {
-                    initialTranscriptBuilder.AppendLine("[Session History]");
-                    initialTranscriptBuilder.AppendLine(sessionHistoryForPrompt);
-                    initialTranscriptBuilder.AppendLine("=================================");
+                    initialTranscriptBuilder.Append(sessionHistoryForPrompt.TrimEnd());
+                    initialTranscriptBuilder.AppendLine();
                     initialTranscriptBuilder.AppendLine();
                 }
-                initialTranscriptBuilder.AppendLine(workspaceContext);
                 initialTranscript = initialTranscriptBuilder.ToString();
 
-                transcript = initialTranscript;
-                modelTranscript = initialTranscript;
+                transcript = initialTranscript + conversationTurn.Trim() + Environment.NewLine;
+                modelTranscript = transcript;
                 string response = string.Empty;
 
                 bool completed = false;
@@ -493,9 +491,10 @@ namespace TxtAIEditor.Controls
                     AgentContextCompressionResult compressionResult =
                         await _contextCompressionService.CompressIfNeededAsync(
                             runContext.LlmSettings,
-                            instruction,
+                            fixedPromptContext,
                             modelTranscript,
                             currentTranscript,
+                            currentWorkspaceContext,
                             runSelectionContext,
                             planningMode,
                             runContext.HasEnabledSkills,
@@ -522,8 +521,9 @@ namespace TxtAIEditor.Controls
 
                     AgentResponseStreamResult streamResult = await _responseStreamService.RunAsync(
                         runContext,
-                        instruction,
+                        fixedPromptContext,
                         currentTranscript,
+                        currentWorkspaceContext,
                         runSelectionContext,
                         planningMode,
                         agentTools,
@@ -619,7 +619,7 @@ namespace TxtAIEditor.Controls
 
                         AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                             runContext,
-                            instruction,
+                            conversationTurn,
                             transcript,
                             initialTranscript,
                             $"[Agent Response]: {emptyResponseMessage}");
@@ -728,7 +728,7 @@ namespace TxtAIEditor.Controls
 
                                 AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                                     runContext,
-                                    instruction,
+                                    conversationTurn,
                                     transcript,
                                     initialTranscript,
                                     $"[Agent Response]: {limitMessage}");
@@ -777,7 +777,7 @@ namespace TxtAIEditor.Controls
 
                                 AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                                     runContext,
-                                    instruction,
+                                    conversationTurn,
                                     transcript,
                                     initialTranscript,
                                     $"[Agent Response]: {limitMessage}");
@@ -793,7 +793,7 @@ namespace TxtAIEditor.Controls
 
                         if (!planningMode &&
                             skillMentionRetryCount < maxSkillMentionRetries &&
-                            instruction.Contains("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase) &&
+                            conversationTurn.Contains("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase) &&
                             _responseInspector.ResponseMentionsSkillIntent(response))
                         {
                             skillMentionRetryCount++;
@@ -842,7 +842,7 @@ namespace TxtAIEditor.Controls
 
                         AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                             runContext,
-                            instruction,
+                            conversationTurn,
                             transcript,
                             initialTranscript,
                             $"[Agent Response]: {response.Trim()}");
@@ -990,8 +990,8 @@ namespace TxtAIEditor.Controls
 
                     await _uiDispatcher.RunAsync(() =>
                     {
-                        string refreshedContext = _promptContextService.BuildWorkspaceContext(
-                            instruction,
+                        currentWorkspaceContext = _promptContextService.BuildWorkspaceContext(
+                            conversationTurn,
                             currentRunActiveTab,
                             currentRunSelectionSnapshot,
                             runContext.Attachments,
@@ -999,25 +999,17 @@ namespace TxtAIEditor.Controls
                         var addedPartBuilder = new StringBuilder();
                         addedPartBuilder.AppendLine();
                         addedPartBuilder.AppendLine();
-                        addedPartBuilder.AppendLine("[Agent tool call]");
+                        addedPartBuilder.AppendLine("[assistant: tool call]");
                         addedPartBuilder.AppendLine(response);
 
                         foreach (var tcRes in toolCallResults)
                         {
                             addedPartBuilder.AppendLine();
-                            addedPartBuilder.AppendLine($"[Parsed tool call: {tcRes.Name}]");
+                            addedPartBuilder.AppendLine($"[tool: {tcRes.Name} arguments]");
                             addedPartBuilder.AppendLine(tcRes.Args.GetRawText());
                             addedPartBuilder.AppendLine();
-                            addedPartBuilder.AppendLine($"[Tool result: {tcRes.Name}]");
+                            addedPartBuilder.AppendLine($"[tool: {tcRes.Name} result]");
                             addedPartBuilder.AppendLine(tcRes.ResultForTranscript);
-                        }
-
-                        if (!string.Equals(refreshedContext, lastWorkspaceContext, StringComparison.Ordinal))
-                        {
-                            addedPartBuilder.AppendLine();
-                            addedPartBuilder.AppendLine("[Current workspace context snapshot]");
-                            addedPartBuilder.AppendLine(refreshedContext);
-                            lastWorkspaceContext = refreshedContext;
                         }
 
                         string addedPart = addedPartBuilder.ToString();
@@ -1057,7 +1049,7 @@ namespace TxtAIEditor.Controls
 
                         AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                             runContext,
-                            instruction,
+                            conversationTurn,
                             transcript,
                             initialTranscript,
                             "[Agent Response]: Plan saved for user review.");
@@ -1077,7 +1069,7 @@ namespace TxtAIEditor.Controls
 
                         AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                             runContext,
-                            instruction,
+                            conversationTurn,
                             transcript,
                             initialTranscript,
                             $"[Agent Response]: {loopMessage}");
@@ -1105,7 +1097,7 @@ namespace TxtAIEditor.Controls
 
                             AgentRunTranscriptRecorder.AppendPromptTranscript(
                                 runContext,
-                                instruction,
+                                conversationTurn,
                                 transcript,
                                 initialTranscript);
                             _ = PersistRunSessionToHistoryAsync();
@@ -1132,7 +1124,7 @@ namespace TxtAIEditor.Controls
 
                     AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                         runContext,
-                        instruction,
+                        conversationTurn,
                         transcript,
                         initialTranscript,
                         "[Agent Response]: Tool step limit reached before a final answer.");
@@ -1146,7 +1138,7 @@ namespace TxtAIEditor.Controls
 
                 AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                     runContext,
-                    instruction,
+                    conversationTurn,
                     transcript,
                     initialTranscript,
                     "[Agent Response]: Agent execution was interrupted by the user.");

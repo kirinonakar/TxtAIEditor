@@ -44,8 +44,9 @@ namespace TxtAIEditor.Controls
 
         public async Task<AgentResponseStreamResult> RunAsync(
             AgentRunContext runContext,
-            string instruction,
+            string fixedPromptContext,
             string currentTranscript,
+            string currentWorkspaceContext,
             string runSelectionContext,
             bool planningMode,
             IReadOnlyList<LlmTool> agentToolsList,
@@ -119,8 +120,8 @@ namespace TxtAIEditor.Controls
             {
                 response = await _llmService.RunAgentAsync(
                     runContext.LlmSettings,
-                    instruction,
                     currentTranscript,
+                    currentWorkspaceContext,
                     runSelectionContext,
                     "run",
                     async chunk =>
@@ -449,7 +450,8 @@ namespace TxtAIEditor.Controls
 
                         runContext.PendingVisionFallbackContext = fallbackContext;
                         return Task.FromResult(false);
-                    });
+                    },
+                    fixedContext: fixedPromptContext);
             }
             catch (ResponseTruncatedException)
             {

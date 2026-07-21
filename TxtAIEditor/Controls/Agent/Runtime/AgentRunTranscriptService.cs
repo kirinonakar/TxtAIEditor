@@ -113,7 +113,8 @@ namespace TxtAIEditor.Controls
 
                 if (inLegacyRetryPayload)
                 {
-                    if (!line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                    if (!line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase) &&
+                        !line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }

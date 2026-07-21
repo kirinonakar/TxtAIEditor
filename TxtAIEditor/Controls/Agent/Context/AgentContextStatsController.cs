@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<string> _activeSelectionTextProvider;
         private readonly Func<string> _activeSelectionContextProvider;
+        private readonly Func<string> _buildFixedPromptContext;
         private readonly Func<string, string> _buildAgentInstruction;
         private readonly Func<string, string> _buildWorkspaceContext;
         private readonly Func<string, string, string, string> _buildSessionHistoryForPrompt;
@@ -40,6 +41,7 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> activeTabProvider,
             Func<string> activeSelectionTextProvider,
             Func<string> activeSelectionContextProvider,
+            Func<string> buildFixedPromptContext,
             Func<string, string> buildAgentInstruction,
             Func<string, string> buildWorkspaceContext,
             Func<string, string, string, string> buildSessionHistoryForPrompt,
@@ -60,6 +62,7 @@ namespace TxtAIEditor.Controls
             _activeTabProvider = activeTabProvider;
             _activeSelectionTextProvider = activeSelectionTextProvider;
             _activeSelectionContextProvider = activeSelectionContextProvider;
+            _buildFixedPromptContext = buildFixedPromptContext;
             _buildAgentInstruction = buildAgentInstruction;
             _buildWorkspaceContext = buildWorkspaceContext;
             _buildSessionHistoryForPrompt = buildSessionHistoryForPrompt;
@@ -224,28 +227,26 @@ namespace TxtAIEditor.Controls
             string instruction = _buildAgentInstruction(promptText);
             string workspaceContext = _buildWorkspaceContext(instruction);
             string selectedText = _activeSelectionContextProvider();
-
-            string baseUserContent = AgentPromptBuilder.BuildUserContent(
-                instruction,
-                string.Empty,
-                selectedText,
-                string.Empty);
-            double tokens = AgentTokenEstimator.Estimate(systemPrompt) + AgentTokenEstimator.Estimate(baseUserContent);
-
-            tokens += AgentTokenEstimator.Estimate(Environment.NewLine + "[Workspace context]" + Environment.NewLine);
-
             string sessionHistoryForPrompt = _buildSessionHistoryForPrompt(instruction, workspaceContext, selectedText);
+            string conversationTranscript;
             if (!string.IsNullOrWhiteSpace(sessionHistoryForPrompt))
             {
-                tokens += AgentTokenEstimator.Estimate("[Session History]" + Environment.NewLine);
-                tokens += AgentTokenEstimator.Estimate(sessionHistoryForPrompt) + AgentTokenEstimator.Estimate(Environment.NewLine);
-                tokens += AgentTokenEstimator.Estimate("=================================" + Environment.NewLine + Environment.NewLine);
-                tokens += AgentTokenEstimator.Estimate(workspaceContext + Environment.NewLine + Environment.NewLine);
+                conversationTranscript = sessionHistoryForPrompt.TrimEnd() +
+                    Environment.NewLine + Environment.NewLine + instruction;
             }
             else
             {
-                tokens += AgentTokenEstimator.Estimate(workspaceContext + Environment.NewLine + Environment.NewLine);
+                conversationTranscript = instruction;
             }
+
+            string baseUserContent = AgentPromptBuilder.BuildUserContent(
+                _buildFixedPromptContext(),
+                conversationTranscript,
+                workspaceContext,
+                selectedText,
+                string.Empty,
+                langCode);
+            double tokens = AgentTokenEstimator.Estimate(systemPrompt) + AgentTokenEstimator.Estimate(baseUserContent);
 
             return tokens + _currentRunTranscriptTokensProvider() + _attachmentController.EstimatedImageTokens + _toolCatalogTokensProvider();
         }

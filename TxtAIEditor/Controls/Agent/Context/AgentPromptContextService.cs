@@ -84,42 +84,33 @@ namespace TxtAIEditor.Controls
             return $"{prefix} {userInstruction}";
         }
 
-        public string BuildAgentInstruction(string userInstruction)
+        public string BuildConversationTurn(string userInstruction)
         {
             string presetSection = _presetController.BuildSelectedPresetSection();
-            string mcpSection = _mcpController.BuildSelectedMcpSection();
             string skillSection = _skillController.BuildSelectedSkillSection();
-            string agentsMdSection = BuildWorkspaceAgentsMdSection();
             if (string.IsNullOrWhiteSpace(presetSection) &&
-                string.IsNullOrWhiteSpace(mcpSection) &&
                 string.IsNullOrWhiteSpace(skillSection) &&
-                string.IsNullOrWhiteSpace(agentsMdSection))
+                string.IsNullOrWhiteSpace(userInstruction))
             {
-                return userInstruction;
+                return string.Empty;
             }
 
             var builder = new StringBuilder();
-            if (!string.IsNullOrWhiteSpace(agentsMdSection))
+            builder.AppendLine("[user]");
+            if (!string.IsNullOrWhiteSpace(skillSection))
             {
-                builder.AppendLine(agentsMdSection);
+                builder.AppendLine("[Skill application rule]");
+                builder.AppendLine("The skill metadata below applies to this user request only. If a listed skill is relevant, call skill_use before applying it and follow the returned SKILL.md.");
+                builder.AppendLine();
+                builder.AppendLine("[Current Skill]");
+                builder.AppendLine(skillSection);
                 builder.AppendLine();
             }
 
             if (!string.IsNullOrWhiteSpace(presetSection))
             {
+                builder.AppendLine("[Current Preset]");
                 builder.AppendLine(presetSection);
-                builder.AppendLine();
-            }
-
-            if (!string.IsNullOrWhiteSpace(mcpSection))
-            {
-                builder.AppendLine(mcpSection);
-                builder.AppendLine();
-            }
-
-            if (!string.IsNullOrWhiteSpace(skillSection))
-            {
-                builder.AppendLine(skillSection);
                 builder.AppendLine();
             }
 
@@ -127,6 +118,31 @@ namespace TxtAIEditor.Controls
             {
                 builder.AppendLine("[User request]");
                 builder.Append(userInstruction);
+            }
+
+            return builder.ToString().Trim();
+        }
+
+        public string BuildFixedPromptContext()
+        {
+            string mcpSection = _mcpController.BuildSelectedMcpSection();
+            string agentsMdSection = BuildWorkspaceAgentsMdSection();
+            if (string.IsNullOrWhiteSpace(mcpSection) && string.IsNullOrWhiteSpace(agentsMdSection))
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(mcpSection))
+            {
+                builder.AppendLine("[MCP instructions and tool schemas]");
+                builder.AppendLine(mcpSection);
+                builder.AppendLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(agentsMdSection))
+            {
+                builder.AppendLine(agentsMdSection);
             }
 
             return builder.ToString().Trim();

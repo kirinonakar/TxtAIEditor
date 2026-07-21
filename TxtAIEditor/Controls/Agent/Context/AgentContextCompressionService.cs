@@ -29,9 +29,10 @@ namespace TxtAIEditor.Controls
 
         public async Task<AgentContextCompressionResult> CompressIfNeededAsync(
             EditorSettings settings,
-            string instruction,
+            string fixedPromptContext,
             string modelTranscript,
             string requestTranscript,
+            string workspaceContext,
             string selectedText,
             bool planningMode,
             bool hasEnabledSkills,
@@ -60,8 +61,9 @@ namespace TxtAIEditor.Controls
                 hasEnabledSkills,
                 hasEnabledMcp);
             string userContent = AgentPromptBuilder.BuildUserContent(
-                instruction,
+                fixedPromptContext,
                 requestTranscript,
+                workspaceContext,
                 selectedText,
                 string.Empty,
                 languageCode);

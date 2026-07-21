@@ -33,6 +33,30 @@ namespace TxtAIEditor.Controls
             string[] lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             for (int i = 0; i < lines.Length; i++)
             {
+                if (!lines[i].StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                for (int j = i + 1; j < lines.Length; j++)
+                {
+                    string requestLine = lines[j].Trim();
+                    if (requestLine.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
+                        requestLine.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) ||
+                        requestLine.StartsWith("[user]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(requestLine) && !requestLine.StartsWith("[", StringComparison.Ordinal))
+                    {
+                        return requestLine;
+                    }
+                }
+            }
+
+            for (int i = 0; i < lines.Length; i++)
+            {
                 string line = lines[i];
                 if (!line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
                 {

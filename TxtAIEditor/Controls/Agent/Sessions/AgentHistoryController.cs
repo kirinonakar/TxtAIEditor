@@ -183,11 +183,18 @@ namespace TxtAIEditor.Controls
 
             var lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             int responseLineIndex = -1;
+            bool newResponseFormat = false;
             for (int i = 0; i < lines.Length; i++)
             {
                 if (lines[i].StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))
                 {
                     responseLineIndex = i;
+                    newResponseFormat = false;
+                }
+                else if (lines[i].StartsWith("[assistant: final answer]", StringComparison.OrdinalIgnoreCase))
+                {
+                    responseLineIndex = i;
+                    newResponseFormat = true;
                 }
             }
 
@@ -198,13 +205,19 @@ namespace TxtAIEditor.Controls
 
             var result = new StringBuilder();
             string firstLine = lines[responseLineIndex];
-            result.AppendLine(firstLine.Substring("[Agent Response]:".Length).TrimStart());
+            if (!newResponseFormat)
+            {
+                result.AppendLine(firstLine.Substring("[Agent Response]:".Length).TrimStart());
+            }
             for (int i = responseLineIndex + 1; i < lines.Length; i++)
             {
                 string line = lines[i];
                 if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase) ||
                     line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
-                    line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase))
+                    line.StartsWith("[assistant: tool call]", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase))
                 {
                     break;
                 }
@@ -272,7 +285,8 @@ namespace TxtAIEditor.Controls
 
                 if (inLegacyRetryPayload)
                 {
-                    if (!line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                    if (!line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase) &&
+                        !line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
@@ -307,7 +321,18 @@ namespace TxtAIEditor.Controls
                     inPlanningModeTaskDetails = false;
                 }
 
-                if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                if (line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase))
+                {
+                    inToolCall = false;
+                    toolCallSyntaxReached = false;
+                    inToolResult = false;
+                    inUserPromptInstructionMetadata = true;
+                    suppressInstructionMetadataSection = true;
+                    afterUserRequest = false;
+                    inPlanningModeTaskDetails = false;
+                    result.AppendLine("[User Prompt]:");
+                }
+                else if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
                     toolCallSyntaxReached = false;
@@ -337,7 +362,8 @@ namespace TxtAIEditor.Controls
                     inPlanningModeTaskDetails = false;
                     continue;
                 }
-                else if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase))
+                else if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[assistant: tool call]", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = true;
                     toolCallSyntaxReached = false;
@@ -348,7 +374,9 @@ namespace TxtAIEditor.Controls
                     inPlanningModeTaskDetails = false;
                     continue;
                 }
-                else if (line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase))
+                else if (line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase) ||
+                    (line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) &&
+                        line.EndsWith(" result]", StringComparison.OrdinalIgnoreCase)))
                 {
                     inToolCall = false;
                     toolCallSyntaxReached = false;
@@ -358,14 +386,17 @@ namespace TxtAIEditor.Controls
                     afterUserRequest = false;
                     inPlanningModeTaskDetails = false;
 
-                    string toolName = line.Replace("[Tool result:", "").Replace("]", "").Trim();
+                    string toolName = line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase)
+                        ? line.Replace("[Tool result:", "").Replace("]", "").Trim()
+                        : line.Substring("[tool:".Length, line.Length - "[tool:".Length - " result]".Length).Trim();
                     string completedFormat = getString?.Invoke(
                         "AgentHistoryToolCompletedFormat",
                         "[도구 실행]: {0}") ?? "[도구 실행]: {0}";
                     result.AppendLine(string.Format(completedFormat, toolName));
                     continue;
                 }
-                else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))
+                else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[assistant: final answer]", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
                     toolCallSyntaxReached = false;
@@ -374,7 +405,9 @@ namespace TxtAIEditor.Controls
                     suppressInstructionMetadataSection = false;
                     afterUserRequest = false;
                     inPlanningModeTaskDetails = false;
-                    result.AppendLine(line);
+                    result.AppendLine(line.StartsWith("[assistant: final answer]", StringComparison.OrdinalIgnoreCase)
+                        ? "[Agent Response]:"
+                        : line);
                 }
                 else if (line.StartsWith("[Planning-mode task]", StringComparison.OrdinalIgnoreCase))
                 {
@@ -388,6 +421,15 @@ namespace TxtAIEditor.Controls
                         suppressInstructionMetadataSection = false;
                         afterUserRequest = true;
                         result.AppendLine(line);
+                    }
+                    else if (line.StartsWith("[Skill application rule]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        suppressInstructionMetadataSection = true;
+                    }
+                    else if (line.StartsWith("[Current Skill]", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Current Preset]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        suppressInstructionMetadataSection = false;
                     }
                     else if (line.StartsWith("[Workspace agent rules]", StringComparison.OrdinalIgnoreCase) ||
                         line.StartsWith("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase))
@@ -424,6 +466,8 @@ namespace TxtAIEditor.Controls
                             toolCallSyntaxReached = true;
                         }
                         else if (line.StartsWith("[Parsed tool call:", StringComparison.OrdinalIgnoreCase) ||
+                            (line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) &&
+                                line.EndsWith(" arguments]", StringComparison.OrdinalIgnoreCase)) ||
                             AgentToolCallParser.ContainsToolCallSyntax(line))
                         {
                             toolCallSyntaxReached = true;
