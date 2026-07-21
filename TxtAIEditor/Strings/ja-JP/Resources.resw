@@ -344,6 +344,9 @@
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>デフォルトでMarkdownツールバーを表示する</value>
   </data>
+  <data name="SettingsStartInTreeMode" xml:space="preserve">
+    <value>ツリーモードで開始</value>
+  </data>
   <data name="SettingsToolbar" xml:space="preserve">
     <value>ツールバー</value>
   </data>

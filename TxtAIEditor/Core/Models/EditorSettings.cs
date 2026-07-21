@@ -42,6 +42,7 @@ namespace TxtAIEditor.Core.Models
         public bool ScrollSyncEnabled { get; set; } = true;
         public bool DefaultMarkdownEnabled { get; set; } = true;
         public bool DefaultMarkdownToolbarEnabled { get; set; } = true;
+        public bool StartInTreeMode { get; set; } = false;
         public int WindowX { get; set; } = -1;
         public int WindowY { get; set; } = -1;
         public int WindowWidth { get; set; } = 1200;

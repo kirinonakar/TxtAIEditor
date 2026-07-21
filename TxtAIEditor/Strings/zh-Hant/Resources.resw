@@ -344,6 +344,9 @@
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>預設啟用 Markdown 工具列</value>
   </data>
+  <data name="SettingsStartInTreeMode" xml:space="preserve">
+    <value>樹狀模式啟動</value>
+  </data>
   <data name="SettingsToolbar" xml:space="preserve">
     <value>工具列</value>
   </data>

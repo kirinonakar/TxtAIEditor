@@ -344,6 +344,9 @@
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>기본 마크다운 툴바 활성화</value>
   </data>
+  <data name="SettingsStartInTreeMode" xml:space="preserve">
+    <value>트리 모드로 시작</value>
+  </data>
   <data name="SettingsToolbar" xml:space="preserve">
     <value>툴바</value>
   </data>

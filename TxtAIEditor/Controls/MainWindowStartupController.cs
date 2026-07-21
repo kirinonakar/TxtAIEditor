@@ -33,6 +33,7 @@ namespace TxtAIEditor.Controls
         private readonly FavoritesRecentController _favoritesRecentController;
         private readonly Func<string> _getCurrentRepoPath;
         private readonly Func<string, bool, Task> _navigateExplorerToFolderAsync;
+        private readonly Action<bool> _setExplorerTreeMode;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Action _openNewTab;
         private readonly Action<bool> _applyLeftSidebarVisibility;
@@ -65,6 +66,7 @@ namespace TxtAIEditor.Controls
             FavoritesRecentController favoritesRecentController,
             Func<string> getCurrentRepoPath,
             Func<string, bool, Task> navigateExplorerToFolderAsync,
+            Action<bool> setExplorerTreeMode,
             Func<string, Task> loadFileIntoTabAsync,
             Action openNewTab,
             Action<bool> applyLeftSidebarVisibility,
@@ -95,6 +97,7 @@ namespace TxtAIEditor.Controls
             _favoritesRecentController = favoritesRecentController;
             _getCurrentRepoPath = getCurrentRepoPath;
             _navigateExplorerToFolderAsync = navigateExplorerToFolderAsync;
+            _setExplorerTreeMode = setExplorerTreeMode;
             _loadFileIntoTabAsync = loadFileIntoTabAsync;
             _openNewTab = openNewTab;
             _applyLeftSidebarVisibility = applyLeftSidebarVisibility;
@@ -210,6 +213,11 @@ namespace TxtAIEditor.Controls
             _applyUiPersonalization(settings);
             _localizeUi();
             _applyToolbarSettings(settings);
+
+            if (settings.StartInTreeMode)
+            {
+                _setExplorerTreeMode(true);
+            }
         }
 
         private async Task OpenStartupTargetsAsync(StartupPaths startupPaths)

@@ -344,6 +344,9 @@
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>Enable Markdown Toolbar by Default</value>
   </data>
+  <data name="SettingsStartInTreeMode" xml:space="preserve">
+    <value>Start in Tree Mode</value>
+  </data>
   <data name="SettingsToolbar" xml:space="preserve">
     <value>Toolbar</value>
   </data>

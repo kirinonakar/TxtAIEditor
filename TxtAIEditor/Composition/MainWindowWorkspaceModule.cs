@@ -92,6 +92,9 @@ namespace TxtAIEditor.Composition
         public void LoadDirectoryRoot(string folderPath) =>
             Controllers.ExplorerNavigation.LoadDirectoryRoot(folderPath);
 
+        public void SetExplorerTreeMode(bool enableTreeMode) =>
+            Controllers.ExplorerNavigation.SetTreeMode(enableTreeMode);
+
         public Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true) =>
             Controllers.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel);
 

@@ -87,6 +87,34 @@ namespace TxtAIEditor.Controls
         public bool IsViewingArchive => !string.IsNullOrWhiteSpace(CurrentArchivePath);
         public bool IsTreeMode { get; private set; }
 
+        public void SetTreeMode(bool enableTreeMode)
+        {
+            if (enableTreeMode == IsTreeMode)
+            {
+                return;
+            }
+
+            IsTreeMode = enableTreeMode;
+            _lastFilterQuery = string.Empty;
+            _leftSidebar.ClearExplorerFilter();
+            _leftSidebar.SetExplorerTreeMode(IsTreeMode);
+
+            if (string.IsNullOrWhiteSpace(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
+            {
+                _leftSidebar.ExplorerTree.RootNodes.Clear();
+                return;
+            }
+
+            if (IsTreeMode)
+            {
+                LoadTreeRoot(ResolveTreeRoot(CurrentFolderPath));
+            }
+            else
+            {
+                LoadFlatDirectoryRoot(CurrentFolderPath);
+            }
+        }
+
         public void LoadDirectoryRoot(string folderPath)
         {
             if (IsTreeMode)
@@ -349,31 +377,7 @@ namespace TxtAIEditor.Controls
 
         private void OnExplorerTreeModeClick(object? sender, RoutedEventArgs e)
         {
-            bool enableTreeMode = _leftSidebar.ExplorerTreeModeBtn.IsChecked == true;
-            if (enableTreeMode == IsTreeMode)
-            {
-                return;
-            }
-
-            IsTreeMode = enableTreeMode;
-            _lastFilterQuery = string.Empty;
-            _leftSidebar.ClearExplorerFilter();
-            _leftSidebar.SetExplorerTreeMode(IsTreeMode);
-
-            if (string.IsNullOrWhiteSpace(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
-            {
-                _leftSidebar.ExplorerTree.RootNodes.Clear();
-                return;
-            }
-
-            if (IsTreeMode)
-            {
-                LoadTreeRoot(ResolveTreeRoot(CurrentFolderPath));
-            }
-            else
-            {
-                LoadFlatDirectoryRoot(CurrentFolderPath);
-            }
+            SetTreeMode(_leftSidebar.ExplorerTreeModeBtn.IsChecked == true);
         }
 
         private void OnExplorerTreeExpanding(object? sender, Microsoft.UI.Xaml.Controls.TreeViewExpandingEventArgs e)

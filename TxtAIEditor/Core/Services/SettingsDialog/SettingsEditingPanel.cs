@@ -22,6 +22,7 @@ namespace TxtAIEditor.Core.Services
         private readonly CheckBox _autoSaveAllowNonGitCheck;
         private readonly CheckBox _defaultMarkdownCheck;
         private readonly CheckBox _defaultMarkdownToolbarCheck;
+        private readonly CheckBox _startInTreeModeCheck;
         private readonly TextBox _tabSizeBox;
         private readonly TextBox _homeFolderBox;
         private readonly TextBox _externalViewerPathBox;
@@ -45,6 +46,7 @@ namespace TxtAIEditor.Core.Services
             _autoSaveAllowNonGitCheck = new CheckBox { Content = getString("SettingsAutoSaveAllowNonGitFolders", "Git 폴더가 아니어도 Autosave 허용"), IsChecked = settings.AutoSaveAllowNonGitFolders };
             _defaultMarkdownCheck = new CheckBox { Content = getString("SettingsLivePreview", "실시간 미리보기 기본 활성화"), IsChecked = settings.DefaultMarkdownEnabled };
             _defaultMarkdownToolbarCheck = new CheckBox { Content = getString("SettingsMarkdownToolbar", "기본 마크다운 툴바 활성화"), IsChecked = settings.DefaultMarkdownToolbarEnabled };
+            _startInTreeModeCheck = new CheckBox { Content = getString("SettingsStartInTreeMode", "트리 모드로 시작"), IsChecked = settings.StartInTreeMode };
             _tabSizeBox = new TextBox { PlaceholderText = "예: 4", Text = settings.TabSize.ToString(), HorizontalAlignment = HorizontalAlignment.Stretch };
             _homeFolderBox = new TextBox { PlaceholderText = getString("SettingsHomeFolderPlaceholder", "C:\\Users\\..."), Text = settings.HomeFolderPath, Width = 420, IsSpellCheckEnabled = false };
             _externalViewerPathBox = new TextBox { PlaceholderText = getString("SettingsExternalViewerPathPlaceholder", "uviewer 또는 C:\\Program Files\\Viewer\\viewer.exe"), Text = settings.ExternalViewerPath, Width = 420, IsSpellCheckEnabled = false };
@@ -67,6 +69,7 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(_autoSaveAllowNonGitCheck);
             section.Children.Add(_defaultMarkdownCheck);
             section.Children.Add(_defaultMarkdownToolbarCheck);
+            section.Children.Add(_startInTreeModeCheck);
             SettingsDialogUi.AddLabel(section, getString("SettingsTabSize", "Tab size"));
             section.Children.Add(_tabSizeBox);
 
@@ -97,6 +100,7 @@ namespace TxtAIEditor.Core.Services
             settings.DefaultMarkdownEnabled = _defaultMarkdownCheck.IsChecked == true;
             settings.RightSidebarVisible = settings.DefaultMarkdownEnabled;
             settings.DefaultMarkdownToolbarEnabled = _defaultMarkdownToolbarCheck.IsChecked == true;
+            settings.StartInTreeMode = _startInTreeModeCheck.IsChecked == true;
         }
 
         private void AddHomeFolderPicker(

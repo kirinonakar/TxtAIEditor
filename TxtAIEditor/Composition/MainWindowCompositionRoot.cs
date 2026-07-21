@@ -426,6 +426,7 @@ namespace TxtAIEditor.Composition
                     () => state.CurrentRepoPath,
                     () => state.CurrentFolderPath,
                     workspaceModule.NavigateExplorerToFolderAsync,
+                    workspaceModule.SetExplorerTreeMode,
                     callbacks.LoadFileIntoTabAsync,
                     () => callbacks.OpenNewTab(),
                     ApplyLeftSidebarVisibility,
