@@ -21,6 +21,9 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, OpenedTab, int, int> _selectionContextUpdater;
         private readonly Func<bool> _isScrollSyncEnabled;
         private readonly Action<bool> _setScrollSyncEnabled;
+        private readonly object _scrollSyncGate = new();
+        private (OpenedTab Tab, int FirstLine, double Offset)? _pendingScrollSync;
+        private bool _scrollSyncDispatchQueued;
 
         public EditorBridgeInteractionController(
             EditorWorkspacePane editorWorkspace,
@@ -105,29 +108,59 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _dispatcherQueue.TryEnqueue(() =>
+            lock (_scrollSyncGate)
             {
-                if (_activeTabProvider() != tab)
+                _pendingScrollSync = (tab, firstLine, offset);
+                if (_scrollSyncDispatchQueued)
                 {
                     return;
                 }
 
-                _livePreviewController.PostScrollSync(firstLine, offset);
+                _scrollSyncDispatchQueued = true;
+            }
 
-                if (_editorWorkspace.CurrentSplitMode == EditorSplitMode.None)
+            if (!_dispatcherQueue.TryEnqueue(ProcessPendingScrollSync))
+            {
+                lock (_scrollSyncGate)
                 {
-                    return;
+                    _scrollSyncDispatchQueued = false;
+                    _pendingScrollSync = null;
                 }
+            }
+        }
 
-                var otherTabView = GetOtherTabView(tab.Id);
-                if (otherTabView?.SelectedItem is TabViewItem otherItem &&
-                    otherItem.Tag is string otherTabId &&
-                    _tabBridges.TryGetValue(otherTabId, out var otherBridgeGroup) &&
-                    otherBridgeGroup.Bridge != null)
-                {
-                    _ = otherBridgeGroup.Bridge.SyncScrollFromPreviewAsync(firstLine, offset);
-                }
-            });
+        private void ProcessPendingScrollSync()
+        {
+            (OpenedTab Tab, int FirstLine, double Offset)? pending;
+            lock (_scrollSyncGate)
+            {
+                pending = _pendingScrollSync;
+                _pendingScrollSync = null;
+                _scrollSyncDispatchQueued = false;
+            }
+
+            if (pending is not { } scroll ||
+                !_isScrollSyncEnabled() ||
+                _activeTabProvider() != scroll.Tab)
+            {
+                return;
+            }
+
+            _livePreviewController.PostScrollSync(scroll.FirstLine, scroll.Offset);
+
+            if (_editorWorkspace.CurrentSplitMode == EditorSplitMode.None)
+            {
+                return;
+            }
+
+            var otherTabView = GetOtherTabView(scroll.Tab.Id);
+            if (otherTabView?.SelectedItem is TabViewItem otherItem &&
+                otherItem.Tag is string otherTabId &&
+                _tabBridges.TryGetValue(otherTabId, out var otherBridgeGroup) &&
+                otherBridgeGroup.Bridge != null)
+            {
+                _ = otherBridgeGroup.Bridge.SyncScrollFromPreviewAsync(scroll.FirstLine, scroll.Offset);
+            }
         }
 
         public void HandleScrollSyncChanged(bool enabled)

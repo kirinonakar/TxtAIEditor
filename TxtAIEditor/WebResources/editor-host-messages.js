@@ -344,9 +344,15 @@ export function createHostMessageHandler({
             break;
         case 'receiveLines':
             {
-                receiveLineBlock(msg.startLine || 1, msg.lines || []);
+                const receivedStart = Math.max(1, Number(msg.startLine || 1));
+                const receivedCount = receiveLineBlock(receivedStart, msg.lines || []);
+                const receivedEnd = receivedStart + receivedCount - 1;
+                const touchesRenderedRange = receivedCount > 0 &&
+                    state.renderedRangeStart > 0 &&
+                    receivedEnd >= state.renderedRangeStart &&
+                    receivedStart <= state.renderedRangeEnd;
                 runPendingLineActions();
-                if (!state.isComposing) {
+                if (!state.isComposing && touchesRenderedRange) {
                     queueRender(true);
                 }
             }

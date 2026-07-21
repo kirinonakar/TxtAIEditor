@@ -61,6 +61,8 @@ const state = {
     isLineSelecting: false,
     initialized: false,
     lastRangeKey: '',
+    renderedRangeStart: 0,
+    renderedRangeEnd: 0,
     cacheVersion: 0,
     documentVersion: 0,
     hostDocumentId: '',
@@ -566,6 +568,8 @@ function setupModel(lineCount) {
     state.hexSelectionAnchorOffset = null;
     state.hexCursorOffset = 0;
     state.lastRangeKey = '';
+    state.renderedRangeStart = 0;
+    state.renderedRangeEnd = 0;
     state.dirtyLines.clear();
     setupVirtualHeight();
     queueRender(true);
@@ -1017,10 +1021,30 @@ function requestMissingLines(start, end) {
     start = Math.max(1, Number(start || 1));
     end = Math.min(sourceLineCount, Math.max(start, Number(end || start)));
 
+    const pendingRanges = [...state.pending].map(key => {
+        const [pendingStart, pendingCount] = key.split(':').map(Number);
+        return {
+            start: pendingStart,
+            end: pendingStart + pendingCount - 1
+        };
+    });
+    const isPending = line => pendingRanges.some(range => line >= range.start && line <= range.end);
+    const requestMissingBlock = (missingStart, missingCount) => {
+        let requestCount = Math.max(missingCount, MIN_BATCH_SIZE);
+        const nextPendingStart = pendingRanges
+            .filter(range => range.start > missingStart)
+            .reduce((nearest, range) => Math.min(nearest, range.start), Number.POSITIVE_INFINITY);
+        if (Number.isFinite(nextPendingStart)) {
+            requestCount = Math.min(requestCount, nextPendingStart - missingStart);
+        }
+        requestCount = Math.min(requestCount, sourceLineCount - missingStart + 1);
+        requestLines(missingStart, requestCount);
+    };
+
     let missingStart = 0;
     let missingCount = 0;
     for (let line = start; line <= end; line++) {
-        if (!state.cache.has(line)) {
+        if (!state.cache.has(line) && !isPending(line)) {
             if (missingStart === 0) {
                 missingStart = line;
                 missingCount = 1;
@@ -1028,13 +1052,13 @@ function requestMissingLines(start, end) {
                 missingCount++;
             }
         } else if (missingStart !== 0) {
-            requestLines(missingStart, Math.max(missingCount, MIN_BATCH_SIZE));
+            requestMissingBlock(missingStart, missingCount);
             missingStart = 0;
             missingCount = 0;
         }
     }
     if (missingStart !== 0) {
-        requestLines(missingStart, Math.max(missingCount, MIN_BATCH_SIZE));
+        requestMissingBlock(missingStart, missingCount);
     }
 }
 

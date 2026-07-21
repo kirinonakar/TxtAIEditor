@@ -259,6 +259,8 @@ function createEditorRenderer({
             }
 
             viewport.innerHTML = renderCsvTableRows(renderStart, renderEnd, hoveredLineNumber).join('');
+            state.renderedRangeStart = renderStart;
+            state.renderedRangeEnd = renderEnd;
             refreshHoveredLineFromLastPointer();
             restoreCsvFocusAfterRender();
             syncHorizontalOverflow();
@@ -413,6 +415,8 @@ function createEditorRenderer({
         }
 
         viewport.innerHTML = rows.join('');
+        state.renderedRangeStart = renderStart;
+        state.renderedRangeEnd = renderEnd;
         syncHorizontalOverflow();
 
         if (composingRow) {
