@@ -190,7 +190,10 @@ namespace TxtAIEditor.Controls
                 return string.Empty;
             }
 
-            int hardCharCap = Math.Min(history.Length, FallbackSessionHistoryPromptChars);
+            int maxHistoryCharsCap = contextLimit > FallbackSessionHistoryPromptChars
+                ? (int)Math.Floor(contextLimit * 0.9)
+                : FallbackSessionHistoryPromptChars;
+            int hardCharCap = Math.Min(history.Length, maxHistoryCharsCap);
             string cappedHistory = BuildSessionHistoryTail(history, hardCharCap);
             if (AgentTokenEstimator.Estimate(cappedHistory) <= availableHistoryTokens)
             {
