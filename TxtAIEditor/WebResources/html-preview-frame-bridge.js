@@ -25,6 +25,49 @@ function shortcutNameFromKeyboardEvent(event) {
 }
 
 function htmlPreviewFrameBridge() {
+    function createMemoryStorage() {
+        const entries = new Map();
+        return {
+            get length() {
+                return entries.size;
+            },
+            clear() {
+                entries.clear();
+            },
+            getItem(key) {
+                const normalizedKey = String(key);
+                return entries.has(normalizedKey) ? entries.get(normalizedKey) : null;
+            },
+            key(index) {
+                return [...entries.keys()][Number(index)] ?? null;
+            },
+            removeItem(key) {
+                entries.delete(String(key));
+            },
+            setItem(key, value) {
+                entries.set(String(key), String(value));
+            }
+        };
+    }
+
+    function installStorageFallback(storageName) {
+        try {
+            void window[storageName].length;
+            return;
+        } catch (error) { }
+
+        try {
+            Object.defineProperty(window, storageName, {
+                configurable: true,
+                enumerable: true,
+                value: createMemoryStorage()
+            });
+        } catch (error) { }
+    }
+
+    installStorageFallback('localStorage');
+    installStorageFallback('sessionStorage');
+
     function topOverlayOffset() {
         let offset = 0;
         const elements = document.body ? document.body.querySelectorAll('*') : [];
