@@ -75,7 +75,7 @@ namespace TxtAIEditor.Core.Models
         public bool LlmAgentAutoApprovePlanning { get; set; } = false;
         public string LlmSourceLanguage { get; set; } = "Auto";
         public string LlmTargetLanguage { get; set; } = "Korean";
-        public int LlmMaxToolCalls { get; set; } = 50;
+        public int LlmMaxToolCalls { get; set; } = 100;
 
         // Exa Config
         public string ExaEndpoint { get; set; } = "https://mcp.exa.ai/mcp";

@@ -289,7 +289,7 @@ namespace TxtAIEditor.Controls
                 string? lastSuccessfulToolInvocationKey = null;
                 const int maxRepeatedDuplicateToolSkips = 3;
                 bool planningMode = requestedPlanningMode;
-                int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls > 0 ? runContext.LlmSettings.LlmMaxToolCalls : 50;
+                int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls >= 50 ? runContext.LlmSettings.LlmMaxToolCalls : 100;
                 var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
                 int currentTaskStartEditIndex = runContext.SessionEdits.Count;
 

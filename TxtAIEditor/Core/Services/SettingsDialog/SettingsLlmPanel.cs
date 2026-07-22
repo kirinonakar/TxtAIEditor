@@ -38,7 +38,7 @@ namespace TxtAIEditor.Core.Services
         private readonly Button _tokenUsageStatsButton;
         private readonly Button _tokenUsageResetButton;
         private readonly TextBlock _tokenUsageSummaryText;
-        private readonly NumberBox _maxToolCallsBox;
+        private readonly Slider _maxToolCallsSlider;
 
         private SettingsLlmPanel(EditorSettings settings, ILLMService llmService, Func<string, string, string> getString)
         {
@@ -91,13 +91,12 @@ namespace TxtAIEditor.Core.Services
                 Content = getString("SettingsLlmTokenUsageStatsReset", "통계 초기화"),
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            _maxToolCallsBox = new NumberBox
+            _maxToolCallsSlider = new Slider
             {
-                Minimum = 0,
-                Maximum = 500,
-                Value = Math.Clamp(settings.LlmMaxToolCalls, 0, 500),
-                SmallChange = 1,
-                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Hidden,
+                Minimum = 50,
+                Maximum = 1000,
+                Value = Math.Clamp(settings.LlmMaxToolCalls, 50, 1000),
+                StepFrequency = 1,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
@@ -140,7 +139,7 @@ namespace TxtAIEditor.Core.Services
             settings.LlmAgentAutoApproveGitEdits = _agentAutoApproveGitEditsCheck.IsChecked == true;
             settings.LlmAgentAutoApprovePowerShell = _agentAutoApprovePowerShellCheck.IsChecked == true;
             settings.LlmAgentAutoApprovePlanning = _agentAutoApprovePlanningCheck.IsChecked == true;
-            settings.LlmMaxToolCalls = (int)Math.Clamp(_maxToolCallsBox.Value, 0, 500);
+            settings.LlmMaxToolCalls = (int)Math.Clamp(_maxToolCallsSlider.Value, 50, 1000);
             settings.LlmThinkingLevel = _llmThinkingLevelCombo.SelectedIndex switch
             {
                 1 => "disabled",
@@ -243,8 +242,10 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(_agentAutoApprovePowerShellCheck);
             section.Children.Add(_agentAutoApprovePlanningCheck);
 
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)"));
-            section.Children.Add(_maxToolCallsBox);
+            var maxToolCallsLabel = new TextBlock { Text = _getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)") + $" ({_maxToolCallsSlider.Value:0})", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+            section.Children.Add(maxToolCallsLabel);
+            section.Children.Add(_maxToolCallsSlider);
+            _maxToolCallsSlider.ValueChanged += (_, args) => maxToolCallsLabel.Text = _getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)") + $" ({args.NewValue:0})";
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmSourceLanguage", "번역 원본 언어 (Source Language)"));
             section.Children.Add(_sourceLangCombo);
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTargetLanguage", "번역 대상 언어 (Target Language)"));

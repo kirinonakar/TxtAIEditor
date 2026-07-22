@@ -534,7 +534,7 @@
     <value>Source Language</value>
   </data>
   <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
-    <value>Max Tool Calls (0 = use default)</value>
+    <value>Max Tool Calls</value>
   </data>
   <data name="SettingsLlmTargetLanguage" xml:space="preserve">
     <value>Target Language</value>

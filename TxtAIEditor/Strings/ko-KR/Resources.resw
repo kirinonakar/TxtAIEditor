@@ -534,7 +534,7 @@
     <value>번역 원본 언어 (Source Language)</value>
   </data>
   <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
-    <value>도구 호출 최대 횟수 (0 = 기본값 사용)</value>
+    <value>도구 호출 최대 횟수 (Max Tool Calls)</value>
   </data>
   <data name="SettingsLlmTargetLanguage" xml:space="preserve">
     <value>번역 대상 언어 (Target Language)</value>
