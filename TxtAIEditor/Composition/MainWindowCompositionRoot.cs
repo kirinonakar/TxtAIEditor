@@ -392,6 +392,11 @@ namespace TxtAIEditor.Composition
                 tab.Title = uniqueTitle;
                 tab.Language = services.LanguageDetectionService.GetEditorLanguageName(uniqueTitle);
                 callbacks.UpdateWindowTitle();
+
+                if (string.Equals(tab.Language, "html", StringComparison.OrdinalIgnoreCase))
+                {
+                    moduleBindings.ToolbarCommand?.EnableLivePreview();
+                }
             }
 
             var startupControllers = MainWindowStartupComposition.Compose(

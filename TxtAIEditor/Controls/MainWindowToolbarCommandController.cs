@@ -126,6 +126,17 @@ namespace TxtAIEditor.Controls
             _ = ApplyLivePreviewToggleAsync();
         }
 
+        public void EnableLivePreview()
+        {
+            if (LivePreviewEnabled && _topToolbar.LivePreviewIsChecked)
+            {
+                return;
+            }
+
+            _topToolbar.LivePreviewIsChecked = true;
+            _ = ApplyLivePreviewToggleAsync();
+        }
+
 
         public void ToggleWordWrap()
         {

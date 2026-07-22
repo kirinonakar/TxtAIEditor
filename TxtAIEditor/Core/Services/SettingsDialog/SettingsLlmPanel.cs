@@ -300,7 +300,7 @@ namespace TxtAIEditor.Core.Services
             _refreshModelsButton.Click += async (_, __) => await RefreshModelsAsync();
             _visionFallbackRefreshModelsButton.Click += async (_, __) => await RefreshVisionFallbackModelsAsync();
             _tokenUsageStatsButton.Click += (_, __) => OpenTokenUsageStatsInEditor();
-            _tokenUsageHtmlButton.Click += (_, __) => OpenTokenUsageStatsInBrowser();
+            _tokenUsageHtmlButton.Click += (_, __) => OpenTokenUsageStatsHtmlInEditor();
             _tokenUsageResetButton.Click += (_, __) =>
             {
                 _llmService.ResetTokenUsageStats();
@@ -314,13 +314,15 @@ namespace TxtAIEditor.Core.Services
             OpenTextInEditorRequested?.Invoke(title, BuildTokenUsageStatsDetails());
         }
 
-        private void OpenTokenUsageStatsInBrowser()
+        private void OpenTokenUsageStatsHtmlInEditor()
         {
             try
             {
-                LlmTokenUsageHtmlReportService.CreateAndOpen(
+                string title = $"{_getString("SettingsLlmTokenUsageStatsLabel", "token 통계")}.html";
+                string html = LlmTokenUsageHtmlReportService.BuildHtml(
                     _llmService.TokenUsageStats,
                     _getString);
+                OpenTextInEditorRequested?.Invoke(title, html);
             }
             catch (Exception ex)
             {
