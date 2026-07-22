@@ -664,9 +664,14 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <Grid Grid.Row="0">
+                                <TextBox x:Name="AgentSkillFilterTextBox"
+                                         Grid.Row="0"
+                                         PlaceholderText="스킬 검색..."
+                                         TextChanged="OnAgentSkillFilterTextChanged"/>
+                                <Grid Grid.Row="1">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
@@ -692,8 +697,8 @@
                                               FontSize="12"
                                               Tapped="OnAgentSkillRefreshClick"/>
                                 </Grid>
-                                <MenuFlyoutSeparator Grid.Row="1"/>
-                                <ScrollViewer Grid.Row="2" MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                                <MenuFlyoutSeparator Grid.Row="2"/>
+                                <ScrollViewer Grid.Row="3" MaxHeight="260" VerticalScrollBarVisibility="Auto">
                                     <StackPanel x:Name="AgentSkillListPanel" Spacing="4"/>
                                 </ScrollViewer>
                             </Grid>

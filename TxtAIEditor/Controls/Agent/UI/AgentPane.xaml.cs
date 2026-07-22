@@ -227,6 +227,7 @@ namespace TxtAIEditor.Controls
             AgentImportMcpText.Text = getString("PresetImportText", "가져오기");
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
             ToolTipService.SetToolTip(AgentSkillButton, getString("AgentSkillButtonTooltip", "스킬"));
+            AgentSkillFilterTextBox.PlaceholderText = getString("AgentSkillFilterPlaceholder", "스킬 검색...");
             AgentSkillTitleText.Text = getString("AgentSkillTitle", "스킬");
             ToolTipService.SetToolTip(AgentSkillOpenFolderButton, getString("AgentSkillOpenFolderTooltip", "스킬 폴더 열기"));
             ToolTipService.SetToolTip(AgentPresetButton, getString("AgentPresetButtonTooltip", "페르소나/지침 프리셋"));
@@ -583,6 +584,11 @@ namespace TxtAIEditor.Controls
         {
             AgentSkillFlyoutOpened?.Invoke(this, EventArgs.Empty);
             _menuCoordinator.RebuildAgentSkillMenu();
+        }
+
+        private void OnAgentSkillFilterTextChanged(object sender, TextChangedEventArgs e)
+        {
+            _menuCoordinator.SetAgentSkillFilter(AgentSkillFilterTextBox.Text);
         }
 
         private void OnAgentSkillRefreshClick(object sender, TappedRoutedEventArgs e)

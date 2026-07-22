@@ -42,6 +42,7 @@ namespace TxtAIEditor.Controls
         private HashSet<string> _selectedAgentPresetNames = new(StringComparer.OrdinalIgnoreCase);
         private List<AgentSkillItem> _agentSkillItems = new();
         private HashSet<string> _selectedAgentSkillNames = new(StringComparer.OrdinalIgnoreCase);
+        private string _agentSkillFilter = string.Empty;
         private List<AgentMcpItem> _agentMcpItems = new();
         private HashSet<string> _selectedAgentMcpNames = new(StringComparer.OrdinalIgnoreCase);
         private Func<string, string, string>? _getString;
@@ -119,6 +120,12 @@ namespace TxtAIEditor.Controls
             _selectedAgentSkillNames = new HashSet<string>(selectedSkillNames, StringComparer.OrdinalIgnoreCase);
             UpdateAgentSkillButtonStates();
             RebuildSelectedAgentPresetChips();
+        }
+
+        public void SetAgentSkillFilter(string? filter)
+        {
+            _agentSkillFilter = filter?.Trim() ?? string.Empty;
+            RebuildAgentSkillMenu();
         }
 
         public void UpdateAgentMcpMenu(
@@ -285,8 +292,16 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            int visibleSkillCount = 0;
             foreach (var skill in _agentSkillItems)
             {
+                if (_agentSkillFilter.Length > 0 &&
+                    !skill.Name.Contains(_agentSkillFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                visibleSkillCount++;
                 bool isSelected = _selectedAgentSkillNames.Contains(skill.Name);
                 var selectBtn = new Button
                 {
@@ -302,6 +317,17 @@ namespace TxtAIEditor.Controls
                 selectBtn.Click += (_, _) => _callbacks.AgentSkillToggled?.Invoke(currentName);
                 _agentSkillButtons[currentName] = selectBtn;
                 _agentSkillListPanel.Children.Add(selectBtn);
+            }
+
+            if (visibleSkillCount == 0)
+            {
+                _agentSkillListPanel.Children.Add(new TextBlock
+                {
+                    Text = getString("AgentSkillFilterEmptyText", "검색 결과 없음"),
+                    FontSize = 11,
+                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
+                    Margin = new Thickness(4, 2, 4, 2)
+                });
             }
         }
 

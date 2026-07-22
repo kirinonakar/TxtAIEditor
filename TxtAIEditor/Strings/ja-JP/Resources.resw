@@ -2604,6 +2604,12 @@
   <data name="AgentSkillEmptyText" xml:space="preserve">
     <value>インストール済みスキルなし</value>
   </data>
+  <data name="AgentSkillFilterPlaceholder" xml:space="preserve">
+    <value>スキルを検索...</value>
+  </data>
+  <data name="AgentSkillFilterEmptyText" xml:space="preserve">
+    <value>一致するスキルはありません</value>
+  </data>
   <data name="AgentSkillRemoveTooltip" xml:space="preserve">
     <value>スキルの選択を解除</value>
   </data>

@@ -2604,6 +2604,12 @@
   <data name="AgentSkillEmptyText" xml:space="preserve">
     <value>没有安装技能</value>
   </data>
+  <data name="AgentSkillFilterPlaceholder" xml:space="preserve">
+    <value>搜索技能...</value>
+  </data>
+  <data name="AgentSkillFilterEmptyText" xml:space="preserve">
+    <value>没有匹配的技能</value>
+  </data>
   <data name="AgentSkillRemoveTooltip" xml:space="preserve">
     <value>取消选择技能</value>
   </data>

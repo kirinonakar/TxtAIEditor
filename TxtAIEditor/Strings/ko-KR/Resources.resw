@@ -2604,6 +2604,12 @@
   <data name="AgentSkillEmptyText" xml:space="preserve">
     <value>설치된 스킬 없음</value>
   </data>
+  <data name="AgentSkillFilterPlaceholder" xml:space="preserve">
+    <value>스킬 검색...</value>
+  </data>
+  <data name="AgentSkillFilterEmptyText" xml:space="preserve">
+    <value>검색 결과 없음</value>
+  </data>
   <data name="AgentSkillRemoveTooltip" xml:space="preserve">
     <value>스킬 선택 해제</value>
   </data>
