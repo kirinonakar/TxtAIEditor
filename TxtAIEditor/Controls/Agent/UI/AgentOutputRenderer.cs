@@ -359,6 +359,34 @@ namespace TxtAIEditor.Controls
             return alignments;
         }
 
+        private static double MeasureCellDisplayWidth(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return 1;
+
+            double width = 0;
+            foreach (char c in text)
+            {
+                width += IsWideCharacter(c) ? 2.0 : 1.0;
+            }
+            return Math.Max(1, width);
+        }
+
+        private static bool IsWideCharacter(char c)
+        {
+            return (c >= 0x1100 && c <= 0x115F) ||
+                   (c >= 0x2E80 && c <= 0x303E) ||
+                   (c >= 0x3041 && c <= 0x33FF) ||
+                   (c >= 0x3400 && c <= 0x4DBF) ||
+                   (c >= 0x4E00 && c <= 0x9FFF) ||
+                   (c >= 0xA000 && c <= 0xA4CF) ||
+                   (c >= 0xAC00 && c <= 0xD7A3) ||
+                   (c >= 0xF900 && c <= 0xFAFF) ||
+                   (c >= 0xFE30 && c <= 0xFE4F) ||
+                   (c >= 0xFF00 && c <= 0xFF60) ||
+                   (c >= 0xFFE0 && c <= 0xFFE6);
+        }
+
         private Block RenderTable(List<string> tableLines)
         {
             var headerCells = ParseTableRow(tableLines[0]);
@@ -369,6 +397,22 @@ namespace TxtAIEditor.Controls
             }
 
             var alignments = ParseTableAlignments(tableLines[1], colCount);
+
+            // Calculate content-proportional column weights so columns fit their content
+            double[] colWeights = new double[colCount];
+            for (int c = 0; c < colCount; c++)
+            {
+                colWeights[c] = MeasureCellDisplayWidth(headerCells[c]);
+            }
+            for (int r = 2; r < tableLines.Count; r++)
+            {
+                var cells = ParseTableRow(tableLines[r]);
+                for (int c = 0; c < colCount && c < cells.Count; c++)
+                {
+                    double w = MeasureCellDisplayWidth(cells[c]);
+                    if (w > colWeights[c]) colWeights[c] = w;
+                }
+            }
 
             var grid = new Grid
             {
@@ -382,7 +426,18 @@ namespace TxtAIEditor.Controls
 
             for (int c = 0; c < colCount; c++)
             {
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                // Narrow columns use Auto so they always fit their content
+                // and never disappear when the panel is narrow.
+                // Wider columns use Star with proportional weights to share
+                // the remaining space.
+                if (colWeights[c] <= 12)
+                {
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                }
+                else
+                {
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Min(colWeights[c], 50), GridUnitType.Star) });
+                }
             }
 
             int rowCount = 0;
