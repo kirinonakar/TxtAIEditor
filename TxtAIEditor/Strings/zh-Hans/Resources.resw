@@ -3438,6 +3438,9 @@
   <data name="SettingsLlmTokenUsageHtmlFailedFormat" xml:space="preserve">
     <value>无法打开 HTML 统计信息：{0}</value>
   </data>
+  <data name="TokenReportLocale" xml:space="preserve">
+    <value>zh-CN</value>
+  </data>
   <data name="TokenReportStringsJson" xml:space="preserve">
     <value>{"title":"Token 使用概览","subtitle":"集中查看请求量、Token 消耗和缓存效率的累计仪表板","periodBadge":"显示时段","themeToggle":"切换主题","darkModeSwitch":"切换到深色模式","lightModeSwitch":"切换到浅色模式","summaryAria":"关键统计","totalRequests":"请求总数","dailyAverageFormat":"日均 {0}","totalTokens":"Token 总数","averagePerRequestFormat":"每次请求平均 {0}","cachedTokens":"已缓存 Token","cachedTokensNote":"复用的输入 Token","cacheRatio":"缓存比例","cacheGood":"效率良好 · 目标 70% 以上","cacheNeedsImprovement":"建议改进 · 目标 70% 以上","dailyHeading":"每日使用趋势","dailyDescription":"按日期比较请求量和 Token 消耗模式。","dailyInsightsAria":"每日关键洞察","peakRequests":"请求峰值","peakTokens":"Token 峰值","requestCount":"请求数","dailyRequestsDescription":"每天发生的全部模型请求","countUnit":"次","tokenUsage":"Token 使用量","dailyTokensDescription":"输入与输出合计的每日消耗量","millionUnit":"百万","inputOutput":"输入与输出","inputOutputDescription":"输入和输出 Token 的每日构成","input":"输入","output":"输出","cacheEfficiency":"缓存效率","cacheEfficiencyDescription":"70% 以上表示复用稳定","modelHeading":"按模型分析使用情况","modelDescription":"比较各模型的请求频率和 Token 消耗集中度。","modelInsightsAria":"模型关键洞察","mostUsedModel":"使用最多的模型","requestShare":"请求占比","modelRequests":"各模型请求数","modelRequestsDescription":"按请求数排名前 8 的模型","modelTokens":"各模型 Token 总数","modelTokensDescription":"使用至少 1,000 Token 的模型","modelInputOutput":"各模型输入与输出","modelInputOutputDescription":"Token 使用量前 10 个模型的输入与输出构成","horizontalAxisNote":"横轴：百万 Token","noDataTitle":"没有可显示的 Token 统计","noDataDescription":"记录 LLM 请求后，此报告会自动更新。","footerPeriodFormat":"显示时段 {0} · 累计","footerProduct":"TxtAIEditor Token 统计 · 基于 Chart.js 的静态仪表板","generatedAtFormat":"生成时间：{0}","requestsFormat":"{0} 次","tokensFormat":"{0} Token"}</value>
   </data>

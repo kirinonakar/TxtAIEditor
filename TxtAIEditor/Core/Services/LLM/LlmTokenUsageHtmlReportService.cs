@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -29,7 +28,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             var report = new
             {
-                Culture = CultureInfo.CurrentUICulture.Name,
+                Culture = getString("TokenReportLocale", "ko-KR"),
                 GeneratedAt = DateTimeOffset.Now,
                 Stats = stats,
                 Strings = CreateLocalizedStrings(getString)
