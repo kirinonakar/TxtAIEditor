@@ -1,14 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Shapes;
 using Windows.System;
 
 namespace TxtAIEditor.Controls
@@ -61,36 +57,15 @@ namespace TxtAIEditor.Controls
 
     public sealed partial class AgentPane : UserControl
     {
-        private int _outputLength;
-        private string _rawOutputText = string.Empty;
-        private readonly StringBuilder _pendingOutputText = new StringBuilder();
-        private readonly AgentOutputRenderer _outputRenderer;
-        private bool _outputScrollQueued;
-        private bool _outputFlushQueued;
-        private bool _userScrolledUp;
-        private double _lastVerticalOffset;
-        private DispatcherTimer? _outputFlushTimer;
+        private readonly AgentPaneOutputController _outputController;
         private AgentDisplayLocalizer _displayText = AgentDisplayLocalizer.CreateWithResourceLoader();
         private readonly AgentPaneMenuCoordinator _menuCoordinator;
-        private string _explicitSelectedOutputText = string.Empty;
-        private Windows.Foundation.Point? _outputPointerDownPoint;
-        private bool _outputPointerSelectionGesture;
-        private bool _hasExplicitOutputSelection;
+        private readonly AgentPaneSessionMenuCoordinator _sessionMenuCoordinator;
+        private readonly AgentPaneReviewController _reviewController;
         private Func<string, string, string>? _getString;
 
         public string RawOutputText => GetRawOutputText();
-        public string SelectedOutputText
-        {
-            get
-            {
-                if (_hasExplicitOutputSelection)
-                {
-                    CaptureExplicitOutputSelection();
-                }
-
-                return _explicitSelectedOutputText;
-            }
-        }
+        public string SelectedOutputText => _outputController.SelectedOutputText;
 
         public AgentPane()
         {
@@ -129,29 +104,41 @@ namespace TxtAIEditor.Controls
                     AgentMcpDeleted = name => AgentMcpDeleted?.Invoke(this, name),
                     AgentMcpRemoved = name => AgentMcpRemoved?.Invoke(this, name)
                 });
-            _outputRenderer = new AgentOutputRenderer(
+            _outputController = new AgentPaneOutputController(
                 AgentOutputText,
+                AgentOutputScrollViewer,
+                this);
+            _sessionMenuCoordinator = new AgentPaneSessionMenuCoordinator(
                 this,
-                text =>
+                AgentHistoryListPanel,
+                AgentHistoryFlyout,
+                AgentOpenSessionsListPanel,
+                AgentOpenSessionsFlyout,
+                AgentNewSessionButton,
+                AgentNewSessionButtonText,
+                AgentNewSessionBadge,
+                AgentNewSessionBadgeText,
+                AgentOpenSessionsButton,
+                AgentRewindSessionButton,
+                new AgentPaneSessionMenuCallbacks
                 {
-                    _hasExplicitOutputSelection = true;
-                    _explicitSelectedOutputText = text;
+                    HistorySelected = id => HistorySelected?.Invoke(this, id),
+                    HistoryDeleted = id => HistoryDeleted?.Invoke(this, id),
+                    OpenSessionSelected = id => OpenSessionSelected?.Invoke(this, id),
+                    OpenSessionClosed = id => OpenSessionClosed?.Invoke(this, id)
                 });
-            AgentOutputText.SizeChanged += (_, _) => QueueOutputScrollToEnd();
-            AgentOutputText.AddHandler(
-                UIElement.PointerPressedEvent,
-                new PointerEventHandler(OnOutputPointerPressed),
-                true);
-            AgentOutputText.AddHandler(
-                UIElement.PointerMovedEvent,
-                new PointerEventHandler(OnOutputPointerMoved),
-                true);
-            AgentOutputText.AddHandler(
-                UIElement.PointerReleasedEvent,
-                new PointerEventHandler(OnOutputPointerReleased),
-                true);
-
-            ActualThemeChanged += (sender, args) => UpdateRichText(_rawOutputText);
+            _reviewController = new AgentPaneReviewController(
+                this,
+                AgentReviewPanelsHost,
+                AgentDiffConfirmPanel,
+                AgentDiffConfirmHeader,
+                AgentDiffConfirmDescription,
+                AgentPowerShellCommandPanel,
+                AgentPowerShellConfirmCommand,
+                AgentModifiedFilesPanel,
+                AgentModifiedFilesList,
+                preview => FileDiffRequested?.Invoke(this, preview),
+                preview => FileRevertRequested?.Invoke(this, preview));
 
             ResetOutput(_displayText.OutputPlaceholder);
             Localize(_displayText.GetString);
@@ -199,11 +186,6 @@ namespace TxtAIEditor.Controls
         public event EventHandler<string>? OpenSessionClosed;
         public event RoutedEventHandler? ModelNameClick;
 
-        private List<AgentHistoryItemViewModel> _historyItems = new List<AgentHistoryItemViewModel>();
-        private string? _selectedHistoryId;
-        private List<AgentOpenSessionItemViewModel> _openSessionItems = new List<AgentOpenSessionItemViewModel>();
-        private string? _selectedOpenSessionId;
-
         public AgentOutputWrapper Output => new AgentOutputWrapper(this);
         public TextBox Prompt => AgentPromptInput;
         public bool IsPromptInputFocused => AgentPromptInput.FocusState != FocusState.Unfocused;
@@ -217,83 +199,21 @@ namespace TxtAIEditor.Controls
 
         public bool HideHtmlCodeBlocks
         {
-            get => _outputRenderer.HideHtmlCodeBlocks;
-            set => _outputRenderer.HideHtmlCodeBlocks = value;
+            get => _outputController.HideHtmlCodeBlocks;
+            set => _outputController.HideHtmlCodeBlocks = value;
         }
-        public bool IsThinkingActivityActive => _thinkingLineActive;
+        public bool IsThinkingActivityActive => _outputController.IsThinkingActivityActive;
 
         private bool _isBusy;
         private bool _canRewindSession;
-        private int _completedSessionNotificationCount;
-        private string _newSessionButtonText = string.Empty;
         private string _runButtonText = string.Empty;
         private string _stopButtonText = string.Empty;
-        private const string OutputLineBreak = "\r\n";
-        private DispatcherTimer? _thinkingTimer;
-        private DispatcherTimer? _thinkingLabelFlushTimer;
-        private bool _thinkingLineActive;
-        private int _thinkingLineStart;
-        private int _thinkingDotCount;
-        private string _thinkingLinePrefix = string.Empty;
-        private string _thinkingLineTimestamp = string.Empty;
-        private string? _pendingThinkingLabel;
-        private DateTimeOffset _lastThinkingLabelRender = DateTimeOffset.MinValue;
-        private const int MaxOutputFlushChars = 8_000;
-        private const int OutputFlushIntervalMs = 100;
-        private const int ThinkingLabelMinIntervalMs = 200;
-
-        private void AppendText(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            int currentLength = _rawOutputText.Length;
-            if (_outputLength < 0 || _outputLength > currentLength)
-            {
-                _outputLength = currentLength;
-            }
-
-            bool appendingAtEnd = _outputLength == currentLength;
-            if (appendingAtEnd)
-            {
-                text = CollapseExcessBlankLinesForAppend(_rawOutputText, text);
-                if (string.IsNullOrEmpty(text))
-                {
-                    return;
-                }
-
-                _rawOutputText += text;
-                _outputLength += text.Length;
-                if (!HideHtmlCodeBlocks)
-                {
-                    AppendRenderedText(text);
-                }
-                else
-                {
-                    UpdateRichText(_rawOutputText);
-                }
-            }
-            else
-            {
-                _rawOutputText = _rawOutputText.Insert(_outputLength, text);
-                _outputLength += text.Length;
-                UpdateRichText(_rawOutputText);
-            }
-        }
-
         public void Localize(Func<string, string, string> getString)
         {
             _getString = getString;
             _displayText = new AgentDisplayLocalizer(getString);
             _menuCoordinator.Localize(getString);
-            _outputRenderer.Localize(getString);
-            string outputText = _rawOutputText.TrimStart();
-            if (_displayText.IsOutputPlaceholder(outputText))
-            {
-                ResetOutput(_displayText.OutputPlaceholder);
-            }
+            _outputController.Localize(getString);
 
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
             AgentPlanningModeCheckBox.Content = getString("AgentIncludeActiveFile", "계획 모드 (Planning mode)");
@@ -317,8 +237,7 @@ namespace TxtAIEditor.Controls
             _runButtonText = getString("AgentRunButton", "실행");
             _stopButtonText = getString("AgentStopButton", "중단");
             AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
-            _newSessionButtonText = getString("AgentNewSessionButton", "새 세션");
-            AgentNewSessionButtonText.Text = _newSessionButtonText;
+            string newSessionButtonText = getString("AgentNewSessionButton", "새 세션");
             ToolTipService.SetToolTip(AgentRewindSessionButton, getString("AgentRewindSessionTooltip", "이전 프롬프트 입력 전으로 되감기"));
             ToolTipService.SetToolTip(AgentOpenSessionsButton, getString("AgentOpenSessionsTooltip", "열린 세션"));
             AgentOpenSessionsTitleText.Text = getString("AgentOpenSessionsTitle", "열린 세션");
@@ -345,14 +264,14 @@ namespace TxtAIEditor.Controls
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
             ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
             _menuCoordinator.RebuildAll();
-            RebuildOpenSessionMenu();
+            _sessionMenuCoordinator.Localize(getString, newSessionButtonText);
         }
 
         public void SetBusy(bool isBusy)
         {
             if (!isBusy)
             {
-                FlushAllPendingOutputText();
+                _outputController.FlushPendingOutput();
             }
 
             _isBusy = isBusy;
@@ -373,11 +292,11 @@ namespace TxtAIEditor.Controls
             AgentPresetButton.IsEnabled = !isBusy;
             AgentSelectedPresetScrollViewer.IsHitTestVisible = !isBusy;
             AgentSelectedPresetScrollViewer.Opacity = isBusy ? 0.65 : 1.0;
-            RebuildHistoryMenu();
+            _sessionMenuCoordinator.SetBusy(isBusy);
 
             if (!isBusy)
             {
-                ScrollOutputToEnd(true);
+                _outputController.ScrollToEnd(true);
             }
         }
 
@@ -422,552 +341,53 @@ namespace TxtAIEditor.Controls
 
         public void AppendOutputText(string text)
         {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            CompleteThinkingLine();
-            ClearOutputPlaceholder();
-            QueueOutputText(text);
+            _outputController.AppendOutputText(text);
         }
 
         public void AppendOutputLine(string line)
         {
-            FlushAllPendingOutputText();
-            CompleteThinkingLine();
-            ClearOutputPlaceholder();
-
-            string currentText = _rawOutputText;
-            if (!string.IsNullOrEmpty(currentText) &&
-                !EndsWithLineBreak(currentText))
-            {
-                AppendText(OutputLineBreak);
-            }
-
-            AppendText(line + OutputLineBreak);
-            ScrollOutputToEnd();
+            _outputController.AppendOutputLine(line);
         }
 
         public void BeginOutputBlock(string title)
         {
-            FlushAllPendingOutputText();
-            CompleteThinkingLine();
-            ClearOutputPlaceholder();
-
-            string currentText = _rawOutputText;
-            if (!string.IsNullOrWhiteSpace(currentText))
-            {
-                if (!EndsWithBlankLine(currentText))
-                {
-                    AppendText(EndsWithLineBreak(currentText)
-                        ? OutputLineBreak
-                        : OutputLineBreak + OutputLineBreak);
-                }
-            }
-
-            AppendText(title + OutputLineBreak);
-            ScrollOutputToEnd(true);
+            _outputController.BeginOutputBlock(title);
         }
 
         public void BeginThinkingActivity(string label)
         {
-            FlushAllPendingOutputText();
-            CompleteThinkingLine();
-            ClearOutputPlaceholder();
-
-            string currentText = _rawOutputText;
-            int lineBreakLength = 0;
-            if (!string.IsNullOrEmpty(currentText) &&
-                !EndsWithLineBreak(currentText))
-            {
-                AppendText(OutputLineBreak);
-                lineBreakLength = OutputLineBreak.Length;
-            }
-
-            _thinkingLineTimestamp = DateTime.Now.ToString("HH:mm:ss");
-            _thinkingLinePrefix = $"{_thinkingLineTimestamp}  {label}";
-            _pendingThinkingLabel = null;
-            _lastThinkingLabelRender = DateTimeOffset.Now;
-            _thinkingLineStart = currentText.Length + lineBreakLength;
-            _thinkingDotCount = 0;
-            _thinkingLineActive = true;
-            AppendText(_thinkingLinePrefix);
-            ScrollOutputToEnd(true);
-
-            _thinkingTimer ??= CreateThinkingTimer();
-            _thinkingTimer.Start();
+            _outputController.BeginThinkingActivity(label);
         }
 
         public void UpdateThinkingActivity(string label)
         {
-            if (!_thinkingLineActive)
-            {
-                return;
-            }
-
-            _pendingThinkingLabel = label;
-            DateTimeOffset now = DateTimeOffset.Now;
-            if ((now - _lastThinkingLabelRender).TotalMilliseconds >= ThinkingLabelMinIntervalMs)
-            {
-                FlushPendingThinkingLabel(now);
-                return;
-            }
-
-            _thinkingLabelFlushTimer ??= CreateThinkingLabelFlushTimer();
-            if (!_thinkingLabelFlushTimer.IsEnabled)
-            {
-                _thinkingLabelFlushTimer.Start();
-            }
+            _outputController.UpdateThinkingActivity(label);
         }
 
         public void StopThinkingActivity()
         {
-            CompleteThinkingLine();
+            _outputController.StopThinkingActivity();
         }
 
         public void ResumeThinkingActivityFromOutput()
         {
-            FlushAllPendingOutputText();
-            ResetThinkingState();
-            if (string.IsNullOrEmpty(_rawOutputText))
-            {
-                return;
-            }
-
-            int lineStart = FindLastLineStart(_rawOutputText);
-            string line = _rawOutputText.Substring(lineStart).TrimEnd('\r', '\n');
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                return;
-            }
-
-            int trailingDotCount = CountTrailingThinkingDots(line);
-            _thinkingLineStart = lineStart;
-            _thinkingDotCount = trailingDotCount;
-            _thinkingLinePrefix = trailingDotCount > 0
-                ? line.Substring(0, line.Length - trailingDotCount)
-                : line;
-            _thinkingLineTimestamp = string.Empty;
-            _thinkingLineActive = true;
-
-            _thinkingTimer ??= CreateThinkingTimer();
-            _thinkingTimer.Start();
-        }
-
-        private void ClearOutputPlaceholder()
-        {
-            string text = _rawOutputText;
-            if (text.Length > 100)
-            {
-                return;
-            }
-
-            string trimmed = text.TrimStart();
-            if (_displayText.IsOutputPlaceholder(trimmed))
-            {
-                _rawOutputText = string.Empty;
-                UpdateRichText(_rawOutputText);
-                _outputLength = 0;
-            }
-            else
-            {
-                _outputLength = text.Length;
-            }
+            _outputController.ResumeThinkingActivityFromOutput();
         }
 
         public void ResetOutput(string text)
         {
-            ResetThinkingState();
-            ClearPendingOutputText();
-            ClearExplicitOutputSelection();
-            _rawOutputText = text ?? string.Empty;
-            UpdateRichText(_rawOutputText);
-            _outputLength = _rawOutputText.Length;
+            _outputController.ResetOutput(text);
         }
 
         public string GetRawOutputText()
         {
-            FlushAllPendingOutputText();
-            return _rawOutputText;
-        }
-
-        private void QueueOutputText(string text)
-        {
-            _pendingOutputText.Append(text);
-            _outputFlushTimer ??= CreateOutputFlushTimer();
-
-            if (!_outputFlushTimer.IsEnabled)
-            {
-                _outputFlushTimer.Start();
-            }
-        }
-
-        private DispatcherTimer CreateOutputFlushTimer()
-        {
-            var timer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(OutputFlushIntervalMs)
-            };
-            timer.Tick += (_, _) => QueuePendingOutputFlush();
-            return timer;
-        }
-
-        private void QueuePendingOutputFlush()
-        {
-            if (_outputFlushQueued)
-            {
-                return;
-            }
-
-            if (_pendingOutputText.Length == 0)
-            {
-                _outputFlushTimer?.Stop();
-                return;
-            }
-
-            _outputFlushQueued = true;
-            if (DispatcherQueue.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-                () =>
-                {
-                    _outputFlushQueued = false;
-                    FlushPendingOutputText();
-                }))
-            {
-                return;
-            }
-
-            _outputFlushQueued = false;
-            FlushPendingOutputText();
-        }
-
-        private void FlushPendingOutputText()
-        {
-            _outputFlushQueued = false;
-            if (_pendingOutputText.Length == 0)
-            {
-                _outputFlushTimer?.Stop();
-                return;
-            }
-
-            int take = Math.Min(_pendingOutputText.Length, MaxOutputFlushChars);
-            string text = _pendingOutputText.ToString(0, take);
-            _pendingOutputText.Remove(0, take);
-
-            AppendText(text);
-            ScrollOutputToEnd();
-
-            if (_pendingOutputText.Length == 0)
-            {
-                _outputFlushTimer?.Stop();
-            }
-        }
-
-        private void FlushAllPendingOutputText()
-        {
-            while (_pendingOutputText.Length > 0)
-            {
-                FlushPendingOutputText();
-            }
-        }
-
-        private void ClearPendingOutputText()
-        {
-            _pendingOutputText.Clear();
-            _outputFlushQueued = false;
-            _outputFlushTimer?.Stop();
-        }
-
-        private void ScrollOutputToEnd(bool force = false)
-        {
-            if (force)
-            {
-                _userScrolledUp = false;
-            }
-
-            int currentLength = _rawOutputText.Length;
-            if (_outputLength < 0 || _outputLength > currentLength)
-            {
-                _outputLength = currentLength;
-            }
-
-            if (!_userScrolledUp)
-            {
-                if (force)
-                {
-                    ChangeOutputViewToEnd();
-                }
-
-                QueueOutputScrollToEnd();
-            }
-        }
-
-        private void QueueOutputScrollToEnd()
-        {
-            if (_outputScrollQueued)
-            {
-                return;
-            }
-
-            _outputScrollQueued = true;
-            DispatcherQueue.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-                () =>
-                {
-                    _outputScrollQueued = false;
-                    ChangeOutputViewToEnd();
-                    QueueDeferredOutputScrollToEnd();
-                });
-        }
-
-        private void QueueDeferredOutputScrollToEnd()
-        {
-            DispatcherQueue.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-                ChangeOutputViewToEnd);
-        }
-
-        private void ChangeOutputViewToEnd()
-        {
-            AgentOutputScrollViewer.ChangeView(null, double.MaxValue, null, true);
+            return _outputController.RawOutputText;
         }
 
         private void OnAgentOutputScrollViewerViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
         {
-            double offset = AgentOutputScrollViewer.VerticalOffset;
-            double maxOffset = AgentOutputScrollViewer.ScrollableHeight;
-
-            if (offset < _lastVerticalOffset - 1.0)
-            {
-                _userScrolledUp = true;
-            }
-            else if (offset >= maxOffset - 5.0)
-            {
-                _userScrolledUp = false;
-            }
-
-            _lastVerticalOffset = offset;
+            _outputController.OnScrollViewerViewChanged();
         }
-
-        private DispatcherTimer CreateThinkingTimer()
-        {
-            var timer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(450)
-            };
-            timer.Tick += (_, _) =>
-            {
-                if (!_thinkingLineActive)
-                {
-                    timer.Stop();
-                    return;
-                }
-
-                _thinkingDotCount = (_thinkingDotCount + 1) % 4;
-                ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
-            };
-            return timer;
-        }
-
-        private DispatcherTimer CreateThinkingLabelFlushTimer()
-        {
-            var timer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(ThinkingLabelMinIntervalMs)
-            };
-            timer.Tick += (_, _) =>
-            {
-                if (!_thinkingLineActive || string.IsNullOrEmpty(_pendingThinkingLabel))
-                {
-                    timer.Stop();
-                    return;
-                }
-
-                FlushPendingThinkingLabel(DateTimeOffset.Now);
-                timer.Stop();
-            };
-            return timer;
-        }
-
-        private void FlushPendingThinkingLabel(DateTimeOffset now)
-        {
-            if (string.IsNullOrEmpty(_pendingThinkingLabel))
-            {
-                return;
-            }
-
-            _thinkingLinePrefix = $"{_thinkingLineTimestamp}  {_pendingThinkingLabel}";
-            _pendingThinkingLabel = null;
-            _lastThinkingLabelRender = now;
-            ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
-        }
-
-        private void CompleteThinkingLine()
-        {
-            if (!_thinkingLineActive)
-            {
-                return;
-            }
-
-            if (!string.IsNullOrEmpty(_pendingThinkingLabel))
-            {
-                _thinkingLinePrefix = $"{_thinkingLineTimestamp}  {_pendingThinkingLabel}";
-                _pendingThinkingLabel = null;
-            }
-
-            _thinkingTimer?.Stop();
-            _thinkingLabelFlushTimer?.Stop();
-            ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
-            string currentText = _rawOutputText;
-            if (!EndsWithLineBreak(currentText))
-            {
-                AppendText(OutputLineBreak);
-            }
-
-            _thinkingLineActive = false;
-            ScrollOutputToEnd();
-        }
-
-        private void ResetThinkingState()
-        {
-            _thinkingTimer?.Stop();
-            _thinkingLabelFlushTimer?.Stop();
-            _thinkingLineActive = false;
-            _thinkingLineStart = 0;
-            _thinkingDotCount = 0;
-            _thinkingLinePrefix = string.Empty;
-            _thinkingLineTimestamp = string.Empty;
-            _pendingThinkingLabel = null;
-            _lastThinkingLabelRender = DateTimeOffset.MinValue;
-        }
-
-        private void ReplaceThinkingLine(string text)
-        {
-            int currentLength = _rawOutputText.Length;
-            if (_thinkingLineStart < 0 || _thinkingLineStart > currentLength)
-            {
-                return;
-            }
-
-            _rawOutputText = _rawOutputText.Substring(0, _thinkingLineStart) + text;
-            _outputLength = _thinkingLineStart + text.Length;
-            if (!_outputRenderer.TrySetLastLine(text))
-            {
-                UpdateRichText(_rawOutputText);
-            }
-            ScrollOutputToEnd();
-        }
-
-        private static int FindLastLineStart(string text)
-        {
-            int lastLf = text.LastIndexOf('\n');
-            if (lastLf >= 0)
-            {
-                return lastLf + 1;
-            }
-
-            int lastCr = text.LastIndexOf('\r');
-            return lastCr >= 0 ? lastCr + 1 : 0;
-        }
-
-        private static int CountTrailingThinkingDots(string line)
-        {
-            int count = 0;
-            for (int i = line.Length - 1; i >= 0 && line[i] == '.' && count < 3; i--)
-            {
-                count++;
-            }
-
-            return count;
-        }
-
-        private static bool EndsWithLineBreak(string text)
-        {
-            return text.EndsWith("\r\n", StringComparison.Ordinal) ||
-                   text.EndsWith("\n", StringComparison.Ordinal) ||
-                   text.EndsWith("\r", StringComparison.Ordinal);
-        }
-
-        private static bool EndsWithBlankLine(string text)
-        {
-            return text.EndsWith("\r\n\r\n", StringComparison.Ordinal) ||
-                   text.EndsWith("\n\n", StringComparison.Ordinal);
-        }
-
-        private static string CollapseExcessBlankLinesForAppend(string existingText, string text)
-        {
-            string normalized = NormalizeOutputLineBreaks(text);
-            normalized = CollapseLineBreakRuns(normalized);
-
-            int trailingBreaks = CountTrailingLineBreaks(NormalizeOutputLineBreaks(existingText));
-            int leadingBreaks = CountLeadingLineBreaks(normalized);
-            int allowedLeadingBreaks = Math.Max(0, 2 - trailingBreaks);
-            if (leadingBreaks > allowedLeadingBreaks)
-            {
-                normalized = normalized.Substring(leadingBreaks - allowedLeadingBreaks);
-            }
-
-            return normalized.Replace("\n", OutputLineBreak, StringComparison.Ordinal);
-        }
-
-        private static string NormalizeOutputLineBreaks(string text)
-        {
-            return (text ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
-        }
-
-        private static string CollapseLineBreakRuns(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return string.Empty;
-            }
-
-            var builder = new StringBuilder(text.Length);
-            int lineBreakRun = 0;
-            foreach (char ch in text)
-            {
-                if (ch == '\n')
-                {
-                    if (lineBreakRun < 2)
-                    {
-                        builder.Append(ch);
-                    }
-
-                    lineBreakRun++;
-                }
-                else
-                {
-                    builder.Append(ch);
-                    lineBreakRun = 0;
-                }
-            }
-
-            return builder.ToString();
-        }
-
-        private static int CountLeadingLineBreaks(string text)
-        {
-            int count = 0;
-            while (count < text.Length && text[count] == '\n')
-            {
-                count++;
-            }
-
-            return count;
-        }
-
-        private static int CountTrailingLineBreaks(string text)
-        {
-            int count = 0;
-            for (int i = text.Length - 1; i >= 0 && text[i] == '\n'; i--)
-            {
-                count++;
-            }
-
-            return count;
-        }
-
         private bool IsControlDown()
         {
             return IsKeyDown(VirtualKey.Control) ||
@@ -1031,13 +451,13 @@ namespace TxtAIEditor.Controls
 
         private void OnAgentHistoryFlyoutOpened(object sender, object e)
         {
-            RebuildHistoryMenu();
+            _sessionMenuCoordinator.RebuildHistoryMenu();
         }
 
         private void OnAgentOpenSessionsFlyoutOpened(object sender, object e)
         {
             OpenSessionsFlyoutOpened?.Invoke(this, EventArgs.Empty);
-            RebuildOpenSessionMenu();
+            _sessionMenuCoordinator.RebuildOpenSessionMenu();
         }
 
         private void OnDeleteHistoryClick(object sender, RoutedEventArgs e)
@@ -1055,107 +475,10 @@ namespace TxtAIEditor.Controls
             InsertNewTabOutputRequested?.Invoke(sender, e);
         }
 
-        private void OnOutputPointerPressed(object sender, PointerRoutedEventArgs e)
-        {
-            _outputPointerDownPoint = e.GetCurrentPoint(AgentOutputText).Position;
-            _outputPointerSelectionGesture = false;
-        }
-
-        private void OnOutputPointerMoved(object sender, PointerRoutedEventArgs e)
-        {
-            if (_outputPointerDownPoint == null)
-            {
-                return;
-            }
-
-            var currentPoint = e.GetCurrentPoint(AgentOutputText);
-            if (!currentPoint.Properties.IsLeftButtonPressed)
-            {
-                return;
-            }
-
-            var startPoint = _outputPointerDownPoint.Value;
-            double dx = currentPoint.Position.X - startPoint.X;
-            double dy = currentPoint.Position.Y - startPoint.Y;
-            if ((dx * dx) + (dy * dy) > 16)
-            {
-                _outputPointerSelectionGesture = true;
-            }
-        }
-
-        private void OnOutputPointerReleased(object sender, PointerRoutedEventArgs e)
-        {
-            if (_outputPointerSelectionGesture)
-            {
-                _hasExplicitOutputSelection = true;
-                QueueCaptureExplicitOutputSelection();
-            }
-            else
-            {
-                ClearExplicitOutputSelection();
-            }
-
-            _outputPointerDownPoint = null;
-            _outputPointerSelectionGesture = false;
-        }
-
         private void OnOutputDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
         {
-            _hasExplicitOutputSelection = true;
-            QueueCaptureExplicitOutputSelection();
+            _outputController.OnOutputDoubleTapped();
         }
-
-        private void QueueCaptureExplicitOutputSelection()
-        {
-            DispatcherQueue.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-                CaptureExplicitOutputSelection);
-        }
-
-        private void CaptureExplicitOutputSelection()
-        {
-            if (!_hasExplicitOutputSelection)
-            {
-                _explicitSelectedOutputText = string.Empty;
-                return;
-            }
-
-            _explicitSelectedOutputText = AgentOutputText.SelectedText;
-        }
-
-        private void ClearExplicitOutputSelection()
-        {
-            _explicitSelectedOutputText = string.Empty;
-            _hasExplicitOutputSelection = false;
-            _outputPointerDownPoint = null;
-            _outputPointerSelectionGesture = false;
-        }
-
-        private bool IsTextFromOutput(string selectedText)
-        {
-            if (string.IsNullOrEmpty(selectedText) || string.IsNullOrEmpty(_rawOutputText))
-            {
-                return false;
-            }
-
-            if (_rawOutputText.Contains(selectedText, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            string normalizedSelected = NormalizeLineEndings(selectedText);
-            string normalizedOutput = NormalizeLineEndings(_rawOutputText);
-            return normalizedSelected.Length > 0 &&
-                normalizedOutput.Contains(normalizedSelected, StringComparison.Ordinal);
-        }
-
-        private static string NormalizeLineEndings(string value)
-        {
-            return (value ?? string.Empty)
-                .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Replace('\r', '\n');
-        }
-
         private void OnAddAttachmentClick(object sender, RoutedEventArgs e)
         {
             AddAttachmentRequested?.Invoke(sender, e);
@@ -1340,37 +663,8 @@ namespace TxtAIEditor.Controls
 
         private void OnOutputTextKeyDown(object sender, KeyRoutedEventArgs e)
         {
-            if (e.Key == VirtualKey.C && IsControlDown())
-            {
-                _hasExplicitOutputSelection = true;
-                CaptureExplicitOutputSelection();
-                string textToCopy = _explicitSelectedOutputText;
-                if (string.IsNullOrEmpty(textToCopy))
-                {
-                    textToCopy = _rawOutputText;
-                }
-
-                if (!string.IsNullOrEmpty(textToCopy))
-                {
-                    var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
-                    dataPackage.SetText(textToCopy);
-                    Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
-                    Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
-                    e.Handled = true;
-                }
-            }
+            _outputController.CopySelectionOrAll(e);
         }
-
-        private void UpdateRichText(string rawText)
-        {
-            _outputRenderer.UpdateRichText(rawText);
-        }
-
-        private void AppendRenderedText(string text)
-        {
-            _outputRenderer.AppendText(text);
-        }
-
         public void UpdateAgentPresetsMenu(
             IReadOnlyList<string> presetNames,
             IReadOnlyCollection<string> selectedPresetNames,
@@ -1429,83 +723,22 @@ namespace TxtAIEditor.Controls
 
         public void ShowDiffConfirm(string header, string description)
         {
-            AgentDiffConfirmHeader.Text = header;
-            AgentDiffConfirmDescription.Text = description;
-            AgentPowerShellConfirmCommand.Text = string.Empty;
-            AgentPowerShellCommandPanel.Visibility = Visibility.Collapsed;
-            AgentDiffConfirmPanel.Visibility = Visibility.Visible;
-            UpdateReviewPanelsHostVisibility();
+            _reviewController.ShowDiffConfirm(header, description);
         }
 
         public void ShowPowerShellConfirm(string header, string description, string command)
         {
-            AgentDiffConfirmHeader.Text = header;
-            AgentDiffConfirmDescription.Text = description;
-            AgentPowerShellConfirmCommand.Text = command;
-
-            bool isDanger = AgentToolHelpers.IsDangerousPowerShellCommand(command);
-
-            if (isDanger)
-            {
-                AgentPowerShellConfirmCommand.Foreground = GetAgentBrush("AgentPowerShellConfirmDangerForeground", Microsoft.UI.Colors.Red);
-            }
-            else
-            {
-                AgentPowerShellConfirmCommand.Foreground = GetAgentBrush("AgentOutputForeground", Microsoft.UI.Colors.Black);
-            }
-            AgentPowerShellCommandPanel.Visibility = Visibility.Visible;
-            AgentDiffConfirmPanel.Visibility = Visibility.Visible;
-            UpdateReviewPanelsHostVisibility();
-        }
-
-        private Brush GetAgentBrush(string key, Windows.UI.Color fallbackColor)
-        {
-            string themeName = ActualTheme == ElementTheme.Default
-                ? (Application.Current.RequestedTheme == ApplicationTheme.Dark ? "Dark" : "Light")
-                : (ActualTheme == ElementTheme.Dark ? "Dark" : "Light");
-
-            object? dictObj;
-            object? resource;
-
-            if (Resources.ThemeDictionaries.TryGetValue(themeName, out dictObj) &&
-                dictObj is ResourceDictionary themeDict &&
-                themeDict.TryGetValue(key, out resource) &&
-                resource is Brush brush1)
-            {
-                return brush1;
-            }
-
-            if (Application.Current.Resources.ThemeDictionaries.TryGetValue(themeName, out dictObj) &&
-                dictObj is ResourceDictionary appThemeDict &&
-                appThemeDict.TryGetValue(key, out resource) &&
-                resource is Brush brush2)
-            {
-                return brush2;
-            }
-
-            if (Resources.TryGetValue(key, out resource) && resource is Brush brush3)
-            {
-                return brush3;
-            }
-            if (Application.Current.Resources.TryGetValue(key, out resource) && resource is Brush brush4)
-            {
-                return brush4;
-            }
-
-            return new SolidColorBrush(fallbackColor);
+            _reviewController.ShowPowerShellConfirm(header, description, command);
         }
 
         public void HideDiffConfirm()
         {
-            AgentDiffConfirmPanel.Visibility = Visibility.Collapsed;
-            UpdateReviewPanelsHostVisibility();
+            _reviewController.HideDiffConfirm();
         }
 
         public void UpdateModifiedFiles(IReadOnlyList<AgentFileEditPreview> edits)
         {
-            AgentModifiedFilesList.ItemsSource = edits;
-            AgentModifiedFilesPanel.Visibility = edits.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            UpdateReviewPanelsHostVisibility();
+            _reviewController.UpdateModifiedFiles(edits);
         }
 
         public void UpdateAttachments(IReadOnlyList<AgentAttachmentItem> attachments)
@@ -1516,35 +749,18 @@ namespace TxtAIEditor.Controls
 
         private void OnModifiedFilesListItemClick(object sender, ItemClickEventArgs e)
         {
-            if (e.ClickedItem is AgentFileEditPreview preview)
-            {
-                AgentModifiedFilesList.SelectedItem = preview;
-                FileDiffRequested?.Invoke(this, preview);
-            }
+            _reviewController.OpenFileDiff(e.ClickedItem);
         }
 
         private void OnRevertFileClick(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.Tag is AgentFileEditPreview preview)
-            {
-                FileRevertRequested?.Invoke(this, preview);
-            }
+            _reviewController.RevertFile(sender);
         }
 
         private void OnModifiedFilesCloseClick(object sender, RoutedEventArgs e)
         {
-            AgentModifiedFilesPanel.Visibility = Visibility.Collapsed;
-            UpdateReviewPanelsHostVisibility();
+            _reviewController.CloseModifiedFiles();
         }
-
-        private void UpdateReviewPanelsHostVisibility()
-        {
-            bool hasVisiblePanel =
-                AgentDiffConfirmPanel.Visibility == Visibility.Visible ||
-                AgentModifiedFilesPanel.Visibility == Visibility.Visible;
-            AgentReviewPanelsHost.Visibility = hasVisiblePanel ? Visibility.Visible : Visibility.Collapsed;
-        }
-
         public void UpdateModelName(string text)
         {
             if (!string.Equals(AgentModelNameText.Text, text, StringComparison.Ordinal))
@@ -1555,288 +771,13 @@ namespace TxtAIEditor.Controls
 
         public void UpdateHistoryItems(List<AgentHistoryItemViewModel> items, string? selectedId)
         {
-            _historyItems = items;
-            _selectedHistoryId = selectedId;
-            RebuildHistoryMenu();
+            _sessionMenuCoordinator.UpdateHistoryItems(items, selectedId);
         }
 
         public void UpdateOpenSessionItems(List<AgentOpenSessionItemViewModel> items, string? selectedId)
         {
-            _openSessionItems = items;
-            _selectedOpenSessionId = selectedId;
-            _completedSessionNotificationCount = _openSessionItems.Sum(item => Math.Max(0, item.CompletedNotificationCount));
-            UpdateOpenSessionButtonChrome();
-            RebuildOpenSessionMenu();
+            _sessionMenuCoordinator.UpdateOpenSessionItems(items);
         }
 
-        private void UpdateOpenSessionButtonChrome()
-        {
-            bool showSessionList = _openSessionItems.Count > 1;
-            AgentOpenSessionsButton.Visibility = showSessionList ? Visibility.Visible : Visibility.Collapsed;
-            string newSessionText = string.IsNullOrWhiteSpace(_newSessionButtonText)
-                ? "새 세션"
-                : _newSessionButtonText;
-            AgentNewSessionButtonText.Text = newSessionText;
-
-            if (_completedSessionNotificationCount > 0)
-            {
-                AgentNewSessionBadgeText.Text = FormatCompletionBadgeText(_completedSessionNotificationCount);
-                AgentNewSessionBadge.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                AgentNewSessionBadge.Visibility = Visibility.Collapsed;
-            }
-
-            string automationName = newSessionText;
-            if (_completedSessionNotificationCount > 0)
-            {
-                automationName += " " + FormatCompletionBadgeText(_completedSessionNotificationCount);
-            }
-            AutomationProperties.SetName(AgentNewSessionButton, automationName);
-            Func<string, string, string> getString = _getString ?? _displayText.GetString;
-            string? completionTooltip = _completedSessionNotificationCount > 0
-                ? string.Format(
-                    getString("AgentCompletedSessionsBadgeTooltip", "{0:N0} background session(s) completed"),
-                    _completedSessionNotificationCount)
-                : null;
-            ToolTipService.SetToolTip(AgentNewSessionButton, completionTooltip);
-            AgentNewSessionButton.CornerRadius = showSessionList
-                ? new CornerRadius(4, 0, 0, 4)
-                : new CornerRadius(4);
-            AgentOpenSessionsButton.CornerRadius = new CornerRadius(0, 4, 4, 0);
-            AgentRewindSessionButton.CornerRadius = new CornerRadius(4);
-        }
-
-        private void RebuildOpenSessionMenu()
-        {
-            if (AgentOpenSessionsListPanel == null)
-            {
-                return;
-            }
-
-            UpdateOpenSessionButtonChrome();
-            AgentOpenSessionsListPanel.Children.Clear();
-            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
-            Func<string, string, string> getString = _getString ?? _displayText.GetString;
-
-            if (_openSessionItems.Count == 0)
-            {
-                AgentOpenSessionsListPanel.Children.Add(new TextBlock
-                {
-                    Text = getString("AgentOpenSessionsEmptyText", "열린 세션 없음"),
-                    FontSize = 11,
-                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
-                    Margin = new Thickness(4, 2, 4, 2)
-                });
-                return;
-            }
-
-            foreach (var item in _openSessionItems)
-            {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                var titlePanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 6,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-
-                titlePanel.Children.Add(new Ellipse
-                {
-                    Width = 7,
-                    Height = 7,
-                    Fill = new SolidColorBrush(item.CompletedNotificationCount > 0
-                        ? Windows.UI.Color.FromArgb(255, 220, 38, 38)
-                        : (item.IsRunning
-                            ? Windows.UI.Color.FromArgb(255, 34, 197, 94)
-                            : Windows.UI.Color.FromArgb(255, 156, 163, 175))),
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-
-                if (item.IsSelected)
-                {
-                    titlePanel.Children.Add(new FontIcon
-                    {
-                        Glyph = "\uE73E",
-                        FontSize = 10,
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-                }
-
-                titlePanel.Children.Add(new TextBlock
-                {
-                    Text = item.Title,
-                    FontSize = 11,
-                    MaxWidth = 190,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    TextWrapping = TextWrapping.NoWrap,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-
-
-
-                var selectBtn = new Button
-                {
-                    Content = titlePanel,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Left,
-                    Height = 28,
-                    Padding = new Thickness(8, 0, 8, 0),
-                    Style = buttonStyle,
-                    IsEnabled = item.CanSelect
-                };
-                if (item.IsSelected)
-                {
-                    selectBtn.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
-                }
-
-                string currentId = item.Id;
-                selectBtn.Click += (_, _) =>
-                {
-                    OpenSessionSelected?.Invoke(this, currentId);
-                    AgentOpenSessionsFlyout.Hide();
-                };
-                Grid.SetColumn(selectBtn, 0);
-                rowGrid.Children.Add(selectBtn);
-
-                var closeBtn = new Button
-                {
-                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
-                    Width = 28,
-                    Height = 28,
-                    Padding = new Thickness(0),
-                    Style = buttonStyle,
-                    IsEnabled = item.CanClose
-                };
-                ToolTipService.SetToolTip(closeBtn, getString("AgentOpenSessionCloseText", "세션 닫기"));
-                closeBtn.Click += (_, _) =>
-                {
-                    OpenSessionClosed?.Invoke(this, currentId);
-                };
-                Grid.SetColumn(closeBtn, 1);
-                rowGrid.Children.Add(closeBtn);
-
-                AgentOpenSessionsListPanel.Children.Add(rowGrid);
-            }
-        }
-
-        private static Border CreateCompletionBadge(int count, Func<string, string, string> getString)
-        {
-            var text = new TextBlock
-            {
-                Text = FormatCompletionBadgeText(count),
-                FontSize = 11,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255)),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            var badge = new Border
-            {
-                MinWidth = 18,
-                Height = 18,
-                Padding = new Thickness(4, 0, 4, 1),
-                CornerRadius = new CornerRadius(9),
-                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 220, 38, 38)),
-                VerticalAlignment = VerticalAlignment.Center,
-                Child = text
-            };
-            ToolTipService.SetToolTip(
-                badge,
-                string.Format(
-                    getString("AgentCompletedSessionsBadgeTooltip", "{0:N0} background session(s) completed"),
-                    Math.Max(0, count)));
-            return badge;
-        }
-
-        private static string FormatCompletionBadgeText(int count)
-        {
-            if (count <= 0)
-            {
-                return string.Empty;
-            }
-
-            return count.ToString();
-        }
-
-        private void RebuildHistoryMenu()
-        {
-            if (AgentHistoryListPanel == null)
-            {
-                return;
-            }
-
-            AgentHistoryListPanel.Children.Clear();
-            Style? buttonStyle = Resources["AgentButtonStyle"] as Style;
-            Func<string, string, string> getString = _getString ?? _displayText.GetString;
-
-            if (_historyItems.Count == 0)
-            {
-                AgentHistoryListPanel.Children.Add(new TextBlock
-                {
-                    Text = getString("AgentHistoryEmptyText", "히스토리 없음"),
-                    FontSize = 11,
-                    Foreground = (Brush)Application.Current.Resources["SystemControlForegroundBaseMediumBrush"],
-                    Margin = new Thickness(4, 2, 4, 2)
-                });
-                return;
-            }
-
-            foreach (var item in _historyItems)
-            {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                bool isSelected = string.Equals(_selectedHistoryId, item.Id, StringComparison.Ordinal);
-                var selectBtn = new Button
-                {
-                    Content = isSelected ? $"✓ {item.Title} ({item.TimeText})" : $"{item.Title} ({item.TimeText})",
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Left,
-                    Height = 28,
-                    FontSize = 11,
-                    Padding = new Thickness(8, 0, 8, 0),
-                    Style = buttonStyle
-                };
-                if (isSelected)
-                {
-                    selectBtn.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
-                }
-
-                string currentId = item.Id;
-                selectBtn.Click += (_, _) =>
-                {
-                    HistorySelected?.Invoke(this, currentId);
-                    AgentHistoryFlyout.Hide();
-                };
-                Grid.SetColumn(selectBtn, 0);
-                rowGrid.Children.Add(selectBtn);
-
-                var deleteBtn = new Button
-                {
-                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
-                    Width = 28,
-                    Height = 28,
-                    Padding = new Thickness(0),
-                    Style = buttonStyle,
-                    IsEnabled = !_isBusy
-                };
-                ToolTipService.SetToolTip(deleteBtn, getString("AgentHistoryDeleteText", "삭제"));
-                deleteBtn.Click += (_, _) =>
-                {
-                    HistoryDeleted?.Invoke(this, currentId);
-                };
-                Grid.SetColumn(deleteBtn, 1);
-                rowGrid.Children.Add(deleteBtn);
-
-                AgentHistoryListPanel.Children.Add(rowGrid);
-            }
-        }
     }
 }
