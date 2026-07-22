@@ -188,7 +188,7 @@ export function createHostMessageHandler({
             if (msg.inlineLivePreviewEnabled !== undefined && msg.inlineLivePreviewEnabled !== null) {
                 state.inlineLivePreviewEnabled = !!msg.inlineLivePreviewEnabled;
                 state.livePreviewBaseHref = msg.livePreviewBaseHref || '';
-                state.inlineLivePreviewSourceLine = state.inlineLivePreviewEnabled
+                state.inlineLivePreviewSourceLine = state.inlineLivePreviewEnabled && state.language !== 'html'
                     ? Math.min(
                         Math.max(1, Number(msg.lineCount || 1)),
                         Math.max(1, Number(state.currentLine || 1)))
@@ -558,7 +558,7 @@ export function createHostMessageHandler({
             state.inlineLivePreviewEnabled = !!msg.enabled;
             state.livePreviewBaseHref = msg.baseHref || '';
             clearPendingInlineLivePreviewFocus();
-            if (state.inlineLivePreviewEnabled) {
+            if (state.inlineLivePreviewEnabled && state.language !== 'html') {
                 const activeEl = document.activeElement?.closest?.('.line-text');
                 const activeLine = activeEl ? Number(activeEl.dataset.line) : state.currentLine;
                 if (activeLine) {

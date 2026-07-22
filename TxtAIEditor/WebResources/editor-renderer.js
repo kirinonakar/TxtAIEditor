@@ -30,6 +30,7 @@ import {
     restoreCsvFocusAfterRender
 } from './editor-csv-table.js';
 import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
+import { createFullHtmlLivePreviewRenderer } from './editor-html-live-preview.js';
 
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
@@ -47,6 +48,7 @@ function createEditorRenderer({
     let horizontalOverflowFrame = 0;
     const livePreviewProcessedImages = new Set();
     const livePreviewFailedImages = new Set();
+    const fullHtmlLivePreview = createFullHtmlLivePreviewRenderer();
 
     function ensureHexStickyHeader() {
         if (hexStickyHeader && hexStickyHeader.isConnected) {
@@ -173,6 +175,10 @@ function createEditorRenderer({
         // syllables can be committed as separate jamo. Defer every DOM render
         // until compositionend instead of trying to detach/preserve the row.
         if ((state.isComposing && state.compositionLine) || state.rangeComposition) {
+            return;
+        }
+
+        if (fullHtmlLivePreview.renderIfActive()) {
             return;
         }
 

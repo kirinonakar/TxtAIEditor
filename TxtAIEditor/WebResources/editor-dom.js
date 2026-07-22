@@ -9,6 +9,7 @@ const requiredElement = id => {
 export const scrollContainer = requiredElement('scroll-container');
 export const virtualSpacer = requiredElement('virtual-spacer');
 export const viewport = requiredElement('viewport');
+export const htmlLivePreview = requiredElement('html-live-preview');
 export const findPanel = requiredElement('find-panel');
 export const findInput = requiredElement('find-input');
 export const findClear = requiredElement('find-clear');
