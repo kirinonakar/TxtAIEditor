@@ -16,7 +16,7 @@ namespace TxtAIEditor.Controls
         private readonly AutoSaveController _autoSaveController;
         private readonly DispatcherTimer _gitAutoRefreshTimer;
         private readonly EditorWorkspacePane _editorWorkspace;
-        private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly LivePreviewController _livePreviewController;
 
         public MainWindowLifecycleController(
@@ -27,7 +27,7 @@ namespace TxtAIEditor.Controls
             AutoSaveController autoSaveController,
             DispatcherTimer gitAutoRefreshTimer,
             EditorWorkspacePane editorWorkspace,
-            IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             LivePreviewController livePreviewController)
         {
             _window = window;

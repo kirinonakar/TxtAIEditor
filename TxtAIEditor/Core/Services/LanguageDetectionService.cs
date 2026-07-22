@@ -6,7 +6,7 @@ namespace TxtAIEditor.Core.Services
 {
     public sealed class LanguageDetectionService : ILanguageDetectionService
     {
-        public string GetMonacoLanguageName(string filePath)
+        public string GetEditorLanguageName(string filePath)
         {
             string name = Path.GetFileName(filePath);
             if (name.Equals("Dockerfile", StringComparison.OrdinalIgnoreCase)) return "dockerfile";

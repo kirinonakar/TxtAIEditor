@@ -88,7 +88,7 @@ namespace TxtAIEditor.Controls
             tabItem.RightTapped += (_, args) => showTabContextMenu(tabItem, args);
             ApplyUiFont(tabItem, uiFontFamily);
 
-            var bridge = new MonacoBridge(editorWebView, _localizationService);
+            var bridge = new CustomEditorBridge(editorWebView, _localizationService);
             return new EditorTabViewItemParts(tabItem, editorWebView, editorLoadCover, bridge);
         }
 
@@ -219,7 +219,7 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                var env = await WebViewEnvironmentProvider.GetSharedAsync();
                 await webView.EnsureCoreWebView2Async(env);
 
                 var coreWebView = webView.CoreWebView2;
@@ -753,7 +753,7 @@ audio {{
             TabViewItem tabItem,
             WebView2 webView,
             Border loadCover,
-            MonacoBridge bridge)
+            CustomEditorBridge bridge)
         {
             TabItem = tabItem;
             WebView = webView;
@@ -764,7 +764,7 @@ audio {{
         public TabViewItem TabItem { get; }
         public WebView2 WebView { get; }
         public Border LoadCover { get; }
-        public MonacoBridge Bridge { get; }
+        public CustomEditorBridge Bridge { get; }
     }
 
     public sealed class PdfViewerTabParts

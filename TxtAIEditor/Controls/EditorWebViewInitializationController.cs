@@ -22,7 +22,7 @@ namespace TxtAIEditor.Controls
             _livePreviewController = livePreviewController;
         }
 
-        public async Task InitializeAsync(WebView2 webView, MonacoBridge bridge)
+        public async Task InitializeAsync(WebView2 webView, CustomEditorBridge bridge)
         {
             try
             {

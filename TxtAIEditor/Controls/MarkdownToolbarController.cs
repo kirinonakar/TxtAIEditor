@@ -15,7 +15,7 @@ namespace TxtAIEditor.Controls
         private readonly TopCommandBarPane _topToolbar;
         private readonly MarkdownToolbarControl _markdownToolbar;
         private readonly TabView _editorTabView;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Func<string, Task> _loadFileIntoTabAsync;
         private readonly Func<string, Task<bool>> _insertTextIntoActiveEditorAsync;
         private readonly Action<string, string> _showError;
@@ -25,7 +25,7 @@ namespace TxtAIEditor.Controls
             TopCommandBarPane topToolbar,
             MarkdownToolbarControl markdownToolbar,
             TabView editorTabView,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Func<string, Task> loadFileIntoTabAsync,
             Func<string, Task<bool>> insertTextIntoActiveEditorAsync,
             Action<string, string> showError,

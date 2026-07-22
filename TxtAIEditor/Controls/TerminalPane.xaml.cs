@@ -209,7 +209,7 @@ namespace TxtAIEditor.Controls
             _webViewInitializing = true;
             try
             {
-                var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                var env = await WebViewEnvironmentProvider.GetSharedAsync();
                 await TerminalWebView.EnsureCoreWebView2Async(env);
                 TerminalWebView.CoreWebView2.Settings.IsWebMessageEnabled = true;
                 TerminalWebView.CoreWebView2.Settings.IsScriptEnabled = true;

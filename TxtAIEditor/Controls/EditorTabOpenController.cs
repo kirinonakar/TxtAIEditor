@@ -36,7 +36,7 @@ namespace TxtAIEditor.Controls
         private readonly EditorBridgeInteractionController _editorBridgeInteractionController;
         private readonly EditorLinkNavigationController _editorLinkNavigationController;
         private readonly TabSelectionController _tabSelectionController;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly Dictionary<string, HexViewState> _hexViewStates = new();
         private readonly Dictionary<string, ViewerHexViewState> _viewerHexViewStates = new();
@@ -78,7 +78,7 @@ namespace TxtAIEditor.Controls
             TabViewItem HexTabItem,
             EditorDocumentSession HexSession,
             WebView2 HexWebView,
-            MonacoBridge HexBridge,
+            CustomEditorBridge HexBridge,
             EditorDocumentSession? ViewerSession,
             string Content,
             string Language,
@@ -110,7 +110,7 @@ namespace TxtAIEditor.Controls
             EditorBridgeInteractionController editorBridgeInteractionController,
             EditorLinkNavigationController editorLinkNavigationController,
             TabSelectionController tabSelectionController,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             DispatcherQueue dispatcherQueue,
             Func<XamlRoot?> xamlRootProvider,
@@ -1077,7 +1077,7 @@ namespace TxtAIEditor.Controls
             _updateWindowTitle();
         }
 
-        private void QueueEditorInitialization(OpenedTab tab, WebView2 webView, MonacoBridge bridge)
+        private void QueueEditorInitialization(OpenedTab tab, WebView2 webView, CustomEditorBridge bridge)
         {
             bool initQueued = _dispatcherQueue.TryEnqueue(
                 DispatcherQueuePriority.Normal,
@@ -1095,13 +1095,13 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async void InitializeEditorWebView(WebView2 webView, MonacoBridge bridge)
+        private async void InitializeEditorWebView(WebView2 webView, CustomEditorBridge bridge)
         {
             await _editorWebViewInitializationController.InitializeAsync(webView, bridge);
         }
 
         private void WireEditorBridge(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             WebView2 editorWebView,
             Border editorLoadCover,
             OpenedTab tab,
@@ -1341,7 +1341,7 @@ namespace TxtAIEditor.Controls
             };
         }
 
-        private async Task ApplyDeferredEditorStateAsync(MonacoBridge bridge, OpenedTab tab)
+        private async Task ApplyDeferredEditorStateAsync(CustomEditorBridge bridge, OpenedTab tab)
         {
             try
             {

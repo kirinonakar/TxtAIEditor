@@ -8,13 +8,13 @@ namespace TxtAIEditor.Controls
     public sealed class PreviewScrollSyncController
     {
         private readonly EditorWorkspacePane _editorWorkspace;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly System.Func<OpenedTab?> _activeTabProvider;
         private readonly System.Func<OpenedTab, TabView?> _oppositeTabViewProvider;
 
         public PreviewScrollSyncController(
             EditorWorkspacePane editorWorkspace,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             System.Func<OpenedTab?> activeTabProvider,
             System.Func<OpenedTab, TabView?> oppositeTabViewProvider)
         {

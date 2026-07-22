@@ -388,7 +388,7 @@ namespace TxtAIEditor.Composition
                 string uniqueTitle = CreateUniqueGeneratedTitle(title, viewModel);
                 var tab = callbacks.OpenGeneratedTab(content);
                 tab.Title = uniqueTitle;
-                tab.Language = services.LanguageDetectionService.GetMonacoLanguageName(uniqueTitle);
+                tab.Language = services.LanguageDetectionService.GetEditorLanguageName(uniqueTitle);
                 callbacks.UpdateWindowTitle();
             }
 

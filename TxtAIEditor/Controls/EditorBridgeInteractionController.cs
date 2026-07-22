@@ -12,7 +12,7 @@ namespace TxtAIEditor.Controls
         private readonly EditorWorkspacePane _editorWorkspace;
         private readonly TabView _primaryTabView;
         private readonly TabView _secondaryTabView;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly StatusBarController _statusBarController;
@@ -29,7 +29,7 @@ namespace TxtAIEditor.Controls
             EditorWorkspacePane editorWorkspace,
             TabView primaryTabView,
             TabView secondaryTabView,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             DispatcherQueue dispatcherQueue,
             Func<OpenedTab?> activeTabProvider,
             StatusBarController statusBarController,
@@ -53,7 +53,7 @@ namespace TxtAIEditor.Controls
             _setScrollSyncEnabled = setScrollSyncEnabled;
         }
 
-        public void HandleCursorChanged(MonacoBridge bridge, OpenedTab tab, int line, int column)
+        public void HandleCursorChanged(CustomEditorBridge bridge, OpenedTab tab, int line, int column)
         {
             ActivateOwnerTab(tab);
 

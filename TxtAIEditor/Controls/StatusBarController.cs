@@ -22,7 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab, bool> _isActiveTab;
         private readonly Func<string, EditorDocumentSession?> _sessionProvider;
         private readonly ILanguageDetectionService _languageDetectionService;
-        private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Func<string, string, string> _getString;
         private readonly Func<XamlRoot> _xamlRootProvider;
         private readonly Func<ElementTheme> _themeProvider;
@@ -42,7 +42,7 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab, bool> isActiveTab,
             Func<string, EditorDocumentSession?> sessionProvider,
             ILanguageDetectionService languageDetectionService,
-            IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Func<string, string, string> getString,
             Func<XamlRoot> xamlRootProvider,
             Func<ElementTheme> themeProvider,

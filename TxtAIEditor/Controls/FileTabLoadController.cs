@@ -25,7 +25,7 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowViewModel _viewModel;
         private readonly TabView _editorTabView;
         private readonly TabView _editorTabView2;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Action<string> _currentRepoPathChanged;
         private readonly Func<string, string, string> _getString;
         private readonly Func<string, string, Task<string?>> _promptPasswordAsync;
@@ -46,7 +46,7 @@ namespace TxtAIEditor.Controls
             MainWindowViewModel viewModel,
             TabView editorTabView,
             TabView editorTabView2,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Action<string> currentRepoPathChanged,
             Func<string, string, string> getString,
             Func<string, string, Task<string?>> promptPasswordAsync,

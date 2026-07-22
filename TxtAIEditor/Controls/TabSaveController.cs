@@ -21,7 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly StatusBarController _statusBarController;
         private readonly Func<OpenedTab, bool> _isTabOpen;
         private readonly Func<string, EditorDocumentSession?> _sessionProvider;
-        private readonly Func<string, (WebView2 WebView, MonacoBridge Bridge)?> _bridgeProvider;
+        private readonly Func<string, (WebView2 WebView, CustomEditorBridge Bridge)?> _bridgeProvider;
         private readonly Action<OpenedTab> _cleanDirtyStateOnOtherTabs;
         private readonly Action<OpenedTab> _updateLanguageUi;
         private readonly Func<Task> _refreshGitStatusAsync;
@@ -41,7 +41,7 @@ namespace TxtAIEditor.Controls
             StatusBarController statusBarController,
             Func<OpenedTab, bool> isTabOpen,
             Func<string, EditorDocumentSession?> sessionProvider,
-            Func<string, (WebView2 WebView, MonacoBridge Bridge)?> bridgeProvider,
+            Func<string, (WebView2 WebView, CustomEditorBridge Bridge)?> bridgeProvider,
             Action<OpenedTab> cleanDirtyStateOnOtherTabs,
             Action<OpenedTab> updateLanguageUi,
             Func<Task> refreshGitStatusAsync,
@@ -234,7 +234,7 @@ namespace TxtAIEditor.Controls
         {
             tab.FilePath = selectedPath;
             tab.Title = Path.GetFileName(selectedPath);
-            tab.Language = _languageDetectionService.GetMonacoLanguageName(selectedPath);
+            tab.Language = _languageDetectionService.GetEditorLanguageName(selectedPath);
             tab.IsLanguageManuallySelected = false;
             if (string.IsNullOrWhiteSpace(tab.EncodingName))
             {

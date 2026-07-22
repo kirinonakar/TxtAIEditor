@@ -124,7 +124,7 @@ namespace TxtAIEditor.Controls
             {
                 if (pdfWebView.CoreWebView2 == null)
                 {
-                    var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                    var env = await WebViewEnvironmentProvider.GetSharedAsync();
                     await pdfWebView.EnsureCoreWebView2Async(env);
                 }
 
@@ -182,7 +182,7 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                var env = await WebViewEnvironmentProvider.GetSharedAsync();
                 await pdfWebView.EnsureCoreWebView2Async(env);
 
                 if (!_viewerWebViews.TryGetValue(tab.Id, out var registeredWebView) ||

@@ -14,14 +14,14 @@ namespace TxtAIEditor.Controls
         private const int MaxDirtyDiffCells = 4_000_000;
 
         private readonly MainWindowViewModel _viewModel;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly Func<bool> _showDirtyLines;
         private readonly Action _updateWindowTitle;
 
         public TabDirtyStateController(
             MainWindowViewModel viewModel,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             Func<bool> showDirtyLines,
             Action updateWindowTitle)

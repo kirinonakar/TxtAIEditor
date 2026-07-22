@@ -20,7 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab> _updateLanguage;
         private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
         private readonly Dictionary<string, DeferredContentRefresh> _contentRefreshTimers = new();
-        private readonly Dictionary<MonacoBridge, CancellationTokenSource> _textOperationCancellations = new();
+        private readonly Dictionary<CustomEditorBridge, CancellationTokenSource> _textOperationCancellations = new();
         private static readonly TimeSpan ContentRefreshDebounce = TimeSpan.FromMilliseconds(350);
 
         private sealed class DeferredContentRefresh
@@ -59,7 +59,7 @@ namespace TxtAIEditor.Controls
         }
 
         public async Task HandleEditRequestedAsync(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session,
@@ -94,7 +94,7 @@ namespace TxtAIEditor.Controls
         }
 
         public async Task HandleFindRequestedAsync(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             EditorDocumentSession session,
             string query,
             int startLine,
@@ -108,7 +108,7 @@ namespace TxtAIEditor.Controls
         }
 
         public async Task HandleFindAllRequestedAsync(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             EditorDocumentSession session,
             string query,
             bool matchCase,
@@ -154,7 +154,7 @@ namespace TxtAIEditor.Controls
         }
 
         public async Task HandleReplaceAllRequestedAsync(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session,
@@ -241,7 +241,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private CancellationTokenSource BeginTextOperation(MonacoBridge bridge)
+        private CancellationTokenSource BeginTextOperation(CustomEditorBridge bridge)
         {
             if (_textOperationCancellations.Remove(bridge, out CancellationTokenSource? previous))
             {
@@ -254,7 +254,7 @@ namespace TxtAIEditor.Controls
             return current;
         }
 
-        private bool IsCurrentTextOperation(MonacoBridge bridge, CancellationTokenSource cancellation)
+        private bool IsCurrentTextOperation(CustomEditorBridge bridge, CancellationTokenSource cancellation)
         {
             return !cancellation.IsCancellationRequested &&
                 _textOperationCancellations.TryGetValue(bridge, out CancellationTokenSource? current) &&
@@ -262,7 +262,7 @@ namespace TxtAIEditor.Controls
         }
 
         private void CompleteTextOperation(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             CancellationTokenSource cancellation)
         {
             if (IsCurrentTextOperation(bridge, cancellation))
@@ -344,7 +344,7 @@ namespace TxtAIEditor.Controls
         }
 
         private static Task ResynchronizeRejectedEditAsync(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             OpenedTab tab,
             EditorDocumentSession session)
         {

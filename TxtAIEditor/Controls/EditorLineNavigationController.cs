@@ -13,11 +13,11 @@ namespace TxtAIEditor.Controls
     public sealed class EditorLineNavigationController
     {
         private readonly MainWindowViewModel _viewModel;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
 
         public EditorLineNavigationController(
             MainWindowViewModel viewModel,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges)
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges)
         {
             _viewModel = viewModel;
             _tabBridges = tabBridges;

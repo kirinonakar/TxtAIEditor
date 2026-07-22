@@ -17,7 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
         private readonly ArchiveExplorerService _archiveExplorerService;
         private readonly ISettingsService _settingsService;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly StatusBarController _statusBarController;
         private readonly int _initialEditorLineWarmupCount;
@@ -33,7 +33,7 @@ namespace TxtAIEditor.Controls
             SecureNoteEncryptionService secureNoteEncryptionService,
             ArchiveExplorerService archiveExplorerService,
             ISettingsService settingsService,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             StatusBarController statusBarController,
             int initialEditorLineWarmupCount,

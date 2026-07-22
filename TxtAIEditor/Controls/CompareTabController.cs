@@ -22,7 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowViewModel _viewModel;
         private readonly EditorWorkspacePane _editorWorkspace;
         private readonly TabView _editorTabView;
-        private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Func<string, string, string> _getString;
         private readonly Func<CoreWebView2WebMessageReceivedEventArgs, string> _normalizeWebMessageJson;
         private readonly Action<string> _shortcutHandler;
@@ -35,7 +35,7 @@ namespace TxtAIEditor.Controls
             MainWindowViewModel viewModel,
             EditorWorkspacePane editorWorkspace,
             TabView editorTabView,
-            IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Func<string, string, string> getString,
             Func<CoreWebView2WebMessageReceivedEventArgs, string> normalizeWebMessageJson,
             Action<string> shortcutHandler)
@@ -169,7 +169,7 @@ namespace TxtAIEditor.Controls
                 Tag = tab.Id
             };
 
-            var env = await MonacoBridge.GetSharedEnvironmentAsync();
+            var env = await WebViewEnvironmentProvider.GetSharedAsync();
             await diffWebView.EnsureCoreWebView2Async(env);
 
             var coreWebView = diffWebView.CoreWebView2;

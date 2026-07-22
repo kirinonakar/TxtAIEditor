@@ -96,7 +96,7 @@ namespace TxtAIEditor.Composition
             MainWindowUiRefs ui,
             MainWindowServices services,
             MainWindowViewModel viewModel,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             MainWindowAgentModuleDependencies dependencies,
             MainWindowAgentCompositionCallbacks callbacks)
@@ -184,7 +184,7 @@ namespace TxtAIEditor.Composition
                     {
                         tab.FilePath = targetPath;
                         tab.Title = Path.GetFileName(targetPath);
-                        tab.Language = services.LanguageDetectionService.GetMonacoLanguageName(targetPath);
+                        tab.Language = services.LanguageDetectionService.GetEditorLanguageName(targetPath);
                     }
 
                     return await callbacks.SaveTabAsync(tab);
@@ -259,7 +259,7 @@ namespace TxtAIEditor.Composition
             var tab = callbacks.OpenGeneratedTab(content);
             tab.Title = uniqueTitle;
             tab.Language = !string.IsNullOrWhiteSpace(title)
-                ? services.LanguageDetectionService.GetMonacoLanguageName(title)
+                ? services.LanguageDetectionService.GetEditorLanguageName(title)
                 : "plaintext";
             tab.OriginalContent = string.Empty;
             tabDirtyState.MarkTabDirty(tab);

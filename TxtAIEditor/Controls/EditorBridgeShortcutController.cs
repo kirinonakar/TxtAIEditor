@@ -79,7 +79,7 @@ namespace TxtAIEditor.Controls
 
         public void Handle(
             string shortcutName,
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem,
             EditorDocumentSession session)
@@ -149,7 +149,7 @@ namespace TxtAIEditor.Controls
         private async Task ApplyUndoRedoAsync(
             EditorDocumentSession session,
             bool isUndo,
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             OpenedTab tab,
             TabViewItem tabItem)
         {

@@ -13,7 +13,7 @@ namespace TxtAIEditor.Controls
     public sealed class ActiveEditorInsertionController
     {
         private readonly MainWindowViewModel _viewModel;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Func<TabView> _activeTabViewProvider;
         private readonly TabDirtyStateController _tabDirtyStateController;
 
@@ -21,7 +21,7 @@ namespace TxtAIEditor.Controls
 
         public ActiveEditorInsertionController(
             MainWindowViewModel viewModel,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Func<TabView> activeTabViewProvider,
             TabDirtyStateController tabDirtyStateController)
         {
@@ -123,7 +123,7 @@ namespace TxtAIEditor.Controls
         private bool TryGetCurrentActiveEditorBridge(
             out string tabId,
             out TabViewItem? activeTabItem,
-            out (WebView2 WebView, MonacoBridge Bridge) bridgeGroup)
+            out (WebView2 WebView, CustomEditorBridge Bridge) bridgeGroup)
         {
             tabId = string.Empty;
             activeTabItem = null;
@@ -147,7 +147,7 @@ namespace TxtAIEditor.Controls
         private bool TryGetStreamEditorBridge(
             string? targetTabId,
             out string tabId,
-            out (WebView2 WebView, MonacoBridge Bridge) bridgeGroup)
+            out (WebView2 WebView, CustomEditorBridge Bridge) bridgeGroup)
         {
             tabId = string.Empty;
             bridgeGroup = default;

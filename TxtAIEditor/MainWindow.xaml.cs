@@ -67,7 +67,7 @@ namespace TxtAIEditor
             WindowPlacementService.SetWindowIcon(AppWindow);
 
             // Start pre-warming the shared WebView2 environment in the background
-            _ = TxtAIEditor.Editor.MonacoBridge.GetSharedEnvironmentAsync();
+            _ = TxtAIEditor.Editor.WebViewEnvironmentProvider.GetSharedAsync();
 
             var ui = CreateUiRefs();
             var services = MainWindowServices.Create(GetLocalizedString);

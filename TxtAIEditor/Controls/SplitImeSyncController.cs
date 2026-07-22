@@ -10,14 +10,14 @@ namespace TxtAIEditor.Controls
 {
     public sealed class SplitImeSyncController
     {
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly Func<OpenedTab, IEnumerable<OpenedTab>> _getTabsForSameFile;
         private readonly Action<OpenedTab> _schedulePreview;
         private readonly Action<OpenedTab, bool> _setDirtyStateForFileGroup;
 
         public SplitImeSyncController(
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             Func<OpenedTab, IEnumerable<OpenedTab>> getTabsForSameFile,
             Action<OpenedTab> schedulePreview,
@@ -96,7 +96,7 @@ namespace TxtAIEditor.Controls
         }
 
         private static Task ApplyDocumentChangeAsync(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             EditorDocumentChange change)
         {
             if (change.LinePatches is { Count: > 0 } patches)
@@ -122,7 +122,7 @@ namespace TxtAIEditor.Controls
         }
 
         private static async Task ReplayDocumentChangesAsync(
-            MonacoBridge bridge,
+            CustomEditorBridge bridge,
             EditorDocumentSession targetSession,
             IReadOnlyList<EditorDocumentChange> changes)
         {

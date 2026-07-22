@@ -110,7 +110,7 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                var env = await WebViewEnvironmentProvider.GetSharedAsync();
                 await webView.EnsureCoreWebView2Async(env);
 
                 if (!_viewerWebViews.TryGetValue(tab.Id, out var registeredWebView) ||

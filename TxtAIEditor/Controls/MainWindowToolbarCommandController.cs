@@ -32,7 +32,7 @@ namespace TxtAIEditor.Controls
         private readonly CompareSelectionDialogService _compareSelectionDialogService;
         private readonly CompareTabController _compareTabController;
         private readonly WindowDialogController _dialogController;
-        private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly IDictionary<string, EditorDocumentSession> _editorSessions;
         private readonly Func<XamlRoot> _getXamlRoot;
         private readonly Func<ElementTheme> _getCurrentElementTheme;
@@ -61,7 +61,7 @@ namespace TxtAIEditor.Controls
             CompareSelectionDialogService compareSelectionDialogService,
             CompareTabController compareTabController,
             WindowDialogController dialogController,
-            IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             IDictionary<string, EditorDocumentSession> editorSessions,
             Func<XamlRoot> getXamlRoot,
             Func<ElementTheme> getCurrentElementTheme,

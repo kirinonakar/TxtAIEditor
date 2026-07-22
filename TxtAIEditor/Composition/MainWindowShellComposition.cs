@@ -42,7 +42,7 @@ namespace TxtAIEditor.Composition
             MainWindowUiRefs ui,
             MainWindowServices services,
             MainWindowViewModel viewModel,
-            IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Func<string, EditorDocumentSession?> getEditorSession,
             MainWindowShellCompositionCallbacks callbacks)
         {

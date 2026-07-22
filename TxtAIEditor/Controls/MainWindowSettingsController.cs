@@ -34,7 +34,7 @@ namespace TxtAIEditor.Controls
         private readonly StickyNoteBar _stickyNoteBar;
         private readonly CustomSplitter _leftSplitter;
         private readonly CustomSplitter _rightSplitter;
-        private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly PdfViewerController _pdfViewerController;
         private readonly OfficeDocumentViewerController _officeDocumentViewerController;
@@ -74,7 +74,7 @@ namespace TxtAIEditor.Controls
             StickyNoteBar stickyNoteBar,
             CustomSplitter leftSplitter,
             CustomSplitter rightSplitter,
-            IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             TabDirtyStateController tabDirtyStateController,
             PdfViewerController pdfViewerController,
             OfficeDocumentViewerController officeDocumentViewerController,

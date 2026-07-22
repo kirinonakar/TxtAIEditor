@@ -24,7 +24,7 @@ namespace TxtAIEditor.Controls
 
         private readonly RightSidebarPane _previewPane;
         private readonly ISettingsService _settingsService;
-        private readonly IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Func<string, EditorDocumentSession?> _sessionProvider;
         private readonly Func<string> _currentFolderProvider;
@@ -56,7 +56,7 @@ namespace TxtAIEditor.Controls
         public LivePreviewController(
             RightSidebarPane previewPane,
             ISettingsService settingsService,
-            IDictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Func<OpenedTab?> activeTabProvider,
             Func<string, EditorDocumentSession?> sessionProvider,
             Func<string> currentFolderProvider,
@@ -133,7 +133,7 @@ namespace TxtAIEditor.Controls
                 _isPreviewReady = false;
                 var previewWebView = PreviewWebView;
                 previewWebView.DefaultBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
-                var env = await MonacoBridge.GetSharedEnvironmentAsync();
+                var env = await WebViewEnvironmentProvider.GetSharedAsync();
                 await previewWebView.EnsureCoreWebView2Async(env);
 
                 var coreWebView = previewWebView.CoreWebView2;

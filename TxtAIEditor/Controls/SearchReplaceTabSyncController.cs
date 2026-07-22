@@ -15,7 +15,7 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowViewModel _viewModel;
         private readonly TabView _primaryTabView;
         private readonly TabView _secondaryTabView;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly Func<OpenedTab?> _activeTabProvider;
@@ -27,7 +27,7 @@ namespace TxtAIEditor.Controls
             MainWindowViewModel viewModel,
             TabView primaryTabView,
             TabView secondaryTabView,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             TabDirtyStateController tabDirtyStateController,
             Func<OpenedTab?> activeTabProvider,

@@ -52,7 +52,7 @@ namespace TxtAIEditor.Composition
             MainWindowUiRefs ui,
             MainWindowServices services,
             MainWindowViewModel viewModel,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             StatusBarController statusBar,
             TabNavigationController tabNavigation,

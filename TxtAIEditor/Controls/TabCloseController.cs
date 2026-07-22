@@ -16,7 +16,7 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowViewModel _viewModel;
         private readonly TabView _editorTabView;
         private readonly TabView _editorTabView2;
-        private readonly Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly LivePreviewController _livePreviewController;
         private readonly UnsavedChangesDialogService _unsavedChangesDialogService;
@@ -37,7 +37,7 @@ namespace TxtAIEditor.Controls
             MainWindowViewModel viewModel,
             TabView editorTabView,
             TabView editorTabView2,
-            Dictionary<string, (WebView2 WebView, MonacoBridge Bridge)> tabBridges,
+            Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             LivePreviewController livePreviewController,
             UnsavedChangesDialogService unsavedChangesDialogService,

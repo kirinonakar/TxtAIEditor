@@ -46,7 +46,7 @@ namespace TxtAIEditor.Controls
                 tab.FilePath = filePath;
                 tab.Title = Path.GetFileName(filePath);
                 tab.Content = content;
-                tab.Language = _languageDetectionService.GetMonacoLanguageName(filePath);
+                tab.Language = _languageDetectionService.GetEditorLanguageName(filePath);
                 if (IsExtractedDocumentViewerFile(filePath))
                 {
                     tab.IsDocxViewer = true;

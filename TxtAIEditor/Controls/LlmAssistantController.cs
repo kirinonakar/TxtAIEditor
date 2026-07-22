@@ -177,7 +177,7 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrWhiteSpace(activeTab.FilePath))
             {
-                return _languageDetectionService.GetMonacoLanguageName(activeTab.FilePath);
+                return _languageDetectionService.GetEditorLanguageName(activeTab.FilePath);
             }
 
             return "plaintext";
