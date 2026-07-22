@@ -197,7 +197,8 @@ if (!stats.hasAny) {
   document.getElementById('modelInsights').style.display = 'none';
 }
 
-const storedTheme = localStorage.getItem('token-dashboard-theme');
+let storedTheme = null;
+try { storedTheme = localStorage.getItem('token-dashboard-theme'); } catch (error) { }
 const initialTheme = storedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 document.documentElement.dataset.theme = initialTheme;
 const themeToggle = document.getElementById('themeToggle');
@@ -230,7 +231,7 @@ if (window.Chart) {
   const top10=[...namedModels].filter(x=>x.totalTokens>0).sort((a,b)=>b.totalTokens-a.totalTokens).slice(0,10);
   addChart('modelInOut',()=>({type:'bar',data:{labels:top10.map(x=>x.label),datasets:[{label:s.input,data:top10.map(x=>x.promptTokens/1e6),backgroundColor:`${themeTokens().primary}d6`,borderRadius:5,maxBarThickness:20},{label:s.output,data:top10.map(x=>x.completionTokens/1e6),backgroundColor:`${themeTokens().red}c2`,borderRadius:5,maxBarThickness:20}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:plugins(true),scales:{...scales(true),x:{...scales(true).x,ticks:{...scales(true).x.ticks,callback:v=>`${v}M`}}}}}));
 }
-themeToggle.addEventListener('click',()=>{const next=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=next;localStorage.setItem('token-dashboard-theme',next);updateThemeIcon(next);requestAnimationFrame(()=>charts.forEach((chart,index)=>{const canvas=chart.canvas;const factory=chart.$factory;chart.destroy();const rebuilt=new Chart(canvas,factory());rebuilt.$factory=factory;charts[index]=rebuilt;}));});
+themeToggle.addEventListener('click',()=>{const next=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=next;try{localStorage.setItem('token-dashboard-theme',next);}catch(error){}updateThemeIcon(next);requestAnimationFrame(()=>charts.forEach((chart,index)=>{const canvas=chart.canvas;const factory=chart.$factory;chart.destroy();const rebuilt=new Chart(canvas,factory());rebuilt.$factory=factory;charts[index]=rebuilt;}));});
 </script>
 </body>
 </html>

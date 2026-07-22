@@ -4,6 +4,16 @@ namespace TxtAIEditor.Controls
     {
         void Find();
 
+        void SearchAll();
+
+        void NewTab();
+
+        void Save();
+
+        void SaveAs();
+
+        void Open();
+
         void ToggleLivePreview();
 
         void ToggleTopMost();
@@ -15,6 +25,14 @@ namespace TxtAIEditor.Controls
         void ToggleStickyNote();
 
         void Print();
+
+        void ToggleLeftPanel();
+
+        void ToggleRightPanel();
+
+        void ToggleTerminal();
+
+        void ToggleWordWrap();
 
         void TogglePreviewWidth();
 

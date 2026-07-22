@@ -12,10 +12,19 @@ namespace TxtAIEditor.Composition
 {
     internal sealed record MainWindowPreviewCompositionCallbacks(
         Action FindRequested,
+        Action SearchAllRequested,
+        Action NewTabRequested,
+        Action SaveRequested,
+        Action SaveAsRequested,
+        Action OpenRequested,
         Action ToggleLivePreviewRequested,
         Action ToggleThemeRequested,
         Action ToggleMaximizeRequested,
         Action PrintRequested,
+        Action ToggleLeftPanelRequested,
+        Action ToggleRightPanelRequested,
+        Action ToggleTerminalRequested,
+        Action ToggleWordWrapRequested,
         Action TogglePreviewWidthRequested,
         Action CloseActiveTabRequested,
         Func<string, Task> LoadFileAsync,
@@ -139,6 +148,16 @@ namespace TxtAIEditor.Composition
 
             public void Find() => _callbacks.FindRequested();
 
+            public void SearchAll() => _callbacks.SearchAllRequested();
+
+            public void NewTab() => _callbacks.NewTabRequested();
+
+            public void Save() => _callbacks.SaveRequested();
+
+            public void SaveAs() => _callbacks.SaveAsRequested();
+
+            public void Open() => _callbacks.OpenRequested();
+
             public void ToggleLivePreview() => _callbacks.ToggleLivePreviewRequested();
 
             public void ToggleTopMost() => _stickyNoteMode.ToggleTopMostFromShortcut();
@@ -150,6 +169,14 @@ namespace TxtAIEditor.Composition
             public void ToggleStickyNote() => _stickyNoteMode.ToggleMode();
 
             public void Print() => _callbacks.PrintRequested();
+
+            public void ToggleLeftPanel() => _callbacks.ToggleLeftPanelRequested();
+
+            public void ToggleRightPanel() => _callbacks.ToggleRightPanelRequested();
+
+            public void ToggleTerminal() => _callbacks.ToggleTerminalRequested();
+
+            public void ToggleWordWrap() => _callbacks.ToggleWordWrapRequested();
 
             public void TogglePreviewWidth() => _callbacks.TogglePreviewWidthRequested();
 

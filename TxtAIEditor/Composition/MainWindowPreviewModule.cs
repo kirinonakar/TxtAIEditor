@@ -27,6 +27,8 @@ namespace TxtAIEditor.Composition
             MainWindowPreviewModuleDependencies dependencies,
             MainWindowCompositionRootCallbacks callbacks,
             Func<MainWindowToolbarCommandController?> getToolbarCommand,
+            Func<Task> toggleLeftPanelAsync,
+            Func<Task> toggleRightPanelAsync,
             Func<string, Task> navigateExplorerToFolderAndRevealAsync)
         {
             var shell = dependencies.Shell;
@@ -41,10 +43,19 @@ namespace TxtAIEditor.Composition
                 tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
                 new MainWindowPreviewCompositionCallbacks(
                     () => getToolbarCommand()?.Find(),
+                    callbacks.FocusSearchPanel,
+                    () => callbacks.OpenNewTab(),
+                    () => getToolbarCommand()?.SaveActive(),
+                    () => getToolbarCommand()?.SaveActiveAs(),
+                    () => getToolbarCommand()?.OpenFile(),
                     () => getToolbarCommand()?.ToggleLivePreview(),
                     () => getToolbarCommand()?.ToggleTheme(),
                     callbacks.ToggleMaximize,
                     () => getToolbarCommand()?.Print(),
+                    () => _ = toggleLeftPanelAsync(),
+                    () => _ = toggleRightPanelAsync(),
+                    () => getToolbarCommand()?.ToggleTerminal(),
+                    () => getToolbarCommand()?.ToggleWordWrap(),
                     shell.ShellPanelLayout.TogglePreviewWidth,
                     callbacks.CloseActiveTab,
                     callbacks.LoadFileIntoTabAsync,

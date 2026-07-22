@@ -15,6 +15,8 @@ namespace TxtAIEditor.Core.Services
             "editor-highlighter.js",
             "editor-selection.js",
             "editor-caret.js",
+            "editor-html-live-preview.js",
+            "html-preview-frame-bridge.js",
             "editor-composition.js",
             "editor-commands.js",
             "editor-ui.js",

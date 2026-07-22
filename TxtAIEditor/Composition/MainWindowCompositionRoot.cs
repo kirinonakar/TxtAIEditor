@@ -93,6 +93,8 @@ namespace TxtAIEditor.Composition
                 new MainWindowPreviewModuleDependencies(shellControllers),
                 callbacks,
                 () => moduleBindings.ToolbarCommand,
+                ToggleLeftPanelAsync,
+                ToggleRightPanelAsync,
                 folderPath => moduleBindings.ExplorerNavigation.NavigateToFolderAsync(
                     folderPath,
                     revealInLeftPanel: true));

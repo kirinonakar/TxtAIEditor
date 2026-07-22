@@ -379,6 +379,10 @@
             renderPreviewLineAt,
             renderMermaidBlocks: renderSharedMermaidBlocks,
         } = await import(`./markdown-preview-renderer.js?v=${encodeURIComponent(moduleVersion)}`);
+        const {
+            buildHtmlPreviewFrameBridgeScript,
+            shortcutNameFromKeyboardEvent
+        } = await import(`./html-preview-frame-bridge.js?v=${encodeURIComponent(moduleVersion)}`);
 
         const scroll = document.getElementById('preview-scroll');
         const spacer = document.getElementById('virtual-spacer');
@@ -544,7 +548,7 @@
 
         function htmlPreviewInjection(baseHref) {
             const base = baseHref ? `<base href="${escapeAttribute(baseHref)}">` : '';
-            return `${base}<style id="TxtAIEditor-html-preview-selection-fix">html,body{min-height:100%;overflow:auto!important;-webkit-user-select:text!important;user-select:text!important;}body{cursor:text;}</style>`;
+            return `${base}${buildHtmlPreviewFrameBridgeScript()}<style id="TxtAIEditor-html-preview-selection-fix">html{min-height:100%;overflow:auto!important;}body{min-height:100%;overflow:visible!important;-webkit-user-select:text!important;user-select:text!important;cursor:text;}</style>`;
         }
 
         function setPreviewBaseHref(baseHref) {
@@ -1208,51 +1212,22 @@
         }
 
         function handleKeyDown(event) {
-            if (event.key === 'F4') {
-                event.preventDefault();
-                post({ type: 'shortcut', name: 'f4' });
-                return;
-            }
-            if (event.key === 'F9') {
-                event.preventDefault();
-                post({ type: 'shortcut', name: 'f9' });
-                return;
-            }
-            if (event.key === 'F10') {
-                event.preventDefault();
-                post({ type: 'shortcut', name: 'f10' });
-                return;
-            }
-            if (event.key === 'F11') {
-                event.preventDefault();
-                post({ type: 'shortcut', name: 'f11' });
-                return;
-            }
-            if (event.key === 'F12') {
-                event.preventDefault();
-                post({ type: 'shortcut', name: 'f12' });
-                return;
-            }
-            const ctrl = event.ctrlKey || event.metaKey;
-            const key = event.key ? event.key.toLowerCase() : '';
-            if (ctrl && key === '3') {
-                event.preventDefault();
-                post({ type: 'shortcut', name: 'expandRightPanel' });
-                return;
-            }
-            if (ctrl && key === 'f') {
-                event.preventDefault();
-                post({ type: 'shortcut', name: 'find' });
-            }
+            const shortcut = shortcutNameFromKeyboardEvent(event);
+            if (!shortcut) return;
+            event.preventDefault();
+            post({ type: 'shortcut', name: shortcut });
         }
 
         document.addEventListener('keydown', handleKeyDown);
-        htmlPreview.addEventListener('load', () => {
-            try {
-                htmlPreview.contentWindow.addEventListener('keydown', handleKeyDown);
-            } catch (e) {
-                // Ignore cross-origin errors
+        window.addEventListener('message', event => {
+            const message = event.data;
+            if (event.source !== htmlPreview.contentWindow ||
+                message?.source !== 'txtaieditor-html-preview' ||
+                message?.type !== 'shortcut' ||
+                !message.name) {
+                return;
             }
+            post({ type: 'shortcut', name: String(message.name) });
         });
     </script>
 </body>

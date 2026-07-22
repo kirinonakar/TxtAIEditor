@@ -1,5 +1,6 @@
 import { htmlLivePreview, viewport } from './editor-dom.js';
-import { requestMissingLines, state } from './editor-core.js';
+import { post, requestMissingLines, state } from './editor-core.js';
+import { buildHtmlPreviewFrameBridgeScript } from './html-preview-frame-bridge.js';
 
 function escapeAttribute(value) {
     return String(value ?? '')
@@ -12,7 +13,7 @@ function escapeAttribute(value) {
 function buildHtmlPreviewDocument(html, baseHref) {
     const source = String(html ?? '');
     const base = baseHref ? `<base href="${escapeAttribute(baseHref)}">` : '';
-    const injection = `${base}<meta name="viewport" content="width=device-width, initial-scale=1.0">`;
+    const injection = `${base}<meta name="viewport" content="width=device-width, initial-scale=1.0">${buildHtmlPreviewFrameBridgeScript()}`;
 
     if (/<head(?:\s[^>]*)?>/i.test(source)) {
         return source.replace(/<head(\s[^>]*)?>/i, match => `${match}${injection}`);
@@ -47,6 +48,17 @@ function fullDocumentText() {
 function createFullHtmlLivePreviewRenderer() {
     let active = false;
     let lastDocumentKey = '';
+
+    window.addEventListener('message', event => {
+        const message = event.data;
+        if (event.source !== htmlLivePreview.contentWindow ||
+            message?.source !== 'txtaieditor-html-preview' ||
+            message?.type !== 'shortcut' ||
+            !message.name) {
+            return;
+        }
+        post({ type: 'shortcut', name: String(message.name) });
+    });
 
     function deactivate() {
         if (!active) return;

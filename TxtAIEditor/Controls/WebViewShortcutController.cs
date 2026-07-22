@@ -16,6 +16,21 @@ namespace TxtAIEditor.Controls
                 case "find":
                     _commands.Find();
                     break;
+                case "searchAll":
+                    _commands.SearchAll();
+                    break;
+                case "newTab":
+                    _commands.NewTab();
+                    break;
+                case "save":
+                    _commands.Save();
+                    break;
+                case "saveAs":
+                    _commands.SaveAs();
+                    break;
+                case "open":
+                    _commands.Open();
+                    break;
                 case "f4":
                     _commands.ToggleLivePreview();
                     break;
@@ -33,6 +48,18 @@ namespace TxtAIEditor.Controls
                     break;
                 case "print":
                     _commands.Print();
+                    break;
+                case "toggleLeftPanel":
+                    _commands.ToggleLeftPanel();
+                    break;
+                case "toggleRightPanel":
+                    _commands.ToggleRightPanel();
+                    break;
+                case "terminal":
+                    _commands.ToggleTerminal();
+                    break;
+                case "wordWrap":
+                    _commands.ToggleWordWrap();
                     break;
                 case "expandRightPanel":
                     _commands.TogglePreviewWidth();
