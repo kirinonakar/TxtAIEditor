@@ -3,144 +3,99 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
     public sealed partial class LeftSidebarPane : UserControl
     {
-        private ScrollViewer? _gitHistoryScrollViewer;
-
-        public static readonly DependencyProperty ReplaceOneTooltipProperty =
-            DependencyProperty.Register(
-                nameof(ReplaceOneTooltip),
-                typeof(string),
-                typeof(LeftSidebarPane),
-                new PropertyMetadata("이 항목만 바꾸기"));
-
-        public string ReplaceOneTooltip
-        {
-            get => (string)GetValue(ReplaceOneTooltipProperty);
-            set => SetValue(ReplaceOneTooltipProperty, value);
-        }
-
-        public static readonly DependencyProperty SnippetEditTooltipProperty =
-            DependencyProperty.Register(
-                nameof(SnippetEditTooltip),
-                typeof(string),
-                typeof(LeftSidebarPane),
-                new PropertyMetadata("수정"));
-
-        public string SnippetEditTooltip
-        {
-            get => (string)GetValue(SnippetEditTooltipProperty);
-            set => SetValue(SnippetEditTooltipProperty, value);
-        }
-
-        public static readonly DependencyProperty SnippetDeleteTooltipProperty =
-            DependencyProperty.Register(
-                nameof(SnippetDeleteTooltip),
-                typeof(string),
-                typeof(LeftSidebarPane),
-                new PropertyMetadata("삭제"));
-
-        public string SnippetDeleteTooltip
-        {
-            get => (string)GetValue(SnippetDeleteTooltipProperty);
-            set => SetValue(SnippetDeleteTooltipProperty, value);
-        }
-
         public LeftSidebarPane()
         {
             InitializeComponent();
-            GitBranchesCombo.SelectionChanged += OnGitBranchSelectionChanged;
-            GitHistoryList.Loaded += OnGitHistoryListLoaded;
         }
 
         public event RoutedEventHandler? LeftActivityClick;
-        public event RoutedEventHandler? ExplorerUpClick;
-        public event RoutedEventHandler? SelectFolderClick;
-        public event RoutedEventHandler? CreateFolderClick;
-        public event RoutedEventHandler? RefreshClick;
-        public event RoutedEventHandler? SortClick;
-        public event RoutedEventHandler? OpenInWindowsExplorerClick;
-        public event RoutedEventHandler? ExplorerHomeClick;
-        public event RoutedEventHandler? ExplorerTreeModeClick;
-        public event EventHandler<TreeViewExpandingEventArgs>? ExplorerTreeExpanding;
-        public event EventHandler<TreeViewItemInvokedEventArgs>? ExplorerTreeItemInvoked;
-        public event DragEventHandler? ExplorerTreeDragOver;
-        public event DragEventHandler? ExplorerTreeDrop;
-        public event ItemClickEventHandler? FileListViewItemClick;
-        public event RightTappedEventHandler? FileListViewItemRightTapped;
-        public event RoutedEventHandler? AddFileToFavoritesClick;
-        public event RoutedEventHandler? AddFolderToFavoritesClick;
-        public event RoutedEventHandler? InsertMarkdownImageClick;
-        public event RoutedEventHandler? OpenExternalViewerClick;
-        public event RoutedEventHandler? OpenWithDefaultProgramClick;
-        public event RoutedEventHandler? ExtractArchiveToFolderClick;
-        public event RoutedEventHandler? CompressFolderToZipClick;
-        public event RoutedEventHandler? CompressFolderToSevenZipClick;
-        public event RoutedEventHandler? CopyFileNameClick;
-        public event RoutedEventHandler? CopyFilePathClick;
-        public event RoutedEventHandler? CopyFolderPathClick;
-        public event RoutedEventHandler? RenameClick;
-        public event RoutedEventHandler? DeleteClick;
-        public event ItemClickEventHandler? FavoriteItemClick;
-        public event RoutedEventHandler? RemoveFavoriteClick;
-        public event RoutedEventHandler? FavoritePinClick;
-        public event RoutedEventHandler? FavoritesTabClick;
-        public event RoutedEventHandler? RecentTabClick;
-        public event DoubleTappedEventHandler? SnippetItemDoubleTapped;
-        public event RoutedEventHandler? DeleteSnippetClick;
-        public event RoutedEventHandler? EditSnippetClick;
-        public event RoutedEventHandler? AddSnippetClick;
-        public event RoutedEventHandler? ExportSnippetsClick;
-        public event RoutedEventHandler? ImportSnippetsClick;
-        public event RoutedEventHandler? ResetSnippetsClick;
-        public event RoutedEventHandler? AutocompleteDictClick;
-        public event ItemClickEventHandler? GitFileItemClick;
-        public event RoutedEventHandler? GitStageToggleClick;
-        public event RoutedEventHandler? GitRestoreFileClick;
-        public event RoutedEventHandler? GitCommitClick;
-        public event RoutedEventHandler? GitStageAllClick;
-        public event RoutedEventHandler? GitRestoreAllClick;
-        public event RoutedEventHandler? GitPushClick;
-        public event RoutedEventHandler? GitPullClick;
-        public event RoutedEventHandler? GitRebaseClick;
-        public event RoutedEventHandler? GitCreateBranchClick;
-        public event RoutedEventHandler? GitMergeClick;
-        public event RoutedEventHandler? GitGcClick;
-        public event RoutedEventHandler? GitHardResetClick;
-        public event RoutedEventHandler? GitPushForceClick;
-        public event RoutedEventHandler? GitRemoteClick;
-        public event RoutedEventHandler? GitScpClick;
-        public event RoutedEventHandler? GitRefreshClick;
-        public event SelectionChangedEventHandler? GitBranchSelectionChanged;
-        public event EventHandler? GitHistoryScrolledToEnd;
-        public event ItemClickEventHandler? GitHistoryItemClick;
-        public event RoutedEventHandler? GitInitRepoClick;
-        public event KeyEventHandler? SearchQueryInputKeyDown;
-        public event RoutedEventHandler? SearchAllFilesClick;
-        public event RoutedEventHandler? ReplaceAllClick;
-        public event RoutedEventHandler? ReplaceOneClick;
-        public event ItemClickEventHandler? SearchResultItemClick;
-        public event ItemClickEventHandler? RecentFileItemClick;
-        public event RoutedEventHandler? RemoveRecentFileClick;
-        public event ItemClickEventHandler? TocItemClick;
-        public event TextChangedEventHandler? ExplorerFilterTextChanged;
-        public event DragEventHandler? FileListViewDragOver;
-        public event DragEventHandler? FileListViewDrop;
-        public event DragEventHandler? FileListViewItemDragOver;
-        public event DragEventHandler? FileListViewItemDrop;
+        public event RoutedEventHandler? ExplorerUpClick { add => ExplorerView.UpClick += value; remove => ExplorerView.UpClick -= value; }
+        public event RoutedEventHandler? SelectFolderClick { add => ExplorerView.SelectFolderClick += value; remove => ExplorerView.SelectFolderClick -= value; }
+        public event RoutedEventHandler? CreateFolderClick { add => ExplorerView.CreateFolderClick += value; remove => ExplorerView.CreateFolderClick -= value; }
+        public event RoutedEventHandler? RefreshClick { add => ExplorerView.RefreshClick += value; remove => ExplorerView.RefreshClick -= value; }
+        public event RoutedEventHandler? SortClick { add => ExplorerView.SortClick += value; remove => ExplorerView.SortClick -= value; }
+        public event RoutedEventHandler? OpenInWindowsExplorerClick { add => ExplorerView.OpenInWindowsExplorerClick += value; remove => ExplorerView.OpenInWindowsExplorerClick -= value; }
+        public event RoutedEventHandler? ExplorerHomeClick { add => ExplorerView.HomeClick += value; remove => ExplorerView.HomeClick -= value; }
+        public event RoutedEventHandler? ExplorerTreeModeClick { add => ExplorerView.TreeModeClick += value; remove => ExplorerView.TreeModeClick -= value; }
+        public event EventHandler<TreeViewExpandingEventArgs>? ExplorerTreeExpanding { add => ExplorerView.TreeExpanding += value; remove => ExplorerView.TreeExpanding -= value; }
+        public event EventHandler<TreeViewItemInvokedEventArgs>? ExplorerTreeItemInvoked { add => ExplorerView.TreeItemInvoked += value; remove => ExplorerView.TreeItemInvoked -= value; }
+        public event DragEventHandler? ExplorerTreeDragOver { add => ExplorerView.TreeDragOver += value; remove => ExplorerView.TreeDragOver -= value; }
+        public event DragEventHandler? ExplorerTreeDrop { add => ExplorerView.TreeDrop += value; remove => ExplorerView.TreeDrop -= value; }
+        public event ItemClickEventHandler? FileListViewItemClick { add => ExplorerView.FileItemClick += value; remove => ExplorerView.FileItemClick -= value; }
+        public event RightTappedEventHandler? FileListViewItemRightTapped { add => ExplorerView.FileItemRightTapped += value; remove => ExplorerView.FileItemRightTapped -= value; }
+        public event RoutedEventHandler? AddFileToFavoritesClick { add => ExplorerView.AddFileToFavoritesClick += value; remove => ExplorerView.AddFileToFavoritesClick -= value; }
+        public event RoutedEventHandler? AddFolderToFavoritesClick { add => ExplorerView.AddFolderToFavoritesClick += value; remove => ExplorerView.AddFolderToFavoritesClick -= value; }
+        public event RoutedEventHandler? InsertMarkdownImageClick { add => ExplorerView.InsertMarkdownImageClick += value; remove => ExplorerView.InsertMarkdownImageClick -= value; }
+        public event RoutedEventHandler? OpenExternalViewerClick { add => ExplorerView.OpenExternalViewerClick += value; remove => ExplorerView.OpenExternalViewerClick -= value; }
+        public event RoutedEventHandler? OpenWithDefaultProgramClick { add => ExplorerView.OpenWithDefaultProgramClick += value; remove => ExplorerView.OpenWithDefaultProgramClick -= value; }
+        public event RoutedEventHandler? ExtractArchiveToFolderClick { add => ExplorerView.ExtractArchiveToFolderClick += value; remove => ExplorerView.ExtractArchiveToFolderClick -= value; }
+        public event RoutedEventHandler? CompressFolderToZipClick { add => ExplorerView.CompressFolderToZipClick += value; remove => ExplorerView.CompressFolderToZipClick -= value; }
+        public event RoutedEventHandler? CompressFolderToSevenZipClick { add => ExplorerView.CompressFolderToSevenZipClick += value; remove => ExplorerView.CompressFolderToSevenZipClick -= value; }
+        public event RoutedEventHandler? CopyFileNameClick { add => ExplorerView.CopyFileNameClick += value; remove => ExplorerView.CopyFileNameClick -= value; }
+        public event RoutedEventHandler? CopyFilePathClick { add => ExplorerView.CopyFilePathClick += value; remove => ExplorerView.CopyFilePathClick -= value; }
+        public event RoutedEventHandler? CopyFolderPathClick { add => ExplorerView.CopyFolderPathClick += value; remove => ExplorerView.CopyFolderPathClick -= value; }
+        public event RoutedEventHandler? RenameClick { add => ExplorerView.RenameClick += value; remove => ExplorerView.RenameClick -= value; }
+        public event RoutedEventHandler? DeleteClick { add => ExplorerView.DeleteClick += value; remove => ExplorerView.DeleteClick -= value; }
+        public event ItemClickEventHandler? FavoriteItemClick { add => FavoritesView.ItemClick += value; remove => FavoritesView.ItemClick -= value; }
+        public event RoutedEventHandler? RemoveFavoriteClick { add => FavoritesView.RemoveClick += value; remove => FavoritesView.RemoveClick -= value; }
+        public event RoutedEventHandler? FavoritePinClick { add => FavoritesView.PinClick += value; remove => FavoritesView.PinClick -= value; }
+        public event RoutedEventHandler? FavoritesTabClick { add => FavoritesView.TabClick += value; remove => FavoritesView.TabClick -= value; }
+        public event RoutedEventHandler? RecentTabClick { add => RecentView.TabClick += value; remove => RecentView.TabClick -= value; }
+        public event DoubleTappedEventHandler? SnippetItemDoubleTapped { add => SnippetsView.ItemDoubleTapped += value; remove => SnippetsView.ItemDoubleTapped -= value; }
+        public event RoutedEventHandler? DeleteSnippetClick { add => SnippetsView.DeleteClick += value; remove => SnippetsView.DeleteClick -= value; }
+        public event RoutedEventHandler? EditSnippetClick { add => SnippetsView.EditClick += value; remove => SnippetsView.EditClick -= value; }
+        public event RoutedEventHandler? AddSnippetClick { add => SnippetsView.AddClick += value; remove => SnippetsView.AddClick -= value; }
+        public event RoutedEventHandler? ExportSnippetsClick { add => SnippetsView.ExportClick += value; remove => SnippetsView.ExportClick -= value; }
+        public event RoutedEventHandler? ImportSnippetsClick { add => SnippetsView.ImportClick += value; remove => SnippetsView.ImportClick -= value; }
+        public event RoutedEventHandler? ResetSnippetsClick { add => SnippetsView.ResetClick += value; remove => SnippetsView.ResetClick -= value; }
+        public event RoutedEventHandler? AutocompleteDictClick { add => SnippetsView.AutocompleteDictionaryClick += value; remove => SnippetsView.AutocompleteDictionaryClick -= value; }
+        public event ItemClickEventHandler? GitFileItemClick { add => GitView.FileItemClick += value; remove => GitView.FileItemClick -= value; }
+        public event RoutedEventHandler? GitStageToggleClick { add => GitView.StageToggleClick += value; remove => GitView.StageToggleClick -= value; }
+        public event RoutedEventHandler? GitRestoreFileClick { add => GitView.RestoreFileClick += value; remove => GitView.RestoreFileClick -= value; }
+        public event RoutedEventHandler? GitCommitClick { add => GitView.CommitClick += value; remove => GitView.CommitClick -= value; }
+        public event RoutedEventHandler? GitStageAllClick { add => GitView.StageAllClick += value; remove => GitView.StageAllClick -= value; }
+        public event RoutedEventHandler? GitRestoreAllClick { add => GitView.RestoreAllClick += value; remove => GitView.RestoreAllClick -= value; }
+        public event RoutedEventHandler? GitPushClick { add => GitView.PushClick += value; remove => GitView.PushClick -= value; }
+        public event RoutedEventHandler? GitPullClick { add => GitView.PullClick += value; remove => GitView.PullClick -= value; }
+        public event RoutedEventHandler? GitRebaseClick { add => GitView.RebaseClick += value; remove => GitView.RebaseClick -= value; }
+        public event RoutedEventHandler? GitCreateBranchClick { add => GitView.CreateBranchClick += value; remove => GitView.CreateBranchClick -= value; }
+        public event RoutedEventHandler? GitMergeClick { add => GitView.MergeClick += value; remove => GitView.MergeClick -= value; }
+        public event RoutedEventHandler? GitGcClick { add => GitView.GcClick += value; remove => GitView.GcClick -= value; }
+        public event RoutedEventHandler? GitHardResetClick { add => GitView.HardResetClick += value; remove => GitView.HardResetClick -= value; }
+        public event RoutedEventHandler? GitPushForceClick { add => GitView.PushForceClick += value; remove => GitView.PushForceClick -= value; }
+        public event RoutedEventHandler? GitRemoteClick { add => GitView.RemoteClick += value; remove => GitView.RemoteClick -= value; }
+        public event RoutedEventHandler? GitScpClick { add => GitView.ScpClick += value; remove => GitView.ScpClick -= value; }
+        public event RoutedEventHandler? GitRefreshClick { add => GitView.RefreshClick += value; remove => GitView.RefreshClick -= value; }
+        public event SelectionChangedEventHandler? GitBranchSelectionChanged { add => GitView.BranchSelectionChanged += value; remove => GitView.BranchSelectionChanged -= value; }
+        public event EventHandler? GitHistoryScrolledToEnd { add => GitView.HistoryScrolledToEnd += value; remove => GitView.HistoryScrolledToEnd -= value; }
+        public event ItemClickEventHandler? GitHistoryItemClick { add => GitView.HistoryItemClick += value; remove => GitView.HistoryItemClick -= value; }
+        public event RoutedEventHandler? GitInitRepoClick { add => GitView.InitRepoClick += value; remove => GitView.InitRepoClick -= value; }
+        public event KeyEventHandler? SearchQueryInputKeyDown { add => SearchView.QueryKeyDown += value; remove => SearchView.QueryKeyDown -= value; }
+        public event RoutedEventHandler? SearchAllFilesClick { add => SearchView.SearchAllClick += value; remove => SearchView.SearchAllClick -= value; }
+        public event RoutedEventHandler? ReplaceAllClick { add => SearchView.ReplaceAllClick += value; remove => SearchView.ReplaceAllClick -= value; }
+        public event RoutedEventHandler? ReplaceOneClick { add => SearchView.ReplaceOneClick += value; remove => SearchView.ReplaceOneClick -= value; }
+        public event ItemClickEventHandler? SearchResultItemClick { add => SearchView.ResultItemClick += value; remove => SearchView.ResultItemClick -= value; }
+        public event ItemClickEventHandler? RecentFileItemClick { add => RecentView.ItemClick += value; remove => RecentView.ItemClick -= value; }
+        public event RoutedEventHandler? RemoveRecentFileClick { add => RecentView.RemoveClick += value; remove => RecentView.RemoveClick -= value; }
+        public event ItemClickEventHandler? TocItemClick { add => TocView.ItemClick += value; remove => TocView.ItemClick -= value; }
+        public event TextChangedEventHandler? ExplorerFilterTextChanged { add => ExplorerView.FilterTextChanged += value; remove => ExplorerView.FilterTextChanged -= value; }
+        public event DragEventHandler? FileListViewDragOver { add => ExplorerView.FileListDragOver += value; remove => ExplorerView.FileListDragOver -= value; }
+        public event DragEventHandler? FileListViewDrop { add => ExplorerView.FileListDrop += value; remove => ExplorerView.FileListDrop -= value; }
+        public event DragEventHandler? FileListViewItemDragOver { add => ExplorerView.FileItemDragOver += value; remove => ExplorerView.FileItemDragOver -= value; }
+        public event DragEventHandler? FileListViewItemDrop { add => ExplorerView.FileItemDrop += value; remove => ExplorerView.FileItemDrop -= value; }
 
-        public Grid ExplorerPage => ExplorerSidebarPage;
-        public Grid FavoritesPage => FavoritesSidebarPage;
-        public Grid SnippetsPage => SnippetsSidebarPage;
-        public Grid GitPage => GitSidebarPage;
-        public Grid SearchPage => SearchSidebarPage;
-        public Grid RecentPage => RecentSidebarPage;
-        public Grid TocPage => TocSidebarPage;
+        public Grid ExplorerPage => ExplorerView.Root;
+        public Grid FavoritesPage => FavoritesView.Root;
+        public Grid SnippetsPage => SnippetsView.Root;
+        public Grid GitPage => GitView.Root;
+        public Grid SearchPage => SearchView.Root;
+        public Grid RecentPage => RecentView.Root;
+        public Grid TocPage => TocView.Root;
 
         public ToggleButton ExplorerActivity => ExplorerActivityButton;
         public ToggleButton FavoritesActivity => FavoritesActivityButton;
@@ -150,77 +105,73 @@ namespace TxtAIEditor.Controls
         public ToggleButton RecentActivity => RecentActivityButton;
         public ToggleButton TocActivity => TocActivityButton;
 
-        public TextBlock ExplorerStatus => ExplorerStatusText;
-        public TextBlock FavoritesHeader => FavoritesHeaderText;
-        public TextBlock SnippetsHeader => SnippetsHeaderText;
-        public Button AddSnippet => AddSnippetButton;
-        public Button ExportSnippets => ExportSnippetsButton;
-        public Button ImportSnippets => ImportSnippetsButton;
-        public Button ResetSnippets => ResetSnippetsButton;
-        public Button AutocompleteDict => AutocompleteDictButton;
+        public TextBlock ExplorerStatus => ExplorerView.Status;
+        public TextBlock FavoritesHeader => FavoritesView.Header;
+        public TextBlock SnippetsHeader => SnippetsView.Header;
+        public Button AddSnippet => SnippetsView.AddButton;
+        public Button ExportSnippets => SnippetsView.ExportButton;
+        public Button ImportSnippets => SnippetsView.ImportButton;
+        public Button ResetSnippets => SnippetsView.ResetButton;
+        public Button AutocompleteDict => SnippetsView.AutocompleteDictionaryButton;
 
-        public TextBlock SearchHeaderLabel => SearchHeaderText;
-        public FrameworkElement SearchProgressIndicator => SearchProgressDot;
-        public Button SearchAllFilesBtn => SearchAllButton;
-        public Button ReplaceAllFilesBtn => ReplaceAllButton;
-        public TextBlock RecentFilesHeaderLabel => RecentFilesHeaderText;
-        public TextBlock GitHeaderLabel => GitHeaderText;
-        public Button GitCommitBtn => GitCommitButton;
-        public Button GitStageAllBtn => GitStageAllButton;
-        public Button GitRestoreAllBtn => GitRestoreAllButton;
-        public SplitButton GitPushBtn => GitPushButton;
-        public Button GitRemoteBtn => GitRemoteButton;
-        public Button GitScpBtn => GitScpButton;
-        public Button GitRefreshBtn => GitRefreshButton;
-        public TextBlock GitHistoryHeaderLabel => GitHistoryHeader;
-        public Button ExplorerUpBtn => ExplorerUpButton;
-        public Button ExplorerSelectFolderBtn => ExplorerSelectFolderButton;
-        public Button ExplorerCreateFolderBtn => ExplorerCreateFolderButton;
-        public Button ExplorerRefreshBtn => ExplorerRefreshButton;
-        public Button ExplorerSortBtn => ExplorerSortButton;
-        public Button ExplorerOpenInWindowsBtn => ExplorerOpenInWindowsButton;
-        public Button ExplorerHomeBtn => ExplorerHomeButton;
-        public ToggleButton ExplorerTreeModeBtn => ExplorerTreeModeButton;
-        public TreeView ExplorerTree => ExplorerTreeView;
+        public TextBlock SearchHeaderLabel => SearchView.Header;
+        public FrameworkElement SearchProgressIndicator => SearchView.ProgressIndicator;
+        public Button SearchAllFilesBtn => SearchView.SearchAllButtonControl;
+        public Button ReplaceAllFilesBtn => SearchView.ReplaceAllButtonControl;
+        public TextBlock RecentFilesHeaderLabel => RecentView.Header;
+        public TextBlock GitHeaderLabel => GitView.Header;
+        public Button GitCommitBtn => GitView.CommitButton;
+        public Button GitStageAllBtn => GitView.StageAllButton;
+        public Button GitRestoreAllBtn => GitView.RestoreAllButton;
+        public SplitButton GitPushBtn => GitView.PushButton;
+        public Button GitRemoteBtn => GitView.RemoteButton;
+        public Button GitScpBtn => GitView.ScpButton;
+        public Button GitRefreshBtn => GitView.RefreshButton;
+        public TextBlock GitHistoryHeaderLabel => GitView.HistoryHeader;
+        public Button ExplorerUpBtn => ExplorerView.UpButton;
+        public Button ExplorerSelectFolderBtn => ExplorerView.SelectFolderButton;
+        public Button ExplorerCreateFolderBtn => ExplorerView.CreateFolderButton;
+        public Button ExplorerRefreshBtn => ExplorerView.RefreshButton;
+        public Button ExplorerSortBtn => ExplorerView.SortButton;
+        public Button ExplorerOpenInWindowsBtn => ExplorerView.OpenInWindowsButton;
+        public Button ExplorerHomeBtn => ExplorerView.HomeButton;
+        public ToggleButton ExplorerTreeModeBtn => ExplorerView.TreeModeButton;
+        public TreeView ExplorerTree => ExplorerView.Tree;
 
-        public ListView FileList => FileListView;
-        public ListView FavoritesList => FavoritesListView;
-        public ListView RecentFilesList => RecentFilesListView;
-        public ListView SnippetsList => SnippetsListView;
-        public ListView GitChangedFiles => GitChangedFilesList;
-        public ListView GitHistory => GitHistoryList;
-        public ListView SearchResults => SearchResultsList;
-        public ListView TocList => TocListView;
+        public ListView FileList => ExplorerView.FileList;
+        public ListView FavoritesList => FavoritesView.Items;
+        public ListView RecentFilesList => RecentView.Items;
+        public ListView SnippetsList => SnippetsView.Items;
+        public ListView GitChangedFiles => GitView.ChangedFiles;
+        public ListView GitHistory => GitView.History;
+        public ListView SearchResults => SearchView.Results;
+        public ListView TocList => TocView.Items;
 
-        public TextBlock GitPanelBranch => GitPanelBranchText;
-        public TextBlock GitRepoPath => GitRepoPathText;
-        public Button GitInitRepoBtn => GitInitRepoButton;
-        public ComboBox GitBranches => GitBranchesCombo;
-        public TextBox GitCommitMessage => GitCommitMessageInput;
+        public TextBlock GitPanelBranch => GitView.PanelBranch;
+        public TextBlock GitRepoPath => GitView.RepoPath;
+        public Button GitInitRepoBtn => GitView.InitRepoButton;
+        public ComboBox GitBranches => GitView.Branches;
+        public TextBox GitCommitMessage => GitView.CommitMessage;
 
-        public TextBox SearchQuery => SearchQueryInput;
-        public TextBox ReplaceQuery => ReplaceQueryInput;
-        public ToggleButton SearchMatchCase => SearchMatchCaseToggle;
-        public ToggleButton SearchWholeWord => SearchWholeWordToggle;
-        public ToggleButton SearchRegex => SearchRegexToggle;
+        public TextBox SearchQuery => SearchView.SearchQuery;
+        public TextBox ReplaceQuery => SearchView.ReplaceQuery;
+        public ToggleButton SearchMatchCase => SearchView.MatchCase;
+        public ToggleButton SearchWholeWord => SearchView.WholeWord;
+        public ToggleButton SearchRegex => SearchView.Regex;
 
-        public ToggleButton FavoritesFileTabButton => FavoritesFileTab;
-        public ToggleButton FavoritesFolderTabButton => FavoritesFolderTab;
-        public ToggleButton RecentFileTabButton => RecentFileTab;
-        public ToggleButton RecentFolderTabButton => RecentFolderTab;
+        public ToggleButton FavoritesFileTabButton => FavoritesView.FileTab;
+        public ToggleButton FavoritesFolderTabButton => FavoritesView.FolderTab;
+        public ToggleButton RecentFileTabButton => RecentView.FileTab;
+        public ToggleButton RecentFolderTabButton => RecentView.FolderTab;
 
         public void SetExplorerTreeMode(bool isTreeMode)
         {
-            ExplorerTreeModeButton.IsChecked = isTreeMode;
-            FileListView.Visibility = isTreeMode ? Visibility.Collapsed : Visibility.Visible;
-            ExplorerTreeView.Visibility = isTreeMode ? Visibility.Visible : Visibility.Collapsed;
-            ExplorerFilterPanel.Visibility = isTreeMode ? Visibility.Collapsed : Visibility.Visible;
-            ExplorerUpButton.IsEnabled = !isTreeMode;
+            ExplorerView.SetTreeMode(isTreeMode);
         }
 
         public void ClearExplorerFilter()
         {
-            ExplorerFilterBox.Text = string.Empty;
+            ExplorerView.ClearFilter();
         }
 
         public void Localize(Func<string, string, string> getString, bool updateEmptyFolderStatus)
@@ -232,116 +183,26 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(SearchActivityButton, getString("Search", "검색"));
             ToolTipService.SetToolTip(RecentActivityButton, getString("RecentFiles", "최근 파일"));
             ToolTipService.SetToolTip(TocActivityButton, getString("TOC", "목차 (TOC)"));
-
-            if (updateEmptyFolderStatus)
-            {
-                ExplorerStatusText.Text = getString("NoFolderSelected", "폴더를 선택하세요.");
-            }
-
-            FavoritesHeaderText.Text = getString("FavoritesHeader", "즐겨찾기 목록");
-            SnippetsHeaderText.Text = getString("SnippetsHeader", "코드 및 수식 템플릿");
-            TocHeaderText.Text = getString("TOCHeader", "목차 (TOC)");
-            AddSnippetButton.Content = getString("AddSnippet", "스니펫 추가...");
-            ExportSnippetsButton.Content = getString("SnippetExport", "내보내기");
-            ImportSnippetsButton.Content = getString("SnippetImport", "가져오기");
-            ResetSnippetsButton.Content = getString("SnippetReset", "초기화");
-            AutocompleteDictButton.Content = getString("AutocompleteDict", "자동완성 사전...");
-            SnippetEditTooltip = getString("SnippetEditTooltip", "수정");
-            SnippetDeleteTooltip = getString("SnippetDeleteTooltip", "삭제");
-
-            ToolTipService.SetToolTip(ExplorerUpButton, getString("ExplorerUpTooltip", "상위 폴더"));
-            var selectFolderText = getString("ExplorerSelectFolder", "폴더 선택...");
-            ToolTipService.SetToolTip(ExplorerSelectFolderButton, selectFolderText);
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerSelectFolderButton, selectFolderText);
-            ToolTipService.SetToolTip(ExplorerCreateFolderButton, getString("ExplorerCreateFolderTooltip", "새 폴더"));
-            ToolTipService.SetToolTip(ExplorerRefreshButton, getString("ExplorerRefreshTooltip", "새로고침"));
-            ToolTipService.SetToolTip(ExplorerSortButton, getString("ExplorerSortName", "이름순 정렬"));
-            var openInWindowsExplorerText = getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기");
-            ToolTipService.SetToolTip(ExplorerOpenInWindowsButton, openInWindowsExplorerText);
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerOpenInWindowsButton, openInWindowsExplorerText);
-
-            ExplorerFilterBox.PlaceholderText = getString("ExplorerFilterPlaceholder", "파일명 필터 (하위 폴더 포함)...");
-
-            var homeFolderText = getString("ExplorerHomeFolderTooltip", "홈 폴더로 이동");
-            ToolTipService.SetToolTip(ExplorerHomeButton, homeFolderText);
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerHomeButton, homeFolderText);
-
-            var treeModeText = getString("ExplorerTreeModeTooltip", "트리 모드");
-            ToolTipService.SetToolTip(ExplorerTreeModeButton, treeModeText);
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerTreeModeButton, treeModeText);
-
-            FavoritesFileTab.Content = getString("FavoritesFileTab", "파일");
-            FavoritesFolderTab.Content = getString("FavoritesFolderTab", "폴더");
-            RecentFileTab.Content = getString("RecentFileTab", "파일");
-            RecentFolderTab.Content = getString("RecentFolderTab", "폴더");
-
-            RecentFilesHeaderText.Text = getString("RecentFilesHeader", "최근 파일");
-
-            SearchHeaderText.Text = getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
-            SearchQueryInput.PlaceholderText = getString("SearchPlaceholder", "검색어 입력...");
-            ReplaceQueryInput.PlaceholderText = getString("ReplacePlaceholder", "바꿀 단어 입력...");
-            ToolTipService.SetToolTip(SearchMatchCaseToggle, getString("SearchMatchCaseTooltip", "대소문자 구분"));
-            ToolTipService.SetToolTip(SearchWholeWordToggle, getString("SearchWholeWordTooltip", "단어 단위"));
-            ToolTipService.SetToolTip(SearchRegexToggle, getString("SearchRegexTooltip", "정규식 검색"));
-            SearchAllButton.Content = getString("SearchAllFiles", "전체 검색");
-            ReplaceAllButton.Content = getString("ReplaceAllFiles", "모두 바꾸기");
-            ReplaceOneTooltip = getString("SearchReplaceOneTooltip", "이 항목만 바꾸기");
-            var gitRestoreFileTooltipVal = getString("GitRestoreFile", "파일 복원");
-
-            if (Resources.TryGetValue("LocBridge", out var bridgeObj) && bridgeObj is LocalizationBridge bridge)
-            {
-                bridge.SnippetEditTooltip = SnippetEditTooltip;
-                bridge.SnippetDeleteTooltip = SnippetDeleteTooltip;
-                bridge.ReplaceOneTooltip = ReplaceOneTooltip;
-                bridge.GitRestoreFileTooltip = gitRestoreFileTooltipVal;
-            }
-
-            GitHeaderText.Text = getString("GitRepoHeader", "Git 저장소 관리");
-            var gitRepoPathLabel = getString("GitRepoPathLabel", "경로");
-            ToolTipService.SetToolTip(GitRepoPathText, gitRepoPathLabel);
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(GitRepoPathText, gitRepoPathLabel);
-            GitInitRepoButton.Content = getString("GitCreateRepo", "Git 생성");
-            ToolTipService.SetToolTip(GitInitRepoButton, getString("GitCreateRepoTooltip", "Git 저장소 생성"));
-            GitBranchesCombo.PlaceholderText = getString("GitBranchPlaceholder", "브랜치 목록");
-            GitCommitMessageInput.PlaceholderText = getString("GitCommitPlaceholder", "커밋 메시지 입력...");
-            GitCommitButton.Content = getString("GitCommit", "커밋 (Commit)");
-            GitStageAllButton.Content = getString("GitStageAll", "전체 Stage");
-            GitRestoreAllButton.Content = getString("GitRestoreAll", "전체 Restore");
-            GitPushButton.Content = getString("GitPush", "Push");
-            ToolTipService.SetToolTip(GitPushButton, getString("GitPushMenuTooltip", "Git 작업"));
-            GitPullMenuItem.Text = getString("GitPull", "Pull");
-            GitRebaseMenuItem.Text = getString("GitRebase", "Rebase");
-            GitCreateBranchMenuItem.Text = getString("GitCreateBranch", "Create Branch");
-            GitMergeMenuItem.Text = getString("GitMerge", "Merge Branch");
-            GitGcMenuItem.Text = "git gc";
-            GitHardResetMenuItem.Text = "hard reset";
-            GitPushForceMenuItem.Text = "push force";
-            GitRemoteButton.Content = getString("GitRemote", "Remote");
-            GitScpButton.Content = getString("GitScp", "S/C/P");
-            ToolTipService.SetToolTip(GitScpButton, getString("GitScpTooltip", "Stage/Commit/Push"));
-            var gitRefreshText = getString("GitRefresh", "새로고침");
-            GitRefreshButton.Content = new FontIcon { Glyph = "\xE72C", FontSize = 10 };
-            ToolTipService.SetToolTip(GitRefreshButton, gitRefreshText);
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(GitRefreshButton, gitRefreshText);
-            GitHistoryHeader.Text = getString("GitHistory", "과거 기록");
-
-            if (GitBranchStatus.IsNotDetectedTag(GitPanelBranchText.Tag))
-            {
-                GitPanelBranchText.Text = getString("GitNotDetected", "Git: 감지 안됨");
-            }
+            ExplorerView.Localize(getString, updateEmptyFolderStatus);
+            FavoritesView.Localize(getString);
+            RecentView.Localize(getString);
+            SearchView.Localize(getString);
+            GitView.Localize(getString);
+            SnippetsView.Localize(getString);
+            TocView.Localize(getString);
         }
 
         public int ShowPage(int index)
         {
             Grid[] pages =
             {
-                ExplorerSidebarPage,
-                FavoritesSidebarPage,
-                RecentSidebarPage,
-                SearchSidebarPage,
-                GitSidebarPage,
-                SnippetsSidebarPage,
-                TocSidebarPage
+                ExplorerView.Root,
+                FavoritesView.Root,
+                RecentView.Root,
+                SearchView.Root,
+                GitView.Root,
+                SnippetsView.Root,
+                TocView.Root
             };
 
             ToggleButton[] buttons =
@@ -366,214 +227,5 @@ namespace TxtAIEditor.Controls
         }
 
         private void OnLeftActivityClick(object sender, RoutedEventArgs e) => LeftActivityClick?.Invoke(sender, e);
-        private void OnExplorerUpClick(object sender, RoutedEventArgs e) => ExplorerUpClick?.Invoke(sender, e);
-        private void OnSelectFolderClick(object sender, RoutedEventArgs e) => SelectFolderClick?.Invoke(sender, e);
-        private void OnCreateFolderClick(object sender, RoutedEventArgs e) => CreateFolderClick?.Invoke(sender, e);
-        private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
-        private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
-        private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e) => OpenInWindowsExplorerClick?.Invoke(sender, e);
-        private void OnExplorerHomeClick(object sender, RoutedEventArgs e) => ExplorerHomeClick?.Invoke(sender, e);
-        private void OnExplorerTreeModeClick(object sender, RoutedEventArgs e) => ExplorerTreeModeClick?.Invoke(sender, e);
-        private void OnExplorerTreeExpanding(TreeView sender, TreeViewExpandingEventArgs e) => ExplorerTreeExpanding?.Invoke(sender, e);
-        private void OnExplorerTreeItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs e) => ExplorerTreeItemInvoked?.Invoke(sender, e);
-        private void OnExplorerTreeDragOver(object sender, DragEventArgs e) => ExplorerTreeDragOver?.Invoke(sender, e);
-        private void OnExplorerTreeDrop(object sender, DragEventArgs e) => ExplorerTreeDrop?.Invoke(sender, e);
-        private void OnFileListViewItemClick(object sender, ItemClickEventArgs e) => FileListViewItemClick?.Invoke(sender, e);
-        private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e) => FileListViewItemRightTapped?.Invoke(sender, e);
-        private void OnAddFileToFavoritesClick(object sender, RoutedEventArgs e) => AddFileToFavoritesClick?.Invoke(sender, e);
-        private void OnAddFolderToFavoritesClick(object sender, RoutedEventArgs e) => AddFolderToFavoritesClick?.Invoke(sender, e);
-        private void OnInsertMarkdownImageClick(object sender, RoutedEventArgs e) => InsertMarkdownImageClick?.Invoke(sender, e);
-        private void OnOpenExternalViewerClick(object sender, RoutedEventArgs e) => OpenExternalViewerClick?.Invoke(sender, e);
-        private void OnOpenWithDefaultProgramClick(object sender, RoutedEventArgs e) => OpenWithDefaultProgramClick?.Invoke(sender, e);
-        private void OnExtractArchiveToFolderClick(object sender, RoutedEventArgs e) => ExtractArchiveToFolderClick?.Invoke(sender, e);
-        private void OnCompressFolderToZipClick(object sender, RoutedEventArgs e) => CompressFolderToZipClick?.Invoke(sender, e);
-        private void OnCompressFolderToSevenZipClick(object sender, RoutedEventArgs e) => CompressFolderToSevenZipClick?.Invoke(sender, e);
-        private void OnCopyFileNameClick(object sender, RoutedEventArgs e) => CopyFileNameClick?.Invoke(sender, e);
-        private void OnCopyFilePathClick(object sender, RoutedEventArgs e) => CopyFilePathClick?.Invoke(sender, e);
-        private void OnCopyFolderPathClick(object sender, RoutedEventArgs e) => CopyFolderPathClick?.Invoke(sender, e);
-        private void OnRenameClick(object sender, RoutedEventArgs e) => RenameClick?.Invoke(sender, e);
-        private void OnDeleteClick(object sender, RoutedEventArgs e) => DeleteClick?.Invoke(sender, e);
-        private void OnFavoriteItemClick(object sender, ItemClickEventArgs e) => FavoriteItemClick?.Invoke(sender, e);
-        private void OnRemoveFavoriteClick(object sender, RoutedEventArgs e) => RemoveFavoriteClick?.Invoke(sender, e);
-        private void OnFavoritePinClick(object sender, RoutedEventArgs e) => FavoritePinClick?.Invoke(sender, e);
-        private void OnFavoritesTabClick(object sender, RoutedEventArgs e) => FavoritesTabClick?.Invoke(sender, e);
-        private void OnRecentTabClick(object sender, RoutedEventArgs e) => RecentTabClick?.Invoke(sender, e);
-        private void OnSnippetItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => SnippetItemDoubleTapped?.Invoke(sender, e);
-        private void OnDeleteSnippetClick(object sender, RoutedEventArgs e) => DeleteSnippetClick?.Invoke(sender, e);
-        private void OnEditSnippetClick(object sender, RoutedEventArgs e) => EditSnippetClick?.Invoke(sender, e);
-        private void OnAddSnippetClick(object sender, RoutedEventArgs e) => AddSnippetClick?.Invoke(sender, e);
-        private void OnExportSnippetsClick(object sender, RoutedEventArgs e) => ExportSnippetsClick?.Invoke(sender, e);
-        private void OnImportSnippetsClick(object sender, RoutedEventArgs e) => ImportSnippetsClick?.Invoke(sender, e);
-        private void OnResetSnippetsClick(object sender, RoutedEventArgs e) => ResetSnippetsClick?.Invoke(sender, e);
-        private void OnAutocompleteDictClick(object sender, RoutedEventArgs e) => AutocompleteDictClick?.Invoke(sender, e);
-        private void OnGitFileItemClick(object sender, ItemClickEventArgs e) => GitFileItemClick?.Invoke(sender, e);
-        private void OnGitStageToggleClick(object sender, RoutedEventArgs e) => GitStageToggleClick?.Invoke(sender, e);
-        private void OnGitRestoreFileClick(object sender, RoutedEventArgs e) => GitRestoreFileClick?.Invoke(sender, e);
-        private void OnGitCommitClick(object sender, RoutedEventArgs e) => GitCommitClick?.Invoke(sender, e);
-        private void OnGitStageAllClick(object sender, RoutedEventArgs e) => GitStageAllClick?.Invoke(sender, e);
-        private void OnGitRestoreAllClick(object sender, RoutedEventArgs e) => GitRestoreAllClick?.Invoke(sender, e);
-        private void OnGitPushClick(SplitButton sender, SplitButtonClickEventArgs e) => GitPushClick?.Invoke(sender, new RoutedEventArgs());
-        private void OnGitPullClick(object sender, RoutedEventArgs e) => GitPullClick?.Invoke(sender, e);
-        private void OnGitRebaseClick(object sender, RoutedEventArgs e) => GitRebaseClick?.Invoke(sender, e);
-        private void OnGitCreateBranchClick(object sender, RoutedEventArgs e) => GitCreateBranchClick?.Invoke(sender, e);
-        private void OnGitMergeClick(object sender, RoutedEventArgs e) => GitMergeClick?.Invoke(sender, e);
-        private void OnGitGcClick(object sender, RoutedEventArgs e) => GitGcClick?.Invoke(sender, e);
-        private void OnGitHardResetClick(object sender, RoutedEventArgs e) => GitHardResetClick?.Invoke(sender, e);
-        private void OnGitPushForceClick(object sender, RoutedEventArgs e) => GitPushForceClick?.Invoke(sender, e);
-        private void OnGitRemoteClick(object sender, RoutedEventArgs e) => GitRemoteClick?.Invoke(sender, e);
-        private void OnGitScpClick(object sender, RoutedEventArgs e) => GitScpClick?.Invoke(sender, e);
-        private void OnGitRefreshClick(object sender, RoutedEventArgs e) => GitRefreshClick?.Invoke(sender, e);
-        private void OnGitBranchSelectionChanged(object sender, SelectionChangedEventArgs e) => GitBranchSelectionChanged?.Invoke(sender, e);
-        private void OnGitHistoryListLoaded(object sender, RoutedEventArgs e)
-        {
-            if (_gitHistoryScrollViewer != null)
-            {
-                return;
-            }
-
-            _gitHistoryScrollViewer = FindVisualChild<ScrollViewer>(GitHistoryList);
-            if (_gitHistoryScrollViewer != null)
-            {
-                _gitHistoryScrollViewer.ViewChanged += OnGitHistoryScrollViewerViewChanged;
-            }
-            else
-            {
-                GitHistoryList.LayoutUpdated += OnGitHistoryListLayoutUpdated;
-            }
-        }
-
-        private void OnGitHistoryListLayoutUpdated(object? sender, object e)
-        {
-            if (_gitHistoryScrollViewer != null)
-            {
-                GitHistoryList.LayoutUpdated -= OnGitHistoryListLayoutUpdated;
-                return;
-            }
-
-            _gitHistoryScrollViewer = FindVisualChild<ScrollViewer>(GitHistoryList);
-            if (_gitHistoryScrollViewer != null)
-            {
-                GitHistoryList.LayoutUpdated -= OnGitHistoryListLayoutUpdated;
-                _gitHistoryScrollViewer.ViewChanged += OnGitHistoryScrollViewerViewChanged;
-            }
-        }
-
-        private void OnGitHistoryScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
-        {
-            if (sender is not ScrollViewer scrollViewer || scrollViewer.ScrollableHeight <= 0)
-            {
-                return;
-            }
-
-            const double BottomLoadThreshold = 24;
-            if (scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - BottomLoadThreshold)
-            {
-                GitHistoryScrolledToEnd?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        private void OnGitHistoryItemClick(object sender, ItemClickEventArgs e) => GitHistoryItemClick?.Invoke(sender, e);
-        private void OnGitInitRepoClick(object sender, RoutedEventArgs e) => GitInitRepoClick?.Invoke(sender, e);
-        private void OnSearchQueryInputKeyDown(object sender, KeyRoutedEventArgs e) => SearchQueryInputKeyDown?.Invoke(sender, e);
-        private void OnSearchAllFilesClick(object sender, RoutedEventArgs e) => SearchAllFilesClick?.Invoke(sender, e);
-        private void OnReplaceAllClick(object sender, RoutedEventArgs e) => ReplaceAllClick?.Invoke(sender, e);
-        private void OnReplaceOneClick(object sender, RoutedEventArgs e) => ReplaceOneClick?.Invoke(sender, e);
-        private void OnSearchResultItemClick(object sender, ItemClickEventArgs e) => SearchResultItemClick?.Invoke(sender, e);
-        private void OnRecentFileItemClick(object sender, ItemClickEventArgs e) => RecentFileItemClick?.Invoke(sender, e);
-        private void OnRemoveRecentFileClick(object sender, RoutedEventArgs e) => RemoveRecentFileClick?.Invoke(sender, e);
-        private void OnTocItemClick(object sender, ItemClickEventArgs e) => TocItemClick?.Invoke(sender, e);
-        private void OnExplorerFilterTextChanged(object sender, TextChangedEventArgs e) => ExplorerFilterTextChanged?.Invoke(sender, e);
-        private void OnFileListViewDragOver(object sender, DragEventArgs e) => FileListViewDragOver?.Invoke(sender, e);
-        private void OnFileListViewDrop(object sender, DragEventArgs e) => FileListViewDrop?.Invoke(sender, e);
-        private void OnFileListViewItemDragOver(object sender, DragEventArgs e) => FileListViewItemDragOver?.Invoke(sender, e);
-        private void OnFileListViewItemDrop(object sender, DragEventArgs e) => FileListViewItemDrop?.Invoke(sender, e);
-
-        private static T? FindVisualChild<T>(DependencyObject parent)
-            where T : DependencyObject
-        {
-            int childCount = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < childCount; i++)
-            {
-                DependencyObject child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T typedChild)
-                {
-                    return typedChild;
-                }
-
-                T? descendant = FindVisualChild<T>(child);
-                if (descendant != null)
-                {
-                    return descendant;
-                }
-            }
-
-            return null;
-        }
-    }
-
-    public class LocalizationBridge : System.ComponentModel.INotifyPropertyChanged
-    {
-        private string _snippetEditTooltip = "수정";
-        private string _snippetDeleteTooltip = "삭제";
-        private string _replaceOneTooltip = "이 항목만 바꾸기";
-
-        public string SnippetEditTooltip
-        {
-            get => _snippetEditTooltip;
-            set
-            {
-                if (_snippetEditTooltip != value)
-                {
-                    _snippetEditTooltip = value;
-                    OnPropertyChanged(nameof(SnippetEditTooltip));
-                }
-            }
-        }
-
-        public string SnippetDeleteTooltip
-        {
-            get => _snippetDeleteTooltip;
-            set
-            {
-                if (_snippetDeleteTooltip != value)
-                {
-                    _snippetDeleteTooltip = value;
-                    OnPropertyChanged(nameof(SnippetDeleteTooltip));
-                }
-            }
-        }
-
-        public string ReplaceOneTooltip
-        {
-            get => _replaceOneTooltip;
-            set
-            {
-                if (_replaceOneTooltip != value)
-                {
-                    _replaceOneTooltip = value;
-                    OnPropertyChanged(nameof(ReplaceOneTooltip));
-                }
-            }
-        }
-
-        private string _gitRestoreFileTooltip = "파일 복원";
-        public string GitRestoreFileTooltip
-        {
-            get => _gitRestoreFileTooltip;
-            set
-            {
-                if (_gitRestoreFileTooltip != value)
-                {
-                    _gitRestoreFileTooltip = value;
-                    OnPropertyChanged(nameof(GitRestoreFileTooltip));
-                }
-            }
-        }
-
-        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
-        }
     }
 }

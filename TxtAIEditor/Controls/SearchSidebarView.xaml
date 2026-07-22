@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TxtAIEditor.Controls.SearchSidebarView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:TxtAIEditor.Core.Models"
+    xmlns:local="using:TxtAIEditor.Controls">
+    <UserControl.Resources>
+        <local:LocalizationBridge x:Key="LocBridge"/>
+    </UserControl.Resources>
+    <Grid x:Name="RootGrid" Padding="0,10,0,10" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/> <!-- Form Inputs -->
+                                    <RowDefinition Height="*"/>    <!-- Results -->
+                                </Grid.RowDefinitions>
+                                
+                                <StackPanel Grid.Row="0" Spacing="8" Margin="10,0,10,10">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <TextBlock x:Name="SearchHeaderText" Text="폴더 전체 검색 및 바꾸기" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                                        <Ellipse x:Name="SearchProgressDot" Width="7" Height="7" Fill="#2FB344" Visibility="Collapsed" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBox x:Name="SearchQueryInput" PlaceholderText="검색어 입력..." KeyDown="OnSearchQueryInputKeyDown" Height="32" FontSize="12" FontFamily="Segoe UI, Malgun Gothic" VerticalContentAlignment="Center" Padding="10,8,10,0" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
+                                    <TextBox x:Name="ReplaceQueryInput" PlaceholderText="바꿀 단어 입력..." Height="32" FontSize="12" FontFamily="Segoe UI, Malgun Gothic" VerticalContentAlignment="Center" Padding="10,8,10,0" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
+                                    
+                                    <Grid ColumnSpacing="5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ToggleButton x:Name="SearchMatchCaseToggle" Content="Aa" ToolTipService.ToolTip="대소문자 구분" HorizontalAlignment="Stretch" FontSize="11"/>
+                                        <ToggleButton x:Name="SearchWholeWordToggle" Content="[ab]" Grid.Column="1" ToolTipService.ToolTip="단어 단위" HorizontalAlignment="Stretch" FontSize="11"/>
+                                        <ToggleButton x:Name="SearchRegexToggle" Content=".*" Grid.Column="2" ToolTipService.ToolTip="정규식 검색" HorizontalAlignment="Stretch" FontSize="11"/>
+                                    </Grid>
+     
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="SearchAllButton" Content="전체 검색" HorizontalAlignment="Stretch" Click="OnSearchAllFilesClick" Style="{StaticResource AccentButtonStyle}" FontSize="11"/>
+                                        <Button x:Name="ReplaceAllButton" Content="모두 바꾸기" Grid.Column="1" HorizontalAlignment="Stretch" Click="OnReplaceAllClick" FontSize="11"/>
+                                    </Grid>
+                                </StackPanel>
+    
+                                <ListView x:Name="SearchResultsList" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnSearchResultItemClick">
+                                    <ListView.GroupStyle>
+                                        <GroupStyle>
+                                            <GroupStyle.HeaderTemplate>
+                                                <DataTemplate x:DataType="models:SearchResultGroup">
+                                                    <Grid Padding="8,4,8,4" Background="{ThemeResource SystemControlBackgroundListLowBrush}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <FontIcon Glyph="&#xE7C3;" FontSize="11" Margin="0,0,6,0" Foreground="{ThemeResource SystemControlForegroundAccentBrush}" VerticalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" ToolTipService.ToolTip="{x:Bind Path}">
+                                                            <TextBlock Text="{x:Bind FileName}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{x:Bind RelativeDirectory}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <Border Grid.Column="2" Background="{ThemeResource SystemControlBackgroundAccentBrush}" CornerRadius="10" Padding="6,1,6,1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind MatchCount, Mode=OneWay}" FontSize="8" FontWeight="Bold" Foreground="White"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </GroupStyle.HeaderTemplate>
+                                        </GroupStyle>
+                                    </ListView.GroupStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:SearchResultItem">
+                                            <Grid Padding="12,3,0,3">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind LineHeader}" FontWeight="SemiBold" FontSize="10" Foreground="{ThemeResource SystemControlForegroundAccentBrush}"/>
+                                                    <TextBlock Text="{x:Bind LineContent}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="&#xE194;" FontFamily="Segoe MDL2 Assets" Background="Transparent" BorderBrush="Transparent" Click="OnReplaceOneClick" Tag="{x:Bind}" Padding="4" Margin="5,0,0,0" VerticalAlignment="Center" Visibility="{x:Bind ReplaceButtonVisibility}" ToolTipService.ToolTip="{Binding Path=ReplaceOneTooltip, Source={StaticResource LocBridge}}" FontSize="11"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+    </Grid>
+</UserControl>

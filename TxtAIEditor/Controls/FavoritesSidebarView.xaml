@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TxtAIEditor.Controls.FavoritesSidebarView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid x:Name="RootGrid" Padding="0,10,0,10" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" x:Name="FavoritesHeaderText" Text="즐겨찾기 목록" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="10,0,0,8"/>
+                                <Grid Grid.Row="1" Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ToggleButton x:Name="FavoritesFileTab" Grid.Column="0" Content="파일" FontSize="13" Height="30" Padding="10,0" Margin="15,0,0,0" IsChecked="True" Click="OnFavoritesTabClick"/>
+                                    <ToggleButton x:Name="FavoritesFolderTab" Grid.Column="1" Content="폴더" FontSize="13" Height="30" Padding="10,0" Margin="6,0,0,0" Click="OnFavoritesTabClick"/>
+                                </Grid>
+                                <ListView x:Name="FavoritesListView" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFavoriteItemClick" AllowDrop="True" CanDragItems="True" CanReorderItems="True">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding Path}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="13" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <FontIcon.Foreground>
+                                                        <SolidColorBrush Color="{Binding IconColor}"/>
+                                                    </FontIcon.Foreground>
+                                                </FontIcon>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Path}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="2" x:Name="FavoritePinButton" Background="Transparent" BorderBrush="Transparent" Padding="3" VerticalAlignment="Center" Opacity="{Binding PinOpacity}" Click="OnFavoritePinClick" Tag="{Binding}" ToolTipService.ToolTip="고정">
+                                                    <FontIcon Glyph="&#xE718;" FontSize="10"/>
+                                                </Button>
+                                                <Button Grid.Column="3" Background="Transparent" BorderBrush="Transparent" Click="OnRemoveFavoriteClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" ToolTipService.ToolTip="즐겨찾기에서 제거">
+                                                    <FontIcon Glyph="&#xE74D;" FontSize="10"/>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+    </Grid>
+</UserControl>
