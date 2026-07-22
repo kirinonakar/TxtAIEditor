@@ -36,6 +36,7 @@ namespace TxtAIEditor.Core.Services
         private readonly Button _visionFallbackRefreshModelsButton;
         private readonly TextBlock _modelStatusText;
         private readonly Button _tokenUsageStatsButton;
+        private readonly Button _tokenUsageHtmlButton;
         private readonly Button _tokenUsageResetButton;
         private readonly TextBlock _tokenUsageSummaryText;
         private readonly Slider _maxToolCallsSlider;
@@ -84,6 +85,11 @@ namespace TxtAIEditor.Core.Services
             _tokenUsageStatsButton = new Button
             {
                 Content = getString("SettingsLlmTokenUsageStatsButton", "token 통계 에디터에서 열기"),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            _tokenUsageHtmlButton = new Button
+            {
+                Content = getString("SettingsLlmTokenUsageHtmlButton", "HTML로 보기"),
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
             _tokenUsageResetButton = new Button
@@ -260,6 +266,7 @@ namespace TxtAIEditor.Core.Services
             SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTokenUsageStatsLabel", "token 통계"));
             section.Children.Add(_tokenUsageSummaryText);
             section.Children.Add(_tokenUsageStatsButton);
+            section.Children.Add(_tokenUsageHtmlButton);
             section.Children.Add(_tokenUsageResetButton);
             return section;
         }
@@ -293,6 +300,7 @@ namespace TxtAIEditor.Core.Services
             _refreshModelsButton.Click += async (_, __) => await RefreshModelsAsync();
             _visionFallbackRefreshModelsButton.Click += async (_, __) => await RefreshVisionFallbackModelsAsync();
             _tokenUsageStatsButton.Click += (_, __) => OpenTokenUsageStatsInEditor();
+            _tokenUsageHtmlButton.Click += (_, __) => OpenTokenUsageStatsInBrowser();
             _tokenUsageResetButton.Click += (_, __) =>
             {
                 _llmService.ResetTokenUsageStats();
@@ -304,6 +312,22 @@ namespace TxtAIEditor.Core.Services
         {
             string title = $"{_getString("SettingsLlmTokenUsageStatsLabel", "token 통계")}.txt";
             OpenTextInEditorRequested?.Invoke(title, BuildTokenUsageStatsDetails());
+        }
+
+        private void OpenTokenUsageStatsInBrowser()
+        {
+            try
+            {
+                LlmTokenUsageHtmlReportService.CreateAndOpen(
+                    _llmService.TokenUsageStats,
+                    _getString);
+            }
+            catch (Exception ex)
+            {
+                _tokenUsageSummaryText.Text = string.Format(
+                    _getString("SettingsLlmTokenUsageHtmlFailedFormat", "HTML 통계를 열 수 없습니다: {0}"),
+                    ex.Message);
+            }
         }
 
         private void RefreshTokenUsageStatsDisplay()

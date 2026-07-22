@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title></title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f4f6fa; --surface: #fff; --surface-soft: #f8faff; --text: #172033;
+  --text-soft: #667085; --text-faint: #98a2b3; --border: #e4e9f2; --border-strong: #d7deea;
+  --primary: #2864dc; --primary-soft: #dfeaff; --cyan: #0f9bb5; --green: #16a46c;
+  --orange: #e78324; --red: #dc4c5a; --purple: #7656d6;
+  --shadow-sm: 0 1px 2px rgba(16,24,40,.04); --shadow-md: 0 12px 30px rgba(27,42,73,.07);
+}
+html[data-theme="dark"] {
+  --bg: #0d1118; --surface: #151b25; --surface-soft: #111721; --text: #eef2f8;
+  --text-soft: #a7b0c0; --text-faint: #748096; --border: #283142; --border-strong: #364156;
+  --primary: #78a8ff; --primary-soft: #1d3152; --cyan: #56c4d7; --green: #56c991;
+  --orange: #f2a454; --red: #ef7b86; --purple: #a38af0;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.18); --shadow-md: 0 18px 38px rgba(0,0,0,.24);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); font-family: Inter,"Segoe UI","Malgun Gothic",system-ui,sans-serif; -webkit-font-smoothing: antialiased; transition: background-color 180ms ease,color 180ms ease; }
+button { font: inherit; }
+.page-shell { width: min(1420px,calc(100% - 48px)); margin: 0 auto; padding: 34px 0 56px; }
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand-mark { display: grid; place-items: center; width: 46px; height: 46px; flex: 0 0 46px; border-radius: 14px; color: #fff; background: linear-gradient(145deg,#2e6de8,#204db7); box-shadow: 0 10px 24px rgba(40,100,220,.25); }
+.brand-mark svg { width: 24px; height: 24px; }
+h1 { margin: 0; font-size: clamp(24px,2.4vw,32px); line-height: 1.18; letter-spacing: -.035em; }
+.subtitle { margin: 7px 0 0; color: var(--text-soft); font-size: 14px; line-height: 1.55; }
+.header-actions { display: flex; align-items: center; gap: 10px; }
+.period-badge { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); color: var(--text-soft); font-size: 13px; white-space: nowrap; }
+.period-badge svg { width: 16px; height: 16px; color: var(--primary); }
+.icon-button { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--border); border-radius: 12px; color: var(--text-soft); background: var(--surface); box-shadow: var(--shadow-sm); cursor: pointer; transition: transform 140ms ease,border-color 140ms ease,color 140ms ease; }
+.icon-button:hover { transform: translateY(-1px); border-color: var(--border-strong); color: var(--text); }
+.icon-button:focus-visible { outline: 3px solid var(--primary-soft); outline-offset: 2px; }
+.icon-button svg { width: 19px; height: 19px; }
+.summary-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 15px; margin-bottom: 30px; }
+.metric-card { position: relative; min-height: 150px; overflow: hidden; padding: 22px; border: 1px solid var(--border); border-radius: 15px; background: var(--surface); box-shadow: var(--shadow-sm); transition: transform 160ms ease,box-shadow 160ms ease,border-color 160ms ease; }
+.metric-card:hover { transform: translateY(-2px); border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.metric-card::after { content: ""; position: absolute; right: -42px; bottom: -54px; width: 128px; height: 128px; border-radius: 50%; background: var(--metric-tint); opacity: .55; }
+.metric-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.metric-label { color: var(--text-soft); font-size: 13px; font-weight: 650; }
+.metric-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: var(--metric-color); background: var(--metric-tint); }
+.metric-icon svg { width: 17px; height: 17px; }
+.metric-value { margin-top: 18px; font-size: clamp(27px,2.5vw,35px); font-weight: 760; line-height: 1; letter-spacing: -.045em; }
+.metric-note { position: relative; z-index: 1; margin-top: 11px; color: var(--text-faint); font-size: 12px; }
+.empty-state { display: none; margin: 0 0 28px; padding: 24px; border: 1px dashed var(--border-strong); border-radius: 15px; background: var(--surface); text-align: center; }
+.empty-state.visible { display: block; }
+.empty-state strong { display: block; margin-bottom: 6px; }
+.empty-state span { color: var(--text-soft); font-size: 13px; }
+.section { margin-top: 34px; }
+.section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 15px; }
+.section-copy h2 { margin: 0; font-size: 19px; line-height: 1.3; letter-spacing: -.02em; }
+.section-copy p { margin: 6px 0 0; color: var(--text-soft); font-size: 13px; }
+.section-insights { display: flex; align-items: center; gap: 9px; color: var(--text-soft); font-size: 12px; }
+.insight { display: inline-flex; align-items: center; gap: 6px; min-height: 31px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.insight strong { color: var(--text); font-weight: 700; }
+.insight-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); }
+.chart-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.chart-card { min-width: 0; padding: 20px 20px 16px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-sm); }
+.chart-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.chart-title { margin: 0; font-size: 15px; font-weight: 720; line-height: 1.35; letter-spacing: -.015em; }
+.chart-description { margin: 5px 0 0; color: var(--text-faint); font-size: 12px; line-height: 1.45; }
+.unit { flex: 0 0 auto; padding: 5px 8px; border-radius: 8px; background: var(--surface-soft); color: var(--text-soft); font-size: 11px; font-weight: 650; }
+.chart-wrap { position: relative; height: 300px; }
+.chart-wrap.tall { height: 360px; }
+.model-layout { display: grid; grid-template-columns: minmax(0,.95fr) minmax(0,1.05fr); gap: 16px; }
+.model-layout .wide { grid-column: 1 / -1; }
+.legend-note { display: inline-flex; align-items: center; gap: 7px; color: var(--text-faint); font-size: 11px; }
+.legend-line { width: 20px; height: 3px; border-radius: 999px; background: var(--primary); }
+.footer { display: flex; justify-content: space-between; gap: 20px; margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--text-faint); font-size: 11px; }
+.footer-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+@media (max-width: 1020px) { .summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .model-layout { grid-template-columns: 1fr; } .model-layout .wide { grid-column: auto; } }
+@media (max-width: 760px) { .page-shell { width: min(100% - 28px,1420px); padding-top: 22px; } .topbar { margin-bottom: 24px; } .period-badge { display: none; } .chart-grid { grid-template-columns: 1fr; } .section-heading { align-items: flex-start; flex-direction: column; } .section-insights { width: 100%; overflow-x: auto; padding-bottom: 2px; } .chart-wrap { height: 280px; } .chart-wrap.tall { height: 330px; } }
+@media (max-width: 520px) { .summary-grid { grid-template-columns: 1fr; gap: 11px; } .metric-card { min-height: 128px; padding: 18px; } .metric-value { margin-top: 12px; } .chart-card { padding: 17px 14px 12px; border-radius: 16px; } .footer { flex-direction: column; gap: 8px; } .footer-meta { align-items: flex-start; } }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page-shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></div>
+      <div><h1 id="title"></h1><p class="subtitle" id="subtitle"></p></div>
+    </div>
+    <div class="header-actions">
+      <div class="period-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span id="periodBadge"></span></div>
+      <button class="icon-button" id="themeToggle" type="button"><svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></svg></button>
+    </div>
+  </header>
+
+  <section class="summary-grid" id="summaryGrid">
+    <article class="metric-card" style="--metric-color:var(--primary);--metric-tint:var(--primary-soft)"><div class="metric-top"><span class="metric-label" id="totalRequestsLabel"></span><span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span></div><div class="metric-value" id="totalRequests"></div><div class="metric-note" id="requestNote"></div></article>
+    <article class="metric-card" style="--metric-color:var(--purple);--metric-tint:color-mix(in srgb,var(--purple) 14%,transparent)"><div class="metric-top"><span class="metric-label" id="totalTokensLabel"></span><span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></span></div><div class="metric-value" id="totalTokens"></div><div class="metric-note" id="tokenNote"></div></article>
+    <article class="metric-card" style="--metric-color:var(--cyan);--metric-tint:color-mix(in srgb,var(--cyan) 14%,transparent)"><div class="metric-top"><span class="metric-label" id="cachedTokensLabel"></span><span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span></div><div class="metric-value" id="cachedTokens"></div><div class="metric-note" id="cachedTokensNote"></div></article>
+    <article class="metric-card" style="--metric-color:var(--green);--metric-tint:color-mix(in srgb,var(--green) 14%,transparent)"><div class="metric-top"><span class="metric-label" id="cacheRatioLabel"></span><span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7 10 17l-5-5M14 7h6v6"/></svg></span></div><div class="metric-value" id="cacheRatio"></div><div class="metric-note" id="cacheNote"></div></article>
+  </section>
+
+  <div class="empty-state" id="emptyState"><strong id="emptyTitle"></strong><span id="emptyDescription"></span></div>
+
+  <section class="section" aria-labelledby="dailyHeading">
+    <div class="section-heading"><div class="section-copy"><h2 id="dailyHeading"></h2><p id="dailyDescription"></p></div><div class="section-insights" id="dailyInsights"><span class="insight"><span class="insight-dot"></span><span id="peakRequestsLabel"></span> <strong id="peakRequest"></strong></span><span class="insight"><span class="insight-dot" style="background:var(--purple)"></span><span id="peakTokensLabel"></span> <strong id="peakToken"></strong></span></div></div>
+    <div class="chart-grid">
+      <article class="chart-card"><div class="chart-card-header"><div><h3 class="chart-title" id="requestCountTitle"></h3><p class="chart-description" id="dailyRequestsDescription"></p></div><span class="unit" id="countUnit1"></span></div><div class="chart-wrap"><canvas id="dailyRequests"></canvas></div></article>
+      <article class="chart-card"><div class="chart-card-header"><div><h3 class="chart-title" id="tokenUsageTitle"></h3><p class="chart-description" id="dailyTokensDescription"></p></div><span class="unit" id="millionUnit1"></span></div><div class="chart-wrap"><canvas id="dailyTokens"></canvas></div></article>
+      <article class="chart-card"><div class="chart-card-header"><div><h3 class="chart-title" id="inputOutputTitle"></h3><p class="chart-description" id="inputOutputDescription"></p></div><span class="unit" id="millionUnit2"></span></div><div class="chart-wrap"><canvas id="dailyInOut"></canvas></div></article>
+      <article class="chart-card"><div class="chart-card-header"><div><h3 class="chart-title" id="cacheEfficiencyTitle"></h3><p class="chart-description" id="cacheEfficiencyDescription"></p></div><span class="unit">%</span></div><div class="chart-wrap"><canvas id="dailyCache"></canvas></div></article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="modelHeading">
+    <div class="section-heading"><div class="section-copy"><h2 id="modelHeading"></h2><p id="modelDescription"></p></div><div class="section-insights" id="modelInsights"><span class="insight"><span class="insight-dot" style="background:var(--green)"></span><span id="mostUsedModelLabel"></span> <strong id="mostUsedModel"></strong></span><span class="insight"><span class="insight-dot" style="background:var(--orange)"></span><span id="requestShareLabel"></span> <strong id="topModelShare"></strong></span></div></div>
+    <div class="model-layout">
+      <article class="chart-card"><div class="chart-card-header"><div><h3 class="chart-title" id="modelRequestsTitle"></h3><p class="chart-description" id="modelRequestsDescription"></p></div><span class="unit" id="countUnit2"></span></div><div class="chart-wrap tall"><canvas id="modelRequests"></canvas></div></article>
+      <article class="chart-card"><div class="chart-card-header"><div><h3 class="chart-title" id="modelTokensTitle"></h3><p class="chart-description" id="modelTokensDescription"></p></div><span class="unit" id="millionUnit3"></span></div><div class="chart-wrap tall"><canvas id="modelTokens"></canvas></div></article>
+      <article class="chart-card wide"><div class="chart-card-header"><div><h3 class="chart-title" id="modelInputOutputTitle"></h3><p class="chart-description" id="modelInputOutputDescription"></p></div><span class="legend-note"><span class="legend-line"></span><span id="horizontalAxisNote"></span></span></div><div class="chart-wrap tall"><canvas id="modelInOut"></canvas></div></article>
+    </div>
+  </section>
+
+  <footer class="footer"><span id="footerPeriod"></span><span class="footer-meta"><span id="footerProduct"></span><span id="generatedAt"></span></span></footer>
+</div>
+
+<script>
+const report = __TOKEN_USAGE_REPORT_DATA__;
+const stats = report.stats;
+const s = report.strings;
+const locale = report.culture || navigator.language;
+document.documentElement.lang = locale;
+document.title = s.title;
+
+const setText = (id, value) => { document.getElementById(id).textContent = value; };
+const format = (template, value) => template.replace('{0}', value);
+const number = value => new Intl.NumberFormat(locale).format(value || 0);
+const compact = value => new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(value || 0);
+const dateValue = period => new Date(`${period}${period.length === 7 ? '-01' : ''}T00:00:00`);
+const shortDate = period => new Intl.DateTimeFormat(locale, { month: 'numeric', day: period.length > 7 ? 'numeric' : undefined, year: period.length === 7 ? 'numeric' : undefined }).format(dateValue(period));
+const fullDate = period => new Intl.DateTimeFormat(locale, period.length === 7 ? { year: 'numeric', month: 'long' } : { year: 'numeric', month: 'short', day: 'numeric' }).format(dateValue(period));
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const days = stats.byDay || [];
+const models = stats.byProviderModel || [];
+const dayLabels = days.map(item => shortDate(item.period));
+const reqData = days.map(item => item.requestCount);
+const inData = days.map(item => item.promptTokens);
+const outData = days.map(item => item.completionTokens);
+const totalData = days.map(item => item.totalTokens);
+const cacheData = days.map(item => item.cachedTokens);
+const cacheRatio = stats.totalTokens ? stats.cachedTokens / stats.totalTokens * 100 : 0;
+const peakRequestIndex = reqData.length ? reqData.indexOf(Math.max(...reqData)) : -1;
+const peakTokenIndex = totalData.length ? totalData.indexOf(Math.max(...totalData)) : -1;
+const topModel = [...models].sort((a,b) => b.requestCount - a.requestCount)[0];
+const periodSource = days.length ? days : (stats.byMonth || []);
+const periodText = periodSource.length ? `${fullDate(periodSource[0].period)} — ${fullDate(periodSource[periodSource.length - 1].period)}` : '—';
+
+setText('title', s.title); setText('subtitle', s.subtitle); setText('periodBadge', periodText);
+document.getElementById('periodBadge').parentElement.setAttribute('aria-label', `${s.periodBadge}: ${periodText}`);
+setText('totalRequestsLabel', s.totalRequests); setText('totalRequests', number(stats.requestCount));
+setText('requestNote', format(s.dailyAverageFormat, compact(days.length ? Math.round(stats.requestCount / days.length) : stats.requestCount)));
+setText('totalTokensLabel', s.totalTokens); setText('totalTokens', compact(stats.totalTokens));
+setText('tokenNote', format(s.averagePerRequestFormat, compact(stats.requestCount ? Math.round(stats.totalTokens / stats.requestCount) : 0)));
+setText('cachedTokensLabel', s.cachedTokens); setText('cachedTokens', compact(stats.cachedTokens)); setText('cachedTokensNote', s.cachedTokensNote);
+setText('cacheRatioLabel', s.cacheRatio); setText('cacheRatio', `${cacheRatio.toFixed(1)}%`); setText('cacheNote', cacheRatio >= 70 ? s.cacheGood : s.cacheNeedsImprovement);
+setText('emptyTitle', s.noDataTitle); setText('emptyDescription', s.noDataDescription);
+setText('dailyHeading', s.dailyHeading); setText('dailyDescription', s.dailyDescription);
+setText('peakRequestsLabel', s.peakRequests); setText('peakTokensLabel', s.peakTokens);
+setText('requestCountTitle', s.requestCount); setText('dailyRequestsDescription', s.dailyRequestsDescription);
+setText('tokenUsageTitle', s.tokenUsage); setText('dailyTokensDescription', s.dailyTokensDescription);
+setText('inputOutputTitle', s.inputOutput); setText('inputOutputDescription', s.inputOutputDescription);
+setText('cacheEfficiencyTitle', s.cacheEfficiency); setText('cacheEfficiencyDescription', s.cacheEfficiencyDescription);
+setText('modelHeading', s.modelHeading); setText('modelDescription', s.modelDescription);
+setText('mostUsedModelLabel', s.mostUsedModel); setText('requestShareLabel', s.requestShare);
+setText('modelRequestsTitle', s.modelRequests); setText('modelRequestsDescription', s.modelRequestsDescription);
+setText('modelTokensTitle', s.modelTokens); setText('modelTokensDescription', s.modelTokensDescription);
+setText('modelInputOutputTitle', s.modelInputOutput); setText('modelInputOutputDescription', s.modelInputOutputDescription);
+setText('horizontalAxisNote', s.horizontalAxisNote); setText('footerPeriod', format(s.footerPeriodFormat, periodText));
+setText('footerProduct', s.footerProduct); setText('generatedAt', format(s.generatedAtFormat, new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(report.generatedAt))));
+['countUnit1','countUnit2'].forEach(id => setText(id, s.countUnit));
+['millionUnit1','millionUnit2','millionUnit3'].forEach(id => setText(id, s.millionUnit));
+document.getElementById('summaryGrid').setAttribute('aria-label', s.summaryAria);
+document.getElementById('dailyInsights').setAttribute('aria-label', s.dailyInsightsAria);
+document.getElementById('modelInsights').setAttribute('aria-label', s.modelInsightsAria);
+
+if (peakRequestIndex >= 0) setText('peakRequest', `${dayLabels[peakRequestIndex]} · ${format(s.requestsFormat, number(reqData[peakRequestIndex]))}`);
+if (peakTokenIndex >= 0) setText('peakToken', `${dayLabels[peakTokenIndex]} · ${compact(totalData[peakTokenIndex])}`);
+if (topModel) {
+  setText('mostUsedModel', topModel.model);
+  setText('topModelShare', `${stats.requestCount ? (topModel.requestCount / stats.requestCount * 100).toFixed(1) : '0.0'}%`);
+}
+if (!stats.hasAny) {
+  document.getElementById('emptyState').classList.add('visible');
+  document.getElementById('dailyInsights').style.display = 'none';
+  document.getElementById('modelInsights').style.display = 'none';
+}
+
+const storedTheme = localStorage.getItem('token-dashboard-theme');
+const initialTheme = storedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+document.documentElement.dataset.theme = initialTheme;
+const themeToggle = document.getElementById('themeToggle');
+const themeIcon = document.getElementById('themeIcon');
+const charts = [];
+function updateThemeIcon(theme) {
+  themeIcon.innerHTML = theme === 'dark' ? '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>' : '<path d="M12 3a9 9 0 1 0 9 9c0-.34-.02-.67-.06-1A7 7 0 0 1 13 3.06 8.4 8.4 0 0 0 12 3Z"></path>';
+  const label = theme === 'dark' ? s.lightModeSwitch : s.darkModeSwitch;
+  themeToggle.setAttribute('aria-label', label); themeToggle.title = s.themeToggle;
+}
+updateThemeIcon(initialTheme);
+
+function themeTokens() { return { text:css('--text-soft'), faint:css('--text-faint'), grid:css('--border'), surface:css('--surface'), primary:css('--primary'), green:css('--green'), orange:css('--orange'), red:css('--red'), purple:css('--purple') }; }
+function plugins(showLegend=false) { const t=themeTokens(); return { legend:{display:showLegend,position:'top',align:'end',labels:{color:t.text,usePointStyle:true,pointStyle:'circle',boxWidth:7,boxHeight:7,padding:16,font:{size:11,weight:'600'}}}, tooltip:{backgroundColor:t.surface,titleColor:css('--text'),bodyColor:t.text,borderColor:t.grid,borderWidth:1,padding:11,cornerRadius:10,displayColors:true} }; }
+function scales(horizontal=false) { const t=themeTokens(); const common={grid:{color:t.grid,drawBorder:false},border:{display:false},ticks:{color:t.faint,padding:8,font:{size:11}}}; return horizontal ? {x:{...common,beginAtZero:true,ticks:{...common.ticks,callback:value=>compact(value)}},y:{...common,grid:{display:false},ticks:{...common.ticks,color:t.text,font:{size:11,weight:'600'}}}} : {x:{...common,grid:{display:false}},y:{...common,beginAtZero:true}}; }
+function addChart(id,factory) { if (!window.Chart) return; const chart=new Chart(document.getElementById(id),factory()); chart.$factory=factory; charts.push(chart); }
+if (window.Chart) {
+  Chart.defaults.font.family='Inter,"Segoe UI","Malgun Gothic",system-ui,sans-serif';
+  Chart.defaults.animation.duration=matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 550;
+  addChart('dailyRequests',()=>({type:'bar',data:{labels:dayLabels,datasets:[{label:s.requestCount,data:reqData,backgroundColor:`${themeTokens().primary}99`,hoverBackgroundColor:themeTokens().primary,borderRadius:7,borderSkipped:false,maxBarThickness:30}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:plugins(false),scales:scales(false)}}));
+  addChart('dailyTokens',()=>({type:'line',data:{labels:dayLabels,datasets:[{label:s.totalTokens,data:totalData.map(v=>v/1e6),borderColor:themeTokens().purple,backgroundColor:`${themeTokens().purple}18`,fill:true,tension:.36,borderWidth:2.2,pointRadius:3.5,pointBackgroundColor:themeTokens().surface}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:plugins(false),scales:{...scales(false),y:{...scales(false).y,ticks:{...scales(false).y.ticks,callback:v=>`${v}M`}}}}}));
+  addChart('dailyInOut',()=>({type:'bar',data:{labels:dayLabels,datasets:[{label:s.input,data:inData.map(v=>v/1e6),backgroundColor:`${themeTokens().primary}cc`,borderRadius:5,maxBarThickness:22},{label:s.output,data:outData.map(v=>v/1e6),backgroundColor:`${themeTokens().red}b8`,borderRadius:5,maxBarThickness:22}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:plugins(true),scales:{...scales(false),y:{...scales(false).y,ticks:{...scales(false).y.ticks,callback:v=>`${v}M`}}}}}));
+  addChart('dailyCache',()=>{const ratios=totalData.map((v,i)=>v?cacheData[i]/v*100:0);const t=themeTokens();return {type:'bar',data:{labels:dayLabels,datasets:[{label:s.cacheRatio,data:ratios,backgroundColor:ratios.map(v=>v>=70?`${t.green}d9`:v>=50?`${t.orange}d9`:`${t.red}c7`),borderRadius:7,borderSkipped:false,maxBarThickness:30}]},options:{responsive:true,maintainAspectRatio:false,plugins:plugins(false),scales:{...scales(false),y:{...scales(false).y,max:100,ticks:{...scales(false).y.ticks,callback:v=>`${v}%`}}}}};});
+  const palette=['#2864dc','#7656d6','#0f9bb5','#16a46c','#e78324','#dc4c5a','#667085','#8c6bd8','#3e89db','#54a578'];
+  const namedModels=models.map((item,index)=>({...item,label:item.provider?`${item.provider} / ${item.model}`:item.model,color:palette[index%palette.length]}));
+  const top8=[...namedModels].sort((a,b)=>b.requestCount-a.requestCount).slice(0,8);
+  addChart('modelRequests',()=>({type:'bar',data:{labels:top8.map(x=>x.label),datasets:[{label:s.requestCount,data:top8.map(x=>x.requestCount),backgroundColor:top8.map((x,i)=>i===0?themeTokens().primary:`${x.color}b8`),borderRadius:7,borderSkipped:false,maxBarThickness:26}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:plugins(false),scales:scales(true)}}));
+  const tokenModels=[...namedModels].filter(x=>x.totalTokens>=1000).sort((a,b)=>b.totalTokens-a.totalTokens);
+  addChart('modelTokens',()=>({type:'bar',data:{labels:tokenModels.map(x=>x.label),datasets:[{label:s.totalTokens,data:tokenModels.map(x=>x.totalTokens/1e6),backgroundColor:tokenModels.map((x,i)=>i===0?themeTokens().purple:`${x.color}b8`),borderRadius:7,borderSkipped:false,maxBarThickness:24}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:plugins(false),scales:{...scales(true),x:{...scales(true).x,ticks:{...scales(true).x.ticks,callback:v=>`${v}M`}}}}}));
+  const top10=[...namedModels].filter(x=>x.totalTokens>0).sort((a,b)=>b.totalTokens-a.totalTokens).slice(0,10);
+  addChart('modelInOut',()=>({type:'bar',data:{labels:top10.map(x=>x.label),datasets:[{label:s.input,data:top10.map(x=>x.promptTokens/1e6),backgroundColor:`${themeTokens().primary}d6`,borderRadius:5,maxBarThickness:20},{label:s.output,data:top10.map(x=>x.completionTokens/1e6),backgroundColor:`${themeTokens().red}c2`,borderRadius:5,maxBarThickness:20}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:plugins(true),scales:{...scales(true),x:{...scales(true).x,ticks:{...scales(true).x.ticks,callback:v=>`${v}M`}}}}}));
+}
+themeToggle.addEventListener('click',()=>{const next=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=next;localStorage.setItem('token-dashboard-theme',next);updateThemeIcon(next);requestAnimationFrame(()=>charts.forEach((chart,index)=>{const canvas=chart.canvas;const factory=chart.$factory;chart.destroy();const rebuilt=new Chart(canvas,factory());rebuilt.$factory=factory;charts[index]=rebuilt;}));});
+</script>
+</body>
+</html>
