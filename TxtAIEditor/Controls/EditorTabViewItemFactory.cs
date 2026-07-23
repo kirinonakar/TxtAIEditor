@@ -241,18 +241,28 @@ namespace TxtAIEditor.Controls
                     folderPath,
                     CoreWebView2HostResourceAccessKind.Allow);
 
-                if (contentKind == ViewerContentKind.Image)
+                string sourceUrl;
+                string extension = Path.GetExtension(fileName);
+                if (contentKind == ViewerContentKind.Image &&
+                    (extension.Equals(".tif", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".tiff", StringComparison.OrdinalIgnoreCase)))
                 {
-                    coreWebView.AddWebResourceRequestedFilter(
-                        $"https://{ImageViewerHostName}/*",
-                        CoreWebView2WebResourceContext.All);
-
-                    string capturedFolderPath = folderPath;
-                    coreWebView.WebResourceRequested += (sender, args) =>
-                        OnImageViewerWebResourceRequested(sender, args, capturedFolderPath);
+                    using var pngStream = await ConvertTiffToPngStreamAsync(filePath);
+                    if (pngStream != null)
+                    {
+                        string base64 = Convert.ToBase64String(pngStream.ToArray());
+                        sourceUrl = $"data:image/png;base64,{base64}";
+                    }
+                    else
+                    {
+                        sourceUrl = $"https://{hostName}/{Uri.EscapeDataString(fileName)}";
+                    }
+                }
+                else
+                {
+                    sourceUrl = $"https://{hostName}/{Uri.EscapeDataString(fileName)}";
                 }
 
-                string sourceUrl = $"https://{hostName}/{Uri.EscapeDataString(fileName)}";
                 string html = contentKind switch
                 {
                     ViewerContentKind.Image => BuildImageViewerHtml(sourceUrl, backgroundColor),
@@ -264,48 +274,6 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to load viewer source: {ex.Message}");
-            }
-        }
-
-        private static async void OnImageViewerWebResourceRequested(
-            CoreWebView2 sender,
-            CoreWebView2WebResourceRequestedEventArgs args,
-            string folderPath)
-        {
-            try
-            {
-                var uriObj = new Uri(args.Request.Uri);
-                string relativePath = Uri.UnescapeDataString(uriObj.AbsolutePath.TrimStart('/'));
-                string extension = Path.GetExtension(relativePath);
-                if (!extension.Equals(".tif", StringComparison.OrdinalIgnoreCase) &&
-                    !extension.Equals(".tiff", StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                var deferral = args.GetDeferral();
-                try
-                {
-                    string fullPath = Path.Combine(folderPath, relativePath);
-                    MemoryStream? pngStream = await ConvertTiffToPngStreamAsync(fullPath);
-                    if (pngStream != null)
-                    {
-                        var response = sender.Environment.CreateWebResourceResponse(
-                            pngStream.AsRandomAccessStream(),
-                            200,
-                            "OK",
-                            "Content-Type: image/png");
-                        args.Response = response;
-                    }
-                }
-                finally
-                {
-                    deferral.Complete();
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to intercept Tiff web resource: {ex.Message}");
             }
         }
 
@@ -322,24 +290,16 @@ namespace TxtAIEditor.Controls
                 using IRandomAccessStream input = fileStream.AsRandomAccessStream();
                 BitmapDecoder decoder = await BitmapDecoder.CreateAsync(input);
 
-                PixelDataProvider pixelData = await decoder.GetPixelDataAsync(
-                    BitmapPixelFormat.Bgra8,
-                    BitmapAlphaMode.Premultiplied,
-                    new BitmapTransform(),
-                    ExifOrientationMode.RespectExifOrientation,
-                    ColorManagementMode.ColorManageToSRgb);
+                using SoftwareBitmap softwareBitmap = await decoder.GetSoftwareBitmapAsync();
+                bool isBgra8 = softwareBitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8 &&
+                               softwareBitmap.BitmapAlphaMode == BitmapAlphaMode.Premultiplied;
+                using SoftwareBitmap convertedBitmap = isBgra8
+                    ? softwareBitmap
+                    : SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
 
                 var output = new InMemoryRandomAccessStream();
                 BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, output);
-                encoder.SetPixelData(
-                    BitmapPixelFormat.Bgra8,
-                    BitmapAlphaMode.Premultiplied,
-                    decoder.OrientedPixelWidth,
-                    decoder.OrientedPixelHeight,
-                    decoder.DpiX,
-                    decoder.DpiY,
-                    pixelData.DetachPixelData());
-
+                encoder.SetSoftwareBitmap(convertedBitmap);
                 await encoder.FlushAsync();
                 output.Seek(0);
 
