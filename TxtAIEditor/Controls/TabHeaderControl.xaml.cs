@@ -48,6 +48,7 @@ namespace TxtAIEditor.Controls
             UpdateDirtyIndicator();
             UpdateLockIcon();
             UpdateArchiveIcon();
+            UpdateRemoteIcon();
             UpdateExternalPathIndicator();
 
             _tab.PropertyChanged += OnTabPropertyChanged;
@@ -161,6 +162,7 @@ namespace TxtAIEditor.Controls
             }
             else if (args.PropertyName == nameof(OpenedTab.FilePath) || args.PropertyName == nameof(OpenedTab.RemotePath))
             {
+                UpdateRemoteIcon();
                 UpdateExternalPathIndicator();
             }
         }
@@ -183,6 +185,13 @@ namespace TxtAIEditor.Controls
         private void UpdateArchiveIcon()
         {
             ArchiveIcon.Visibility = _tab?.IsArchiveEntry == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void UpdateRemoteIcon()
+        {
+            RemoteIcon.Visibility = _tab?.IsRemoteFile == true
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }

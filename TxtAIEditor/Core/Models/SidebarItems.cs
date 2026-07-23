@@ -15,6 +15,9 @@ namespace TxtAIEditor.Core.Models
         public bool IsFolder { get; set; } = false;
         public string IconGlyph => IsFolder ? "\uE8B7" : "\uE7C3";
 
+        public bool IsRemote => RemotePath.IsRemote(Path);
+        public Visibility RemoteIconVisibility => IsRemote ? Visibility.Visible : Visibility.Collapsed;
+
         public Windows.UI.Color IconColor => IsFolder
             ? Windows.UI.Color.FromArgb(255, 255, 195, 0)
             : GetFileIconColor();
@@ -46,6 +49,10 @@ namespace TxtAIEditor.Core.Models
         public bool IsFolder { get; set; } = false;
         public bool IsPinned { get; set; } = false;
         public string IconGlyph => IsFolder ? "\uE8B7" : "\uE734";
+
+        public bool IsRemote => RemotePath.IsRemote(Path);
+        public Visibility RemoteIconVisibility => IsRemote ? Visibility.Visible : Visibility.Collapsed;
+
         public Windows.UI.Color IconColor => IsFolder
             ? Windows.UI.Color.FromArgb(255, 255, 195, 0)
             : Windows.UI.Color.FromArgb(255, 255, 215, 0);

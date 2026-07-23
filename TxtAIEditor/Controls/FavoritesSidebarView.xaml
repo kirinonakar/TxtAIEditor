@@ -26,23 +26,25 @@
                                             <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding DisplayPath}">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="13" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                <FontIcon Grid.Column="0" Glyph="&#xE774;" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" Visibility="{Binding RemoteIconVisibility}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                                <FontIcon Grid.Column="1" Glyph="{Binding IconGlyph}" FontSize="13" Margin="0,0,8,0" VerticalAlignment="Center">
                                                     <FontIcon.Foreground>
                                                         <SolidColorBrush Color="{Binding IconColor}"/>
                                                     </FontIcon.Foreground>
                                                 </FontIcon>
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
                                                     <TextBlock Text="{Binding DisplayPath}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
-                                                <Button Grid.Column="2" x:Name="FavoritePinButton" Background="Transparent" BorderBrush="Transparent" Padding="3" VerticalAlignment="Center" Opacity="{Binding PinOpacity}" Click="OnFavoritePinClick" Tag="{Binding}" ToolTipService.ToolTip="고정">
+                                                <Button Grid.Column="3" x:Name="FavoritePinButton" Background="Transparent" BorderBrush="Transparent" Padding="3" VerticalAlignment="Center" Opacity="{Binding PinOpacity}" Click="OnFavoritePinClick" Tag="{Binding}" ToolTipService.ToolTip="고정">
                                                     <FontIcon Glyph="&#xE718;" FontSize="10"/>
                                                 </Button>
-                                                <Button Grid.Column="3" Background="Transparent" BorderBrush="Transparent" Click="OnRemoveFavoriteClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" ToolTipService.ToolTip="즐겨찾기에서 제거">
+                                                <Button Grid.Column="4" Background="Transparent" BorderBrush="Transparent" Click="OnRemoveFavoriteClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" ToolTipService.ToolTip="즐겨찾기에서 제거">
                                                     <FontIcon Glyph="&#xE74D;" FontSize="10"/>
                                                 </Button>
                                             </Grid>
