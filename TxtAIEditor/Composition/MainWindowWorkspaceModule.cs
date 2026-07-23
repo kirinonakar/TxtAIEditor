@@ -95,8 +95,17 @@ namespace TxtAIEditor.Composition
         public void SetExplorerTreeMode(bool enableTreeMode) =>
             Controllers.ExplorerNavigation.SetTreeMode(enableTreeMode);
 
-        public Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true) =>
-            Controllers.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel);
+        public async Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true)
+        {
+            if (RemotePath.IsRemote(folderPath))
+            {
+                await Controllers.ExplorerNavigation.NavigateRemoteVirtualPathAsync(folderPath, revealInLeftPanel);
+            }
+            else
+            {
+                await Controllers.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel);
+            }
+        }
 
         public void QueueGitStatusRefresh() =>
             Controllers.GitStatusRefresh.QueueRefresh();

@@ -896,7 +896,7 @@ namespace TxtAIEditor.Controls
             var item = GetExplorerItem(sender);
             if (item != null && !string.IsNullOrEmpty(item.Path))
             {
-                SetClipboardText(item.IsRemote ? item.RemotePath : item.Path);
+                SetClipboardText(item.IsRemote ? RemotePath.GetDisplayPath(item.RemotePath) : item.Path);
             }
         }
 
@@ -906,9 +906,9 @@ namespace TxtAIEditor.Controls
             if (item != null && !string.IsNullOrEmpty(item.Path))
             {
                 string folderPath = item.IsFolder
-                    ? item.IsRemote ? item.RemotePath : item.Path
+                    ? item.IsRemote ? RemotePath.GetDisplayPath(item.RemotePath) : item.Path
                     : item.IsRemote
-                        ? RemoteExplorerService.GetParentPath(item.RemotePath)
+                        ? RemotePath.GetDisplayPath(RemoteExplorerService.GetParentPath(item.RemotePath))
                         : Path.GetDirectoryName(item.Path) ?? string.Empty;
                 SetClipboardText(folderPath);
             }

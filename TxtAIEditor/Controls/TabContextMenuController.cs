@@ -64,32 +64,34 @@ namespace TxtAIEditor.Controls
         {
             var menu = new MenuFlyout();
             string? fileActionPath = GetFileActionPath(tab);
+            bool hasActionPath = !string.IsNullOrEmpty(fileActionPath) || !string.IsNullOrWhiteSpace(tab.RemotePath);
 
             var copyFileNameItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFileName", "파일이름 복사"), Icon = new SymbolIcon(Symbol.Copy) };
-            copyFileNameItem.IsEnabled = !string.IsNullOrEmpty(fileActionPath);
+            copyFileNameItem.IsEnabled = hasActionPath;
             copyFileNameItem.Click += (_, __) => CopyFileName(tab);
             menu.Items.Add(copyFileNameItem);
 
             var copyFilePathItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFilePath", "경로 복사"), Icon = new SymbolIcon(Symbol.Link) };
-            copyFilePathItem.IsEnabled = !string.IsNullOrEmpty(fileActionPath);
+            copyFilePathItem.IsEnabled = hasActionPath;
             copyFilePathItem.Click += (_, __) => CopyFilePath(tab);
             menu.Items.Add(copyFilePathItem);
 
             menu.Items.Add(new MenuFlyoutSeparator());
 
             var addToFavoritesItem = new MenuFlyoutItem { Text = _getString("TabMenuAddToFavorites", "즐겨찾기 추가"), Icon = new SymbolIcon(Symbol.Favorite) };
-            addToFavoritesItem.IsEnabled = !string.IsNullOrEmpty(fileActionPath);
+            addToFavoritesItem.IsEnabled = hasActionPath;
             addToFavoritesItem.Click += async (_, __) => await AddBookmarkAsync(tab);
             menu.Items.Add(addToFavoritesItem);
 
             var openFolderItem = new MenuFlyoutItem { Text = _getString("TabMenuOpenFolder", "해당 폴더로 이동"), Icon = new SymbolIcon(Symbol.Folder) };
+            openFolderItem.IsEnabled = hasActionPath;
             openFolderItem.Click += async (_, __) => await OpenFolderAsync(tab);
             menu.Items.Add(openFolderItem);
 
             menu.Items.Add(new MenuFlyoutSeparator());
 
             var reloadItem = new MenuFlyoutItem { Text = _getString("TabMenuReload", "새로고침"), Icon = new SymbolIcon(Symbol.Refresh) };
-            reloadItem.IsEnabled = !string.IsNullOrEmpty(fileActionPath);
+            reloadItem.IsEnabled = hasActionPath;
             reloadItem.Click += async (_, __) => await _reloadTabAsync(tab, tabItem);
             menu.Items.Add(reloadItem);
 
@@ -186,6 +188,12 @@ namespace TxtAIEditor.Controls
 
         private static void CopyFileName(OpenedTab tab)
         {
+            if (!string.IsNullOrWhiteSpace(tab.RemotePath))
+            {
+                SetClipboardText(RemotePath.GetName(tab.RemotePath));
+                return;
+            }
+
             string? filePath = GetFileActionPath(tab);
             if (!string.IsNullOrEmpty(filePath))
             {
@@ -195,6 +203,12 @@ namespace TxtAIEditor.Controls
 
         private static void CopyFilePath(OpenedTab tab)
         {
+            if (!string.IsNullOrWhiteSpace(tab.RemotePath))
+            {
+                SetClipboardText(RemotePath.GetDisplayPath(tab.RemotePath));
+                return;
+            }
+
             string? filePath = GetFileActionPath(tab);
             if (!string.IsNullOrEmpty(filePath))
             {
@@ -218,6 +232,16 @@ namespace TxtAIEditor.Controls
 
         private async Task OpenFolderAsync(OpenedTab tab)
         {
+            if (!string.IsNullOrWhiteSpace(tab.RemotePath))
+            {
+                string parentRemotePath = RemotePath.GetParent(tab.RemotePath);
+                if (!string.IsNullOrEmpty(parentRemotePath))
+                {
+                    await _navigateExplorerToFolderAsync(parentRemotePath);
+                }
+                return;
+            }
+
             string? filePath = GetFileActionPath(tab);
             if (string.IsNullOrEmpty(filePath))
             {
