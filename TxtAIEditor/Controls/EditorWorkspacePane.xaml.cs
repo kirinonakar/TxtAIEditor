@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using Windows.Foundation;
 
 namespace TxtAIEditor.Controls
@@ -500,7 +501,10 @@ namespace TxtAIEditor.Controls
             QueueTabActionSpacerUpdate();
         }
 
-        public bool ToggleTerminal(Func<string> workingDirectoryProvider)
+        public bool ToggleTerminal(
+            Func<string> workingDirectoryProvider,
+            TerminalShellProfile? requestedProfile = null,
+            string? requestedAuthenticationPassword = null)
         {
             if (IsTerminalVisible)
             {
@@ -511,6 +515,15 @@ namespace TxtAIEditor.Controls
             EnsureTerminalPanelVisible();
             if (TerminalPane.HasSessions)
             {
+                if (requestedProfile != null &&
+                    !TerminalPane.TryActivateProfile(requestedProfile.Id))
+                {
+                    TerminalPane.OpenTerminal(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        requestedProfile,
+                        requestedAuthenticationPassword);
+                }
+
                 TerminalPane.ResumeNativeWindows();
                 TerminalPane.QueueEmbeddedTerminalResize();
             }
@@ -522,7 +535,17 @@ namespace TxtAIEditor.Controls
                     workingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                 }
 
-                TerminalPane.OpenTerminal(workingDirectory);
+                if (requestedProfile == null)
+                {
+                    TerminalPane.OpenTerminal(workingDirectory);
+                }
+                else
+                {
+                    TerminalPane.OpenTerminal(
+                        workingDirectory,
+                        requestedProfile,
+                        requestedAuthenticationPassword);
+                }
             }
 
             return true;

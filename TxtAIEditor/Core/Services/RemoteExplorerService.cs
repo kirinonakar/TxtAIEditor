@@ -25,7 +25,9 @@ namespace TxtAIEditor.Core.Services
         {
             return connection.Profile.ServerType switch
             {
-                RemoteServerType.Ssh or RemoteServerType.Sftp =>
+                RemoteServerType.Ssh =>
+                    await ListSshAsync(connection, path, cancellationToken),
+                RemoteServerType.Sftp =>
                     await ListSftpAsync(connection, path, cancellationToken),
                 RemoteServerType.Ftps =>
                     await ListFtpsAsync(connection, path, cancellationToken),
@@ -48,6 +50,8 @@ namespace TxtAIEditor.Core.Services
             switch (connection.Profile.ServerType)
             {
                 case RemoteServerType.Ssh:
+                    await DownloadScpAsync(connection, entry.FullPath, localPath, cancellationToken);
+                    break;
                 case RemoteServerType.Sftp:
                     await DownloadSftpAsync(connection, entry.FullPath, localPath, cancellationToken);
                     break;
@@ -78,6 +82,8 @@ namespace TxtAIEditor.Core.Services
             switch (connection.Profile.ServerType)
             {
                 case RemoteServerType.Ssh:
+                    await UploadScpAsync(connection, localPath, remotePath, cancellationToken);
+                    break;
                 case RemoteServerType.Sftp:
                     await RunSftpAsync(connection, client =>
                     {
@@ -129,6 +135,11 @@ namespace TxtAIEditor.Core.Services
             switch (connection.Profile.ServerType)
             {
                 case RemoteServerType.Ssh:
+                    await RunSshCommandAsync(
+                        connection,
+                        $"mkdir -- {QuoteShellArgument(NormalizeRemotePath(remotePath))}",
+                        cancellationToken);
+                    break;
                 case RemoteServerType.Sftp:
                     await RunSftpAsync(connection, client => client.CreateDirectory(remotePath), cancellationToken);
                     break;
@@ -159,6 +170,12 @@ namespace TxtAIEditor.Core.Services
             switch (connection.Profile.ServerType)
             {
                 case RemoteServerType.Ssh:
+                    string createPath = QuoteShellArgument(NormalizeRemotePath(remotePath));
+                    await RunSshCommandAsync(
+                        connection,
+                        $"if [ -e {createPath} ]; then echo 'A remote item with the same name already exists.' >&2; exit 1; fi; : > {createPath}",
+                        cancellationToken);
+                    break;
                 case RemoteServerType.Sftp:
                     await RunSftpAsync(connection, client =>
                     {
@@ -218,6 +235,13 @@ namespace TxtAIEditor.Core.Services
             switch (connection.Profile.ServerType)
             {
                 case RemoteServerType.Ssh:
+                    string source = QuoteShellArgument(NormalizeRemotePath(sourcePath));
+                    string destination = QuoteShellArgument(NormalizeRemotePath(destinationPath));
+                    await RunSshCommandAsync(
+                        connection,
+                        $"if [ -e {destination} ]; then echo 'A remote item with the same name already exists.' >&2; exit 1; fi; mv -- {source} {destination}",
+                        cancellationToken);
+                    break;
                 case RemoteServerType.Sftp:
                     await RunSftpAsync(
                         connection,
@@ -276,6 +300,11 @@ namespace TxtAIEditor.Core.Services
             switch (connection.Profile.ServerType)
             {
                 case RemoteServerType.Ssh:
+                    await RunSshCommandAsync(
+                        connection,
+                        $"{(isDirectory ? "rm -rf" : "rm -f")} -- {QuoteShellArgument(NormalizeRemotePath(remotePath))}",
+                        cancellationToken);
+                    break;
                 case RemoteServerType.Sftp:
                     await RunSftpAsync(connection, client =>
                     {
@@ -448,6 +477,161 @@ namespace TxtAIEditor.Core.Services
         private static string CombineRemotePath(string parent, string name)
         {
             return NormalizeRemotePath($"{NormalizeRemotePath(parent).TrimEnd('/')}/{name}");
+        }
+
+        private static async Task<IReadOnlyList<RemoteDirectoryEntry>> ListSshAsync(
+            RemoteConnectionSettings connection,
+            string path,
+            CancellationToken cancellationToken)
+        {
+            string normalizedPath = NormalizeRemotePath(path);
+            string quotedPath = QuoteShellArgument(normalizedPath);
+            string output = await RunSshCommandAsync(
+                connection,
+                $"if [ ! -d {quotedPath} ]; then echo 'Remote directory does not exist.' >&2; exit 1; fi; " +
+                $"LC_ALL=C find {quotedPath} -mindepth 1 -maxdepth 1 -printf '%y\\0%s\\0%T@\\0%f\\0' | base64",
+                cancellationToken);
+
+            string encoded = string.Concat(output.Where(character => !char.IsWhiteSpace(character)));
+            if (string.IsNullOrEmpty(encoded))
+            {
+                return Array.Empty<RemoteDirectoryEntry>();
+            }
+
+            byte[] payload;
+            try
+            {
+                payload = Convert.FromBase64String(encoded);
+            }
+            catch (FormatException ex)
+            {
+                throw new IOException("The SSH server returned an invalid directory listing.", ex);
+            }
+
+            string[] fields = Encoding.UTF8.GetString(payload)
+                .Split('\0', StringSplitOptions.None);
+            var entries = new List<RemoteDirectoryEntry>();
+            for (int index = 0; index + 3 < fields.Length; index += 4)
+            {
+                string name = fields[index + 3];
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                bool isDirectory = string.Equals(fields[index], "d", StringComparison.Ordinal);
+                _ = long.TryParse(
+                    fields[index + 1],
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out long size);
+
+                DateTimeOffset? modifiedTime = null;
+                if (double.TryParse(
+                    fields[index + 2],
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out double unixSeconds))
+                {
+                    modifiedTime = DateTimeOffset.FromUnixTimeMilliseconds(
+                        checked((long)(unixSeconds * 1000)));
+                }
+
+                entries.Add(new RemoteDirectoryEntry
+                {
+                    Name = name,
+                    FullPath = CombineRemotePath(normalizedPath, name),
+                    IsDirectory = isDirectory,
+                    Size = isDirectory ? 0 : size,
+                    ModifiedTime = modifiedTime
+                });
+            }
+
+            return entries
+                .OrderByDescending(item => item.IsDirectory)
+                .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+
+        private static async Task DownloadScpAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            string localPath,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using ScpClient client = CreateScpClient(connection);
+                client.Connect();
+                cancellationToken.ThrowIfCancellationRequested();
+                using FileStream output = new(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                client.Download(NormalizeRemotePath(remotePath), output);
+            }, cancellationToken);
+        }
+
+        private static async Task UploadScpAsync(
+            RemoteConnectionSettings connection,
+            string localPath,
+            string remotePath,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using ScpClient client = CreateScpClient(connection);
+                client.Connect();
+                cancellationToken.ThrowIfCancellationRequested();
+                using FileStream input = new(localPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                client.Upload(input, NormalizeRemotePath(remotePath));
+            }, cancellationToken);
+        }
+
+        private static ScpClient CreateScpClient(RemoteConnectionSettings connection)
+        {
+            return new ScpClient(
+                GetHost(connection.Address),
+                connection.Profile.Port,
+                connection.Profile.UserName,
+                connection.Password);
+        }
+
+        private static SshClient CreateSshClient(RemoteConnectionSettings connection)
+        {
+            return new SshClient(
+                GetHost(connection.Address),
+                connection.Profile.Port,
+                connection.Profile.UserName,
+                connection.Password);
+        }
+
+        private static async Task<string> RunSshCommandAsync(
+            RemoteConnectionSettings connection,
+            string commandText,
+            CancellationToken cancellationToken)
+        {
+            return await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using SshClient client = CreateSshClient(connection);
+                client.Connect();
+                cancellationToken.ThrowIfCancellationRequested();
+                using SshCommand command = client.RunCommand(commandText);
+                if (command.ExitStatus != 0)
+                {
+                    string message = string.IsNullOrWhiteSpace(command.Error)
+                        ? $"SSH command failed with exit code {command.ExitStatus}."
+                        : command.Error.Trim();
+                    throw new IOException(message);
+                }
+
+                return command.Result;
+            }, cancellationToken);
+        }
+
+        private static string QuoteShellArgument(string value)
+        {
+            return "'" + value.Replace("'", "'\"'\"'", StringComparison.Ordinal) + "'";
         }
 
         private static async Task<IReadOnlyList<RemoteDirectoryEntry>> ListSftpAsync(

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -78,6 +79,32 @@ namespace TxtAIEditor.Core.Services
             return Resolve(profileId).Id;
         }
 
+        public static TerminalShellProfile CreateSsh(RemoteConnectionSettings connection)
+        {
+            ArgumentNullException.ThrowIfNull(connection);
+
+            string host = GetHost(connection.Address);
+            if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(connection.Profile.UserName))
+            {
+                throw new InvalidOperationException("The SSH host and user name are required.");
+            }
+
+            string target = $"{connection.Profile.UserName}@{host}";
+            string displayName = string.IsNullOrWhiteSpace(connection.Profile.Name)
+                ? target
+                : connection.Profile.Name.Trim();
+            string arguments =
+                $"-p {connection.Profile.Port} -o ServerAliveInterval=30 " +
+                $"-o StrictHostKeyChecking=accept-new {QuoteArgument(target)}";
+
+            return new TerminalShellProfile(
+                $"SSH:{connection.Profile.Id:N}",
+                displayName,
+                "S",
+                ResolveSshExecutable(),
+                arguments);
+        }
+
         private static string ResolvePowerShellExecutable(out bool isPowerShell7)
         {
             string[] candidates =
@@ -131,6 +158,31 @@ namespace TxtAIEditor.Core.Services
 
             string pathCmd = FindExecutableOnPath("cmd.exe");
             return string.IsNullOrWhiteSpace(pathCmd) ? "cmd.exe" : pathCmd;
+        }
+
+        private static string ResolveSshExecutable()
+        {
+            string systemSsh = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                "OpenSSH",
+                "ssh.exe");
+            if (File.Exists(systemSsh))
+            {
+                return systemSsh;
+            }
+
+            string pathSsh = FindExecutableOnPath("ssh.exe");
+            return string.IsNullOrWhiteSpace(pathSsh) ? "ssh.exe" : pathSsh;
+        }
+
+        private static string GetHost(string address)
+        {
+            if (Uri.TryCreate(address, UriKind.Absolute, out Uri? uri))
+            {
+                return uri.Host;
+            }
+
+            return (address ?? string.Empty).Trim().TrimEnd('/');
         }
 
         private static string FindExecutableOnPath(string fileName)

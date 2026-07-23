@@ -68,7 +68,7 @@ namespace TxtAIEditor.Controls
 
         public void OpenTerminal(string workingDirectory)
         {
-            OpenTerminal(workingDirectory, null);
+            OpenTerminal(workingDirectory, (string?)null);
         }
 
         public void OpenTerminal(string workingDirectory, string? profileId)
@@ -94,6 +94,49 @@ namespace TxtAIEditor.Controls
             }
 
             _ = StartTerminalAsync(resolvedDirectory, profileId);
+        }
+
+        public void OpenTerminal(string workingDirectory, TerminalShellProfile shellProfile)
+        {
+            OpenTerminal(workingDirectory, shellProfile, null);
+        }
+
+        public void OpenTerminal(
+            string workingDirectory,
+            TerminalShellProfile shellProfile,
+            string? authenticationPassword)
+        {
+            ArgumentNullException.ThrowIfNull(shellProfile);
+
+            string resolvedDirectory;
+            try
+            {
+                resolvedDirectory = Path.GetFullPath(workingDirectory);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (!Directory.Exists(resolvedDirectory))
+            {
+                return;
+            }
+
+            _ = StartTerminalAsync(resolvedDirectory, shellProfile, authenticationPassword);
+        }
+
+        public bool TryActivateProfile(string profileId)
+        {
+            TerminalSession? session = _terminalSessions.FirstOrDefault(
+                item => item.ShellProfile.Id.Equals(profileId, StringComparison.OrdinalIgnoreCase));
+            if (session == null)
+            {
+                return false;
+            }
+
+            SetActiveTerminalSession(session);
+            return true;
         }
 
         public void SuspendNativeWindows()
@@ -175,9 +218,22 @@ namespace TxtAIEditor.Controls
 
         private async Task StartTerminalAsync(string workingDirectory, string? profileId = null)
         {
+            var shellProfile = TerminalShellProfile.Resolve(string.IsNullOrWhiteSpace(profileId) ? _terminalProfileId : profileId);
+            await StartTerminalAsync(workingDirectory, shellProfile);
+        }
+
+        private async Task StartTerminalAsync(string workingDirectory, TerminalShellProfile shellProfile)
+        {
+            await StartTerminalAsync(workingDirectory, shellProfile, null);
+        }
+
+        private async Task StartTerminalAsync(
+            string workingDirectory,
+            TerminalShellProfile shellProfile,
+            string? authenticationPassword)
+        {
             await EnsureTerminalWebViewAsync();
 
-            var shellProfile = TerminalShellProfile.Resolve(string.IsNullOrWhiteSpace(profileId) ? _terminalProfileId : profileId);
             var session = new TerminalSession(workingDirectory, shellProfile);
             _terminalSessions.Add(session);
             RenumberTerminalSessions();
@@ -190,8 +246,54 @@ namespace TxtAIEditor.Controls
                 var terminal = ConPtyTerminal.Start(shellProfile, workingDirectory, columns, rows);
                 session.Terminal = terminal;
                 session.Process = terminal.Process;
-                terminal.OutputReceived += text => AppendTerminalOutput(session, text);
+                string? pendingPassword = authenticationPassword;
+                string authenticationPromptBuffer = string.Empty;
+                object authenticationLock = new();
+                terminal.OutputReceived += text =>
+                {
+                    AppendTerminalOutput(session, text);
+
+                    string? response = null;
+                    lock (authenticationLock)
+                    {
+                        if (!string.IsNullOrEmpty(pendingPassword))
+                        {
+                            authenticationPromptBuffer = (authenticationPromptBuffer + text);
+                            if (authenticationPromptBuffer.Length > 512)
+                            {
+                                authenticationPromptBuffer = authenticationPromptBuffer[^512..];
+                            }
+
+                            if (Regex.IsMatch(
+                                authenticationPromptBuffer,
+                                @"(?i)password:\s*(?:\x1b\[[0-9;?]*[ -/]*[@-~]\s*)*$"))
+                            {
+                                response = pendingPassword;
+                                pendingPassword = null;
+                                authenticationPromptBuffer = string.Empty;
+                            }
+                        }
+                    }
+
+                    if (response != null)
+                    {
+                        _ = terminal.WriteAsync(response + "\r");
+                    }
+                };
                 terminal.Exited += () => CloseExitedTerminalSession(session);
+
+                if (!string.IsNullOrEmpty(authenticationPassword))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(30));
+                        lock (authenticationLock)
+                        {
+                            pendingPassword = null;
+                            authenticationPromptBuffer = string.Empty;
+                        }
+                    });
+                }
             }
             catch (Exception ex)
             {

@@ -200,7 +200,8 @@ namespace TxtAIEditor.Composition
                 callbacks.GetCurrentFolderPath,
                 callbacks.GetCurrentRepoPath,
                 callbacks.LoadFileIntoTabAtLineAsync,
-                callbacks.NavigateExplorerToFolderAndRevealAsync);
+                callbacks.NavigateExplorerToFolderAndRevealAsync,
+                services.RemoteWorkspaceService);
 
             var snippets = new SnippetsController(
                 services.SnippetService,

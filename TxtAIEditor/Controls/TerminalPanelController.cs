@@ -4,6 +4,8 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
 {
@@ -16,6 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string> _currentRepoProvider;
         private readonly Func<string, int, Task> _openFileAsync;
         private readonly Func<string, Task> _navigateFolderAsync;
+        private readonly RemoteWorkspaceService _remoteWorkspaceService;
         private readonly Window _owner;
         private TerminalPane? _terminalPane;
 
@@ -27,7 +30,8 @@ namespace TxtAIEditor.Controls
             Func<string> currentFolderProvider,
             Func<string> currentRepoProvider,
             Func<string, int, Task> openFileAsync,
-            Func<string, Task> navigateFolderAsync)
+            Func<string, Task> navigateFolderAsync,
+            RemoteWorkspaceService remoteWorkspaceService)
         {
             _owner = owner;
             _editorWorkspace = editorWorkspace;
@@ -37,6 +41,7 @@ namespace TxtAIEditor.Controls
             _currentRepoProvider = currentRepoProvider;
             _openFileAsync = openFileAsync;
             _navigateFolderAsync = navigateFolderAsync;
+            _remoteWorkspaceService = remoteWorkspaceService;
         }
 
         private TerminalPane EnsureTerminalPane()
@@ -59,7 +64,17 @@ namespace TxtAIEditor.Controls
         public void Toggle()
         {
             EnsureTerminalPane();
-            _topToolbar.TerminalIsChecked = _editorWorkspace.ToggleTerminal(GetWorkingDirectory);
+            TerminalShellProfile? requestedProfile = null;
+            RemoteConnectionSettings? activeConnection = _remoteWorkspaceService.ActiveConnection;
+            if (activeConnection?.Profile.ServerType == RemoteServerType.Ssh)
+            {
+                requestedProfile = TerminalShellProfile.CreateSsh(activeConnection);
+            }
+
+            _topToolbar.TerminalIsChecked = _editorWorkspace.ToggleTerminal(
+                GetWorkingDirectory,
+                requestedProfile,
+                requestedProfile == null ? null : activeConnection?.Password);
         }
 
         private string GetWorkingDirectory()
