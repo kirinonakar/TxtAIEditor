@@ -4,9 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Input;
-using Windows.UI;
 using Windows.System;
 
 namespace TxtAIEditor.Controls
@@ -332,16 +330,14 @@ namespace TxtAIEditor.Controls
             AgentRewindSessionButton.IsEnabled = !_isBusy && _canRewindSession;
 }
 
+private Style? _accentRunButtonStyle;
+
         private void UpdateRunButtonColor(bool isBusy)
         {
-            if (isBusy)
-            {
-                AgentRunButton.Background = new SolidColorBrush(Color.FromArgb(0xFF, 0xDC, 0x26, 0x26));
-            }
-            else
-            {
-                AgentRunButton.ClearValue(Button.BackgroundProperty);
-            }
+            _accentRunButtonStyle ??= AgentRunButton.Style;
+            AgentRunButton.Style = isBusy
+                ? (Style)Application.Current.Resources["StopButtonStyle"]
+                : _accentRunButtonStyle;
         }
 
         public void ClearActivity(string idleText)

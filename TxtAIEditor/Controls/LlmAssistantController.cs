@@ -6,8 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
-using Windows.UI;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
@@ -630,21 +628,17 @@ namespace TxtAIEditor.Controls
             return $"{displayName}{suffix}.txt";
         }
 
-        private static readonly SolidColorBrush _cancelRunButtonBrush = new(Color.FromArgb(0xFF, 0xDC, 0x26, 0x26));
+private Style? _accentRunButtonStyle;
 
         private void SetLlmRunButtonCancelMode(bool isCancel)
         {
             _rightSidebar.LlmCustomRunBtn.Content = isCancel
                 ? _getString("LlmCustomCancelButtonText", "중단")
                 : _getString("LlmCustomRunButtonText", "전송");
-            if (isCancel)
-            {
-                _rightSidebar.LlmCustomRunBtn.Background = _cancelRunButtonBrush;
-            }
-            else
-            {
-                _rightSidebar.LlmCustomRunBtn.ClearValue(Button.BackgroundProperty);
-            }
+            _accentRunButtonStyle ??= _rightSidebar.LlmCustomRunBtn.Style;
+            _rightSidebar.LlmCustomRunBtn.Style = isCancel
+                ? (Style)Application.Current.Resources["StopButtonStyle"]
+                : _accentRunButtonStyle;
         }
 
         private async Task ProcessChunkedSummarizationAsync(string fileContext)
