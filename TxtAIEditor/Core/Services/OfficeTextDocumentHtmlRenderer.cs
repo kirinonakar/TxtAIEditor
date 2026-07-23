@@ -9,6 +9,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -946,7 +948,62 @@ body { padding: 28px 16px 44px; }
             using Stream stream = entry.Open();
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
-            return "data:" + GetImageMimeType(imagePath) + ";base64," + Convert.ToBase64String(memory.ToArray());
+
+            byte[] bytes = memory.ToArray();
+            string extension = Path.GetExtension(imagePath).ToLowerInvariant();
+            if (extension is ".tif" or ".tiff")
+            {
+                byte[]? pngBytes = ConvertTiffBytesToPngBytes(bytes);
+                if (pngBytes != null && pngBytes.Length > 0)
+                {
+                    return "data:image/png;base64," + Convert.ToBase64String(pngBytes);
+                }
+            }
+
+            return "data:" + GetImageMimeType(imagePath) + ";base64," + Convert.ToBase64String(bytes);
+        }
+
+        private static byte[]? ConvertTiffBytesToPngBytes(byte[] tiffBytes)
+        {
+            try
+            {
+                return Task.Run(async () =>
+                {
+                    using var stream = new InMemoryRandomAccessStream();
+                    using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
+                    {
+                        writer.WriteBytes(tiffBytes);
+                        await writer.StoreAsync();
+                    }
+                    stream.Seek(0);
+
+                    BitmapDecoder decoder = await BitmapDecoder.CreateAsync(stream);
+                    using SoftwareBitmap softwareBitmap = await decoder.GetSoftwareBitmapAsync();
+
+                    bool isBgra8 = softwareBitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8 &&
+                                   softwareBitmap.BitmapAlphaMode == BitmapAlphaMode.Premultiplied;
+                    using SoftwareBitmap convertedBitmap = isBgra8
+                        ? softwareBitmap
+                        : SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+
+                    using var output = new InMemoryRandomAccessStream();
+                    BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, output);
+                    encoder.SetSoftwareBitmap(convertedBitmap);
+                    await encoder.FlushAsync();
+                    output.Seek(0);
+
+                    byte[] pngBytes = new byte[output.Size];
+                    using var reader = new DataReader(output.GetInputStreamAt(0));
+                    await reader.LoadAsync((uint)output.Size);
+                    reader.ReadBytes(pngBytes);
+                    return pngBytes;
+                }).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to convert embedded DOCX Tiff to PNG: {ex.Message}");
+                return null;
+            }
         }
 
         private static string GetImageMimeType(string imagePath)
@@ -960,6 +1017,7 @@ body { padding: 28px 16px 44px; }
                 ".webp" => "image/webp",
                 ".avif" => "image/avif",
                 ".svg" => "image/svg+xml",
+                ".tif" or ".tiff" => "image/tiff",
                 _ => "image/png"
             };
         }
