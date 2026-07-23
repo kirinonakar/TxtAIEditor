@@ -8,7 +8,7 @@ namespace TxtAIEditor.Core.Models
     {
         public const string DefaultExternalViewerPath = "uviewer";
 
-        public string Theme { get; set; } = "Dark";
+        public string Theme { get; set; } = "Light";
         public string FontFamily { get; set; } = "Consolas, 'Courier New', monospace";
         public double FontSize { get; set; } = 14.0;
         public bool WordWrap { get; set; } = true;
