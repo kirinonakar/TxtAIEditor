@@ -57,7 +57,7 @@
                                         </Button>
                                         <Button x:Name="OpenWithDefaultProgramButton" Click="OnOpenWithDefaultProgramClick" Height="24" Padding="8,0,8,0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="기본 프로그램으로 열기">
                                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                                <FontIcon Glyph="&#xE163;" FontSize="12"/>
+                                                <FontIcon Glyph="&#xE122;" FontSize="12"/>
                                             </StackPanel>
                                         </Button>
                                     </StackPanel>

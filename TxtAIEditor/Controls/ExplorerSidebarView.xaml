@@ -118,7 +118,7 @@
                                                         </MenuFlyoutItem>
                                                         <MenuFlyoutItem x:Name="ExplorerOpenWithDefaultProgramMenuItem" Text="기본 프로그램으로 열기" Click="OnOpenWithDefaultProgramClick" Tag="{Binding}">
                                                             <MenuFlyoutItem.Icon>
-                                                                <FontIcon Glyph="&#xE163;" FontSize="12"/>
+                                                                <FontIcon Glyph="&#xE122;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
                                                         <MenuFlyoutItem x:Name="ExplorerExtractArchiveToFolderMenuItem" Text="폴더에 풀기" Click="OnExtractArchiveToFolderClick" Tag="{Binding}">
