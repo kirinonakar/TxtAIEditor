@@ -136,7 +136,7 @@
                                                                 <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
-                                                        <MenuFlyoutItem x:Name="ExplorerDownloadRemoteMenuItem" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding}">
+                                                        <MenuFlyoutItem x:Name="ExplorerDownloadRemoteMenuItem" Visibility="Collapsed" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
@@ -212,7 +212,7 @@
                                                                 <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
-                                                        <MenuFlyoutItem x:Name="ExplorerTreeDownloadRemoteMenuItem" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding Content}">
+                                                        <MenuFlyoutItem x:Name="ExplorerTreeDownloadRemoteMenuItem" Visibility="Collapsed" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding Content}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>

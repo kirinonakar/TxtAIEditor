@@ -460,17 +460,23 @@ namespace TxtAIEditor.Controls
                 compressToSevenZipItem.Visibility = canCompressFolder ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem copyFolderPathItem)
+            bool canDownloadRemote = item != null && item.IsRemote;
+            if (flyout.Items.Count > 8 && flyout.Items[8] is MenuFlyoutItem downloadRemoteItem)
+            {
+                downloadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (flyout.Items.Count > 12 && flyout.Items[12] is MenuFlyoutItem copyFolderPathItem)
             {
                 copyFolderPathItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
 
-            if (flyout.Items.Count > 13 && flyout.Items[13] is MenuFlyoutItem renameItem)
+            if (flyout.Items.Count > 14 && flyout.Items[14] is MenuFlyoutItem renameItem)
             {
                 renameItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
 
-            if (flyout.Items.Count > 14 && flyout.Items[14] is MenuFlyoutItem deleteItem)
+            if (flyout.Items.Count > 15 && flyout.Items[15] is MenuFlyoutItem deleteItem)
             {
                 deleteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
