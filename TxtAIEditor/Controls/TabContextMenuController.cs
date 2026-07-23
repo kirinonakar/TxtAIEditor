@@ -204,13 +204,15 @@ namespace TxtAIEditor.Controls
 
         private async Task AddBookmarkAsync(OpenedTab tab)
         {
-            string? filePath = GetFileActionPath(tab);
-            if (string.IsNullOrEmpty(filePath))
+            string? favoritePath = !string.IsNullOrWhiteSpace(tab.RemotePath)
+                ? tab.RemotePath
+                : GetFileActionPath(tab);
+            if (string.IsNullOrEmpty(favoritePath))
             {
                 return;
             }
 
-            await _favoritesRecentController.AddFavoritePathAsync(filePath, true);
+            await _favoritesRecentController.AddFavoritePathAsync(favoritePath, true);
             _showLeftSidebarPage(1);
         }
 
