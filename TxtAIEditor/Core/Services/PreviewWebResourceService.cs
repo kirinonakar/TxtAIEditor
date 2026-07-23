@@ -80,6 +80,7 @@ namespace TxtAIEditor.Core.Services
                 ".bmp" => "image/bmp",
                 ".ico" => "image/x-icon",
                 ".avif" => "image/avif",
+                ".tif" or ".tiff" => "image/tiff",
                 ".mp4" => "video/mp4",
                 ".webm" => "video/webm",
                 ".mp3" => "audio/mpeg",

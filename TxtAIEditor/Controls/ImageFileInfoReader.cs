@@ -78,6 +78,8 @@ namespace TxtAIEditor.Controls
                 ".ico" => "ICO",
                 ".webp" => "WEBP",
                 ".avif" => "AVIF",
+                ".tif" => "TIFF",
+                ".tiff" => "TIFF",
                 _ => null
             };
         }
@@ -85,6 +87,11 @@ namespace TxtAIEditor.Controls
         private static bool TryReadRasterHeader(byte[] bytes, int length, out ImageFileInfo imageInfo)
         {
             imageInfo = default;
+
+            if (TryReadTiffHeader(bytes, length, out imageInfo))
+            {
+                return true;
+            }
 
             if (length >= 24 &&
                 bytes[0] == 0x89 &&
@@ -137,6 +144,69 @@ namespace TxtAIEditor.Controls
             }
 
             return TryReadAvifHeader(bytes, length, out imageInfo);
+        }
+
+        private static bool TryReadTiffHeader(byte[] bytes, int length, out ImageFileInfo imageInfo)
+        {
+            imageInfo = default;
+            if (length < 8)
+            {
+                return false;
+            }
+
+            bool isLittleEndian;
+            if (bytes[0] == 0x49 && bytes[1] == 0x49 && bytes[2] == 0x2A && bytes[3] == 0x00)
+            {
+                isLittleEndian = true;
+            }
+            else if (bytes[0] == 0x4D && bytes[1] == 0x4D && bytes[2] == 0x00 && bytes[3] == 0x2A)
+            {
+                isLittleEndian = false;
+            }
+            else
+            {
+                return false;
+            }
+
+            int ifdOffset = isLittleEndian ? ReadLittleEndianInt32(bytes, 4) : ReadBigEndianInt32(bytes, 4);
+            if (ifdOffset <= 0 || ifdOffset + 2 > length)
+            {
+                return false;
+            }
+
+            int tagCount = isLittleEndian ? ReadLittleEndianUInt16(bytes, ifdOffset) : ReadBigEndianUInt16(bytes, ifdOffset);
+            int width = 0;
+            int height = 0;
+
+            for (int i = 0; i < tagCount; i++)
+            {
+                int tagOffset = ifdOffset + 2 + (i * 12);
+                if (tagOffset + 12 > length)
+                {
+                    break;
+                }
+
+                ushort tagId = (ushort)(isLittleEndian ? ReadLittleEndianUInt16(bytes, tagOffset) : ReadBigEndianUInt16(bytes, tagOffset));
+                ushort type = (ushort)(isLittleEndian ? ReadLittleEndianUInt16(bytes, tagOffset + 2) : ReadBigEndianUInt16(bytes, tagOffset + 2));
+                uint val = (uint)(isLittleEndian ? ReadLittleEndianInt32(bytes, tagOffset + 8) : ReadBigEndianInt32(bytes, tagOffset + 8));
+
+                if (tagId == 256)
+                {
+                    width = type == 3 ? (ushort)val : (int)val;
+                }
+                else if (tagId == 257)
+                {
+                    height = type == 3 ? (ushort)val : (int)val;
+                }
+            }
+
+            if (width > 0 && height > 0)
+            {
+                imageInfo = new ImageFileInfo(width, height, "TIFF");
+                return IsValidImageInfo(imageInfo);
+            }
+
+            return false;
         }
 
         private static bool TryReadAvifHeader(byte[] bytes, int length, out ImageFileInfo imageInfo)
@@ -398,6 +468,11 @@ namespace TxtAIEditor.Controls
             int high = stream.ReadByte();
             int low = stream.ReadByte();
             return high < 0 || low < 0 ? 0 : (high << 8) | low;
+        }
+
+        private static int ReadBigEndianUInt16(byte[] bytes, int offset)
+        {
+            return (bytes[offset] << 8) | bytes[offset + 1];
         }
 
         private static int ReadBigEndianInt32(byte[] bytes, int offset)

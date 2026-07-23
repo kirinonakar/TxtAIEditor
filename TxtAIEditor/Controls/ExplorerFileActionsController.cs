@@ -1176,13 +1176,7 @@ namespace TxtAIEditor.Controls
 
         private static bool IsSupportedImageFile(string filePath)
         {
-            string extension = Path.GetExtension(filePath);
-            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
+            return SupportedFileTypes.IsImageFile(filePath);
         }
 
         private void OnFileListViewDragOver(object sender, DragEventArgs e)

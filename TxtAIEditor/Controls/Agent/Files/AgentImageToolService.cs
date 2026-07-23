@@ -56,7 +56,7 @@ namespace TxtAIEditor.Controls
             {
                 return new AgentReadImageResult
                 {
-                    TranscriptText = $"read_image failed: unsupported image type '{Path.GetExtension(fullPath)}'. Supported types: .png, .jpg, .jpeg, .webp, .avif, .bmp, .gif."
+                    TranscriptText = $"read_image failed: unsupported image type '{Path.GetExtension(fullPath)}'. Supported types: .png, .jpg, .jpeg, .webp, .avif, .bmp, .gif, .tif, .tiff."
                 };
             }
 
@@ -111,7 +111,8 @@ namespace TxtAIEditor.Controls
 
             bool shouldTranscode =
                 Math.Max(originalWidth, originalHeight) > MaxReadImageDimension ||
-                outputMimeType.Equals("image/bmp", StringComparison.OrdinalIgnoreCase);
+                outputMimeType.Equals("image/bmp", StringComparison.OrdinalIgnoreCase) ||
+                outputMimeType.Equals("image/tiff", StringComparison.OrdinalIgnoreCase);
 
             if (shouldTranscode)
             {
@@ -196,6 +197,7 @@ namespace TxtAIEditor.Controls
                 ".avif" => "image/avif",
                 ".bmp" => "image/bmp",
                 ".gif" => "image/gif",
+                ".tif" or ".tiff" => "image/tiff",
                 _ => "application/octet-stream"
             };
         }

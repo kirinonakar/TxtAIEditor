@@ -11,6 +11,8 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.Web.WebView2.Core;
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Editor;
@@ -239,6 +241,17 @@ namespace TxtAIEditor.Controls
                     folderPath,
                     CoreWebView2HostResourceAccessKind.Allow);
 
+                if (contentKind == ViewerContentKind.Image)
+                {
+                    coreWebView.AddWebResourceRequestedFilter(
+                        $"https://{ImageViewerHostName}/*",
+                        CoreWebView2WebResourceContext.All);
+
+                    string capturedFolderPath = folderPath;
+                    coreWebView.WebResourceRequested += (sender, args) =>
+                        OnImageViewerWebResourceRequested(sender, args, capturedFolderPath);
+                }
+
                 string sourceUrl = $"https://{hostName}/{Uri.EscapeDataString(fileName)}";
                 string html = contentKind switch
                 {
@@ -251,6 +264,95 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to load viewer source: {ex.Message}");
+            }
+        }
+
+        private static async void OnImageViewerWebResourceRequested(
+            CoreWebView2 sender,
+            CoreWebView2WebResourceRequestedEventArgs args,
+            string folderPath)
+        {
+            try
+            {
+                var uriObj = new Uri(args.Request.Uri);
+                string relativePath = Uri.UnescapeDataString(uriObj.AbsolutePath.TrimStart('/'));
+                string extension = Path.GetExtension(relativePath);
+                if (!extension.Equals(".tif", StringComparison.OrdinalIgnoreCase) &&
+                    !extension.Equals(".tiff", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                var deferral = args.GetDeferral();
+                try
+                {
+                    string fullPath = Path.Combine(folderPath, relativePath);
+                    MemoryStream? pngStream = await ConvertTiffToPngStreamAsync(fullPath);
+                    if (pngStream != null)
+                    {
+                        var response = sender.Environment.CreateWebResourceResponse(
+                            pngStream.AsRandomAccessStream(),
+                            200,
+                            "OK",
+                            "Content-Type: image/png");
+                        args.Response = response;
+                    }
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to intercept Tiff web resource: {ex.Message}");
+            }
+        }
+
+        private static async Task<MemoryStream?> ConvertTiffToPngStreamAsync(string tiffFilePath)
+        {
+            try
+            {
+                if (!File.Exists(tiffFilePath))
+                {
+                    return null;
+                }
+
+                using var fileStream = new FileStream(tiffFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using IRandomAccessStream input = fileStream.AsRandomAccessStream();
+                BitmapDecoder decoder = await BitmapDecoder.CreateAsync(input);
+
+                PixelDataProvider pixelData = await decoder.GetPixelDataAsync(
+                    BitmapPixelFormat.Bgra8,
+                    BitmapAlphaMode.Premultiplied,
+                    new BitmapTransform(),
+                    ExifOrientationMode.RespectExifOrientation,
+                    ColorManagementMode.ColorManageToSRgb);
+
+                var output = new InMemoryRandomAccessStream();
+                BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, output);
+                encoder.SetPixelData(
+                    BitmapPixelFormat.Bgra8,
+                    BitmapAlphaMode.Premultiplied,
+                    decoder.OrientedPixelWidth,
+                    decoder.OrientedPixelHeight,
+                    decoder.DpiX,
+                    decoder.DpiY,
+                    pixelData.DetachPixelData());
+
+                await encoder.FlushAsync();
+                output.Seek(0);
+
+                var memoryStream = new MemoryStream();
+                using var managedStream = output.AsStreamForRead();
+                await managedStream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
+                return memoryStream;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to convert Tiff to PNG: {ex.Message}");
+                return null;
             }
         }
 
