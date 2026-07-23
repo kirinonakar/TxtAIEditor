@@ -103,6 +103,12 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Custom Personas & Skills:** Supports custom personas/system instructions, and extensible local/custom skills (with auto-generation via `skill-creator`).
 *   **Recommended Extensions:** For full feature support, installing [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`), [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`), [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`), and [pdftotext](https://poppler.freedesktop.org/) is recommended.
 
+### 🌐 Remote Server Workspace (SSH, SFTP, FTPS, WebDAV, WSL)
+*   **Multi-Protocol Support:** Connect seamlessly to remote environments over SSH, SFTP, FTPS, WebDAV, or local Windows Subsystem for Linux (WSL) distributions.
+*   **Remote File Explorer:** Browse remote directory trees, inspect file details (sizes, modified dates), and navigate remote file systems directly.
+*   **Automatic WSL Discovery:** Automatically detects installed WSL Linux distributions on your Windows machine for zero-configuration access.
+*   **Seamless Remote Editing:** Open and edit remote files directly in the editor canvas. Changes saved in the editor are automatically uploaded and synchronized back to the remote server.
+*   **Secure Credential Storage:** Safely stores connection profiles and credentials using native Windows Credential Manager integration.
 
 ### 💻 Terminal
 *   **Shell Profiles:** Launch PowerShell, Command Prompt, Git Bash, or WSL sessions directly beneath your editor canvas.
