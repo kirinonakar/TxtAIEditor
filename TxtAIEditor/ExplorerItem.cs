@@ -17,6 +17,8 @@ namespace TxtAIEditor
 
         public string Name { get; set; } = string.Empty;
         public string Path { get; set; } = string.Empty;
+        public string DisplayPath { get; set; } = string.Empty;
+        public string ToolTipPath => string.IsNullOrWhiteSpace(DisplayPath) ? Path : DisplayPath;
         public bool IsRemote { get; set; }
         public Guid RemoteServerId { get; set; }
         public string RemotePath { get; set; } = string.Empty;

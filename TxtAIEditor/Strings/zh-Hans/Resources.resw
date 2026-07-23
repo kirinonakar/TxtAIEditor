@@ -3452,6 +3452,7 @@
   </data>
   <data name="RemoteExplorerTitle" xml:space="preserve"><value>远程资源管理器</value></data>
   <data name="RemoteExplorerDescription" xml:space="preserve"><value>浏览 WSL、SSH、SFTP、FTPS 或 WebDAV 服务器。</value></data>
+  <data name="RemoteExplorerLoadingServers" xml:space="preserve"><value>正在加载服务器列表...</value></data>
   <data name="RemoteExplorerAddServer" xml:space="preserve"><value>添加服务器</value></data>
   <data name="RemoteExplorerNoServers" xml:space="preserve"><value>尚未添加服务器。</value></data>
   <data name="RemoteExplorerDisconnect" xml:space="preserve"><value>断开连接</value></data>

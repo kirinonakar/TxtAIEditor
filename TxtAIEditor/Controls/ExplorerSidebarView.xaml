@@ -156,7 +156,7 @@
                                                     </FontIcon.Foreground>
                                                 </FontIcon>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Name}" Foreground="{Binding ForegroundColor}" FontSize="12" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Path}"/>
+                                                    <TextBlock Text="{Binding Name}" Foreground="{Binding ForegroundColor}" FontSize="12" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding ToolTipPath}"/>
                                                     <TextBlock Text="{Binding SubPath}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis" Visibility="{Binding SubPathVisibility}"/>
                                                 </StackPanel>
                                                 <TextBlock Grid.Column="2" Text="{Binding GitBadge}" Foreground="{Binding ForegroundColor}" FontSize="10" FontWeight="Bold" Margin="5,0,8,0" VerticalAlignment="Center" Visibility="{Binding GitBadgeVisibility}"/>
@@ -176,7 +176,7 @@
                                           ItemInvoked="OnExplorerTreeItemInvoked">
                                     <TreeView.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Padding="0,3,8,3" ToolTipService.ToolTip="{Binding Content.Path}" RightTapped="OnFileListViewItemRightTapped">
+                                            <Grid Padding="0,3,8,3" ToolTipService.ToolTip="{Binding Content.ToolTipPath}" RightTapped="OnFileListViewItemRightTapped">
                                                 <Grid.ContextFlyout>
                                                     <MenuFlyout>
                                                         <MenuFlyoutItem Text="즐겨찾기에 추가" Icon="Favorite" Click="OnAddFileToFavoritesClick" Tag="{Binding Content}"/>

@@ -24,6 +24,7 @@ namespace TxtAIEditor.Controls
         private string _currentPath = "/";
         private string _connectionRootPath = "/";
         private CancellationTokenSource? _operationCancellation;
+        private Task? _profileRefreshTask;
         private bool _loaded;
 
         public RemoteExplorerView()
@@ -61,27 +62,68 @@ namespace TxtAIEditor.Controls
                 : string.Format(Get("RemoteExplorerConnectedFormat", "{0}에 연결됨"), _connection.Profile.Name));
         }
 
-        public async Task RefreshProfilesAsync()
+        public Task RefreshProfilesAsync()
         {
-            IReadOnlyList<RemoteServerProfile> profiles = await _serverStore.LoadAsync();
-            IReadOnlyList<RemoteServerProfile> wslProfiles =
-                await _wslDistributionService.GetInstalledProfilesAsync();
-            _profiles.Clear();
-            foreach (RemoteServerProfile profile in profiles)
+            if (_profileRefreshTask is { IsCompleted: false })
             {
-                _profiles.Add(profile);
+                return _profileRefreshTask;
             }
-            foreach (RemoteServerProfile profile in wslProfiles)
+
+            _profileRefreshTask = RefreshProfilesCoreAsync();
+            return _profileRefreshTask;
+        }
+
+        private async Task RefreshProfilesCoreAsync()
+        {
+            BusyRing.IsActive = true;
+            BusyRing.Visibility = Visibility.Visible;
+            EmptyServersPanel.Visibility = Visibility.Collapsed;
+            UpdateStatus(Get(
+                "RemoteExplorerLoadingServers",
+                "서버 목록을 불러오는 중..."));
+            try
             {
-                if (_profiles.All(candidate => candidate.Id != profile.Id))
+                IReadOnlyList<RemoteServerProfile> profiles =
+                    await _serverStore.LoadAsync();
+                _profiles.Clear();
+                foreach (RemoteServerProfile profile in profiles)
                 {
                     _profiles.Add(profile);
                 }
-            }
 
-            EmptyServersPanel.Visibility = _profiles.Count == 0
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+                InvalidateProfileListMeasure();
+
+                IReadOnlyList<RemoteServerProfile> wslProfiles =
+                    await _wslDistributionService.GetInstalledProfilesAsync();
+                foreach (RemoteServerProfile profile in wslProfiles)
+                {
+                    if (_profiles.All(candidate => candidate.Id != profile.Id))
+                    {
+                        _profiles.Add(profile);
+                    }
+                }
+            }
+            finally
+            {
+                BusyRing.IsActive = false;
+                BusyRing.Visibility = Visibility.Collapsed;
+                EmptyServersPanel.Visibility = _profiles.Count == 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                UpdateStatus(_connection == null
+                    ? Get("RemoteExplorerSelectServer", "서버를 선택하세요.")
+                    : string.Format(
+                        Get("RemoteExplorerConnectedFormat", "{0}에 연결됨"),
+                        _connection.Profile.Name));
+                InvalidateProfileListMeasure();
+            }
+        }
+
+        private void InvalidateProfileListMeasure()
+        {
+            ServerList.InvalidateMeasure();
+            ServerListPanel.InvalidateMeasure();
+            InvalidateMeasure();
         }
 
         private async void OnLoaded(object sender, RoutedEventArgs e)

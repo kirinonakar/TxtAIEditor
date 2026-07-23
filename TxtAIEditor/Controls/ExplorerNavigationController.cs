@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -33,6 +34,9 @@ namespace TxtAIEditor.Controls
         private readonly ILocalizationService _localizationService;
         private readonly Func<string> _homeFolderPathProvider;
         private System.Threading.CancellationTokenSource? _remoteCancellation;
+        private string _currentArchiveRemotePath = string.Empty;
+        private readonly HashSet<string> _loadingRemoteArchivePaths =
+            new(StringComparer.OrdinalIgnoreCase);
 
         public enum ExplorerSortMode
         {
@@ -156,6 +160,7 @@ namespace TxtAIEditor.Controls
             _viewModel.ExplorerItems.Clear();
             CurrentArchivePath = string.Empty;
             CurrentArchiveDirectory = string.Empty;
+            _currentArchiveRemotePath = string.Empty;
             SetCurrentFolderPath(folderPath);
 
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
@@ -189,6 +194,7 @@ namespace TxtAIEditor.Controls
                 foreach (var item in SortItems(_archiveExplorerService.CreateArchiveItems(archivePath, CurrentArchiveDirectory)))
                 {
                     item.IsDark = isDark;
+                    ApplyArchiveDisplayPath(item);
                     _viewModel.ExplorerItems.Add(item);
                 }
 
@@ -196,7 +202,7 @@ namespace TxtAIEditor.Controls
                 string format = _localizationService.GetString("ExplorerArchiveStatusFormat", "{0}!/{1}\n{2}");
                 _leftSidebar.ExplorerStatus.Text = string.Format(
                     format,
-                    archivePath,
+                    GetArchiveDisplayPath(archivePath),
                     directoryLabel,
                     FormatExplorerItemCount(_viewModel.ExplorerItems.Count));
             }
@@ -204,8 +210,37 @@ namespace TxtAIEditor.Controls
             {
                 Debug.WriteLine($"Failed reading archive: {ex.Message}");
                 string title = _localizationService.GetString("ArchiveOpenFailedTitle", "압축 파일 열기 실패");
-                _leftSidebar.ExplorerStatus.Text = $"{archivePath}\n{title}: {ex.Message}";
+                _leftSidebar.ExplorerStatus.Text =
+                    $"{GetArchiveDisplayPath(archivePath)}\n{title}: {ex.Message}";
             }
+        }
+
+        private string GetArchiveDisplayPath(string archivePath)
+        {
+            string remotePath = _currentArchiveRemotePath;
+            if (string.IsNullOrWhiteSpace(remotePath))
+            {
+                _remoteWorkspaceService.TryGetVirtualPath(archivePath, out remotePath);
+            }
+
+            return string.IsNullOrWhiteSpace(remotePath)
+                ? archivePath
+                : _remoteWorkspaceService.GetDisplayPath(remotePath);
+        }
+
+        private void ApplyArchiveDisplayPath(ExplorerItem item)
+        {
+            if (string.IsNullOrWhiteSpace(item.ArchivePath) ||
+                !_remoteWorkspaceService.TryGetVirtualPath(
+                    item.ArchivePath,
+                    out string remoteArchivePath))
+            {
+                return;
+            }
+
+            string entryPath = ArchiveExplorerService.NormalizeEntryPath(item.ArchiveEntryPath);
+            item.DisplayPath =
+                $"{_remoteWorkspaceService.GetDisplayPath(remoteArchivePath)}!/{entryPath}";
         }
 
         public bool TryOpenArchive(string archivePath, bool revealInLeftPanel = true)
@@ -231,7 +266,15 @@ namespace TxtAIEditor.Controls
             }
 
             string? folderPath = Path.GetDirectoryName(fullArchivePath);
-            if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
+            bool isRemoteArchive = _remoteWorkspaceService.TryGetVirtualPath(
+                fullArchivePath,
+                out string remoteArchivePath);
+            _currentArchiveRemotePath = isRemoteArchive
+                ? remoteArchivePath
+                : string.Empty;
+            if (!isRemoteArchive &&
+                !string.IsNullOrWhiteSpace(folderPath) &&
+                Directory.Exists(folderPath))
             {
                 UpdateRepoPath(folderPath);
                 SetCurrentFolderPath(folderPath);
@@ -335,6 +378,9 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            CurrentArchivePath = string.Empty;
+            CurrentArchiveDirectory = string.Empty;
+            _currentArchiveRemotePath = string.Empty;
             _remoteCancellation?.Cancel();
             _remoteCancellation?.Dispose();
             _remoteCancellation = new System.Threading.CancellationTokenSource();
@@ -364,11 +410,19 @@ namespace TxtAIEditor.Controls
                             entry.FullPath,
                             entry.IsDirectory,
                             connection.Profile.Name),
+                        DisplayPath = _remoteWorkspaceService.GetDisplayPath(
+                            RemotePath.Create(
+                                connection.Profile.Id,
+                                entry.FullPath,
+                                entry.IsDirectory,
+                                connection.Profile.Name)),
                         IsFolder = entry.IsDirectory,
                         ModifiedTime = entry.ModifiedTime?.LocalDateTime ?? DateTime.MinValue,
                         IsRemote = true,
                         RemoteServerId = connection.Profile.Id,
                         RemotePath = entry.FullPath,
+                        IsArchive = !entry.IsDirectory &&
+                            ArchiveExplorerService.IsSupportedArchivePath(entry.Name),
                         IsDark = isDark
                     };
                     _viewModel.ExplorerItems.Add(item);
@@ -662,6 +716,7 @@ namespace TxtAIEditor.Controls
             _viewModel.ExplorerItems.Clear();
             CurrentArchivePath = string.Empty;
             CurrentArchiveDirectory = string.Empty;
+            _currentArchiveRemotePath = string.Empty;
             SetCurrentFolderPath(folderPath);
             UpdateRepoPath(folderPath);
 
@@ -697,6 +752,9 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            CurrentArchivePath = string.Empty;
+            CurrentArchiveDirectory = string.Empty;
+            _currentArchiveRemotePath = string.Empty;
             RemoteConnectionSettings connection = _remoteWorkspaceService.ActiveConnection;
             string rootPath = _remoteWorkspaceService.ActiveDirectoryPath;
             string rootName = rootPath == "/"
@@ -710,6 +768,12 @@ namespace TxtAIEditor.Controls
                     rootPath,
                     isDirectory: true,
                     serverName: connection.Profile.Name),
+                DisplayPath = _remoteWorkspaceService.GetDisplayPath(
+                    RemotePath.Create(
+                        connection.Profile.Id,
+                        rootPath,
+                        isDirectory: true,
+                        serverName: connection.Profile.Name)),
                 IsFolder = true,
                 IsRemote = true,
                 RemoteServerId = connection.Profile.Id,
@@ -739,6 +803,12 @@ namespace TxtAIEditor.Controls
             if ((!forceReload && !node.HasUnrealizedChildren) ||
                 node.Content is not ExplorerItem item)
             {
+                return;
+            }
+
+            if (item.IsRemote && item.IsArchive)
+            {
+                _ = PopulateRemoteArchiveTreeNodeAsync(node, item);
                 return;
             }
 
@@ -772,6 +842,7 @@ namespace TxtAIEditor.Controls
             foreach (var childItem in SortItems(childItems))
             {
                 childItem.IsDark = isDark;
+                ApplyArchiveDisplayPath(childItem);
                 childItem.IsArchive = !childItem.IsArchiveEntry &&
                                       !childItem.IsFolder &&
                                       _archiveExplorerService.IsSupportedArchiveFile(childItem.Path);
@@ -784,6 +855,55 @@ namespace TxtAIEditor.Controls
 
             node.HasUnrealizedChildren = false;
             _ = UpdateGitStatusesAsync();
+        }
+
+        private async Task PopulateRemoteArchiveTreeNodeAsync(
+            Microsoft.UI.Xaml.Controls.TreeViewNode node,
+            ExplorerItem item)
+        {
+            if (!_loadingRemoteArchivePaths.Add(item.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                string localArchivePath =
+                    await _remoteWorkspaceService.DownloadVirtualFileAsync(item.Path);
+                if (node.Content != item)
+                {
+                    return;
+                }
+
+                bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                node.Children.Clear();
+                foreach (ExplorerItem childItem in SortItems(
+                             _archiveExplorerService.CreateArchiveItems(
+                                 localArchivePath,
+                                 string.Empty)))
+                {
+                    childItem.IsDark = isDark;
+                    ApplyArchiveDisplayPath(childItem);
+                    node.Children.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
+                    {
+                        Content = childItem,
+                        HasUnrealizedChildren = childItem.IsFolder
+                    });
+                }
+
+                node.HasUnrealizedChildren = false;
+                node.IsExpanded = true;
+            }
+            catch (Exception ex)
+            {
+                _leftSidebar.ExplorerStatus.Text = string.Format(
+                    _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
+                    ex.Message);
+            }
+            finally
+            {
+                _loadingRemoteArchivePaths.Remove(item.Path);
+            }
         }
 
         private async Task PopulateRemoteTreeNodeAsync(
@@ -819,17 +939,25 @@ namespace TxtAIEditor.Controls
                             entry.FullPath,
                             entry.IsDirectory,
                             connection.Profile.Name),
+                        DisplayPath = _remoteWorkspaceService.GetDisplayPath(
+                            RemotePath.Create(
+                                connection.Profile.Id,
+                                entry.FullPath,
+                                entry.IsDirectory,
+                                connection.Profile.Name)),
                         IsFolder = entry.IsDirectory,
                         ModifiedTime = entry.ModifiedTime?.LocalDateTime ?? DateTime.MinValue,
                         IsRemote = true,
                         RemoteServerId = connection.Profile.Id,
                         RemotePath = entry.FullPath,
+                        IsArchive = !entry.IsDirectory &&
+                            ArchiveExplorerService.IsSupportedArchivePath(entry.Name),
                         IsDark = isDark
                     };
                     node.Children.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
                     {
                         Content = child,
-                        HasUnrealizedChildren = child.IsFolder
+                        HasUnrealizedChildren = child.IsFolder || child.IsArchive
                     });
                 }
 
@@ -916,18 +1044,18 @@ namespace TxtAIEditor.Controls
 
         private void OnExplorerUpClick(object sender, RoutedEventArgs e)
         {
+            if (IsViewingArchive)
+            {
+                NavigateArchiveUp();
+                return;
+            }
+
             if (IsViewingRemote)
             {
                 if (_remoteWorkspaceService.NavigateUp())
                 {
                     _ = LoadRemoteDirectoryAsync();
                 }
-                return;
-            }
-
-            if (IsViewingArchive)
-            {
-                NavigateArchiveUp();
                 return;
             }
 
@@ -950,6 +1078,13 @@ namespace TxtAIEditor.Controls
         {
             if (string.IsNullOrEmpty(CurrentArchiveDirectory))
             {
+                if (!string.IsNullOrWhiteSpace(_currentArchiveRemotePath))
+                {
+                    string remoteParent = RemotePath.GetParent(_currentArchiveRemotePath);
+                    _ = NavigateRemoteVirtualPathAsync(remoteParent, revealInLeftPanel: false);
+                    return;
+                }
+
                 string archiveFolderPath = Path.GetDirectoryName(CurrentArchivePath) ?? CurrentFolderPath;
                 if (!string.IsNullOrWhiteSpace(archiveFolderPath) && Directory.Exists(archiveFolderPath))
                 {
@@ -1348,6 +1483,7 @@ namespace TxtAIEditor.Controls
                     foreach (var item in SortItems(matchedItems))
                     {
                         item.IsDark = isDark;
+                        ApplyArchiveDisplayPath(item);
                         _viewModel.ExplorerItems.Add(item);
                     }
 
@@ -1394,7 +1530,7 @@ namespace TxtAIEditor.Controls
                     string format = _localizationService.GetString("ExplorerArchiveStatusFormat", "{0}!/{1}\n{2}");
                     _leftSidebar.ExplorerStatus.Text = string.Format(
                         format,
-                        CurrentArchivePath,
+                        GetArchiveDisplayPath(CurrentArchivePath),
                         directoryLabel,
                         FormatExplorerFilterResult(_viewModel.ExplorerItems.Count));
                 });

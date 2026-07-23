@@ -3488,6 +3488,7 @@
   </data>
   <data name="RemoteExplorerTitle" xml:space="preserve"><value>리모트 탐색기</value></data>
   <data name="RemoteExplorerDescription" xml:space="preserve"><value>WSL, SSH, SFTP, FTPS 또는 WebDAV 서버를 탐색합니다.</value></data>
+  <data name="RemoteExplorerLoadingServers" xml:space="preserve"><value>서버 목록을 불러오는 중...</value></data>
   <data name="RemoteExplorerAddServer" xml:space="preserve"><value>서버 추가</value></data>
   <data name="RemoteExplorerNoServers" xml:space="preserve"><value>추가된 서버가 없습니다.</value></data>
   <data name="RemoteExplorerDisconnect" xml:space="preserve"><value>연결 끊기</value></data>
