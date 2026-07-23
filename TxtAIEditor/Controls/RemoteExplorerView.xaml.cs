@@ -289,6 +289,23 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (profile.ServerType == RemoteServerType.Wsl)
+            {
+                SetBusy(true);
+                UpdateStatus(Get(
+                    "RemoteExplorerResolvingWslHome",
+                    "WSL 홈 폴더를 확인하는 중..."));
+                try
+                {
+                    profile.UserName =
+                        await WslDistributionService.GetHomePathAsync(profile.Name);
+                }
+                finally
+                {
+                    SetBusy(false);
+                }
+            }
+
             RemoteConnectionSettings? connection = _serverStore.GetConnection(profile);
             if (connection == null)
             {

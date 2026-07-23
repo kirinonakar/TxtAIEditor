@@ -43,20 +43,12 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 string text = DecodeWslOutput(output.ToArray());
-                List<string> distributionNames = text
+                return text
                     .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(line => line.Replace("\0", string.Empty).Trim())
                     .Where(name => !string.IsNullOrWhiteSpace(name))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                var profiles = new List<RemoteServerProfile>(distributionNames.Count);
-                foreach (string distributionName in distributionNames)
-                {
-                    string homePath = await GetHomePathAsync(distributionName, cancellationToken);
-                    profiles.Add(CreateProfile(distributionName, homePath));
-                }
-
-                return profiles
+                    .Select(name => CreateProfile(name))
                     .OrderBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase)
                     .ToList();
             }
@@ -80,9 +72,9 @@ namespace TxtAIEditor.Core.Services
             };
         }
 
-        private static async Task<string> GetHomePathAsync(
+        public static async Task<string> GetHomePathAsync(
             string distributionName,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken = default)
         {
             try
             {
