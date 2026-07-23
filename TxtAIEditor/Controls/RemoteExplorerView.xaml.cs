@@ -42,8 +42,8 @@ namespace TxtAIEditor.Controls
         public void Localize(Func<string, string, string> getString)
         {
             _getString = getString;
-            TitleText.Text = Get("RemoteExplorerTitle", "리모트 탐색기");
-            DescriptionText.Text = Get("RemoteExplorerDescription", "WSL, SSH, SFTP, FTPS 또는 WebDAV 서버를 탐색합니다.");
+            TitleText.Text = Get("RemoteExplorerTitle", "리모트 서버");
+            DescriptionText.Text = Get("RemoteExplorerDescription", "WSL, SSH/SFTP, FTPS, WebDAV");
             AddServerButtonText.Text = Get("RemoteExplorerAddServer", "서버 추가");
             EmptyServersText.Text = Get("RemoteExplorerNoServers", "추가된 서버가 없습니다.");
 

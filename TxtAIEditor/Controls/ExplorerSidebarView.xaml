@@ -50,7 +50,7 @@
                                     <Button x:Name="ExplorerSortButton" Grid.Column="4" Click="OnSortClick" ToolTipService.ToolTip="이름순 정렬" Padding="0" Width="28" MinWidth="28" Height="28">
                                             <FontIcon Glyph="&#xE8CB;" FontSize="10"/>
                                         </Button>
-                                    <Button x:Name="ExplorerRemoteButton" Grid.Column="6" ToolTipService.ToolTip="리모트 탐색기" AutomationProperties.Name="리모트 탐색기" Padding="0" Width="28" MinWidth="28" Height="28">
+                                    <Button x:Name="ExplorerRemoteButton" Grid.Column="6" ToolTipService.ToolTip="리모트 서버" AutomationProperties.Name="리모트 서버" Padding="0" Width="28" MinWidth="28" Height="28">
                                         <Button.Flyout>
                                             <Flyout Placement="BottomEdgeAlignedRight" Opening="OnRemoteFlyoutOpening">
                                                 <local:RemoteExplorerView x:Name="RemoteExplorer"/>

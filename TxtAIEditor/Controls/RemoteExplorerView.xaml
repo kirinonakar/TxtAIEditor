@@ -16,9 +16,9 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center">
-                <TextBlock x:Name="TitleText" Text="리모트 탐색기" FontSize="18" FontWeight="SemiBold"/>
+                <TextBlock x:Name="TitleText" Text="리모트 서버" FontSize="18" FontWeight="SemiBold"/>
                 <TextBlock x:Name="DescriptionText"
-                           Text="WSL, SSH, SFTP, FTPS 또는 WebDAV 서버를 탐색합니다."
+                           Text="WSL, SSH/SFTP, FTPS, WebDAV"
                            FontSize="11"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>

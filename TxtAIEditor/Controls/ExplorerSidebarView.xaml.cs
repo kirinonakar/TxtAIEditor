@@ -102,7 +102,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(ExplorerRefreshButton, getString("ExplorerRefreshTooltip", "새로고침"));
             ToolTipService.SetToolTip(ExplorerSortButton, getString("ExplorerSortName", "이름순 정렬"));
 
-            var remoteExplorerText = getString("RemoteExplorerTitle", "리모트 탐색기");
+            var remoteExplorerText = getString("RemoteExplorerTitle", "리모트 서버");
             ToolTipService.SetToolTip(ExplorerRemoteButton, remoteExplorerText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerRemoteButton, remoteExplorerText);
             RemoteExplorer.Localize(getString);
