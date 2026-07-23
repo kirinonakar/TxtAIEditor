@@ -43,12 +43,20 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 string text = DecodeWslOutput(output.ToArray());
-                return text
+                List<string> distributionNames = text
                     .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(line => line.Replace("\0", string.Empty).Trim())
                     .Where(name => !string.IsNullOrWhiteSpace(name))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Select(CreateProfile)
+                    .ToList();
+                var profiles = new List<RemoteServerProfile>(distributionNames.Count);
+                foreach (string distributionName in distributionNames)
+                {
+                    string homePath = await GetHomePathAsync(distributionName, cancellationToken);
+                    profiles.Add(CreateProfile(distributionName, homePath));
+                }
+
+                return profiles
                     .OrderBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase)
                     .ToList();
             }
@@ -58,7 +66,9 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        public static RemoteServerProfile CreateProfile(string distributionName)
+        public static RemoteServerProfile CreateProfile(
+            string distributionName,
+            string homePath = "/")
         {
             return new RemoteServerProfile
             {
@@ -66,8 +76,58 @@ namespace TxtAIEditor.Core.Services
                 Name = distributionName,
                 ServerType = RemoteServerType.Wsl,
                 Port = 0,
-                UserName = string.Empty
+                UserName = NormalizeHomePath(homePath)
             };
+        }
+
+        private static async Task<string> GetHomePathAsync(
+            string distributionName,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                using Process process = new()
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "wsl.exe",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    }
+                };
+                process.StartInfo.ArgumentList.Add("--distribution");
+                process.StartInfo.ArgumentList.Add(distributionName);
+                process.StartInfo.ArgumentList.Add("--exec");
+                process.StartInfo.ArgumentList.Add("sh");
+                process.StartInfo.ArgumentList.Add("-lc");
+                process.StartInfo.ArgumentList.Add("printf %s \"$HOME\"");
+                process.Start();
+
+                await using MemoryStream output = new();
+                Task copyTask = process.StandardOutput.BaseStream.CopyToAsync(output, cancellationToken);
+                await process.WaitForExitAsync(cancellationToken);
+                await copyTask;
+                return process.ExitCode == 0
+                    ? NormalizeHomePath(DecodeWslOutput(output.ToArray()))
+                    : "/";
+            }
+            catch
+            {
+                return "/";
+            }
+        }
+
+        private static string NormalizeHomePath(string homePath)
+        {
+            string normalized = (homePath ?? string.Empty)
+                .Replace("\0", string.Empty)
+                .Replace('\\', '/')
+                .Trim();
+            return string.IsNullOrWhiteSpace(normalized)
+                ? "/"
+                : "/" + normalized.Trim('/');
         }
 
         private static Guid CreateStableId(string distributionName)

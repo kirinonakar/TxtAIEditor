@@ -347,6 +347,11 @@ namespace TxtAIEditor.Core.Services
 
         public static string GetInitialPath(RemoteConnectionSettings connection)
         {
+            if (connection.Profile.ServerType == RemoteServerType.Wsl)
+            {
+                return NormalizeRemotePath(connection.Profile.UserName);
+            }
+
             if (Uri.TryCreate(connection.Address, UriKind.Absolute, out Uri? uri))
             {
                 return string.IsNullOrWhiteSpace(uri.AbsolutePath)
