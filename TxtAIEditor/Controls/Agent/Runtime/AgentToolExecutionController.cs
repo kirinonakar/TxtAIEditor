@@ -94,7 +94,7 @@ namespace TxtAIEditor.Controls
                             cancellationToken),
                         "run_powershell" => await _fileTools.RunPowerShellAsync(
                             GetStringArgument(arguments, "command"),
-                            GetIntArgument(arguments, "timeoutMs", 10000),
+                            GetIntArgument(arguments, "timeoutMs", AgentProcessToolService.DefaultPowerShellTimeoutMs),
                             cancellationToken),
                         "read_file" => await _fileTools.ReadFileAsync(
                             GetStringArgument(arguments, "path"),

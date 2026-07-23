@@ -101,7 +101,8 @@ namespace TxtAIEditor.Controls
                                 type = "integer",
                                 minimum = AgentProcessToolService.MinimumProcessTimeoutMs,
                                 maximum = AgentProcessToolService.MaximumProcessTimeoutMs,
-                                description = "Timeout in milliseconds (default: 10000, maximum: 300000)"
+                                @default = AgentProcessToolService.DefaultPowerShellTimeoutMs,
+                                description = "Timeout in milliseconds (default: 120000, maximum: 300000)"
                             }
                         },
                         required = new[] { "command" }

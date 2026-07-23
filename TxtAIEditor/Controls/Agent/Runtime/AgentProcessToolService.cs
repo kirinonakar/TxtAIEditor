@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentProcessToolService
     {
+        internal const int DefaultPowerShellTimeoutMs = 120000;
         internal const int MinimumProcessTimeoutMs = 1000;
         internal const int MaximumProcessTimeoutMs = 300000;
 
@@ -114,7 +115,7 @@ namespace TxtAIEditor.Controls
                 shellPath,
                 $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
                 _workspace.ResolveWorkspaceRoot(),
-                timeoutMs <= 0 ? 10000 : timeoutMs,
+                timeoutMs <= 0 ? DefaultPowerShellTimeoutMs : timeoutMs,
                 cancellationToken,
                 Encoding.UTF8,
                 environmentVariables);
