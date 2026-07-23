@@ -61,7 +61,7 @@ namespace TxtAIEditor.Core.Services
             cred.TargetName = targetName;
             cred.UserName = userName;
             cred.Persist = CRED_PERSIST_LOCAL_MACHINE;
-            cred.Comment = "TxtAIEditor LLM API Key Storage";
+            cred.Comment = "TxtAIEditor secure credential storage";
 
             byte[] passwordBytes = Encoding.Unicode.GetBytes(password);
             cred.CredentialBlobSize = (uint)passwordBytes.Length;

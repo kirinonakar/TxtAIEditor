@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
@@ -19,6 +20,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? CreateFolderClick { add => ExplorerView.CreateFolderClick += value; remove => ExplorerView.CreateFolderClick -= value; }
         public event RoutedEventHandler? RefreshClick { add => ExplorerView.RefreshClick += value; remove => ExplorerView.RefreshClick -= value; }
         public event RoutedEventHandler? SortClick { add => ExplorerView.SortClick += value; remove => ExplorerView.SortClick -= value; }
+        public event EventHandler<RemoteFileOpenedEventArgs>? RemoteFileOpened { add => ExplorerView.RemoteFileOpened += value; remove => ExplorerView.RemoteFileOpened -= value; }
         public event RoutedEventHandler? OpenInWindowsExplorerClick { add => ExplorerView.OpenInWindowsExplorerClick += value; remove => ExplorerView.OpenInWindowsExplorerClick -= value; }
         public event RoutedEventHandler? ExplorerHomeClick { add => ExplorerView.HomeClick += value; remove => ExplorerView.HomeClick -= value; }
         public event RoutedEventHandler? ExplorerTreeModeClick { add => ExplorerView.TreeModeClick += value; remove => ExplorerView.TreeModeClick -= value; }
@@ -133,6 +135,7 @@ namespace TxtAIEditor.Controls
         public Button ExplorerCreateFolderBtn => ExplorerView.CreateFolderButton;
         public Button ExplorerRefreshBtn => ExplorerView.RefreshButton;
         public Button ExplorerSortBtn => ExplorerView.SortButton;
+        public Button ExplorerRemoteBtn => ExplorerView.RemoteButton;
         public Button ExplorerOpenInWindowsBtn => ExplorerView.OpenInWindowsButton;
         public Button ExplorerHomeBtn => ExplorerView.HomeButton;
         public ToggleButton ExplorerTreeModeBtn => ExplorerView.TreeModeButton;

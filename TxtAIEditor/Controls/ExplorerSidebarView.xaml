@@ -2,7 +2,8 @@
 <UserControl
     x:Class="TxtAIEditor.Controls.ExplorerSidebarView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:TxtAIEditor.Controls">
     <Grid x:Name="RootGrid">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -17,6 +18,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                     <Button x:Name="ExplorerUpButton" Click="OnExplorerUpClick" ToolTipService.ToolTip="상위 폴더" Padding="0" Width="28" MinWidth="28" Height="28">
@@ -34,7 +36,15 @@
                                     <Button x:Name="ExplorerSortButton" Grid.Column="4" Click="OnSortClick" ToolTipService.ToolTip="이름순 정렬" Padding="0" Width="28" MinWidth="28" Height="28">
                                             <FontIcon Glyph="&#xE8CB;" FontSize="10"/>
                                         </Button>
-                                    <Button x:Name="ExplorerOpenInWindowsButton" Grid.Column="6" Click="OnOpenInWindowsExplorerClick" ToolTipService.ToolTip="Windows 탐색기에서 열기" AutomationProperties.Name="Windows 탐색기에서 열기" Padding="0" Width="28" MinWidth="28" Height="28">
+                                    <Button x:Name="ExplorerRemoteButton" Grid.Column="6" ToolTipService.ToolTip="리모트 탐색기" AutomationProperties.Name="리모트 탐색기" Padding="0" Width="28" MinWidth="28" Height="28">
+                                        <Button.Flyout>
+                                            <Flyout Placement="BottomEdgeAlignedRight" Opening="OnRemoteFlyoutOpening">
+                                                <local:RemoteExplorerView x:Name="RemoteExplorer"/>
+                                            </Flyout>
+                                        </Button.Flyout>
+                                        <FontIcon Glyph="&#xE774;" FontSize="11"/>
+                                    </Button>
+                                    <Button x:Name="ExplorerOpenInWindowsButton" Grid.Column="7" Click="OnOpenInWindowsExplorerClick" ToolTipService.ToolTip="Windows 탐색기에서 열기" AutomationProperties.Name="Windows 탐색기에서 열기" Padding="0" Width="28" MinWidth="28" Height="28">
                                             <FontIcon Glyph="&#xE8DA;" FontSize="10"/>
                                         </Button>
                                     </Grid>

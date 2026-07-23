@@ -3486,4 +3486,44 @@
   <data name="TokenReportStringsJson" xml:space="preserve">
     <value>{"title":"Token 사용 현황","subtitle":"요청량, 토큰 소비, 캐시 효율을 한눈에 확인하는 누적 대시보드","periodBadge":"표시 기간","themeToggle":"테마 전환","darkModeSwitch":"다크 모드로 전환","lightModeSwitch":"라이트 모드로 전환","summaryAria":"핵심 통계","totalRequests":"총 요청","dailyAverageFormat":"일평균 {0}","totalTokens":"전체 토큰","averagePerRequestFormat":"요청당 평균 {0}","cachedTokens":"캐시된 토큰","cachedTokensNote":"입력 토큰 재사용량","cacheRatio":"캐시 비율","cacheGood":"효율 양호 · 목표 70% 이상","cacheNeedsImprovement":"개선 권장 · 목표 70% 이상","dailyHeading":"일별 사용 추이","dailyDescription":"날짜별 요청량과 토큰 소비 패턴을 비교합니다.","dailyInsightsAria":"일별 주요 인사이트","peakRequests":"최다 요청","peakTokens":"최다 토큰","requestCount":"요청 수","dailyRequestsDescription":"하루 동안 발생한 전체 모델 요청","countUnit":"회","tokenUsage":"토큰 사용량","dailyTokensDescription":"입력과 출력을 합산한 일별 소비량","millionUnit":"백만","inputOutput":"입력과 출력","inputOutputDescription":"입력 토큰과 출력 토큰의 일별 구성","input":"입력","output":"출력","cacheEfficiency":"캐시 효율","cacheEfficiencyDescription":"70% 이상은 안정적인 재사용 구간으로 표시","modelHeading":"모델별 사용 분석","modelDescription":"모델별 요청 빈도와 토큰 소비 편중을 비교합니다.","modelInsightsAria":"모델 주요 인사이트","mostUsedModel":"최다 사용 모델","requestShare":"요청 비중","modelRequests":"모델별 요청 수","modelRequestsDescription":"요청 기준 상위 8개 모델","modelTokens":"모델별 전체 토큰","modelTokensDescription":"1천 토큰 이상 사용한 모델","modelInputOutput":"모델별 입력과 출력","modelInputOutputDescription":"토큰 사용량 상위 10개 모델의 입력·출력 구성","horizontalAxisNote":"가로축: 백만 토큰","noDataTitle":"표시할 토큰 통계가 없습니다","noDataDescription":"LLM 요청이 기록되면 이 보고서에 자동으로 반영됩니다.","footerPeriodFormat":"표시 기간 {0} · 누적 기준","footerProduct":"TxtAIEditor Token 통계 · Chart.js 기반 정적 대시보드","generatedAtFormat":"생성: {0}","requestsFormat":"{0}회","tokensFormat":"{0} 토큰"}</value>
   </data>
+  <data name="RemoteExplorerTitle" xml:space="preserve"><value>리모트 탐색기</value></data>
+  <data name="RemoteExplorerDescription" xml:space="preserve"><value>SSH, SFTP, FTPS 또는 WebDAV 서버를 탐색합니다.</value></data>
+  <data name="RemoteExplorerAddServer" xml:space="preserve"><value>서버 추가</value></data>
+  <data name="RemoteExplorerNoServers" xml:space="preserve"><value>추가된 서버가 없습니다.</value></data>
+  <data name="RemoteExplorerDisconnect" xml:space="preserve"><value>연결 끊기</value></data>
+  <data name="RemoteExplorerAddServerTooltip" xml:space="preserve"><value>새 리모트 서버 추가</value></data>
+  <data name="RemoteExplorerSelectServer" xml:space="preserve"><value>서버를 선택하세요.</value></data>
+  <data name="RemoteExplorerConnectedFormat" xml:space="preserve"><value>{0}에 연결됨</value></data>
+  <data name="RemoteServerNamePlaceholder" xml:space="preserve"><value>서버 이름</value></data>
+  <data name="RemoteServerAddressPlaceholder" xml:space="preserve"><value>호스트 또는 주소</value></data>
+  <data name="RemoteServerUserNamePlaceholder" xml:space="preserve"><value>ID</value></data>
+  <data name="RemoteServerPasswordPlaceholder" xml:space="preserve"><value>비밀번호</value></data>
+  <data name="RemoteServerNameLabel" xml:space="preserve"><value>서버 이름</value></data>
+  <data name="RemoteServerTypeLabel" xml:space="preserve"><value>서버 종류</value></data>
+  <data name="RemoteServerAddressLabel" xml:space="preserve"><value>주소</value></data>
+  <data name="RemoteServerPortLabel" xml:space="preserve"><value>포트</value></data>
+  <data name="RemoteServerUserNameLabel" xml:space="preserve"><value>ID</value></data>
+  <data name="RemoteServerPasswordLabel" xml:space="preserve"><value>비밀번호</value></data>
+  <data name="RemoteServerCredentialNotice" xml:space="preserve"><value>주소와 비밀번호는 Windows 자격 증명 관리자에 일반 자격 증명으로 저장됩니다.</value></data>
+  <data name="RemoteExplorerAddServerTitle" xml:space="preserve"><value>리모트 서버 추가</value></data>
+  <data name="CommonAdd" xml:space="preserve"><value>추가</value></data>
+  <data name="CommonCancel" xml:space="preserve"><value>취소</value></data>
+  <data name="CommonDelete" xml:space="preserve"><value>삭제</value></data>
+  <data name="CommonClose" xml:space="preserve"><value>닫기</value></data>
+  <data name="RemoteServerSaved" xml:space="preserve"><value>서버가 저장되었습니다.</value></data>
+  <data name="RemoteServerSaveFailedTitle" xml:space="preserve"><value>서버 저장 실패</value></data>
+  <data name="RemoteServerDeleteTitle" xml:space="preserve"><value>서버 삭제</value></data>
+  <data name="RemoteServerDeleteMessageFormat" xml:space="preserve"><value>'{0}' 서버와 저장된 자격 증명을 삭제할까요?</value></data>
+  <data name="RemoteServerDeleted" xml:space="preserve"><value>서버와 자격 증명이 삭제되었습니다.</value></data>
+  <data name="RemoteConnectionFailedTitle" xml:space="preserve"><value>리모트 연결 실패</value></data>
+  <data name="RemoteCredentialMissing" xml:space="preserve"><value>Windows 자격 증명 관리자에서 서버 주소 또는 비밀번호를 찾을 수 없습니다.</value></data>
+  <data name="RemoteSshSftpNotice" xml:space="preserve"><value>SSH 서버 탐색은 보안 파일 전송(SFTP) 채널을 사용합니다.</value></data>
+  <data name="RemoteDownloadingFile" xml:space="preserve"><value>파일을 여는 중...</value></data>
+  <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>{0}의 임시 로컬 복사본을 열었습니다.</value></data>
+  <data name="RemoteLoadingDirectory" xml:space="preserve"><value>폴더를 불러오는 중...</value></data>
+  <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0}개 항목</value></data>
+  <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>작업 실패: {0}</value></data>
+  <data name="RemoteServerRequiredFields" xml:space="preserve"><value>서버 이름, 주소, ID, 비밀번호를 모두 입력하세요.</value></data>
+  <data name="RemoteServerInvalidPort" xml:space="preserve"><value>포트는 1~65535 사이의 숫자여야 합니다.</value></data>
+  <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV 주소는 https://로 시작해야 합니다.</value></data>
 </root>

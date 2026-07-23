@@ -305,6 +305,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.SelectFolderClick += OnSelectFolderClick;
             _leftSidebar.RefreshClick += OnExplorerRefreshClick;
             _leftSidebar.SortClick += OnExplorerSortClick;
+            _leftSidebar.RemoteFileOpened += OnRemoteFileOpened;
             _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
             _leftSidebar.ExplorerHomeClick += OnExplorerHomeClick;
             _leftSidebar.ExplorerTreeModeClick += OnExplorerTreeModeClick;
@@ -337,6 +338,11 @@ namespace TxtAIEditor.Controls
         private void OnExplorerRefreshClick(object sender, RoutedEventArgs e)
         {
             RefreshCurrentFolder();
+        }
+
+        private void OnRemoteFileOpened(object? sender, Core.Models.RemoteFileOpenedEventArgs e)
+        {
+            _ = _loadFileIntoTabAsync(e.LocalPath);
         }
 
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e)

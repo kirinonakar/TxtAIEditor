@@ -3450,4 +3450,44 @@
   <data name="TokenReportStringsJson" xml:space="preserve">
     <value>{"title":"Token 使用概覽","subtitle":"集中查看請求量、Token 消耗和快取效率的累計儀表板","periodBadge":"顯示期間","themeToggle":"切換主題","darkModeSwitch":"切換至深色模式","lightModeSwitch":"切換至淺色模式","summaryAria":"關鍵統計","totalRequests":"請求總數","dailyAverageFormat":"每日平均 {0}","totalTokens":"Token 總數","averagePerRequestFormat":"每次請求平均 {0}","cachedTokens":"已快取 Token","cachedTokensNote":"重複使用的輸入 Token","cacheRatio":"快取比例","cacheGood":"效率良好 · 目標 70% 以上","cacheNeedsImprovement":"建議改善 · 目標 70% 以上","dailyHeading":"每日使用趨勢","dailyDescription":"依日期比較請求量與 Token 消耗模式。","dailyInsightsAria":"每日關鍵洞察","peakRequests":"請求峰值","peakTokens":"Token 峰值","requestCount":"請求數","dailyRequestsDescription":"每天發生的所有模型請求","countUnit":"次","tokenUsage":"Token 使用量","dailyTokensDescription":"輸入與輸出合計的每日消耗量","millionUnit":"百萬","inputOutput":"輸入與輸出","inputOutputDescription":"輸入與輸出 Token 的每日組成","input":"輸入","output":"輸出","cacheEfficiency":"快取效率","cacheEfficiencyDescription":"70% 以上表示重複使用穩定","modelHeading":"依模型分析使用情況","modelDescription":"比較各模型的請求頻率和 Token 消耗集中度。","modelInsightsAria":"模型關鍵洞察","mostUsedModel":"使用最多的模型","requestShare":"請求占比","modelRequests":"各模型請求數","modelRequestsDescription":"依請求數排名前 8 的模型","modelTokens":"各模型 Token 總數","modelTokensDescription":"使用至少 1,000 Token 的模型","modelInputOutput":"各模型輸入與輸出","modelInputOutputDescription":"Token 使用量前 10 個模型的輸入與輸出組成","horizontalAxisNote":"橫軸：百萬 Token","noDataTitle":"沒有可顯示的 Token 統計","noDataDescription":"記錄 LLM 請求後，此報告會自動更新。","footerPeriodFormat":"顯示期間 {0} · 累計","footerProduct":"TxtAIEditor Token 統計 · 基於 Chart.js 的靜態儀表板","generatedAtFormat":"產生時間：{0}","requestsFormat":"{0} 次","tokensFormat":"{0} Token"}</value>
   </data>
+  <data name="RemoteExplorerTitle" xml:space="preserve"><value>遠端檔案總管</value></data>
+  <data name="RemoteExplorerDescription" xml:space="preserve"><value>瀏覽 SSH、SFTP、FTPS 或 WebDAV 伺服器。</value></data>
+  <data name="RemoteExplorerAddServer" xml:space="preserve"><value>新增伺服器</value></data>
+  <data name="RemoteExplorerNoServers" xml:space="preserve"><value>尚未新增伺服器。</value></data>
+  <data name="RemoteExplorerDisconnect" xml:space="preserve"><value>中斷連線</value></data>
+  <data name="RemoteExplorerAddServerTooltip" xml:space="preserve"><value>新增遠端伺服器</value></data>
+  <data name="RemoteExplorerSelectServer" xml:space="preserve"><value>請選擇伺服器。</value></data>
+  <data name="RemoteExplorerConnectedFormat" xml:space="preserve"><value>已連線至 {0}</value></data>
+  <data name="RemoteServerNamePlaceholder" xml:space="preserve"><value>伺服器名稱</value></data>
+  <data name="RemoteServerAddressPlaceholder" xml:space="preserve"><value>主機或位址</value></data>
+  <data name="RemoteServerUserNamePlaceholder" xml:space="preserve"><value>ID</value></data>
+  <data name="RemoteServerPasswordPlaceholder" xml:space="preserve"><value>密碼</value></data>
+  <data name="RemoteServerNameLabel" xml:space="preserve"><value>伺服器名稱</value></data>
+  <data name="RemoteServerTypeLabel" xml:space="preserve"><value>伺服器類型</value></data>
+  <data name="RemoteServerAddressLabel" xml:space="preserve"><value>位址</value></data>
+  <data name="RemoteServerPortLabel" xml:space="preserve"><value>連接埠</value></data>
+  <data name="RemoteServerUserNameLabel" xml:space="preserve"><value>ID</value></data>
+  <data name="RemoteServerPasswordLabel" xml:space="preserve"><value>密碼</value></data>
+  <data name="RemoteServerCredentialNotice" xml:space="preserve"><value>位址與密碼會以一般認證儲存在 Windows 認證管理員中。</value></data>
+  <data name="RemoteExplorerAddServerTitle" xml:space="preserve"><value>新增遠端伺服器</value></data>
+  <data name="CommonAdd" xml:space="preserve"><value>新增</value></data>
+  <data name="CommonCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="CommonDelete" xml:space="preserve"><value>刪除</value></data>
+  <data name="CommonClose" xml:space="preserve"><value>關閉</value></data>
+  <data name="RemoteServerSaved" xml:space="preserve"><value>伺服器已儲存。</value></data>
+  <data name="RemoteServerSaveFailedTitle" xml:space="preserve"><value>無法儲存伺服器</value></data>
+  <data name="RemoteServerDeleteTitle" xml:space="preserve"><value>刪除伺服器</value></data>
+  <data name="RemoteServerDeleteMessageFormat" xml:space="preserve"><value>要刪除「{0}」伺服器及其已儲存的認證嗎？</value></data>
+  <data name="RemoteServerDeleted" xml:space="preserve"><value>伺服器及其認證已刪除。</value></data>
+  <data name="RemoteConnectionFailedTitle" xml:space="preserve"><value>遠端連線失敗</value></data>
+  <data name="RemoteCredentialMissing" xml:space="preserve"><value>在 Windows 認證管理員中找不到伺服器位址或密碼。</value></data>
+  <data name="RemoteSshSftpNotice" xml:space="preserve"><value>瀏覽 SSH 伺服器時會使用安全檔案傳輸（SFTP）通道。</value></data>
+  <data name="RemoteDownloadingFile" xml:space="preserve"><value>正在開啟檔案...</value></data>
+  <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>已開啟 {0} 的暫存本機複本。</value></data>
+  <data name="RemoteLoadingDirectory" xml:space="preserve"><value>正在載入資料夾...</value></data>
+  <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0} 個項目</value></data>
+  <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>作業失敗: {0}</value></data>
+  <data name="RemoteServerRequiredFields" xml:space="preserve"><value>請輸入伺服器名稱、位址、ID 與密碼。</value></data>
+  <data name="RemoteServerInvalidPort" xml:space="preserve"><value>連接埠必須是 1 到 65535 之間的數字。</value></data>
+  <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV 位址必須以 https:// 開頭。</value></data>
 </root>

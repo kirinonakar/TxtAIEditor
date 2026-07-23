@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
@@ -20,6 +21,7 @@ namespace TxtAIEditor.Controls
         public Button CreateFolderButton => ExplorerCreateFolderButton;
         public Button RefreshButton => ExplorerRefreshButton;
         public Button SortButton => ExplorerSortButton;
+        public Button RemoteButton => ExplorerRemoteButton;
         public Button OpenInWindowsButton => ExplorerOpenInWindowsButton;
         public Button HomeButton => ExplorerHomeButton;
         public ToggleButton TreeModeButton => ExplorerTreeModeButton;
@@ -31,6 +33,11 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? CreateFolderClick;
         public event RoutedEventHandler? RefreshClick;
         public event RoutedEventHandler? SortClick;
+        public event EventHandler<RemoteFileOpenedEventArgs>? RemoteFileOpened
+        {
+            add => RemoteExplorer.RemoteFileOpened += value;
+            remove => RemoteExplorer.RemoteFileOpened -= value;
+        }
         public event RoutedEventHandler? OpenInWindowsExplorerClick;
         public event RoutedEventHandler? HomeClick;
         public event RoutedEventHandler? TreeModeClick;
@@ -88,6 +95,11 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(ExplorerRefreshButton, getString("ExplorerRefreshTooltip", "새로고침"));
             ToolTipService.SetToolTip(ExplorerSortButton, getString("ExplorerSortName", "이름순 정렬"));
 
+            var remoteExplorerText = getString("RemoteExplorerTitle", "리모트 탐색기");
+            ToolTipService.SetToolTip(ExplorerRemoteButton, remoteExplorerText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerRemoteButton, remoteExplorerText);
+            RemoteExplorer.Localize(getString);
+
             var openInWindowsExplorerText = getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기");
             ToolTipService.SetToolTip(ExplorerOpenInWindowsButton, openInWindowsExplorerText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerOpenInWindowsButton, openInWindowsExplorerText);
@@ -108,6 +120,7 @@ namespace TxtAIEditor.Controls
         private void OnCreateFolderClick(object sender, RoutedEventArgs e) => CreateFolderClick?.Invoke(sender, e);
         private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
+        private async void OnRemoteFlyoutOpening(object sender, object e) => await RemoteExplorer.RefreshProfilesAsync();
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e) => OpenInWindowsExplorerClick?.Invoke(sender, e);
         private void OnExplorerHomeClick(object sender, RoutedEventArgs e) => HomeClick?.Invoke(sender, e);
         private void OnExplorerTreeModeClick(object sender, RoutedEventArgs e) => TreeModeClick?.Invoke(sender, e);

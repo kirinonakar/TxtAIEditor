@@ -3450,4 +3450,44 @@
   <data name="TokenReportStringsJson" xml:space="preserve">
     <value>{"title":"Token 使用状況","subtitle":"リクエスト数、Token 消費量、キャッシュ効率を一覧できる累積ダッシュボード","periodBadge":"表示期間","themeToggle":"テーマを切り替え","darkModeSwitch":"ダークモードに切り替え","lightModeSwitch":"ライトモードに切り替え","summaryAria":"主要統計","totalRequests":"総リクエスト","dailyAverageFormat":"1日平均 {0}","totalTokens":"総 Token 数","averagePerRequestFormat":"1リクエスト平均 {0}","cachedTokens":"キャッシュ済み Token","cachedTokensNote":"再利用された入力 Token","cacheRatio":"キャッシュ率","cacheGood":"良好 · 目標70%以上","cacheNeedsImprovement":"改善推奨 · 目標70%以上","dailyHeading":"日別使用推移","dailyDescription":"日付ごとのリクエスト数と Token 消費傾向を比較します。","dailyInsightsAria":"日別の主要インサイト","peakRequests":"最多リクエスト","peakTokens":"最多 Token","requestCount":"リクエスト数","dailyRequestsDescription":"1日に発生した全モデルのリクエスト","countUnit":"回","tokenUsage":"Token 使用量","dailyTokensDescription":"入力と出力を合計した日別消費量","millionUnit":"百万","inputOutput":"入力と出力","inputOutputDescription":"入力 Token と出力 Token の日別構成","input":"入力","output":"出力","cacheEfficiency":"キャッシュ効率","cacheEfficiencyDescription":"70%以上を安定した再利用区間として表示","modelHeading":"モデル別使用分析","modelDescription":"モデル別のリクエスト頻度と Token 消費の偏りを比較します。","modelInsightsAria":"モデル別の主要インサイト","mostUsedModel":"最も使用したモデル","requestShare":"リクエスト比率","modelRequests":"モデル別リクエスト数","modelRequestsDescription":"リクエスト数上位8モデル","modelTokens":"モデル別総 Token 数","modelTokensDescription":"1,000 Token 以上使用したモデル","modelInputOutput":"モデル別の入力と出力","modelInputOutputDescription":"Token 使用量上位10モデルの入力・出力構成","horizontalAxisNote":"横軸: 百万 Token","noDataTitle":"表示する Token 統計がありません","noDataDescription":"LLMリクエストが記録されると、このレポートに自動反映されます。","footerPeriodFormat":"表示期間 {0} · 累積","footerProduct":"TxtAIEditor Token 統計 · Chart.js 静的ダッシュボード","generatedAtFormat":"生成: {0}","requestsFormat":"{0}回","tokensFormat":"{0} Token"}</value>
   </data>
+  <data name="RemoteExplorerTitle" xml:space="preserve"><value>リモート エクスプローラー</value></data>
+  <data name="RemoteExplorerDescription" xml:space="preserve"><value>SSH、SFTP、FTPS、WebDAV サーバーを参照します。</value></data>
+  <data name="RemoteExplorerAddServer" xml:space="preserve"><value>サーバーを追加</value></data>
+  <data name="RemoteExplorerNoServers" xml:space="preserve"><value>サーバーが追加されていません。</value></data>
+  <data name="RemoteExplorerDisconnect" xml:space="preserve"><value>切断</value></data>
+  <data name="RemoteExplorerAddServerTooltip" xml:space="preserve"><value>リモート サーバーを追加</value></data>
+  <data name="RemoteExplorerSelectServer" xml:space="preserve"><value>サーバーを選択してください。</value></data>
+  <data name="RemoteExplorerConnectedFormat" xml:space="preserve"><value>{0} に接続しました</value></data>
+  <data name="RemoteServerNamePlaceholder" xml:space="preserve"><value>サーバー名</value></data>
+  <data name="RemoteServerAddressPlaceholder" xml:space="preserve"><value>ホストまたはアドレス</value></data>
+  <data name="RemoteServerUserNamePlaceholder" xml:space="preserve"><value>ID</value></data>
+  <data name="RemoteServerPasswordPlaceholder" xml:space="preserve"><value>パスワード</value></data>
+  <data name="RemoteServerNameLabel" xml:space="preserve"><value>サーバー名</value></data>
+  <data name="RemoteServerTypeLabel" xml:space="preserve"><value>サーバーの種類</value></data>
+  <data name="RemoteServerAddressLabel" xml:space="preserve"><value>アドレス</value></data>
+  <data name="RemoteServerPortLabel" xml:space="preserve"><value>ポート</value></data>
+  <data name="RemoteServerUserNameLabel" xml:space="preserve"><value>ID</value></data>
+  <data name="RemoteServerPasswordLabel" xml:space="preserve"><value>パスワード</value></data>
+  <data name="RemoteServerCredentialNotice" xml:space="preserve"><value>アドレスとパスワードは Windows 資格情報マネージャーの汎用資格情報に保存されます。</value></data>
+  <data name="RemoteExplorerAddServerTitle" xml:space="preserve"><value>リモート サーバーの追加</value></data>
+  <data name="CommonAdd" xml:space="preserve"><value>追加</value></data>
+  <data name="CommonCancel" xml:space="preserve"><value>キャンセル</value></data>
+  <data name="CommonDelete" xml:space="preserve"><value>削除</value></data>
+  <data name="CommonClose" xml:space="preserve"><value>閉じる</value></data>
+  <data name="RemoteServerSaved" xml:space="preserve"><value>サーバーを保存しました。</value></data>
+  <data name="RemoteServerSaveFailedTitle" xml:space="preserve"><value>サーバーを保存できませんでした</value></data>
+  <data name="RemoteServerDeleteTitle" xml:space="preserve"><value>サーバーの削除</value></data>
+  <data name="RemoteServerDeleteMessageFormat" xml:space="preserve"><value>「{0}」サーバーと保存済み資格情報を削除しますか？</value></data>
+  <data name="RemoteServerDeleted" xml:space="preserve"><value>サーバーと資格情報を削除しました。</value></data>
+  <data name="RemoteConnectionFailedTitle" xml:space="preserve"><value>リモート接続に失敗しました</value></data>
+  <data name="RemoteCredentialMissing" xml:space="preserve"><value>Windows 資格情報マネージャーにサーバーのアドレスまたはパスワードが見つかりません。</value></data>
+  <data name="RemoteSshSftpNotice" xml:space="preserve"><value>SSH サーバーの参照にはセキュア ファイル転送（SFTP）チャネルを使用します。</value></data>
+  <data name="RemoteDownloadingFile" xml:space="preserve"><value>ファイルを開いています...</value></data>
+  <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>{0} の一時ローカル コピーを開きました。</value></data>
+  <data name="RemoteLoadingDirectory" xml:space="preserve"><value>フォルダーを読み込んでいます...</value></data>
+  <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0} 項目</value></data>
+  <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>操作に失敗しました: {0}</value></data>
+  <data name="RemoteServerRequiredFields" xml:space="preserve"><value>サーバー名、アドレス、ID、パスワードを入力してください。</value></data>
+  <data name="RemoteServerInvalidPort" xml:space="preserve"><value>ポートは 1～65535 の数値で指定してください。</value></data>
+  <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV アドレスは https:// で始まる必要があります。</value></data>
 </root>

@@ -3486,4 +3486,44 @@ Plan: {0}</value>
   <data name="TokenReportStringsJson" xml:space="preserve">
     <value>{"title":"Token Usage Overview","subtitle":"A cumulative dashboard for requests, token consumption, and cache efficiency","periodBadge":"Display period","themeToggle":"Switch theme","darkModeSwitch":"Switch to dark mode","lightModeSwitch":"Switch to light mode","summaryAria":"Key statistics","totalRequests":"Total requests","dailyAverageFormat":"Daily average {0}","totalTokens":"Total tokens","averagePerRequestFormat":"Average per request {0}","cachedTokens":"Cached tokens","cachedTokensNote":"Reused input tokens","cacheRatio":"Cache ratio","cacheGood":"Healthy efficiency · Target 70% or higher","cacheNeedsImprovement":"Improvement recommended · Target 70% or higher","dailyHeading":"Daily usage trend","dailyDescription":"Compare request volume and token consumption by date.","dailyInsightsAria":"Key daily insights","peakRequests":"Most requests","peakTokens":"Most tokens","requestCount":"Requests","dailyRequestsDescription":"All model requests made during each day","countUnit":"requests","tokenUsage":"Token usage","dailyTokensDescription":"Daily consumption combining input and output","millionUnit":"million","inputOutput":"Input and output","inputOutputDescription":"Daily composition of input and output tokens","input":"Input","output":"Output","cacheEfficiency":"Cache efficiency","cacheEfficiencyDescription":"Values of 70% or higher indicate stable reuse","modelHeading":"Usage by model","modelDescription":"Compare request frequency and token concentration by model.","modelInsightsAria":"Key model insights","mostUsedModel":"Most used model","requestShare":"Request share","modelRequests":"Requests by model","modelRequestsDescription":"Top 8 models by request count","modelTokens":"Total tokens by model","modelTokensDescription":"Models using at least 1,000 tokens","modelInputOutput":"Input and output by model","modelInputOutputDescription":"Input and output for the top 10 models by token usage","horizontalAxisNote":"Horizontal axis: million tokens","noDataTitle":"No token statistics to display","noDataDescription":"This report updates automatically after LLM requests are recorded.","footerPeriodFormat":"Display period {0} · Cumulative","footerProduct":"TxtAIEditor token statistics · Static dashboard powered by Chart.js","generatedAtFormat":"Generated: {0}","requestsFormat":"{0} requests","tokensFormat":"{0} tokens"}</value>
   </data>
+  <data name="RemoteExplorerTitle" xml:space="preserve"><value>Remote Explorer</value></data>
+  <data name="RemoteExplorerDescription" xml:space="preserve"><value>Browse SSH, SFTP, FTPS, or WebDAV servers.</value></data>
+  <data name="RemoteExplorerAddServer" xml:space="preserve"><value>Add server</value></data>
+  <data name="RemoteExplorerNoServers" xml:space="preserve"><value>No servers have been added.</value></data>
+  <data name="RemoteExplorerDisconnect" xml:space="preserve"><value>Disconnect</value></data>
+  <data name="RemoteExplorerAddServerTooltip" xml:space="preserve"><value>Add a remote server</value></data>
+  <data name="RemoteExplorerSelectServer" xml:space="preserve"><value>Select a server.</value></data>
+  <data name="RemoteExplorerConnectedFormat" xml:space="preserve"><value>Connected to {0}</value></data>
+  <data name="RemoteServerNamePlaceholder" xml:space="preserve"><value>Server name</value></data>
+  <data name="RemoteServerAddressPlaceholder" xml:space="preserve"><value>Host or address</value></data>
+  <data name="RemoteServerUserNamePlaceholder" xml:space="preserve"><value>ID</value></data>
+  <data name="RemoteServerPasswordPlaceholder" xml:space="preserve"><value>Password</value></data>
+  <data name="RemoteServerNameLabel" xml:space="preserve"><value>Server name</value></data>
+  <data name="RemoteServerTypeLabel" xml:space="preserve"><value>Server type</value></data>
+  <data name="RemoteServerAddressLabel" xml:space="preserve"><value>Address</value></data>
+  <data name="RemoteServerPortLabel" xml:space="preserve"><value>Port</value></data>
+  <data name="RemoteServerUserNameLabel" xml:space="preserve"><value>ID</value></data>
+  <data name="RemoteServerPasswordLabel" xml:space="preserve"><value>Password</value></data>
+  <data name="RemoteServerCredentialNotice" xml:space="preserve"><value>The address and password are stored as Generic Credentials in Windows Credential Manager.</value></data>
+  <data name="RemoteExplorerAddServerTitle" xml:space="preserve"><value>Add remote server</value></data>
+  <data name="CommonAdd" xml:space="preserve"><value>Add</value></data>
+  <data name="CommonCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="CommonDelete" xml:space="preserve"><value>Delete</value></data>
+  <data name="CommonClose" xml:space="preserve"><value>Close</value></data>
+  <data name="RemoteServerSaved" xml:space="preserve"><value>The server was saved.</value></data>
+  <data name="RemoteServerSaveFailedTitle" xml:space="preserve"><value>Could not save server</value></data>
+  <data name="RemoteServerDeleteTitle" xml:space="preserve"><value>Delete server</value></data>
+  <data name="RemoteServerDeleteMessageFormat" xml:space="preserve"><value>Delete the '{0}' server and its saved credentials?</value></data>
+  <data name="RemoteServerDeleted" xml:space="preserve"><value>The server and its credentials were deleted.</value></data>
+  <data name="RemoteConnectionFailedTitle" xml:space="preserve"><value>Remote connection failed</value></data>
+  <data name="RemoteCredentialMissing" xml:space="preserve"><value>The server address or password could not be found in Windows Credential Manager.</value></data>
+  <data name="RemoteSshSftpNotice" xml:space="preserve"><value>SSH server browsing uses the secure file transfer (SFTP) channel.</value></data>
+  <data name="RemoteDownloadingFile" xml:space="preserve"><value>Opening file...</value></data>
+  <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>Opened a temporary local copy of {0}.</value></data>
+  <data name="RemoteLoadingDirectory" xml:space="preserve"><value>Loading folder...</value></data>
+  <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0} items</value></data>
+  <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>Operation failed: {0}</value></data>
+  <data name="RemoteServerRequiredFields" xml:space="preserve"><value>Enter the server name, address, ID, and password.</value></data>
+  <data name="RemoteServerInvalidPort" xml:space="preserve"><value>The port must be a number from 1 to 65535.</value></data>
+  <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>The WebDAV address must start with https://.</value></data>
 </root>
