@@ -23,7 +23,7 @@
                             <ListView x:Name="RecentFilesListView" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnRecentFileItemClick">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding Path}">
+                                        <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding DisplayPath}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
@@ -36,7 +36,7 @@
                                             </FontIcon>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding Path}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding DisplayPath}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
                                             <Button Grid.Column="2" Background="Transparent" BorderBrush="Transparent" Click="OnRemoveRecentFileClick" Tag="{Binding Path}" Padding="3" VerticalAlignment="Center" ToolTipService.ToolTip="최근 파일 목록에서 제거">
                                                 <FontIcon Glyph="&#xE74D;" FontSize="10"/>

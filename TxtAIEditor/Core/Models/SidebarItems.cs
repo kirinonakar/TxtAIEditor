@@ -10,6 +10,7 @@ namespace TxtAIEditor.Core.Models
     {
         public string Name { get; set; } = string.Empty;
         public string Path { get; set; } = string.Empty;
+        public string DisplayPath { get; set; } = string.Empty;
         public string LastOpenedText { get; set; } = string.Empty;
         public bool IsFolder { get; set; } = false;
         public string IconGlyph => IsFolder ? "\uE8B7" : "\uE7C3";

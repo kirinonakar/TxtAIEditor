@@ -597,6 +597,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            _remoteWorkspaceService.NotifyActiveDirectoryOpened();
             _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
             SetCurrentFolderPath(string.Empty);
             _currentRepoPathChanged(string.Empty);

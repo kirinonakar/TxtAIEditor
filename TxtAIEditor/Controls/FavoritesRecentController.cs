@@ -57,6 +57,8 @@ namespace TxtAIEditor.Controls
 
             _leftSidebar.FavoritesList.ItemsSource = _viewModel.Favorites;
             _leftSidebar.RecentFilesList.ItemsSource = _viewModel.RecentFiles;
+            _remoteWorkspaceService.DirectoryOpened += (_, path) =>
+                AddRecentFolder(path);
             WireEvents();
         }
 
@@ -77,6 +79,9 @@ namespace TxtAIEditor.Controls
             var filtered = _allRecentItems.Where(i => i.IsFolder == !showFiles).ToList();
             foreach (var item in filtered)
             {
+                item.DisplayPath = RemotePath.IsRemote(item.Path)
+                    ? _remoteWorkspaceService.GetDisplayPath(item.Path)
+                    : item.Path;
                 _viewModel.RecentFiles.Add(item);
             }
         }

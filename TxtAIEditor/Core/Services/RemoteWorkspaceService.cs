@@ -30,6 +30,7 @@ namespace TxtAIEditor.Core.Services
         public string ActiveRootPath { get; private set; } = "/";
         public bool IsActive => ActiveConnection != null;
         public event EventHandler<string>? FileUploaded;
+        public event EventHandler<string>? DirectoryOpened;
         public string ActiveDirectoryVirtualPath => ActiveConnection == null
             ? string.Empty
             : RemotePath.Create(
@@ -76,6 +77,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             ActiveDirectoryPath = path;
+            NotifyActiveDirectoryOpened();
             return true;
         }
 
@@ -105,6 +107,7 @@ namespace TxtAIEditor.Core.Services
         public void NavigateTo(string remotePath)
         {
             ActiveDirectoryPath = remotePath;
+            NotifyActiveDirectoryOpened();
         }
 
         public bool NavigateUp()
@@ -116,7 +119,16 @@ namespace TxtAIEditor.Core.Services
             }
 
             ActiveDirectoryPath = RemoteExplorerService.GetParentPath(ActiveDirectoryPath);
+            NotifyActiveDirectoryOpened();
             return true;
+        }
+
+        public void NotifyActiveDirectoryOpened()
+        {
+            if (IsActive)
+            {
+                DirectoryOpened?.Invoke(this, ActiveDirectoryVirtualPath);
+            }
         }
 
         public async Task<string> DownloadVirtualFileAsync(

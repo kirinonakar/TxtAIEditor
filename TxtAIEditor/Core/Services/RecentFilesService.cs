@@ -134,6 +134,7 @@ namespace TxtAIEditor.Core.Services
                 {
                     Name = item.Name,
                     Path = item.Path,
+                    DisplayPath = item.DisplayPath,
                     LastOpenedText = item.LastOpenedText,
                     IsFolder = item.IsFolder
                 })
@@ -178,6 +179,7 @@ namespace TxtAIEditor.Core.Services
                 {
                     Name = displayName,
                     Path = fullPath,
+                    DisplayPath = fullPath,
                     IsFolder = isFolder,
                     LastOpenedText = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 });
