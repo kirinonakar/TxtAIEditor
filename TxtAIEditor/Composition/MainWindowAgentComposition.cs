@@ -148,6 +148,18 @@ namespace TxtAIEditor.Composition
                 services.RemoteWorkspaceService,
                 callbacks);
 
+            var agentFileTools = new AgentFileToolService(
+                agentFileWorkflow.GetWorkspaceRoot,
+                callbacks.GetLocalizedString)
+            {
+                FileDisplayPathProvider = fullPath =>
+                    services.RemoteWorkspaceService.TryGetVirtualPath(
+                        fullPath,
+                        out string remotePath)
+                        ? services.RemoteWorkspaceService.GetDisplayPath(remotePath)
+                        : null
+            };
+
             var agent = new AgentController(
                 services.LlmService,
                 services.SettingsService,
@@ -167,7 +179,7 @@ namespace TxtAIEditor.Composition
                     callbacks),
                 shell.Dialog.ShowErrorMessage,
                 callbacks.GetLocalizedString,
-                new AgentFileToolService(agentFileWorkflow.GetWorkspaceRoot, callbacks.GetLocalizedString),
+                agentFileTools,
                 services.PdfTextExtractionService,
                 callbacks.InitializePickerWindow,
                 path => services.GitService.FindRepositoryRoot(path) != null,

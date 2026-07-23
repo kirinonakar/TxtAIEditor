@@ -47,19 +47,23 @@ namespace TxtAIEditor.Controls
 
         public async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)
         {
+            string displayPath = _fileTools.GetDisplayPath(
+                preview.FullPath,
+                preview.RelativePath);
+            preview.DisplayPath = displayPath;
             var settings = _settingsService.CurrentSettings;
             string root = _fileTools.WorkspaceRoot;
             if (settings.LlmAgentAutoApproveGitEdits && _isGitRepoProvider(root))
             {
                 _appendActivity(string.Format(
                     _getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"),
-                    preview.RelativePath));
+                    displayPath));
                 return true;
             }
 
             _appendActivity(string.Format(
                 _getString("AgentActivityDiffReviewFormat", "파일 변경 승인 대기 중: {0}"),
-                preview.RelativePath));
+                displayPath));
 
             return await _runOnUIThreadAsync(async () =>
             {
@@ -76,8 +80,8 @@ namespace TxtAIEditor.Controls
                 };
 
                 string summaryText = preview.IsNewFile
-                    ? string.Format(_getString("AgentCreateSummaryFormat", "파일을 생성하시겠습니까? 경로: {0}"), preview.RelativePath)
-                    : string.Format(_getString("AgentEditSummaryFormat", "파일을 수정하시겠습니까? 경로: {0}"), preview.RelativePath);
+                    ? string.Format(_getString("AgentCreateSummaryFormat", "파일을 생성하시겠습니까? 경로: {0}"), displayPath)
+                    : string.Format(_getString("AgentEditSummaryFormat", "파일을 수정하시겠습니까? 경로: {0}"), displayPath);
 
                 string headerText = string.Format(
                     _getString(titleKey, defaultTitle),
@@ -90,8 +94,8 @@ namespace TxtAIEditor.Controls
                 _agentPane.HideDiffConfirm();
 
                 _appendActivity(approved
-                    ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), preview.RelativePath)
-                    : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), preview.RelativePath));
+                    ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), displayPath)
+                    : string.Format(_getString("AgentActivityDiffCancelledFormat", "변경 적용 취소: {0}"), displayPath));
 
                 return approved;
             });

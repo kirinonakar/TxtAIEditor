@@ -12,6 +12,7 @@ namespace TxtAIEditor.Controls
         public string ActionName { get; init; } = string.Empty;
         public string RelativePath { get; init; } = string.Empty;
         public string FullPath { get; init; } = string.Empty;
+        public string DisplayPath { get; set; } = string.Empty;
         public string OldContent { get; init; } = string.Empty;
         public string NewContent { get; init; } = string.Empty;
         public bool IsNewFile { get; init; }
@@ -19,9 +20,18 @@ namespace TxtAIEditor.Controls
         public int ModificationNumber { get; set; }
         public int TotalModifications { get; set; }
 
-        public string DisplayRelativePath => TotalModifications > 1
-            ? $"({ModificationNumber}) {RelativePath}"
-            : RelativePath;
+        public string DisplayRelativePath
+        {
+            get
+            {
+                string path = string.IsNullOrWhiteSpace(DisplayPath)
+                    ? RelativePath
+                    : DisplayPath;
+                return TotalModifications > 1
+                    ? $"({ModificationNumber}) {path}"
+                    : path;
+            }
+        }
     }
 
     public sealed class AgentReadImageResult
@@ -106,10 +116,19 @@ namespace TxtAIEditor.Controls
         public Func<string, Task<bool>>? ConfirmPowerShellAsync { get; set; }
         public Func<string, Task>? FileModifiedAsync { get; set; }
         public Func<AgentFileEditPreview, Task>? FileEditCommittedAsync { get; set; }
+        public Func<string, string?>? FileDisplayPathProvider { get; set; }
         public Action<string>? ActivityReporter { get; set; }
         public Func<string?>? WorkspaceRootOverrideProvider { get; set; }
 
         public string WorkspaceRoot => _workspace.WorkspaceRoot;
+
+        public string GetDisplayPath(string fullPath, string fallbackPath)
+        {
+            string? displayPath = FileDisplayPathProvider?.Invoke(fullPath);
+            return string.IsNullOrWhiteSpace(displayPath)
+                ? fallbackPath
+                : displayPath;
+        }
 
         private string ResolveWorkspaceRoot()
         {

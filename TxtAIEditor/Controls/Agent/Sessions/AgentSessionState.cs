@@ -153,6 +153,7 @@ namespace TxtAIEditor.Controls
                 ActionName = preview.ActionName,
                 RelativePath = preview.RelativePath,
                 FullPath = preview.FullPath,
+                DisplayPath = preview.DisplayPath,
                 OldContent = preview.OldContent,
                 NewContent = preview.NewContent,
                 IsNewFile = preview.IsNewFile,
