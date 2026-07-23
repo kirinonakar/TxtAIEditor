@@ -59,28 +59,83 @@ namespace TxtAIEditor.Controls
             UpdateExternalPathIndicator();
         }
 
-        private bool IsPathUnderWorkspace(string filePath)
+        private static bool IsPathUnderWorkspace(OpenedTab tab, string workspaceFolderPath)
         {
-            var fileDirectory = Path.GetDirectoryName(filePath);
-            if (fileDirectory == null)
-                return false;
+            if (string.IsNullOrWhiteSpace(workspaceFolderPath))
+            {
+                return true;
+            }
 
-            return string.Equals(
-                fileDirectory.TrimEnd(Path.DirectorySeparatorChar),
-                _workspaceFolderPath.TrimEnd(Path.DirectorySeparatorChar),
-                StringComparison.OrdinalIgnoreCase);
+            if (tab.IsRemoteFile && !string.IsNullOrWhiteSpace(tab.RemotePath))
+            {
+                if (!RemotePath.IsRemote(workspaceFolderPath))
+                {
+                    return false;
+                }
+
+                if (!RemotePath.TryParse(tab.RemotePath, out Guid fileServerId, out string filePath) ||
+                    !RemotePath.TryParse(workspaceFolderPath, out Guid wsServerId, out string wsPath))
+                {
+                    return false;
+                }
+
+                if (fileServerId != wsServerId)
+                {
+                    return false;
+                }
+
+                string normalizedFilePath = NormalizeRemotePath(filePath);
+                string normalizedWsPath = NormalizeRemotePath(wsPath);
+
+                string fileDir = GetRemoteDirectoryName(normalizedFilePath);
+                return string.Equals(fileDir, normalizedWsPath, StringComparison.OrdinalIgnoreCase);
+            }
+
+            string? localFilePath = !string.IsNullOrWhiteSpace(tab.FilePath) ? tab.FilePath : tab.HexSourceFilePath;
+            if (string.IsNullOrWhiteSpace(localFilePath))
+            {
+                return true;
+            }
+
+            if (RemotePath.IsRemote(workspaceFolderPath))
+            {
+                return false;
+            }
+
+            var fileDirectory = Path.GetDirectoryName(localFilePath);
+            if (string.IsNullOrEmpty(fileDirectory))
+            {
+                return false;
+            }
+
+            string normalizedLocalDir = fileDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string normalizedLocalWs = workspaceFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            return string.Equals(normalizedLocalDir, normalizedLocalWs, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeRemotePath(string path)
+        {
+            string normalized = (path ?? string.Empty).Replace('\\', '/').Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? "/" : "/" + normalized.Trim('/');
+        }
+
+        private static string GetRemoteDirectoryName(string remotePath)
+        {
+            string normalized = NormalizeRemotePath(remotePath);
+            int separator = normalized.LastIndexOf('/');
+            return separator <= 0 ? "/" : normalized[..separator];
         }
 
         private void UpdateExternalPathIndicator()
         {
-            if (string.IsNullOrEmpty(_workspaceFolderPath) ||
-                string.IsNullOrEmpty(_tab?.FilePath))
+            if (string.IsNullOrEmpty(_workspaceFolderPath) || _tab == null)
             {
                 TitleText.ClearValue(TextBlock.ForegroundProperty);
                 return;
             }
 
-            if (IsPathUnderWorkspace(_tab.FilePath))
+            if (IsPathUnderWorkspace(_tab, _workspaceFolderPath))
             {
                 TitleText.ClearValue(TextBlock.ForegroundProperty);
             }
@@ -103,6 +158,10 @@ namespace TxtAIEditor.Controls
             else if (args.PropertyName == nameof(OpenedTab.IsArchiveEntry))
             {
                 UpdateArchiveIcon();
+            }
+            else if (args.PropertyName == nameof(OpenedTab.FilePath) || args.PropertyName == nameof(OpenedTab.RemotePath))
+            {
+                UpdateExternalPathIndicator();
             }
         }
 

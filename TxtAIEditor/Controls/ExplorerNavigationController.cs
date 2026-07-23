@@ -319,7 +319,7 @@ namespace TxtAIEditor.Controls
             }
 
             _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
-            SetCurrentFolderPath(string.Empty);
+            SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
             _currentRepoPathChanged(string.Empty);
             if (IsTreeMode)
             {
@@ -438,6 +438,7 @@ namespace TxtAIEditor.Controls
                     }
                 }
 
+                SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
                 _leftSidebar.ExplorerStatus.Text =
                     $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel} · {_remoteWorkspaceService.ActiveDirectoryPath}\n" +
                     FormatExplorerItemCount(_viewModel.ExplorerItems.Count);
@@ -599,7 +600,7 @@ namespace TxtAIEditor.Controls
 
             _remoteWorkspaceService.NotifyActiveDirectoryOpened();
             _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
-            SetCurrentFolderPath(string.Empty);
+            SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
             _currentRepoPathChanged(string.Empty);
             _leftSidebar.ClearExplorerFilter();
             if (IsTreeMode)
@@ -792,6 +793,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
             await PopulateRemoteTreeNodeAsync(rootNode, rootItem);
             rootNode.IsExpanded = true;
+            SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
             _leftSidebar.ExplorerStatus.Text =
                 $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel} · {rootPath}\n" +
                 FormatExplorerItemCount(rootNode.Children.Count);
