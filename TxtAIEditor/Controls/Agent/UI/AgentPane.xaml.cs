@@ -71,11 +71,23 @@ namespace TxtAIEditor.Controls
         {
             InitializeComponent();
             AgentMcpFlyout.OverlayInputPassThroughElement = AgentPromptInput;
+            AgentSkillFlyout.OverlayInputPassThroughElement = AgentPromptInput;
+            AgentPresetFlyout.OverlayInputPassThroughElement = AgentPromptInput;
             AgentPromptInput.GotFocus += (_, _) =>
             {
                 if (AgentMcpFlyout.IsOpen)
                 {
                     AgentMcpFlyout.Hide();
+                }
+
+                if (AgentSkillFlyout.IsOpen)
+                {
+                    AgentSkillFlyout.Hide();
+                }
+
+                if (AgentPresetFlyout.IsOpen)
+                {
+                    AgentPresetFlyout.Hide();
                 }
             };
             _menuCoordinator = new AgentPaneMenuCoordinator(
