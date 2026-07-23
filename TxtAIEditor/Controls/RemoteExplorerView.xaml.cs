@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
 {
     public sealed partial class RemoteExplorerView : UserControl
     {
+        private const double ServerInputHeight = 32;
         private readonly ObservableCollection<RemoteServerProfile> _profiles = new();
         private readonly ObservableCollection<RemoteDirectoryEntry> _entries = new();
         private readonly RemoteServerStore _serverStore = new(new CredentialService());
@@ -144,12 +145,20 @@ namespace TxtAIEditor.Controls
             ComboBox typeBox = new()
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = ServerInputHeight,
+                MinHeight = ServerInputHeight,
+                MaxHeight = ServerInputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 ItemsSource = new[] { "SSH", "SFTP", "FTPS", "WebDAV" },
                 SelectedIndex = 1
             };
             TextBox addressBox = new()
             {
                 PlaceholderText = Get("RemoteServerAddressPlaceholder", "호스트 또는 HTTPS 주소"),
+                Height = ServerInputHeight,
+                MinHeight = ServerInputHeight,
+                MaxHeight = ServerInputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 IsSpellCheckEnabled = false,
                 IsTextPredictionEnabled = false,
                 InputScope = new InputScope
@@ -157,10 +166,28 @@ namespace TxtAIEditor.Controls
                     Names = { new InputScopeName(InputScopeNameValue.Url) }
                 }
             };
-            TextBox portBox = new() { Text = "22", InputScope = new InputScope { Names = { new InputScopeName(InputScopeNameValue.Number) } } };
+            TextBox portBox = new()
+            {
+                Text = "22",
+                Height = ServerInputHeight,
+                MinHeight = ServerInputHeight,
+                MaxHeight = ServerInputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                InputScope = new InputScope
+                {
+                    Names = { new InputScopeName(InputScopeNameValue.Number) }
+                }
+            };
             TextBox userNameBox = CreateLiteralTextBox(
                 Get("RemoteServerUserNamePlaceholder", "ID"));
-            PasswordBox passwordBox = new() { PlaceholderText = Get("RemoteServerPasswordPlaceholder", "비밀번호") };
+            PasswordBox passwordBox = new()
+            {
+                PlaceholderText = Get("RemoteServerPasswordPlaceholder", "비밀번호"),
+                Height = ServerInputHeight,
+                MinHeight = ServerInputHeight,
+                MaxHeight = ServerInputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
             TextBlock validationText = new()
             {
                 Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
@@ -496,6 +523,10 @@ namespace TxtAIEditor.Controls
             return new TextBox
             {
                 PlaceholderText = placeholderText,
+                Height = ServerInputHeight,
+                MinHeight = ServerInputHeight,
+                MaxHeight = ServerInputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 IsSpellCheckEnabled = false,
                 IsTextPredictionEnabled = false,
                 InputScope = new InputScope
