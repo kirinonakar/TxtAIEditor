@@ -73,6 +73,108 @@ namespace TxtAIEditor.Core.Services
             return localPath;
         }
 
+        public async Task DownloadFileToPathAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            string localPath,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+
+            switch (connection.Profile.ServerType)
+            {
+                case RemoteServerType.Ssh:
+                    await DownloadScpWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
+                    break;
+                case RemoteServerType.Sftp:
+                    await DownloadSftpWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
+                    break;
+                case RemoteServerType.Ftps:
+                    await DownloadFtpsWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
+                    break;
+                case RemoteServerType.WebDav:
+                    await DownloadWebDavWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
+                    break;
+                case RemoteServerType.Wsl:
+                    await CopyWslFileWithProgressAsync(
+                        GetWslFileSystemPath(connection, remotePath),
+                        localPath,
+                        progress,
+                        cancellationToken);
+                    break;
+            }
+        }
+
+        public async Task DownloadDirectoryToPathAsync(
+            RemoteConnectionSettings connection,
+            string remoteFolderPath,
+            string targetLocalFolderPath,
+            Action<string, double>? progressCallback,
+            CancellationToken cancellationToken)
+        {
+            Directory.CreateDirectory(targetLocalFolderPath);
+
+            var filesToDownload = new List<(string RemotePath, string LocalPath)>();
+            var foldersToCreate = new List<string>();
+
+            async Task ScanDirectoryAsync(string currentRemoteDir, string currentLocalDir)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                IReadOnlyList<RemoteDirectoryEntry> entries =
+                    await ListDirectoryAsync(connection, currentRemoteDir, cancellationToken);
+
+                foreach (RemoteDirectoryEntry entry in entries)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string subLocal = Path.Combine(currentLocalDir, entry.Name);
+                    if (entry.IsDirectory)
+                    {
+                        foldersToCreate.Add(subLocal);
+                        await ScanDirectoryAsync(entry.FullPath, subLocal);
+                    }
+                    else
+                    {
+                        filesToDownload.Add((entry.FullPath, subLocal));
+                    }
+                }
+            }
+
+            await ScanDirectoryAsync(remoteFolderPath, targetLocalFolderPath);
+
+            foreach (string folder in foldersToCreate)
+            {
+                Directory.CreateDirectory(folder);
+            }
+
+            int totalFiles = filesToDownload.Count;
+            if (totalFiles == 0)
+            {
+                progressCallback?.Invoke(Path.GetFileName(targetLocalFolderPath), 100.0);
+                return;
+            }
+
+            for (int i = 0; i < totalFiles; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var (remFile, locFile) = filesToDownload[i];
+                string fileName = Path.GetFileName(remFile);
+                double fileStartPercent = (double)i / totalFiles * 100.0;
+                progressCallback?.Invoke($"{fileName} ({i + 1}/{totalFiles})", fileStartPercent);
+
+                Progress<double> fileProgress = new(p =>
+                {
+                    double filePortion = p / totalFiles;
+                    double currentOverall = fileStartPercent + filePortion;
+                    progressCallback?.Invoke($"{fileName} ({i + 1}/{totalFiles})", Math.Min(99.9, currentOverall));
+                });
+
+                await DownloadFileToPathAsync(connection, remFile, locFile, fileProgress, cancellationToken);
+            }
+
+            progressCallback?.Invoke(Path.GetFileName(targetLocalFolderPath), 100.0);
+        }
+
         public async Task UploadFileAsync(
             RemoteConnectionSettings connection,
             string localPath,
@@ -884,6 +986,142 @@ namespace TxtAIEditor.Core.Services
             response.EnsureSuccessStatusCode();
             await using FileStream output = new(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
             await response.Content.CopyToAsync(output, cancellationToken);
+        }
+
+        private static async Task DownloadScpWithProgressAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            string localPath,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using ScpClient client = CreateScpClient(connection);
+                client.Connect();
+                cancellationToken.ThrowIfCancellationRequested();
+                using FileStream output = new(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                client.Downloading += (sender, e) =>
+                {
+                    if (e.Size > 0)
+                    {
+                        progress?.Report((double)e.Downloaded * 100.0 / e.Size);
+                    }
+                };
+                client.Download(NormalizeRemotePath(remotePath), output);
+                progress?.Report(100.0);
+            }, cancellationToken);
+        }
+
+        private static async Task DownloadSftpWithProgressAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            string localPath,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using SftpClient client = CreateSftpClient(connection);
+                client.Connect();
+                cancellationToken.ThrowIfCancellationRequested();
+                var stat = client.Get(NormalizeRemotePath(remotePath));
+                ulong totalSize = (ulong)Math.Max(1, stat.Length);
+                using FileStream output = new(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                client.DownloadFile(NormalizeRemotePath(remotePath), output, downloaded =>
+                {
+                    progress?.Report((double)downloaded * 100.0 / totalSize);
+                });
+                progress?.Report(100.0);
+            }, cancellationToken);
+        }
+
+        private static async Task DownloadFtpsWithProgressAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            string localPath,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using FtpClient client = CreateFtpsClient(connection);
+                client.Connect();
+                cancellationToken.ThrowIfCancellationRequested();
+                Action<FtpProgress>? ftpProgress = progress != null
+                    ? p => progress.Report(p.Progress)
+                    : null;
+                FtpStatus status = client.DownloadFile(
+                    localPath,
+                    NormalizeRemotePath(remotePath),
+                    FtpLocalExists.Overwrite,
+                    FtpVerify.None,
+                    ftpProgress);
+                if (status != FtpStatus.Success)
+                {
+                    throw new IOException($"FTPS download failed: {status}");
+                }
+                progress?.Report(100.0);
+            }, cancellationToken);
+        }
+
+        private static async Task DownloadWebDavWithProgressAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            string localPath,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
+        {
+            using HttpClient client = CreateWebDavClient(connection);
+            using HttpResponseMessage response = await client.GetAsync(
+                BuildWebDavUri(connection, remotePath),
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+            long? contentLength = response.Content.Headers.ContentLength;
+            await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using FileStream output = new(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            byte[] buffer = new byte[81920];
+            long totalRead = 0;
+            int bytesRead;
+            while ((bytesRead = await input.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+            {
+                await output.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                totalRead += bytesRead;
+                if (contentLength.HasValue && contentLength.Value > 0)
+                {
+                    progress?.Report((double)totalRead * 100.0 / contentLength.Value);
+                }
+            }
+            progress?.Report(100.0);
+        }
+
+        private static async Task CopyWslFileWithProgressAsync(
+            string sourceWslPath,
+            string targetLocalPath,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(async () =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using FileStream input = new(sourceWslPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using FileStream output = new(targetLocalPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                long totalLength = Math.Max(1, input.Length);
+                byte[] buffer = new byte[81920];
+                long totalRead = 0;
+                int bytesRead;
+                while ((bytesRead = await input.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+                {
+                    await output.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                    totalRead += bytesRead;
+                    progress?.Report((double)totalRead * 100.0 / totalLength);
+                }
+                progress?.Report(100.0);
+            }, cancellationToken);
         }
 
         private static HttpClient CreateWebDavClient(RemoteConnectionSettings connection)

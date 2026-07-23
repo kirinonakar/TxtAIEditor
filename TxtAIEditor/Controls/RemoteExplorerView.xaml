@@ -125,6 +125,15 @@
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <Grid MinHeight="42" Padding="8,3" ColumnSpacing="9">
+                            <Grid.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem x:Name="RemoteEntryDownloadMenuItem" Text="다운로드" Click="OnRemoteEntryDownloadClick" Tag="{Binding}">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE896;" FontSize="12"/>
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </Grid.ContextFlyout>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>

@@ -3538,4 +3538,8 @@ Plan: {0}</value>
   <data name="CreateFileErrorTitle" xml:space="preserve"><value>Could not create file</value></data>
   <data name="CreateFileEmptyName" xml:space="preserve"><value>Enter a file name.</value></data>
   <data name="CreateFileInvalidName" xml:space="preserve"><value>The file name contains invalid characters.</value></data>
+  <data name="ExplorerDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="RemoteDownloadingStatus" xml:space="preserve"><value>Downloading...</value></data>
+  <data name="RemoteDownloadCompleted" xml:space="preserve"><value>Download completed.</value></data>
+  <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>Download failed</value></data>
 </root>

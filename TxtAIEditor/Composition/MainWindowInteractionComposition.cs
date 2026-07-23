@@ -107,7 +107,8 @@ namespace TxtAIEditor.Composition
                 () => ui.TerminalPane.ResumeNativeWindows(),
                 callbacks.IsExplorerArchiveView,
                 callbacks.IsExplorerRemoteView,
-                callbacks.RefreshRemoteExplorerAsync);
+                callbacks.RefreshRemoteExplorerAsync,
+                callbacks.InitializePickerWindow);
 
             return ComposeAfterExplorerActions(
                 window,

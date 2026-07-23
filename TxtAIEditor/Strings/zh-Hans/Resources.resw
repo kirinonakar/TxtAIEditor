@@ -3502,4 +3502,8 @@
   <data name="CreateFileErrorTitle" xml:space="preserve"><value>无法创建文件</value></data>
   <data name="CreateFileEmptyName" xml:space="preserve"><value>请输入文件名。</value></data>
   <data name="CreateFileInvalidName" xml:space="preserve"><value>文件名包含无效字符。</value></data>
+  <data name="ExplorerDownload" xml:space="preserve"><value>下载</value></data>
+  <data name="RemoteDownloadingStatus" xml:space="preserve"><value>下载中...</value></data>
+  <data name="RemoteDownloadCompleted" xml:space="preserve"><value>下载完成。</value></data>
+  <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>下载失败</value></data>
 </root>

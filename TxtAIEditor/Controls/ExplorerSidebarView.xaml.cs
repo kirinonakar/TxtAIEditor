@@ -58,6 +58,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExtractArchiveToFolderClick;
         public event RoutedEventHandler? CompressFolderToZipClick;
         public event RoutedEventHandler? CompressFolderToSevenZipClick;
+        public event RoutedEventHandler? DownloadRemoteItemClick;
         public event RoutedEventHandler? CopyFileNameClick;
         public event RoutedEventHandler? CopyFilePathClick;
         public event RoutedEventHandler? CopyFolderPathClick;
@@ -146,6 +147,7 @@ namespace TxtAIEditor.Controls
         private void OnExtractArchiveToFolderClick(object sender, RoutedEventArgs e) => ExtractArchiveToFolderClick?.Invoke(sender, e);
         private void OnCompressFolderToZipClick(object sender, RoutedEventArgs e) => CompressFolderToZipClick?.Invoke(sender, e);
         private void OnCompressFolderToSevenZipClick(object sender, RoutedEventArgs e) => CompressFolderToSevenZipClick?.Invoke(sender, e);
+        private void OnDownloadRemoteItemClick(object sender, RoutedEventArgs e) => DownloadRemoteItemClick?.Invoke(sender, e);
         private void OnCopyFileNameClick(object sender, RoutedEventArgs e) => CopyFileNameClick?.Invoke(sender, e);
         private void OnCopyFilePathClick(object sender, RoutedEventArgs e) => CopyFilePathClick?.Invoke(sender, e);
         private void OnCopyFolderPathClick(object sender, RoutedEventArgs e) => CopyFolderPathClick?.Invoke(sender, e);

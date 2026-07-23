@@ -15,6 +15,7 @@ namespace TxtAIEditor
         private const string SingleInstanceMutexName = "TxtAIEditorSingleInstanceMutex";
         private static readonly string AppTempDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor");
         private static readonly string IpcDir = Path.Combine(AppTempDir, "IPC");
+        public static Window? MainWindow { get; private set; }
         private Window? _window;
         private static Mutex? _singleInstanceMutex;
         private FileSystemWatcher? _ipcWatcher;
@@ -116,6 +117,7 @@ namespace TxtAIEditor
             StartIpcWatcher();
 
             var mainWindow = new MainWindow();
+            MainWindow = mainWindow;
             _window = mainWindow;
             _window.Closed += (_, _) => CleanupAppResources();
             await mainWindow.PrepareForInitialActivationAsync();

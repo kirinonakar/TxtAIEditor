@@ -154,6 +154,42 @@ namespace TxtAIEditor.Core.Services
             return localPath;
         }
 
+        public async Task DownloadRemoteItemToFolderAsync(
+            string virtualPath,
+            bool isDirectory,
+            string targetLocalDirectory,
+            Action<string, double>? progressCallback,
+            CancellationToken cancellationToken = default)
+        {
+            (RemoteConnectionSettings connection, string remotePath) =
+                await ResolveConnectionAsync(virtualPath);
+
+            string itemName = remotePath.TrimEnd('/').Split('/').LastOrDefault() ?? (isDirectory ? "remote-folder" : "remote-file");
+            string targetLocalPath = Path.Combine(targetLocalDirectory, itemName);
+
+            if (isDirectory)
+            {
+                await _explorerService.DownloadDirectoryToPathAsync(
+                    connection,
+                    remotePath,
+                    targetLocalPath,
+                    progressCallback,
+                    cancellationToken);
+            }
+            else
+            {
+                progressCallback?.Invoke(itemName, 0.0);
+                Progress<double> progress = new(p => progressCallback?.Invoke(itemName, p));
+                await _explorerService.DownloadFileToPathAsync(
+                    connection,
+                    remotePath,
+                    targetLocalPath,
+                    progress,
+                    cancellationToken);
+                progressCallback?.Invoke(itemName, 100.0);
+            }
+        }
+
         public bool TryGetVirtualPath(string? localPath, out string virtualPath)
         {
             if (!string.IsNullOrWhiteSpace(localPath) &&

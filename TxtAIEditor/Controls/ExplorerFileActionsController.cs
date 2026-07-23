@@ -43,6 +43,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isArchiveViewProvider;
         private readonly Func<bool> _isRemoteViewProvider;
         private readonly Func<Task> _refreshRemoteExplorerAsync;
+        private readonly Action<object> _initializePickerWindow;
         private readonly ConditionalWeakTable<MenuFlyout, object> _localizedFlyouts = new ConditionalWeakTable<MenuFlyout, object>();
 
         private System.Threading.CancellationTokenSource? _archiveCts;
@@ -74,7 +75,8 @@ namespace TxtAIEditor.Controls
             Action resumeTerminal,
             Func<bool> isArchiveViewProvider,
             Func<bool> isRemoteViewProvider,
-            Func<Task> refreshRemoteExplorerAsync)
+            Func<Task> refreshRemoteExplorerAsync,
+            Action<object> initializePickerWindow)
         {
             _leftSidebar = leftSidebar;
             _statusBar = statusBar;
@@ -102,6 +104,7 @@ namespace TxtAIEditor.Controls
             _isArchiveViewProvider = isArchiveViewProvider;
             _isRemoteViewProvider = isRemoteViewProvider;
             _refreshRemoteExplorerAsync = refreshRemoteExplorerAsync;
+            _initializePickerWindow = initializePickerWindow;
 
             WireEvents();
         }
@@ -141,7 +144,7 @@ namespace TxtAIEditor.Controls
                     _leftSidebar.FileList.SelectedItem = listItem;
                 }
 
-                if (element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 15)
+                if (element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 16)
                 {
                     LocalizeContextFlyout(flyout);
                     ConfigureContextFlyout(
@@ -390,11 +393,12 @@ namespace TxtAIEditor.Controls
             ((MenuFlyoutItem)flyout.Items[5]).Text = _getString("ExplorerExtractArchiveToFolder", "폴더에 풀기");
             ((MenuFlyoutItem)flyout.Items[6]).Text = _getString("ExplorerCompressFolderToZip", "ZIP으로 압축하기");
             ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerCompressFolderToSevenZip", "7z로 압축하기");
-            ((MenuFlyoutItem)flyout.Items[9]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
-            ((MenuFlyoutItem)flyout.Items[10]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
-            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
-            ((MenuFlyoutItem)flyout.Items[13]).Text = _getString("ExplorerRename", "이름 바꾸기");
-            ((MenuFlyoutItem)flyout.Items[14]).Text = _getString("ExplorerDelete", "삭제");
+            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerDownload", "다운로드");
+            ((MenuFlyoutItem)flyout.Items[10]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
+            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
+            ((MenuFlyoutItem)flyout.Items[12]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
+            ((MenuFlyoutItem)flyout.Items[14]).Text = _getString("ExplorerRename", "이름 바꾸기");
+            ((MenuFlyoutItem)flyout.Items[15]).Text = _getString("ExplorerDelete", "삭제");
         }
 
         private void ConfigureContextFlyout(MenuFlyout flyout, ExplorerItem? item)
