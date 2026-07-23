@@ -44,6 +44,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isRemoteViewProvider;
         private readonly Func<Task> _refreshRemoteExplorerAsync;
         private readonly Action<object> _initializePickerWindow;
+        private readonly Func<string>? _homeFolderPathProvider;
         private readonly ConditionalWeakTable<MenuFlyout, object> _localizedFlyouts = new ConditionalWeakTable<MenuFlyout, object>();
 
         private System.Threading.CancellationTokenSource? _archiveCts;
@@ -76,7 +77,8 @@ namespace TxtAIEditor.Controls
             Func<bool> isArchiveViewProvider,
             Func<bool> isRemoteViewProvider,
             Func<Task> refreshRemoteExplorerAsync,
-            Action<object> initializePickerWindow)
+            Action<object> initializePickerWindow,
+            Func<string>? homeFolderPathProvider = null)
         {
             _leftSidebar = leftSidebar;
             _statusBar = statusBar;
@@ -105,6 +107,7 @@ namespace TxtAIEditor.Controls
             _isRemoteViewProvider = isRemoteViewProvider;
             _refreshRemoteExplorerAsync = refreshRemoteExplorerAsync;
             _initializePickerWindow = initializePickerWindow;
+            _homeFolderPathProvider = homeFolderPathProvider;
 
             WireEvents();
         }
@@ -806,6 +809,16 @@ namespace TxtAIEditor.Controls
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
 
+        private string GetConfiguredHomeFolder()
+        {
+            string? homeFolder = _homeFolderPathProvider?.Invoke()?.Trim();
+            if (!string.IsNullOrWhiteSpace(homeFolder) && Directory.Exists(homeFolder))
+            {
+                return homeFolder;
+            }
+            return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
+
         private async void OnDownloadRemoteItemClick(object sender, RoutedEventArgs e)
         {
             ExplorerItem? item = GetExplorerItem(sender);
@@ -814,20 +827,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var picker = new Windows.Storage.Pickers.FolderPicker
-            {
-                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads
-            };
-            _initializePickerWindow(picker);
-            picker.FileTypeFilter.Add("*");
-
-            Windows.Storage.StorageFolder folder = await picker.PickSingleFolderAsync();
-            if (folder == null || string.IsNullOrWhiteSpace(folder.Path))
+            IntPtr hwnd = App.MainWindow != null ? WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow) : IntPtr.Zero;
+            Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            var picker = new Microsoft.Windows.Storage.Pickers.FolderPicker(windowId);
+            picker.SuggestedFolder = GetConfiguredHomeFolder();
+            var pickResult = await picker.PickSingleFolderAsync();
+            if (pickResult == null || string.IsNullOrWhiteSpace(pickResult.Path))
             {
                 return;
             }
 
-            string targetLocalDirectory = folder.Path;
+            string targetLocalDirectory = pickResult.Path;
             using System.Threading.CancellationTokenSource cts = new();
 
             string downloadStatusPrefix = _getString("RemoteDownloadingStatus", "다운로드 중...");

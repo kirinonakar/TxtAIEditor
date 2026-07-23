@@ -29,6 +29,12 @@ namespace TxtAIEditor.Controls
         public TreeView Tree => ExplorerTreeView;
         public ListView FileList => FileListView;
 
+        public Func<string>? HomeFolderPathProvider
+        {
+            get => RemoteExplorer.HomeFolderPathProvider;
+            set => RemoteExplorer.HomeFolderPathProvider = value;
+        }
+
         public event RoutedEventHandler? UpClick;
         public event RoutedEventHandler? SelectFolderClick;
         public event RoutedEventHandler? CreateFolderClick;

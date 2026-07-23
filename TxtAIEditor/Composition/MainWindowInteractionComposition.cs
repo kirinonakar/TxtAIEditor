@@ -108,7 +108,8 @@ namespace TxtAIEditor.Composition
                 callbacks.IsExplorerArchiveView,
                 callbacks.IsExplorerRemoteView,
                 callbacks.RefreshRemoteExplorerAsync,
-                callbacks.InitializePickerWindow);
+                callbacks.InitializePickerWindow,
+                () => services.SettingsService.CurrentSettings.HomeFolderPath);
 
             return ComposeAfterExplorerActions(
                 window,

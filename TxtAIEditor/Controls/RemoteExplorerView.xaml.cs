@@ -372,6 +372,18 @@ namespace TxtAIEditor.Controls
                 });
         }
 
+        public Func<string>? HomeFolderPathProvider { get; set; }
+
+        private string GetConfiguredHomeFolder()
+        {
+            string? homeFolder = HomeFolderPathProvider?.Invoke()?.Trim();
+            if (!string.IsNullOrWhiteSpace(homeFolder) && System.IO.Directory.Exists(homeFolder))
+            {
+                return homeFolder;
+            }
+            return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
+
         private async void OnRemoteEntryDownloadClick(object sender, RoutedEventArgs e)
         {
             if (_connection == null || sender is not FrameworkElement element || element.Tag is not RemoteDirectoryEntry entry)
@@ -379,24 +391,18 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var picker = new Windows.Storage.Pickers.FolderPicker
-            {
-                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads
-            };
-            if (App.MainWindow != null)
-            {
-                IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-                WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-            }
-            picker.FileTypeFilter.Add("*");
+            IntPtr hwnd = App.MainWindow != null ? WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow) : IntPtr.Zero;
+            Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            var picker = new Microsoft.Windows.Storage.Pickers.FolderPicker(windowId);
+            picker.SuggestedFolder = GetConfiguredHomeFolder();
 
-            Windows.Storage.StorageFolder folder = await picker.PickSingleFolderAsync();
-            if (folder == null || string.IsNullOrWhiteSpace(folder.Path))
+            var pickResult = await picker.PickSingleFolderAsync();
+            if (pickResult == null || string.IsNullOrWhiteSpace(pickResult.Path))
             {
                 return;
             }
 
-            string targetLocalDirectory = folder.Path;
+            string targetLocalDirectory = pickResult.Path;
             string downloadStatusPrefix = Get("RemoteDownloadingStatus", "다운로드 중...");
             bool isCompleted = false;
 
