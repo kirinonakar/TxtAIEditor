@@ -13,6 +13,9 @@ namespace TxtAIEditor.Core.Services
 {
     public sealed class WslDistributionService
     {
+        private static readonly TimeSpan DistributionListTimeout =
+            TimeSpan.FromSeconds(2);
+
         public async Task<IReadOnlyList<RemoteServerProfile>> GetInstalledProfilesAsync(
             CancellationToken cancellationToken = default)
         {
@@ -33,10 +36,28 @@ namespace TxtAIEditor.Core.Services
                 process.StartInfo.ArgumentList.Add("--quiet");
                 process.Start();
 
+                using CancellationTokenSource timeoutSource =
+                    CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeoutSource.CancelAfter(DistributionListTimeout);
+                CancellationToken operationToken = timeoutSource.Token;
                 await using MemoryStream output = new();
-                Task copyTask = process.StandardOutput.BaseStream.CopyToAsync(output, cancellationToken);
-                await process.WaitForExitAsync(cancellationToken);
-                await copyTask;
+                Task outputTask = process.StandardOutput.BaseStream.CopyToAsync(
+                    output,
+                    operationToken);
+                Task errorTask = process.StandardError.BaseStream.CopyToAsync(
+                    Stream.Null,
+                    operationToken);
+                try
+                {
+                    await process.WaitForExitAsync(operationToken);
+                    await Task.WhenAll(outputTask, errorTask);
+                }
+                catch (OperationCanceledException)
+                {
+                    TryTerminate(process);
+                    return Array.Empty<RemoteServerProfile>();
+                }
+
                 if (process.ExitCode != 0)
                 {
                     return Array.Empty<RemoteServerProfile>();
@@ -120,6 +141,20 @@ namespace TxtAIEditor.Core.Services
             return string.IsNullOrWhiteSpace(normalized)
                 ? "/"
                 : "/" + normalized.Trim('/');
+        }
+
+        private static void TryTerminate(Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch
+            {
+            }
         }
 
         private static Guid CreateStableId(string distributionName)
