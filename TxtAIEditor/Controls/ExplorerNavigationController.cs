@@ -962,6 +962,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 node.HasUnrealizedChildren = false;
+                node.IsExpanded = true;
             }
             catch (Exception ex)
             {
