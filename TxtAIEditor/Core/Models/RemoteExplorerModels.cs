@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace TxtAIEditor.Core.Models
 {
@@ -16,7 +17,9 @@ namespace TxtAIEditor.Core.Models
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Name { get; set; } = string.Empty;
         public RemoteServerType ServerType { get; set; } = RemoteServerType.Sftp;
+        [JsonIgnore]
         public int Port { get; set; } = 22;
+        [JsonIgnore]
         public string UserName { get; set; } = string.Empty;
 
         public string ProtocolLabel => ServerType switch
@@ -29,9 +32,7 @@ namespace TxtAIEditor.Core.Models
             _ => ServerType.ToString()
         };
 
-        public string Summary => ServerType == RemoteServerType.Wsl
-            ? $"WSL · {Name}"
-            : $"{ProtocolLabel} · {UserName} · :{Port}";
+        public string Summary => ProtocolLabel;
         public Microsoft.UI.Xaml.Visibility DeleteVisibility => ServerType == RemoteServerType.Wsl
             ? Microsoft.UI.Xaml.Visibility.Collapsed
             : Microsoft.UI.Xaml.Visibility.Visible;
