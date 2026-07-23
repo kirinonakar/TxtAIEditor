@@ -97,16 +97,27 @@ namespace TxtAIEditor.Controls
 
         private async void OnAddServerClick(object sender, RoutedEventArgs e)
         {
-            TextBox nameBox = new() { PlaceholderText = Get("RemoteServerNamePlaceholder", "서버 이름") };
+            TextBox nameBox = CreateLiteralTextBox(
+                Get("RemoteServerNamePlaceholder", "서버 이름"));
             ComboBox typeBox = new()
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 ItemsSource = new[] { "SSH", "SFTP", "FTPS", "WebDAV" },
                 SelectedIndex = 1
             };
-            TextBox addressBox = new() { PlaceholderText = Get("RemoteServerAddressPlaceholder", "호스트 또는 HTTPS 주소") };
+            TextBox addressBox = new()
+            {
+                PlaceholderText = Get("RemoteServerAddressPlaceholder", "호스트 또는 HTTPS 주소"),
+                IsSpellCheckEnabled = false,
+                IsTextPredictionEnabled = false,
+                InputScope = new InputScope
+                {
+                    Names = { new InputScopeName(InputScopeNameValue.Url) }
+                }
+            };
             TextBox portBox = new() { Text = "22", InputScope = new InputScope { Names = { new InputScopeName(InputScopeNameValue.Number) } } };
-            TextBox userNameBox = new() { PlaceholderText = Get("RemoteServerUserNamePlaceholder", "ID") };
+            TextBox userNameBox = CreateLiteralTextBox(
+                Get("RemoteServerUserNamePlaceholder", "ID"));
             PasswordBox passwordBox = new() { PlaceholderText = Get("RemoteServerPasswordPlaceholder", "비밀번호") };
             TextBlock validationText = new()
             {
@@ -419,6 +430,20 @@ namespace TxtAIEditor.Controls
         {
             panel.Children.Add(new TextBlock { Text = label, FontSize = 12 });
             panel.Children.Add(control);
+        }
+
+        private static TextBox CreateLiteralTextBox(string placeholderText)
+        {
+            return new TextBox
+            {
+                PlaceholderText = placeholderText,
+                IsSpellCheckEnabled = false,
+                IsTextPredictionEnabled = false,
+                InputScope = new InputScope
+                {
+                    Names = { new InputScopeName(InputScopeNameValue.Url) }
+                }
+            };
         }
 
         private async Task ShowErrorAsync(string title, string message)
