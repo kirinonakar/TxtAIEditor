@@ -40,6 +40,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExtractArchiveToFolderClick { add => ExplorerView.ExtractArchiveToFolderClick += value; remove => ExplorerView.ExtractArchiveToFolderClick -= value; }
         public event RoutedEventHandler? CompressFolderToZipClick { add => ExplorerView.CompressFolderToZipClick += value; remove => ExplorerView.CompressFolderToZipClick -= value; }
         public event RoutedEventHandler? CompressFolderToSevenZipClick { add => ExplorerView.CompressFolderToSevenZipClick += value; remove => ExplorerView.CompressFolderToSevenZipClick -= value; }
+        public event RoutedEventHandler? DownloadRemoteItemClick { add => ExplorerView.DownloadRemoteItemClick += value; remove => ExplorerView.DownloadRemoteItemClick -= value; }
         public event RoutedEventHandler? CopyFileNameClick { add => ExplorerView.CopyFileNameClick += value; remove => ExplorerView.CopyFileNameClick -= value; }
         public event RoutedEventHandler? CopyFilePathClick { add => ExplorerView.CopyFilePathClick += value; remove => ExplorerView.CopyFilePathClick -= value; }
         public event RoutedEventHandler? CopyFolderPathClick { add => ExplorerView.CopyFolderPathClick += value; remove => ExplorerView.CopyFolderPathClick -= value; }

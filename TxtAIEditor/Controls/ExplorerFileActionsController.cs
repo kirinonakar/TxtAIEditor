@@ -120,6 +120,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExtractArchiveToFolderClick += OnExtractArchiveToFolderClick;
             _leftSidebar.CompressFolderToZipClick += OnCompressFolderToZipClick;
             _leftSidebar.CompressFolderToSevenZipClick += OnCompressFolderToSevenZipClick;
+            _leftSidebar.DownloadRemoteItemClick += OnDownloadRemoteItemClick;
             _leftSidebar.CopyFileNameClick += OnCopyFileNameClick;
             _leftSidebar.CopyFilePathClick += OnCopyFilePathClick;
             _leftSidebar.CopyFolderPathClick += OnCopyFolderPathClick;
@@ -803,6 +804,69 @@ namespace TxtAIEditor.Controls
             }
 
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
+
+        private async void OnDownloadRemoteItemClick(object sender, RoutedEventArgs e)
+        {
+            ExplorerItem? item = GetExplorerItem(sender);
+            if (item == null || !item.IsRemote)
+            {
+                return;
+            }
+
+            var picker = new Windows.Storage.Pickers.FolderPicker
+            {
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder
+            };
+            _initializePickerWindow(picker);
+            picker.FileTypeFilter.Add("*");
+
+            Windows.Storage.StorageFolder folder = await picker.PickSingleFolderAsync();
+            if (folder == null || string.IsNullOrWhiteSpace(folder.Path))
+            {
+                return;
+            }
+
+            string targetLocalDirectory = folder.Path;
+            System.Threading.CancellationTokenSource cts = new();
+
+            string downloadStatusPrefix = _getString("RemoteDownloadingStatus", "다운로드 중...");
+
+            try
+            {
+                _statusBar.ShowProgress(
+                    $"{downloadStatusPrefix} ({item.Name})",
+                    0,
+                    () => cts.Cancel());
+
+                await _remoteWorkspaceService.DownloadRemoteItemToFolderAsync(
+                    item.Path,
+                    item.IsFolder,
+                    targetLocalDirectory,
+                    (currentFile, percent) =>
+                    {
+                        _statusBar.ShowProgress(
+                            $"{downloadStatusPrefix} ({currentFile})",
+                            percent,
+                            () => cts.Cancel());
+                    },
+                    cts.Token);
+
+                _statusBar.HideProgress();
+                string successMessage = _getString("RemoteDownloadCompleted", "다운로드가 완료되었습니다.");
+                _statusBar.FileStatsText.Text = successMessage;
+            }
+            catch (OperationCanceledException)
+            {
+                _statusBar.HideProgress();
+            }
+            catch (Exception ex)
+            {
+                _statusBar.HideProgress();
+                _showError(
+                    _getString("RemoteDownloadFailedTitle", "다운로드 실패"),
+                    ex.Message);
+            }
         }
 
         private void OnCopyFileNameClick(object sender, RoutedEventArgs e)

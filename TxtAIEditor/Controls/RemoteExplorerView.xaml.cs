@@ -383,8 +383,11 @@ namespace TxtAIEditor.Controls
             {
                 SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder
             };
-            IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            if (App.MainWindow != null)
+            {
+                IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            }
             picker.FileTypeFilter.Add("*");
 
             Windows.Storage.StorageFolder folder = await picker.PickSingleFolderAsync();
