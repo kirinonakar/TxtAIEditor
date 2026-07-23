@@ -176,6 +176,9 @@ namespace TxtAIEditor.Controls
                 extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".avif", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".ico", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".woff", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".woff2", StringComparison.OrdinalIgnoreCase))

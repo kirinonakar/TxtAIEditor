@@ -62,7 +62,8 @@ namespace TxtAIEditor.Controls
             ".gif",
             ".bmp",
             ".ico",
-            ".webp"
+            ".webp",
+            ".avif"
         };
 
         public static readonly string[] AudioFileExtensions =

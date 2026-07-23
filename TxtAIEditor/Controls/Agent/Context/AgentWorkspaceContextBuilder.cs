@@ -165,7 +165,7 @@ namespace TxtAIEditor.Controls
             }
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            const string extensions = "csv|md|txt|json|xml|html|htm|css|js|ts|tsx|jsx|cs|xaml|py|rs|java|kt|cpp|c|h|hpp|sql|xlsx|xls|docx|pptx|pdf|png|jpg|jpeg|webp|gif|bmp";
+            const string extensions = "csv|md|txt|json|xml|html|htm|css|js|ts|tsx|jsx|cs|xaml|py|rs|java|kt|cpp|c|h|hpp|sql|xlsx|xls|docx|pptx|pdf|png|jpg|jpeg|webp|avif|gif|bmp";
             string pattern = $@"(?<path>[^\s""'<>|:*?\r\n]+?\.(?:{extensions}))(?=$|[\s""'<>|,.;:!?()\[\]{{}}]|[가-힣])";
             foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(
                 instruction,

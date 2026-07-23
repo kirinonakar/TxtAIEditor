@@ -1368,6 +1368,7 @@ namespace TxtAIEditor.Controls
             {
                 ".jpg" or ".jpeg" => "image/jpeg",
                 ".webp" => "image/webp",
+                ".avif" => "image/avif",
                 ".bmp" => "image/bmp",
                 ".gif" => "image/gif",
                 ".tif" or ".tiff" => "image/tiff",

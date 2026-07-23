@@ -25,7 +25,7 @@ namespace TxtAIEditor.Core.Services
             // Documents
             ".pdf", ".doc", ".docx", ".hwp", ".hwpx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".pages", ".key", ".numbers", ".epub", ".mobi",
             // Images
-            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp", ".avif",
             ".tiff", ".tif", ".heic", ".heif", ".raw", ".psd", ".ai", ".eps",
             // Videos & Audio
             ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v",

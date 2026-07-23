@@ -77,6 +77,7 @@ namespace TxtAIEditor.Controls
                 ".bmp" => "BMP",
                 ".ico" => "ICO",
                 ".webp" => "WEBP",
+                ".avif" => "AVIF",
                 _ => null
             };
         }
@@ -130,7 +131,64 @@ namespace TxtAIEditor.Controls
                 return true;
             }
 
-            return TryReadWebPHeader(bytes, length, out imageInfo);
+            if (TryReadWebPHeader(bytes, length, out imageInfo))
+            {
+                return true;
+            }
+
+            return TryReadAvifHeader(bytes, length, out imageInfo);
+        }
+
+        private static bool TryReadAvifHeader(byte[] bytes, int length, out ImageFileInfo imageInfo)
+        {
+            imageInfo = default;
+            if (length < 12 ||
+                bytes[4] != 0x66 ||
+                bytes[5] != 0x74 ||
+                bytes[6] != 0x79 ||
+                bytes[7] != 0x70)
+            {
+                return false;
+            }
+
+            bool isAvif = (bytes[8] == 'a' && bytes[9] == 'v' && bytes[10] == 'i' && (bytes[11] == 'f' || bytes[11] == 's')) ||
+                          (bytes[8] == 'M' && bytes[9] == 'A' && bytes[10] == '1' && (bytes[11] == 'B' || bytes[11] == 'A'));
+
+            if (!isAvif)
+            {
+                int boxSize = ReadBigEndianInt32(bytes, 0);
+                if (boxSize > 0 && boxSize <= length)
+                {
+                    for (int i = 12; i + 4 <= boxSize; i += 4)
+                    {
+                        if (bytes[i] == 'a' && bytes[i + 1] == 'v' && bytes[i + 2] == 'i' && (bytes[i + 3] == 'f' || bytes[i + 3] == 's'))
+                        {
+                            isAvif = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!isAvif)
+            {
+                return false;
+            }
+
+            int width = 0;
+            int height = 0;
+            for (int i = 0; i + 16 <= length; i++)
+            {
+                if (bytes[i] == 'i' && bytes[i + 1] == 's' && bytes[i + 2] == 'p' && bytes[i + 3] == 'e')
+                {
+                    width = ReadBigEndianInt32(bytes, i + 8);
+                    height = ReadBigEndianInt32(bytes, i + 12);
+                    break;
+                }
+            }
+
+            imageInfo = new ImageFileInfo(width, height, "AVIF");
+            return IsValidImageInfo(imageInfo);
         }
 
         private static bool TryReadIcoHeader(byte[] bytes, int length, out ImageFileInfo imageInfo)

@@ -786,6 +786,7 @@ namespace TxtAIEditor.Core.Services
                 extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".avif", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".svg", StringComparison.OrdinalIgnoreCase);
         }
 
@@ -957,6 +958,7 @@ body { padding: 28px 16px 44px; }
                 ".gif" => "image/gif",
                 ".bmp" => "image/bmp",
                 ".webp" => "image/webp",
+                ".avif" => "image/avif",
                 ".svg" => "image/svg+xml",
                 _ => "image/png"
             };

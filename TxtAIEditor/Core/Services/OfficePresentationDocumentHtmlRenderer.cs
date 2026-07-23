@@ -2008,6 +2008,7 @@ if (document.fonts && document.fonts.ready) {
                 ".gif" => "image/gif",
                 ".bmp" => "image/bmp",
                 ".webp" => "image/webp",
+                ".avif" => "image/avif",
                 ".svg" => "image/svg+xml",
                 _ => "image/png"
             };

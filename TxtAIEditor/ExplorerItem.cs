@@ -191,6 +191,7 @@ namespace TxtAIEditor
                 ".bmp" => "\uEB9F",
                 ".ico" => "\uEB9F",
                 ".webp" => "\uEB9F",
+                ".avif" => "\uEB9F",
                 ".mp3" => "\uEC4F",
                 ".wav" => "\uEC4F",
                 ".m4a" => "\uEC4F",

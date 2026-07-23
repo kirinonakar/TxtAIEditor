@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -108,6 +108,14 @@
             <uap:DisplayName>TxtAIEditor HWPX</uap:DisplayName>
             <uap:SupportedFileTypes>
               <uap:FileType>.hwpx</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="txtaieditor.avif">
+            <uap:DisplayName>TxtAIEditor AVIF</uap:DisplayName>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.avif</uap:FileType>
             </uap:SupportedFileTypes>
           </uap:FileTypeAssociation>
         </uap:Extension>

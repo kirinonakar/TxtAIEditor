@@ -56,7 +56,7 @@ namespace TxtAIEditor.Controls
             {
                 return new AgentReadImageResult
                 {
-                    TranscriptText = $"read_image failed: unsupported image type '{Path.GetExtension(fullPath)}'. Supported types: .png, .jpg, .jpeg, .webp, .bmp, .gif."
+                    TranscriptText = $"read_image failed: unsupported image type '{Path.GetExtension(fullPath)}'. Supported types: .png, .jpg, .jpeg, .webp, .avif, .bmp, .gif."
                 };
             }
 
@@ -182,13 +182,7 @@ namespace TxtAIEditor.Controls
 
         private static bool IsSupportedImageExtension(string path)
         {
-            string extension = Path.GetExtension(path);
-            return extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".bmp", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
+            return SupportedFileTypes.IsImageFile(path);
         }
 
         private static string GetImageMimeType(string path)
@@ -199,6 +193,7 @@ namespace TxtAIEditor.Controls
                 ".png" => "image/png",
                 ".jpg" or ".jpeg" => "image/jpeg",
                 ".webp" => "image/webp",
+                ".avif" => "image/avif",
                 ".bmp" => "image/bmp",
                 ".gif" => "image/gif",
                 _ => "application/octet-stream"
