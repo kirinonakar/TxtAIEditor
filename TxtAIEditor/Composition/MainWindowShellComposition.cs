@@ -77,7 +77,8 @@ namespace TxtAIEditor.Composition
             var windowTitle = new WindowTitleController(
                 window,
                 ui.AppTitleTextBlock,
-                tabNavigation.GetActiveTab);
+                tabNavigation.GetActiveTab,
+                services.RemoteWorkspaceService);
 
             var tabEncryption = new TabEncryptionController(
                 callbacks.GetLocalizedString,
