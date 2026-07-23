@@ -3490,4 +3490,6 @@
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>サーバー名、アドレス、ID、パスワードを入力してください。</value></data>
   <data name="RemoteServerInvalidPort" xml:space="preserve"><value>ポートは 1～65535 の数値で指定してください。</value></data>
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV アドレスは https:// で始まる必要があります。</value></data>
+  <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>「{0}」をリモート サーバーから完全に削除しますか？</value></data>
+  <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>リモート操作に失敗しました</value></data>
 </root>

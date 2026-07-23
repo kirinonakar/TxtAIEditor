@@ -54,7 +54,11 @@ namespace TxtAIEditor.Core.Services
                     {
                         if (string.IsNullOrWhiteSpace(item.Name))
                         {
-                            if (item.IsFolder)
+                            if (RemotePath.IsRemote(item.Path))
+                            {
+                                item.Name = RemotePath.GetName(item.Path);
+                            }
+                            else if (item.IsFolder)
                             {
                                 string displayPath = item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                                 string name = Path.GetFileName(displayPath);
@@ -145,7 +149,9 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                string fullPath = Path.GetFullPath(filePath);
+                string fullPath = RemotePath.IsRemote(filePath)
+                    ? filePath
+                    : Path.GetFullPath(filePath);
                 var existing = recentFiles.FirstOrDefault(f => f.Path.Equals(fullPath, StringComparison.OrdinalIgnoreCase));
                 if (existing != null)
                 {
@@ -153,7 +159,11 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 string displayName;
-                if (isFolder)
+                if (RemotePath.IsRemote(fullPath))
+                {
+                    displayName = RemotePath.GetName(fullPath);
+                }
+                else if (isFolder)
                 {
                     string displayPath = fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                     string name = Path.GetFileName(displayPath);

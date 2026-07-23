@@ -3490,4 +3490,6 @@
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>請輸入伺服器名稱、位址、ID 與密碼。</value></data>
   <data name="RemoteServerInvalidPort" xml:space="preserve"><value>連接埠必須是 1 到 65535 之間的數字。</value></data>
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV 位址必須以 https:// 開頭。</value></data>
+  <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>要從遠端伺服器永久刪除「{0}」嗎？</value></data>
+  <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>遠端作業失敗</value></data>
 </root>

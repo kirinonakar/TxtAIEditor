@@ -60,6 +60,182 @@ namespace TxtAIEditor.Core.Services
             return localPath;
         }
 
+        public async Task UploadFileAsync(
+            RemoteConnectionSettings connection,
+            string localPath,
+            string remotePath,
+            CancellationToken cancellationToken)
+        {
+            switch (connection.Profile.ServerType)
+            {
+                case RemoteServerType.Ssh:
+                case RemoteServerType.Sftp:
+                    await RunSftpAsync(connection, client =>
+                    {
+                        using FileStream input = new(localPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        client.UploadFile(input, remotePath, canOverride: true);
+                    }, cancellationToken);
+                    break;
+                case RemoteServerType.Ftps:
+                    await RunFtpsAsync(connection, client =>
+                    {
+                        FtpStatus status = client.UploadFile(
+                            localPath,
+                            remotePath,
+                            FtpRemoteExists.Overwrite,
+                            createRemoteDir: false,
+                            FtpVerify.None);
+                        if (status != FtpStatus.Success)
+                        {
+                            throw new IOException($"FTPS upload failed: {status}");
+                        }
+                    }, cancellationToken);
+                    break;
+                case RemoteServerType.WebDav:
+                    using (HttpClient client = CreateWebDavClient(connection))
+                    await using (FileStream input = new(localPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (HttpResponseMessage response = await client.PutAsync(
+                        BuildWebDavUri(connection, remotePath),
+                        new StreamContent(input),
+                        cancellationToken))
+                    {
+                        response.EnsureSuccessStatusCode();
+                    }
+                    break;
+            }
+        }
+
+        public async Task CreateDirectoryAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            CancellationToken cancellationToken)
+        {
+            switch (connection.Profile.ServerType)
+            {
+                case RemoteServerType.Ssh:
+                case RemoteServerType.Sftp:
+                    await RunSftpAsync(connection, client => client.CreateDirectory(remotePath), cancellationToken);
+                    break;
+                case RemoteServerType.Ftps:
+                    await RunFtpsAsync(connection, client => client.CreateDirectory(remotePath), cancellationToken);
+                    break;
+                case RemoteServerType.WebDav:
+                    using (HttpClient client = CreateWebDavClient(connection))
+                    using (HttpRequestMessage request = new(new HttpMethod("MKCOL"), BuildWebDavUri(connection, remotePath)))
+                    using (HttpResponseMessage response = await client.SendAsync(request, cancellationToken))
+                    {
+                        response.EnsureSuccessStatusCode();
+                    }
+                    break;
+            }
+        }
+
+        public async Task RenameAsync(
+            RemoteConnectionSettings connection,
+            string sourcePath,
+            string destinationPath,
+            bool isDirectory,
+            CancellationToken cancellationToken)
+        {
+            switch (connection.Profile.ServerType)
+            {
+                case RemoteServerType.Ssh:
+                case RemoteServerType.Sftp:
+                    await RunSftpAsync(
+                        connection,
+                        client => client.RenameFile(sourcePath, destinationPath),
+                        cancellationToken);
+                    break;
+                case RemoteServerType.Ftps:
+                    await RunFtpsAsync(connection, client =>
+                    {
+                        bool moved = isDirectory
+                            ? client.MoveDirectory(sourcePath, destinationPath, FtpRemoteExists.NoCheck)
+                            : client.MoveFile(sourcePath, destinationPath, FtpRemoteExists.NoCheck);
+                        if (!moved)
+                        {
+                            throw new IOException("FTPS rename failed.");
+                        }
+                    }, cancellationToken);
+                    break;
+                case RemoteServerType.WebDav:
+                    using (HttpClient client = CreateWebDavClient(connection))
+                    using (HttpRequestMessage request = new(new HttpMethod("MOVE"), BuildWebDavUri(connection, sourcePath)))
+                    {
+                        request.Headers.TryAddWithoutValidation(
+                            "Destination",
+                            BuildWebDavUri(connection, destinationPath).AbsoluteUri);
+                        request.Headers.TryAddWithoutValidation("Overwrite", "F");
+                        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+                        response.EnsureSuccessStatusCode();
+                    }
+                    break;
+            }
+        }
+
+        public async Task DeleteAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            bool isDirectory,
+            CancellationToken cancellationToken)
+        {
+            switch (connection.Profile.ServerType)
+            {
+                case RemoteServerType.Ssh:
+                case RemoteServerType.Sftp:
+                    await RunSftpAsync(connection, client =>
+                    {
+                        if (isDirectory)
+                        {
+                            DeleteSftpDirectoryRecursive(client, remotePath);
+                        }
+                        else
+                        {
+                            client.DeleteFile(remotePath);
+                        }
+                    }, cancellationToken);
+                    break;
+                case RemoteServerType.Ftps:
+                    await RunFtpsAsync(connection, client =>
+                    {
+                        if (isDirectory)
+                        {
+                            client.DeleteDirectory(remotePath);
+                        }
+                        else
+                        {
+                            client.DeleteFile(remotePath);
+                        }
+                    }, cancellationToken);
+                    break;
+                case RemoteServerType.WebDav:
+                    using (HttpClient client = CreateWebDavClient(connection))
+                    using (HttpRequestMessage request = new(HttpMethod.Delete, BuildWebDavUri(connection, remotePath)))
+                    using (HttpResponseMessage response = await client.SendAsync(request, cancellationToken))
+                    {
+                        response.EnsureSuccessStatusCode();
+                    }
+                    break;
+            }
+        }
+
+        private static void DeleteSftpDirectoryRecursive(SftpClient client, string path)
+        {
+            foreach (var item in client.ListDirectory(path).Where(item => item.Name is not "." and not ".."))
+            {
+                if (item.IsDirectory && !item.IsSymbolicLink)
+                {
+                    DeleteSftpDirectoryRecursive(client, item.FullName);
+                }
+                else
+                {
+                    client.DeleteFile(item.FullName);
+                }
+            }
+
+            client.DeleteDirectory(path);
+        }
+
         public static string GetInitialPath(RemoteConnectionSettings connection)
         {
             if (Uri.TryCreate(connection.Address, UriKind.Absolute, out Uri? uri))
@@ -138,6 +314,21 @@ namespace TxtAIEditor.Core.Services
                 connection.Password);
         }
 
+        private static async Task RunSftpAsync(
+            RemoteConnectionSettings connection,
+            Action<SftpClient> operation,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using SftpClient client = CreateSftpClient(connection);
+                client.Connect();
+                cancellationToken.ThrowIfCancellationRequested();
+                operation(client);
+            }, cancellationToken);
+        }
+
         private static async Task<IReadOnlyList<RemoteDirectoryEntry>> ListFtpsAsync(
             RemoteConnectionSettings connection,
             string path,
@@ -204,6 +395,21 @@ namespace TxtAIEditor.Core.Services
             client.Config.ValidateAnyCertificate = false;
             client.Config.DataConnectionEncryption = true;
             return client;
+        }
+
+        private static async Task RunFtpsAsync(
+            RemoteConnectionSettings connection,
+            Action<FtpClient> operation,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using FtpClient client = CreateFtpsClient(connection);
+                client.Connect();
+                cancellationToken.ThrowIfCancellationRequested();
+                operation(client);
+            }, cancellationToken);
         }
 
         private static async Task<IReadOnlyList<RemoteDirectoryEntry>> ListWebDavAsync(

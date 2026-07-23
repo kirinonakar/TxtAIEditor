@@ -33,6 +33,7 @@ namespace TxtAIEditor.Controls
         }
 
         public event EventHandler<RemoteFileOpenedEventArgs>? RemoteFileOpened;
+        public event EventHandler<RemoteServerSelectedEventArgs>? RemoteServerSelected;
 
         public void Localize(Func<string, string, string> getString)
         {
@@ -233,15 +234,8 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _connection = connection;
-            _currentPath = RemoteExplorerService.GetInitialPath(connection);
-            _connectionRootPath = _currentPath;
-            ServerListPanel.Visibility = Visibility.Collapsed;
-            BrowserPanel.Visibility = Visibility.Visible;
-            ConnectedServerText.Text = $"{profile.Name} · {profile.ProtocolLabel}";
-            ProtocolInfoBar.IsOpen = profile.ServerType == RemoteServerType.Ssh;
-            ProtocolInfoBar.Message = Get("RemoteSshSftpNotice", "SSH 서버 탐색은 보안 파일 전송(SFTP) 채널을 사용합니다.");
-            await LoadCurrentDirectoryAsync();
+            RemoteServerSelected?.Invoke(this, new RemoteServerSelectedEventArgs(profile));
+            await Task.CompletedTask;
         }
 
         private async void OnRemoteEntryClick(object sender, ItemClickEventArgs e)

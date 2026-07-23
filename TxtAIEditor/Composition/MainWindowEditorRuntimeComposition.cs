@@ -165,6 +165,7 @@ namespace TxtAIEditor.Composition
             var editorTabOpen = new EditorTabOpenController(
                 services.SettingsService,
                 services.SnippetService,
+                services.RemoteWorkspaceService,
                 viewModel,
                 ui.EditorWorkspace,
                 documentFactory,

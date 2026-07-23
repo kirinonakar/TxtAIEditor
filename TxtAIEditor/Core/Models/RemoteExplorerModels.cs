@@ -74,4 +74,14 @@ namespace TxtAIEditor.Core.Models
 
         public string LocalPath { get; }
     }
+
+    public sealed class RemoteServerSelectedEventArgs : EventArgs
+    {
+        public RemoteServerSelectedEventArgs(RemoteServerProfile profile)
+        {
+            Profile = profile;
+        }
+
+        public RemoteServerProfile Profile { get; }
+    }
 }

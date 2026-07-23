@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly IFileService _fileService;
         private readonly IFileSaveDialogService _fileSaveDialogService;
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
+        private readonly RemoteWorkspaceService _remoteWorkspaceService;
         private readonly ILanguageDetectionService _languageDetectionService;
         private readonly StatusBarController _statusBarController;
         private readonly Func<OpenedTab, bool> _isTabOpen;
@@ -37,6 +38,7 @@ namespace TxtAIEditor.Controls
             IFileService fileService,
             IFileSaveDialogService fileSaveDialogService,
             SecureNoteEncryptionService secureNoteEncryptionService,
+            RemoteWorkspaceService remoteWorkspaceService,
             ILanguageDetectionService languageDetectionService,
             StatusBarController statusBarController,
             Func<OpenedTab, bool> isTabOpen,
@@ -56,6 +58,7 @@ namespace TxtAIEditor.Controls
             _fileService = fileService;
             _fileSaveDialogService = fileSaveDialogService;
             _secureNoteEncryptionService = secureNoteEncryptionService;
+            _remoteWorkspaceService = remoteWorkspaceService;
             _languageDetectionService = languageDetectionService;
             _statusBarController = statusBarController;
             _isTabOpen = isTabOpen;
@@ -91,7 +94,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                await SaveTabContentAsync(tab);
+                await SaveTabContentAndUploadAsync(tab);
                 tab.IsDirty = false;
                 _cleanDirtyStateOnOtherTabs(tab);
                 await CompleteSuccessfulSaveAsync(tab, syncLineEnding: true);
@@ -133,6 +136,7 @@ namespace TxtAIEditor.Controls
             bool oldIsReadOnlyTextFile = tab.IsReadOnlyTextFile;
             string? oldArchiveSourcePath = tab.ArchiveSourcePath;
             string? oldArchiveEntryPath = tab.ArchiveEntryPath;
+            string? oldRemotePath = tab.RemotePath;
             if (!TryChooseSavePath(tab, initialDir))
             {
                 return false;
@@ -141,7 +145,8 @@ namespace TxtAIEditor.Controls
             try
             {
                 ClearArchiveReadOnlyState(tab);
-                await SaveTabContentAsync(tab);
+                tab.RemotePath = null;
+                await SaveTabContentAndUploadAsync(tab);
                 tab.IsDirty = false;
                 _cleanDirtyStateOnOtherTabs(tab);
                 await CompleteSuccessfulSaveAsync(tab, syncLineEnding: false);
@@ -156,6 +161,7 @@ namespace TxtAIEditor.Controls
                 tab.IsReadOnlyTextFile = oldIsReadOnlyTextFile;
                 tab.ArchiveSourcePath = oldArchiveSourcePath;
                 tab.ArchiveEntryPath = oldArchiveEntryPath;
+                tab.RemotePath = oldRemotePath;
                 return false;
             }
             catch (Exception ex)
@@ -167,6 +173,7 @@ namespace TxtAIEditor.Controls
                 tab.IsReadOnlyTextFile = oldIsReadOnlyTextFile;
                 tab.ArchiveSourcePath = oldArchiveSourcePath;
                 tab.ArchiveEntryPath = oldArchiveEntryPath;
+                tab.RemotePath = oldRemotePath;
                 _showErrorMessage(
                     _getString("SaveFile", "저장") + " - " + _getString("SaveAsFile", "다른 이름으로 저장"),
                     ex.Message);
@@ -334,6 +341,15 @@ namespace TxtAIEditor.Controls
             await _fileService.SaveTextFileAsync(tab.FilePath!, tab.Content, tab.EncodingName);
         }
 
+        private async Task SaveTabContentAndUploadAsync(OpenedTab tab)
+        {
+            await SaveTabContentAsync(tab);
+            if (!string.IsNullOrWhiteSpace(tab.RemotePath))
+            {
+                await _remoteWorkspaceService.UploadLocalFileAsync(tab.FilePath!, tab.RemotePath);
+            }
+        }
+
         private async Task CompleteSuccessfulSaveAsync(OpenedTab tab, bool syncLineEnding)
         {
             _statusBarController.UpdateFileStats(tab);
@@ -350,7 +366,7 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
             {
-                _addRecentFile(tab.FilePath);
+                _addRecentFile(tab.RemotePath ?? tab.FilePath);
             }
 
             string currentFolderPath = _currentFolderProvider();

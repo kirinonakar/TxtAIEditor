@@ -235,6 +235,8 @@ namespace TxtAIEditor.Composition
                         revealInLeftPanel: true),
                     callbacks.GetSelectedExplorerItem,
                     () => explorerNavigationController.IsViewingArchive,
+                    () => explorerNavigationController.IsViewingRemote,
+                    explorerNavigationController.RefreshRemoteDirectoryAsync,
                     () => explorerNavigationController.IsTreeMode,
                     ToggleLeftPanelAsync,
                     ToggleRightPanelAsync,

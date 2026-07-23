@@ -54,6 +54,7 @@ namespace TxtAIEditor.Composition
                 services.FileService,
                 services.FileSaveDialogService,
                 services.SecureNoteEncryptionService,
+                services.RemoteWorkspaceService,
                 services.LanguageDetectionService,
                 statusBar,
                 tabNavigation.IsOpen,

@@ -23,6 +23,8 @@ namespace TxtAIEditor.Composition
         Func<string, Task> NavigateExplorerToFolderAndRevealAsync,
         Func<TxtAIEditor.ExplorerItem?> GetSelectedExplorerItem,
         Func<bool> IsExplorerArchiveView,
+        Func<bool> IsExplorerRemoteView,
+        Func<Task> RefreshRemoteExplorerAsync,
         Func<bool> IsExplorerTreeMode,
         Func<Task> ToggleLeftPanelAsync,
         Func<Task> ToggleRightPanelAsync,
@@ -84,6 +86,7 @@ namespace TxtAIEditor.Composition
                 ui.StatusBar,
                 viewModel,
                 services.ArchiveExplorerService,
+                services.RemoteWorkspaceService,
                 ui.EditorTabView,
                 ui.EditorTabView2,
                 callbacks.GetCurrentFolderPath,
@@ -102,7 +105,9 @@ namespace TxtAIEditor.Composition
                 () => ui.EditorWorkspace.IsTerminalVisible,
                 () => ui.TerminalPane.SuspendNativeWindows(),
                 () => ui.TerminalPane.ResumeNativeWindows(),
-                callbacks.IsExplorerArchiveView);
+                callbacks.IsExplorerArchiveView,
+                callbacks.IsExplorerRemoteView,
+                callbacks.RefreshRemoteExplorerAsync);
 
             return ComposeAfterExplorerActions(
                 window,

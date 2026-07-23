@@ -17,6 +17,9 @@ namespace TxtAIEditor
 
         public string Name { get; set; } = string.Empty;
         public string Path { get; set; } = string.Empty;
+        public bool IsRemote { get; set; }
+        public Guid RemoteServerId { get; set; }
+        public string RemotePath { get; set; } = string.Empty;
         public bool IsFolder { get; set; } = false;
         public bool IsArchive { get; set; } = false;
         public string ArchivePath { get; set; } = string.Empty;

@@ -123,6 +123,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 services.ExplorerDirectoryService,
                 services.ArchiveExplorerService,
+                services.RemoteWorkspaceService,
                 services.GitService,
                 callbacks.InitializePickerWindow,
                 callbacks.SetCurrentFolderPath,
@@ -143,9 +144,21 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 ui.LeftSidebar,
                 callback => window.DispatcherQueue.TryEnqueue(() => callback()),
-                callbacks.NavigateExplorerToFolderAndRevealAsync,
+                async path =>
+                {
+                    if (RemotePath.IsRemote(path))
+                    {
+                        await explorerNavigation.NavigateRemoteVirtualPathAsync(path);
+                    }
+                    else
+                    {
+                        await callbacks.NavigateExplorerToFolderAndRevealAsync(path);
+                    }
+                },
                 () => explorerNavigation.IsTreeMode,
-                callbacks.LoadFileIntoTabAsync,
+                path => RemotePath.IsRemote(path)
+                    ? explorerNavigation.OpenRemoteFileAsync(path)
+                    : callbacks.LoadFileIntoTabAsync(path),
                 dialog.ShowErrorMessage,
                 callbacks.GetLocalizedString);
 

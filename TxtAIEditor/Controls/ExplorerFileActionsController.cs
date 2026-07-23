@@ -21,6 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly StatusBarPane _statusBar;
         private readonly MainWindowViewModel _viewModel;
         private readonly ArchiveExplorerService _archiveExplorerService;
+        private readonly RemoteWorkspaceService _remoteWorkspaceService;
         private readonly TabView _primaryTabView;
         private readonly TabView _secondaryTabView;
         private readonly Func<string> _currentFolderProvider;
@@ -40,6 +41,8 @@ namespace TxtAIEditor.Controls
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
         private readonly Func<bool> _isArchiveViewProvider;
+        private readonly Func<bool> _isRemoteViewProvider;
+        private readonly Func<Task> _refreshRemoteExplorerAsync;
         private readonly ConditionalWeakTable<MenuFlyout, object> _localizedFlyouts = new ConditionalWeakTable<MenuFlyout, object>();
 
         private System.Threading.CancellationTokenSource? _archiveCts;
@@ -50,6 +53,7 @@ namespace TxtAIEditor.Controls
             StatusBarPane statusBar,
             MainWindowViewModel viewModel,
             ArchiveExplorerService archiveExplorerService,
+            RemoteWorkspaceService remoteWorkspaceService,
             TabView primaryTabView,
             TabView secondaryTabView,
             Func<string> currentFolderProvider,
@@ -68,12 +72,15 @@ namespace TxtAIEditor.Controls
             Func<bool> isTerminalVisible,
             Action suspendTerminal,
             Action resumeTerminal,
-            Func<bool> isArchiveViewProvider)
+            Func<bool> isArchiveViewProvider,
+            Func<bool> isRemoteViewProvider,
+            Func<Task> refreshRemoteExplorerAsync)
         {
             _leftSidebar = leftSidebar;
             _statusBar = statusBar;
             _viewModel = viewModel;
             _archiveExplorerService = archiveExplorerService;
+            _remoteWorkspaceService = remoteWorkspaceService;
             _primaryTabView = primaryTabView;
             _secondaryTabView = secondaryTabView;
             _currentFolderProvider = currentFolderProvider;
@@ -93,6 +100,8 @@ namespace TxtAIEditor.Controls
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
             _isArchiveViewProvider = isArchiveViewProvider;
+            _isRemoteViewProvider = isRemoteViewProvider;
+            _refreshRemoteExplorerAsync = refreshRemoteExplorerAsync;
 
             WireEvents();
         }
@@ -156,7 +165,8 @@ namespace TxtAIEditor.Controls
             }
 
             string currentFolder = _currentFolderProvider();
-            if (string.IsNullOrWhiteSpace(currentFolder) || !Directory.Exists(currentFolder))
+            if (!_isRemoteViewProvider() &&
+                (string.IsNullOrWhiteSpace(currentFolder) || !Directory.Exists(currentFolder)))
             {
                 _showError(
                     _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
@@ -203,6 +213,24 @@ namespace TxtAIEditor.Controls
                 _showError(
                     _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
                     _getString("CreateFolderInvalidName", "폴더 이름에 사용할 수 없는 문자가 포함되어 있습니다."));
+                return;
+            }
+
+            if (_isRemoteViewProvider())
+            {
+                try
+                {
+                    await _remoteWorkspaceService.CreateDirectoryAsync(
+                        _remoteWorkspaceService.ActiveDirectoryVirtualPath,
+                        folderName);
+                    await _refreshRemoteExplorerAsync();
+                }
+                catch (Exception ex)
+                {
+                    _showError(
+                        _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
+                        ex.Message);
+                }
                 return;
             }
 
@@ -276,7 +304,7 @@ namespace TxtAIEditor.Controls
 
             if (flyout.Items.Count > 2 && flyout.Items[2] is MenuFlyoutItem markdownItem)
             {
-                markdownItem.Visibility = item != null && !isArchiveEntry && !item.IsFolder && IsSupportedImageFile(item.Path)
+                markdownItem.Visibility = item != null && !item.IsRemote && !isArchiveEntry && !item.IsFolder && IsSupportedImageFile(item.Path)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
@@ -305,6 +333,7 @@ namespace TxtAIEditor.Controls
             }
 
             bool canCompressFolder = item != null &&
+                !item.IsRemote &&
                 item.IsFolder &&
                 !isArchiveEntry &&
                 !string.IsNullOrWhiteSpace(item.Path) &&
@@ -370,7 +399,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            await _openFileInExternalViewerAsync(item!.Path);
+            try
+            {
+                string path = item!.IsRemote
+                    ? await _remoteWorkspaceService.DownloadVirtualFileAsync(item.Path)
+                    : item.Path;
+                await _openFileInExternalViewerAsync(path);
+            }
+            catch (Exception ex)
+            {
+                _showError(_getString("RemoteOperationFailedTitle", "리모트 작업 실패"), ex.Message);
+            }
         }
 
         private async void OnOpenWithDefaultProgramClick(object sender, RoutedEventArgs e)
@@ -381,7 +420,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            await _openFileWithDefaultProgramAsync(item!.Path);
+            try
+            {
+                string path = item!.IsRemote
+                    ? await _remoteWorkspaceService.DownloadVirtualFileAsync(item.Path)
+                    : item.Path;
+                await _openFileWithDefaultProgramAsync(path);
+            }
+            catch (Exception ex)
+            {
+                _showError(_getString("RemoteOperationFailedTitle", "리모트 작업 실패"), ex.Message);
+            }
         }
 
         private async void OnExtractArchiveToFolderClick(object sender, RoutedEventArgs e)
@@ -652,7 +701,7 @@ namespace TxtAIEditor.Controls
             var item = GetExplorerItem(sender);
             if (item != null && !string.IsNullOrEmpty(item.Path))
             {
-                SetClipboardText(item.Path);
+                SetClipboardText(item.IsRemote ? item.RemotePath : item.Path);
             }
         }
 
@@ -661,7 +710,11 @@ namespace TxtAIEditor.Controls
             var item = GetExplorerItem(sender);
             if (item != null && !string.IsNullOrEmpty(item.Path))
             {
-                string folderPath = item.IsFolder ? item.Path : Path.GetDirectoryName(item.Path) ?? string.Empty;
+                string folderPath = item.IsFolder
+                    ? item.IsRemote ? item.RemotePath : item.Path
+                    : item.IsRemote
+                        ? RemoteExplorerService.GetParentPath(item.RemotePath)
+                        : Path.GetDirectoryName(item.Path) ?? string.Empty;
                 SetClipboardText(folderPath);
             }
         }
@@ -718,6 +771,23 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (item.IsRemote)
+            {
+                try
+                {
+                    await _remoteWorkspaceService.RenameAsync(item.Path, newName, item.IsFolder);
+                    CloseOpenTabsForPath(item.Path);
+                    await _refreshRemoteExplorerAsync();
+                }
+                catch (Exception ex)
+                {
+                    _showError(
+                        _getString("RenameErrorTitle", "이름 바꾸기 오류"),
+                        ex.Message);
+                }
+                return;
+            }
+
             string newPath = Path.Combine(parentDir, newName);
 
             try
@@ -755,7 +825,9 @@ namespace TxtAIEditor.Controls
             {
                 Title = _getString("DeleteConfirmTitle", "삭제 확인"),
                 Content = string.Format(
-                    _getString("DeleteConfirmMessage", "'{0}'을(를) 휴지통으로 이동하시겠습니까?"),
+                    item.IsRemote
+                        ? _getString("RemoteDeleteConfirmMessage", "'{0}'을(를) 원격 서버에서 영구 삭제하시겠습니까?")
+                        : _getString("DeleteConfirmMessage", "'{0}'을(를) 휴지통으로 이동하시겠습니까?"),
                     item.Name),
                 PrimaryButtonText = _getString("DeleteConfirmOK", "삭제"),
                 CloseButtonText = _getString("DeleteConfirmCancel", "취소"),
@@ -771,6 +843,14 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                if (item.IsRemote)
+                {
+                    await _remoteWorkspaceService.DeleteAsync(item.Path, item.IsFolder);
+                    CloseOpenTabsForPath(item.Path);
+                    await _refreshRemoteExplorerAsync();
+                    return;
+                }
+
                 CloseOpenTabsForPath(item.Path);
 
                 if (item.IsFolder)
@@ -824,7 +904,7 @@ namespace TxtAIEditor.Controls
                    !item.IsFolder &&
                    !item.IsArchiveEntry &&
                    !string.IsNullOrWhiteSpace(item.Path) &&
-                   File.Exists(item.Path);
+                   (item.IsRemote || File.Exists(item.Path));
         }
 
         private static bool IsSupportedArchiveFile(ExplorerItem? item)
@@ -869,7 +949,9 @@ namespace TxtAIEditor.Controls
         private void CloseOpenTabsForPath(string path)
         {
             var tabsToClose = _viewModel.Tabs
-                .Where(t => string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase))
+                .Where(t =>
+                    string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(t.RemotePath, path, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             foreach (var tab in tabsToClose)
@@ -910,7 +992,7 @@ namespace TxtAIEditor.Controls
 
         private void OnFileListViewDragOver(object sender, DragEventArgs e)
         {
-            if (_isArchiveViewProvider())
+            if (_isArchiveViewProvider() || _isRemoteViewProvider())
             {
                 e.AcceptedOperation = DataPackageOperation.None;
                 e.Handled = true;
@@ -930,7 +1012,7 @@ namespace TxtAIEditor.Controls
         private async void OnFileListViewDrop(object sender, DragEventArgs e)
         {
             e.Handled = true;
-            if (_isArchiveViewProvider())
+            if (_isArchiveViewProvider() || _isRemoteViewProvider())
             {
                 e.AcceptedOperation = DataPackageOperation.None;
                 return;
@@ -971,6 +1053,13 @@ namespace TxtAIEditor.Controls
 
         private void OnFileListViewItemDragOver(object sender, DragEventArgs e)
         {
+            if (_isRemoteViewProvider())
+            {
+                e.AcceptedOperation = DataPackageOperation.None;
+                e.Handled = true;
+                return;
+            }
+
             if (sender is FrameworkElement targetElement &&
                 targetElement.DataContext is ExplorerItem targetArchiveItem &&
                 targetArchiveItem.IsArchiveEntry)
@@ -1008,6 +1097,12 @@ namespace TxtAIEditor.Controls
         private async void OnFileListViewItemDrop(object sender, DragEventArgs e)
         {
             e.Handled = true;
+            if (_isRemoteViewProvider())
+            {
+                e.AcceptedOperation = DataPackageOperation.None;
+                return;
+            }
+
             if (!e.DataView.Contains(StandardDataFormats.StorageItems))
             {
                 return;

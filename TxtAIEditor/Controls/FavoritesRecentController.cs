@@ -207,9 +207,12 @@ namespace TxtAIEditor.Controls
 
             string folderPath = explorerItem.IsFolder
                 ? explorerItem.Path
-                : Path.GetDirectoryName(explorerItem.Path) ?? string.Empty;
+                : RemotePath.IsRemote(explorerItem.Path)
+                    ? RemotePath.GetParent(explorerItem.Path)
+                    : Path.GetDirectoryName(explorerItem.Path) ?? string.Empty;
 
-            if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
+            if (string.IsNullOrEmpty(folderPath) ||
+                (!RemotePath.IsRemote(folderPath) && !Directory.Exists(folderPath)))
             {
                 return;
             }
@@ -269,6 +272,11 @@ namespace TxtAIEditor.Controls
 
         private static bool InferFolderWithoutTouchingFileSystem(string path)
         {
+            if (RemotePath.IsRemote(path))
+            {
+                return RemotePath.IsDirectory(path);
+            }
+
             string trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (trimmed.Length != path.Length)
             {
@@ -280,6 +288,11 @@ namespace TxtAIEditor.Controls
 
         private static string GetFavoriteDisplayName(string path, bool isFolder)
         {
+            if (RemotePath.IsRemote(path))
+            {
+                return RemotePath.GetName(path);
+            }
+
             string displayPath = isFolder
                 ? path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 : path;
@@ -300,6 +313,17 @@ namespace TxtAIEditor.Controls
             if (item.IsFolder)
             {
                 await _navigateExplorerToFolderAsync(item.Path);
+                return;
+            }
+
+            if (RemotePath.IsRemote(item.Path))
+            {
+                string parentRemotePath = RemotePath.GetParent(item.Path);
+                if (!_isExplorerTreeMode())
+                {
+                    await _navigateExplorerToFolderAsync(parentRemotePath);
+                }
+                await _loadFileIntoTabAsync(item.Path);
                 return;
             }
 
@@ -449,6 +473,12 @@ namespace TxtAIEditor.Controls
 
             if (item.IsFolder)
             {
+                if (RemotePath.IsRemote(item.Path))
+                {
+                    await _navigateExplorerToFolderAsync(item.Path);
+                    return;
+                }
+
                 if (!Directory.Exists(item.Path))
                 {
                     _showError(
@@ -458,6 +488,17 @@ namespace TxtAIEditor.Controls
                 }
 
                 await _navigateExplorerToFolderAsync(item.Path);
+                return;
+            }
+
+            if (RemotePath.IsRemote(item.Path))
+            {
+                string parentRemotePath = RemotePath.GetParent(item.Path);
+                if (!_isExplorerTreeMode())
+                {
+                    await _navigateExplorerToFolderAsync(parentRemotePath);
+                }
+                await _loadFileIntoTabAsync(item.Path);
                 return;
             }
 

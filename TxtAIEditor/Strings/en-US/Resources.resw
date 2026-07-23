@@ -3526,4 +3526,6 @@ Plan: {0}</value>
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>Enter the server name, address, ID, and password.</value></data>
   <data name="RemoteServerInvalidPort" xml:space="preserve"><value>The port must be a number from 1 to 65535.</value></data>
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>The WebDAV address must start with https://.</value></data>
+  <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>Permanently delete '{0}' from the remote server?</value></data>
+  <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>Remote operation failed</value></data>
 </root>

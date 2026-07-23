@@ -12,6 +12,7 @@ namespace TxtAIEditor.Controls
         public ExplorerSidebarView()
         {
             InitializeComponent();
+            RemoteExplorer.RemoteServerSelected += OnRemoteServerSelected;
         }
 
         public Grid Root => RootGrid;
@@ -38,6 +39,7 @@ namespace TxtAIEditor.Controls
             add => RemoteExplorer.RemoteFileOpened += value;
             remove => RemoteExplorer.RemoteFileOpened -= value;
         }
+        public event EventHandler<RemoteServerSelectedEventArgs>? RemoteServerSelected;
         public event RoutedEventHandler? OpenInWindowsExplorerClick;
         public event RoutedEventHandler? HomeClick;
         public event RoutedEventHandler? TreeModeClick;
@@ -148,5 +150,11 @@ namespace TxtAIEditor.Controls
         private void OnFileListViewDrop(object sender, DragEventArgs e) => FileListDrop?.Invoke(sender, e);
         private void OnFileListViewItemDragOver(object sender, DragEventArgs e) => FileItemDragOver?.Invoke(sender, e);
         private void OnFileListViewItemDrop(object sender, DragEventArgs e) => FileItemDrop?.Invoke(sender, e);
+
+        private void OnRemoteServerSelected(object? sender, RemoteServerSelectedEventArgs e)
+        {
+            ExplorerRemoteButton.Flyout?.Hide();
+            RemoteServerSelected?.Invoke(this, e);
+        }
     }
 }

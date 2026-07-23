@@ -183,6 +183,8 @@ namespace TxtAIEditor.Core.Models
 
         public bool IsArchiveEntry => !string.IsNullOrWhiteSpace(ArchiveSourcePath) &&
                                       !string.IsNullOrWhiteSpace(ArchiveEntryPath);
+        public string? RemotePath { get; set; }
+        public bool IsRemoteFile => !string.IsNullOrWhiteSpace(RemotePath);
         public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile;
         public string? EncryptionPassword { get; set; }
 

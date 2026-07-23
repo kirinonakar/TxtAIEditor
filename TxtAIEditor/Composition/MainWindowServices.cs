@@ -21,6 +21,7 @@ namespace TxtAIEditor.Composition
             ISettingsDialogService settingsDialogService,
             IUiPersonalizationService uiPersonalizationService,
             ExplorerDirectoryService explorerDirectoryService,
+            RemoteWorkspaceService remoteWorkspaceService,
             ArchiveExplorerService archiveExplorerService,
             PdfTextExtractionService pdfTextExtractionService,
             SecureNoteEncryptionService secureNoteEncryptionService,
@@ -42,6 +43,7 @@ namespace TxtAIEditor.Composition
             SettingsDialogService = settingsDialogService;
             UiPersonalizationService = uiPersonalizationService;
             ExplorerDirectoryService = explorerDirectoryService;
+            RemoteWorkspaceService = remoteWorkspaceService;
             ArchiveExplorerService = archiveExplorerService;
             PdfTextExtractionService = pdfTextExtractionService;
             SecureNoteEncryptionService = secureNoteEncryptionService;
@@ -64,6 +66,7 @@ namespace TxtAIEditor.Composition
         public ISettingsDialogService SettingsDialogService { get; }
         public IUiPersonalizationService UiPersonalizationService { get; }
         public ExplorerDirectoryService ExplorerDirectoryService { get; }
+        public RemoteWorkspaceService RemoteWorkspaceService { get; }
         public ArchiveExplorerService ArchiveExplorerService { get; }
         public PdfTextExtractionService PdfTextExtractionService { get; }
         public SecureNoteEncryptionService SecureNoteEncryptionService { get; }
@@ -87,6 +90,7 @@ namespace TxtAIEditor.Composition
             var settingsDialogService = new SettingsDialogService(llmService);
             var uiPersonalizationService = new UiPersonalizationService();
             var explorerDirectoryService = new ExplorerDirectoryService();
+            var remoteWorkspaceService = new RemoteWorkspaceService(credentialService);
             var archiveExplorerService = new ArchiveExplorerService();
             var pdfTextExtractionService = new PdfTextExtractionService();
             var secureNoteEncryptionService = new SecureNoteEncryptionService();
@@ -109,6 +113,7 @@ namespace TxtAIEditor.Composition
                 settingsDialogService,
                 uiPersonalizationService,
                 explorerDirectoryService,
+                remoteWorkspaceService,
                 archiveExplorerService,
                 pdfTextExtractionService,
                 secureNoteEncryptionService,

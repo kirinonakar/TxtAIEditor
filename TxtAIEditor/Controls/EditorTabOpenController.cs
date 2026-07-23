@@ -20,6 +20,7 @@ namespace TxtAIEditor.Controls
     {
         private readonly ISettingsService _settingsService;
         private readonly ISnippetService _snippetService;
+        private readonly RemoteWorkspaceService _remoteWorkspaceService;
         private readonly MainWindowViewModel _viewModel;
         private readonly EditorWorkspacePane _editorWorkspace;
         private readonly EditorTabDocumentFactory _editorTabDocumentFactory;
@@ -94,6 +95,7 @@ namespace TxtAIEditor.Controls
         public EditorTabOpenController(
             ISettingsService settingsService,
             ISnippetService snippetService,
+            RemoteWorkspaceService remoteWorkspaceService,
             MainWindowViewModel viewModel,
             EditorWorkspacePane editorWorkspace,
             EditorTabDocumentFactory editorTabDocumentFactory,
@@ -132,6 +134,7 @@ namespace TxtAIEditor.Controls
         {
             _settingsService = settingsService;
             _snippetService = snippetService;
+            _remoteWorkspaceService = remoteWorkspaceService;
             _viewModel = viewModel;
             _editorWorkspace = editorWorkspace;
             _editorTabDocumentFactory = editorTabDocumentFactory;
@@ -984,12 +987,18 @@ namespace TxtAIEditor.Controls
 
         private void AddOpenTab(OpenedTab tab)
         {
+            if (_remoteWorkspaceService.TryGetVirtualPath(tab.FilePath, out string remotePath))
+            {
+                tab.RemotePath = remotePath;
+                tab.Title = RemotePath.GetName(remotePath);
+            }
+
             _viewModel.Tabs.Add(tab);
             if (!string.IsNullOrEmpty(tab.FilePath) &&
                 File.Exists(tab.FilePath) &&
                 !ArchiveExplorerService.IsArchiveCachePath(tab.FilePath))
             {
-                _favoritesRecentController.AddRecentFile(tab.FilePath);
+                _favoritesRecentController.AddRecentFile(tab.RemotePath ?? tab.FilePath);
             }
         }
 

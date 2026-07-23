@@ -1,10 +1,12 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using TxtAIEditor.Core.Interfaces;
+using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
 using Windows.Storage.Pickers;
@@ -18,6 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly MainWindowViewModel _viewModel;
         private readonly ExplorerDirectoryService _directoryService;
         private readonly ArchiveExplorerService _archiveExplorerService;
+        private readonly RemoteWorkspaceService _remoteWorkspaceService;
         private readonly IGitService _gitService;
         private readonly Action<object> _initializePickerWindow;
         private readonly Action<string> _currentFolderChanged;
@@ -29,6 +32,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, Task> _loadArchiveEntryIntoTabAsync;
         private readonly ILocalizationService _localizationService;
         private readonly Func<string> _homeFolderPathProvider;
+        private System.Threading.CancellationTokenSource? _remoteCancellation;
 
         public enum ExplorerSortMode
         {
@@ -44,6 +48,7 @@ namespace TxtAIEditor.Controls
             MainWindowViewModel viewModel,
             ExplorerDirectoryService directoryService,
             ArchiveExplorerService archiveExplorerService,
+            RemoteWorkspaceService remoteWorkspaceService,
             IGitService gitService,
             Action<object> initializePickerWindow,
             Action<string> currentFolderChanged,
@@ -60,6 +65,7 @@ namespace TxtAIEditor.Controls
             _viewModel = viewModel;
             _directoryService = directoryService;
             _archiveExplorerService = archiveExplorerService;
+            _remoteWorkspaceService = remoteWorkspaceService;
             _gitService = gitService;
             _initializePickerWindow = initializePickerWindow;
             _currentFolderChanged = currentFolderChanged;
@@ -73,6 +79,8 @@ namespace TxtAIEditor.Controls
             _homeFolderPathProvider = homeFolderPathProvider;
 
             WireEvents();
+            _remoteWorkspaceService.FileUploaded += (_, _) =>
+                _leftSidebar.DispatcherQueue.TryEnqueue(() => _ = RefreshRemoteDirectoryAsync());
             UpdateSortButtonVisuals();
             _leftSidebar.ActualThemeChanged += (sender, args) =>
             {
@@ -85,10 +93,20 @@ namespace TxtAIEditor.Controls
         public string CurrentArchivePath { get; private set; } = string.Empty;
         public string CurrentArchiveDirectory { get; private set; } = string.Empty;
         public bool IsViewingArchive => !string.IsNullOrWhiteSpace(CurrentArchivePath);
+        public bool IsViewingRemote => _remoteWorkspaceService.IsActive;
         public bool IsTreeMode { get; private set; }
 
         public void SetTreeMode(bool enableTreeMode)
         {
+            if (IsViewingRemote)
+            {
+                IsTreeMode = false;
+                _leftSidebar.ExplorerTreeModeBtn.IsChecked = false;
+                _leftSidebar.SetExplorerTreeMode(false);
+                _leftSidebar.ExplorerTree.RootNodes.Clear();
+                return;
+            }
+
             if (enableTreeMode == IsTreeMode)
             {
                 return;
@@ -128,6 +146,8 @@ namespace TxtAIEditor.Controls
 
         private void LoadFlatDirectoryRoot(string folderPath)
         {
+            _remoteWorkspaceService.Deactivate();
+            _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
             _viewModel.ExplorerItems.Clear();
             CurrentArchivePath = string.Empty;
             CurrentArchiveDirectory = string.Empty;
@@ -241,8 +261,158 @@ namespace TxtAIEditor.Controls
             await _refreshGitStatusAsync();
         }
 
+        public async Task<bool> NavigateRemoteVirtualPathAsync(
+            string virtualPath,
+            bool revealInLeftPanel = true)
+        {
+            if (!await _remoteWorkspaceService.ActivateVirtualPathAsync(virtualPath))
+            {
+                return false;
+            }
+
+            if (IsTreeMode)
+            {
+                SetTreeMode(false);
+            }
+
+            _leftSidebar.ExplorerTreeModeBtn.IsEnabled = false;
+            SetCurrentFolderPath(string.Empty);
+            _currentRepoPathChanged(string.Empty);
+            await LoadRemoteDirectoryAsync();
+
+            if (revealInLeftPanel)
+            {
+                _ensureLeftPanelVisible();
+                _showLeftSidebarPage(0);
+            }
+
+            return true;
+        }
+
+        public async Task OpenRemoteFileAsync(string virtualPath)
+        {
+            try
+            {
+                OpenedTab? existingTab = _viewModel.Tabs.FirstOrDefault(tab =>
+                    string.Equals(tab.RemotePath, virtualPath, StringComparison.OrdinalIgnoreCase));
+                if (existingTab?.FilePath is string existingLocalPath && File.Exists(existingLocalPath))
+                {
+                    await _loadFileIntoTabAsync(existingLocalPath);
+                    return;
+                }
+
+                string localPath = await _remoteWorkspaceService.DownloadVirtualFileAsync(virtualPath);
+                await _loadFileIntoTabAsync(localPath);
+            }
+            catch (Exception ex)
+            {
+                _leftSidebar.ExplorerStatus.Text = string.Format(
+                    _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
+                    ex.Message);
+            }
+        }
+
+        public Task RefreshRemoteDirectoryAsync()
+        {
+            return IsViewingRemote ? LoadRemoteDirectoryAsync() : Task.CompletedTask;
+        }
+
+        private async Task LoadRemoteDirectoryAsync()
+        {
+            if (!IsViewingRemote || _remoteWorkspaceService.ActiveConnection == null)
+            {
+                return;
+            }
+
+            _remoteCancellation?.Cancel();
+            _remoteCancellation?.Dispose();
+            _remoteCancellation = new System.Threading.CancellationTokenSource();
+            var cancellationToken = _remoteCancellation.Token;
+            RemoteConnectionSettings connection = _remoteWorkspaceService.ActiveConnection;
+            string loadingText = _localizationService.GetString("RemoteLoadingDirectory", "폴더를 불러오는 중...");
+            _leftSidebar.ExplorerStatus.Text =
+                $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel}\n{loadingText}";
+
+            try
+            {
+                var entries = await _remoteWorkspaceService.ListActiveDirectoryAsync(cancellationToken);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                _viewModel.ExplorerItems.Clear();
+                bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                foreach (RemoteDirectoryEntry entry in entries)
+                {
+                    var item = new ExplorerItem
+                    {
+                        Name = entry.Name,
+                        Path = RemotePath.Create(connection.Profile.Id, entry.FullPath, entry.IsDirectory),
+                        IsFolder = entry.IsDirectory,
+                        ModifiedTime = entry.ModifiedTime?.LocalDateTime ?? DateTime.MinValue,
+                        IsRemote = true,
+                        RemoteServerId = connection.Profile.Id,
+                        RemotePath = entry.FullPath,
+                        IsDark = isDark
+                    };
+                    _viewModel.ExplorerItems.Add(item);
+                }
+
+                if (_currentSortMode != ExplorerSortMode.Name)
+                {
+                    var sorted = SortItems(_viewModel.ExplorerItems).ToList();
+                    _viewModel.ExplorerItems.Clear();
+                    foreach (ExplorerItem item in sorted)
+                    {
+                        _viewModel.ExplorerItems.Add(item);
+                    }
+                }
+
+                _leftSidebar.ExplorerStatus.Text =
+                    $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel} · {_remoteWorkspaceService.ActiveDirectoryPath}\n" +
+                    FormatExplorerItemCount(_viewModel.ExplorerItems.Count);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _leftSidebar.ExplorerStatus.Text = string.Format(
+                    _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
+                    ex.Message);
+            }
+        }
+
+        private async Task ApplyRemoteFilterAsync(string query)
+        {
+            await LoadRemoteDirectoryAsync();
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return;
+            }
+
+            var matched = _viewModel.ExplorerItems
+                .Where(item => MatchesPattern(item.Name, query))
+                .ToList();
+            _viewModel.ExplorerItems.Clear();
+            foreach (ExplorerItem item in matched)
+            {
+                _viewModel.ExplorerItems.Add(item);
+            }
+
+            _leftSidebar.ExplorerStatus.Text =
+                $"{_remoteWorkspaceService.ActiveDirectoryPath}\n{FormatExplorerFilterResult(matched.Count)}";
+        }
+
         public void RefreshCurrentFolder()
         {
+            if (IsViewingRemote)
+            {
+                _ = LoadRemoteDirectoryAsync();
+                return;
+            }
+
             if (IsViewingArchive)
             {
                 if (File.Exists(CurrentArchivePath))
@@ -305,7 +475,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.SelectFolderClick += OnSelectFolderClick;
             _leftSidebar.RefreshClick += OnExplorerRefreshClick;
             _leftSidebar.SortClick += OnExplorerSortClick;
-            _leftSidebar.RemoteFileOpened += OnRemoteFileOpened;
+            _leftSidebar.RemoteServerSelected += OnRemoteServerSelected;
             _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
             _leftSidebar.ExplorerHomeClick += OnExplorerHomeClick;
             _leftSidebar.ExplorerTreeModeClick += OnExplorerTreeModeClick;
@@ -340,9 +510,25 @@ namespace TxtAIEditor.Controls
             RefreshCurrentFolder();
         }
 
-        private void OnRemoteFileOpened(object? sender, Core.Models.RemoteFileOpenedEventArgs e)
+        private async void OnRemoteServerSelected(object? sender, Core.Models.RemoteServerSelectedEventArgs e)
         {
-            _ = _loadFileIntoTabAsync(e.LocalPath);
+            if (!_remoteWorkspaceService.Activate(e.Profile))
+            {
+                _leftSidebar.ExplorerStatus.Text = _localizationService.GetString(
+                    "RemoteCredentialMissing",
+                    "Windows 자격 증명 관리자에서 서버 주소 또는 비밀번호를 찾을 수 없습니다.");
+                return;
+            }
+
+            if (IsTreeMode)
+            {
+                SetTreeMode(false);
+            }
+            _leftSidebar.ExplorerTreeModeBtn.IsEnabled = false;
+            SetCurrentFolderPath(string.Empty);
+            _currentRepoPathChanged(string.Empty);
+            _leftSidebar.ClearExplorerFilter();
+            await LoadRemoteDirectoryAsync();
         }
 
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e)
@@ -593,6 +779,15 @@ namespace TxtAIEditor.Controls
 
         private void OnExplorerUpClick(object sender, RoutedEventArgs e)
         {
+            if (IsViewingRemote)
+            {
+                if (_remoteWorkspaceService.NavigateUp())
+                {
+                    _ = LoadRemoteDirectoryAsync();
+                }
+                return;
+            }
+
             if (IsViewingArchive)
             {
                 NavigateArchiveUp();
@@ -638,6 +833,20 @@ namespace TxtAIEditor.Controls
                        ?? _leftSidebar.FileList.SelectedItem as ExplorerItem;
             if (item == null)
             {
+                return;
+            }
+
+            if (item.IsRemote)
+            {
+                if (item.IsFolder)
+                {
+                    _remoteWorkspaceService.NavigateTo(item.RemotePath);
+                    _ = LoadRemoteDirectoryAsync();
+                }
+                else
+                {
+                    _ = OpenRemoteFileAsync(item.Path);
+                }
                 return;
             }
 
@@ -961,6 +1170,12 @@ namespace TxtAIEditor.Controls
 
         private async Task ApplyFilterAsync(string query)
         {
+            if (IsViewingRemote)
+            {
+                await ApplyRemoteFilterAsync(query);
+                return;
+            }
+
             if (IsViewingArchive)
             {
                 await ApplyArchiveFilterAsync(query);

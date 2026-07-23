@@ -3526,4 +3526,6 @@
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>서버 이름, 주소, ID, 비밀번호를 모두 입력하세요.</value></data>
   <data name="RemoteServerInvalidPort" xml:space="preserve"><value>포트는 1~65535 사이의 숫자여야 합니다.</value></data>
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV 주소는 https://로 시작해야 합니다.</value></data>
+  <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>'{0}'을(를) 원격 서버에서 영구 삭제하시겠습니까?</value></data>
+  <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>리모트 작업 실패</value></data>
 </root>
