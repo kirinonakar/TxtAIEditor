@@ -669,8 +669,8 @@
                                 <Grid Grid.Row="0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock x:Name="AgentSkillTitleText"
@@ -679,29 +679,30 @@
                                                FontWeight="SemiBold"
                                                FontSize="12"
                                                VerticalAlignment="Center"/>
+                                    <TextBox x:Name="AgentSkillFilterTextBox"
+                                             Grid.Column="1"
+                                             Height="24"
+                                             MinHeight="0"
+                                             MinWidth="92"
+                                             Margin="8,0,0,0"
+                                             Padding="7,0"
+                                             FontSize="11"
+                                             VerticalContentAlignment="Center"
+                                             PlaceholderText="스킬 검색..."
+                                             TextChanged="OnAgentSkillFilterTextChanged"/>
                                     <FontIcon x:Name="AgentSkillOpenFolderButton"
-                                              Grid.Column="1"
+                                              Grid.Column="2"
                                               Glyph="&#xE8DA;"
                                               FontSize="12"
                                               Margin="8,0,0,0"
                                               HorizontalAlignment="Left"
                                               VerticalAlignment="Center"
                                               Tapped="OnAgentSkillOpenFolderClick"/>
-                                    <TextBox x:Name="AgentSkillFilterTextBox"
-                                             Grid.Column="2"
-                                             Height="24"
-                                             MinHeight="0"
-                                             MinWidth="92"
-                                             Margin="8,0"
-                                             Padding="7,0"
-                                             FontSize="11"
-                                             VerticalContentAlignment="Center"
-                                             PlaceholderText="스킬 검색..."
-                                             TextChanged="OnAgentSkillFilterTextChanged"/>
                                     <FontIcon x:Name="AgentSkillRefreshButton"
                                               Grid.Column="3"
                                               Glyph="&#xE72C;"
                                               FontSize="12"
+                                              Margin="8,0,0,0"
                                               VerticalAlignment="Center"
                                               Tapped="OnAgentSkillRefreshClick"/>
                                 </Grid>
