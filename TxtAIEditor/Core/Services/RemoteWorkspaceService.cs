@@ -132,6 +132,21 @@ namespace TxtAIEditor.Core.Services
             return false;
         }
 
+        public string GetDisplayPath(string virtualPath)
+        {
+            if (!RemotePath.TryParse(virtualPath, out Guid serverId, out string remotePath))
+            {
+                return virtualPath;
+            }
+
+            string serverName = ActiveConnection?.Profile.Id == serverId
+                ? ActiveConnection.Profile.Name
+                : _serverStore.Load()
+                    .FirstOrDefault(profile => profile.Id == serverId)
+                    ?.Name ?? "Remote";
+            return $"{serverName}:{remotePath}";
+        }
+
         public async Task UploadLocalFileAsync(
             string localPath,
             string virtualPath,
@@ -157,6 +172,18 @@ namespace TxtAIEditor.Core.Services
             (RemoteConnectionSettings connection, string remotePath) =
                 await ResolveConnectionAsync(target);
             await _explorerService.CreateDirectoryAsync(connection, remotePath, cancellationToken);
+        }
+
+        public async Task<string> CreateFileAsync(
+            string parentVirtualPath,
+            string name,
+            CancellationToken cancellationToken = default)
+        {
+            string target = RemotePath.Combine(parentVirtualPath, name);
+            (RemoteConnectionSettings connection, string remotePath) =
+                await ResolveConnectionAsync(target);
+            await _explorerService.CreateFileAsync(connection, remotePath, cancellationToken);
+            return target;
         }
 
         public async Task RenameAsync(

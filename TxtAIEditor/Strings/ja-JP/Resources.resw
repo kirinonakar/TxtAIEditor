@@ -3492,4 +3492,12 @@
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV アドレスは https:// で始まる必要があります。</value></data>
   <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>「{0}」をリモート サーバーから完全に削除しますか？</value></data>
   <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>リモート操作に失敗しました</value></data>
+  <data name="ExplorerCreateItemTooltip" xml:space="preserve"><value>新しい項目</value></data>
+  <data name="ExplorerCreateFileTooltip" xml:space="preserve"><value>新しいファイル</value></data>
+  <data name="CreateFileDialogTitle" xml:space="preserve"><value>新しいファイル</value></data>
+  <data name="CreateFilePlaceholder" xml:space="preserve"><value>ファイル名を入力...</value></data>
+  <data name="CreateFileDialogCreate" xml:space="preserve"><value>作成</value></data>
+  <data name="CreateFileErrorTitle" xml:space="preserve"><value>ファイルを作成できませんでした</value></data>
+  <data name="CreateFileEmptyName" xml:space="preserve"><value>ファイル名を入力してください。</value></data>
+  <data name="CreateFileInvalidName" xml:space="preserve"><value>ファイル名に使用できない文字が含まれています。</value></data>
 </root>

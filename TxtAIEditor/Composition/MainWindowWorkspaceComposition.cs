@@ -141,6 +141,7 @@ namespace TxtAIEditor.Composition
             var favoritesRecent = new FavoritesRecentController(
                 services.SettingsService,
                 services.RecentFilesService,
+                services.RemoteWorkspaceService,
                 viewModel,
                 ui.LeftSidebar,
                 callback => window.DispatcherQueue.TryEnqueue(() => callback()),

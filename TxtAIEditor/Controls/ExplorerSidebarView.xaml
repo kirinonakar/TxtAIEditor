@@ -27,7 +27,21 @@
                                     <Button x:Name="ExplorerSelectFolderButton" Grid.Column="1" Click="OnSelectFolderClick" ToolTipService.ToolTip="폴더 선택..." AutomationProperties.Name="폴더 선택..." Padding="0" Width="28" MinWidth="28" Height="28">
                                             <FontIcon Glyph="&#xED25;" FontSize="10"/>
                                         </Button>
-                                    <Button x:Name="ExplorerCreateFolderButton" Grid.Column="2" Click="OnCreateFolderClick" ToolTipService.ToolTip="새 폴더" Padding="0" Width="28" MinWidth="28" Height="28">
+                                    <Button x:Name="ExplorerCreateFolderButton" Grid.Column="2" ToolTipService.ToolTip="새 항목" Padding="0" Width="28" MinWidth="28" Height="28">
+                                        <Button.Flyout>
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem x:Name="ExplorerCreateFolderMenuItem" Text="새 폴더" Click="OnCreateFolderClick">
+                                                    <MenuFlyoutItem.Icon>
+                                                        <FontIcon Glyph="&#xED41;"/>
+                                                    </MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                                <MenuFlyoutItem x:Name="ExplorerCreateFileMenuItem" Text="새 파일" Click="OnCreateFileClick">
+                                                    <MenuFlyoutItem.Icon>
+                                                        <FontIcon Glyph="&#xE7C3;"/>
+                                                    </MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                            </MenuFlyout>
+                                        </Button.Flyout>
                                             <FontIcon Glyph="&#xE710;" FontSize="10"/>
                                         </Button>
                                     <Button x:Name="ExplorerRefreshButton" Grid.Column="3" Click="OnRefreshClick" ToolTipService.ToolTip="새로고침" Padding="0" Width="28" MinWidth="28" Height="28">

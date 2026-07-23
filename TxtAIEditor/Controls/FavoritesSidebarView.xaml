@@ -23,7 +23,7 @@
                                 <ListView x:Name="FavoritesListView" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFavoriteItemClick" AllowDrop="True" CanDragItems="True" CanReorderItems="True">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding Path}">
+                                            <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding DisplayPath}">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
@@ -37,7 +37,7 @@
                                                 </FontIcon>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding Path}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding DisplayPath}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
                                                 <Button Grid.Column="2" x:Name="FavoritePinButton" Background="Transparent" BorderBrush="Transparent" Padding="3" VerticalAlignment="Center" Opacity="{Binding PinOpacity}" Click="OnFavoritePinClick" Tag="{Binding}" ToolTipService.ToolTip="고정">
                                                     <FontIcon Glyph="&#xE718;" FontSize="10"/>

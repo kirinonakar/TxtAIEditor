@@ -110,6 +110,7 @@ namespace TxtAIEditor.Controls
         {
             _leftSidebar.FileListViewItemRightTapped += OnFileListViewItemRightTapped;
             _leftSidebar.CreateFolderClick += OnCreateFolderClick;
+            _leftSidebar.CreateFileClick += OnCreateFileClick;
             _leftSidebar.InsertMarkdownImageClick += OnInsertMarkdownImageClick;
             _leftSidebar.OpenExternalViewerClick += OnOpenExternalViewerClick;
             _leftSidebar.OpenWithDefaultProgramClick += OnOpenWithDefaultProgramClick;
@@ -262,6 +263,113 @@ namespace TxtAIEditor.Controls
             {
                 _showError(
                     _getString("CreateFolderErrorTitle", "새 폴더 만들기 오류"),
+                    ex.Message);
+            }
+        }
+
+        private async void OnCreateFileClick(object sender, RoutedEventArgs e)
+        {
+            if (_isArchiveViewProvider())
+            {
+                _showError(
+                    _getString("CreateFileErrorTitle", "새 파일 만들기 오류"),
+                    _getString("ArchiveExplorerReadOnlyMessage", "압축 파일 내부는 읽기 전용입니다."));
+                return;
+            }
+
+            string currentFolder = _currentFolderProvider();
+            if (!_isRemoteViewProvider() &&
+                (string.IsNullOrWhiteSpace(currentFolder) || !Directory.Exists(currentFolder)))
+            {
+                _showError(
+                    _getString("CreateFileErrorTitle", "새 파일 만들기 오류"),
+                    _getString("CreateFolderNoFolderSelected", "먼저 탐색기에서 폴더를 선택하십시오."));
+                return;
+            }
+
+            var nameInput = new TextBox
+            {
+                PlaceholderText = _getString("CreateFilePlaceholder", "파일 이름 입력..."),
+                MinWidth = 260,
+                MaxLength = 255
+            };
+            var dialog = new ContentDialog
+            {
+                Title = _getString("CreateFileDialogTitle", "새 파일"),
+                Content = nameInput,
+                PrimaryButtonText = _getString("CreateFileDialogCreate", "만들기"),
+                CloseButtonText = _getString("CreateFolderDialogCancel", "취소"),
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = _xamlRootProvider(),
+                RequestedTheme = _themeProvider()
+            };
+
+            if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            string fileName = nameInput.Text.Trim();
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                _showError(
+                    _getString("CreateFileErrorTitle", "새 파일 만들기 오류"),
+                    _getString("CreateFileEmptyName", "파일 이름을 입력하십시오."));
+                return;
+            }
+
+            if (fileName is "." or ".." ||
+                fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            {
+                _showError(
+                    _getString("CreateFileErrorTitle", "새 파일 만들기 오류"),
+                    _getString("CreateFileInvalidName", "파일 이름에 사용할 수 없는 문자가 포함되어 있습니다."));
+                return;
+            }
+
+            if (_isRemoteViewProvider())
+            {
+                try
+                {
+                    string virtualPath = await _remoteWorkspaceService.CreateFileAsync(
+                        _remoteWorkspaceService.ActiveDirectoryVirtualPath,
+                        fileName);
+                    await _refreshRemoteExplorerAsync();
+                    string localPath = await _remoteWorkspaceService.DownloadVirtualFileAsync(virtualPath);
+                    await _loadFileIntoTabAsync(localPath);
+                }
+                catch (Exception ex)
+                {
+                    _showError(
+                        _getString("CreateFileErrorTitle", "새 파일 만들기 오류"),
+                        ex.Message);
+                }
+                return;
+            }
+
+            string newFilePath = Path.Combine(currentFolder, fileName);
+            if (File.Exists(newFilePath) || Directory.Exists(newFilePath))
+            {
+                _showError(
+                    _getString("CreateFileErrorTitle", "새 파일 만들기 오류"),
+                    string.Format(
+                        _getString("CreateFolderAlreadyExists", "'{0}'이(가) 이미 존재합니다."),
+                        fileName));
+                return;
+            }
+
+            try
+            {
+                using (File.Create(newFilePath))
+                {
+                }
+                _loadDirectoryRoot(currentFolder);
+                await _loadFileIntoTabAsync(newFilePath);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("CreateFileErrorTitle", "새 파일 만들기 오류"),
                     ex.Message);
             }
         }

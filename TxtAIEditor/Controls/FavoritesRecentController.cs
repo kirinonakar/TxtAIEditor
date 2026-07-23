@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
 
 namespace TxtAIEditor.Controls
@@ -17,6 +18,7 @@ namespace TxtAIEditor.Controls
     {
         private readonly ISettingsService _settingsService;
         private readonly IRecentFilesService _recentFilesService;
+        private readonly RemoteWorkspaceService _remoteWorkspaceService;
         private readonly MainWindowViewModel _viewModel;
         private readonly LeftSidebarPane _leftSidebar;
         private readonly Action<Action> _enqueueOnUiThread;
@@ -31,6 +33,7 @@ namespace TxtAIEditor.Controls
         public FavoritesRecentController(
             ISettingsService settingsService,
             IRecentFilesService recentFilesService,
+            RemoteWorkspaceService remoteWorkspaceService,
             MainWindowViewModel viewModel,
             LeftSidebarPane leftSidebar,
             Action<Action> enqueueOnUiThread,
@@ -42,6 +45,7 @@ namespace TxtAIEditor.Controls
         {
             _settingsService = settingsService;
             _recentFilesService = recentFilesService;
+            _remoteWorkspaceService = remoteWorkspaceService;
             _viewModel = viewModel;
             _leftSidebar = leftSidebar;
             _enqueueOnUiThread = enqueueOnUiThread;
@@ -265,6 +269,9 @@ namespace TxtAIEditor.Controls
             {
                 Name = GetFavoriteDisplayName(path, isFolder),
                 Path = path,
+                DisplayPath = RemotePath.IsRemote(path)
+                    ? _remoteWorkspaceService.GetDisplayPath(path)
+                    : path,
                 IsFolder = isFolder,
                 IsPinned = isPinned
             };

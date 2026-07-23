@@ -130,6 +130,52 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        public async Task CreateFileAsync(
+            RemoteConnectionSettings connection,
+            string remotePath,
+            CancellationToken cancellationToken)
+        {
+            switch (connection.Profile.ServerType)
+            {
+                case RemoteServerType.Ssh:
+                case RemoteServerType.Sftp:
+                    await RunSftpAsync(connection, client =>
+                    {
+                        if (client.Exists(remotePath))
+                        {
+                            throw new IOException("A remote item with the same name already exists.");
+                        }
+
+                        using Stream _ = client.Create(remotePath);
+                    }, cancellationToken);
+                    break;
+                case RemoteServerType.Ftps:
+                    await RunFtpsAsync(connection, client =>
+                    {
+                        FtpStatus status = client.UploadBytes(
+                            Array.Empty<byte>(),
+                            remotePath,
+                            FtpRemoteExists.Skip,
+                            createRemoteDir: false);
+                        if (status != FtpStatus.Success)
+                        {
+                            throw new IOException("A remote item with the same name already exists.");
+                        }
+                    }, cancellationToken);
+                    break;
+                case RemoteServerType.WebDav:
+                    using (HttpClient client = CreateWebDavClient(connection))
+                    using (HttpRequestMessage request = new(HttpMethod.Put, BuildWebDavUri(connection, remotePath)))
+                    {
+                        request.Headers.TryAddWithoutValidation("If-None-Match", "*");
+                        request.Content = new ByteArrayContent(Array.Empty<byte>());
+                        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+                        response.EnsureSuccessStatusCode();
+                    }
+                    break;
+            }
+        }
+
         public async Task RenameAsync(
             RemoteConnectionSettings connection,
             string sourcePath,

@@ -32,6 +32,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? UpClick;
         public event RoutedEventHandler? SelectFolderClick;
         public event RoutedEventHandler? CreateFolderClick;
+        public event RoutedEventHandler? CreateFileClick;
         public event RoutedEventHandler? RefreshClick;
         public event RoutedEventHandler? SortClick;
         public event EventHandler<RemoteFileOpenedEventArgs>? RemoteFileOpened
@@ -93,7 +94,11 @@ namespace TxtAIEditor.Controls
             var selectFolderText = getString("ExplorerSelectFolder", "폴더 선택...");
             ToolTipService.SetToolTip(ExplorerSelectFolderButton, selectFolderText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerSelectFolderButton, selectFolderText);
-            ToolTipService.SetToolTip(ExplorerCreateFolderButton, getString("ExplorerCreateFolderTooltip", "새 폴더"));
+            string createItemText = getString("ExplorerCreateItemTooltip", "새 항목");
+            ToolTipService.SetToolTip(ExplorerCreateFolderButton, createItemText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerCreateFolderButton, createItemText);
+            ExplorerCreateFolderMenuItem.Text = getString("ExplorerCreateFolderTooltip", "새 폴더");
+            ExplorerCreateFileMenuItem.Text = getString("ExplorerCreateFileTooltip", "새 파일");
             ToolTipService.SetToolTip(ExplorerRefreshButton, getString("ExplorerRefreshTooltip", "새로고침"));
             ToolTipService.SetToolTip(ExplorerSortButton, getString("ExplorerSortName", "이름순 정렬"));
 
@@ -120,6 +125,7 @@ namespace TxtAIEditor.Controls
         private void OnExplorerUpClick(object sender, RoutedEventArgs e) => UpClick?.Invoke(sender, e);
         private void OnSelectFolderClick(object sender, RoutedEventArgs e) => SelectFolderClick?.Invoke(sender, e);
         private void OnCreateFolderClick(object sender, RoutedEventArgs e) => CreateFolderClick?.Invoke(sender, e);
+        private void OnCreateFileClick(object sender, RoutedEventArgs e) => CreateFileClick?.Invoke(sender, e);
         private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
         private async void OnRemoteFlyoutOpening(object sender, object e) => await RemoteExplorer.RefreshProfilesAsync();

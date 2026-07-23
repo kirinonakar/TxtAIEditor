@@ -3528,4 +3528,12 @@
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV 주소는 https://로 시작해야 합니다.</value></data>
   <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>'{0}'을(를) 원격 서버에서 영구 삭제하시겠습니까?</value></data>
   <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>리모트 작업 실패</value></data>
+  <data name="ExplorerCreateItemTooltip" xml:space="preserve"><value>새 항목</value></data>
+  <data name="ExplorerCreateFileTooltip" xml:space="preserve"><value>새 파일</value></data>
+  <data name="CreateFileDialogTitle" xml:space="preserve"><value>새 파일</value></data>
+  <data name="CreateFilePlaceholder" xml:space="preserve"><value>파일 이름 입력...</value></data>
+  <data name="CreateFileDialogCreate" xml:space="preserve"><value>만들기</value></data>
+  <data name="CreateFileErrorTitle" xml:space="preserve"><value>새 파일 만들기 오류</value></data>
+  <data name="CreateFileEmptyName" xml:space="preserve"><value>파일 이름을 입력하십시오.</value></data>
+  <data name="CreateFileInvalidName" xml:space="preserve"><value>파일 이름에 사용할 수 없는 문자가 포함되어 있습니다.</value></data>
 </root>

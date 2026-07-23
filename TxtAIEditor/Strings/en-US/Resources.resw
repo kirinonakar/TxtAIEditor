@@ -3528,4 +3528,12 @@ Plan: {0}</value>
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>The WebDAV address must start with https://.</value></data>
   <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>Permanently delete '{0}' from the remote server?</value></data>
   <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>Remote operation failed</value></data>
+  <data name="ExplorerCreateItemTooltip" xml:space="preserve"><value>New item</value></data>
+  <data name="ExplorerCreateFileTooltip" xml:space="preserve"><value>New file</value></data>
+  <data name="CreateFileDialogTitle" xml:space="preserve"><value>New file</value></data>
+  <data name="CreateFilePlaceholder" xml:space="preserve"><value>Enter a file name...</value></data>
+  <data name="CreateFileDialogCreate" xml:space="preserve"><value>Create</value></data>
+  <data name="CreateFileErrorTitle" xml:space="preserve"><value>Could not create file</value></data>
+  <data name="CreateFileEmptyName" xml:space="preserve"><value>Enter a file name.</value></data>
+  <data name="CreateFileInvalidName" xml:space="preserve"><value>The file name contains invalid characters.</value></data>
 </root>

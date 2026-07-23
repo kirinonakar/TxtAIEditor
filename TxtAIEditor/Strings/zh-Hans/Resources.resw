@@ -3492,4 +3492,12 @@
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV 地址必须以 https:// 开头。</value></data>
   <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>是否从远程服务器永久删除“{0}”？</value></data>
   <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>远程操作失败</value></data>
+  <data name="ExplorerCreateItemTooltip" xml:space="preserve"><value>新建项目</value></data>
+  <data name="ExplorerCreateFileTooltip" xml:space="preserve"><value>新建文件</value></data>
+  <data name="CreateFileDialogTitle" xml:space="preserve"><value>新建文件</value></data>
+  <data name="CreateFilePlaceholder" xml:space="preserve"><value>输入文件名...</value></data>
+  <data name="CreateFileDialogCreate" xml:space="preserve"><value>创建</value></data>
+  <data name="CreateFileErrorTitle" xml:space="preserve"><value>无法创建文件</value></data>
+  <data name="CreateFileEmptyName" xml:space="preserve"><value>请输入文件名。</value></data>
+  <data name="CreateFileInvalidName" xml:space="preserve"><value>文件名包含无效字符。</value></data>
 </root>

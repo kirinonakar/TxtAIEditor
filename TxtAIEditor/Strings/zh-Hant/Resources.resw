@@ -3492,4 +3492,12 @@
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>WebDAV 位址必須以 https:// 開頭。</value></data>
   <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>要從遠端伺服器永久刪除「{0}」嗎？</value></data>
   <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>遠端作業失敗</value></data>
+  <data name="ExplorerCreateItemTooltip" xml:space="preserve"><value>新增項目</value></data>
+  <data name="ExplorerCreateFileTooltip" xml:space="preserve"><value>新增檔案</value></data>
+  <data name="CreateFileDialogTitle" xml:space="preserve"><value>新增檔案</value></data>
+  <data name="CreateFilePlaceholder" xml:space="preserve"><value>輸入檔案名稱...</value></data>
+  <data name="CreateFileDialogCreate" xml:space="preserve"><value>建立</value></data>
+  <data name="CreateFileErrorTitle" xml:space="preserve"><value>無法建立檔案</value></data>
+  <data name="CreateFileEmptyName" xml:space="preserve"><value>請輸入檔案名稱。</value></data>
+  <data name="CreateFileInvalidName" xml:space="preserve"><value>檔案名稱包含無效字元。</value></data>
 </root>

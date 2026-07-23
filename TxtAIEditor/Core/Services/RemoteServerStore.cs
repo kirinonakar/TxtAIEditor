@@ -44,6 +44,25 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        public IReadOnlyList<RemoteServerProfile> Load()
+        {
+            if (!File.Exists(_profilesPath))
+            {
+                return Array.Empty<RemoteServerProfile>();
+            }
+
+            try
+            {
+                string json = File.ReadAllText(_profilesPath);
+                return JsonSerializer.Deserialize<List<RemoteServerProfile>>(json, JsonOptions)
+                    ?? new List<RemoteServerProfile>();
+            }
+            catch
+            {
+                return Array.Empty<RemoteServerProfile>();
+            }
+        }
+
         public async Task SaveAsync(
             RemoteServerProfile profile,
             string address,

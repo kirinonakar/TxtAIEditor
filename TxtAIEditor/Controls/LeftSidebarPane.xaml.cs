@@ -18,6 +18,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExplorerUpClick { add => ExplorerView.UpClick += value; remove => ExplorerView.UpClick -= value; }
         public event RoutedEventHandler? SelectFolderClick { add => ExplorerView.SelectFolderClick += value; remove => ExplorerView.SelectFolderClick -= value; }
         public event RoutedEventHandler? CreateFolderClick { add => ExplorerView.CreateFolderClick += value; remove => ExplorerView.CreateFolderClick -= value; }
+        public event RoutedEventHandler? CreateFileClick { add => ExplorerView.CreateFileClick += value; remove => ExplorerView.CreateFileClick -= value; }
         public event RoutedEventHandler? RefreshClick { add => ExplorerView.RefreshClick += value; remove => ExplorerView.RefreshClick -= value; }
         public event RoutedEventHandler? SortClick { add => ExplorerView.SortClick += value; remove => ExplorerView.SortClick -= value; }
         public event EventHandler<RemoteFileOpenedEventArgs>? RemoteFileOpened { add => ExplorerView.RemoteFileOpened += value; remove => ExplorerView.RemoteFileOpened -= value; }
