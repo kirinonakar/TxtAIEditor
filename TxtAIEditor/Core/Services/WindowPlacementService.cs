@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Windowing;
 using TxtAIEditor.Core.Models;
 using Windows.Graphics;
@@ -9,6 +10,11 @@ namespace TxtAIEditor.Core.Services
 {
     public static class WindowPlacementService
     {
+        private const double DefaultDpi = 96.0;
+
+        [DllImport("user32.dll")]
+        private static extern uint GetDpiForWindow(IntPtr hWnd);
+
         public static void SetWindowIcon(AppWindow appWindow)
         {
             try
@@ -34,8 +40,12 @@ namespace TxtAIEditor.Core.Services
                     return;
                 }
 
-                var size = new SizeInt32(settings.WindowWidth, settings.WindowHeight);
-                if (settings.WindowX >= 0 && settings.WindowY >= 0)
+                bool hasSavedPlacement = settings.WindowX >= 0 && settings.WindowY >= 0;
+                var size = hasSavedPlacement
+                    ? new SizeInt32(settings.WindowWidth, settings.WindowHeight)
+                    : GetDpiScaledInitialSize(appWindow, settings.WindowWidth, settings.WindowHeight);
+
+                if (hasSavedPlacement)
                 {
                     appWindow.MoveAndResize(new RectInt32(settings.WindowX, settings.WindowY, size.Width, size.Height));
                 }
@@ -48,6 +58,17 @@ namespace TxtAIEditor.Core.Services
             {
                 Debug.WriteLine($"Failed to restore window placement: {ex.Message}");
             }
+        }
+
+        private static SizeInt32 GetDpiScaledInitialSize(AppWindow appWindow, int width, int height)
+        {
+            IntPtr hWnd = Microsoft.UI.Win32Interop.GetWindowFromWindowId(appWindow.Id);
+            uint dpi = GetDpiForWindow(hWnd);
+            double scale = dpi > 0 ? dpi / DefaultDpi : 1.0;
+
+            return new SizeInt32(
+                Math.Max(1, (int)Math.Round(width * scale)),
+                Math.Max(1, (int)Math.Round(height * scale)));
         }
 
         public static void CaptureRestoredWindowPlacement(AppWindow appWindow, EditorSettings settings)

@@ -7,6 +7,8 @@ namespace TxtAIEditor.Core.Models
     public class EditorSettings
     {
         public const string DefaultExternalViewerPath = "uviewer";
+        public const int DefaultWindowWidth = 1200;
+        public const int DefaultWindowHeight = 800;
 
         public string Theme { get; set; } = "Light";
         public string FontFamily { get; set; } = "Consolas, 'Courier New', monospace";
@@ -45,8 +47,8 @@ namespace TxtAIEditor.Core.Models
         public bool StartInTreeMode { get; set; } = false;
         public int WindowX { get; set; } = -1;
         public int WindowY { get; set; } = -1;
-        public int WindowWidth { get; set; } = 1200;
-        public int WindowHeight { get; set; } = 800;
+        public int WindowWidth { get; set; } = DefaultWindowWidth;
+        public int WindowHeight { get; set; } = DefaultWindowHeight;
         public double TerminalPanelHeight { get; set; } = 220;
         public string TerminalProfile { get; set; } = "PowerShell";
         public string TerminalFontFamily { get; set; } = "Consolas";
