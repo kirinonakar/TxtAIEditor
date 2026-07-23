@@ -54,7 +54,13 @@ namespace TxtAIEditor.Controls
                         properties = new
                         {
                             arguments = new { type = "string", description = "Ripgrep arguments, e.g. -n \"pattern\" FolderName" },
-                            timeoutMs = new { type = "integer", description = "Execution timeout in milliseconds (default: 10000)" }
+                            timeoutMs = new
+                            {
+                                type = "integer",
+                                minimum = AgentProcessToolService.MinimumProcessTimeoutMs,
+                                maximum = AgentProcessToolService.MaximumProcessTimeoutMs,
+                                description = "Execution timeout in milliseconds (default: 10000, maximum: 300000)"
+                            }
                         },
                         required = new[] { "arguments" }
                     }
@@ -69,7 +75,13 @@ namespace TxtAIEditor.Controls
                         properties = new
                         {
                             arguments = new { type = "string", description = "Ripgrep-all arguments" },
-                            timeoutMs = new { type = "integer", description = "Timeout in milliseconds" }
+                            timeoutMs = new
+                            {
+                                type = "integer",
+                                minimum = AgentProcessToolService.MinimumProcessTimeoutMs,
+                                maximum = AgentProcessToolService.MaximumProcessTimeoutMs,
+                                description = "Timeout in milliseconds (default: 10000, maximum: 300000)"
+                            }
                         },
                         required = new[] { "arguments" }
                     }
@@ -84,7 +96,13 @@ namespace TxtAIEditor.Controls
                         properties = new
                         {
                             command = new { type = "string", description = "The PowerShell command to run, e.g. git status --short" },
-                            timeoutMs = new { type = "integer", description = "Timeout in milliseconds" }
+                            timeoutMs = new
+                            {
+                                type = "integer",
+                                minimum = AgentProcessToolService.MinimumProcessTimeoutMs,
+                                maximum = AgentProcessToolService.MaximumProcessTimeoutMs,
+                                description = "Timeout in milliseconds (default: 10000, maximum: 300000)"
+                            }
                         },
                         required = new[] { "command" }
                     }

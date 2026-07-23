@@ -14,6 +14,9 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentProcessToolService
     {
+        internal const int MinimumProcessTimeoutMs = 1000;
+        internal const int MaximumProcessTimeoutMs = 300000;
+
         private readonly AgentWorkspaceFileResolver _workspace;
         private readonly Func<string, int, Task<string>> _searchTextFallbackAsync;
         private readonly Func<string, Task<bool>> _confirmPowerShellAsync;
@@ -292,7 +295,8 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                Task completed = await Task.WhenAny(exitTask, Task.Delay(Math.Clamp(timeoutMs, 1000, 60000), cancellationToken));
+                int effectiveTimeoutMs = Math.Clamp(timeoutMs, MinimumProcessTimeoutMs, MaximumProcessTimeoutMs);
+                Task completed = await Task.WhenAny(exitTask, Task.Delay(effectiveTimeoutMs, cancellationToken));
                 if (completed != exitTask)
                 {
                     try
@@ -303,7 +307,7 @@ namespace TxtAIEditor.Controls
                     {
                     }
 
-                    return $"{fileName} timed out after {timeoutMs}ms.";
+                    return $"{fileName} timed out after {effectiveTimeoutMs}ms.";
                 }
 
                 await exitTask;
