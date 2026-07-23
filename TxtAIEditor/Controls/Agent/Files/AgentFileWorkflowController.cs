@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
 
@@ -20,6 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly TabCloseController _tabCloseController;
         private readonly SearchReplaceTabSyncController _tabSyncController;
         private readonly CompareTabController _compareTabController;
+        private readonly RemoteWorkspaceService _remoteWorkspaceService;
         private readonly IAgentFileWorkflowHost _host;
 
         public AgentFileWorkflowController(
@@ -31,6 +33,7 @@ namespace TxtAIEditor.Controls
             TabCloseController tabCloseController,
             SearchReplaceTabSyncController tabSyncController,
             CompareTabController compareTabController,
+            RemoteWorkspaceService remoteWorkspaceService,
             IAgentFileWorkflowHost host)
         {
             _viewModel = viewModel;
@@ -41,6 +44,7 @@ namespace TxtAIEditor.Controls
             _tabCloseController = tabCloseController;
             _tabSyncController = tabSyncController;
             _compareTabController = compareTabController;
+            _remoteWorkspaceService = remoteWorkspaceService;
             _host = host;
         }
 
@@ -72,6 +76,15 @@ namespace TxtAIEditor.Controls
 
         public async Task HandleFileModifiedAsync(string filePath)
         {
+            if (_remoteWorkspaceService.TryGetVirtualPath(
+                    filePath,
+                    out string remotePath))
+            {
+                await _remoteWorkspaceService.UploadLocalFileAsync(
+                    filePath,
+                    remotePath);
+            }
+
             await RunOnUiAsync(async () =>
             {
                 await _tabSyncController.HandleFileModifiedAsync(filePath);

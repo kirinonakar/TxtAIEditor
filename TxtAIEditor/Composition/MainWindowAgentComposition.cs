@@ -145,6 +145,7 @@ namespace TxtAIEditor.Composition
                 documents.TabClose,
                 editor.SearchReplaceTabSync,
                 preview.CompareTab,
+                services.RemoteWorkspaceService,
                 callbacks);
 
             var agent = new AgentController(
