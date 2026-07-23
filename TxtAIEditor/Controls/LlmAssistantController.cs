@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Windows.UI;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
@@ -628,11 +630,28 @@ namespace TxtAIEditor.Controls
             return $"{displayName}{suffix}.txt";
         }
 
+        private static readonly SolidColorBrush _cancelRunButtonBrush = new(Color.FromArgb(0xFF, 0xDC, 0x26, 0x26));
+
+        private void SetLlmRunButtonCancelMode(bool isCancel)
+        {
+            _rightSidebar.LlmCustomRunBtn.Content = isCancel
+                ? _getString("LlmCustomCancelButtonText", "중단")
+                : _getString("LlmCustomRunButtonText", "전송");
+            if (isCancel)
+            {
+                _rightSidebar.LlmCustomRunBtn.Background = _cancelRunButtonBrush;
+            }
+            else
+            {
+                _rightSidebar.LlmCustomRunBtn.ClearValue(Button.BackgroundProperty);
+            }
+        }
+
         private async Task ProcessChunkedSummarizationAsync(string fileContext)
         {
             _assistantCts = new CancellationTokenSource();
             _isAssistantRunning = true;
-            _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomCancelButtonText", "중단");
+            SetLlmRunButtonCancelMode(true);
 
             try
             {
@@ -719,7 +738,7 @@ namespace TxtAIEditor.Controls
             finally
             {
                 _isAssistantRunning = false;
-                _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomRunButtonText", "전송");
+                SetLlmRunButtonCancelMode(false);
                 _assistantCts?.Dispose();
                 _assistantCts = null;
             }
@@ -780,7 +799,7 @@ namespace TxtAIEditor.Controls
         {
             _assistantCts = new CancellationTokenSource();
             _isAssistantRunning = true;
-            _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomCancelButtonText", "중단");
+            SetLlmRunButtonCancelMode(true);
 
             try
             {
@@ -925,7 +944,7 @@ namespace TxtAIEditor.Controls
             finally
             {
                 _isAssistantRunning = false;
-                _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomRunButtonText", "전송");
+                SetLlmRunButtonCancelMode(false);
                 _assistantCts?.Dispose();
                 _assistantCts = null;
             }
@@ -977,7 +996,7 @@ namespace TxtAIEditor.Controls
 
             _assistantCts = new CancellationTokenSource();
             _isAssistantRunning = true;
-            _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomCancelButtonText", "중단");
+            SetLlmRunButtonCancelMode(true);
 
             string progressHeader = string.Format(_getString("LlmActionProgressFormat", "[{0} 진행 중...]"), actionName) + "\n\n";
             string completedHeader = string.Format(_getString("LlmActionHeaderFormat", "[{0}]"), actionName) + "\n\n";
@@ -1091,7 +1110,7 @@ namespace TxtAIEditor.Controls
             finally
             {
                 _isAssistantRunning = false;
-                _rightSidebar.LlmCustomRunBtn.Content = _getString("LlmCustomRunButtonText", "전송");
+                SetLlmRunButtonCancelMode(false);
                 _assistantCts?.Dispose();
                 _assistantCts = null;
             }
