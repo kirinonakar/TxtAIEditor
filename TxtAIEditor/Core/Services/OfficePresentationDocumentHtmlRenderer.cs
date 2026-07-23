@@ -1257,9 +1257,30 @@ if (document.fonts && document.fonts.ready) {
                 color = ReadPresentationThemeColor(schemeName, themeColors);
             }
 
-            return string.IsNullOrWhiteSpace(color)
-                ? null
-                : ApplyColorTransforms(color, solidFill);
+            if (string.IsNullOrWhiteSpace(color))
+            {
+                return null;
+            }
+
+            string transformedColor = ApplyColorTransforms(color, solidFill);
+            int alpha = Math.Clamp(ReadPercentageTransform(solidFill, "alpha", 100000), 0, 100000);
+            if (alpha == 0)
+            {
+                return null;
+            }
+            if (alpha < 100000 && Regex.IsMatch(transformedColor, "^#[0-9A-Fa-f]{6}$"))
+            {
+                int red = Convert.ToInt32(transformedColor.Substring(1, 2), 16);
+                int green = Convert.ToInt32(transformedColor.Substring(3, 2), 16);
+                int blue = Convert.ToInt32(transformedColor.Substring(5, 2), 16);
+                return "rgba(" +
+                    red.ToString(CultureInfo.InvariantCulture) + "," +
+                    green.ToString(CultureInfo.InvariantCulture) + "," +
+                    blue.ToString(CultureInfo.InvariantCulture) + "," +
+                    FormatInvariant(alpha / 100000.0) + ")";
+            }
+
+            return transformedColor;
         }
 
         private static string? ReadPresentationThemeColor(string? schemeName, IReadOnlyList<string> themeColors)
