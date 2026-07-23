@@ -816,7 +816,7 @@ namespace TxtAIEditor.Controls
 
             var picker = new Windows.Storage.Pickers.FolderPicker
             {
-                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads
             };
             _initializePickerWindow(picker);
             picker.FileTypeFilter.Add("*");
@@ -828,9 +828,10 @@ namespace TxtAIEditor.Controls
             }
 
             string targetLocalDirectory = folder.Path;
-            System.Threading.CancellationTokenSource cts = new();
+            using System.Threading.CancellationTokenSource cts = new();
 
             string downloadStatusPrefix = _getString("RemoteDownloadingStatus", "다운로드 중...");
+            bool isCompleted = false;
 
             try
             {
@@ -845,27 +846,29 @@ namespace TxtAIEditor.Controls
                     targetLocalDirectory,
                     (currentFile, percent) =>
                     {
-                        _statusBar.ShowProgress(
-                            $"{downloadStatusPrefix} ({currentFile})",
-                            percent,
-                            () => cts.Cancel());
+                        if (!isCompleted && !cts.IsCancellationRequested)
+                        {
+                            _statusBar.ShowProgress(
+                                $"{downloadStatusPrefix} ({currentFile})",
+                                percent,
+                                () => cts.Cancel());
+                        }
                     },
                     cts.Token);
-
-                _statusBar.HideProgress();
-                string successMessage = _getString("RemoteDownloadCompleted", "다운로드가 완료되었습니다.");
-                _statusBar.FileStatsText.Text = successMessage;
             }
             catch (OperationCanceledException)
             {
-                _statusBar.HideProgress();
             }
             catch (Exception ex)
             {
-                _statusBar.HideProgress();
                 _showError(
                     _getString("RemoteDownloadFailedTitle", "다운로드 실패"),
                     ex.Message);
+            }
+            finally
+            {
+                isCompleted = true;
+                _statusBar.HideProgress();
             }
         }
 

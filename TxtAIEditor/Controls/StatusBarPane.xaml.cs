@@ -63,27 +63,64 @@ namespace TxtAIEditor.Controls
         }
 
         private Action? _cancelAction;
+        private int _currentProgressSessionId;
+        private bool _isProgressActive;
 
         public void ShowProgress(string statusText, double value, Action? cancelAction = null)
         {
-            DispatcherQueue.TryEnqueue(() =>
+            void DoShow()
             {
-                _cancelAction = cancelAction;
-                StatusProgressText.Text = statusText;
-                StatusProgressBar.Value = value;
-                StatusProgressPercent.Text = $"{(int)value}%";
-                StatusProgressCancelButton.Visibility = cancelAction != null ? Visibility.Visible : Visibility.Collapsed;
-                StatusProgressPanel.Visibility = Visibility.Visible;
-            });
+                if (!_isProgressActive)
+                {
+                    _currentProgressSessionId++;
+                    _isProgressActive = true;
+                }
+                UpdateProgressUi(_currentProgressSessionId, statusText, value, cancelAction);
+            }
+
+            if (DispatcherQueue.HasThreadAccess)
+            {
+                DoShow();
+            }
+            else
+            {
+                DispatcherQueue.TryEnqueue(DoShow);
+            }
+        }
+
+        private void UpdateProgressUi(int sessionId, string statusText, double value, Action? cancelAction)
+        {
+            if (!_isProgressActive || sessionId != _currentProgressSessionId || _currentProgressSessionId == 0)
+            {
+                return;
+            }
+
+            _cancelAction = cancelAction;
+            StatusProgressText.Text = statusText;
+            StatusProgressBar.Value = value;
+            StatusProgressPercent.Text = $"{(int)value}%";
+            StatusProgressCancelButton.Visibility = cancelAction != null ? Visibility.Visible : Visibility.Collapsed;
+            StatusProgressPanel.Visibility = Visibility.Visible;
         }
 
         public void HideProgress()
         {
-            DispatcherQueue.TryEnqueue(() =>
+            void DoHide()
             {
+                _currentProgressSessionId++;
+                _isProgressActive = false;
                 _cancelAction = null;
                 StatusProgressPanel.Visibility = Visibility.Collapsed;
-            });
+            }
+
+            if (DispatcherQueue.HasThreadAccess)
+            {
+                DoHide();
+            }
+            else
+            {
+                DispatcherQueue.TryEnqueue(DoHide);
+            }
         }
 
         private void HandleLeftPanelToggleClick(object sender, RoutedEventArgs e)

@@ -381,7 +381,7 @@ namespace TxtAIEditor.Controls
 
             var picker = new Windows.Storage.Pickers.FolderPicker
             {
-                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads
             };
             if (App.MainWindow != null)
             {
@@ -398,36 +398,55 @@ namespace TxtAIEditor.Controls
 
             string targetLocalDirectory = folder.Path;
             string downloadStatusPrefix = Get("RemoteDownloadingStatus", "다운로드 중...");
+            bool isCompleted = false;
 
             await RunBusyAsync(
                 $"{downloadStatusPrefix} ({entry.Name})",
                 async cancellationToken =>
                 {
                     string targetLocalPath = System.IO.Path.Combine(targetLocalDirectory, entry.Name);
-                    if (entry.IsDirectory)
+                    try
                     {
-                        await _explorerService.DownloadDirectoryToPathAsync(
-                            _connection,
-                            entry.FullPath,
-                            targetLocalPath,
-                            (currentFile, percent) =>
+                        if (entry.IsDirectory)
+                        {
+                            await _explorerService.DownloadDirectoryToPathAsync(
+                                _connection,
+                                entry.FullPath,
+                                targetLocalPath,
+                                (currentFile, percent) =>
+                                {
+                                    if (!isCompleted && !cancellationToken.IsCancellationRequested)
+                                    {
+                                        UpdateStatus($"{downloadStatusPrefix} ({currentFile})");
+                                    }
+                                },
+                                cancellationToken);
+                        }
+                        else
+                        {
+                            Progress<double> progress = new(p =>
                             {
-                                UpdateStatus($"{downloadStatusPrefix} ({currentFile})");
-                            },
-                            cancellationToken);
+                                if (!isCompleted && !cancellationToken.IsCancellationRequested)
+                                {
+                                    UpdateStatus($"{downloadStatusPrefix} ({entry.Name})");
+                                }
+                            });
+                            await _explorerService.DownloadFileToPathAsync(
+                                _connection,
+                                entry.FullPath,
+                                targetLocalPath,
+                                progress,
+                                cancellationToken);
+                        }
                     }
-                    else
+                    finally
                     {
-                        Progress<double> progress = new(p => UpdateStatus($"{downloadStatusPrefix} ({entry.Name})"));
-                        await _explorerService.DownloadFileToPathAsync(
-                            _connection,
-                            entry.FullPath,
-                            targetLocalPath,
-                            progress,
-                            cancellationToken);
+                        isCompleted = true;
                     }
 
-                    UpdateStatus(Get("RemoteDownloadCompleted", "다운로드가 완료되었습니다."));
+                    UpdateStatus(string.Format(
+                        Get("RemoteExplorerConnectedFormat", "{0}에 연결됨"),
+                        _connection.Profile.Name));
                 });
         }
 
