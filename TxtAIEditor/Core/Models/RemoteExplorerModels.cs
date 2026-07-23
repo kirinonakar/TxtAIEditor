@@ -7,7 +7,8 @@ namespace TxtAIEditor.Core.Models
         Ssh,
         Sftp,
         Ftps,
-        WebDav
+        WebDav,
+        Wsl
     }
 
     public sealed class RemoteServerProfile
@@ -24,10 +25,16 @@ namespace TxtAIEditor.Core.Models
             RemoteServerType.Sftp => "SFTP",
             RemoteServerType.Ftps => "FTPS",
             RemoteServerType.WebDav => "WebDAV",
+            RemoteServerType.Wsl => "WSL",
             _ => ServerType.ToString()
         };
 
-        public string Summary => $"{ProtocolLabel} · {UserName} · :{Port}";
+        public string Summary => ServerType == RemoteServerType.Wsl
+            ? $"WSL · {Name}"
+            : $"{ProtocolLabel} · {UserName} · :{Port}";
+        public Microsoft.UI.Xaml.Visibility DeleteVisibility => ServerType == RemoteServerType.Wsl
+            ? Microsoft.UI.Xaml.Visibility.Collapsed
+            : Microsoft.UI.Xaml.Visibility.Visible;
     }
 
     public sealed class RemoteDirectoryEntry

@@ -31,6 +31,8 @@ namespace TxtAIEditor.Core.Services
                     await ListFtpsAsync(connection, path, cancellationToken),
                 RemoteServerType.WebDav =>
                     await ListWebDavAsync(connection, path, cancellationToken),
+                RemoteServerType.Wsl =>
+                    await ListWslAsync(connection, path, cancellationToken),
                 _ => Array.Empty<RemoteDirectoryEntry>()
             };
         }
@@ -54,6 +56,13 @@ namespace TxtAIEditor.Core.Services
                     break;
                 case RemoteServerType.WebDav:
                     await DownloadWebDavAsync(connection, entry.FullPath, localPath, cancellationToken);
+                    break;
+                case RemoteServerType.Wsl:
+                    await CopyWslFileAsync(
+                        GetWslFileSystemPath(connection, entry.FullPath),
+                        localPath,
+                        overwrite: true,
+                        cancellationToken);
                     break;
             }
 
@@ -102,6 +111,13 @@ namespace TxtAIEditor.Core.Services
                         response.EnsureSuccessStatusCode();
                     }
                     break;
+                case RemoteServerType.Wsl:
+                    await CopyWslFileAsync(
+                        localPath,
+                        GetWslFileSystemPath(connection, remotePath),
+                        overwrite: true,
+                        cancellationToken);
+                    break;
             }
         }
 
@@ -126,6 +142,11 @@ namespace TxtAIEditor.Core.Services
                     {
                         response.EnsureSuccessStatusCode();
                     }
+                    break;
+                case RemoteServerType.Wsl:
+                    await Task.Run(
+                        () => Directory.CreateDirectory(GetWslFileSystemPath(connection, remotePath)),
+                        cancellationToken);
                     break;
             }
         }
@@ -173,6 +194,17 @@ namespace TxtAIEditor.Core.Services
                         response.EnsureSuccessStatusCode();
                     }
                     break;
+                case RemoteServerType.Wsl:
+                    await Task.Run(() =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        using FileStream _ = new(
+                            GetWslFileSystemPath(connection, remotePath),
+                            FileMode.CreateNew,
+                            FileAccess.Write,
+                            FileShare.None);
+                    }, cancellationToken);
+                    break;
             }
         }
 
@@ -215,6 +247,22 @@ namespace TxtAIEditor.Core.Services
                         using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
                         response.EnsureSuccessStatusCode();
                     }
+                    break;
+                case RemoteServerType.Wsl:
+                    await Task.Run(() =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string source = GetWslFileSystemPath(connection, sourcePath);
+                        string destination = GetWslFileSystemPath(connection, destinationPath);
+                        if (isDirectory)
+                        {
+                            Directory.Move(source, destination);
+                        }
+                        else
+                        {
+                            File.Move(source, destination);
+                        }
+                    }, cancellationToken);
                     break;
             }
         }
@@ -262,6 +310,21 @@ namespace TxtAIEditor.Core.Services
                         response.EnsureSuccessStatusCode();
                     }
                     break;
+                case RemoteServerType.Wsl:
+                    await Task.Run(() =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string path = GetWslFileSystemPath(connection, remotePath);
+                        if (isDirectory)
+                        {
+                            Directory.Delete(path, recursive: true);
+                        }
+                        else
+                        {
+                            File.Delete(path);
+                        }
+                    }, cancellationToken);
+                    break;
             }
         }
 
@@ -304,6 +367,82 @@ namespace TxtAIEditor.Core.Services
 
             int separator = normalized.LastIndexOf('/');
             return separator <= 0 ? "/" : normalized[..separator];
+        }
+
+        private static async Task<IReadOnlyList<RemoteDirectoryEntry>> ListWslAsync(
+            RemoteConnectionSettings connection,
+            string path,
+            CancellationToken cancellationToken)
+        {
+            return await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                DirectoryInfo directory = new(GetWslFileSystemPath(connection, path));
+                return (IReadOnlyList<RemoteDirectoryEntry>)directory
+                    .EnumerateFileSystemInfos()
+                    .Select(item =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        bool isDirectory = item is DirectoryInfo;
+                        string fullPath = CombineRemotePath(path, item.Name);
+                        return new RemoteDirectoryEntry
+                        {
+                            Name = item.Name,
+                            FullPath = fullPath,
+                            IsDirectory = isDirectory,
+                            Size = item is FileInfo file ? file.Length : 0,
+                            ModifiedTime = new DateTimeOffset(item.LastWriteTimeUtc, TimeSpan.Zero)
+                        };
+                    })
+                    .OrderByDescending(item => item.IsDirectory)
+                    .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+            }, cancellationToken);
+        }
+
+        private static async Task CopyWslFileAsync(
+            string sourcePath,
+            string destinationPath,
+            bool overwrite,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Copy(sourcePath, destinationPath, overwrite);
+            }, cancellationToken);
+        }
+
+        private static string GetWslFileSystemPath(
+            RemoteConnectionSettings connection,
+            string remotePath)
+        {
+            string distributionName = connection.Address.Trim();
+            if (string.IsNullOrWhiteSpace(distributionName) ||
+                distributionName.Contains('\\') ||
+                distributionName.Contains('/'))
+            {
+                throw new InvalidOperationException("The WSL distribution name is invalid.");
+            }
+
+            string result = Path.Combine(@"\\wsl.localhost", distributionName);
+            foreach (string segment in NormalizeRemotePath(remotePath)
+                         .Split('/', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (segment is "." or "..")
+                {
+                    throw new InvalidOperationException("The WSL path is invalid.");
+                }
+
+                result = Path.Combine(result, segment);
+            }
+
+            return result;
+        }
+
+        private static string CombineRemotePath(string parent, string name)
+        {
+            return NormalizeRemotePath($"{NormalizeRemotePath(parent).TrimEnd('/')}/{name}");
         }
 
         private static async Task<IReadOnlyList<RemoteDirectoryEntry>> ListSftpAsync(

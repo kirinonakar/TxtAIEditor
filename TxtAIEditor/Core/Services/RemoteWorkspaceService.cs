@@ -14,6 +14,7 @@ namespace TxtAIEditor.Core.Services
     {
         private readonly RemoteServerStore _serverStore;
         private readonly RemoteExplorerService _explorerService;
+        private readonly WslDistributionService _wslDistributionService;
         private readonly ConcurrentDictionary<string, string> _localToRemote =
             new(StringComparer.OrdinalIgnoreCase);
 
@@ -21,6 +22,7 @@ namespace TxtAIEditor.Core.Services
         {
             _serverStore = new RemoteServerStore(credentialService);
             _explorerService = new RemoteExplorerService();
+            _wslDistributionService = new WslDistributionService();
         }
 
         public RemoteConnectionSettings? ActiveConnection { get; private set; }
@@ -30,7 +32,11 @@ namespace TxtAIEditor.Core.Services
         public event EventHandler<string>? FileUploaded;
         public string ActiveDirectoryVirtualPath => ActiveConnection == null
             ? string.Empty
-            : RemotePath.Create(ActiveConnection.Profile.Id, ActiveDirectoryPath, isDirectory: true);
+            : RemotePath.Create(
+                ActiveConnection.Profile.Id,
+                ActiveDirectoryPath,
+                isDirectory: true,
+                serverName: ActiveConnection.Profile.Name);
 
         public bool Activate(RemoteServerProfile profile)
         {
@@ -62,6 +68,8 @@ namespace TxtAIEditor.Core.Services
 
             RemoteServerProfile? profile = (await _serverStore.LoadAsync())
                 .FirstOrDefault(candidate => candidate.Id == serverId);
+            profile ??= (await _wslDistributionService.GetInstalledProfilesAsync())
+                .FirstOrDefault(candidate => candidate.Id == serverId);
             if (profile == null || !Activate(profile))
             {
                 return false;
@@ -79,6 +87,18 @@ namespace TxtAIEditor.Core.Services
             return await _explorerService.ListDirectoryAsync(
                 connection,
                 ActiveDirectoryPath,
+                cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<RemoteDirectoryEntry>> ListDirectoryAsync(
+            string remotePath,
+            CancellationToken cancellationToken = default)
+        {
+            RemoteConnectionSettings connection = ActiveConnection
+                ?? throw new InvalidOperationException("No remote server is active.");
+            return await _explorerService.ListDirectoryAsync(
+                connection,
+                remotePath,
                 cancellationToken);
         }
 
@@ -115,7 +135,10 @@ namespace TxtAIEditor.Core.Services
                 connection,
                 entry,
                 cancellationToken);
-            _localToRemote[localPath] = virtualPath;
+            _localToRemote[localPath] = RemotePath.Create(
+                connection.Profile.Id,
+                remotePath,
+                serverName: connection.Profile.Name);
             return localPath;
         }
 
@@ -139,11 +162,12 @@ namespace TxtAIEditor.Core.Services
                 return virtualPath;
             }
 
-            string serverName = ActiveConnection?.Profile.Id == serverId
+            string serverName = RemotePath.GetServerNameHint(virtualPath) ??
+                (ActiveConnection?.Profile.Id == serverId
                 ? ActiveConnection.Profile.Name
                 : _serverStore.Load()
                     .FirstOrDefault(profile => profile.Id == serverId)
-                    ?.Name ?? "Remote";
+                    ?.Name ?? "Remote");
             return $"{serverName}:{remotePath}";
         }
 
@@ -237,6 +261,8 @@ namespace TxtAIEditor.Core.Services
             }
 
             RemoteServerProfile? profile = (await _serverStore.LoadAsync())
+                .FirstOrDefault(candidate => candidate.Id == serverId);
+            profile ??= (await _wslDistributionService.GetInstalledProfilesAsync())
                 .FirstOrDefault(candidate => candidate.Id == serverId);
             RemoteConnectionSettings? connection = profile == null
                 ? null

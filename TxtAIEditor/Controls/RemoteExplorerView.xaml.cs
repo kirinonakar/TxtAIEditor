@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -17,6 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly ObservableCollection<RemoteDirectoryEntry> _entries = new();
         private readonly RemoteServerStore _serverStore = new(new CredentialService());
         private readonly RemoteExplorerService _explorerService = new();
+        private readonly WslDistributionService _wslDistributionService = new();
         private Func<string, string, string> _getString = (_, fallback) => fallback;
         private RemoteConnectionSettings? _connection;
         private string _currentPath = "/";
@@ -39,7 +41,7 @@ namespace TxtAIEditor.Controls
         {
             _getString = getString;
             TitleText.Text = Get("RemoteExplorerTitle", "리모트 탐색기");
-            DescriptionText.Text = Get("RemoteExplorerDescription", "SSH, SFTP, FTPS 또는 WebDAV 서버를 탐색합니다.");
+            DescriptionText.Text = Get("RemoteExplorerDescription", "WSL, SSH, SFTP, FTPS 또는 WebDAV 서버를 탐색합니다.");
             AddServerButtonText.Text = Get("RemoteExplorerAddServer", "서버 추가");
             EmptyServersText.Text = Get("RemoteExplorerNoServers", "추가된 서버가 없습니다.");
 
@@ -62,10 +64,19 @@ namespace TxtAIEditor.Controls
         public async Task RefreshProfilesAsync()
         {
             IReadOnlyList<RemoteServerProfile> profiles = await _serverStore.LoadAsync();
+            IReadOnlyList<RemoteServerProfile> wslProfiles =
+                await _wslDistributionService.GetInstalledProfilesAsync();
             _profiles.Clear();
             foreach (RemoteServerProfile profile in profiles)
             {
                 _profiles.Add(profile);
+            }
+            foreach (RemoteServerProfile profile in wslProfiles)
+            {
+                if (_profiles.All(candidate => candidate.Id != profile.Id))
+                {
+                    _profiles.Add(profile);
+                }
             }
 
             EmptyServersPanel.Visibility = _profiles.Count == 0

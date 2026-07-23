@@ -25,7 +25,11 @@ namespace TxtAIEditor.Controls
         {
             var activeTab = _activeTabProvider();
             string pathOrTitle = activeTab != null
-                ? (!string.IsNullOrEmpty(activeTab.FilePath) ? activeTab.FilePath : activeTab.Title)
+                ? (!string.IsNullOrWhiteSpace(activeTab.RemotePath)
+                    ? RemotePath.GetDisplayPath(activeTab.RemotePath)
+                    : !string.IsNullOrEmpty(activeTab.FilePath)
+                        ? activeTab.FilePath
+                        : activeTab.Title)
                 : string.Empty;
 
             string newTitle = string.IsNullOrEmpty(pathOrTitle)

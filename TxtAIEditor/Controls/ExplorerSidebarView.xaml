@@ -29,7 +29,7 @@
                                         </Button>
                                     <Button x:Name="ExplorerCreateFolderButton" Grid.Column="2" ToolTipService.ToolTip="새 항목" Padding="0" Width="28" MinWidth="28" Height="28">
                                         <Button.Flyout>
-                                            <MenuFlyout>
+                                            <MenuFlyout Placement="BottomEdgeAlignedLeft">
                                                 <MenuFlyoutItem x:Name="ExplorerCreateFolderMenuItem" Text="새 폴더" Click="OnCreateFolderClick">
                                                     <MenuFlyoutItem.Icon>
                                                         <FontIcon Glyph="&#xED41;"/>

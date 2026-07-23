@@ -98,15 +98,6 @@ namespace TxtAIEditor.Controls
 
         public void SetTreeMode(bool enableTreeMode)
         {
-            if (IsViewingRemote)
-            {
-                IsTreeMode = false;
-                _leftSidebar.ExplorerTreeModeBtn.IsChecked = false;
-                _leftSidebar.SetExplorerTreeMode(false);
-                _leftSidebar.ExplorerTree.RootNodes.Clear();
-                return;
-            }
-
             if (enableTreeMode == IsTreeMode)
             {
                 return;
@@ -116,6 +107,20 @@ namespace TxtAIEditor.Controls
             _lastFilterQuery = string.Empty;
             _leftSidebar.ClearExplorerFilter();
             _leftSidebar.SetExplorerTreeMode(IsTreeMode);
+
+            if (IsViewingRemote)
+            {
+                if (IsTreeMode)
+                {
+                    _ = LoadRemoteTreeRootAsync();
+                }
+                else
+                {
+                    _ = LoadRemoteDirectoryAsync();
+                }
+
+                return;
+            }
 
             if (string.IsNullOrWhiteSpace(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
             {
@@ -270,15 +275,17 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (IsTreeMode)
-            {
-                SetTreeMode(false);
-            }
-
-            _leftSidebar.ExplorerTreeModeBtn.IsEnabled = false;
+            _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
             SetCurrentFolderPath(string.Empty);
             _currentRepoPathChanged(string.Empty);
-            await LoadRemoteDirectoryAsync();
+            if (IsTreeMode)
+            {
+                await LoadRemoteTreeRootAsync();
+            }
+            else
+            {
+                await LoadRemoteDirectoryAsync();
+            }
 
             if (revealInLeftPanel)
             {
@@ -314,7 +321,11 @@ namespace TxtAIEditor.Controls
 
         public Task RefreshRemoteDirectoryAsync()
         {
-            return IsViewingRemote ? LoadRemoteDirectoryAsync() : Task.CompletedTask;
+            return !IsViewingRemote
+                ? Task.CompletedTask
+                : IsTreeMode
+                    ? LoadRemoteTreeRootAsync()
+                    : LoadRemoteDirectoryAsync();
         }
 
         private async Task LoadRemoteDirectoryAsync()
@@ -348,7 +359,11 @@ namespace TxtAIEditor.Controls
                     var item = new ExplorerItem
                     {
                         Name = entry.Name,
-                        Path = RemotePath.Create(connection.Profile.Id, entry.FullPath, entry.IsDirectory),
+                        Path = RemotePath.Create(
+                            connection.Profile.Id,
+                            entry.FullPath,
+                            entry.IsDirectory,
+                            connection.Profile.Name),
                         IsFolder = entry.IsDirectory,
                         ModifiedTime = entry.ModifiedTime?.LocalDateTime ?? DateTime.MinValue,
                         IsRemote = true,
@@ -409,7 +424,9 @@ namespace TxtAIEditor.Controls
         {
             if (IsViewingRemote)
             {
-                _ = LoadRemoteDirectoryAsync();
+                _ = IsTreeMode
+                    ? LoadRemoteTreeRootAsync()
+                    : LoadRemoteDirectoryAsync();
                 return;
             }
 
@@ -438,6 +455,12 @@ namespace TxtAIEditor.Controls
             if (!IsTreeMode)
             {
                 RefreshCurrentFolder();
+                return;
+            }
+
+            if (IsViewingRemote)
+            {
+                _ = LoadRemoteTreeRootAsync();
                 return;
             }
 
@@ -520,15 +543,18 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (IsTreeMode)
-            {
-                SetTreeMode(false);
-            }
-            _leftSidebar.ExplorerTreeModeBtn.IsEnabled = false;
+            _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
             SetCurrentFolderPath(string.Empty);
             _currentRepoPathChanged(string.Empty);
             _leftSidebar.ClearExplorerFilter();
-            await LoadRemoteDirectoryAsync();
+            if (IsTreeMode)
+            {
+                await LoadRemoteTreeRootAsync();
+            }
+            else
+            {
+                await LoadRemoteDirectoryAsync();
+            }
         }
 
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e)
@@ -609,6 +635,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (item.IsRemote)
+            {
+                _ = OpenRemoteFileAsync(item.Path);
+                return;
+            }
+
             _ = _loadFileIntoTabAsync(item.Path);
         }
 
@@ -658,6 +690,48 @@ namespace TxtAIEditor.Controls
             _ = UpdateGitStatusesAsync();
         }
 
+        private async Task LoadRemoteTreeRootAsync()
+        {
+            if (!IsViewingRemote || _remoteWorkspaceService.ActiveConnection == null)
+            {
+                return;
+            }
+
+            RemoteConnectionSettings connection = _remoteWorkspaceService.ActiveConnection;
+            string rootPath = _remoteWorkspaceService.ActiveDirectoryPath;
+            string rootName = rootPath == "/"
+                ? connection.Profile.Name
+                : rootPath.TrimEnd('/').Split('/').LastOrDefault() ?? connection.Profile.Name;
+            var rootItem = new ExplorerItem
+            {
+                Name = rootName,
+                Path = RemotePath.Create(
+                    connection.Profile.Id,
+                    rootPath,
+                    isDirectory: true,
+                    serverName: connection.Profile.Name),
+                IsFolder = true,
+                IsRemote = true,
+                RemoteServerId = connection.Profile.Id,
+                RemotePath = rootPath,
+                IsDark = _leftSidebar.ActualTheme == ElementTheme.Dark
+            };
+            var rootNode = new Microsoft.UI.Xaml.Controls.TreeViewNode
+            {
+                Content = rootItem,
+                HasUnrealizedChildren = true
+            };
+
+            _viewModel.ExplorerItems.Clear();
+            _leftSidebar.ExplorerTree.RootNodes.Clear();
+            _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
+            await PopulateRemoteTreeNodeAsync(rootNode, rootItem);
+            rootNode.IsExpanded = true;
+            _leftSidebar.ExplorerStatus.Text =
+                $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel} · {rootPath}\n" +
+                FormatExplorerItemCount(rootNode.Children.Count);
+        }
+
         private void PopulateTreeNode(
             Microsoft.UI.Xaml.Controls.TreeViewNode node,
             bool forceReload = false)
@@ -665,6 +739,12 @@ namespace TxtAIEditor.Controls
             if ((!forceReload && !node.HasUnrealizedChildren) ||
                 node.Content is not ExplorerItem item)
             {
+                return;
+            }
+
+            if (item.IsRemote)
+            {
+                _ = PopulateRemoteTreeNodeAsync(node, item);
                 return;
             }
 
@@ -704,6 +784,63 @@ namespace TxtAIEditor.Controls
 
             node.HasUnrealizedChildren = false;
             _ = UpdateGitStatusesAsync();
+        }
+
+        private async Task PopulateRemoteTreeNodeAsync(
+            Microsoft.UI.Xaml.Controls.TreeViewNode node,
+            ExplorerItem item)
+        {
+            if (!item.IsFolder || !item.IsRemote ||
+                _remoteWorkspaceService.ActiveConnection == null)
+            {
+                node.HasUnrealizedChildren = false;
+                return;
+            }
+
+            try
+            {
+                var entries = await _remoteWorkspaceService.ListDirectoryAsync(item.RemotePath);
+                if (node.Content != item ||
+                    _remoteWorkspaceService.ActiveConnection == null)
+                {
+                    return;
+                }
+
+                RemoteConnectionSettings connection = _remoteWorkspaceService.ActiveConnection;
+                bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                node.Children.Clear();
+                foreach (RemoteDirectoryEntry entry in entries)
+                {
+                    var child = new ExplorerItem
+                    {
+                        Name = entry.Name,
+                        Path = RemotePath.Create(
+                            connection.Profile.Id,
+                            entry.FullPath,
+                            entry.IsDirectory,
+                            connection.Profile.Name),
+                        IsFolder = entry.IsDirectory,
+                        ModifiedTime = entry.ModifiedTime?.LocalDateTime ?? DateTime.MinValue,
+                        IsRemote = true,
+                        RemoteServerId = connection.Profile.Id,
+                        RemotePath = entry.FullPath,
+                        IsDark = isDark
+                    };
+                    node.Children.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
+                    {
+                        Content = child,
+                        HasUnrealizedChildren = child.IsFolder
+                    });
+                }
+
+                node.HasUnrealizedChildren = false;
+            }
+            catch (Exception ex)
+            {
+                _leftSidebar.ExplorerStatus.Text = string.Format(
+                    _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
+                    ex.Message);
+            }
         }
 
         private Microsoft.UI.Xaml.Controls.TreeViewNode? FindTreeNode(ExplorerItem item)
@@ -1064,6 +1201,12 @@ namespace TxtAIEditor.Controls
             };
 
             UpdateSortButtonVisuals();
+
+            if (IsTreeMode && IsViewingRemote)
+            {
+                _ = LoadRemoteTreeRootAsync();
+                return;
+            }
 
             if (IsTreeMode && !string.IsNullOrWhiteSpace(CurrentFolderPath))
             {

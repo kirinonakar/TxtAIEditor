@@ -92,6 +92,16 @@ namespace TxtAIEditor.Core.Services
 
         public RemoteConnectionSettings? GetConnection(RemoteServerProfile profile)
         {
+            if (profile.ServerType == RemoteServerType.Wsl)
+            {
+                return new RemoteConnectionSettings
+                {
+                    Profile = profile,
+                    Address = profile.Name,
+                    Password = string.Empty
+                };
+            }
+
             string? address = _credentialService.ReadCredential(AddressTarget(profile.Id));
             string? password = _credentialService.ReadCredential(PasswordTarget(profile.Id));
             if (string.IsNullOrWhiteSpace(address) || password == null)
