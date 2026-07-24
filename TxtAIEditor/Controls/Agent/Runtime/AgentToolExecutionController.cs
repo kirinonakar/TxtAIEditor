@@ -171,6 +171,10 @@ namespace TxtAIEditor.Controls
                     "동일한 도구 호출이 이미 성공해 재실행하지 않았습니다.");
             }
 
+            string displayToolResult = verbose
+                ? toolResult
+                : HideEditFailureContext(toolResult);
+
             if (normalizedToolName == "read_file")
             {
                 string path = GetStringArgument(arguments, "path");
@@ -204,15 +208,20 @@ namespace TxtAIEditor.Controls
             {
                 if (verbose || toolResult.StartsWith("MCP tool failed:", StringComparison.OrdinalIgnoreCase))
                 {
-                    return toolResult;
+                    return displayToolResult;
                 }
 
                 return _getString("AgentVerboseMcpToolOnly", "MCP 도구를 실행했습니다");
             }
 
+            if (!verbose && !IsSuccessfulToolResult(toolResult))
+            {
+                return displayToolResult;
+            }
+
             if (verbose || toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
             {
-                return toolResult;
+                return displayToolResult;
             }
 
             if (normalizedToolName == "read_file")
@@ -314,7 +323,7 @@ namespace TxtAIEditor.Controls
                 return _getString("AgentVerboseEditTabOnly", "탭 내용을 수정했습니다");
             }
 
-            return toolResult;
+            return displayToolResult;
         }
 
         private async Task<string> ReadImageToolAsync(JsonElement arguments)

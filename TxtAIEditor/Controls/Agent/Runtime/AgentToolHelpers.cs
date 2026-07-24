@@ -9,6 +9,9 @@ namespace TxtAIEditor.Controls
 {
     internal static class AgentToolHelpers
     {
+        public const string EditFailureContextStartMarker = "[Edit failure context]";
+        public const string EditFailureContextEndMarker = "[End edit failure context]";
+
         private static readonly Regex DangerousPowerShellCommandRegex = new(
             @"(?:\$home\b|\b(Remove\w*|rm\w*|Clear-Content|Clear-Disk|Initialize-Disk|Resize-Partition|Set-Disk|format(?!-(?:table|list)\b|=)|diskpart|del|delete|erase|rd|ri)\b)",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -274,6 +277,24 @@ namespace TxtAIEditor.Controls
             var exitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
             return !exitCodeMatch.Success ||
                 (int.TryParse(exitCodeMatch.Groups[1].Value, out int exitCode) && exitCode == 0);
+        }
+
+        public static string HideEditFailureContext(string result)
+        {
+            if (string.IsNullOrEmpty(result))
+            {
+                return string.Empty;
+            }
+
+            int markerIndex = result.IndexOf(
+                EditFailureContextStartMarker,
+                StringComparison.Ordinal);
+            if (markerIndex < 0)
+            {
+                return result;
+            }
+
+            return result.Substring(0, markerIndex).TrimEnd();
         }
 
         public static string AppendToolStatusMessage(string result, string message)

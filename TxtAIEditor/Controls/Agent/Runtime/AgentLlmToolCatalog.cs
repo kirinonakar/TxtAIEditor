@@ -260,9 +260,9 @@ namespace TxtAIEditor.Controls
                             startLine = new { type = "integer", description = "Start line number to replace" },
                             endLine = new { type = "integer", description = "End line number to replace" },
                             newText = new { type = "string", description = "New text to insert" },
-                            expectedSnippet = new { type = "string", description = "The exact full text expected at the range to verify correctness. Required for ranges < 5 lines; for ranges >= 5 lines, provide either this full-range snippet or expectedStartLines plus expectedEndLines." },
-                            expectedStartLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "For ranges >= 5 lines, the exact content of the first 2 or more lines inside the range. Pass as a string array or as a newline-separated string when expectedSnippet is not provided." },
-                            expectedEndLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "For ranges >= 5 lines, the exact content of the last 2 or more lines inside the range. Pass as a string array or as a newline-separated string when expectedSnippet is not provided." }
+                            expectedSnippet = new { type = "string", description = "The exact full text expected at the range to verify correctness. For any range length, provide either this full-range snippet or expectedStartLines plus expectedEndLines." },
+                            expectedStartLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "The exact content at the start of the range when expectedSnippet is not provided. Use at least 1 line for a 1-line range and at least 2 lines otherwise. Pass as a string array or newline-separated string." },
+                            expectedEndLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "The exact content at the end of the range when expectedSnippet is not provided. Use at least 1 line for a 1-line range and at least 2 lines otherwise. Pass as a string array or newline-separated string." }
                         },
                         required = new[] { "path", "startLine", "endLine", "newText" }
                     }

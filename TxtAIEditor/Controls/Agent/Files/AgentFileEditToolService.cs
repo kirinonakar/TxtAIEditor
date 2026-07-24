@@ -402,13 +402,25 @@ namespace TxtAIEditor.Controls
             string content = NormalizeNewlines(rawText);
             string[] lines = content.Split('\n');
 
+            string WithFailureContext(string message)
+            {
+                return AppendEditFailureContext(
+                    message,
+                    path,
+                    lines,
+                    startLine,
+                    endLine);
+            }
+
             if (startLine < 1 || startLine > lines.Length)
             {
-                return $"replace_range failed: startLine {startLine} is out of bounds (1-{lines.Length}).";
+                return WithFailureContext(
+                    $"replace_range failed: startLine {startLine} is out of bounds (1-{lines.Length}).");
             }
             if (endLine < startLine || endLine > lines.Length)
             {
-                return $"replace_range failed: endLine {endLine} is out of bounds (startLine-{lines.Length}).";
+                return WithFailureContext(
+                    $"replace_range failed: endLine {endLine} is out of bounds (startLine-{lines.Length}).");
             }
 
             string? rangeAdjustmentNote = null;
@@ -432,62 +444,57 @@ namespace TxtAIEditor.Controls
             }
 
             int lineCount = endLine - startLine + 1;
-            if (lineCount >= 5)
+            if (!string.IsNullOrWhiteSpace(expectedSnippet))
             {
-                if (!string.IsNullOrWhiteSpace(expectedSnippet))
+                if (!TryValidateExpectedSnippet(expectedSnippet, targetText))
                 {
-                    if (!TryValidateExpectedSnippet(expectedSnippet, targetText))
-                    {
-                        return $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).";
-                    }
-                }
-                else
-                {
-                    // Boundary verification
-
-                    // expectedStartLines
-                    if (expectedStartLines == null || expectedStartLines.Count < 2)
-                    {
-                        return "replace_range failed: expectedStartLines is required and must have at least 2 elements.";
-                    }
-                    if (expectedStartLines.Count > lineCount)
-                    {
-                        return $"replace_range failed: expectedStartLines has {expectedStartLines.Count} elements, but the requested range only has {lineCount} lines.";
-                    }
-                    for (int i = 0; i < expectedStartLines.Count; i++)
-                    {
-                        int fileLineIndex = startLine - 1 + i;
-                        if (!LinesMatch(lines[fileLineIndex], expectedStartLines[i]))
-                        {
-                            return $"replace_range failed: expectedStartLines[{i}] did not match line {fileLineIndex + 1} of the file.";
-                        }
-                    }
-
-                    // expectedEndLines
-                    if (expectedEndLines == null || expectedEndLines.Count < 2)
-                    {
-                        return "replace_range failed: expectedEndLines is required and must have at least 2 elements.";
-                    }
-                    if (expectedEndLines.Count > lineCount)
-                    {
-                        return $"replace_range failed: expectedEndLines has {expectedEndLines.Count} elements, but the requested range only has {lineCount} lines.";
-                    }
-                    int expectedEndStartIndex = endLine - expectedEndLines.Count;
-                    for (int i = 0; i < expectedEndLines.Count; i++)
-                    {
-                        int fileLineIndex = expectedEndStartIndex + i;
-                        if (!LinesMatch(lines[fileLineIndex], expectedEndLines[i]))
-                        {
-                            return $"replace_range failed: expectedEndLines[{i}] did not match line {fileLineIndex + 1} of the file.";
-                        }
-                    }
+                    return WithFailureContext(
+                        $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).");
                 }
             }
             else
             {
-                if (!TryValidateExpectedSnippet(expectedSnippet, targetText))
+                int minimumBoundaryLineCount = Math.Min(2, lineCount);
+
+                if (expectedStartLines == null || expectedStartLines.Count < minimumBoundaryLineCount)
                 {
-                    return $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).";
+                    return WithFailureContext(
+                        $"replace_range failed: expectedStartLines is required and must have at least {minimumBoundaryLineCount} element(s).");
+                }
+                if (expectedStartLines.Count > lineCount)
+                {
+                    return WithFailureContext(
+                        $"replace_range failed: expectedStartLines has {expectedStartLines.Count} elements, but the requested range only has {lineCount} lines.");
+                }
+                for (int i = 0; i < expectedStartLines.Count; i++)
+                {
+                    int fileLineIndex = startLine - 1 + i;
+                    if (!LinesMatch(lines[fileLineIndex], expectedStartLines[i]))
+                    {
+                        return WithFailureContext(
+                            $"replace_range failed: expectedStartLines[{i}] did not match line {fileLineIndex + 1} of the file.");
+                    }
+                }
+
+                if (expectedEndLines == null || expectedEndLines.Count < minimumBoundaryLineCount)
+                {
+                    return WithFailureContext(
+                        $"replace_range failed: expectedEndLines is required and must have at least {minimumBoundaryLineCount} element(s).");
+                }
+                if (expectedEndLines.Count > lineCount)
+                {
+                    return WithFailureContext(
+                        $"replace_range failed: expectedEndLines has {expectedEndLines.Count} elements, but the requested range only has {lineCount} lines.");
+                }
+                int expectedEndStartIndex = endLine - expectedEndLines.Count;
+                for (int i = 0; i < expectedEndLines.Count; i++)
+                {
+                    int fileLineIndex = expectedEndStartIndex + i;
+                    if (!LinesMatch(lines[fileLineIndex], expectedEndLines[i]))
+                    {
+                        return WithFailureContext(
+                            $"replace_range failed: expectedEndLines[{i}] did not match line {fileLineIndex + 1} of the file.");
+                    }
                 }
             }
 
@@ -612,7 +619,13 @@ namespace TxtAIEditor.Controls
                 int matchIndex = FindHunkMatch(lines, hunk);
                 if (matchIndex < 0)
                 {
-                    return $"apply_patch failed: could not match hunk starting at line {hunk.OldStart} in file {path}.";
+                    int targetEndLine = hunk.OldStart + Math.Max(hunk.OldCount, 1) - 1;
+                    return AppendEditFailureContext(
+                        $"apply_patch failed: could not match hunk starting at line {hunk.OldStart} in file {path}.",
+                        path,
+                        lines,
+                        hunk.OldStart,
+                        targetEndLine);
                 }
 
                 int fileLinesConsumed = 0;
@@ -1168,6 +1181,47 @@ namespace TxtAIEditor.Controls
         private string BuildUnchangedEditResult(string toolName, string fullPath)
         {
             return $"{toolName} unchanged: {_workspace.RelativePath(fullPath)} requested change is already applied; no additional edit was needed.";
+        }
+
+        private static string AppendEditFailureContext(
+            string failureMessage,
+            string path,
+            IReadOnlyList<string> lines,
+            int targetStartLine,
+            int targetEndLine)
+        {
+            if (lines.Count == 0)
+            {
+                return failureMessage;
+            }
+
+            int requestedStartLine = Math.Max(1, targetStartLine);
+            int requestedEndLine = Math.Max(requestedStartLine, targetEndLine);
+            int targetStartInFile = Math.Min(requestedStartLine, lines.Count);
+            int targetEndInFile = Math.Min(Math.Max(targetStartInFile, requestedEndLine), lines.Count);
+            int shownStartLine = Math.Max(1, targetStartInFile - 5);
+            int shownEndLine = Math.Min(lines.Count, targetEndInFile + 5);
+            int lineNumberWidth = shownEndLine.ToString().Length;
+
+            var builder = new StringBuilder();
+            builder.AppendLine(failureMessage);
+            builder.AppendLine();
+            builder.AppendLine(AgentToolHelpers.EditFailureContextStartMarker);
+            builder.AppendLine($"File: {path}");
+            builder.AppendLine($"Requested edit lines: {targetStartLine}-{targetEndLine}");
+            builder.AppendLine($"Shown lines: {shownStartLine}-{shownEndLine}");
+            for (int lineNumber = shownStartLine; lineNumber <= shownEndLine; lineNumber++)
+            {
+                bool isTargetLine =
+                    lineNumber >= requestedStartLine &&
+                    lineNumber <= requestedEndLine;
+                builder.Append(isTargetLine ? ">> " : "   ");
+                builder.Append(lineNumber.ToString().PadLeft(lineNumberWidth));
+                builder.Append(" | ");
+                builder.AppendLine(lines[lineNumber - 1]);
+            }
+            builder.Append(AgentToolHelpers.EditFailureContextEndMarker);
+            return builder.ToString();
         }
 
         private static async Task<TextFileSnapshot> ReadTextFileAsync(string fullPath)

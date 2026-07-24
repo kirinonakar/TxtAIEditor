@@ -525,25 +525,13 @@ namespace TxtAIEditor.Controls
 
             int startLine = GetReplaceRangeStartLineArgument(arguments, path);
             int endLine = GetReplaceRangeEndLineArgument(arguments, path);
-            int lineCount = endLine - startLine + 1;
 
-            string? expectedSnippet = null;
-            List<string>? expectedStartLines = null;
-            List<string>? expectedEndLines = null;
-
-            expectedSnippet = GetReplaceRangeExpectedSnippetArgument(arguments, path);
-            if (lineCount >= 5)
-            {
-                expectedStartLines = GetStringListArgument(arguments, "expectedStartLines", "expected_start_lines");
-                expectedEndLines = GetStringListArgument(arguments, "expectedEndLines", "expected_end_lines");
-            }
-            else
-            {
-                if (string.IsNullOrWhiteSpace(expectedSnippet))
-                {
-                    return "replace_range failed: expectedSnippet is required for replace_range edits to ensure edit safety.";
-                }
-            }
+            List<string>? expectedStartLines = GetStringListArgument(arguments, "expectedStartLines", "expected_start_lines");
+            List<string>? expectedEndLines = GetStringListArgument(arguments, "expectedEndLines", "expected_end_lines");
+            bool hasExplicitBoundaryVerification = expectedStartLines != null || expectedEndLines != null;
+            string? expectedSnippet = hasExplicitBoundaryVerification
+                ? GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected")
+                : GetReplaceRangeExpectedSnippetArgument(arguments, path);
 
             return await _fileTools.ReplaceRangeAsync(
                 path,
