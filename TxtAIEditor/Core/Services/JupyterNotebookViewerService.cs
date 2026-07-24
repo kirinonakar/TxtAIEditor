@@ -139,12 +139,77 @@ namespace TxtAIEditor.Core.Services
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
                 sb.AppendLine("</div>");
-                sb.AppendLine("<div class=\"cell-output\"></div>");
+                string outputHtml = RenderCellOutputs(cell.Outputs);
+                string hasOutputClass = !string.IsNullOrEmpty(outputHtml) ? "cell-output has-output" : "cell-output";
+                sb.AppendLine($"<div class=\"{hasOutputClass}\">{outputHtml}</div>");
                 sb.AppendLine("</div>");
             }
 
             sb.AppendLine("</div>");
             return sb.ToString();
+        }
+
+        private static string RenderCellOutputs(List<JsonElement>? outputs)
+        {
+            if (outputs == null || outputs.Count == 0) return string.Empty;
+            var sb = new StringBuilder();
+            foreach (var outElement in outputs)
+            {
+                if (outElement.ValueKind != JsonValueKind.Object) continue;
+                string outputType = outElement.TryGetProperty("output_type", out var ot) ? ot.GetString() ?? "" : "";
+                if (outputType == "stream")
+                {
+                    string text = GetTextOrArray(outElement, "text");
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        string name = outElement.TryGetProperty("name", out var n) ? n.GetString() ?? "stdout" : "stdout";
+                        string cls = name == "stderr" ? "output-stderr" : "output-stdout";
+                        sb.Append($"<span class=\"{cls}\">{HtmlEncode(text)}</span>");
+                    }
+                }
+                else if (outputType == "execute_result" || outputType == "display_data")
+                {
+                    if (outElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
+                    {
+                        if (data.TryGetProperty("text/html", out var htmlEl))
+                        {
+                            string htmlText = GetTextOrArrayFromElement(htmlEl);
+                            sb.Append(htmlText);
+                        }
+                        else if (data.TryGetProperty("text/plain", out var plainEl))
+                        {
+                            string plainText = GetTextOrArrayFromElement(plainEl);
+                            sb.Append($"<span class=\"output-result\">{HtmlEncode(plainText)}</span>");
+                        }
+                    }
+                }
+                else if (outputType == "error")
+                {
+                    string ename = outElement.TryGetProperty("ename", out var en) ? en.GetString() ?? "" : "";
+                    string evalue = outElement.TryGetProperty("evalue", out var ev) ? ev.GetString() ?? "" : "";
+                    sb.Append($"<span class=\"output-error\">{HtmlEncode(ename)}: {HtmlEncode(evalue)}</span>");
+                }
+            }
+            return sb.ToString();
+        }
+
+        private static string GetTextOrArray(JsonElement parent, string propertyName)
+        {
+            if (!parent.TryGetProperty(propertyName, out var prop)) return string.Empty;
+            return GetTextOrArrayFromElement(prop);
+        }
+
+        private static string GetTextOrArrayFromElement(JsonElement prop)
+        {
+            if (prop.ValueKind == JsonValueKind.Array)
+            {
+                return string.Join("", prop.EnumerateArray().Select(e => e.GetString() ?? ""));
+            }
+            if (prop.ValueKind == JsonValueKind.String)
+            {
+                return prop.GetString() ?? string.Empty;
+            }
+            return prop.ToString();
         }
 
         private static string RenderMarkdown(string source)
@@ -438,8 +503,13 @@ strong { font-weight: 700; }
             if (resp.stdout) html += '<span class=""output-stdout"">' + escapeHtml(resp.stdout) + '</span>';
             if (resp.stderr) html += '<span class=""output-stderr"">' + escapeHtml(resp.stderr) + '</span>';
             if (resp.result) html += '<span class=""output-result"">' + escapeHtml(resp.result) + '</span>';
-            if (!html && resp.status === 'ok') html = '<span style=""color:#888;"">(no output)</span>';
-            outputDiv.innerHTML = html;
+            if (html) {
+                outputDiv.classList.add('has-output');
+                outputDiv.innerHTML = html;
+            } else {
+                outputDiv.classList.remove('has-output');
+                outputDiv.innerHTML = '';
+            }
         } catch (e) {
             outputDiv.innerHTML = '<span class=""output-error"">' + escapeHtml(String(e)) + '</span>';
         }

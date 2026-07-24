@@ -95,7 +95,7 @@ namespace TxtAIEditor.Core.Services
             private readonly string _pythonExecutable;
             private readonly string _workingDirectory;
             private static readonly string KernelScript = @"
-import sys, json, io, contextlib, traceback
+import sys, json, io, contextlib, traceback, ast
 
 _ns = {'__name__': '__main__'}
 
@@ -112,18 +112,23 @@ while True:
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()
         result_obj = None
-        is_expression = False
-        try:
-            compile(code, '<cell>', 'eval')
-            is_expression = True
-        except SyntaxError:
-            is_expression = False
 
         with contextlib.redirect_stdout(stdout_buf), contextlib.redirect_stderr(stderr_buf):
-            if is_expression:
-                result_obj = eval(code, _ns)
-            else:
-                exec(code, _ns)
+            try:
+                tree = ast.parse(code, mode='exec')
+                if tree.body:
+                    if isinstance(tree.body[-1], ast.Expr):
+                        exec_body = tree.body[:-1]
+                        eval_expr = tree.body[-1]
+                        if exec_body:
+                            exec_module = ast.Module(body=exec_body, type_ignores=[])
+                            exec(compile(exec_module, '<cell>', 'exec'), _ns)
+                        eval_module = ast.Expression(body=eval_expr.value)
+                        result_obj = eval(compile(eval_module, '<cell>', 'eval'), _ns)
+                    else:
+                        exec(compile(tree, '<cell>', 'exec'), _ns)
+            except Exception:
+                raise
 
         stdout_text = stdout_buf.getvalue()
         stderr_text = stderr_buf.getvalue()
