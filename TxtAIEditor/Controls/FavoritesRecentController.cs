@@ -282,7 +282,7 @@ namespace TxtAIEditor.Controls
             };
         }
 
-        private static bool InferFolderWithoutTouchingFileSystem(string path)
+private static bool InferFolderWithoutTouchingFileSystem(string path)
         {
             if (RemotePath.IsRemote(path))
             {
@@ -291,6 +291,14 @@ namespace TxtAIEditor.Controls
 
             string trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (trimmed.Length != path.Length)
+            {
+                return true;
+            }
+
+            // A leading dot in the last segment (e.g. ".github", ".git", ".vscode")
+            // indicates a hidden directory, not a file extension.
+            string lastSegment = Path.GetFileName(trimmed);
+            if (!string.IsNullOrEmpty(lastSegment) && lastSegment[0] == '.')
             {
                 return true;
             }

@@ -1331,6 +1331,13 @@ function setCsvTableMode(enabled, options = {}) {
     csvToolbar.hidden = !state.csvTableEnabled;
     csvColumnHeader.hidden = !state.csvTableEnabled;
     state.lastRangeKey = '';
+
+    // Reset scroll position to the top-left corner on toggle.
+    if (scrollContainer) {
+        scrollContainer.scrollLeft = 0;
+        scrollContainer.scrollTop = 0;
+    }
+
     queueRender(true);
 }
 
