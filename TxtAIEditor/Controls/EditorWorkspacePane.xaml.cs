@@ -556,8 +556,7 @@ namespace TxtAIEditor.Controls
             EnsureTerminalPanelVisible();
             if (TerminalPane.HasSessions)
             {
-                TerminalPane.ResumeNativeWindows();
-                TerminalPane.QueueEmbeddedTerminalResize();
+                TerminalPane.WriteCommandToActiveSession(command);
             }
             else
             {

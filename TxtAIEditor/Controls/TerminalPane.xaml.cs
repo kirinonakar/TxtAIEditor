@@ -152,6 +152,17 @@ namespace TxtAIEditor.Controls
             _ = StartTerminalAsync(resolvedDirectory, shellProfile, null, command);
         }
 
+        public void WriteCommandToActiveSession(string command)
+        {
+            if (string.IsNullOrWhiteSpace(command) || _activeTerminalSession?.Terminal == null)
+            {
+                return;
+            }
+
+            _ = _activeTerminalSession.Terminal.WriteAsync(command + "\r");
+            FocusActiveTerminal();
+        }
+
         public bool TryActivateProfile(string profileId)
         {
             TerminalSession? session = _terminalSessions.FirstOrDefault(
