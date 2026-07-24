@@ -1,0 +1,405 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
+using TxtAIEditor.Core.Interfaces;
+using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
+using TxtAIEditor.Editor;
+
+namespace TxtAIEditor.Controls
+{
+    public sealed class JupyterNotebookViewerController
+    {
+        private readonly ISettingsService _settingsService;
+        private readonly Func<OpenedTab?> _activeTabProvider;
+        private readonly Action<string> _shortcutHandler;
+        private readonly Func<string, string, string> _getString;
+        private readonly JupyterNotebookViewerService _viewerService;
+        private readonly JupyterNotebookKernelService _kernelService;
+        private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
+        private readonly Dictionary<string, string> _viewerHtmlPaths = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> _tabPythonExecutables = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> _tabWorkingDirectories = new Dictionary<string, string>();
+
+        public JupyterNotebookViewerController(
+            ISettingsService settingsService,
+            Func<OpenedTab?> activeTabProvider,
+            Action<string> shortcutHandler,
+            Func<string, string, string> getString,
+            JupyterNotebookKernelService kernelService)
+        {
+            _settingsService = settingsService;
+            _activeTabProvider = activeTabProvider;
+            _shortcutHandler = shortcutHandler;
+            _getString = getString;
+            _kernelService = kernelService;
+            _viewerService = new JupyterNotebookViewerService(getString);
+        }
+
+        public void Register(OpenedTab tab, WebView2 webView)
+        {
+            _viewerWebViews[tab.Id] = webView;
+
+            string? dir = null;
+            if (!string.IsNullOrEmpty(tab.FilePath))
+            {
+                dir = Path.GetDirectoryName(tab.FilePath);
+            }
+            dir ??= Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+            _tabWorkingDirectories[tab.Id] = dir;
+            _tabPythonExecutables[tab.Id] = _kernelService.ResolvePythonExecutable(dir);
+
+            _ = InitializeAsync(tab, webView);
+        }
+
+        public bool IsActiveViewer()
+        {
+            return _activeTabProvider()?.IsNotebookViewer == true;
+        }
+public async Task<bool> SaveAsync(OpenedTab tab)
+        {
+            if (!tab.IsNotebookViewer || !_viewerWebViews.TryGetValue(tab.Id, out var webView))
+            {
+                return false;
+            }
+
+            if (webView.CoreWebView2 == null || string.IsNullOrEmpty(tab.FilePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string script = "(() => { const container = document.getElementById('cells-container'); const cells = []; container.querySelectorAll('.cell').forEach(cellDiv => { const type = cellDiv.getAttribute('data-cell-type'); const input = cellDiv.querySelector('.cell-input-area, .markdown-cell, .raw-cell'); const source = input ? input.innerText : ''; const sourceLines = source.split('\\n').map((l, i, arr) => i < arr.length - 1 ? l + '\\n' : l); if (type === 'code') { cells.push({cell_type:'code',source:sourceLines,outputs:[],metadata:{},execution_count:null}); } else if (type === 'markdown') { cells.push({cell_type:'markdown',source:sourceLines,metadata:{}}); } else { cells.push({cell_type:'raw',source:sourceLines,metadata:{}}); } }); return JSON.stringify({cells:cells,metadata:{},nbformat:4,nbformat_minor:5}, null, 1); })();";
+                string jsonResult = await webView.CoreWebView2.ExecuteScriptAsync(script);
+
+                string? content = null;
+                try
+                {
+                    using var doc = JsonDocument.Parse(jsonResult);
+                    content = doc.RootElement.GetString();
+                }
+                catch
+                {
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(content))
+                {
+                    return false;
+                }
+
+                await File.WriteAllTextAsync(tab.FilePath, content, Encoding.UTF8);
+                tab.IsDirty = false;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool Reload(OpenedTab tab)
+        {
+            if (!tab.IsNotebookViewer || !_viewerWebViews.TryGetValue(tab.Id, out var webView))
+            {
+                return false;
+            }
+
+            _ = NavigateAsync(tab, webView);
+            return true;
+        }
+
+        public void Close(string tabId)
+        {
+            if (_viewerWebViews.TryGetValue(tabId, out var webView))
+            {
+                webView.Close();
+                _viewerWebViews.Remove(tabId);
+            }
+
+            _kernelService.CloseSession(tabId);
+            _tabPythonExecutables.Remove(tabId);
+            _tabWorkingDirectories.Remove(tabId);
+            DeleteViewerHtml(tabId);
+        }
+
+        public void ApplyPreferredColorScheme(string theme)
+        {
+            foreach (var webView in _viewerWebViews.Values)
+            {
+                WebViewAppearanceService.ApplyPreferredColorScheme(webView?.CoreWebView2, theme);
+            }
+        }
+
+        private async Task InitializeAsync(OpenedTab tab, WebView2 webView)
+        {
+            try
+            {
+                var env = await WebViewEnvironmentProvider.GetSharedAsync();
+                await webView.EnsureCoreWebView2Async(env);
+
+                if (!_viewerWebViews.TryGetValue(tab.Id, out var registeredWebView) ||
+                    !ReferenceEquals(registeredWebView, webView))
+                {
+                    return;
+                }
+
+                await ConfigureAsync(webView);
+                await NavigateAsync(tab, webView);
+            }
+            catch
+            {
+            }
+        }
+
+        private async Task ConfigureAsync(WebView2 webView)
+        {
+            if (webView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
+            webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+            webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
+            webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            webView.CoreWebView2.Settings.IsScriptEnabled = true;
+            webView.WebMessageReceived += OnWebMessageReceived;
+            WebViewAppearanceService.ApplyPreferredColorScheme(webView.CoreWebView2, _settingsService.CurrentSettings.Theme);
+            await InstallShortcutBridgeAsync(webView);
+        }
+
+        private void OnWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            try
+            {
+                string raw = args.TryGetWebMessageAsString();
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    return;
+                }
+
+                using var document = JsonDocument.Parse(raw);
+                var root = document.RootElement;
+                if (!root.TryGetProperty("type", out var typeProp))
+                {
+                    return;
+                }
+
+                string type = typeProp.GetString() ?? string.Empty;
+
+                var tab = _activeTabProvider();
+                if (tab == null || !tab.IsNotebookViewer)
+                {
+                    return;
+                }
+
+                if (string.Equals(type, "executeCell", StringComparison.Ordinal))
+                {
+                    string code = root.TryGetProperty("code", out var c) ? c.GetString() ?? "" : "";
+                    int cellIndex = root.TryGetProperty("cellIndex", out var ci) ? ci.GetInt32() : 0;
+                    _ = ExecuteCellAsync(sender, tab, cellIndex, code);
+                }
+                else if (string.Equals(type, "saveNotebook", StringComparison.Ordinal))
+                {
+                    string content = root.TryGetProperty("content", out var cont) ? cont.GetString() ?? "" : "";
+                    _ = SaveNotebookAsync(sender, tab, content);
+                }
+                else if (string.Equals(type, "shortcut", StringComparison.Ordinal))
+                {
+                    string name = root.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "";
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        sender.DispatcherQueue.TryEnqueue(() => _shortcutHandler(name));
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private async Task ExecuteCellAsync(WebView2 webView, OpenedTab tab, int cellIndex, string code)
+        {
+            if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
+                !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
+            {
+                return;
+            }
+
+            var result = await _kernelService.ExecuteAsync(tab.Id, python, workDir, code);
+
+            var resultJson = JsonSerializer.Serialize(new
+            {
+                status = result.Status,
+                stdout = result.Stdout,
+                stderr = result.Stderr,
+                result = result.Result
+            });
+
+            string script = $"window.__notebookReceiveResult && window.__notebookReceiveResult({cellIndex}, {JsonSerializer.Serialize(resultJson)});";
+            await ExecuteScriptSafeAsync(webView, script);
+        }
+
+        private async Task SaveNotebookAsync(WebView2 webView, OpenedTab tab, string content)
+        {
+            bool success = false;
+            try
+            {
+                if (!string.IsNullOrEmpty(tab.FilePath))
+                {
+                    await File.WriteAllTextAsync(tab.FilePath, content, Encoding.UTF8);
+                    tab.IsDirty = false;
+                    success = true;
+                }
+            }
+            catch
+            {
+                success = false;
+            }
+
+            string script = $"window.__notebookSaveResult && window.__notebookSaveResult({success.ToString().ToLowerInvariant()}, '');";
+            await ExecuteScriptSafeAsync(webView, script);
+        }
+
+        private static async Task ExecuteScriptSafeAsync(WebView2 webView, string script)
+        {
+            if (webView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await webView.CoreWebView2.ExecuteScriptAsync(script);
+            }
+            catch
+            {
+            }
+        }
+
+        private async Task NavigateAsync(OpenedTab tab, WebView2 webView)
+        {
+            if (string.IsNullOrWhiteSpace(tab.FilePath))
+            {
+                return;
+            }
+
+            try
+            {
+                string html = await _viewerService.BuildHtmlAsync(tab.FilePath);
+                string htmlPath = await WriteViewerHtmlAsync(tab.Id, html);
+                webView.Source = new Uri(htmlPath, UriKind.Absolute);
+            }
+            catch
+            {
+            }
+        }
+
+        private async Task<string> WriteViewerHtmlAsync(string tabId, string html)
+        {
+            DeleteViewerHtml(tabId);
+
+            string folder = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "NotebookViewer");
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, tabId + ".html");
+            await File.WriteAllTextAsync(path, html, Encoding.UTF8);
+            _viewerHtmlPaths[tabId] = path;
+            return path;
+        }
+
+        private void DeleteViewerHtml(string tabId)
+        {
+            if (!_viewerHtmlPaths.TryGetValue(tabId, out string? path))
+            {
+                return;
+            }
+
+            _viewerHtmlPaths.Remove(tabId);
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static async Task InstallShortcutBridgeAsync(WebView2 webView)
+        {
+            if (webView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(ShortcutBridgeScript);
+                await webView.CoreWebView2.ExecuteScriptAsync(ShortcutBridgeScript);
+            }
+            catch
+            {
+            }
+        }
+
+        private const string ShortcutBridgeScript = @"
+(() => {
+    if (window.__txtAiEditorNotebookShortcutBridge) return;
+    window.__txtAiEditorNotebookShortcutBridge = true;
+
+    function post(name) {
+        try {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage({ type: 'shortcut', name });
+            }
+        } catch {}
+    }
+
+    document.addEventListener('keydown', event => {
+        let name = '';
+        if (event.key === 'F4') {
+            name = 'f4';
+        } else if (event.key === 'F9') {
+            name = 'f9';
+        } else if (event.key === 'F10') {
+            name = 'f10';
+        } else if (event.key === 'F11') {
+            name = 'f11';
+        } else if (event.key === 'F12') {
+            name = 'f12';
+        } else {
+            const ctrl = event.ctrlKey || event.metaKey;
+            const key = event.key ? event.key.toLowerCase() : '';
+            if (ctrl && key === '3') {
+                name = 'expandRightPanel';
+            } else if (ctrl && key === 'f') {
+                name = 'find';
+            } else if (ctrl && key === 'p') {
+                name = 'print';
+            } else if (ctrl && key === 'w') {
+                name = 'closeTab';
+            } else if (ctrl && key === 's') {
+                name = 'save';
+            }
+        }
+
+        if (!name) return;
+        event.preventDefault();
+        event.stopPropagation();
+        post(name);
+    }, true);
+})();
+";
+    }
+}

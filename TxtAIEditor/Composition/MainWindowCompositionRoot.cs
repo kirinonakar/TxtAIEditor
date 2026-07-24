@@ -107,6 +107,7 @@ namespace TxtAIEditor.Composition
             var pdfViewerController = previewControllers.PdfViewer;
             var officeDocumentViewerController = previewControllers.OfficeDocumentViewer;
             var editorLinkNavigationController = previewControllers.EditorLinkNavigation;
+            var notebookViewerController = previewControllers.NotebookViewer;
 
             var workspaceModule = MainWindowWorkspaceModule.Compose(
                 window,
@@ -328,6 +329,7 @@ namespace TxtAIEditor.Composition
                 livePreviewController,
                 pdfViewerController,
                 officeDocumentViewerController,
+                notebookViewerController,
                 previewControllers.WebViewShortcut,
                 editorWebViewInitializationController,
                 editorLineNavigationController,

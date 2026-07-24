@@ -35,6 +35,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, OpenedTab> _openPdfTab;
         private readonly Func<string, OpenedTab> _openOfficeDocumentTab;
         private readonly Func<string, OpenedTab> _openHexTab;
+        private readonly Func<string, OpenedTab> _openNotebookTab;
         private readonly Action _queueGitStatusRefresh;
         private readonly Action<string, string> _showErrorMessage;
         private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
@@ -56,6 +57,7 @@ namespace TxtAIEditor.Controls
             Func<string, OpenedTab> openPdfTab,
             Func<string, OpenedTab> openOfficeDocumentTab,
             Func<string, OpenedTab> openHexTab,
+            Func<string, OpenedTab> openNotebookTab,
             Action queueGitStatusRefresh,
             Action<string, string> showErrorMessage)
         {
@@ -75,6 +77,7 @@ namespace TxtAIEditor.Controls
             _openPdfTab = openPdfTab;
             _openOfficeDocumentTab = openOfficeDocumentTab;
             _openHexTab = openHexTab;
+            _openNotebookTab = openNotebookTab;
             _queueGitStatusRefresh = queueGitStatusRefresh;
             _showErrorMessage = showErrorMessage;
         }
@@ -136,6 +139,13 @@ namespace TxtAIEditor.Controls
                 if (SupportedFileTypes.IsOfficeDocumentFile(filePath))
                 {
                     var tab = _openOfficeDocumentTab(filePath);
+                    QueueGitRefreshIfNeeded(repoRoot);
+                    return FileTabLoadResult.Opened(tab);
+                }
+
+                if (SupportedFileTypes.IsNotebookFile(filePath))
+                {
+                    var tab = _openNotebookTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return FileTabLoadResult.Opened(tab);
                 }

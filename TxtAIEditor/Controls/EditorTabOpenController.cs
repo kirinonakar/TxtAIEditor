@@ -31,6 +31,7 @@ namespace TxtAIEditor.Controls
         private readonly TabEncryptionController _tabEncryptionController;
         private readonly PdfViewerController _pdfViewerController;
         private readonly OfficeDocumentViewerController _officeDocumentViewerController;
+        private readonly JupyterNotebookViewerController _notebookViewerController;
         private readonly EditorWebViewInitializationController _editorWebViewInitializationController;
         private readonly EditorBridgeShortcutController _editorBridgeShortcutController;
         private readonly EditorBridgeDocumentController _editorBridgeDocumentController;
@@ -106,6 +107,7 @@ namespace TxtAIEditor.Controls
             TabEncryptionController tabEncryptionController,
             PdfViewerController pdfViewerController,
             OfficeDocumentViewerController officeDocumentViewerController,
+            JupyterNotebookViewerController notebookViewerController,
             EditorWebViewInitializationController editorWebViewInitializationController,
             EditorBridgeShortcutController editorBridgeShortcutController,
             EditorBridgeDocumentController editorBridgeDocumentController,
@@ -145,6 +147,7 @@ namespace TxtAIEditor.Controls
             _tabEncryptionController = tabEncryptionController;
             _pdfViewerController = pdfViewerController;
             _officeDocumentViewerController = officeDocumentViewerController;
+            _notebookViewerController = notebookViewerController;
             _editorWebViewInitializationController = editorWebViewInitializationController;
             _editorBridgeShortcutController = editorBridgeShortcutController;
             _editorBridgeDocumentController = editorBridgeDocumentController;
@@ -908,6 +911,43 @@ namespace TxtAIEditor.Controls
                 _getCurrentFolderPath());
 
             _officeDocumentViewerController.Register(tab, tabParts.WebView);
+
+            AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
+            UpdateTabStatus(tab, updateLanguageUi: true);
+
+            return tab;
+        }
+
+        public OpenedTab OpenNotebookTab(string filePath)
+        {
+            var tab = new OpenedTab
+            {
+                FilePath = filePath,
+                Title = Path.GetFileName(filePath),
+                Content = string.Empty,
+                Language = "python",
+                EncodingName = string.Empty,
+                EncodingWasAutoDetected = false,
+                IsNotebookViewer = true
+            };
+
+            AddOpenTab(tab);
+
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+            _applyEditorSurfaceBackground(settings);
+
+            var targetTabView = _getCurrentActiveTabView();
+            var tabParts = _editorTabViewItemFactory.CreateNotebookViewer(
+                tab,
+                editorBgColor,
+                settings.UiFontFamily,
+                _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                _tabEncryptionController.ShowMenu,
+                (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
+                _getCurrentFolderPath());
+
+            _notebookViewerController.Register(tab, tabParts.WebView);
 
             AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
             UpdateTabStatus(tab, updateLanguageUi: true);

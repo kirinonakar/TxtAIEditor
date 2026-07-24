@@ -82,6 +82,7 @@ namespace TxtAIEditor.Composition
                     callbacks.OpenPdfTab,
                     callbacks.OpenOfficeDocumentTab,
                     callbacks.OpenHexTab,
+                    callbacks.OpenNotebookTab,
                     module.QueueGitStatusRefresh));
 
             module.Bind(controllers);

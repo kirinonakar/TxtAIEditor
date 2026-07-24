@@ -132,7 +132,8 @@ namespace TxtAIEditor.Core.Models
         public bool IsMediaViewer { get; set; } = false;
         public bool IsPdfViewer { get; set; } = false;
         public bool IsDocxViewer { get; set; } = false;
-        public bool IsOfficeDocumentViewer { get; set; } = false;
+public bool IsOfficeDocumentViewer { get; set; } = false;
+        public bool IsNotebookViewer { get; set; } = false;
         private bool _isHexViewer;
         public bool IsHexViewer
         {
@@ -185,7 +186,7 @@ namespace TxtAIEditor.Core.Models
                                       !string.IsNullOrWhiteSpace(ArchiveEntryPath);
         public string? RemotePath { get; set; }
         public bool IsRemoteFile => !string.IsNullOrWhiteSpace(RemotePath);
-        public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile;
+        public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile || IsNotebookViewer;
         public string? EncryptionPassword { get; set; }
 
         private bool _isEncrypted = false;

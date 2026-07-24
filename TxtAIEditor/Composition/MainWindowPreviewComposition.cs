@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 using TxtAIEditor.Controls;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
 
@@ -45,7 +46,8 @@ namespace TxtAIEditor.Composition
         EditorLineNavigationController EditorLineNavigation,
         PdfViewerController PdfViewer,
         OfficeDocumentViewerController OfficeDocumentViewer,
-        EditorLinkNavigationController EditorLinkNavigation);
+        EditorLinkNavigationController EditorLinkNavigation,
+        JupyterNotebookViewerController NotebookViewer);
 
     internal static class MainWindowPreviewComposition
     {
@@ -117,6 +119,14 @@ namespace TxtAIEditor.Composition
                 webViewShortcut.Handle,
                 callbacks.GetLocalizedString);
 
+            var notebookKernelService = new JupyterNotebookKernelService(callbacks.GetLocalizedString);
+            var notebookViewer = new JupyterNotebookViewerController(
+                services.SettingsService,
+                tabNavigation.GetActiveTab,
+                webViewShortcut.Handle,
+                callbacks.GetLocalizedString,
+                notebookKernelService);
+
             var editorLinkNavigation = new EditorLinkNavigationController(
                 tabNavigation.GetActiveTab,
                 callbacks.NavigateExplorerToFolderAndRevealAsync);
@@ -130,7 +140,8 @@ namespace TxtAIEditor.Composition
                 editorLineNavigation,
                 pdfViewer,
                 officeDocumentViewer,
-                editorLinkNavigation);
+                editorLinkNavigation,
+                notebookViewer);
         }
 
         private sealed class PreviewWebViewShortcutCommands : IWebViewShortcutCommands

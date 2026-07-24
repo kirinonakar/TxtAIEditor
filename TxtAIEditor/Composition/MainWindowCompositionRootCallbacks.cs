@@ -34,6 +34,7 @@ namespace TxtAIEditor.Composition
         Func<string, OpenedTab> OpenPdfTab,
         Func<string, OpenedTab> OpenOfficeDocumentTab,
         Func<string, OpenedTab> OpenHexTab,
+        Func<string, OpenedTab> OpenNotebookTab,
         Func<OpenedTab, bool, Task> SetHexViewModeAsync,
         Action CloseActiveTab,
         Func<Task> SyncSnippetsToOpenEditorsAsync,

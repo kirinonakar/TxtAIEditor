@@ -34,6 +34,7 @@ namespace TxtAIEditor.Composition
         Func<string, OpenedTab> OpenPdfTab,
         Func<string, OpenedTab> OpenOfficeDocumentTab,
         Func<string, OpenedTab> OpenHexTab,
+        Func<string, OpenedTab> OpenNotebookTab,
         Action QueueGitStatusRefresh);
 
     internal sealed record MainWindowWorkspaceControllers(
@@ -115,6 +116,7 @@ namespace TxtAIEditor.Composition
                 callbacks.OpenPdfTab,
                 callbacks.OpenOfficeDocumentTab,
                 callbacks.OpenHexTab,
+                callbacks.OpenNotebookTab,
                 callbacks.QueueGitStatusRefresh,
                 dialog.ShowErrorMessage);
 

@@ -110,6 +110,11 @@ namespace TxtAIEditor.Controls
             ".ppt"
         };
 
+        public static readonly string[] NotebookFileExtensions =
+        {
+            ".ipynb"
+        };
+
         public static readonly string[] PickerFileExtensions =
             TextFileExtensions
                 .Concat(ImageFileExtensions)
@@ -117,6 +122,7 @@ namespace TxtAIEditor.Controls
                 .Concat(VideoFileExtensions)
                 .Concat(PdfFileExtensions)
                 .Concat(OfficeDocumentFileExtensions)
+                .Concat(NotebookFileExtensions)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
@@ -148,6 +154,11 @@ namespace TxtAIEditor.Controls
         public static bool IsOfficeDocumentFile(string filePath)
         {
             return HasExtension(filePath, OfficeDocumentFileExtensions);
+        }
+
+        public static bool IsNotebookFile(string filePath)
+        {
+            return HasExtension(filePath, NotebookFileExtensions);
         }
 
         public static bool IsReadOnlyDocumentFile(string filePath)
