@@ -338,6 +338,7 @@ body {
     display: none; min-height: 0;
 }
 .cell-output.has-output { display: block; }
+.cell-output .output-stdout { color: var(--nb-fg); white-space: pre-wrap; }
 .cell-output .output-stderr { color: var(--nb-error); }
 .cell-output .output-error { color: var(--nb-error); }
 .cell-output .output-result { color: var(--nb-accent); font-style: italic; }
@@ -362,7 +363,7 @@ strong { font-weight: 700; }
     const path = window.__notebookPath;
 
     function getCellSource(cellDiv) {
-        const input = cellDiv.querySelector('.cell-input-area');
+        const input = cellDiv.querySelector('.cell-input-area, .markdown-cell, .raw-cell');
         if (!input) return '';
         return input.innerText;
     }

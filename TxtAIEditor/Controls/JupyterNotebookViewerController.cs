@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, string> _viewerHtmlPaths = new Dictionary<string, string>();
         private readonly Dictionary<string, string> _tabPythonExecutables = new Dictionary<string, string>();
         private readonly Dictionary<string, string> _tabWorkingDirectories = new Dictionary<string, string>();
+        private readonly Dictionary<WebView2, string> _webViewToTabId = new Dictionary<WebView2, string>();
 
         public JupyterNotebookViewerController(
             ISettingsService settingsService,
@@ -45,6 +46,7 @@ namespace TxtAIEditor.Controls
         public void Register(OpenedTab tab, WebView2 webView)
         {
             _viewerWebViews[tab.Id] = webView;
+            _webViewToTabId[webView] = tab.Id;
 
             string? dir = null;
             if (!string.IsNullOrEmpty(tab.FilePath))
@@ -196,8 +198,13 @@ public async Task<bool> SaveAsync(OpenedTab tab)
 
                 string type = typeProp.GetString() ?? string.Empty;
 
+                if (!_webViewToTabId.TryGetValue(sender, out string? tabId))
+                {
+                    return;
+                }
+
                 var tab = _activeTabProvider();
-                if (tab == null || !tab.IsNotebookViewer)
+                if (tab == null || tab.Id != tabId)
                 {
                     return;
                 }
@@ -229,23 +236,36 @@ public async Task<bool> SaveAsync(OpenedTab tab)
 
         private async Task ExecuteCellAsync(WebView2 webView, OpenedTab tab, int cellIndex, string code)
         {
-            if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
-                !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
+            try
             {
-                return;
+                if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
+                    !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
+                {
+                    await SendResultAsync(webView, cellIndex, "error", "", "Kernel session not found.", "");
+                    return;
+                }
+
+                var result = await _kernelService.ExecuteAsync(tab.Id, python, workDir, code);
+
+                await SendResultAsync(webView, cellIndex, result.Status, result.Stdout, result.Stderr, result.Result);
             }
-
-            var result = await _kernelService.ExecuteAsync(tab.Id, python, workDir, code);
-
-            var resultJson = JsonSerializer.Serialize(new
+            catch (Exception ex)
             {
-                status = result.Status,
-                stdout = result.Stdout,
-                stderr = result.Stderr,
-                result = result.Result
+                await SendResultAsync(webView, cellIndex, "error", "", ex.Message, "");
+            }
+        }
+
+        private static async Task SendResultAsync(WebView2 webView, int cellIndex, string status, string stdout, string stderr, string result)
+        {
+            string resultJson = JsonSerializer.Serialize(new
+            {
+                status = status,
+                stdout = stdout,
+                stderr = stderr,
+                result = result
             });
 
-            string script = $"window.__notebookReceiveResult && window.__notebookReceiveResult({cellIndex}, {JsonSerializer.Serialize(resultJson)});";
+            string script = $"window.__notebookReceiveResult && window.__notebookReceiveResult({cellIndex}, {resultJson});";
             await ExecuteScriptSafeAsync(webView, script);
         }
 
@@ -389,8 +409,6 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 name = 'print';
             } else if (ctrl && key === 'w') {
                 name = 'closeTab';
-            } else if (ctrl && key === 's') {
-                name = 'save';
             }
         }
 
