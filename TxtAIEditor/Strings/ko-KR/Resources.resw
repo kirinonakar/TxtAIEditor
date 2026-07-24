@@ -3429,6 +3429,9 @@
   <data name="SaveDialogLatexFileFilter" xml:space="preserve">
     <value>LaTeX 파일</value>
   </data>
+  <data name="SaveDialogJupyterFileFilter" xml:space="preserve">
+    <value>Jupyter Notebook 파일</value>
+  </data>
   <data name="PreviewCsvEmpty" xml:space="preserve">
     <value>빈 CSV 파일입니다.</value>
   </data>

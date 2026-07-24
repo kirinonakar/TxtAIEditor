@@ -3393,6 +3393,9 @@
   <data name="SaveDialogLatexFileFilter" xml:space="preserve">
     <value>LaTeX ファイル</value>
   </data>
+  <data name="SaveDialogJupyterFileFilter" xml:space="preserve">
+    <value>Jupyter Notebook ファイル</value>
+  </data>
   <data name="PreviewCsvEmpty" xml:space="preserve">
     <value>空の CSV ファイルです。</value>
   </data>

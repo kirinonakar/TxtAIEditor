@@ -103,6 +103,9 @@ while True:
     line = sys.stdin.readline()
     if not line:
         break
+    line = line.lstrip('\ufeff')
+    if not line.strip():
+        continue
     try:
         msg = json.loads(line)
         code = msg.get('code', '')
@@ -159,8 +162,8 @@ while True:
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                     WorkingDirectory = _workingDirectory,
-                    StandardInputEncoding = Encoding.UTF8,
-                    StandardOutputEncoding = Encoding.UTF8
+                    StandardInputEncoding = new UTF8Encoding(false),
+                    StandardOutputEncoding = new UTF8Encoding(false)
                 };
                 psi.EnvironmentVariables["PYTHONUTF8"] = "1";
                 psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";

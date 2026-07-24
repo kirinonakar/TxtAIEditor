@@ -80,10 +80,13 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<div id=\"cells-container\">");
 
             int cellIndex = 0;
-            foreach (var cell in doc.Cells)
+            if (doc.Cells != null)
             {
-                sb.AppendLine(BuildCellHtml(cell, cellIndex));
-                cellIndex++;
+                foreach (var cell in doc.Cells)
+                {
+                    sb.AppendLine(BuildCellHtml(cell, cellIndex));
+                    cellIndex++;
+                }
             }
 
             sb.AppendLine("</div>");

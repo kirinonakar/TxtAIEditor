@@ -3429,6 +3429,9 @@ Plan: {0}</value>
   <data name="SaveDialogLatexFileFilter" xml:space="preserve">
     <value>LaTeX File</value>
   </data>
+  <data name="SaveDialogJupyterFileFilter" xml:space="preserve">
+    <value>Jupyter Notebook File</value>
+  </data>
   <data name="PreviewCsvEmpty" xml:space="preserve">
     <value>Empty CSV file.</value>
   </data>
