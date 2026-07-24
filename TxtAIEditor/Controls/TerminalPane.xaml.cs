@@ -282,6 +282,8 @@ namespace TxtAIEditor.Controls
                 };
                 terminal.Exited += () => CloseExitedTerminalSession(session);
 
+                TryAutoActivateVenv(terminal, workingDirectory, shellProfile);
+
                 if (!string.IsNullOrEmpty(authenticationPassword))
                 {
                     _ = Task.Run(async () =>
@@ -721,6 +723,52 @@ namespace TxtAIEditor.Controls
             }
 
             return value + lineSuffix;
+        }
+
+        private static void TryAutoActivateVenv(ConPtyTerminal terminal, string workingDirectory, TerminalShellProfile shellProfile)
+        {
+            if (shellProfile.Id.StartsWith("SSH:", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            string? venvPath = null;
+            foreach (string name in new[] { ".venv", "venv" })
+            {
+                string candidate = Path.Combine(workingDirectory, name);
+                if (Directory.Exists(candidate))
+                {
+                    venvPath = candidate;
+                    break;
+                }
+            }
+
+            if (venvPath == null)
+            {
+                return;
+            }
+
+            string? activateCommand = shellProfile.Id switch
+            {
+                "PowerShell" => File.Exists(Path.Combine(venvPath, "Scripts", "Activate.ps1"))
+                    ? $". '{Path.Combine(venvPath, "Scripts", "Activate.ps1")}'\r"
+                    : null,
+                "Cmd" => File.Exists(Path.Combine(venvPath, "Scripts", "activate.bat"))
+                    ? $"call \"{Path.Combine(venvPath, "Scripts", "activate.bat")}\"\r"
+                    : null,
+                "GitBash" => File.Exists(Path.Combine(venvPath, "Scripts", "activate"))
+                    ? $"source '{venvPath.Replace('\\', '/')}/Scripts/activate'\r"
+                    : null,
+                "WSL" => File.Exists(Path.Combine(venvPath, "bin", "activate"))
+                    ? $"source '{venvPath.Replace('\\', '/')}/bin/activate'\r"
+                    : null,
+                _ => null
+            };
+
+            if (!string.IsNullOrEmpty(activateCommand))
+            {
+                _ = terminal.WriteAsync(activateCommand);
+            }
         }
 
         private void OnActualThemeChanged(FrameworkElement sender, object args)
