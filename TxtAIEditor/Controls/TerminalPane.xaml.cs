@@ -399,6 +399,17 @@ namespace TxtAIEditor.Controls
                 {
                     string path = root.TryGetProperty("path", out var pathElement) ? pathElement.GetString() ?? string.Empty : string.Empty;
                     RequestPathOpen(path);
+                    return;
+                }
+
+                if (type.Equals("openUrl", StringComparison.OrdinalIgnoreCase))
+                {
+                    string url = root.TryGetProperty("url", out var urlElement) ? urlElement.GetString() ?? string.Empty : string.Empty;
+                    if (!string.IsNullOrWhiteSpace(url))
+                    {
+                        _ = Windows.System.Launcher.LaunchUriAsync(new Uri(url));
+                    }
+                    return;
                 }
             }
             catch (Exception ex)
