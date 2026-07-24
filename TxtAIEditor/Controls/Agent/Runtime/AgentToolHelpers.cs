@@ -287,8 +287,21 @@ namespace TxtAIEditor.Controls
             }
 
             var exitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
-            return !exitCodeMatch.Success ||
-                (int.TryParse(exitCodeMatch.Groups[1].Value, out int exitCode) && exitCode == 0);
+            if (!exitCodeMatch.Success)
+            {
+                return true;
+            }
+            if (!int.TryParse(exitCodeMatch.Groups[1].Value, out int exitCode))
+            {
+                return true;
+            }
+            // ripgrep/rga exit with code 1 when no matches are found, which is normal
+            // behavior and should not be treated as a tool failure.
+            if (exitCode == 1 && result.Contains("[ripgrep_no_matches]", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return exitCode == 0;
         }
 
         public static string HideEditFailureContext(string result)

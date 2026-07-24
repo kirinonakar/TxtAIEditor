@@ -51,8 +51,20 @@ namespace TxtAIEditor.Controls
                 if (!string.IsNullOrWhiteSpace(query))
                 {
                     string fallbackResult = await _searchTextFallbackAsync(query, 80);
-                    return $"[run_rg failed: fell back to search_text for query \"{query}\"]\n{fallbackResult}";
+                    return $"[run_rg unavailable: fell back to search_text for query \"{query}\"]\n{fallbackResult}";
                 }
+            }
+
+            // ripgrep exits with code 1 when no matches are found, which is normal
+            // behavior and should not be treated as a tool failure by IsSuccessfulToolResult.
+            var rgExitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
+            if (rgExitCodeMatch.Success &&
+                int.TryParse(rgExitCodeMatch.Groups[1].Value, out int rgExitCode) &&
+                rgExitCode == 1 &&
+                !result.Contains("failed to start") &&
+                !result.Contains("timed out"))
+            {
+                result += "\n[ripgrep_no_matches]";
             }
 
             return result;
@@ -74,6 +86,16 @@ namespace TxtAIEditor.Controls
             if (result.Contains("failed to start"))
             {
                 return $"{result}\nNote: Make sure 'ripgrep-all' (rga) is installed and available in the system PATH.";
+            }
+
+            // ripgrep-all also exits with code 1 when no matches are found.
+            var rgaExitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
+            if (rgaExitCodeMatch.Success &&
+                int.TryParse(rgaExitCodeMatch.Groups[1].Value, out int rgaExitCode) &&
+                rgaExitCode == 1 &&
+                !result.Contains("failed to start"))
+            {
+                result += "\n[ripgrep_no_matches]";
             }
 
             return result;

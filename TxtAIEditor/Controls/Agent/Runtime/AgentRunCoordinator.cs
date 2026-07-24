@@ -967,6 +967,14 @@ namespace TxtAIEditor.Controls
                 await _runOutputController.AppendRunOutputLineAsync(runContext, string.Format(
                     _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
                     ex.Message));
+
+                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                    runContext,
+                    conversationTurn,
+                    transcript,
+                    initialTranscript,
+                    $"[Agent Response]: Agent execution encountered an exception: {ex.Message}");
+                _ = PersistRunSessionToHistoryAsync();
             }
             finally
             {
