@@ -29,6 +29,7 @@ import {
 } from './editor-commands.js';
 import { autocompleteState, hideAutocomplete, triggerAutocomplete } from './editor-autocomplete.js';
 import {
+    isJsonCsvTableMode,
     selectedCsvText,
     setCsvTableMode,
     updateCsvLocalization
@@ -352,7 +353,7 @@ export function createHostMessageHandler({
                     receivedEnd >= state.renderedRangeStart &&
                     receivedStart <= state.renderedRangeEnd;
                 runPendingLineActions();
-                if (!state.isComposing && touchesRenderedRange) {
+                if (!state.isComposing && (touchesRenderedRange || isJsonCsvTableMode())) {
                     queueRender(true);
                 }
             }

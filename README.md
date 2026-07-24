@@ -77,7 +77,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 📊 Interactive CSV/JSON Table Mode
 *   **Grid Editor Shell:** Automatically renders `.csv` and `.json` files into a premium, highly responsive interactive spreadsheet-like grid/table instead of raw text (decodes and displays JSON objects/arrays in a structured table layout).
-*   **Nested Object Inspection:** Double-click any cell containing a nested object or array to inspect its contents in detail.
+*   **Nested Object Inspection (JSON):** In JSON table mode, double-click any cell containing a nested object or array to inspect its contents in detail.
 *   **Column & Row Multi-Select:** Click row numbers or column headers to select entire rows/columns, with support for range dragging and multi-selection using `Ctrl` and `Shift` keys.
 *   **Formula Bar & Name Box:** Built-in toolbar at the top showing the current active cell coordinates (e.g., `A1`, `D12`) along with an editable formula bar for writing and viewing values.
 *   **Dynamic Column Resizing:** Drag the border of any column header to resize column widths in real-time.
