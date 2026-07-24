@@ -286,7 +286,12 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            var exitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
+            // Only match [exit_code] at the start of a line. RunProcessAsync
+            // always appends it on its own line, so this correctly identifies
+            // process exit codes while avoiding false matches inside file
+            // content returned by read_file (e.g. source code that contains
+            // the literal string "[exit_code] 1").
+            var exitCodeMatch = Regex.Match(result, @"^\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase | RegexOptions.Multiline);
             if (!exitCodeMatch.Success)
             {
                 return true;
