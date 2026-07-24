@@ -323,13 +323,13 @@ function tableFromRecordObjects(recordObjects, preferredHeaders = [], pathObject
     };
 }
 
-function tableFromJsonArray(items) {
+function tableFromJsonArray(items, basePath = []) {
     const recordObjects = items.map(item => flattenJsonRecord(item));
-    const pathObjects = items.map((item, index) => prefixedPathObject(flattenJsonPaths(item), [index]));
+    const pathObjects = items.map((item, index) => prefixedPathObject(flattenJsonPaths(item), basePath.concat(index)));
     return tableFromRecordObjects(recordObjects, [], pathObjects);
 }
 
-function tableFromKeyedJsonObject(entries) {
+function tableFromKeyedJsonObject(entries, basePath = []) {
     const keyHeader = jsonTableKeyHeader();
     const recordObjects = entries.map(([key, value]) => ({
         [keyHeader]: decodeUnicodeEscapes(key),
@@ -337,20 +337,20 @@ function tableFromKeyedJsonObject(entries) {
     }));
     const pathObjects = entries.map(([key, value]) => ({
         [keyHeader]: null,
-        ...prefixedPathObject(flattenJsonPaths(value), [key])
+        ...prefixedPathObject(flattenJsonPaths(value), basePath.concat(key))
     }));
 
     return tableFromRecordObjects(recordObjects, [keyHeader], pathObjects);
 }
 
-function tableFromJsonObject(value) {
+function tableFromJsonObject(value, basePath = []) {
     const entries = Object.entries(value);
     if (entries.length === 1 && Array.isArray(entries[0][1])) {
-        return tableFromJsonArray(entries[0][1]);
+        return tableFromJsonArray(entries[0][1], basePath.concat(entries[0][0]));
     }
 
     if (entries.length > 0 && entries.every(([, child]) => isPlainJsonObject(child))) {
-        return tableFromKeyedJsonObject(entries);
+        return tableFromKeyedJsonObject(entries, basePath);
     }
 
     return {
@@ -360,7 +360,7 @@ function tableFromJsonObject(value) {
         ],
         paths: [
             [null, null],
-            ...entries.map(([key]) => [null, [key]])
+            ...entries.map(([key]) => [null, basePath.concat(key)])
         ],
         columnCount: 2
     };
@@ -543,7 +543,11 @@ function csvJsonCellPath(lineNumber, columnIndex) {
 
     const row = model.paths?.[Math.max(1, Number(lineNumber || 1)) - 1];
     const path = row?.[Math.max(0, Number(columnIndex || 0))];
-    return Array.isArray(path) ? path : null;
+    if (!Array.isArray(path)) return null;
+    // model.paths are relative to the current nav target; prepend navPath
+    // so the returned path is absolute (relative to model.root).
+    const navPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+    return navPath.concat(path);
 }
 
 function canEditCsvCell(lineNumber, columnIndex) {
@@ -1513,12 +1517,19 @@ const cell = event.target.closest?.('.csv-cell');
         event.preventDefault();
         const line = Number(cell.dataset.line || 1);
         const column = Number(cell.dataset.csvColumn || 0);
+        const expandable = isJsonCsvTableMode() && cell.classList.contains('csv-json-expandable');
         if (event.detail >= 2) {
-            if (isJsonCsvTableMode() && cell.classList.contains('csv-json-expandable')) {
+            if (expandable) {
                 navigateToCsvJsonSubTable(line, column);
             } else {
                 beginCsvEdit(line, column, 'edit');
             }
+            return;
+        }
+        // 확장 가능 셀에서는 beginCsvEdit(렌더/포커스 유발)를 건너뛰어
+        // 더블클릭 두 번째 pointerdown이 DOM 교체로 무시되지 않도록 한다.
+        if (expandable) {
+            setSelectedCell(line, column);
             return;
         }
         csvDragState = { mode: 'cells', startLine: line, startColumn: column, pointerId: event.pointerId };
