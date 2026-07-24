@@ -1586,6 +1586,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>Close Other Tabs</value>
   </data>
+  <data name="TabMenuRunPython" xml:space="preserve">
+    <value>Run</value>
+  </data>
   <data name="HexViewerTitleFormat" xml:space="preserve">
     <value>[H] {0}</value>
   </data>

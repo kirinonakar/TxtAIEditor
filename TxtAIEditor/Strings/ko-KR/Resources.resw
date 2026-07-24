@@ -1586,6 +1586,9 @@
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>다른 탭 닫기</value>
   </data>
+  <data name="TabMenuRunPython" xml:space="preserve">
+    <value>실행</value>
+  </data>
   <data name="HexViewerTitleFormat" xml:space="preserve">
     <value>[H] {0}</value>
   </data>

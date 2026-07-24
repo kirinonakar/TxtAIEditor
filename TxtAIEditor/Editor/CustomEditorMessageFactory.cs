@@ -161,6 +161,7 @@ namespace TxtAIEditor.Editor
             message["csvFormulaPlaceholder"] = localizationService?.GetString("CsvFormulaPlaceholder", "선택한 CSV 셀 값") ?? "선택한 CSV 셀 값";
             message["csvJsonKeyHeader"] = localizationService?.GetString("CsvJsonKeyHeader", "키") ?? "키";
             message["csvJsonValueHeader"] = localizationService?.GetString("CsvJsonValueHeader", "값") ?? "값";
+            message["csvBreadcrumbRoot"] = localizationService?.GetString("CsvBreadcrumbRoot", "root") ?? "root";
         }
     }
 }

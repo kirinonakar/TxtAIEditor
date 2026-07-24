@@ -551,6 +551,23 @@ namespace TxtAIEditor.Controls
             return true;
         }
 
+        public void ShowTerminalAndRunCommand(string workingDirectory, string command)
+        {
+            EnsureTerminalPanelVisible();
+            if (TerminalPane.HasSessions)
+            {
+                TerminalPane.ResumeNativeWindows();
+                TerminalPane.QueueEmbeddedTerminalResize();
+            }
+            else
+            {
+                string dir = string.IsNullOrWhiteSpace(workingDirectory) || !System.IO.Directory.Exists(workingDirectory)
+                    ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+                    : workingDirectory;
+                TerminalPane.OpenTerminalWithCommand(dir, command);
+            }
+        }
+
         public bool HideTerminalPanelIfEmpty()
         {
             if (_terminalPane?.HasSessions == true)

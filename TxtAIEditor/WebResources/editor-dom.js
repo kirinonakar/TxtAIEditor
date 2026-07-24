@@ -26,3 +26,4 @@ export const csvNameBox = requiredElement('csv-name-box');
 export const csvFormulaInput = requiredElement('csv-formula-input');
 export const csvColumnHeader = requiredElement('csv-column-header');
 export const csvColumnHeaderInner = requiredElement('csv-column-header-inner');
+export const csvBreadcrumb = requiredElement('csv-breadcrumb');

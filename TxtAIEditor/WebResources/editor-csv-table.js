@@ -13,6 +13,7 @@ import {
     writeClipboardText
 } from './editor-core.js';
 import {
+    csvBreadcrumb,
     csvColumnHeader,
     csvColumnHeaderInner,
     csvFormulaInput,
@@ -43,6 +44,8 @@ function ensureCsvState() {
     state.csvEditMode = state.csvEditMode === 'edit' ? 'edit' : 'select';
     state.csvSelectedRows = Array.isArray(state.csvSelectedRows) ? state.csvSelectedRows : [];
     state.csvSelectedColumns = Array.isArray(state.csvSelectedColumns) ? state.csvSelectedColumns : [];
+    state.csvJsonNavPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+    state.csvBreadcrumbRoot = state.csvBreadcrumbRoot || 'root';
 }
 
 function columnName(index) {
@@ -162,6 +165,17 @@ function jsonCellValue(value) {
     }
 }
 
+function expandableCellDisplay(value) {
+    if (value === null || value === undefined) return '';
+    if (isPlainJsonObject(value)) {
+        return Object.keys(value).length === 0 ? '{}' : '{...}';
+    }
+    if (Array.isArray(value)) {
+        return value.length === 0 ? '[]' : '[...]';
+    }
+    return jsonCellValue(value);
+}
+
 function cellValueFromText(text, previousValue) {
     const value = decodeUnicodeEscapes(String(text ?? ''));
     if (typeof previousValue === 'string') return value;
@@ -218,25 +232,23 @@ function flattenJsonRecord(value, prefix = '', output = {}) {
     if (isPlainJsonObject(value)) {
         const entries = Object.entries(value);
         if (entries.length === 0 && prefix) {
-            output[prefix] = '{}';
+            output[prefix] = expandableCellDisplay(value);
             return output;
         }
 
         for (const [key, child] of entries) {
             const nextPrefix = prefix ? `${prefix}.${key}` : key;
-            flattenJsonRecord(child, nextPrefix, output);
+            if (isPlainJsonObject(child) || Array.isArray(child)) {
+                output[nextPrefix] = expandableCellDisplay(child);
+            } else {
+                output[nextPrefix] = jsonCellValue(child);
+            }
         }
         return output;
     }
 
     if (Array.isArray(value)) {
-        if (!prefix) {
-            value.forEach((child, index) => {
-                output[String(index)] = jsonCellValue(child);
-            });
-        } else {
-            output[prefix] = jsonCellValue(value);
-        }
+        output[prefix] = expandableCellDisplay(value);
         return output;
     }
 
@@ -254,13 +266,9 @@ function flattenJsonPaths(value, prefix = '', output = {}) {
 
         for (const [key, child] of entries) {
             const nextPrefix = prefix ? `${prefix}.${key}` : key;
-            const childPath = prefix ? [key] : [key];
-            if (isPlainJsonObject(child)) {
-                const childOutput = {};
-                flattenJsonPaths(child, nextPrefix, childOutput);
-                for (const [header, path] of Object.entries(childOutput)) {
-                    output[header] = childPath.concat(path);
-                }
+            const childPath = [key];
+            if (isPlainJsonObject(child) || Array.isArray(child)) {
+                output[nextPrefix] = childPath;
             } else {
                 output[nextPrefix] = childPath;
             }
@@ -269,13 +277,7 @@ function flattenJsonPaths(value, prefix = '', output = {}) {
     }
 
     if (Array.isArray(value)) {
-        if (!prefix) {
-            value.forEach((_, index) => {
-                output[String(index)] = [index];
-            });
-        } else {
-            output[prefix] = [];
-        }
+        output[prefix] = [];
         return output;
     }
 
@@ -354,7 +356,7 @@ function tableFromJsonObject(value) {
     return {
         rows: [
             [jsonTableKeyHeader(), jsonTableValueHeader()],
-            ...entries.map(([key, child]) => [decodeUnicodeEscapes(key), jsonCellValue(child)])
+            ...entries.map(([key, child]) => [decodeUnicodeEscapes(key), expandableCellDisplay(child)])
         ],
         paths: [
             [null, null],
@@ -378,7 +380,7 @@ function tableFromJsonValue(value) {
 function currentJsonTableModel() {
     if (!isJsonCsvTableMode()) return null;
 
-    const cacheKey = `${state.cacheVersion}:${state.lineCount}:${state.language}`;
+    const cacheKey = `${state.cacheVersion}:${state.lineCount}:${state.language}:${(state.csvJsonNavPath || []).join('.')}`;
     if (state.csvJsonTableModel?.cacheKey === cacheKey) {
         return state.csvJsonTableModel.model;
     }
@@ -391,15 +393,118 @@ function currentJsonTableModel() {
 
     try {
         const parsed = JSON.parse(sourceTextFromCache());
-        const model = tableFromJsonValue(parsed);
+        const navPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+        const target = navPath.length > 0 ? getJsonPathValue(parsed, navPath) : parsed;
+        const model = tableFromJsonValue(target);
         model.root = parsed;
         model.sourceText = sourceTextFromCache();
+        model.navPath = navPath;
         state.csvJsonTableModel = { cacheKey, model };
         return model;
     } catch {
         state.csvJsonTableModel = { cacheKey, model: null };
         return null;
     }
+}
+
+function csvJsonCellExpandable(lineNumber, columnIndex) {
+    const model = currentJsonTableModel();
+    if (!model) return false;
+    const path = csvJsonCellPath(lineNumber, columnIndex);
+    if (!path) return false;
+    const value = getJsonPathValue(model.root, path);
+    return isPlainJsonObject(value) || Array.isArray(value);
+}
+
+function navigateToCsvJsonSubTable(lineNumber, columnIndex) {
+    const model = currentJsonTableModel();
+    if (!model) return;
+    const path = csvJsonCellPath(lineNumber, columnIndex);
+    if (!path) return;
+    const value = getJsonPathValue(model.root, path);
+    if (!isPlainJsonObject(value) && !Array.isArray(value)) return;
+
+    state.csvJsonNavPath = path.slice();
+    state.csvJsonTableModel = null;
+    state.csvSelectedLine = 1;
+    state.csvSelectedColumn = 0;
+    state.csvEditMode = 'select';
+    state.csvSelection = null;
+    state.csvSelectedRows = [];
+    state.csvSelectedColumns = [];
+    state.csvTableVersion++;
+    if (scrollContainer) {
+        scrollContainer.scrollLeft = 0;
+        scrollContainer.scrollTop = 0;
+    }
+    updateCsvBreadcrumb();
+    prepareCsvTableRenderModel();
+    queueRender(true);
+    requestAnimationFrame(() => restoreCsvFocusAfterRender());
+}
+
+function navigateToCsvJsonRoot() {
+    state.csvJsonNavPath = [];
+    state.csvJsonTableModel = null;
+    state.csvSelectedLine = 1;
+    state.csvSelectedColumn = 0;
+    state.csvEditMode = 'select';
+    state.csvSelection = null;
+    state.csvSelectedRows = [];
+    state.csvSelectedColumns = [];
+    state.csvTableVersion++;
+    if (scrollContainer) {
+        scrollContainer.scrollLeft = 0;
+        scrollContainer.scrollTop = 0;
+    }
+    updateCsvBreadcrumb();
+    prepareCsvTableRenderModel();
+    queueRender(true);
+    requestAnimationFrame(() => restoreCsvFocusAfterRender());
+}
+
+function navigateToCsvJsonBreadcrumb(index) {
+    const navPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+    if (index < 0 || index >= navPath.length) {
+        navigateToCsvJsonRoot();
+        return;
+    }
+    state.csvJsonNavPath = navPath.slice(0, index + 1);
+    state.csvJsonTableModel = null;
+    state.csvSelectedLine = 1;
+    state.csvSelectedColumn = 0;
+    state.csvEditMode = 'select';
+    state.csvSelection = null;
+    state.csvSelectedRows = [];
+    state.csvSelectedColumns = [];
+    state.csvTableVersion++;
+    if (scrollContainer) {
+        scrollContainer.scrollLeft = 0;
+        scrollContainer.scrollTop = 0;
+    }
+    updateCsvBreadcrumb();
+    prepareCsvTableRenderModel();
+    queueRender(true);
+    requestAnimationFrame(() => restoreCsvFocusAfterRender());
+}
+
+function updateCsvBreadcrumb() {
+    if (!csvBreadcrumb) return;
+    const navPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+    if (navPath.length === 0) {
+        csvBreadcrumb.hidden = true;
+        csvBreadcrumb.innerHTML = '';
+        return;
+    }
+
+    csvBreadcrumb.hidden = false;
+    const rootLabel = state.csvBreadcrumbRoot || 'root';
+    const parts = [`<button type="button" class="csv-breadcrumb-item" data-csv-nav="-1">${escapeHtml(rootLabel)}</button>`];
+    for (let i = 0; i < navPath.length; i++) {
+        parts.push('<span class="csv-breadcrumb-sep">›</span>');
+        parts.push(`<button type="button" class="csv-breadcrumb-item" data-csv-nav="${i}">${escapeHtml(String(navPath[i]))}</button>`);
+    }
+    csvBreadcrumb.innerHTML = parts.join('');
 }
 
 function csvDisplayLineCount() {
@@ -1289,14 +1394,15 @@ function renderCsvTableRows(startLine, endLine, hoveredLineNumber) {
             lineCells.push('<div class="csv-cell-spacer" aria-hidden="true"></div>');
         }
 
-        for (let column = columnRange.start; column < columnRange.end; column++) {
+for (let column = columnRange.start; column < columnRange.end; column++) {
             const activeClass = line === state.csvSelectedLine && column === state.csvSelectedColumn ? ' active-cell' : '';
             const selectedClass = isCsvCellSelected(line, column) ? ' selected-cell' : '';
             const loadingClass = hasLine ? '' : ' loading';
             const value = hasLine ? (cells[column] || '') : '';
-            const editable = !state.readOnly && hasLine && activeCellMatches(line, column) && canEditCsvCell(line, column) ? 'true' : 'false';
+            const expandable = hasLine && jsonModel && csvJsonCellExpandable(line, column) ? ' csv-json-expandable' : '';
+            const editable = !state.readOnly && hasLine && activeCellMatches(line, column) && canEditCsvCell(line, column) && !expandable ? 'true' : 'false';
             lineCells.push(
-                `<div class="csv-cell${selectedClass}${activeClass}${loadingClass}" contenteditable="${editable}" spellcheck="false" ` +
+                `<div class="csv-cell${selectedClass}${activeClass}${loadingClass}${expandable}" contenteditable="${editable}" spellcheck="false" ` +
                 `data-line="${line}" data-csv-column="${column}">${escapeHtml(value)}</div>`
             );
         }
@@ -1319,12 +1425,16 @@ function setCsvTableMode(enabled, options = {}) {
     ensureCsvState();
     state.csvTableEnabled = !!enabled;
     state.csvTableVersion++;
+    state.csvJsonNavPath = [];
+    state.csvJsonTableModel = null;
     updateCsvLocalization(options);
     if (state.csvTableEnabled) {
+        updateCsvBreadcrumb();
         prepareCsvTableRenderModel();
     } else {
         updateCsvVirtualLineCount(0);
         csvFormulaInput.readOnly = false;
+        if (csvBreadcrumb) csvBreadcrumb.hidden = true;
     }
 
     document.body.classList.toggle('csv-table-mode', state.csvTableEnabled);
@@ -1352,9 +1462,13 @@ function updateCsvLocalization(options = {}) {
         state.csvJsonKeyHeader = options.csvJsonKeyHeader;
         state.csvJsonTableModel = null;
     }
-    if (options.csvJsonValueHeader !== undefined) {
+if (options.csvJsonValueHeader !== undefined) {
         state.csvJsonValueHeader = options.csvJsonValueHeader;
         state.csvJsonTableModel = null;
+    }
+    if (options.csvBreadcrumbRoot !== undefined) {
+        state.csvBreadcrumbRoot = options.csvBreadcrumbRoot;
+        updateCsvBreadcrumb();
     }
 }
 
@@ -1394,13 +1508,17 @@ function bindCsvTable() {
             return;
         }
 
-        const cell = event.target.closest?.('.csv-cell');
+const cell = event.target.closest?.('.csv-cell');
         if (!cell || !viewport.contains(cell) || event.button !== 0) return;
         event.preventDefault();
         const line = Number(cell.dataset.line || 1);
         const column = Number(cell.dataset.csvColumn || 0);
         if (event.detail >= 2) {
-            beginCsvEdit(line, column, 'edit');
+            if (isJsonCsvTableMode() && cell.classList.contains('csv-json-expandable')) {
+                navigateToCsvJsonSubTable(line, column);
+            } else {
+                beginCsvEdit(line, column, 'edit');
+            }
             return;
         }
         csvDragState = { mode: 'cells', startLine: line, startColumn: column, pointerId: event.pointerId };
@@ -1434,7 +1552,13 @@ function bindCsvTable() {
         const cell = event.target.closest?.('.csv-cell');
         if (!cell || !viewport.contains(cell)) return;
         event.preventDefault();
-        beginCsvEdit(Number(cell.dataset.line || 1), Number(cell.dataset.csvColumn || 0), 'edit');
+        const line = Number(cell.dataset.line || 1);
+        const column = Number(cell.dataset.csvColumn || 0);
+        if (isJsonCsvTableMode() && cell.classList.contains('csv-json-expandable')) {
+            navigateToCsvJsonSubTable(line, column);
+        } else {
+            beginCsvEdit(line, column, 'edit');
+        }
     });
 
     viewport.addEventListener('input', event => {
@@ -1641,7 +1765,16 @@ function bindCsvTable() {
             };
             restoreCsvFocusAfterRender();
         }
-    });
+});
+
+    if (csvBreadcrumb) {
+        csvBreadcrumb.addEventListener('click', event => {
+            const item = event.target.closest?.('.csv-breadcrumb-item');
+            if (!item || !csvBreadcrumb.contains(item)) return;
+            event.preventDefault();
+            navigateToCsvJsonBreadcrumb(Number(item.dataset.csvNav ?? -1));
+        });
+    }
 }
 
 export {
@@ -1649,6 +1782,7 @@ export {
     copyCsvSelectionToClipboard,
     cutCsvSelectionToClipboard,
     isJsonCsvTableMode,
+    navigateToCsvJsonRoot,
     prepareCsvTableRenderModel,
     renderCsvTableRows,
     restoreCsvFocusAfterRender,

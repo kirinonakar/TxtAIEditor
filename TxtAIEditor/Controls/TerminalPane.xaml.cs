@@ -126,6 +126,32 @@ namespace TxtAIEditor.Controls
             _ = StartTerminalAsync(resolvedDirectory, shellProfile, authenticationPassword);
         }
 
+        public void OpenTerminalWithCommand(string workingDirectory, string command)
+        {
+            if (string.IsNullOrWhiteSpace(workingDirectory) || string.IsNullOrWhiteSpace(command))
+            {
+                return;
+            }
+
+            string resolvedDirectory;
+            try
+            {
+                resolvedDirectory = Path.GetFullPath(workingDirectory);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (!Directory.Exists(resolvedDirectory))
+            {
+                return;
+            }
+
+            var shellProfile = TerminalShellProfile.Resolve(_terminalProfileId);
+            _ = StartTerminalAsync(resolvedDirectory, shellProfile, null, command);
+        }
+
         public bool TryActivateProfile(string profileId)
         {
             TerminalSession? session = _terminalSessions.FirstOrDefault(
@@ -230,7 +256,8 @@ namespace TxtAIEditor.Controls
         private async Task StartTerminalAsync(
             string workingDirectory,
             TerminalShellProfile shellProfile,
-            string? authenticationPassword)
+            string? authenticationPassword,
+            string? initialCommand = null)
         {
             await EnsureTerminalWebViewAsync();
 
@@ -283,6 +310,15 @@ namespace TxtAIEditor.Controls
                 terminal.Exited += () => CloseExitedTerminalSession(session);
 
                 TryAutoActivateVenv(terminal, workingDirectory, shellProfile);
+
+                if (!string.IsNullOrEmpty(initialCommand))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(TimeSpan.FromMilliseconds(1000));
+                        await terminal.WriteAsync(initialCommand + "\r");
+                    });
+                }
 
                 if (!string.IsNullOrEmpty(authenticationPassword))
                 {

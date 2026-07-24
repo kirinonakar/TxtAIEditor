@@ -77,6 +77,32 @@ namespace TxtAIEditor.Controls
                 requestedProfile == null ? null : activeConnection?.Password);
         }
 
+        public void RunFileInTerminal(string filePath)
+        {
+            EnsureTerminalPane();
+
+            string? workingDirectory = null;
+            try
+            {
+                string? dir = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+                {
+                    workingDirectory = dir;
+                }
+            }
+            catch
+            {
+            }
+
+            workingDirectory ??= GetWorkingDirectory();
+
+            string fileName = Path.GetFileName(filePath);
+            string command = $"python \"{fileName}\"";
+
+            _topToolbar.TerminalIsChecked = true;
+            _editorWorkspace.ShowTerminalAndRunCommand(workingDirectory, command);
+        }
+
         private string GetWorkingDirectory()
         {
             if (_selectedExplorerItemProvider() is TxtAIEditor.ExplorerItem selectedItem)

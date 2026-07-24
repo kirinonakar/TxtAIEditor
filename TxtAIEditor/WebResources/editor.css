@@ -214,8 +214,44 @@ body.csv-table-mode #scroll-container {
 }
 
 #csv-toolbar[hidden],
-#csv-column-header[hidden] {
+#csv-column-header[hidden],
+#csv-breadcrumb[hidden] {
     display: none;
+}
+
+#csv-breadcrumb {
+    position: absolute;
+    inset: 32px 0 auto 0;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 8px;
+    background: color-mix(in srgb, var(--bg) 92%, var(--fg));
+    border-bottom: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+    z-index: 19;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.csv-breadcrumb-item {
+    border: none;
+    background: none;
+    color: var(--fg);
+    font: 600 12px "Segoe UI", "Malgun Gothic", sans-serif;
+    padding: 2px 6px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.csv-breadcrumb-item:hover {
+    background: color-mix(in srgb, #0078d4 20%, transparent);
+}
+
+.csv-breadcrumb-sep {
+    color: var(--gutter-fg);
+    font-size: 12px;
+    user-select: none;
 }
 
 #csv-name-box,
@@ -249,6 +285,14 @@ body.csv-table-mode #scroll-container {
     background: var(--gutter-bg);
     border-bottom: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
     z-index: 19;
+}
+
+body.csv-table-mode #csv-breadcrumb:not([hidden]) ~ #csv-column-header {
+    inset: 62px 0 auto 0;
+}
+
+body.csv-table-mode #csv-breadcrumb:not([hidden]) ~ #scroll-container {
+    top: 92px;
 }
 
 #csv-column-header-inner {
@@ -401,6 +445,17 @@ body.csv-table-mode .line-row {
 
 .csv-cell.loading {
     color: var(--gutter-fg);
+}
+
+.csv-cell.csv-json-expandable {
+    cursor: pointer;
+    color: #0078d4;
+    font-style: italic;
+}
+
+.csv-cell.csv-json-expandable:hover {
+    background: color-mix(in srgb, #0078d4 12%, var(--bg));
+    text-decoration: underline;
 }
 
 .csv-row.selected-csv-row .line-number {

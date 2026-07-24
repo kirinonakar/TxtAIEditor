@@ -146,6 +146,17 @@ namespace TxtAIEditor.Composition
             MainWindowInteractionCallbacks callbacks,
             ExplorerFileActionsController explorerFileActions)
         {
+            var terminalPanel = new TerminalPanelController(
+                window,
+                ui.EditorWorkspace,
+                ui.TopToolbar,
+                callbacks.GetSelectedExplorerItem,
+                callbacks.GetCurrentFolderPath,
+                callbacks.GetCurrentRepoPath,
+                callbacks.LoadFileIntoTabAtLineAsync,
+                callbacks.NavigateExplorerToFolderAndRevealAsync,
+                services.RemoteWorkspaceService);
+
             var tabContextMenu = new TabContextMenuController(
                 favoritesRecent,
                 callbacks.GetLocalizedString,
@@ -160,6 +171,7 @@ namespace TxtAIEditor.Composition
                 callbacks.CloseRightTabs,
                 callbacks.CloseLeftTabs,
                 callbacks.CloseOtherTabs,
+                terminalPanel.RunFileInTerminal,
                 tabNavigation.GetTabViewForItem);
 
             var fileOpenDrop = new FileOpenDropController(
@@ -193,17 +205,6 @@ namespace TxtAIEditor.Composition
                 callbacks.TogglePreviewWidth,
                 callbacks.ToggleMaximize,
                 callbacks.ToggleWordWrap);
-
-            var terminalPanel = new TerminalPanelController(
-                window,
-                ui.EditorWorkspace,
-                ui.TopToolbar,
-                callbacks.GetSelectedExplorerItem,
-                callbacks.GetCurrentFolderPath,
-                callbacks.GetCurrentRepoPath,
-                callbacks.LoadFileIntoTabAtLineAsync,
-                callbacks.NavigateExplorerToFolderAndRevealAsync,
-                services.RemoteWorkspaceService);
 
             var snippets = new SnippetsController(
                 services.SnippetService,

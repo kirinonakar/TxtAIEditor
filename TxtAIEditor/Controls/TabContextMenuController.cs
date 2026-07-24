@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeRightTabs;
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeLeftTabs;
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeOtherTabs;
+        private readonly Action<string>? _runFileInTerminal;
         private readonly Func<TabViewItem, TabView?> _tabViewResolver;
 
         public TabContextMenuController(
@@ -42,6 +43,7 @@ namespace TxtAIEditor.Controls
             Action<OpenedTab, TabViewItem, TabView> closeRightTabs,
             Action<OpenedTab, TabViewItem, TabView> closeLeftTabs,
             Action<OpenedTab, TabViewItem, TabView> closeOtherTabs,
+            Action<string>? runFileInTerminal,
             Func<TabViewItem, TabView?> tabViewResolver)
         {
             _favoritesRecentController = favoritesRecentController;
@@ -57,6 +59,7 @@ namespace TxtAIEditor.Controls
             _closeRightTabs = closeRightTabs;
             _closeLeftTabs = closeLeftTabs;
             _closeOtherTabs = closeOtherTabs;
+            _runFileInTerminal = runFileInTerminal;
             _tabViewResolver = tabViewResolver;
         }
 
@@ -87,6 +90,21 @@ namespace TxtAIEditor.Controls
             openFolderItem.IsEnabled = hasActionPath;
             openFolderItem.Click += async (_, __) => await OpenFolderAsync(tab);
             menu.Items.Add(openFolderItem);
+
+            if (_runFileInTerminal != null && IsPythonFile(fileActionPath))
+            {
+                var runItem = new MenuFlyoutItem { Text = _getString("TabMenuRunPython", "실행"), Icon = new SymbolIcon(Symbol.Play) };
+                runItem.IsEnabled = hasActionPath && !string.IsNullOrEmpty(fileActionPath) && File.Exists(fileActionPath);
+                runItem.Click += (_, __) =>
+                {
+                    string? path = GetFileActionPath(tab);
+                    if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                    {
+                        _runFileInTerminal(path);
+                    }
+                };
+                menu.Items.Add(runItem);
+            }
 
             menu.Items.Add(new MenuFlyoutSeparator());
 
@@ -285,6 +303,11 @@ namespace TxtAIEditor.Controls
             string? extension = Path.GetExtension(filePath);
             return string.Equals(extension, ".exe", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(extension, ".dll", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsPythonFile(string? filePath)
+        {
+            return string.Equals(Path.GetExtension(filePath), ".py", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void SetClipboardText(string text)
