@@ -266,10 +266,22 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (result.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase) ||
-                result.Contains(" failed:", StringComparison.OrdinalIgnoreCase) ||
-                result.Contains(" cancelled", StringComparison.OrdinalIgnoreCase) ||
-                result.Contains(" timed out", StringComparison.OrdinalIgnoreCase))
+            // Tool-generated failure messages always start at the beginning of the
+            // result string.  Only check the first line so that file content or search
+            // results containing these substrings deeper in the body are not mistaken
+            // for failures (which would bypass non-verbose summarisation).
+            string firstLine = result;
+            int newlineIndex = result.IndexOf('\n');
+            if (newlineIndex >= 0)
+            {
+                firstLine = result.Substring(0, newlineIndex);
+            }
+            firstLine = firstLine.TrimEnd('\r');
+
+            if (firstLine.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.Contains(" failed:", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.Contains(" cancelled", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.Contains(" timed out", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

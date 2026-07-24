@@ -3261,6 +3261,9 @@
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
     <value>MCP 도구를 실행했습니다</value>
   </data>
+  <data name="AgentVerboseToolFailedOnly" xml:space="preserve">
+    <value>도구 실행에 실패했습니다</value>
+  </data>
   <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
     <value>선택 칩 왼쪽으로 스크롤</value>
   </data>

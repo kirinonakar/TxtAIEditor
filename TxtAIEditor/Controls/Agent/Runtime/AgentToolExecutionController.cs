@@ -206,20 +206,22 @@ namespace TxtAIEditor.Controls
 
             if (_mcpController.TryGetToolAlias(normalizedToolName, out _))
             {
-                if (verbose || toolResult.StartsWith("MCP tool failed:", StringComparison.OrdinalIgnoreCase))
+                if (verbose)
                 {
                     return displayToolResult;
                 }
 
-                return _getString("AgentVerboseMcpToolOnly", "MCP 도구를 실행했습니다");
+                return IsSuccessfulToolResult(toolResult)
+                    ? _getString("AgentVerboseMcpToolOnly", "MCP 도구를 실행했습니다")
+                    : _getString("AgentVerboseToolFailedOnly", "도구 실행에 실패했습니다");
             }
 
             if (!verbose && !IsSuccessfulToolResult(toolResult))
             {
-                return displayToolResult;
+                return _getString("AgentVerboseToolFailedOnly", "도구 실행에 실패했습니다");
             }
 
-            if (verbose || toolResult.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase))
+            if (verbose)
             {
                 return displayToolResult;
             }

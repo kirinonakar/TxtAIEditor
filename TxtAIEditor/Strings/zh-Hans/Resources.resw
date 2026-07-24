@@ -3225,6 +3225,9 @@
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
     <value>已执行 MCP 工具</value>
   </data>
+  <data name="AgentVerboseToolFailedOnly" xml:space="preserve">
+    <value>工具执行失败</value>
+  </data>
   <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
     <value>向左滚动选定的筹码</value>
   </data>

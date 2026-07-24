@@ -3225,6 +3225,9 @@
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
     <value>MCP ツールを実行しました</value>
   </data>
+  <data name="AgentVerboseToolFailedOnly" xml:space="preserve">
+    <value>ツールの実行に失敗しました</value>
+  </data>
   <data name="AgentSelectedChipsScrollLeftTooltip" xml:space="preserve">
     <value>選択チップを左へスクロール</value>
   </data>
