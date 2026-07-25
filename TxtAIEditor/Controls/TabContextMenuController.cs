@@ -28,6 +28,8 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeOtherTabs;
         private readonly Action<string>? _runFileInTerminal;
         private readonly Func<TabViewItem, TabView?> _tabViewResolver;
+        private readonly Func<string, Task>? _openNotebookSourceAsync;
+        private readonly Func<string, Task>? _openNotebookViewerAsync;
 
         public TabContextMenuController(
             FavoritesRecentController favoritesRecentController,
@@ -44,7 +46,9 @@ namespace TxtAIEditor.Controls
             Action<OpenedTab, TabViewItem, TabView> closeLeftTabs,
             Action<OpenedTab, TabViewItem, TabView> closeOtherTabs,
             Action<string>? runFileInTerminal,
-            Func<TabViewItem, TabView?> tabViewResolver)
+            Func<TabViewItem, TabView?> tabViewResolver,
+            Func<string, Task>? openNotebookSourceAsync = null,
+            Func<string, Task>? openNotebookViewerAsync = null)
         {
             _favoritesRecentController = favoritesRecentController;
             _getString = getString;
@@ -61,6 +65,8 @@ namespace TxtAIEditor.Controls
             _closeOtherTabs = closeOtherTabs;
             _runFileInTerminal = runFileInTerminal;
             _tabViewResolver = tabViewResolver;
+            _openNotebookSourceAsync = openNotebookSourceAsync;
+            _openNotebookViewerAsync = openNotebookViewerAsync;
         }
 
         public MenuFlyout CreateContextFlyout(OpenedTab tab, TabViewItem tabItem, TabView targetTabView)
@@ -144,6 +150,43 @@ namespace TxtAIEditor.Controls
             csvTableItem.Click += async (_, __) =>
                 await _setCsvTableModeAsync(tab, csvTableItem.IsChecked);
             menu.Items.Add(csvTableItem);
+
+            if (tab.IsNotebookViewer ||
+                (!string.IsNullOrEmpty(fileActionPath) &&
+                 (SupportedFileTypes.IsNotebookFile(fileActionPath) || fileActionPath.EndsWith(".ipynb", StringComparison.OrdinalIgnoreCase))))
+            {
+                var viewSourceItem = new ToggleMenuFlyoutItem
+                {
+                    Text = _getString("TabMenuNotebookViewSource", "소스 보기"),
+                    IsChecked = !tab.IsNotebookViewer,
+                    Icon = new FontIcon { Glyph = "\uE94A" }
+                };
+                viewSourceItem.IsEnabled = hasActionPath && !string.IsNullOrEmpty(fileActionPath) && File.Exists(fileActionPath);
+                viewSourceItem.Click += async (_, __) =>
+                {
+                    string? path = GetFileActionPath(tab);
+                    if (string.IsNullOrEmpty(path))
+                    {
+                        return;
+                    }
+
+                    if (viewSourceItem.IsChecked)
+                    {
+                        if (_openNotebookSourceAsync != null)
+                        {
+                            await _openNotebookSourceAsync(path);
+                        }
+                    }
+                    else
+                    {
+                        if (_openNotebookViewerAsync != null)
+                        {
+                            await _openNotebookViewerAsync(path);
+                        }
+                    }
+                };
+                menu.Items.Add(viewSourceItem);
+            }
 
             if (!tab.IsReadOnlyViewer)
             {

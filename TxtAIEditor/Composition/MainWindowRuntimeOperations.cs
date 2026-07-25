@@ -79,6 +79,8 @@ namespace TxtAIEditor.Composition
                 OpenOfficeDocumentTab,
                 OpenHexTab,
                 OpenNotebookTab,
+                OpenNotebookSourceTabAsync,
+                OpenNotebookViewerTabAsync,
                 SetHexViewModeAsync,
                 CloseActiveTab,
                 SyncSnippetsToOpenEditorsAsync,
@@ -202,6 +204,10 @@ namespace TxtAIEditor.Composition
         public OpenedTab OpenHexTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenHexTab(filePath);
 
         public OpenedTab OpenNotebookTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenNotebookTab(filePath);
+
+        public async Task OpenNotebookSourceTabAsync(string filePath) => await Controllers.Editor.Runtime.EditorTabOpen.OpenNotebookSourceTabAsync(filePath);
+
+        public async Task OpenNotebookViewerTabAsync(string filePath) => await Controllers.Editor.Runtime.EditorTabOpen.OpenNotebookViewerTabAsync(filePath);
 
         public OpenedTab OpenImageTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenImageTab(filePath);
 

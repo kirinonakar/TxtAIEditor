@@ -3517,6 +3517,7 @@
   <data name="CreateNotebookErrorTitle" xml:space="preserve"><value>無法建立 Notebook</value></data>
   <data name="CreateNotebookEmptyName" xml:space="preserve"><value>請輸入 Notebook 名稱。</value></data>
   <data name="CreateNotebookInvalidName" xml:space="preserve"><value>Notebook 名稱包含無效字元。</value></data>
+  <data name="TabMenuNotebookViewSource" xml:space="preserve"><value>檢視原始碼</value></data>
   <data name="ExplorerDownload" xml:space="preserve"><value>下載</value></data>
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>下載中...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>下載完成。</value></data>

@@ -3517,6 +3517,7 @@
   <data name="CreateNotebookErrorTitle" xml:space="preserve"><value>ノートブックを作成できませんでした</value></data>
   <data name="CreateNotebookEmptyName" xml:space="preserve"><value>ノートブック名を入力してください。</value></data>
   <data name="CreateNotebookInvalidName" xml:space="preserve"><value>ノートブック名に使用できない文字が含まれています。</value></data>
+  <data name="TabMenuNotebookViewSource" xml:space="preserve"><value>ソースを表示</value></data>
   <data name="ExplorerDownload" xml:space="preserve"><value>ダウンロード</value></data>
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>ダウンロード中...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>ダウンロードが完了しました。</value></data>

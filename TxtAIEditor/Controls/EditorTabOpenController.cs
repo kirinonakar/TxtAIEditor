@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
@@ -60,6 +61,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab> _updateLanguageUi;
         private readonly Action _updateWindowTitle;
         private readonly Action<OpenedTab, TabViewItem, TabView, FrameworkElement, RightTappedRoutedEventArgs> _showTabContextMenu;
+        private readonly Action<OpenedTab, TabViewItem>? _closeTabAndCleanup;
         private readonly int _initialEditorLineWarmupCount;
 
         private sealed record HexViewState(
@@ -132,7 +134,8 @@ namespace TxtAIEditor.Controls
             Action<OpenedTab> updateLanguageUi,
             Action updateWindowTitle,
             Action<OpenedTab, TabViewItem, TabView, FrameworkElement, RightTappedRoutedEventArgs> showTabContextMenu,
-            int initialEditorLineWarmupCount)
+            int initialEditorLineWarmupCount,
+            Action<OpenedTab, TabViewItem>? closeTabAndCleanup = null)
         {
             _settingsService = settingsService;
             _snippetService = snippetService;
@@ -173,6 +176,7 @@ namespace TxtAIEditor.Controls
             _updateWindowTitle = updateWindowTitle;
             _showTabContextMenu = showTabContextMenu;
             _initialEditorLineWarmupCount = initialEditorLineWarmupCount;
+            _closeTabAndCleanup = closeTabAndCleanup;
         }
 
         public OpenedTab OpenNewTab(
@@ -183,7 +187,8 @@ namespace TxtAIEditor.Controls
             bool encodingWasAutoDetected = true,
             ITextModel? textModel = null,
             bool isEncrypted = false,
-            string? encryptionPassword = null)
+            string? encryptionPassword = null,
+            int targetIndex = -1)
         {
             var documentParts = _editorTabDocumentFactory.Create(
                 filePath,
@@ -196,7 +201,7 @@ namespace TxtAIEditor.Controls
                 encryptionPassword);
             var tab = documentParts.Tab;
             var session = documentParts.Session;
-            OpenEditorDocumentTab(tab, session, documentParts.IsReadOnly, updateLanguageUi: false);
+            OpenEditorDocumentTab(tab, session, documentParts.IsReadOnly, updateLanguageUi: false, targetIndex: targetIndex);
 
             return tab;
         }
@@ -918,7 +923,7 @@ namespace TxtAIEditor.Controls
             return tab;
         }
 
-        public OpenedTab OpenNotebookTab(string filePath)
+        public OpenedTab OpenNotebookTab(string filePath, int targetIndex = -1)
         {
             var tab = new OpenedTab
             {
@@ -931,7 +936,7 @@ namespace TxtAIEditor.Controls
                 IsNotebookViewer = true
             };
 
-            AddOpenTab(tab);
+            AddOpenTab(tab, targetIndex);
 
             var settings = _settingsService.CurrentSettings;
             var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
@@ -949,10 +954,110 @@ namespace TxtAIEditor.Controls
 
             _notebookViewerController.Register(tab, tabParts.WebView);
 
-            AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
+            AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false, targetIndex: targetIndex);
             UpdateTabStatus(tab, updateLanguageUi: true);
 
             return tab;
+        }
+
+        public async Task<OpenedTab> OpenNotebookSourceTabAsync(string filePath)
+        {
+            int targetIndex = -1;
+            var existingViewerTab = _viewModel.Tabs.FirstOrDefault(t =>
+                t.IsNotebookViewer &&
+                string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+
+            if (existingViewerTab != null)
+            {
+                var tabItem = FindTabItem(existingViewerTab.Id);
+                if (tabItem != null)
+                {
+                    var targetTabView = _getTabViewForTabItem(tabItem) ?? _getCurrentActiveTabView();
+                    targetIndex = targetTabView.TabItems.IndexOf(tabItem);
+                }
+
+                CloseTabInternal(existingViewerTab);
+            }
+
+            var existingTextTab = _viewModel.Tabs.FirstOrDefault(t =>
+                !t.IsNotebookViewer &&
+                string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+
+            if (existingTextTab != null)
+            {
+                FocusTab(existingTextTab);
+                return existingTextTab;
+            }
+
+            var readResult = await LineArrayTextModel.LoadFromFileAsync(filePath, "Auto");
+            var tab = OpenNewTab(
+                filePath: filePath,
+                content: "",
+                isReadOnly: false,
+                encodingName: readResult.EncodingName,
+                encodingWasAutoDetected: readResult.EncodingWasAutoDetected,
+                textModel: readResult.Model,
+                targetIndex: targetIndex);
+
+            tab.Language = "json";
+            _updateLanguageUi(tab);
+            return tab;
+        }
+
+        public Task<OpenedTab> OpenNotebookViewerTabAsync(string filePath)
+        {
+            int targetIndex = -1;
+            var existingTextTab = _viewModel.Tabs.FirstOrDefault(t =>
+                !t.IsNotebookViewer &&
+                string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+
+            if (existingTextTab != null)
+            {
+                var tabItem = FindTabItem(existingTextTab.Id);
+                if (tabItem != null)
+                {
+                    var targetTabView = _getTabViewForTabItem(tabItem) ?? _getCurrentActiveTabView();
+                    targetIndex = targetTabView.TabItems.IndexOf(tabItem);
+                }
+
+                CloseTabInternal(existingTextTab);
+            }
+
+            var existingViewerTab = _viewModel.Tabs.FirstOrDefault(t =>
+                t.IsNotebookViewer &&
+                string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+
+            if (existingViewerTab != null)
+            {
+                FocusTab(existingViewerTab);
+                return Task.FromResult(existingViewerTab);
+            }
+
+            var tab = OpenNotebookTab(filePath, targetIndex: targetIndex);
+            return Task.FromResult(tab);
+        }
+
+        private void CloseTabInternal(OpenedTab tab)
+        {
+            var tabItem = FindTabItem(tab.Id);
+            if (tabItem != null && _closeTabAndCleanup != null)
+            {
+                _closeTabAndCleanup(tab, tabItem);
+            }
+            else
+            {
+                _viewModel.Tabs.Remove(tab);
+            }
+        }
+
+        private void FocusTab(OpenedTab tab)
+        {
+            var tabItem = FindTabItem(tab.Id);
+            if (tabItem != null)
+            {
+                var targetTabView = _getTabViewForTabItem(tabItem) ?? _getCurrentActiveTabView();
+                targetTabView.SelectedItem = tabItem;
+            }
         }
 
         public OpenedTab OpenImageTab(string filePath)
@@ -1025,7 +1130,7 @@ namespace TxtAIEditor.Controls
             return tab;
         }
 
-        private void AddOpenTab(OpenedTab tab)
+        private void AddOpenTab(OpenedTab tab, int targetIndex = -1)
         {
             if (_remoteWorkspaceService.TryGetVirtualPath(tab.FilePath, out string remotePath))
             {
@@ -1033,7 +1138,15 @@ namespace TxtAIEditor.Controls
                 tab.Title = RemotePath.GetName(remotePath);
             }
 
-            _viewModel.Tabs.Add(tab);
+            if (targetIndex >= 0 && targetIndex <= _viewModel.Tabs.Count)
+            {
+                _viewModel.Tabs.Insert(targetIndex, tab);
+            }
+            else
+            {
+                _viewModel.Tabs.Add(tab);
+            }
+
             if (!string.IsNullOrEmpty(tab.FilePath) &&
                 File.Exists(tab.FilePath) &&
                 !ArchiveExplorerService.IsArchiveCachePath(tab.FilePath))
@@ -1046,12 +1159,13 @@ namespace TxtAIEditor.Controls
             OpenedTab tab,
             EditorDocumentSession session,
             bool isReadOnly,
-            bool updateLanguageUi)
+            bool updateLanguageUi,
+            int targetIndex = -1)
         {
             tab.InlineLivePreviewEnabled = !tab.IsHexViewer && _isLivePreviewEnabled();
             _editorSessions[tab.Id] = session;
 
-            AddOpenTab(tab);
+            AddOpenTab(tab, targetIndex);
 
             var settings = _settingsService.CurrentSettings;
             var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
@@ -1078,7 +1192,7 @@ namespace TxtAIEditor.Controls
                 session,
                 isReadOnly);
 
-            AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: true);
+            AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: true, targetIndex: targetIndex);
             UpdateTabStatus(tab, updateLanguageUi);
             QueueEditorInitialization(tab, tabParts.WebView, tabParts.Bridge);
         }
@@ -1087,10 +1201,18 @@ namespace TxtAIEditor.Controls
             TabView targetTabView,
             TabViewItem tabItem,
             Windows.UI.Color editorBgColor,
-            bool queueSurfaceRefresh)
+            bool queueSurfaceRefresh,
+            int targetIndex = -1)
         {
             _editorWorkspace.DisableTabItemTransitions();
-            targetTabView.TabItems.Add(tabItem);
+            if (targetIndex >= 0 && targetIndex <= targetTabView.TabItems.Count)
+            {
+                targetTabView.TabItems.Insert(targetIndex, tabItem);
+            }
+            else
+            {
+                targetTabView.TabItems.Add(tabItem);
+            }
             targetTabView.SelectedItem = tabItem;
             _editorWorkspace.SetEditorSurfaceBackground(editorBgColor);
 

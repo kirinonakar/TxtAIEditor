@@ -292,7 +292,9 @@ namespace TxtAIEditor.Composition
                     },
                     (_, tabItem, tabView) => tabCloseController.CloseRightTabs(tabItem, tabView),
                     (_, tabItem, tabView) => tabCloseController.CloseLeftTabs(tabItem, tabView),
-                    (_, tabItem, tabView) => tabCloseController.CloseOtherTabs(tabItem, tabView)));
+                    (_, tabItem, tabView) => tabCloseController.CloseOtherTabs(tabItem, tabView),
+                    callbacks.OpenNotebookSourceTabAsync,
+                    callbacks.OpenNotebookViewerTabAsync));
             var tabContextMenuController = interactionControllers.TabContextMenu;
             var fileOpenDropController = interactionControllers.FileOpenDrop;
             var rootKeyboardShortcutController = interactionControllers.RootKeyboardShortcut;

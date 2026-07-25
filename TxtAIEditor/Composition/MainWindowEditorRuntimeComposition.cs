@@ -203,7 +203,8 @@ namespace TxtAIEditor.Composition
                 callbacks.UpdateLanguageUi,
                 callbacks.UpdateWindowTitle,
                 tabContextMenu.ShowContextMenu,
-                initialEditorLineWarmupCount);
+                initialEditorLineWarmupCount,
+                callbacks.CloseTabAndCleanup);
 
             var editorSplitLayout = new EditorSplitLayoutController(
                 ui.TopToolbar,

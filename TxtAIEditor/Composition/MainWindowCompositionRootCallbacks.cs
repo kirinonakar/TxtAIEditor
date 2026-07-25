@@ -35,6 +35,8 @@ namespace TxtAIEditor.Composition
         Func<string, OpenedTab> OpenOfficeDocumentTab,
         Func<string, OpenedTab> OpenHexTab,
         Func<string, OpenedTab> OpenNotebookTab,
+        Func<string, Task> OpenNotebookSourceTabAsync,
+        Func<string, Task> OpenNotebookViewerTabAsync,
         Func<OpenedTab, bool, Task> SetHexViewModeAsync,
         Action CloseActiveTab,
         Func<Task> SyncSnippetsToOpenEditorsAsync,
