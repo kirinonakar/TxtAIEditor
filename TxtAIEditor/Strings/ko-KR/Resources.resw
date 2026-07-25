@@ -3558,4 +3558,12 @@
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>다운로드 중...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>다운로드가 완료되었습니다.</value></data>
   <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>다운로드 실패</value></data>
+  <data name="JupyterVariablesButton" xml:space="preserve"><value>변수</value></data>
+  <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>변수 탐색기</value></data>
+  <data name="JupyterVariablesName" xml:space="preserve"><value>변수명</value></data>
+  <data name="JupyterVariablesType" xml:space="preserve"><value>타입</value></data>
+  <data name="JupyterVariablesSize" xml:space="preserve"><value>크기</value></data>
+  <data name="JupyterVariablesValue" xml:space="preserve"><value>값</value></data>
+  <data name="JupyterVariablesEmpty" xml:space="preserve"><value>정의된 변수가 없습니다.</value></data>
+  <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>변수 검색...</value></data>
 </root>

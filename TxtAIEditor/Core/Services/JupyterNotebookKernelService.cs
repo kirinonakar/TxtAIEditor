@@ -72,6 +72,19 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        public async Task<string> GetVariablesAsync(string tabId, string pythonExecutable, string workingDirectory)
+        {
+            try
+            {
+                var session = await GetOrCreateSessionAsync(tabId, pythonExecutable, workingDirectory);
+                return await session.GetVariablesAsync();
+            }
+            catch
+            {
+                return "[]";
+            }
+        }
+
         public void CloseSession(string tabId)
         {
             if (_sessions.TryRemove(tabId, out var session))
@@ -104,6 +117,45 @@ except Exception:
     pass
 
 _ns = {'__name__': '__main__'}
+
+def _get_variables():
+    vars_list = []
+    ignored = {'sys', 'json', 'io', 'base64', 'contextlib', 'traceback', 'ast', 'plt', 'matplotlib', '_ns', '_get_variables', '_render_figure_html', '_capture_figures', '_custom_show'}
+    for k, v in list(_ns.items()):
+        if k.startswith('_') or k in ignored:
+            continue
+        try:
+            v_type = type(v).__name__
+            v_size = ''
+            if hasattr(v, 'shape'):
+                try:
+                    v_size = str(tuple(v.shape))
+                except Exception:
+                    v_size = ''
+            elif hasattr(v, '__len__'):
+                try:
+                    v_size = str(len(v))
+                except Exception:
+                    v_size = ''
+
+            v_val = ''
+            try:
+                v_val = repr(v)
+            except Exception as re:
+                v_val = f'<unreprable: {re}>'
+
+            if len(v_val) > 200:
+                v_val = v_val[:197] + '...'
+
+            vars_list.append({
+                'name': str(k),
+                'type': str(v_type),
+                'size': str(v_size),
+                'value': str(v_val)
+            })
+        except Exception:
+            pass
+    return vars_list
 
 def _render_figure_html(fig):
     import io, base64
@@ -211,6 +263,11 @@ while True:
         continue
     try:
         msg = json.loads(line)
+        if msg.get('type') == 'getVariables':
+            sys.stdout.write(json.dumps({'status': 'ok', 'stdout': '', 'stderr': '', 'result': '', 'variables': _get_variables()}, ensure_ascii=False) + '\n')
+            sys.stdout.flush()
+            continue
+
         raw_code = msg.get('code', '')
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()
@@ -286,11 +343,11 @@ while True:
         if extra_html:
             stdout_text = (stdout_text or '') + ''.join(extra_html)
 
-        result = {'status': 'ok', 'stdout': stdout_text, 'stderr': stderr_text, 'result': result_text}
+        result = {'status': 'ok', 'stdout': stdout_text, 'stderr': stderr_text, 'result': result_text, 'variables': _get_variables()}
     except SystemExit:
         break
     except Exception:
-        result = {'status': 'error', 'stdout': '', 'stderr': traceback.format_exc(), 'result': ''}
+        result = {'status': 'error', 'stdout': '', 'stderr': traceback.format_exc(), 'result': '', 'variables': []}
 
     sys.stdout.write(json.dumps(result, ensure_ascii=False) + '\n')
     sys.stdout.flush()
@@ -377,7 +434,8 @@ while True:
                             string stdout = root.TryGetProperty("stdout", out var so) ? so.GetString() ?? string.Empty : string.Empty;
                             string stderr = root.TryGetProperty("stderr", out var se) ? se.GetString() ?? string.Empty : string.Empty;
                             string result = root.TryGetProperty("result", out var r) ? r.GetString() ?? string.Empty : string.Empty;
-                            return new KernelExecutionResult(status, stdout, stderr, result);
+                            string varsJson = root.TryGetProperty("variables", out var v) ? v.GetRawText() : "[]";
+                            return new KernelExecutionResult(status, stdout, stderr, result, varsJson);
                         }
                     }
                     catch
@@ -387,6 +445,45 @@ while True:
                 }
 
                 return new KernelExecutionResult("error", string.Empty, "Kernel did not respond in time.");
+            }
+
+            public async Task<string> GetVariablesAsync()
+            {
+                if (_process == null || _process.HasExited)
+                {
+                    return "[]";
+                }
+
+                var command = JsonSerializer.Serialize(new { type = "getVariables" });
+                await _process.StandardInput.WriteLineAsync(command);
+                await _process.StandardInput.FlushAsync();
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                while (!cts.Token.IsCancellationRequested)
+                {
+                    if (_process.HasExited)
+                    {
+                        return "[]";
+                    }
+
+                    string? line = await ReadLineWithTimeoutAsync(_process.StandardOutput, cts.Token);
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(line);
+                        var root = doc.RootElement;
+                        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("variables", out var varsProp))
+                        {
+                            return varsProp.GetRawText();
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                return "[]";
             }
 
             private static async Task<string?> ReadLineWithTimeoutAsync(StreamReader reader, CancellationToken token)
@@ -419,7 +516,7 @@ while True:
         }
     }
 
-    public sealed record KernelExecutionResult(string Status, string Stdout, string Stderr, string Result = "")
+    public sealed record KernelExecutionResult(string Status, string Stdout, string Stderr, string Result = "", string VariablesJson = "[]")
     {
         public bool IsError => !string.Equals(Status, "ok", StringComparison.OrdinalIgnoreCase);
     }

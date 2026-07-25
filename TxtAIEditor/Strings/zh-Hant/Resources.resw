@@ -3522,4 +3522,12 @@
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>下載中...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>下載完成。</value></data>
   <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>下載失敗</value></data>
+  <data name="JupyterVariablesButton" xml:space="preserve"><value>變數</value></data>
+  <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>變數資源管理器</value></data>
+  <data name="JupyterVariablesName" xml:space="preserve"><value>名稱</value></data>
+  <data name="JupyterVariablesType" xml:space="preserve"><value>類型</value></data>
+  <data name="JupyterVariablesSize" xml:space="preserve"><value>大小</value></data>
+  <data name="JupyterVariablesValue" xml:space="preserve"><value>值</value></data>
+  <data name="JupyterVariablesEmpty" xml:space="preserve"><value>沒有活動變數。</value></data>
+  <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>篩選變數...</value></data>
 </root>

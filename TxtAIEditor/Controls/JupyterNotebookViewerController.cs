@@ -232,6 +232,10 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     int cellIndex = root.TryGetProperty("cellIndex", out var ci) ? ci.GetInt32() : 0;
                     _ = ExecuteCellAsync(sender, tab, cellIndex, code);
                 }
+                else if (string.Equals(type, "getVariables", StringComparison.Ordinal))
+                {
+                    _ = GetVariablesAsync(sender, tab);
+                }
                 else if (string.Equals(type, "saveNotebook", StringComparison.Ordinal))
                 {
                     string content = root.TryGetProperty("content", out var cont) ? cont.GetString() ?? "" : "";
@@ -266,21 +270,47 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
                     !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
                 {
-                    await SendResultAsync(webView, cellIndex, "error", "", "Kernel session not found.", "");
+                    await SendResultAsync(webView, cellIndex, "error", "", "Kernel session not found.", "", "[]");
                     return;
                 }
 
                 var result = await _kernelService.ExecuteAsync(tab.Id, python, workDir, code);
 
-                await SendResultAsync(webView, cellIndex, result.Status, result.Stdout, result.Stderr, result.Result);
+                await SendResultAsync(webView, cellIndex, result.Status, result.Stdout, result.Stderr, result.Result, result.VariablesJson);
             }
             catch (Exception ex)
             {
-                await SendResultAsync(webView, cellIndex, "error", "", ex.Message, "");
+                await SendResultAsync(webView, cellIndex, "error", "", ex.Message, "", "[]");
             }
         }
 
-        private static async Task SendResultAsync(WebView2 webView, int cellIndex, string status, string stdout, string stderr, string result)
+        private async Task GetVariablesAsync(WebView2 webView, OpenedTab tab)
+        {
+            try
+            {
+                if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
+                    !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
+                {
+                    await SendVariablesAsync(webView, "[]");
+                    return;
+                }
+
+                string varsJson = await _kernelService.GetVariablesAsync(tab.Id, python, workDir);
+                await SendVariablesAsync(webView, varsJson);
+            }
+            catch
+            {
+                await SendVariablesAsync(webView, "[]");
+            }
+        }
+
+        private static async Task SendVariablesAsync(WebView2 webView, string varsJson)
+        {
+            string script = $"window.__notebookReceiveVariables && window.__notebookReceiveVariables({varsJson});";
+            await ExecuteScriptSafeAsync(webView, script);
+        }
+
+        private static async Task SendResultAsync(WebView2 webView, int cellIndex, string status, string stdout, string stderr, string result, string variablesJson = "[]")
         {
             string resultJson = JsonSerializer.Serialize(new
             {
@@ -290,7 +320,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 result = result
             });
 
-            string script = $"window.__notebookReceiveResult && window.__notebookReceiveResult({cellIndex}, {resultJson});";
+            string script = $"window.__notebookReceiveResult && window.__notebookReceiveResult({cellIndex}, {resultJson}, {variablesJson});";
             await ExecuteScriptSafeAsync(webView, script);
         }
 

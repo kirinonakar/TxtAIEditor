@@ -69,12 +69,41 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<div id=\"notebook-container\">");
 
             sb.AppendLine("<div id=\"notebook-header\">");
+            sb.AppendLine("<div class=\"notebook-header-top\">");
             sb.AppendLine($"<span class=\"notebook-title\">{HtmlEncode(fileName)}</span>");
             sb.AppendLine("<div id=\"notebook-toolbar\">");
             sb.AppendLine("<button id=\"btn-add-code\" class=\"nb-btn nb-btn-add\">+ Code</button>");
             sb.AppendLine("<button id=\"btn-add-markdown\" class=\"nb-btn nb-btn-add\">+ Markdown</button>");
             sb.AppendLine("<button id=\"btn-save\" class=\"nb-btn nb-btn-save\">Save</button>");
             sb.AppendLine("<button id=\"btn-run-all\" class=\"nb-btn nb-btn-run\">Run All</button>");
+            sb.AppendLine($"<button id=\"btn-variables\" class=\"nb-btn nb-btn-vars\" title=\"{HtmlAttrEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}\">🔍 {HtmlEncode(_getString("JupyterVariablesButton", "Variables"))}</button>");
+            sb.AppendLine("</div>");
+            sb.AppendLine("</div>");
+
+            sb.AppendLine("<div id=\"variables-panel\" style=\"display:none;\">");
+            sb.AppendLine("<div class=\"vars-panel-header\">");
+            sb.AppendLine($"<span class=\"vars-panel-title\">🔍 {HtmlEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}</span>");
+            sb.AppendLine("<div class=\"vars-panel-controls\">");
+            sb.AppendLine($"<input type=\"text\" id=\"vars-filter-input\" placeholder=\"{HtmlAttrEncode(_getString("JupyterVariablesFilterPlaceholder", "Filter variables..."))}\" />");
+            sb.AppendLine("<button id=\"btn-refresh-vars\" class=\"nb-btn nb-btn-sm\" title=\"Refresh\">🔄</button>");
+            sb.AppendLine("<button id=\"btn-close-vars\" class=\"nb-btn nb-btn-sm\" title=\"Close\">✕</button>");
+            sb.AppendLine("</div>");
+            sb.AppendLine("</div>");
+            sb.AppendLine("<div class=\"vars-table-container\">");
+            sb.AppendLine("<table class=\"vars-table\">");
+            sb.AppendLine("<thead>");
+            sb.AppendLine("<tr>");
+            sb.AppendLine($"<th>{HtmlEncode(_getString("JupyterVariablesName", "Name"))}</th>");
+            sb.AppendLine($"<th>{HtmlEncode(_getString("JupyterVariablesType", "Type"))}</th>");
+            sb.AppendLine($"<th>{HtmlEncode(_getString("JupyterVariablesSize", "Size"))}</th>");
+            sb.AppendLine($"<th>{HtmlEncode(_getString("JupyterVariablesValue", "Value"))}</th>");
+            sb.AppendLine("</tr>");
+            sb.AppendLine("</thead>");
+            sb.AppendLine("<tbody id=\"vars-table-body\">");
+            sb.AppendLine($"<tr><td colspan=\"4\" class=\"vars-empty\">{HtmlEncode(_getString("JupyterVariablesEmpty", "No active variables."))}</td></tr>");
+            sb.AppendLine("</tbody>");
+            sb.AppendLine("</table>");
+            sb.AppendLine("</div>");
             sb.AppendLine("</div>");
             sb.AppendLine("</div>");
 
@@ -399,9 +428,12 @@ body {
 }
 #notebook-container { max-width: 1000px; margin: 0 auto; padding: 16px; }
 #notebook-header {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; flex-direction: column; gap: 10px;
     padding: 12px 0; border-bottom: 2px solid var(--nb-border); margin-bottom: 16px;
     position: sticky; top: 0; background: var(--nb-bg); z-index: 100;
+}
+.notebook-header-top {
+    display: flex; justify-content: space-between; align-items: center; width: 100%;
 }
 .notebook-title { font-size: 18px; font-weight: 600; }
 #notebook-toolbar { display: flex; gap: 8px; }
@@ -411,6 +443,91 @@ body {
     font-size: 13px; transition: background 0.15s;
 }
 .nb-btn:hover { background: var(--nb-accent); color: #fff; border-color: var(--nb-accent); }
+#variables-panel {
+    background: var(--nb-input-bg);
+    border: 1px solid var(--nb-border);
+    border-radius: 6px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    width: 100%;
+}
+.vars-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 12px;
+}
+.vars-panel-title {
+    font-weight: 600;
+    font-size: 14px;
+}
+.vars-panel-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+#vars-filter-input {
+    padding: 4px 8px;
+    border: 1px solid var(--nb-border);
+    border-radius: 4px;
+    background: var(--nb-bg);
+    color: var(--nb-fg);
+    font-size: 12px;
+    outline: none;
+    width: 160px;
+}
+#vars-filter-input:focus {
+    border-color: var(--nb-accent);
+}
+.nb-btn-sm {
+    padding: 3px 8px;
+    font-size: 12px;
+}
+.vars-table-container {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--nb-border);
+    border-radius: 4px;
+    background: var(--nb-bg);
+}
+.vars-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    font-family: 'Consolas', 'Cascadia Code', monospace;
+}
+.vars-table th {
+    position: sticky;
+    top: 0;
+    background: var(--nb-input-bg);
+    border-bottom: 1px solid var(--nb-border);
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--nb-fg);
+}
+.vars-table td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--nb-border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+}
+.vars-table tr:last-child td {
+    border-bottom: none;
+}
+.vars-table tr:hover {
+    background: var(--nb-input-bg);
+}
+.vars-empty {
+    text-align: center;
+    color: #888;
+    padding: 16px !important;
+    font-style: italic;
+}
 #cells-container { display: flex; flex-direction: column; gap: 8px; }
 .cell {
     border: 1px solid var(--nb-border); border-radius: 6px; overflow: hidden;
@@ -1466,12 +1583,101 @@ strong { font-weight: 700; }
         }
     });
 
+    // Variables panel UI & handler logic
+    window.__currentVariables = window.__currentVariables || [];
+
+    function renderVariablesTable() {
+        const tbody = document.getElementById('vars-table-body');
+        if (!tbody) return;
+        const filterInput = document.getElementById('vars-filter-input');
+        const filterText = (filterInput ? filterInput.value || '' : '').toLowerCase().trim();
+
+        const vars = (window.__currentVariables || []).filter(v => {
+            if (!filterText) return true;
+            return (v.name || '').toLowerCase().includes(filterText) || (v.type || '').toLowerCase().includes(filterText);
+        });
+
+        if (vars.length === 0) {
+            const emptyMsg = filterText ? 'No matching variables.' : 'No active variables.';
+            tbody.innerHTML = '<tr><td colspan=""4"" class=""vars-empty"">' + escapeHtml(emptyMsg) + '</td></tr>';
+            return;
+        }
+
+        let html = '';
+        for (let i = 0; i < vars.length; i++) {
+            const v = vars[i];
+            html += '<tr>' +
+                '<td><strong>' + escapeHtml(v.name || '') + '</strong></td>' +
+                '<td><code>' + escapeHtml(v.type || '') + '</code></td>' +
+                '<td>' + escapeHtml(v.size || '-') + '</td>' +
+                '<td title=""' + escapeHtml(v.value || '') + '"">' + escapeHtml(v.value || '') + '</td>' +
+                '</tr>';
+        }
+        tbody.innerHTML = html;
+    }
+
+    const btnVars = document.getElementById('btn-variables');
+    const varsPanel = document.getElementById('variables-panel');
+    const btnRefreshVars = document.getElementById('btn-refresh-vars');
+    const btnCloseVars = document.getElementById('btn-close-vars');
+    const varsFilterInput = document.getElementById('vars-filter-input');
+
+    if (btnVars && varsPanel) {
+        btnVars.addEventListener('click', (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            if (varsPanel.style.display === 'none' || !varsPanel.style.display) {
+                varsPanel.style.display = 'block';
+                renderVariablesTable();
+                try {
+                    window.chrome.webview.postMessage(JSON.stringify({ type: 'getVariables' }));
+                } catch (ex) {}
+            } else {
+                varsPanel.style.display = 'none';
+            }
+        });
+    }
+
+    if (btnRefreshVars) {
+        btnRefreshVars.addEventListener('click', () => {
+            try {
+                window.chrome.webview.postMessage(JSON.stringify({ type: 'getVariables' }));
+            } catch (e) {}
+        });
+    }
+
+    if (btnCloseVars && varsPanel) {
+        btnCloseVars.addEventListener('click', () => {
+            varsPanel.style.display = 'none';
+        });
+    }
+
+    if (varsFilterInput) {
+        varsFilterInput.addEventListener('input', () => {
+            renderVariablesTable();
+        });
+    }
+
+    // Receive variables from host
+    window.__notebookReceiveVariables = function(vars) {
+        if (Array.isArray(vars)) {
+            window.__currentVariables = vars;
+            renderVariablesTable();
+        }
+    };
+
     // Receive execution results from host
-    window.__notebookReceiveResult = function(cellIndex, result) {
+    window.__notebookReceiveResult = function(cellIndex, result, vars) {
         const resolve = (window.__pendingCellExecutions || {})[String(cellIndex)];
         if (resolve) {
             resolve(result);
             delete window.__pendingCellExecutions[String(cellIndex)];
+        }
+        if (Array.isArray(vars)) {
+            window.__currentVariables = vars;
+            renderVariablesTable();
         }
     };
 

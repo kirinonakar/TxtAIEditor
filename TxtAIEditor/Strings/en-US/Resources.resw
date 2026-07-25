@@ -3558,4 +3558,12 @@ Plan: {0}</value>
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>Downloading...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>Download completed.</value></data>
   <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>Download failed</value></data>
+  <data name="JupyterVariablesButton" xml:space="preserve"><value>Variables</value></data>
+  <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>Variable Explorer</value></data>
+  <data name="JupyterVariablesName" xml:space="preserve"><value>Name</value></data>
+  <data name="JupyterVariablesType" xml:space="preserve"><value>Type</value></data>
+  <data name="JupyterVariablesSize" xml:space="preserve"><value>Size</value></data>
+  <data name="JupyterVariablesValue" xml:space="preserve"><value>Value</value></data>
+  <data name="JupyterVariablesEmpty" xml:space="preserve"><value>No active variables.</value></data>
+  <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>Filter variables...</value></data>
 </root>
