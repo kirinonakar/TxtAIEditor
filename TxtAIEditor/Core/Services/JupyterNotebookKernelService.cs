@@ -319,13 +319,13 @@ def _render_figure_html(fig, fig_id=None):
 
     if fmt == 'svg':
         mime = 'image/svg+xml'
-        save_kwargs = {'format': 'svg', 'bbox_inches': 'tight', 'pad_inches': 0.01}
+        save_kwargs = {'format': 'svg', 'bbox_inches': 'tight', 'pad_inches': 0.08}
     elif fmt in ('jpeg', 'jpg'):
         mime = 'image/jpeg'
-        save_kwargs = {'format': 'jpeg', 'bbox_inches': 'tight', 'pad_inches': 0.01, 'dpi': dpi_val}
+        save_kwargs = {'format': 'jpeg', 'bbox_inches': 'tight', 'pad_inches': 0.08, 'dpi': dpi_val}
     else:
         mime = 'image/png'
-        save_kwargs = {'format': 'png', 'bbox_inches': 'tight', 'pad_inches': 0.01, 'dpi': dpi_val}
+        save_kwargs = {'format': 'png', 'bbox_inches': 'tight', 'pad_inches': 0.08, 'dpi': dpi_val}
 
     is_3d = False
     cur_elev = 30

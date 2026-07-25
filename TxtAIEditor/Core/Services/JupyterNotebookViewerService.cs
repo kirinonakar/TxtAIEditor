@@ -626,7 +626,7 @@ body {
     margin: 4px 0;
 }
 .cell-output {
-    padding: 6px 12px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
+    padding: 8px 14px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
     font-family: 'Consolas', monospace; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
     display: none; min-height: 0; box-sizing: border-box;
 }
@@ -741,7 +741,7 @@ strong { font-weight: 700; }
     display: block;
     max-width: 100%;
     box-sizing: border-box;
-    margin: 6px 0;
+    margin: 8px 0;
     padding: 0;
     border: 1px solid var(--nb-border);
     border-radius: 6px;
@@ -811,7 +811,7 @@ strong { font-weight: 700; }
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    padding: 4px 0;
+    padding: 8px 12px;
     margin: 0;
     background: var(--nb-output-bg);
     min-height: 40px;
