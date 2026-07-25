@@ -75,6 +75,7 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<button id=\"btn-add-code\" class=\"nb-btn nb-btn-add\">+ Code</button>");
             sb.AppendLine("<button id=\"btn-add-markdown\" class=\"nb-btn nb-btn-add\">+ Markdown</button>");
             sb.AppendLine("<button id=\"btn-run-all\" class=\"nb-btn nb-btn-run\">Run All</button>");
+            sb.AppendLine("<button id=\"btn-export-py\" class=\"nb-btn nb-btn-export\" title=\"Save as Python Script (.py)\">🐍 Save as .py</button>");
             sb.AppendLine($"<button id=\"btn-variables\" class=\"nb-btn nb-btn-vars\" title=\"{HtmlAttrEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}\">🔍 {HtmlEncode(_getString("JupyterVariablesButton", "Variables"))}</button>");
             sb.AppendLine("</div>");
             sb.AppendLine("</div>");
@@ -1890,6 +1891,45 @@ strong { font-weight: 700; }
             }
         }
     });
+
+    function exportToPythonScript() {
+        const cells = Array.from(container.querySelectorAll('.cell'));
+        let pyScript = '# -*- coding: utf-8 -*-\n\n';
+        for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            const type = getCellType(cell);
+            const source = getCellSource(cell);
+            if (type === 'code') {
+                pyScript += '# %% [code]\n';
+                pyScript += source.trimEnd() + '\n\n';
+            } else if (type === 'markdown') {
+                pyScript += '# %% [markdown]\n';
+                const lines = source.split('\n');
+                for (let j = 0; j < lines.length; j++) {
+                    pyScript += '# ' + lines[j] + '\n';
+                }
+                pyScript += '\n';
+            } else {
+                pyScript += '# %% [raw]\n';
+                const lines = source.split('\n');
+                for (let j = 0; j < lines.length; j++) {
+                    pyScript += '# ' + lines[j] + '\n';
+                }
+                pyScript += '\n';
+            }
+        }
+        try {
+            window.chrome.webview.postMessage(JSON.stringify({
+                type: 'exportPy',
+                content: pyScript
+            }));
+        } catch (e) {}
+    }
+
+    const btnExportPy = document.getElementById('btn-export-py');
+    if (btnExportPy) {
+        btnExportPy.addEventListener('click', exportToPythonScript);
+    }
 
     // Variables panel UI & handler logic
     window.__currentVariables = window.__currentVariables || [];

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
+using Windows.Storage.Pickers;
 using TxtAIEditor.Composition;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
@@ -257,6 +258,11 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     string content = root.TryGetProperty("content", out var cont) ? cont.GetString() ?? "" : "";
                     _ = SaveNotebookAsync(sender, tab, content);
                 }
+                else if (string.Equals(type, "exportPy", StringComparison.Ordinal))
+                {
+                    string content = root.TryGetProperty("content", out var cont) ? cont.GetString() ?? "" : "";
+                    _ = ExportPyAsync(sender, tab, content);
+                }
                 else if (string.Equals(type, "markDirty", StringComparison.Ordinal))
                 {
                     sender.DispatcherQueue.TryEnqueue(() =>
@@ -421,6 +427,49 @@ public async Task<bool> SaveAsync(OpenedTab tab)
 
             string script = $"window.__notebookSaveResult && window.__notebookSaveResult({success.ToString().ToLowerInvariant()}, '');";
             await ExecuteScriptSafeAsync(webView, script);
+        }
+
+        private async Task ExportPyAsync(WebView2 webView, OpenedTab tab, string content)
+        {
+            try
+            {
+                string defaultFileName = !string.IsNullOrEmpty(tab.FilePath)
+                    ? Path.GetFileNameWithoutExtension(tab.FilePath) + ".py"
+                    : "notebook.py";
+
+                webView.DispatcherQueue.TryEnqueue(async () =>
+                {
+                    try
+                    {
+                        var picker = new FileSavePicker
+                        {
+                            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                            SuggestedFileName = defaultFileName
+                        };
+
+                        IntPtr hwnd = App.MainWindow != null ? WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow) : IntPtr.Zero;
+                        if (hwnd != IntPtr.Zero)
+                        {
+                            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+                        }
+
+                        picker.FileTypeChoices.Add("Python Script", new List<string> { ".py" });
+
+                        var file = await picker.PickSaveFileAsync();
+                        if (file != null)
+                        {
+                            await File.WriteAllTextAsync(file.Path, content, Utf8NoBom);
+                        }
+                    }
+                    catch
+                    {
+                    }
+                });
+            }
+            catch
+            {
+            }
+            await Task.CompletedTask;
         }
 
         private static async Task ExecuteScriptSafeAsync(WebView2 webView, string script)
