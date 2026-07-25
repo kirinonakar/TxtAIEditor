@@ -934,16 +934,36 @@ strong { font-weight: 700; }
 
     function getEditorText(editor) {
         if (!editor) return '';
-        const pre = editor.querySelector('pre') || editor;
-        const clone = pre.cloneNode(true);
-        clone.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode('\n')));
-        clone.querySelectorAll('div, p').forEach(div => {
-            if (div.previousSibling) {
-                div.before(document.createTextNode('\n'));
-            }
-        });
-        const text = clone.textContent || '';
-        return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+        function readNode(node) {
+            let text = '';
+            node.childNodes.forEach(child => {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    text += child.nodeValue || '';
+                    return;
+                }
+                if (child.nodeType !== Node.ELEMENT_NODE) {
+                    return;
+                }
+                if (child.tagName === 'BR') {
+                    text += '\n';
+                    return;
+                }
+
+                const isBlock = child.tagName === 'DIV' || child.tagName === 'P' || child.tagName === 'PRE';
+                if (isBlock && text.length > 0 && !text.endsWith('\n')) {
+                    text += '\n';
+                }
+                const childText = readNode(child);
+                text += childText;
+                if (isBlock && childText.length > 0 && child.nextSibling && !text.endsWith('\n')) {
+                    text += '\n';
+                }
+            });
+            return text;
+        }
+
+        return readNode(editor).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     }
 
     function getCellSource(cellDiv) {
@@ -984,7 +1004,7 @@ strong { font-weight: 700; }
 
         editor.style.display = 'block';
         preview.style.display = 'none';
-        editor.focus();
+        focusEditorAtEnd(editor);
     }
 
     function insertMarkdownFormatting(cellDiv, formatType) {
@@ -1365,7 +1385,8 @@ strong { font-weight: 700; }
         const sel = window.getSelection();
         if (sel) {
             const range = document.createRange();
-            range.selectNodeContents(editor);
+            const target = editor.querySelector('pre') || editor;
+            range.selectNodeContents(target);
             range.collapse(false);
             sel.removeAllRanges();
             sel.addRange(range);
