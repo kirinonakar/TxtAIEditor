@@ -206,7 +206,7 @@ def _render_figure_html(fig, fig_id=None):
         try:
             for cb in colorbars: cb.set_visible(False)
             buf_main = io.BytesIO()
-            fig.savefig(buf_main, format='png', bbox_inches='tight', transparent=True)
+            fig.savefig(buf_main, format='png', bbox_inches='tight', facecolor='white', edgecolor='none')
             buf_main.seek(0)
             b64_main = base64.b64encode(buf_main.read()).decode('utf-8')
 
@@ -253,7 +253,7 @@ def _render_figure_html(fig, fig_id=None):
             pass
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight')
+    fig.savefig(buf, format='png', bbox_inches='tight', facecolor='white', edgecolor='none')
     buf.seek(0)
     b64 = base64.b64encode(buf.read()).decode('utf-8')
     return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}"">

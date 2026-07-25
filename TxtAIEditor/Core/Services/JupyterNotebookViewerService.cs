@@ -660,13 +660,14 @@ strong { font-weight: 700; }
     display: inline-block;
     transform-origin: center center;
     transform-style: preserve-3d;
-    transition: transform 0.05s ease-out;
+    backface-visibility: hidden;
 }
 .mpl-plot-img {
     display: block;
     max-width: 100%;
     height: auto;
     pointer-events: none;
+    backface-visibility: hidden;
 }
 .mpl-cbar-layer {
     display: inline-block;
@@ -1791,6 +1792,8 @@ strong { font-weight: 700; }
                     }
                 }
 
+                let currentMouseX = 0, currentMouseY = 0;
+
                 wrapper.__on3DUpdateReceived = function(html) {
                     const temp = document.createElement('div');
                     temp.innerHTML = html;
@@ -1805,9 +1808,15 @@ strong { font-weight: 700; }
                         oldCbar.src = newCbar.src;
                     }
 
-                    if (!isDragging) {
+                    if (is3D) {
                         rotateX = 0;
                         rotateY = 0;
+                        if (isDragging) {
+                            startX = currentMouseX;
+                            startY = currentMouseY;
+                            startElev = elev;
+                            startAzim = azim;
+                        }
                         updateTransform();
                     }
 
@@ -1846,6 +1855,8 @@ strong { font-weight: 700; }
 
                     window.addEventListener('mousemove', function(e) {
                         if (!isDragging) return;
+                        currentMouseX = e.clientX;
+                        currentMouseY = e.clientY;
                         const dx = e.clientX - startX;
                         const dy = e.clientY - startY;
 
