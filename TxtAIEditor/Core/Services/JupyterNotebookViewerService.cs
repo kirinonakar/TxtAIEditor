@@ -818,40 +818,161 @@ strong { font-weight: 700; }
         }
     }
 
+    function cycleHeadingText(lineText) {
+        const match = lineText.match(/^(#{1,6})\s*(.*)/);
+        if (!match) {
+            return '# ' + lineText;
+        }
+        const hashes = match[1];
+        const content = match[2];
+        if (hashes.length < 6) {
+            return '#'.repeat(hashes.length + 1) + ' ' + content;
+        } else {
+            return content;
+        }
+    }
+
+    function toggleLinePrefixText(lineText, prefix) {
+        const listMatch = lineText.match(/^([-*+]\s+|\d+\.\s+|>\s*|- \[\s*\]\s*)/);
+        if (lineText.startsWith(prefix)) {
+            return lineText.slice(prefix.length);
+        } else if (listMatch) {
+            return prefix + lineText.slice(listMatch[0].length);
+        } else {
+            return prefix + lineText;
+        }
+    }
+
+    function getLineIndexFromRange(editor, range) {
+        if (!range || !editor) return 0;
+        try {
+            const preRange = document.createRange();
+            preRange.selectNodeContents(editor);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            const textBefore = preRange.toString();
+            const lineIndex = textBefore.split('\n').length - 1;
+            return Math.max(0, lineIndex);
+        } catch {
+            return 0;
+        }
+    }
+
+    function cycleHeadingInEditor(editor, range) {
+        let text = editor.innerText || '';
+        const lines = text.split('\n');
+        let targetIndex = 0;
+        if (range) {
+            targetIndex = getLineIndexFromRange(editor, range);
+        }
+        if (targetIndex >= 0 && targetIndex < lines.length) {
+            lines[targetIndex] = cycleHeadingText(lines[targetIndex]);
+            editor.innerHTML = '<pre>' + escapeHtml(lines.join('\n')) + '</pre>';
+            focusEditorAtEnd(editor);
+        }
+    }
+
+    function togglePrefixInEditor(editor, range, prefix) {
+        let text = editor.innerText || '';
+        const lines = text.split('\n');
+        let targetIndex = 0;
+        if (range) {
+            targetIndex = getLineIndexFromRange(editor, range);
+        }
+        if (targetIndex >= 0 && targetIndex < lines.length) {
+            lines[targetIndex] = toggleLinePrefixText(lines[targetIndex], prefix);
+            editor.innerHTML = '<pre>' + escapeHtml(lines.join('\n')) + '</pre>';
+            focusEditorAtEnd(editor);
+        }
+    }
+
+    function toggleWrapperInEditor(editor, range, opening, closing) {
+        closing = closing || opening;
+        if (range) {
+            const selectedText = range.toString();
+            if (selectedText.length > 0) {
+                if (selectedText.length >= opening.length + closing.length &&
+                    selectedText.startsWith(opening) && selectedText.endsWith(closing)) {
+                    const inner = selectedText.slice(opening.length, selectedText.length - closing.length);
+                    range.deleteContents();
+                    const innerNode = document.createTextNode(inner);
+                    range.insertNode(innerNode);
+                    range.setStart(innerNode, 0);
+                    range.setEnd(innerNode, inner.length);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    return;
+                }
+                const nodeText = range.startContainer.textContent || '';
+                const startCol = range.startOffset;
+                const endCol = range.endOffset;
+                if (startCol >= opening.length && endCol + closing.length <= nodeText.length &&
+                    nodeText.slice(startCol - opening.length, startCol) === opening &&
+                    nodeText.slice(endCol, endCol + closing.length) === closing) {
+                    const node = range.startContainer;
+                    const before = nodeText.slice(0, startCol - opening.length);
+                    const mid = nodeText.slice(startCol, endCol);
+                    const after = nodeText.slice(endCol + closing.length);
+                    node.textContent = before + mid + after;
+                    const sel = window.getSelection();
+                    const newRange = document.createRange();
+                    newRange.setStart(node, before.length);
+                    newRange.setEnd(node, before.length + mid.length);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                    return;
+                }
+                range.deleteContents();
+                const wrappedNode = document.createTextNode(opening + selectedText + closing);
+                range.insertNode(wrappedNode);
+                range.setStart(wrappedNode, opening.length);
+                range.setEnd(wrappedNode, opening.length + selectedText.length);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else {
+                const nodeText = range.startContainer.textContent || '';
+                const caret = range.startOffset;
+                if (caret >= opening.length && caret + closing.length <= nodeText.length &&
+                    nodeText.slice(caret - opening.length, caret) === opening &&
+                    nodeText.slice(caret, caret + closing.length) === closing) {
+                    const node = range.startContainer;
+                    const before = nodeText.slice(0, caret - opening.length);
+                    const after = nodeText.slice(caret + closing.length);
+                    node.textContent = before + after;
+                    const sel = window.getSelection();
+                    const newRange = document.createRange();
+                    newRange.setStart(node, before.length);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                    return;
+                }
+
+                const pNode = document.createTextNode(opening);
+                const sNode = document.createTextNode(closing);
+                range.deleteContents();
+                if (closing) range.insertNode(sNode);
+                range.insertNode(pNode);
+                range.setStartAfter(pNode);
+                range.collapse(true);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        } else {
+            const currentText = editor.innerText || '';
+            const needNewline = currentText.length > 0 && !currentText.endsWith('\n');
+            editor.innerHTML = '<pre>' + escapeHtml(currentText + (needNewline ? '\n' : '') + opening + closing) + '</pre>';
+            focusEditorAtEnd(editor);
+        }
+    }
+
     function applyMarkdownCommandToCell(cellDiv, command, color) {
         if (getCellType(cellDiv) !== 'markdown') return;
         editMarkdownCell(cellDiv);
         const editor = cellDiv.querySelector('.markdown-editor');
         if (!editor) return;
-
-        let prefix = '', suffix = '';
-        switch (command) {
-            case 'bold': prefix = '**'; suffix = '**'; break;
-            case 'italic': prefix = '*'; suffix = '*'; break;
-            case 'underline': prefix = '<u>'; suffix = '</u>'; break;
-            case 'highlight': prefix = '<mark>'; suffix = '</mark>'; break;
-            case 'heading': prefix = '# '; suffix = ''; break;
-            case 'ul': prefix = '- '; suffix = ''; break;
-            case 'ol': prefix = '1. '; suffix = ''; break;
-            case 'quote': prefix = '> '; suffix = ''; break;
-            case 'inlineCode': prefix = '`'; suffix = '`'; break;
-            case 'codeBlock': prefix = '```\n'; suffix = '\n```'; break;
-            case 'task': prefix = '- [ ] '; suffix = ''; break;
-            case 'link': prefix = '['; suffix = '](https://)'; break;
-            case 'image': prefix = '!['; suffix = '](image_url)'; break;
-            case 'table': prefix = '\n| Header 1 | Header 2 |\n| --- | --- |\n|  |  |\n'; suffix = ''; break;
-            case 'arrow': prefix = '-> '; suffix = ''; break;
-            case 'textColor':
-                if (color) {
-                    prefix = '<span style=""color:' + color + ';"">';
-                    suffix = '</span>';
-                }
-                break;
-            default:
-                return;
-        }
-
-        if (!prefix && !suffix) return;
 
         editor.focus();
         const sel = window.getSelection();
@@ -861,33 +982,41 @@ strong { font-weight: 700; }
             range = sel.getRangeAt(0);
         }
 
-        if (range) {
-            const selectedText = range.toString();
-            if (selectedText.length > 0) {
-                range.deleteContents();
-                const wrappedNode = document.createTextNode(prefix + selectedText + suffix);
-                range.insertNode(wrappedNode);
-                range.setStart(wrappedNode, prefix.length);
-                range.setEnd(wrappedNode, prefix.length + selectedText.length);
-                sel.removeAllRanges();
-                sel.addRange(range);
-            } else {
-                const pNode = document.createTextNode(prefix);
-                const sNode = document.createTextNode(suffix);
-                range.deleteContents();
-                if (suffix) range.insertNode(sNode);
-                range.insertNode(pNode);
-                range.setStartAfter(pNode);
-                range.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
-        } else {
-            const currentText = editor.innerText || '';
-            const needNewline = currentText.length > 0 && !currentText.endsWith('\n');
-            editor.innerHTML = '<pre>' + escapeHtml(currentText + (needNewline ? '\n' : '') + prefix + suffix) + '</pre>';
-            focusEditorAtEnd(editor);
+        if (command === 'heading') {
+            cycleHeadingInEditor(editor, range);
+            return;
         }
+
+        if (command === 'ul') { togglePrefixInEditor(editor, range, '- '); return; }
+        if (command === 'ol') { togglePrefixInEditor(editor, range, '1. '); return; }
+        if (command === 'quote') { togglePrefixInEditor(editor, range, '> '); return; }
+        if (command === 'task') { togglePrefixInEditor(editor, range, '- [ ] '); return; }
+
+        let opening = '', closing = '';
+        switch (command) {
+            case 'bold': opening = '**'; closing = '**'; break;
+            case 'italic': opening = '*'; closing = '*'; break;
+            case 'underline': opening = '<u>'; closing = '</u>'; break;
+            case 'highlight': opening = '<mark>'; closing = '</mark>'; break;
+            case 'inlineCode': opening = '`'; closing = '`'; break;
+            case 'codeBlock': opening = '```\n'; closing = '\n```'; break;
+            case 'link': opening = '['; closing = '](https://)'; break;
+            case 'image': opening = '!['; closing = '](image_url)'; break;
+            case 'table': opening = '\n| Header 1 | Header 2 |\n| --- | --- |\n|  |  |\n'; closing = ''; break;
+            case 'arrow': opening = '-> '; closing = ''; break;
+            case 'textColor':
+                if (color) {
+                    opening = '<span style=""color:' + color + ';"">';
+                    closing = '</span>';
+                }
+                break;
+            default:
+                return;
+        }
+
+        if (!opening && !closing) return;
+
+        toggleWrapperInEditor(editor, range, opening, closing);
     }
 
     window.addEventListener('appMarkdownCommand', (e) => {
