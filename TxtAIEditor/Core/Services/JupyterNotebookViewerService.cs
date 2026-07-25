@@ -585,8 +585,9 @@ strong { font-weight: 700; }
 }
 .cell-toggle-type { opacity: 0.8; font-weight: 500; }
 .mpl-interactive-wrapper {
-    display: inline-block;
+    display: block;
     max-width: 100%;
+    box-sizing: border-box;
     margin: 12px 0;
     border: 1px solid var(--nb-border);
     border-radius: 8px;
@@ -651,18 +652,42 @@ strong { font-weight: 700; }
     background: var(--nb-output-bg);
     min-height: 200px;
     cursor: grab;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 .mpl-viewport:active {
     cursor: grabbing;
 }
 .mpl-plot-layer {
+    position: relative;
     display: inline-block;
+    max-width: 100%;
+    box-sizing: border-box;
     transform-origin: center center;
 }
 .mpl-plot-img {
     display: block;
     max-width: 100%;
     height: auto;
+    object-fit: contain;
+    pointer-events: none;
+}
+.mpl-data-clip {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+    display: none;
+    background: var(--nb-output-bg, white);
+}
+.mpl-data-img-wrapper {
+    position: absolute;
+    pointer-events: none;
+    will-change: transform;
+}
+.mpl-data-img {
+    display: block;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
 }
 .mpl-cbar-layer {
@@ -1803,6 +1828,65 @@ strong { font-weight: 700; }
 
                 let currentMouseX = 0, currentMouseY = 0;
 
+                function setupPlotBounds() {
+                    const rawBounds = wrapper.getAttribute('data-plot-bounds');
+                    const clipDiv = wrapper.querySelector('.mpl-data-clip');
+                    const imgWrapper = wrapper.querySelector('.mpl-data-img-wrapper');
+                    const dataImg = wrapper.querySelector('.mpl-data-img');
+                    const mainImg = wrapper.querySelector('.mpl-plot-img');
+
+                    if (dataImg && mainImg && dataImg.src !== mainImg.src) {
+                        dataImg.src = mainImg.src;
+                    }
+
+                    if (rawBounds && clipDiv && imgWrapper && mainImg) {
+                        try {
+                            const b = typeof rawBounds === 'string' ? JSON.parse(rawBounds) : rawBounds;
+                            if (b && b.width > 0 && b.height > 0) {
+                                clipDiv.style.display = 'block';
+                                clipDiv.style.left = b.left + '%';
+                                clipDiv.style.top = b.top + '%';
+                                clipDiv.style.width = b.width + '%';
+                                clipDiv.style.height = b.height + '%';
+
+                                imgWrapper.style.left = (-b.left / b.width * 100) + '%';
+                                imgWrapper.style.top = (-b.top / b.height * 100) + '%';
+
+                                const wPx = mainImg.clientWidth;
+                                const hPx = mainImg.clientHeight;
+                                if (wPx > 0 && hPx > 0) {
+                                    imgWrapper.style.width = (wPx / (b.width / 100)) + 'px';
+                                    imgWrapper.style.height = (hPx / (b.height / 100)) + 'px';
+                                    if (dataImg) {
+                                        dataImg.style.width = wPx + 'px';
+                                        dataImg.style.height = hPx + 'px';
+                                        dataImg.style.maxWidth = 'none';
+                                        dataImg.style.maxHeight = 'none';
+                                    }
+                                } else {
+                                    imgWrapper.style.width = (100 / b.width * 100) + '%';
+                                    imgWrapper.style.height = (100 / b.height * 100) + '%';
+                                    if (dataImg) {
+                                        dataImg.style.width = '100%';
+                                        dataImg.style.height = '100%';
+                                    }
+                                }
+                                return b;
+                            }
+                        } catch (ex) { }
+                    }
+                    if (clipDiv) {
+                        clipDiv.style.display = 'none';
+                    }
+                    return null;
+                }
+
+                const mainImgRef = wrapper.querySelector('.mpl-plot-img');
+                if (mainImgRef) {
+                    mainImgRef.addEventListener('load', function() { setupPlotBounds(); });
+                }
+                setupPlotBounds();
+
                 wrapper.__on3DUpdateReceived = function(html) {
                     const temp = document.createElement('div');
                     temp.innerHTML = html;
@@ -1811,6 +1895,20 @@ strong { font-weight: 700; }
                     if (newImg && oldImg) {
                         oldImg.src = newImg.src;
                     }
+                    const newClipImg = temp.querySelector('.mpl-data-img');
+                    const oldClipImg = wrapper.querySelector('.mpl-data-img');
+                    if (newClipImg && oldClipImg) {
+                        oldClipImg.src = newClipImg.src;
+                    } else if (newImg && oldClipImg) {
+                        oldClipImg.src = newImg.src;
+                    }
+
+                    const newWrapper = temp.querySelector('.mpl-interactive-wrapper');
+                    if (newWrapper && newWrapper.hasAttribute('data-plot-bounds')) {
+                        wrapper.setAttribute('data-plot-bounds', newWrapper.getAttribute('data-plot-bounds'));
+                    }
+                    setupPlotBounds();
+
                     const newCbar = temp.querySelector('.mpl-cbar-img');
                     const oldCbar = wrapper.querySelector('.mpl-cbar-img');
                     if (newCbar && oldCbar) {
@@ -1852,7 +1950,11 @@ strong { font-weight: 700; }
                 };
 
                 function updateTransform() {
-                    if (plotLayer) {
+                    const imgWrapper = wrapper.querySelector('.mpl-data-img-wrapper');
+                    const hasBounds = wrapper.hasAttribute('data-plot-bounds') && wrapper.getAttribute('data-plot-bounds') !== '';
+                    if (!is3D && imgWrapper && hasBounds) {
+                        imgWrapper.style.transform = 'translate(' + panX + 'px, ' + panY + 'px)';
+                    } else if (is3D && plotLayer) {
                         plotLayer.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
                     }
                     if (is3D) {
