@@ -126,7 +126,8 @@ namespace TxtAIEditor.Composition
                 callbacks.LoadFileIntoTabAsync,
                 activeEditorInsertion.InsertTextAsync,
                 dialog.ShowErrorMessage,
-                callbacks.GetLocalizedString);
+                callbacks.GetLocalizedString,
+                () => notebookViewer);
 
             var tabSelection = new TabSelectionController(
                 ui.EditorWorkspace,

@@ -123,11 +123,6 @@ namespace TxtAIEditor.Core.Services
                 sb.AppendLine("<div class=\"cell-toolbar\">");
                 sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Render Markdown (Shift+Enter)\">▶ Render</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-edit\" title=\"Edit Markdown\">✎ Edit</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"bold\" title=\"Bold (**text**)\"><b>B</b></button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"italic\" title=\"Italic (*text*)\"><i>I</i></button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"heading\" title=\"Heading (# Header)\"><b>H</b></button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"link\" title=\"Insert Link ([text](url))\">🔗</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"image\" title=\"Insert Image (![alt](url))\">🖼</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Code\">Code</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
@@ -185,14 +180,31 @@ namespace TxtAIEditor.Core.Services
                     {
                         string name = outElement.TryGetProperty("name", out var n) ? n.GetString() ?? "stdout" : "stdout";
                         string cls = name == "stderr" ? "output-stderr" : "output-stdout";
-                        sb.Append($"<span class=\"{cls}\">{HtmlEncode(text)}</span>");
+                        if (text.Contains("<img ") || text.Contains("<table"))
+                        {
+                            sb.Append(text);
+                        }
+                        else
+                        {
+                            sb.Append($"<span class=\"{cls}\">{HtmlEncode(text)}</span>");
+                        }
                     }
                 }
                 else if (outputType == "execute_result" || outputType == "display_data")
                 {
                     if (outElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
                     {
-                        if (data.TryGetProperty("text/html", out var htmlEl))
+                        if (data.TryGetProperty("image/png", out var imgPngEl))
+                        {
+                            string b64 = GetTextOrArrayFromElement(imgPngEl).Trim();
+                            sb.Append($"<img src=\"data:image/png;base64,{b64}\" style=\"max-width:100%;height:auto;margin:8px 0;display:block;\" />");
+                        }
+                        else if (data.TryGetProperty("image/jpeg", out var imgJpgEl))
+                        {
+                            string b64 = GetTextOrArrayFromElement(imgJpgEl).Trim();
+                            sb.Append($"<img src=\"data:image/jpeg;base64,{b64}\" style=\"max-width:100%;height:auto;margin:8px 0;display:block;\" />");
+                        }
+                        else if (data.TryGetProperty("text/html", out var htmlEl))
                         {
                             string htmlText = GetTextOrArrayFromElement(htmlEl);
                             sb.Append(htmlText);
@@ -670,6 +682,21 @@ strong { font-weight: 700; }
         return JSON.stringify({ cells: cells, metadata: {}, nbformat: 4, nbformat_minor: 5 }, null, 1);
     }
 
+    function renderStdoutWithImages(text) {
+        if (!text) return '';
+        const parts = text.split(/(<img\s+src=""data:image\/[^"">]+""?[^>]*\/>)/gi);
+        let html = '';
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            if (/^<img\s+src=""data:image\//i.test(part)) {
+                html += part;
+            } else if (part) {
+                html += '<span class=""output-stdout"">' + escapeHtml(part) + '</span>';
+            }
+        }
+        return html;
+    }
+
     async function runCell(cellDiv) {
         const type = getCellType(cellDiv);
         if (type === 'markdown') {
@@ -697,7 +724,7 @@ strong { font-weight: 700; }
             });
 
             let html = '';
-            if (resp.stdout) html += '<span class=""output-stdout"">' + escapeHtml(resp.stdout) + '</span>';
+            if (resp.stdout) html += renderStdoutWithImages(resp.stdout);
             if (resp.stderr) html += '<span class=""output-stderr"">' + escapeHtml(resp.stderr) + '</span>';
             if (resp.result) html += '<span class=""output-result"">' + escapeHtml(resp.result) + '</span>';
             if (html) {
@@ -734,11 +761,6 @@ strong { font-weight: 700; }
                 '<div class=""cell-toolbar"">' +
                 '<button class=""cell-btn cell-run"" title=""Render Markdown (Shift+Enter)"">▶ Render</button>' +
                 '<button class=""cell-btn cell-edit"" title=""Edit Markdown"">✎ Edit</button>' +
-                '<button class=""cell-btn cell-md-fmt"" data-fmt=""bold"" title=""Bold (**text**)""><b>B</b></button>' +
-                '<button class=""cell-btn cell-md-fmt"" data-fmt=""italic"" title=""Italic (*text*)""><i>I</i></button>' +
-                '<button class=""cell-btn cell-md-fmt"" data-fmt=""heading"" title=""Heading (# Header)""><b>H</b></button>' +
-                '<button class=""cell-btn cell-md-fmt"" data-fmt=""link"" title=""Insert Link ([text](url))"">🔗</button>' +
-                '<button class=""cell-btn cell-md-fmt"" data-fmt=""image"" title=""Insert Image (![alt](url))"">🖼</button>' +
                 '<button class=""cell-btn cell-toggle-type"" title=""Switch to Code"">Code</button>' +
                 '<button class=""cell-btn cell-delete"" title=""Delete"">✕</button>' +
                 '<button class=""cell-btn cell-move-up"" title=""Move Up"">↑</button>' +
@@ -760,6 +782,102 @@ strong { font-weight: 700; }
         }
         return div;
     }
+
+    let lastActiveMarkdownCell = null;
+    container.addEventListener('focusin', (e) => {
+        const cellDiv = e.target.closest('.cell');
+        if (cellDiv && getCellType(cellDiv) === 'markdown') {
+            lastActiveMarkdownCell = cellDiv;
+        }
+    });
+
+    function focusEditorAtEnd(editor) {
+        editor.focus();
+        const sel = window.getSelection();
+        if (sel) {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+    }
+
+    function applyMarkdownCommandToCell(cellDiv, command, color) {
+        if (getCellType(cellDiv) !== 'markdown') return;
+        editMarkdownCell(cellDiv);
+        const editor = cellDiv.querySelector('.markdown-editor');
+        if (!editor) return;
+
+        let prefix = '', suffix = '', defaultText = '';
+        switch (command) {
+            case 'bold': prefix = '**'; suffix = '**'; defaultText = 'bold'; break;
+            case 'italic': prefix = '*'; suffix = '*'; defaultText = 'italic'; break;
+            case 'underline': prefix = '<u>'; suffix = '</u>'; defaultText = 'underline'; break;
+            case 'highlight': prefix = '<mark>'; suffix = '</mark>'; defaultText = 'highlight'; break;
+            case 'heading': prefix = '# '; suffix = ''; defaultText = 'Heading'; break;
+            case 'ul': prefix = '- '; suffix = ''; defaultText = 'list item'; break;
+            case 'quote': prefix = '> '; suffix = ''; defaultText = 'quote'; break;
+            case 'inlineCode': prefix = '`'; suffix = '`'; defaultText = 'code'; break;
+            case 'codeBlock': prefix = '```\n'; suffix = '\n```'; defaultText = 'code'; break;
+            case 'task': prefix = '- [ ] '; suffix = ''; defaultText = 'task item'; break;
+            case 'table': prefix = '\n| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n'; suffix = ''; defaultText = ''; break;
+            case 'arrow': prefix = '-> '; suffix = ''; defaultText = ''; break;
+            case 'textColor':
+                if (color) {
+                    prefix = '<span style=""color:' + color + ';"">';
+                    suffix = '</span>';
+                    defaultText = 'colored text';
+                }
+                break;
+            default:
+                insertMarkdownFormatting(cellDiv, command);
+                return;
+        }
+
+        const sel = window.getSelection();
+        let selectedText = '';
+        let range = null;
+
+        if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+            range = sel.getRangeAt(0);
+            selectedText = range.toString();
+        }
+
+        const textToWrap = selectedText || defaultText;
+        const inserted = prefix + textToWrap + suffix;
+
+        if (range) {
+            range.deleteContents();
+            const textNode = document.createTextNode(inserted);
+            range.insertNode(textNode);
+            range.setStartAfter(textNode);
+            range.setEndAfter(textNode);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            editor.focus();
+        } else {
+            const currentText = editor.innerText || '';
+            const needNewline = currentText.length > 0 && !currentText.endsWith('\n');
+            editor.innerHTML = '<pre>' + escapeHtml(currentText + (needNewline ? '\n' : '') + inserted) + '</pre>';
+            focusEditorAtEnd(editor);
+        }
+    }
+
+    window.addEventListener('appMarkdownCommand', (e) => {
+        const detail = e.detail || {};
+        const cmd = detail.command;
+        const color = detail.color;
+        if (!cmd) return;
+
+        let activeCell = (document.activeElement && document.activeElement.closest) ? document.activeElement.closest('.cell') : null;
+        if (!activeCell || getCellType(activeCell) !== 'markdown') {
+            activeCell = lastActiveMarkdownCell || container.querySelector('.cell[data-cell-type=""markdown""]');
+        }
+        if (activeCell) {
+            applyMarkdownCommandToCell(activeCell, cmd, color);
+        }
+    });
 
     function reindexCells() {
         container.querySelectorAll('.cell').forEach((c, i) => {

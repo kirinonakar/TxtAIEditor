@@ -21,6 +21,8 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
 
+        private readonly Func<JupyterNotebookViewerController?>? _notebookViewerControllerProvider;
+
         public MarkdownToolbarController(
             TopCommandBarPane topToolbar,
             MarkdownToolbarControl markdownToolbar,
@@ -29,7 +31,8 @@ namespace TxtAIEditor.Controls
             Func<string, Task> loadFileIntoTabAsync,
             Func<string, Task<bool>> insertTextIntoActiveEditorAsync,
             Action<string, string> showError,
-            Func<string, string, string>? getString = null)
+            Func<string, string, string>? getString = null,
+            Func<JupyterNotebookViewerController?>? notebookViewerControllerProvider = null)
         {
             _topToolbar = topToolbar;
             _markdownToolbar = markdownToolbar;
@@ -39,6 +42,7 @@ namespace TxtAIEditor.Controls
             _insertTextIntoActiveEditorAsync = insertTextIntoActiveEditorAsync;
             _showError = showError;
             _getString = getString ?? ((_, fallback) => fallback);
+            _notebookViewerControllerProvider = notebookViewerControllerProvider;
 
             _markdownToolbar.CommandRequested += OnMarkdownToolbarCommandRequested;
             _topToolbar.ToggleMarkdownToolbarClick += OnToggleMarkdownToolbarClick;
@@ -47,11 +51,16 @@ namespace TxtAIEditor.Controls
         public async Task ApplyCommandToActiveEditorAsync(string command, string? color = null)
         {
             if (_editorTabView.SelectedItem is TabViewItem activeTabItem &&
-                activeTabItem.Tag is string tabId &&
-                _tabBridges.TryGetValue(tabId, out var bridgeGroup) &&
-                bridgeGroup.Bridge != null)
+                activeTabItem.Tag is string tabId)
             {
-                await bridgeGroup.Bridge.ApplyMarkdownCommandAsync(command, color);
+                if (_tabBridges.TryGetValue(tabId, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                {
+                    await bridgeGroup.Bridge.ApplyMarkdownCommandAsync(command, color);
+                }
+                else if (_notebookViewerControllerProvider?.Invoke() is JupyterNotebookViewerController notebookViewer)
+                {
+                    await notebookViewer.ApplyMarkdownCommandAsync(tabId, command, color);
+                }
             }
         }
 

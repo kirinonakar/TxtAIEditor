@@ -95,7 +95,7 @@ namespace TxtAIEditor.Core.Services
             private readonly string _pythonExecutable;
             private readonly string _workingDirectory;
             private static readonly string KernelScript = @"
-import sys, json, io, contextlib, traceback, ast
+import sys, json, io, base64, contextlib, traceback, ast
 
 try:
     if hasattr(sys.stdin, 'reconfigure'): sys.stdin.reconfigure(line_buffering=True)
@@ -104,6 +104,25 @@ except Exception:
     pass
 
 _ns = {'__name__': '__main__'}
+
+def _capture_figures():
+    imgs = []
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        if plt.get_fignums():
+            for num in plt.get_fignums():
+                fig = plt.figure(num)
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png', bbox_inches='tight')
+                buf.seek(0)
+                b64 = base64.b64encode(buf.read()).decode('utf-8')
+                imgs.append(f'<img src=""data:image/png;base64,{b64}"" style=""max-width:100%;height:auto;margin:8px 0;display:block;"" />')
+            plt.close('all')
+    except Exception:
+        pass
+    return imgs
 
 while True:
     line = sys.stdin.readline()
@@ -118,6 +137,24 @@ while True:
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()
         result_obj = None
+        extra_html = []
+
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            def _custom_show(*args, **kwargs):
+                for num in plt.get_fignums():
+                    fig = plt.figure(num)
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format='png', bbox_inches='tight')
+                    buf.seek(0)
+                    b64 = base64.b64encode(buf.read()).decode('utf-8')
+                    extra_html.append(f'<img src=""data:image/png;base64,{b64}"" style=""max-width:100%;height:auto;margin:8px 0;display:block;"" />')
+                plt.close('all')
+            plt.show = _custom_show
+        except Exception:
+            pass
 
         with contextlib.redirect_stdout(stdout_buf), contextlib.redirect_stderr(stderr_buf):
             try:
@@ -136,14 +173,36 @@ while True:
             except Exception:
                 raise
 
+        extra_html.extend(_capture_figures())
+
+        if result_obj is not None:
+            if hasattr(result_obj, '_repr_html_'):
+                try:
+                    h = result_obj._repr_html_()
+                    if h: extra_html.append(str(h))
+                except Exception:
+                    pass
+            elif hasattr(result_obj, '_repr_png_'):
+                try:
+                    p = result_obj._repr_png_()
+                    if p:
+                        b64 = base64.b64encode(p).decode('utf-8') if isinstance(p, bytes) else str(p)
+                        extra_html.append(f'<img src=""data:image/png;base64,{b64}"" style=""max-width:100%;height:auto;margin:8px 0;display:block;"" />')
+                except Exception:
+                    pass
+
         stdout_text = stdout_buf.getvalue()
         stderr_text = stderr_buf.getvalue()
         result_text = ''
-        if result_obj is not None:
+        if result_obj is not None and not extra_html:
             try:
                 result_text = repr(result_obj)
             except Exception as re:
                 result_text = f'<unreprable: {re}>'
+
+        if extra_html:
+            stdout_text = (stdout_text or '') + ''.join(extra_html)
+
         result = {'status': 'ok', 'stdout': stdout_text, 'stderr': stderr_text, 'result': result_text}
     except SystemExit:
         break

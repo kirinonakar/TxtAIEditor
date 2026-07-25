@@ -65,6 +65,16 @@ namespace TxtAIEditor.Controls
         {
             return _activeTabProvider()?.IsNotebookViewer == true;
         }
+
+        public async Task ApplyMarkdownCommandAsync(string tabId, string command, string? color = null)
+        {
+            if (_viewerWebViews.TryGetValue(tabId, out var webView) && webView.CoreWebView2 != null)
+            {
+                var payload = JsonSerializer.Serialize(new { command, color });
+                await webView.CoreWebView2.ExecuteScriptAsync($"window.dispatchEvent(new CustomEvent('appMarkdownCommand', {{ detail: {payload} }}));");
+                webView.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+            }
+        }
 public async Task<bool> SaveAsync(OpenedTab tab)
         {
             if (!tab.IsNotebookViewer || !_viewerWebViews.TryGetValue(tab.Id, out var webView))
