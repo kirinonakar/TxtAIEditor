@@ -85,6 +85,19 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        public async Task<string> UpdatePlotViewAsync(string tabId, string pythonExecutable, string workingDirectory, string figId, double elev, double azim)
+        {
+            try
+            {
+                var session = await GetOrCreateSessionAsync(tabId, pythonExecutable, workingDirectory);
+                return await session.UpdatePlotViewAsync(figId, elev, azim);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
         public void CloseSession(string tabId)
         {
             if (_sessions.TryRemove(tabId, out var session))
@@ -157,8 +170,27 @@ def _get_variables():
             pass
     return vars_list
 
-def _render_figure_html(fig):
+_active_figures = {}
+
+def _render_figure_html(fig, fig_id=None):
     import io, base64
+    if not fig_id:
+        fig_id = str(id(fig))
+    _active_figures[fig_id] = fig
+
+    is_3d = False
+    cur_elev = 30
+    cur_azim = -60
+    try:
+        for ax in fig.axes:
+            if hasattr(ax, 'view_init') or getattr(ax, 'name', '') == '3d' or '3d' in str(type(ax)).lower():
+                is_3d = True
+                cur_elev = int(getattr(ax, 'elev', 30) or 30)
+                cur_azim = int(getattr(ax, 'azim', -60) or -60)
+                break
+    except Exception:
+        pass
+
     colorbars = []
     try:
         for ax in fig.axes:
@@ -167,6 +199,8 @@ def _render_figure_html(fig):
                 colorbars.append(ax)
     except Exception:
         pass
+
+    is_3d_str = 'true' if is_3d else 'false'
 
     if colorbars:
         try:
@@ -186,15 +220,20 @@ def _render_figure_html(fig):
 
             for ax in fig.axes: ax.set_visible(True)
 
-            return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"">
+            return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}"">
     <div class=""mpl-toolbar"">
         <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
         <button class=""mpl-btn mpl-btn-pan active"" title=""Pan Mode"">✋ Pan</button>
-        <button class=""mpl-btn mpl-btn-rotate"" title=""Rotate Mode"">🔄 Rotate</button>
+        <button class=""mpl-btn mpl-btn-rotate"" title=""3D View Rotate"">🔄 3D Rotate</button>
         <div class=""mpl-rotate-ctrl"">
-            <span>Rotate:</span>
-            <input type=""range"" class=""mpl-rotate-slider"" min=""-180"" max=""180"" value=""0"" />
-            <span class=""mpl-angle-val"">0°</span>
+            <span>Azim(Azim):</span>
+            <input type=""range"" class=""mpl-rotate-y-slider"" min=""-180"" max=""180"" value=""{cur_azim}"" />
+            <span class=""mpl-angle-val-y"">{cur_azim}°</span>
+        </div>
+        <div class=""mpl-rotate-ctrl"">
+            <span>Elev(Elev):</span>
+            <input type=""range"" class=""mpl-rotate-x-slider"" min=""-90"" max=""90"" value=""{cur_elev}"" />
+            <span class=""mpl-angle-val-x"">{cur_elev}°</span>
         </div>
         <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
     </div>
@@ -207,7 +246,7 @@ def _render_figure_html(fig):
         </div>
     </div>
     <div class=""mpl-status-bar"">
-        <span>Left: Pan/Rotate | Middle: Pan | Right: Rotate | Wheel: Zoom</span>
+        <span>3D Rotate: Drag / Right-Click (Elev/Azim Re-render) | Pan: Middle-Click | Wheel: Zoom</span>
     </div>
 </div><!--MPL_END-->'''
         except Exception:
@@ -217,15 +256,20 @@ def _render_figure_html(fig):
     fig.savefig(buf, format='png', bbox_inches='tight')
     buf.seek(0)
     b64 = base64.b64encode(buf.read()).decode('utf-8')
-    return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"">
+    return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}"">
     <div class=""mpl-toolbar"">
         <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
         <button class=""mpl-btn mpl-btn-pan active"" title=""Pan Mode"">✋ Pan</button>
-        <button class=""mpl-btn mpl-btn-rotate"" title=""Rotate Mode"">🔄 Rotate</button>
+        <button class=""mpl-btn mpl-btn-rotate"" title=""3D View Rotate"">🔄 3D Rotate</button>
         <div class=""mpl-rotate-ctrl"">
-            <span>Rotate:</span>
-            <input type=""range"" class=""mpl-rotate-slider"" min=""-180"" max=""180"" value=""0"" />
-            <span class=""mpl-angle-val"">0°</span>
+            <span>Azim(Azim):</span>
+            <input type=""range"" class=""mpl-rotate-y-slider"" min=""-180"" max=""180"" value=""{cur_azim}"" />
+            <span class=""mpl-angle-val-y"">{cur_azim}°</span>
+        </div>
+        <div class=""mpl-rotate-ctrl"">
+            <span>Elev(Elev):</span>
+            <input type=""range"" class=""mpl-rotate-x-slider"" min=""-90"" max=""90"" value=""{cur_elev}"" />
+            <span class=""mpl-angle-val-x"">{cur_elev}°</span>
         </div>
         <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
     </div>
@@ -235,7 +279,7 @@ def _render_figure_html(fig):
         </div>
     </div>
     <div class=""mpl-status-bar"">
-        <span>Left: Pan/Rotate | Middle: Pan | Right: Rotate | Wheel: Zoom</span>
+        <span>3D Rotate: Drag / Right-Click (Elev/Azim Re-render) | Pan: Middle-Click | Wheel: Zoom</span>
     </div>
 </div><!--MPL_END-->'''
 
@@ -266,6 +310,26 @@ while True:
         if msg.get('type') == 'getVariables':
             sys.stdout.write(json.dumps({'status': 'ok', 'stdout': '', 'stderr': '', 'result': '', 'variables': _get_variables()}, ensure_ascii=False) + '\n')
             sys.stdout.flush()
+            continue
+
+        if msg.get('type') == 'updatePlotView':
+            fig_id = str(msg.get('figId', ''))
+            elev = float(msg.get('elev', 30))
+            azim = float(msg.get('azim', -60))
+            fig = _active_figures.get(fig_id)
+            if fig is not None:
+                for ax in fig.axes:
+                    if hasattr(ax, 'view_init'):
+                        try:
+                            ax.view_init(elev=elev, azim=azim)
+                        except Exception:
+                            pass
+                html = _render_figure_html(fig, fig_id=fig_id)
+                sys.stdout.write(json.dumps({'status': 'ok', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': html, 'elev': elev, 'azim': azim}, ensure_ascii=False) + '\n')
+                sys.stdout.flush()
+            else:
+                sys.stdout.write(json.dumps({'status': 'error', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': ''}, ensure_ascii=False) + '\n')
+                sys.stdout.flush()
             continue
 
         raw_code = msg.get('code', '')
@@ -484,6 +548,41 @@ while True:
                 }
 
                 return "[]";
+            }
+
+            public async Task<string> UpdatePlotViewAsync(string figId, double elev, double azim)
+            {
+                if (_process == null || _process.HasExited)
+                {
+                    return string.Empty;
+                }
+
+                var command = JsonSerializer.Serialize(new { type = "updatePlotView", figId, elev, azim });
+                await _process.StandardInput.WriteLineAsync(command);
+                await _process.StandardInput.FlushAsync();
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                while (!cts.Token.IsCancellationRequested)
+                {
+                    if (_process.HasExited) return string.Empty;
+
+                    string? line = await ReadLineWithTimeoutAsync(_process.StandardOutput, cts.Token);
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(line);
+                        var root = doc.RootElement;
+                        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("type", out var t) && t.GetString() == "plotViewUpdated")
+                        {
+                            string html = root.TryGetProperty("html", out var h) ? h.GetString() ?? string.Empty : string.Empty;
+                            return html;
+                        }
+                    }
+                    catch { }
+                }
+
+                return string.Empty;
             }
 
             private static async Task<string?> ReadLineWithTimeoutAsync(StreamReader reader, CancellationToken token)

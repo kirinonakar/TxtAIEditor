@@ -236,6 +236,13 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 {
                     _ = GetVariablesAsync(sender, tab);
                 }
+                else if (string.Equals(type, "updatePlotView", StringComparison.Ordinal))
+                {
+                    string figId = root.TryGetProperty("figId", out var f) ? f.GetString() ?? "" : "";
+                    double elev = root.TryGetProperty("elev", out var el) ? el.GetDouble() : 30.0;
+                    double azim = root.TryGetProperty("azim", out var az) ? az.GetDouble() : -60.0;
+                    _ = UpdatePlotViewAsync(sender, tab, figId, elev, azim);
+                }
                 else if (string.Equals(type, "saveNotebook", StringComparison.Ordinal))
                 {
                     string content = root.TryGetProperty("content", out var cont) ? cont.GetString() ?? "" : "";
@@ -261,6 +268,33 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             catch
             {
             }
+        }
+
+        private async Task UpdatePlotViewAsync(WebView2 webView, OpenedTab tab, string figId, double elev, double azim)
+        {
+            try
+            {
+                if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
+                    !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
+                {
+                    return;
+                }
+
+                string html = await _kernelService.UpdatePlotViewAsync(tab.Id, python, workDir, figId, elev, azim);
+                if (!string.IsNullOrEmpty(html))
+                {
+                    string js = $"window.__notebookReceivePlotUpdate && window.__notebookReceivePlotUpdate({JsonSerializer.Serialize(figId)}, {JsonSerializer.Serialize(html)});";
+                    webView.DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        try
+                        {
+                            await webView.ExecuteScriptAsync(js);
+                        }
+                        catch { }
+                    });
+                }
+            }
+            catch { }
         }
 
         private async Task ExecuteCellAsync(WebView2 webView, OpenedTab tab, int cellIndex, string code)

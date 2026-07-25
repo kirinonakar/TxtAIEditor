@@ -651,6 +651,7 @@ strong { font-weight: 700; }
     background: var(--nb-output-bg);
     min-height: 200px;
     cursor: grab;
+    perspective: 1000px;
 }
 .mpl-viewport:active {
     cursor: grabbing;
@@ -658,6 +659,7 @@ strong { font-weight: 700; }
 .mpl-plot-layer {
     display: inline-block;
     transform-origin: center center;
+    transform-style: preserve-3d;
     transition: transform 0.05s ease-out;
 }
 .mpl-plot-img {
@@ -1681,6 +1683,15 @@ strong { font-weight: 700; }
         }
     };
 
+    // Receive plot view update from host (3D re-render)
+    window.__notebookReceivePlotUpdate = function(figId, html) {
+        if (!figId || !html) return;
+        const wrapper = document.querySelector('.mpl-interactive-wrapper[data-fig-id=""' + figId + '""]');
+        if (wrapper && wrapper.__on3DUpdateReceived) {
+            wrapper.__on3DUpdateReceived(html);
+        }
+    };
+
     // Receive save result from host
     window.__notebookSaveResult = function(success, message) {
         const btn = document.getElementById('btn-save');
@@ -1735,24 +1746,87 @@ strong { font-weight: 700; }
                 const btnReset = wrapper.querySelector('.mpl-btn-reset');
                 const btnPan = wrapper.querySelector('.mpl-btn-pan');
                 const btnRotate = wrapper.querySelector('.mpl-btn-rotate');
-                const slider = wrapper.querySelector('.mpl-rotate-slider');
-                const angleVal = wrapper.querySelector('.mpl-angle-val');
+                const sliderY = wrapper.querySelector('.mpl-rotate-y-slider') || wrapper.querySelector('.mpl-rotate-slider');
+                const angleValY = wrapper.querySelector('.mpl-angle-val-y') || wrapper.querySelector('.mpl-angle-val');
+                const sliderX = wrapper.querySelector('.mpl-rotate-x-slider');
+                const angleValX = wrapper.querySelector('.mpl-angle-val-x');
                 const btnDownload = wrapper.querySelector('.mpl-btn-download');
 
-                let panX = 0, panY = 0, scale = 1, angle = 0;
+                const is3D = wrapper.getAttribute('data-is-3d') === 'true';
+                const figId = wrapper.getAttribute('data-fig-id');
+                let elev = parseInt(wrapper.getAttribute('data-elev') || '30') || 30;
+                let azim = parseInt(wrapper.getAttribute('data-azim') || '-60') || -60;
+
+                let panX = 0, panY = 0, scale = 1;
+                let rotateX = 0;
+                let rotateY = 0;
+                let rotateZ = 0;
                 let mode = 'pan';
                 let isDragging = false;
                 let dragBtn = -1;
                 let startX = 0, startY = 0;
                 let startPanX = 0, startPanY = 0;
-                let startAngle = 0;
+                let startRotateX = 0, startRotateY = 0;
+                let startElev = elev, startAzim = azim;
+
+                let is3DInFlight = false;
+                let pending3DElevAzim = null;
+
+                function send3DViewRequest(eVal, aVal) {
+                    if (!is3D || !figId) return;
+                    if (is3DInFlight) {
+                        pending3DElevAzim = { elev: eVal, azim: aVal };
+                        return;
+                    }
+                    is3DInFlight = true;
+                    try {
+                        window.chrome.webview.postMessage(JSON.stringify({
+                            type: 'updatePlotView',
+                            figId: figId,
+                            elev: eVal,
+                            azim: aVal
+                        }));
+                    } catch (ex) {
+                        is3DInFlight = false;
+                    }
+                }
+
+                wrapper.__on3DUpdateReceived = function(html) {
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+                    const newImg = temp.querySelector('.mpl-plot-img');
+                    const oldImg = wrapper.querySelector('.mpl-plot-img');
+                    if (newImg && oldImg) {
+                        oldImg.src = newImg.src;
+                    }
+                    const newCbar = temp.querySelector('.mpl-cbar-img');
+                    const oldCbar = wrapper.querySelector('.mpl-cbar-img');
+                    if (newCbar && oldCbar) {
+                        oldCbar.src = newCbar.src;
+                    }
+
+                    if (!isDragging) {
+                        rotateX = 0;
+                        rotateY = 0;
+                        updateTransform();
+                    }
+
+                    is3DInFlight = false;
+                    if (pending3DElevAzim) {
+                        const next = pending3DElevAzim;
+                        pending3DElevAzim = null;
+                        send3DViewRequest(next.elev, next.azim);
+                    }
+                };
 
                 function updateTransform() {
                     if (plotLayer) {
-                        plotLayer.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ') rotate(' + angle + 'deg)';
+                        plotLayer.style.transform = 'translate3d(' + panX + 'px, ' + panY + 'px, 0px) scale(' + scale + ') rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) rotateZ(' + rotateZ + 'deg)';
                     }
-                    if (slider) slider.value = angle;
-                    if (angleVal) angleVal.textContent = angle + '°';
+                    if (sliderY) sliderY.value = is3D ? azim : rotateY;
+                    if (angleValY) angleValY.textContent = (angleValY.classList.contains('mpl-angle-val-y') ? (is3D ? 'Azim:' : 'Y:') : '') + (is3D ? azim : rotateY) + '°';
+                    if (sliderX) sliderX.value = is3D ? elev : rotateX;
+                    if (angleValX) angleValX.textContent = (is3D ? 'Elev:' : 'X:') + (is3D ? elev : rotateX) + '°';
                 }
 
                 if (viewport) {
@@ -1764,7 +1838,10 @@ strong { font-weight: 700; }
                         startY = e.clientY;
                         startPanX = panX;
                         startPanY = panY;
-                        startAngle = angle;
+                        startRotateX = rotateX;
+                        startRotateY = rotateY;
+                        startElev = elev;
+                        startAzim = azim;
                     });
 
                     window.addEventListener('mousemove', function(e) {
@@ -1777,19 +1854,42 @@ strong { font-weight: 700; }
                                 panX = startPanX + dx;
                                 panY = startPanY + dy;
                             } else {
-                                angle = Math.round(startAngle + dx) % 360;
+                                if (is3D) {
+                                    azim = Math.round(startAzim - dx * 0.5) % 360;
+                                    elev = Math.min(Math.max(-90, Math.round(startElev - dy * 0.5)), 90);
+                                    rotateY = dx * 0.4;
+                                    rotateX = -dy * 0.4;
+                                    send3DViewRequest(elev, azim);
+                                } else {
+                                    rotateY = Math.round(startRotateY + dx * 0.8) % 360;
+                                    rotateX = Math.min(Math.max(-85, Math.round(startRotateX - dy * 0.8)), 85);
+                                }
                             }
                         } else if (dragBtn === 1) {
                             panX = startPanX + dx;
                             panY = startPanY + dy;
                         } else if (dragBtn === 2) {
-                            angle = Math.round(startAngle + dx) % 360;
+                            if (is3D) {
+                                azim = Math.round(startAzim - dx * 0.5) % 360;
+                                elev = Math.min(Math.max(-90, Math.round(startElev - dy * 0.5)), 90);
+                                rotateY = dx * 0.4;
+                                rotateX = -dy * 0.4;
+                                send3DViewRequest(elev, azim);
+                            } else {
+                                rotateY = Math.round(startRotateY + dx * 0.8) % 360;
+                                rotateX = Math.min(Math.max(-85, Math.round(startRotateX - dy * 0.8)), 85);
+                            }
                         }
                         updateTransform();
                     });
 
                     window.addEventListener('mouseup', function() {
-                        isDragging = false;
+                        if (isDragging) {
+                            isDragging = false;
+                            if (is3D) {
+                                send3DViewRequest(elev, azim);
+                            }
+                        }
                     });
 
                     viewport.addEventListener('contextmenu', function(e) {
@@ -1804,16 +1904,33 @@ strong { font-weight: 700; }
                     });
                 }
 
-                if (slider) {
-                    slider.addEventListener('input', function() {
-                        angle = parseInt(slider.value) || 0;
+                if (sliderY) {
+                    sliderY.addEventListener('input', function() {
+                        if (is3D) {
+                            azim = parseInt(sliderY.value) || 0;
+                            send3DViewRequest(elev, azim);
+                        } else {
+                            rotateY = parseInt(sliderY.value) || 0;
+                        }
+                        updateTransform();
+                    });
+                }
+
+                if (sliderX) {
+                    sliderX.addEventListener('input', function() {
+                        if (is3D) {
+                            elev = parseInt(sliderX.value) || 0;
+                            send3DViewRequest(elev, azim);
+                        } else {
+                            rotateX = parseInt(sliderX.value) || 0;
+                        }
                         updateTransform();
                     });
                 }
 
                 if (btnReset) {
                     btnReset.addEventListener('click', function() {
-                        panX = 0; panY = 0; scale = 1; angle = 0;
+                        panX = 0; panY = 0; scale = 1; rotateX = 0; rotateY = 0; rotateZ = 0;
                         updateTransform();
                     });
                 }
