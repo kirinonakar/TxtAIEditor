@@ -95,7 +95,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
 
             try
             {
-                string script = "(() => { const container = document.getElementById('cells-container'); const cells = []; container.querySelectorAll('.cell').forEach(cellDiv => { const type = cellDiv.getAttribute('data-cell-type'); const input = cellDiv.querySelector('.cell-input-area, .markdown-cell, .raw-cell'); const source = input ? input.innerText : ''; const sourceLines = source.split('\\n').map((l, i, arr) => i < arr.length - 1 ? l + '\\n' : l); if (type === 'code') { cells.push({cell_type:'code',source:sourceLines,outputs:[],metadata:{},execution_count:null}); } else if (type === 'markdown') { cells.push({cell_type:'markdown',source:sourceLines,metadata:{}}); } else { cells.push({cell_type:'raw',source:sourceLines,metadata:{}}); } }); return JSON.stringify({cells:cells,metadata:{},nbformat:4,nbformat_minor:5}, null, 1); })();";
+                string script = "typeof window.getNotebookJson === 'function' ? window.getNotebookJson() : ''";
                 string jsonResult = await webView.CoreWebView2.ExecuteScriptAsync(script);
 
                 string? content = null;

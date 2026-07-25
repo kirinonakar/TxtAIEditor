@@ -206,6 +206,9 @@ namespace TxtAIEditor.Core.Services
             foreach (var outElement in outputs)
             {
                 if (outElement.ValueKind != JsonValueKind.Object) continue;
+                string jsonAttr = HtmlAttrEncode(outElement.GetRawText());
+                sb.Append($"<div class=\"output-entry\" data-output=\"{jsonAttr}\">");
+
                 string outputType = outElement.TryGetProperty("output_type", out var ot) ? ot.GetString() ?? "" : "";
                 if (outputType == "stream")
                 {
@@ -256,6 +259,8 @@ namespace TxtAIEditor.Core.Services
                     string evalue = outElement.TryGetProperty("evalue", out var ev) ? ev.GetString() ?? "" : "";
                     sb.Append($"<span class=\"output-error\">{HtmlEncode(ename)}: {HtmlEncode(evalue)}</span>");
                 }
+
+                sb.Append("</div>");
             }
             return sb.ToString();
         }
@@ -1042,11 +1047,33 @@ strong { font-weight: 700; }
         return div.innerHTML;
     }
 
+    function escapeHtmlAttr(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/""/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function extractImageMimeAndBase64(imgEl) {
+        if (!imgEl) return null;
+        const src = imgEl.getAttribute('src') || imgEl.src || '';
+        if (!src || !src.startsWith('data:image/')) return null;
+        const match = src.match(/^data:(image\/[a-zA-Z\+\-]+);base64,([\s\S]+)$/i);
+        if (!match) return null;
+        return {
+            mime: match[1],
+            b64: match[2].replace(/[\r\n\s]/g, '')
+        };
+    }
+
     function getCellType(cellDiv) {
         return cellDiv.getAttribute('data-cell-type');
     }
 
-    function getNotebookJson() {
+    window.getNotebookJson = function getNotebookJson() {
         const cells = [];
         container.querySelectorAll('.cell').forEach(cellDiv => {
             const type = getCellType(cellDiv);
@@ -1056,9 +1083,74 @@ strong { font-weight: 700; }
             if (type === 'code') {
                 const outputDiv = cellDiv.querySelector('.cell-output');
                 if (outputDiv) {
-                    outputDiv.querySelectorAll('.output-entry').forEach(e => {
-                        outputs.push(JSON.parse(e.getAttribute('data-output') || '{}'));
-                    });
+                    const entries = outputDiv.querySelectorAll('.output-entry');
+                    if (entries.length > 0) {
+                        entries.forEach(e => {
+                            let outObj = null;
+                            try {
+                                const raw = e.getAttribute('data-output');
+                                if (raw) outObj = JSON.parse(raw);
+                            } catch (ex) {}
+
+                            if (outObj) {
+                                const img = e.querySelector('img[src^=""data:image/""]');
+                                const imgData = extractImageMimeAndBase64(img);
+                                if (imgData) {
+                                    outObj.data = outObj.data || {};
+                                    outObj.data[imgData.mime] = imgData.b64;
+                                    if (outObj.output_type !== 'display_data' && outObj.output_type !== 'execute_result') {
+                                        outObj.output_type = 'display_data';
+                                    }
+                                }
+                                outputs.push(outObj);
+                            }
+                        });
+                    } else {
+                        const imgs = outputDiv.querySelectorAll('img[src^=""data:image/""]');
+                        imgs.forEach(img => {
+                            const imgData = extractImageMimeAndBase64(img);
+                            if (imgData) {
+                                outputs.push({
+                                    output_type: 'display_data',
+                                    data: {
+                                        [imgData.mime]: imgData.b64,
+                                        'text/plain': '<Figure size>'
+                                    },
+                                    metadata: {}
+                                });
+                            }
+                        });
+                        if (outputs.length === 0) {
+                            const stdoutSpan = outputDiv.querySelector('.output-stdout');
+                            if (stdoutSpan && stdoutSpan.textContent) {
+                                const txt = stdoutSpan.textContent;
+                                outputs.push({
+                                    output_type: 'stream',
+                                    name: 'stdout',
+                                    text: txt.split('\n').map((l, i, a) => i < a.length - 1 ? l + '\n' : l)
+                                });
+                            }
+                            const stderrSpan = outputDiv.querySelector('.output-stderr');
+                            if (stderrSpan && stderrSpan.textContent) {
+                                const txt = stderrSpan.textContent;
+                                outputs.push({
+                                    output_type: 'stream',
+                                    name: 'stderr',
+                                    text: txt.split('\n').map((l, i, a) => i < a.length - 1 ? l + '\n' : l)
+                                });
+                            }
+                            const resultSpan = outputDiv.querySelector('.output-result');
+                            if (resultSpan && resultSpan.textContent) {
+                                const txt = resultSpan.textContent;
+                                outputs.push({
+                                    output_type: 'execute_result',
+                                    data: { 'text/plain': txt.split('\n').map((l, i, a) => i < a.length - 1 ? l + '\n' : l) },
+                                    metadata: {},
+                                    execution_count: null
+                                });
+                            }
+                        }
+                    }
                 }
                 cells.push({ cell_type: 'code', source: sourceLines, outputs: outputs, metadata: {}, execution_count: null });
             } else if (type === 'markdown') {
@@ -1068,21 +1160,69 @@ strong { font-weight: 700; }
             }
         });
         return JSON.stringify({ cells: cells, metadata: {}, nbformat: 4, nbformat_minor: 5 }, null, 1);
-    }
+    };
+    const getNotebookJson = window.getNotebookJson;
 
-    function renderStdoutWithImages(text) {
-        if (!text) return '';
-        const parts = text.split(/(<!--MPL_START-->[\s\S]*?<!--MPL_END-->|<img\s+src=""data:image\/[^"">]+""?[^>]*\/>)/gi);
+    function renderCellOutputsFromResponse(resp) {
+        if (!resp) return '';
         let html = '';
-        for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            if (!part) continue;
-            if (part.startsWith('<!--MPL_START-->') || /^<img\s+src=""data:image\//i.test(part)) {
-                html += part;
-            } else {
-                html += '<span class=""output-stdout"">' + escapeHtml(part) + '</span>';
+
+        if (resp.stdout) {
+            const parts = resp.stdout.split(/(<!--MPL_START-->[\s\S]*?<!--MPL_END-->|<img\s+src=""data:image\/[^"">]+""?[^>]*\/>)/gi);
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if (!part) continue;
+                if (part.startsWith('<!--MPL_START-->') || /^<img\s+src=""data:image\//i.test(part)) {
+                    const imgMatch = part.match(/src=""data:(image\/[a-zA-Z\+\-]+);base64,([\s\S]+?)""/i);
+                    const outObj = {
+                        output_type: ""display_data"",
+                        data: {},
+                        metadata: {}
+                    };
+                    if (imgMatch) {
+                        outObj.data[imgMatch[1]] = imgMatch[2].replace(/[\r\n\s]/g, '');
+                        outObj.data[""text/plain""] = ""<Figure size>"";
+                    }
+                    html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '>' + part + '</div>';
+                } else {
+                    const outObj = {
+                        output_type: ""stream"",
+                        name: ""stdout"",
+                        text: part.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
+                    };
+                    html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""output-stdout"">' + escapeHtml(part) + '</span></div>';
+                }
             }
         }
+
+        if (resp.stderr) {
+            const isErrStatus = resp.status === 'error';
+            const outObj = isErrStatus ? {
+                output_type: ""error"",
+                ename: ""ExecutionError"",
+                evalue: resp.stderr,
+                traceback: resp.stderr.split('\n')
+            } : {
+                output_type: ""stream"",
+                name: ""stderr"",
+                text: resp.stderr.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
+            };
+            const cls = isErrStatus ? ""output-error"" : ""output-stderr"";
+            html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""' + cls + '""' + '>' + escapeHtml(resp.stderr) + '</span></div>';
+        }
+
+        if (resp.result) {
+            const outObj = {
+                output_type: ""execute_result"",
+                data: {
+                    ""text/plain"": resp.result.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
+                },
+                metadata: {},
+                execution_count: null
+            };
+            html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""output-result"">' + escapeHtml(resp.result) + '</span></div>';
+        }
+
         return html;
     }
 
@@ -1112,10 +1252,7 @@ strong { font-weight: 700; }
                 window.__pendingCellExecutions[cellDiv.getAttribute('data-cell-index')] = resolve;
             });
 
-            let html = '';
-            if (resp.stdout) html += renderStdoutWithImages(resp.stdout);
-            if (resp.stderr) html += '<span class=""output-stderr"">' + escapeHtml(resp.stderr) + '</span>';
-            if (resp.result) html += '<span class=""output-result"">' + escapeHtml(resp.result) + '</span>';
+            let html = renderCellOutputsFromResponse(resp);
             if (html) {
                 outputDiv.classList.add('has-output');
                 outputDiv.innerHTML = html;
@@ -1126,7 +1263,14 @@ strong { font-weight: 700; }
             }
             notifyModified();
         } catch (e) {
-            outputDiv.innerHTML = '<span class=""output-error"">' + escapeHtml(String(e)) + '</span>';
+            const errObj = {
+                output_type: ""error"",
+                ename: ""CellError"",
+                evalue: String(e),
+                traceback: [String(e)]
+            };
+            outputDiv.classList.add('has-output');
+            outputDiv.innerHTML = '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(errObj)) + '""' + '><span class=""output-error"">' + escapeHtml(String(e)) + '</span></div>';
         }
         cellDiv.classList.remove('cell-running');
     }
