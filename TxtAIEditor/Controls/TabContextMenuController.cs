@@ -159,7 +159,7 @@ namespace TxtAIEditor.Controls
                 {
                     Text = _getString("TabMenuNotebookViewSource", "소스 보기"),
                     IsChecked = !tab.IsNotebookViewer,
-                    Icon = new FontIcon { Glyph = "\uE94A" }
+                    Icon = new FontIcon { Glyph = "\uE943" }
                 };
                 viewSourceItem.IsEnabled = hasActionPath && !string.IsNullOrEmpty(fileActionPath) && File.Exists(fileActionPath);
                 viewSourceItem.Click += async (_, __) =>
