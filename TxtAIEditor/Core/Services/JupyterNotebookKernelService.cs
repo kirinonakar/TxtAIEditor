@@ -319,13 +319,13 @@ def _render_figure_html(fig, fig_id=None):
 
     if fmt == 'svg':
         mime = 'image/svg+xml'
-        save_kwargs = {'format': 'svg', 'bbox_inches': 'tight'}
+        save_kwargs = {'format': 'svg', 'bbox_inches': 'tight', 'pad_inches': 0.01}
     elif fmt in ('jpeg', 'jpg'):
         mime = 'image/jpeg'
-        save_kwargs = {'format': 'jpeg', 'bbox_inches': 'tight', 'dpi': dpi_val}
+        save_kwargs = {'format': 'jpeg', 'bbox_inches': 'tight', 'pad_inches': 0.01, 'dpi': dpi_val}
     else:
         mime = 'image/png'
-        save_kwargs = {'format': 'png', 'bbox_inches': 'tight', 'dpi': dpi_val}
+        save_kwargs = {'format': 'png', 'bbox_inches': 'tight', 'pad_inches': 0.01, 'dpi': dpi_val}
 
     is_3d = False
     cur_elev = 30
@@ -394,22 +394,7 @@ def _render_figure_html(fig, fig_id=None):
 
             for ax in fig.axes: ax.set_visible(True)
 
-            return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}""{bounds_attr}{style_attr}>
-    {toolbar}
-    <div class=""mpl-viewport"">
-        <div class=""mpl-plot-layer"">
-            <img src=""data:{mime};base64,{b64_main}"" class=""mpl-plot-img"" />
-            <div class=""mpl-data-clip"">
-                <div class=""mpl-data-img-wrapper"">
-                    <img src=""data:{mime};base64,{b64_main}"" class=""mpl-data-img"" />
-                </div>
-            </div>
-        </div>
-        <div class=""mpl-cbar-layer"">
-            <img src=""data:{mime};base64,{b64_cbar}"" class=""mpl-cbar-img"" />
-        </div>
-    </div>
-</div><!--MPL_END-->'''
+            return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}""{bounds_attr}{style_attr}>{toolbar}<div class=""mpl-viewport""><div class=""mpl-plot-layer""><img src=""data:{mime};base64,{b64_main}"" class=""mpl-plot-img"" /><div class=""mpl-data-clip""><div class=""mpl-data-img-wrapper""><img src=""data:{mime};base64,{b64_main}"" class=""mpl-data-img"" /></div></div></div><div class=""mpl-cbar-layer""><img src=""data:{mime};base64,{b64_cbar}"" class=""mpl-cbar-img"" /></div></div></div><!--MPL_END-->'''
         except Exception:
             pass
 
@@ -417,19 +402,7 @@ def _render_figure_html(fig, fig_id=None):
     fig.savefig(buf, facecolor='white', edgecolor='none', **save_kwargs)
     buf.seek(0)
     b64 = base64.b64encode(buf.read()).decode('utf-8')
-    return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}""{bounds_attr}{style_attr}>
-    {toolbar}
-    <div class=""mpl-viewport"">
-        <div class=""mpl-plot-layer"">
-            <img src=""data:{mime};base64,{b64}"" class=""mpl-plot-img"" />
-            <div class=""mpl-data-clip"">
-                <div class=""mpl-data-img-wrapper"">
-                    <img src=""data:{mime};base64,{b64}"" class=""mpl-data-img"" />
-                </div>
-            </div>
-        </div>
-    </div>
-</div><!--MPL_END-->'''
+    return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}""{bounds_attr}{style_attr}>{toolbar}<div class=""mpl-viewport""><div class=""mpl-plot-layer""><img src=""data:{mime};base64,{b64}"" class=""mpl-plot-img"" /><div class=""mpl-data-clip""><div class=""mpl-data-img-wrapper""><img src=""data:{mime};base64,{b64}"" class=""mpl-data-img"" /></div></div></div></div></div><!--MPL_END-->'''
 
 def _capture_figures():
     imgs = []
