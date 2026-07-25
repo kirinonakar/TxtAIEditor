@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
+using TxtAIEditor.Composition;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
@@ -199,7 +200,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
         {
             try
             {
-                string raw = args.TryGetWebMessageAsString();
+                string raw = MainWindowMessageJson.Normalize(args);
                 if (string.IsNullOrWhiteSpace(raw))
                 {
                     return;
@@ -418,37 +419,64 @@ public async Task<bool> SaveAsync(OpenedTab tab)
         } catch {}
     }
 
-    document.addEventListener('keydown', event => {
+    function handleKeyDown(event) {
+        const ctrl = !!(event.ctrlKey || event.metaKey);
+        const alt = !!event.altKey;
+        const shift = !!event.shiftKey;
+        const key = String(event.key || '').toLowerCase();
+        const code = String(event.code || '');
+
         let name = '';
-        if (event.key === 'F4') {
-            name = 'f4';
-        } else if (event.key === 'F9') {
-            name = 'f9';
-        } else if (event.key === 'F10') {
-            name = 'f10';
-        } else if (event.key === 'F11') {
-            name = 'f11';
-        } else if (event.key === 'F12') {
-            name = 'f12';
-        } else {
-            const ctrl = event.ctrlKey || event.metaKey;
-            const key = event.key ? event.key.toLowerCase() : '';
-            if (ctrl && key === '3') {
+
+        if (!ctrl && !alt) {
+            if (key === 'f4' || code === 'F4') {
+                name = 'f4';
+            } else if (key === 'f9' || code === 'F9') {
+                name = 'f9';
+            } else if (key === 'f10' || code === 'F10') {
+                name = 'f10';
+            } else if (key === 'f11' || code === 'F11') {
+                name = 'f11';
+            } else if (key === 'f12' || code === 'F12') {
+                name = 'f12';
+            }
+        } else if (alt && !ctrl && !shift && (key === 'z' || code === 'KeyZ')) {
+            name = 'wordWrap';
+        } else if (ctrl && !alt) {
+            if (key === '1' || code === 'Digit1' || code === 'Numpad1') {
+                name = 'toggleLeftPanel';
+            } else if (key === '2' || code === 'Digit2' || code === 'Numpad2') {
+                name = 'toggleRightPanel';
+            } else if (key === '3' || code === 'Digit3' || code === 'Numpad3') {
                 name = 'expandRightPanel';
-            } else if (ctrl && key === 'f') {
-                name = 'find';
-            } else if (ctrl && key === 'p') {
-                name = 'print';
-            } else if (ctrl && key === 'w') {
+            } else if (key === 'n' || code === 'KeyN') {
+                name = 'newTab';
+            } else if (key === 's' || code === 'KeyS') {
+                name = shift ? 'saveAs' : 'save';
+            } else if (key === 'o' || code === 'KeyO') {
+                name = 'open';
+            } else if (key === 'w' || code === 'KeyW') {
                 name = 'closeTab';
+            } else if (key === 'p' || code === 'KeyP') {
+                name = 'print';
+            } else if (key === 'f' || code === 'KeyF') {
+                name = shift ? 'searchAll' : 'find';
+            } else if (code === 'Backquote' || key === '`' || key === '~' || key === 'dead') {
+                name = 'terminal';
             }
         }
 
         if (!name) return;
         event.preventDefault();
         event.stopPropagation();
+        if (event.stopImmediatePropagation) {
+            event.stopImmediatePropagation();
+        }
         post(name);
-    }, true);
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown, true);
 })();
 ";
     }
