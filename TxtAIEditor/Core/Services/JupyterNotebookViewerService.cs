@@ -298,44 +298,65 @@ namespace TxtAIEditor.Core.Services
             var sb = new StringBuilder();
             bool inList = false;
             bool inOl = false;
+            bool inQuote = false;
 
             foreach (string raw in lines)
             {
                 string line = raw.TrimEnd();
 
-                if (line.StartsWith("# "))
+                if (line.StartsWith("> "))
                 {
                     if (inList) { sb.AppendLine("</ul>"); inList = false; }
                     if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (!inQuote) { sb.AppendLine("<blockquote>"); inQuote = true; }
+                    sb.AppendLine($"<p>{InlineMd(line.Substring(2))}</p>");
+                }
+                else if (line.StartsWith(">"))
+                {
+                    if (inList) { sb.AppendLine("</ul>"); inList = false; }
+                    if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (!inQuote) { sb.AppendLine("<blockquote>"); inQuote = true; }
+                    sb.AppendLine($"<p>{InlineMd(line.Substring(1))}</p>");
+                }
+                else if (line.StartsWith("# "))
+                {
+                    if (inList) { sb.AppendLine("</ul>"); inList = false; }
+                    if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (inQuote) { sb.AppendLine("</blockquote>"); inQuote = false; }
                     sb.AppendLine($"<h1>{InlineMd(line.Substring(2))}</h1>");
                 }
                 else if (line.StartsWith("## "))
                 {
                     if (inList) { sb.AppendLine("</ul>"); inList = false; }
                     if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (inQuote) { sb.AppendLine("</blockquote>"); inQuote = false; }
                     sb.AppendLine($"<h2>{InlineMd(line.Substring(3))}</h2>");
                 }
                 else if (line.StartsWith("### "))
                 {
                     if (inList) { sb.AppendLine("</ul>"); inList = false; }
                     if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (inQuote) { sb.AppendLine("</blockquote>"); inQuote = false; }
                     sb.AppendLine($"<h3>{InlineMd(line.Substring(4))}</h3>");
                 }
                 else if (line.StartsWith("#### "))
                 {
                     if (inList) { sb.AppendLine("</ul>"); inList = false; }
                     if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (inQuote) { sb.AppendLine("</blockquote>"); inQuote = false; }
                     sb.AppendLine($"<h4>{InlineMd(line.Substring(5))}</h4>");
                 }
                 else if (line.StartsWith("- ") || line.StartsWith("* "))
                 {
                     if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (inQuote) { sb.AppendLine("</blockquote>"); inQuote = false; }
                     if (!inList) { sb.AppendLine("<ul>"); inList = true; }
                     sb.AppendLine($"<li>{InlineMd(line.Substring(2))}</li>");
                 }
                 else if (line.Length > 0 && char.IsDigit(line[0]) && line.Contains(". "))
                 {
                     if (inList) { sb.AppendLine("</ul>"); inList = false; }
+                    if (inQuote) { sb.AppendLine("</blockquote>"); inQuote = false; }
                     if (!inOl) { sb.AppendLine("<ol>"); inOl = true; }
                     int dot = line.IndexOf(". ");
                     sb.AppendLine($"<li>{InlineMd(line.Substring(dot + 2))}</li>");
@@ -344,17 +365,20 @@ namespace TxtAIEditor.Core.Services
                 {
                     if (inList) { sb.AppendLine("</ul>"); inList = false; }
                     if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (inQuote) { sb.AppendLine("</blockquote>"); inQuote = false; }
                 }
                 else
                 {
                     if (inList) { sb.AppendLine("</ul>"); inList = false; }
                     if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
+                    if (inQuote) { sb.AppendLine("</blockquote>"); inQuote = false; }
                     sb.AppendLine($"<p>{InlineMd(line)}</p>");
                 }
             }
 
             if (inList) sb.AppendLine("</ul>");
             if (inOl) sb.AppendLine("</ol>");
+            if (inQuote) sb.AppendLine("</blockquote>");
             return sb.ToString();
         }
 
@@ -612,6 +636,79 @@ body {
 .cell-output .output-error { color: var(--nb-error); }
 .cell-output .output-result { color: var(--nb-accent); font-style: italic; }
 .cell-running .cell-run { background: var(--nb-accent); color: #fff; opacity: 1; }
+.cell-btn.is-running, .nb-btn-run.is-running { background: #d32f2f !important; color: #fff !important; border-color: #d32f2f !important; opacity: 1 !important; }
+blockquote {
+    border-left: 4px solid var(--nb-accent);
+    margin: 6px 0;
+    padding: 4px 12px;
+    background: rgba(128,128,128,0.08);
+    border-radius: 0 4px 4px 0;
+}
+.cell-output table.dataframe {
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 13px;
+    font-family: 'Consolas', 'Segoe UI', monospace;
+    width: auto;
+    max-width: 100%;
+    overflow-x: auto;
+    display: block;
+    border: 1px solid var(--nb-border);
+    border-radius: 4px;
+}
+.cell-output table.dataframe th, .cell-output table.dataframe td {
+    padding: 6px 12px;
+    border: 1px solid var(--nb-border);
+    text-align: right;
+}
+.cell-output table.dataframe th {
+    background: var(--nb-input-bg);
+    font-weight: 600;
+    text-align: center;
+}
+.cell-output table.dataframe tbody tr:nth-child(even) {
+    background: rgba(128,128,128,0.05);
+}
+.nb-input-request-box {
+    margin: 8px 0;
+    padding: 8px 12px;
+    border: 1px solid var(--nb-accent);
+    border-radius: 4px;
+    background: var(--nb-input-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.nb-input-prompt {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--nb-fg);
+}
+.nb-input-controls {
+    display: flex;
+    gap: 8px;
+}
+.nb-input-field {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--nb-border);
+    border-radius: 4px;
+    background: var(--nb-bg);
+    color: var(--nb-fg);
+    font-family: monospace;
+    font-size: 13px;
+    outline: none;
+}
+.nb-input-field:focus {
+    border-color: var(--nb-accent);
+}
+.mpl-status-text {
+    margin-left: auto;
+    font-size: 11px;
+    color: #888;
+    white-space: nowrap;
+    user-select: none;
+}
 h1, h2, h3, h4 { margin: 8px 0; }
 h1 { font-size: 1.6em; }
 h2 { font-size: 1.4em; }
@@ -894,7 +991,7 @@ strong { font-weight: 700; }
         if (!md) return '';
         const lines = md.replace(/\r\n/g, '\n').split('\n');
         let html = '';
-        let inList = false, inOl = false, inCodeBlock = false;
+        let inList = false, inOl = false, inQuote = false, inCodeBlock = false;
         let codeBuffer = [];
 
         for (let i = 0; i < lines.length; i++) {
@@ -908,6 +1005,7 @@ strong { font-weight: 700; }
                 } else {
                     if (inList) { html += '</ul>'; inList = false; }
                     if (inOl) { html += '</ol>'; inOl = false; }
+                    if (inQuote) { html += '</blockquote>'; inQuote = false; }
                     inCodeBlock = true;
                 }
                 continue;
@@ -920,42 +1018,65 @@ strong { font-weight: 700; }
 
             const trimmed = line.trimEnd();
 
-            if (/^#\s+/.test(trimmed)) {
+            if (trimmed.startsWith('> ')) {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
+                if (!inQuote) { html += '<blockquote>'; inQuote = true; }
+                html += '<p>' + inlineMdJs(trimmed.slice(2)) + '</p>';
+            } else if (trimmed.startsWith('>')) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                if (!inQuote) { html += '<blockquote>'; inQuote = true; }
+                html += '<p>' + inlineMdJs(trimmed.slice(1)) + '</p>';
+            } else if (/^#\s+/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<h1>' + inlineMdJs(trimmed.slice(2)) + '</h1>';
             } else if (/^##\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<h2>' + inlineMdJs(trimmed.slice(3)) + '</h2>';
             } else if (/^###\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<h3>' + inlineMdJs(trimmed.slice(4)) + '</h3>';
             } else if (/^####\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<h4>' + inlineMdJs(trimmed.slice(5)) + '</h4>';
             } else if (/^[-*]\s+/.test(trimmed)) {
                 if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 if (!inList) { html += '<ul>'; inList = true; }
                 html += '<li>' + inlineMdJs(trimmed.slice(2)) + '</li>';
             } else if (/^\d+\.\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 if (!inOl) { html += '<ol>'; inOl = true; }
                 html += '<li>' + inlineMdJs(trimmed.replace(/^\d+\.\s+/, '')) + '</li>';
             } else if (trimmed === '---' || trimmed === '***') {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<hr/>';
             } else if (trimmed.length > 0) {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<p>' + inlineMdJs(trimmed) + '</p>';
+            } else {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
             }
         }
         if (inList) html += '</ul>';
         if (inOl) html += '</ol>';
+        if (inQuote) html += '</blockquote>';
         if (inCodeBlock) html += '<pre><code>' + escapeHtml(codeBuffer.join('\n')) + '</code></pre>';
         return html;
     }
@@ -1306,20 +1427,22 @@ strong { font-weight: 700; }
         let html = '';
 
         if (resp.stdout) {
-            const parts = resp.stdout.split(/(<!--MPL_START-->[\s\S]*?<!--MPL_END-->|<img\s+src=""data:image\/[^"">]+""?[^>]*\/>)/gi);
+            const parts = resp.stdout.split(/(<!--MPL_START-->[\s\S]*?<!--MPL_END-->|<img\s+src=""data:image\/[^"">]+""?[^>]*\/>|<table[\s\S]*?<\/table>|<div\s+class=""dataframe""[\s\S]*?<\/div>)/gi);
             for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
                 if (!part) continue;
-                if (part.startsWith('<!--MPL_START-->') || /^<img\s+src=""data:image\//i.test(part)) {
+                if (part.startsWith('<!--MPL_START-->') || /^<img\s+src=""data:image\//i.test(part) || /^<table/i.test(part) || /^<div\s+class=""dataframe""/i.test(part)) {
                     const imgMatch = part.match(/src=""data:(image\/[a-zA-Z\+\-]+);base64,([\s\S]+?)""/i);
                     const outObj = {
-                        output_type: ""display_data"",
+                        output_type: (part.includes('<table') || part.includes('dataframe')) ? ""execute_result"" : ""display_data"",
                         data: {},
                         metadata: {}
                     };
                     if (imgMatch) {
                         outObj.data[imgMatch[1]] = imgMatch[2].replace(/[\r\n\s]/g, '');
                         outObj.data[""text/plain""] = ""<Figure size>"";
+                    } else if (part.includes('<table')) {
+                        outObj.data[""text/html""] = part;
                     }
                     html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '>' + part + '</div>';
                 } else {
@@ -1364,6 +1487,8 @@ strong { font-weight: 700; }
         return html;
     }
 
+    let runningCells = new Set();
+
     async function runCell(cellDiv) {
         const type = getCellType(cellDiv);
         if (type === 'markdown') {
@@ -1375,7 +1500,22 @@ strong { font-weight: 700; }
         const outputDiv = cellDiv.querySelector('.cell-output');
         if (!outputDiv) return;
 
+        const cellIndex = parseInt(cellDiv.getAttribute('data-cell-index'));
+        const runBtn = cellDiv.querySelector('.cell-run');
+
+        if (runningCells.has(cellIndex)) {
+            try {
+                window.chrome.webview.postMessage(JSON.stringify({ type: 'stopExecution' }));
+            } catch (ex) {}
+            return;
+        }
+
+        runningCells.add(cellIndex);
         cellDiv.classList.add('cell-running');
+        if (runBtn) {
+            runBtn.textContent = '■ Stop';
+            runBtn.classList.add('is-running');
+        }
         outputDiv.classList.add('has-output');
         outputDiv.innerHTML = '<span style=""color:#888;"">Running...</span>';
 
@@ -1384,10 +1524,10 @@ strong { font-weight: 700; }
                 window.chrome.webview.postMessage(JSON.stringify({
                     type: 'executeCell',
                     code: source,
-                    cellIndex: parseInt(cellDiv.getAttribute('data-cell-index'))
+                    cellIndex: cellIndex
                 }));
                 window.__pendingCellExecutions = window.__pendingCellExecutions || {};
-                window.__pendingCellExecutions[cellDiv.getAttribute('data-cell-index')] = resolve;
+                window.__pendingCellExecutions[String(cellIndex)] = resolve;
             });
 
             let html = renderCellOutputsFromResponse(resp);
@@ -1409,8 +1549,14 @@ strong { font-weight: 700; }
             };
             outputDiv.classList.add('has-output');
             outputDiv.innerHTML = '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(errObj)) + '""' + '><span class=""output-error"">' + escapeHtml(String(e)) + '</span></div>';
+        } finally {
+            runningCells.delete(cellIndex);
+            cellDiv.classList.remove('cell-running');
+            if (runBtn) {
+                runBtn.textContent = '▶ Run';
+                runBtn.classList.remove('is-running');
+            }
         }
-        cellDiv.classList.remove('cell-running');
     }
 
     async function saveNotebook() {
@@ -2104,7 +2250,35 @@ strong { font-weight: 700; }
         const cellDiv = input.closest('.cell');
         if (!cellDiv) return;
 
-        if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+        if (e.key === 'Backspace' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            const codeEditor = input.closest('.code-editor');
+            if (codeEditor) {
+                const sel = window.getSelection();
+                if (sel && sel.isCollapsed && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
+                    const node = range.startContainer;
+                    if (node.nodeType === Node.TEXT_NODE && node.textContent) {
+                        const offset = range.startOffset;
+                        const textBefore = node.textContent.slice(0, offset);
+                        const lineStart = textBefore.lastIndexOf('\n') + 1;
+                        const linePrefix = textBefore.slice(lineStart);
+                        if (linePrefix.length > 0 && /^\s+$/.test(linePrefix)) {
+                            e.preventDefault();
+                            const deleteCount = linePrefix.length % 4 === 0 ? 4 : linePrefix.length % 4;
+                            const newOffset = offset - deleteCount;
+                            node.textContent = node.textContent.slice(0, offset - deleteCount) + node.textContent.slice(offset);
+                            const newRange = document.createRange();
+                            newRange.setStart(node, newOffset);
+                            newRange.collapse(true);
+                            sel.removeAllRanges();
+                            sel.addRange(newRange);
+                            notifyModified();
+                            return;
+                        }
+                    }
+                }
+            }
+        } else if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
             const codeEditor = input.closest('.code-editor');
             if (codeEditor) {
                 e.preventDefault();
@@ -2201,14 +2375,38 @@ strong { font-weight: 700; }
     const btnSave = document.getElementById('btn-save');
     if (btnSave) btnSave.addEventListener('click', saveNotebook);
 
-    document.getElementById('btn-run-all').addEventListener('click', async () => {
-        const cells = Array.from(container.querySelectorAll('.cell'));
-        for (const cell of cells) {
-            if (getCellType(cell) === 'code') {
-                await runCell(cell);
+    let isRunAllActive = false;
+
+    const btnRunAll = document.getElementById('btn-run-all');
+    if (btnRunAll) {
+        btnRunAll.addEventListener('click', async () => {
+            if (isRunAllActive) {
+                try {
+                    window.chrome.webview.postMessage(JSON.stringify({ type: 'stopExecution' }));
+                } catch (ex) {}
+                isRunAllActive = false;
+                btnRunAll.textContent = 'Run All';
+                btnRunAll.classList.remove('is-running');
+                return;
             }
-        }
-    });
+            isRunAllActive = true;
+            btnRunAll.textContent = '■ Stop All';
+            btnRunAll.classList.add('is-running');
+            try {
+                const cells = Array.from(container.querySelectorAll('.cell'));
+                for (const cell of cells) {
+                    if (!isRunAllActive) break;
+                    if (getCellType(cell) === 'code') {
+                        await runCell(cell);
+                    }
+                }
+            } finally {
+                isRunAllActive = false;
+                btnRunAll.textContent = 'Run All';
+                btnRunAll.classList.remove('is-running');
+            }
+        });
+    }
 
     function exportToPythonScript() {
         const cells = Array.from(container.querySelectorAll('.cell'));
@@ -2373,6 +2571,51 @@ strong { font-weight: 700; }
         }
     };
 
+    // Receive input request from Python kernel
+    window.__notebookReceiveInputRequest = function(cellIndex, prompt) {
+        const cellDiv = container.querySelector('.cell[data-cell-index=""' + cellIndex + '""]');
+        if (!cellDiv) return;
+        const outputDiv = cellDiv.querySelector('.cell-output');
+        if (!outputDiv) return;
+
+        outputDiv.classList.add('has-output');
+
+        const inputContainer = document.createElement('div');
+        inputContainer.className = 'nb-input-request-box';
+        inputContainer.innerHTML = 
+            '<div class=""nb-input-prompt"">' + escapeHtml(prompt || 'Input:') + '</div>' +
+            '<div class=""nb-input-controls"">' +
+                '<input type=""text"" class=""nb-input-field"" placeholder=""Enter input..."" />' +
+                '<button class=""nb-btn nb-input-submit"">Submit</button>' +
+            '</div>';
+
+        const field = inputContainer.querySelector('.nb-input-field');
+        const submitBtn = inputContainer.querySelector('.nb-input-submit');
+
+        function sendInput() {
+            const val = field.value || '';
+            inputContainer.remove();
+            const valDiv = document.createElement('div');
+            valDiv.className = 'output-entry';
+            valDiv.innerHTML = '<span class=""output-stdout"">' + escapeHtml((prompt || '') + val + '\n') + '</span>';
+            outputDiv.appendChild(valDiv);
+            try {
+                window.chrome.webview.postMessage(JSON.stringify({ type: 'inputReply', value: val }));
+            } catch (ex) {}
+        }
+
+        submitBtn.addEventListener('click', sendInput);
+        field.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendInput();
+            }
+        });
+
+        outputDiv.appendChild(inputContainer);
+        setTimeout(() => field.focus(), 50);
+    };
+
     // Receive plot image saved result from host
     window.__notebookPlotSavedResult = function(success, fileName) {
         const btn = window.__lastSavePlotBtn;
@@ -2400,12 +2643,10 @@ strong { font-weight: 700; }
                             '<button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>' +
                             '<button class=""mpl-btn mpl-btn-zoom"" title=""Toggle Zoom Mode (Scroll Wheel)"">🔍 Zoom</button>' +
                             '<button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>' +
+                            '<span class=""mpl-status-text"">Drag: Pan | Enable 🔍 Zoom + Wheel to Zoom</span>' +
                         '</div>' +
                         '<div class=""mpl-viewport"">' +
                             '<div class=""mpl-plot-layer""></div>' +
-                        '</div>' +
-                        '<div class=""mpl-status-bar"">' +
-                            '<span>Drag: Pan | Enable 🔍 Zoom + Wheel to Zoom</span>' +
                         '</div>';
                     img.parentNode.insertBefore(wrapper, img);
                     const plotLayer = wrapper.querySelector('.mpl-plot-layer');

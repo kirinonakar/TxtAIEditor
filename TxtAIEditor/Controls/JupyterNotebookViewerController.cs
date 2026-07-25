@@ -238,6 +238,15 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     int cellIndex = root.TryGetProperty("cellIndex", out var ci) ? ci.GetInt32() : 0;
                     _ = ExecuteCellAsync(sender, tab, cellIndex, code);
                 }
+                else if (string.Equals(type, "stopExecution", StringComparison.Ordinal))
+                {
+                    _kernelService.InterruptSession(tab.Id);
+                }
+                else if (string.Equals(type, "inputReply", StringComparison.Ordinal))
+                {
+                    string val = root.TryGetProperty("value", out var vVal) ? vVal.GetString() ?? "" : "";
+                    _ = _kernelService.SendInputReplyAsync(tab.Id, val);
+                }
                 else if (string.Equals(type, "getVariables", StringComparison.Ordinal))
                 {
                     _ = GetVariablesAsync(sender, tab);
@@ -360,7 +369,15 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     return;
                 }
 
-                var result = await _kernelService.ExecuteAsync(tab.Id, python, workDir, code);
+                var result = await _kernelService.ExecuteAsync(tab.Id, python, workDir, code, async (prompt) =>
+                {
+                    string script = $"window.__notebookReceiveInputRequest && window.__notebookReceiveInputRequest({cellIndex}, {JsonSerializer.Serialize(prompt)});";
+                    webView.DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        try { await webView.ExecuteScriptAsync(script); } catch { }
+                    });
+                    await Task.CompletedTask;
+                });
 
                 await SendResultAsync(webView, cellIndex, result.Status, result.Stdout, result.Stderr, result.Result, result.VariablesJson);
             }

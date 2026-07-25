@@ -59,16 +59,32 @@ namespace TxtAIEditor.Core.Services
             return session;
         }
 
-        public async Task<KernelExecutionResult> ExecuteAsync(string tabId, string pythonExecutable, string workingDirectory, string code)
+        public async Task<KernelExecutionResult> ExecuteAsync(string tabId, string pythonExecutable, string workingDirectory, string code, Func<string, Task>? onInputRequest = null)
         {
             try
             {
                 var session = await GetOrCreateSessionAsync(tabId, pythonExecutable, workingDirectory);
-                return await session.ExecuteAsync(code);
+                return await session.ExecuteAsync(code, onInputRequest);
             }
             catch (Exception ex)
             {
                 return new KernelExecutionResult("error", string.Empty, ex.Message);
+            }
+        }
+
+        public async Task SendInputReplyAsync(string tabId, string replyValue)
+        {
+            if (_sessions.TryGetValue(tabId, out var session))
+            {
+                await session.SendInputReplyAsync(replyValue);
+            }
+        }
+
+        public void InterruptSession(string tabId)
+        {
+            if (_sessions.TryRemove(tabId, out var session))
+            {
+                session.Dispose();
             }
         }
 
@@ -134,13 +150,33 @@ namespace TxtAIEditor.Core.Services
             private readonly string _pythonExecutable;
             private readonly string _workingDirectory;
             private static readonly string KernelScript = @"
-import sys, json, io, base64, contextlib, traceback, ast
+import sys, json, io, base64, contextlib, traceback, ast, builtins
 
 try:
     if hasattr(sys.stdin, 'reconfigure'): sys.stdin.reconfigure(line_buffering=True)
     if hasattr(sys.stdout, 'reconfigure'): sys.stdout.reconfigure(line_buffering=True)
 except Exception:
     pass
+
+def _custom_input(prompt=''):
+    try:
+        p_str = str(prompt) if prompt is not None else ''
+        sys.stdout.write(json.dumps({'type': 'input_request', 'prompt': p_str}, ensure_ascii=False) + '\n')
+        sys.stdout.flush()
+        line = sys.stdin.readline()
+        if not line:
+            return ''
+        try:
+            data = json.loads(line)
+            if isinstance(data, dict) and 'value' in data:
+                return str(data['value'])
+            return line.rstrip('\r\n')
+        except Exception:
+            return line.rstrip('\r\n')
+    except Exception:
+        return ''
+
+builtins.input = _custom_input
 
 _ns = {'__name__': '__main__'}
 _inline_backend_config = {'figure_format': 'retina', 'dpi': 200}
@@ -345,12 +381,14 @@ def _render_figure_html(fig, fig_id=None):
             <span class=""mpl-angle-val-x"">{cur_elev}°</span>
         </div>
         <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
+        <span class=""mpl-status-text"">{status_text}</span>
     </div>'''
 
-    toolbar_2d = '''<div class=""mpl-toolbar"">
+    toolbar_2d = f'''<div class=""mpl-toolbar"">
         <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
         <button class=""mpl-btn mpl-btn-zoom"" title=""Toggle Zoom Mode (Scroll Wheel)"">🔍 Zoom</button>
         <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
+        <span class=""mpl-status-text"">{status_text}</span>
     </div>'''
 
     toolbar = toolbar_3d if is_3d else toolbar_2d
@@ -391,9 +429,6 @@ def _render_figure_html(fig, fig_id=None):
             <img src=""data:{mime};base64,{b64_cbar}"" class=""mpl-cbar-img"" />
         </div>
     </div>
-    <div class=""mpl-status-bar"">
-        <span>{status_text}</span>
-    </div>
 </div><!--MPL_END-->'''
         except Exception:
             pass
@@ -413,9 +448,6 @@ def _render_figure_html(fig, fig_id=None):
                 </div>
             </div>
         </div>
-    </div>
-    <div class=""mpl-status-bar"">
-        <span>{status_text}</span>
     </div>
 </div><!--MPL_END-->'''
 
@@ -635,7 +667,17 @@ while True:
                 await Task.CompletedTask;
             }
 
-            public async Task<KernelExecutionResult> ExecuteAsync(string code)
+            public async Task SendInputReplyAsync(string replyValue)
+            {
+                if (_process != null && !_process.HasExited)
+                {
+                    var json = JsonSerializer.Serialize(new { value = replyValue });
+                    await _process.StandardInput.WriteLineAsync(json);
+                    await _process.StandardInput.FlushAsync();
+                }
+            }
+
+            public async Task<KernelExecutionResult> ExecuteAsync(string code, Func<string, Task>? onInputRequest = null)
             {
                 if (_process == null || _process.HasExited)
                 {
@@ -648,7 +690,7 @@ while True:
                 await _process.StandardInput.WriteLineAsync(command);
                 await _process.StandardInput.FlushAsync();
 
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(600));
                 while (!cts.Token.IsCancellationRequested)
                 {
                     if (_process.HasExited)
@@ -676,14 +718,27 @@ while True:
                     {
                         using var doc = JsonDocument.Parse(line);
                         var root = doc.RootElement;
-                        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("status", out var s))
+                        if (root.ValueKind == JsonValueKind.Object)
                         {
-                            string status = s.GetString() ?? "ok";
-                            string stdout = root.TryGetProperty("stdout", out var so) ? so.GetString() ?? string.Empty : string.Empty;
-                            string stderr = root.TryGetProperty("stderr", out var se) ? se.GetString() ?? string.Empty : string.Empty;
-                            string result = root.TryGetProperty("result", out var r) ? r.GetString() ?? string.Empty : string.Empty;
-                            string varsJson = root.TryGetProperty("variables", out var v) ? v.GetRawText() : "[]";
-                            return new KernelExecutionResult(status, stdout, stderr, result, varsJson);
+                            if (root.TryGetProperty("type", out var tProp) && string.Equals(tProp.GetString(), "input_request", StringComparison.Ordinal))
+                            {
+                                string prompt = root.TryGetProperty("prompt", out var pProp) ? pProp.GetString() ?? "" : "";
+                                if (onInputRequest != null)
+                                {
+                                    await onInputRequest(prompt);
+                                }
+                                continue;
+                            }
+
+                            if (root.TryGetProperty("status", out var s))
+                            {
+                                string status = s.GetString() ?? "ok";
+                                string stdout = root.TryGetProperty("stdout", out var so) ? so.GetString() ?? string.Empty : string.Empty;
+                                string stderr = root.TryGetProperty("stderr", out var se) ? se.GetString() ?? string.Empty : string.Empty;
+                                string result = root.TryGetProperty("result", out var r) ? r.GetString() ?? string.Empty : string.Empty;
+                                string varsJson = root.TryGetProperty("variables", out var v) ? v.GetRawText() : "[]";
+                                return new KernelExecutionResult(status, stdout, stderr, result, varsJson);
+                            }
                         }
                     }
                     catch
