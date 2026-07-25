@@ -461,12 +461,8 @@ namespace TxtAIEditor.Controls
                     return WithFailureContext(
                         $"replace_range failed: expectedStartLines is required and must have at least {minimumBoundaryLineCount} element(s).");
                 }
-                if (expectedStartLines.Count > lineCount)
-                {
-                    return WithFailureContext(
-                        $"replace_range failed: expectedStartLines has {expectedStartLines.Count} elements, but the requested range only has {lineCount} lines.");
-                }
-                for (int i = 0; i < expectedStartLines.Count; i++)
+                int startCheckCount = Math.Min(expectedStartLines.Count, lines.Length - (startLine - 1));
+                for (int i = 0; i < startCheckCount; i++)
                 {
                     int fileLineIndex = startLine - 1 + i;
                     if (!LinesMatch(lines[fileLineIndex], expectedStartLines[i]))
@@ -481,19 +477,17 @@ namespace TxtAIEditor.Controls
                     return WithFailureContext(
                         $"replace_range failed: expectedEndLines is required and must have at least {minimumBoundaryLineCount} element(s).");
                 }
-                if (expectedEndLines.Count > lineCount)
-                {
-                    return WithFailureContext(
-                        $"replace_range failed: expectedEndLines has {expectedEndLines.Count} elements, but the requested range only has {lineCount} lines.");
-                }
                 int expectedEndStartIndex = endLine - expectedEndLines.Count;
                 for (int i = 0; i < expectedEndLines.Count; i++)
                 {
                     int fileLineIndex = expectedEndStartIndex + i;
-                    if (!LinesMatch(lines[fileLineIndex], expectedEndLines[i]))
+                    if (fileLineIndex >= 0 && fileLineIndex < lines.Length)
                     {
-                        return WithFailureContext(
-                            $"replace_range failed: expectedEndLines[{i}] did not match line {fileLineIndex + 1} of the file.");
+                        if (!LinesMatch(lines[fileLineIndex], expectedEndLines[i]))
+                        {
+                            return WithFailureContext(
+                                $"replace_range failed: expectedEndLines[{i}] did not match line {fileLineIndex + 1} of the file.");
+                        }
                     }
                 }
             }

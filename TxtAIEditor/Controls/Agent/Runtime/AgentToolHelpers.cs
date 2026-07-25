@@ -267,7 +267,7 @@ namespace TxtAIEditor.Controls
             }
 
             // Tool-generated failure messages always start at the beginning of the
-            // result string.  Only check the first line so that file content or search
+            // result string. Only check the first line so that file content or search
             // results containing these substrings deeper in the body are not mistaken
             // for failures (which would bypass non-verbose summarisation).
             string firstLine = result;
@@ -278,6 +278,16 @@ namespace TxtAIEditor.Controls
             }
             firstLine = firstLine.TrimEnd('\r');
 
+            // Internal file/search tools returning standard header blocks are successful
+            if (firstLine.StartsWith("[File: ", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.StartsWith("[Files in ", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.StartsWith("[Matching files ", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.StartsWith("[Search results ", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.StartsWith("[Matches in ", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             if (firstLine.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase) ||
                 firstLine.Contains(" failed:", StringComparison.OrdinalIgnoreCase) ||
                 firstLine.Contains(" cancelled", StringComparison.OrdinalIgnoreCase) ||
@@ -286,12 +296,14 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            // Only match [exit_code] at the start of a line. RunProcessAsync
-            // always appends it on its own line, so this correctly identifies
-            // process exit codes while avoiding false matches inside file
-            // content returned by read_file (e.g. source code that contains
-            // the literal string "[exit_code] 1").
-            var exitCodeMatch = Regex.Match(result, @"^\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            // Process exit code is appended at the end of output by RunProcessAsync.
+            // Match [exit_code] anchored to the end of string to avoid false matches in file content.
+            var exitCodeMatch = Regex.Match(result, @"\r?\n\[exit_code\]\s+(-?\d+)\s*$", RegexOptions.IgnoreCase);
+            if (!exitCodeMatch.Success)
+            {
+                exitCodeMatch = Regex.Match(result, @"^\[exit_code\]\s+(-?\d+)\s*$", RegexOptions.IgnoreCase);
+            }
+
             if (!exitCodeMatch.Success)
             {
                 return true;
