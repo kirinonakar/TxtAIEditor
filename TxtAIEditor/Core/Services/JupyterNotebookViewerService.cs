@@ -626,7 +626,7 @@ body {
     margin: 4px 0;
 }
 .cell-output {
-    padding: 10px 14px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
+    padding: 4px 10px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
     font-family: 'Consolas', monospace; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
     display: none; min-height: 0; box-sizing: border-box;
 }
@@ -646,31 +646,37 @@ blockquote {
 }
 .cell-output table.dataframe {
     border-collapse: collapse;
-    margin: 8px 0;
+    margin: 4px 0;
     font-size: 13px;
-    font-family: 'Consolas', 'Segoe UI', monospace;
+    font-family: 'Segoe UI', 'Consolas', monospace;
     width: auto;
+    min-width: 50%;
     max-width: 100%;
-    overflow-x: auto;
-    display: block;
+    display: table;
+    table-layout: auto;
     border: 1px solid var(--nb-border);
     border-radius: 4px;
+    box-sizing: border-box;
 }
 .cell-output table.dataframe th, .cell-output table.dataframe td {
-    padding: 6px 12px;
+    padding: 5px 12px;
     border: 1px solid var(--nb-border);
     text-align: right;
+    vertical-align: middle;
+    white-space: nowrap;
+    box-sizing: border-box;
 }
 .cell-output table.dataframe th {
     background: var(--nb-input-bg);
     font-weight: 600;
-    text-align: center;
+    color: var(--nb-fg);
+    text-align: right;
 }
 .cell-output table.dataframe tbody tr:nth-child(even) {
     background: rgba(128,128,128,0.05);
 }
 .nb-input-request-box {
-    margin: 8px 0;
+    margin: 6px 0;
     padding: 8px 12px;
     border: 1px solid var(--nb-accent);
     border-radius: 4px;
@@ -733,7 +739,8 @@ strong { font-weight: 700; }
     display: block;
     max-width: 100%;
     box-sizing: border-box;
-    margin: 4px 0;
+    margin: 0;
+    padding: 0;
     border: 1px solid var(--nb-border);
     border-radius: 6px;
     background: var(--nb-output-bg);
@@ -746,7 +753,9 @@ strong { font-weight: 700; }
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
+    padding: 1px 6px;
+    margin: 0;
+    line-height: 1;
     background: var(--nb-input-bg);
     border-bottom: 1px solid var(--nb-border);
     font-size: 11px;
@@ -756,10 +765,12 @@ strong { font-weight: 700; }
     border: 1px solid var(--nb-border);
     background: var(--nb-bg);
     color: var(--nb-fg);
-    padding: 3px 8px;
-    border-radius: 4px;
+    padding: 2px 6px;
+    margin: 0;
+    line-height: 1.2;
+    border-radius: 3px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11px;
     transition: background 0.15s, border-color 0.15s;
 }
 .mpl-btn:hover {
@@ -776,7 +787,8 @@ strong { font-weight: 700; }
     align-items: center;
     gap: 6px;
     margin: 0 4px;
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1;
 }
 .mpl-rotate-slider {
     width: 100px;
@@ -793,9 +805,10 @@ strong { font-weight: 700; }
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    padding: 4px;
+    padding: 0;
+    margin: 0;
     background: var(--nb-output-bg);
-    min-height: 120px;
+    min-height: 40px;
     cursor: grab;
     max-width: 100%;
     box-sizing: border-box;
@@ -2271,13 +2284,9 @@ strong { font-weight: 700; }
                         if (linePrefix.length > 0 && /^\s+$/.test(linePrefix)) {
                             e.preventDefault();
                             const deleteCount = linePrefix.length % 4 === 0 ? 4 : linePrefix.length % 4;
-                            const newOffset = offset - deleteCount;
-                            node.textContent = node.textContent.slice(0, offset - deleteCount) + node.textContent.slice(offset);
-                            const newRange = document.createRange();
-                            newRange.setStart(node, newOffset);
-                            newRange.collapse(true);
-                            sel.removeAllRanges();
-                            sel.addRange(newRange);
+                            range.setStart(node, offset - deleteCount);
+                            range.setEnd(node, offset);
+                            range.deleteContents();
                             notifyModified();
                             return;
                         }
@@ -2585,6 +2594,9 @@ strong { font-weight: 700; }
         if (!outputDiv) return;
 
         outputDiv.classList.add('has-output');
+        if ((outputDiv.textContent || '').trim() === 'Running...') {
+            outputDiv.innerHTML = '';
+        }
 
         const inputContainer = document.createElement('div');
         inputContainer.className = 'nb-input-request-box';
@@ -2619,7 +2631,7 @@ strong { font-weight: 700; }
         });
 
         outputDiv.appendChild(inputContainer);
-        setTimeout(() => field.focus(), 50);
+        setTimeout(() => { if (field) field.focus(); }, 50);
     };
 
     // Receive plot image saved result from host
