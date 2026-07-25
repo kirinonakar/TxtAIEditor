@@ -366,6 +366,9 @@ def _render_figure_html(fig, fig_id=None):
         pass
 
     is_3d_str = 'true' if is_3d else 'false'
+    status_3d = 'Drag: Rotate | Middle: Pan | Enable 🔍 Zoom + Wheel to Zoom'
+    status_2d = 'Drag: Pan | Enable 🔍 Zoom + Wheel to Zoom'
+    status_text = status_3d if is_3d else status_2d
 
     toolbar_3d = f'''<div class=""mpl-toolbar"">
         <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
@@ -392,9 +395,6 @@ def _render_figure_html(fig, fig_id=None):
     </div>'''
 
     toolbar = toolbar_3d if is_3d else toolbar_2d
-    status_3d = 'Drag: Rotate | Middle: Pan | Enable 🔍 Zoom + Wheel to Zoom'
-    status_2d = 'Drag: Pan | Enable 🔍 Zoom + Wheel to Zoom'
-    status_text = status_3d if is_3d else status_2d
 
     if colorbars:
         try:

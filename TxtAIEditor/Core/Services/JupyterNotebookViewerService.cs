@@ -1427,11 +1427,17 @@ strong { font-weight: 700; }
         let html = '';
 
         if (resp.stdout) {
-            const parts = resp.stdout.split(/(<!--MPL_START-->[\s\S]*?<!--MPL_END-->|<img\s+src=""data:image\/[^"">]+""?[^>]*\/>|<table[\s\S]*?<\/table>|<div\s+class=""dataframe""[\s\S]*?<\/div>)/gi);
+            const parts = resp.stdout.split(/(<!--MPL_START-->[\s\S]*?<!--MPL_END-->|<img\s+src=""data:image\/[^"">]+""?[^>]*\/>|<div[\s\S]*?<table[\s\S]*?<\/table>[\s\S]*?<\/div>|<table[\s\S]*?<\/table>)/gi);
             for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
                 if (!part) continue;
-                if (part.startsWith('<!--MPL_START-->') || /^<img\s+src=""data:image\//i.test(part) || /^<table/i.test(part) || /^<div\s+class=""dataframe""/i.test(part)) {
+                const isHtmlOutput = part.startsWith('<!--MPL_START-->') || 
+                                     /^<img\s+src=""data:image\//i.test(part) || 
+                                     /^<table/i.test(part) || 
+                                     /^<div/i.test(part) || 
+                                     part.includes('<table') || 
+                                     part.includes('<style');
+                if (isHtmlOutput) {
                     const imgMatch = part.match(/src=""data:(image\/[a-zA-Z\+\-]+);base64,([\s\S]+?)""/i);
                     const outObj = {
                         output_type: (part.includes('<table') || part.includes('dataframe')) ? ""execute_result"" : ""display_data"",
@@ -1473,15 +1479,15 @@ strong { font-weight: 700; }
         }
 
         if (resp.result) {
+            const isHtmlResult = /^<div/i.test(resp.result) || /^<table/i.test(resp.result) || resp.result.includes('<table');
             const outObj = {
                 output_type: ""execute_result"",
-                data: {
-                    ""text/plain"": resp.result.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
-                },
+                data: isHtmlResult ? { ""text/html"": resp.result } : { ""text/plain"": resp.result.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l) },
                 metadata: {},
                 execution_count: null
             };
-            html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""output-result"">' + escapeHtml(resp.result) + '</span></div>';
+            const resultHtml = isHtmlResult ? resp.result : ('<span class=""output-result"">' + escapeHtml(resp.result) + '</span>');
+            html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '>' + resultHtml + '</div>';
         }
 
         return html;
