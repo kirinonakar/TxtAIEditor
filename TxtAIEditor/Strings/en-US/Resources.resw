@@ -3547,6 +3547,12 @@ Plan: {0}</value>
   <data name="CreateFileErrorTitle" xml:space="preserve"><value>Could not create file</value></data>
   <data name="CreateFileEmptyName" xml:space="preserve"><value>Enter a file name.</value></data>
   <data name="CreateFileInvalidName" xml:space="preserve"><value>The file name contains invalid characters.</value></data>
+  <data name="ExplorerCreateNotebookTooltip" xml:space="preserve"><value>New Notebook</value></data>
+  <data name="CreateNotebookDialogTitle" xml:space="preserve"><value>New Notebook</value></data>
+  <data name="CreateNotebookPlaceholder" xml:space="preserve"><value>Enter a notebook name...</value></data>
+  <data name="CreateNotebookErrorTitle" xml:space="preserve"><value>Could not create notebook</value></data>
+  <data name="CreateNotebookEmptyName" xml:space="preserve"><value>Enter a notebook name.</value></data>
+  <data name="CreateNotebookInvalidName" xml:space="preserve"><value>The notebook name contains invalid characters.</value></data>
   <data name="ExplorerDownload" xml:space="preserve"><value>Download</value></data>
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>Downloading...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>Download completed.</value></data>

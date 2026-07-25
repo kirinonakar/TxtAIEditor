@@ -24,9 +24,7 @@ namespace TxtAIEditor.Core.Services
             string filter =
                 $"{_getString("SaveDialogTextFileFilter", "텍스트 파일")} (*.txt)\0*.txt\0" +
                 $"{_getString("SaveDialogMarkdownFileFilter", "마크다운 파일")} (*.md;*.markdown)\0*.md;*.markdown\0" +
-                $"{_getString("SaveDialogHtmlFileFilter", "HTML 파일")} (*.html)\0*.html\0" +
-                $"{_getString("SaveDialogLatexFileFilter", "LaTeX 파일")} (*.tex)\0*.tex\0" +
-                $"{_getString("SaveDialogJupyterFileFilter", "Jupyter Notebook 파일")} (*.ipynb)\0*.ipynb\0\0";
+                $"{_getString("SaveDialogHtmlFileFilter", "HTML 파일")} (*.html)\0*.html\0\0";
             var fileNameBuffer = new string('\0', 1024);
             if (!string.IsNullOrEmpty(suggestedName))
             {
@@ -45,14 +43,6 @@ namespace TxtAIEditor.Core.Services
                          suggestedName.EndsWith(".htm", StringComparison.OrdinalIgnoreCase))
                 {
                     filterIndex = 3;
-                }
-                else if (suggestedName.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
-                {
-                    filterIndex = 4;
-                }
-                else if (suggestedName.EndsWith(".ipynb", StringComparison.OrdinalIgnoreCase))
-                {
-                    filterIndex = 5;
                 }
             }
 
@@ -104,20 +94,6 @@ namespace TxtAIEditor.Core.Services
                         !selectedPath.EndsWith(".htm", StringComparison.OrdinalIgnoreCase))
                     {
                         selectedPath += ".html";
-                    }
-                }
-                else if (ofn.nFilterIndex == 4)
-                {
-                    if (!selectedPath.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
-                    {
-                        selectedPath += ".tex";
-                    }
-                }
-                else if (ofn.nFilterIndex == 5)
-                {
-                    if (!selectedPath.EndsWith(".ipynb", StringComparison.OrdinalIgnoreCase))
-                    {
-                        selectedPath += ".ipynb";
                     }
                 }
             }

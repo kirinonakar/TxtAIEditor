@@ -39,6 +39,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? SelectFolderClick;
         public event RoutedEventHandler? CreateFolderClick;
         public event RoutedEventHandler? CreateFileClick;
+        public event RoutedEventHandler? CreateNotebookClick;
         public event RoutedEventHandler? RefreshClick;
         public event RoutedEventHandler? SortClick;
         public event EventHandler<RemoteFileOpenedEventArgs>? RemoteFileOpened
@@ -106,6 +107,7 @@ namespace TxtAIEditor.Controls
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerCreateFolderButton, createItemText);
             ExplorerCreateFolderMenuItem.Text = getString("ExplorerCreateFolderTooltip", "새 폴더");
             ExplorerCreateFileMenuItem.Text = getString("ExplorerCreateFileTooltip", "새 파일");
+            ExplorerCreateNotebookMenuItem.Text = getString("ExplorerCreateNotebookTooltip", "새 노트북");
             ToolTipService.SetToolTip(ExplorerRefreshButton, getString("ExplorerRefreshTooltip", "새로고침"));
             ToolTipService.SetToolTip(ExplorerSortButton, getString("ExplorerSortName", "이름순 정렬"));
 
@@ -133,6 +135,7 @@ namespace TxtAIEditor.Controls
         private void OnSelectFolderClick(object sender, RoutedEventArgs e) => SelectFolderClick?.Invoke(sender, e);
         private void OnCreateFolderClick(object sender, RoutedEventArgs e) => CreateFolderClick?.Invoke(sender, e);
         private void OnCreateFileClick(object sender, RoutedEventArgs e) => CreateFileClick?.Invoke(sender, e);
+        private void OnCreateNotebookClick(object sender, RoutedEventArgs e) => CreateNotebookClick?.Invoke(sender, e);
         private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
         private async void OnRemoteFlyoutOpening(object sender, object e) => await RemoteExplorer.RefreshProfilesAsync();

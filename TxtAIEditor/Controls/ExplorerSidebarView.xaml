@@ -40,6 +40,11 @@
                                                         <FontIcon Glyph="&#xE7C3;"/>
                                                     </MenuFlyoutItem.Icon>
                                                 </MenuFlyoutItem>
+                                                <MenuFlyoutItem x:Name="ExplorerCreateNotebookMenuItem" Text="새 노트북" Click="OnCreateNotebookClick">
+                                                    <MenuFlyoutItem.Icon>
+                                                        <FontIcon Glyph="&#xE94A;"/>
+                                                    </MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
                                             </MenuFlyout>
                                         </Button.Flyout>
                                             <FontIcon Glyph="&#xE710;" FontSize="10"/>
