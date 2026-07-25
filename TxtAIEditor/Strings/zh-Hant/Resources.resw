@@ -3530,4 +3530,5 @@
   <data name="JupyterVariablesValue" xml:space="preserve"><value>值</value></data>
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>沒有活動變數。</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>篩選變數...</value></data>
+  <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>所有檔案</value></data>
 </root>

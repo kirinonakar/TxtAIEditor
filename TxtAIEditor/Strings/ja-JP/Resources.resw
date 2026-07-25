@@ -3530,4 +3530,5 @@
   <data name="JupyterVariablesValue" xml:space="preserve"><value>値</value></data>
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>アクティブな変数はありません。</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>変数をフィルター...</value></data>
+  <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>すべてのファイル</value></data>
 </root>

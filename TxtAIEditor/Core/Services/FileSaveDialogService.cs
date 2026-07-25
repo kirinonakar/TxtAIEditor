@@ -24,7 +24,8 @@ namespace TxtAIEditor.Core.Services
             string filter =
                 $"{_getString("SaveDialogTextFileFilter", "텍스트 파일")} (*.txt)\0*.txt\0" +
                 $"{_getString("SaveDialogMarkdownFileFilter", "마크다운 파일")} (*.md;*.markdown)\0*.md;*.markdown\0" +
-                $"{_getString("SaveDialogHtmlFileFilter", "HTML 파일")} (*.html)\0*.html\0\0";
+                $"{_getString("SaveDialogHtmlFileFilter", "HTML 파일")} (*.html)\0*.html\0" +
+                $"{_getString("SaveDialogAllFilesFilter", "모든 형식")} (*.*)\0*.*\0\0";
             var fileNameBuffer = new string('\0', 1024);
             if (!string.IsNullOrEmpty(suggestedName))
             {
@@ -96,6 +97,7 @@ namespace TxtAIEditor.Core.Services
                         selectedPath += ".html";
                     }
                 }
+                // nFilterIndex == 4 ("모든 형식"): 확장자를 자동 추가하지 않음
             }
 
             return string.IsNullOrEmpty(selectedPath) ? null : selectedPath;

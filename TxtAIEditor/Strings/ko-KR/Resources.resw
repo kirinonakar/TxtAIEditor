@@ -3566,4 +3566,5 @@
   <data name="JupyterVariablesValue" xml:space="preserve"><value>값</value></data>
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>정의된 변수가 없습니다.</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>변수 검색...</value></data>
+  <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>모든 형식</value></data>
 </root>

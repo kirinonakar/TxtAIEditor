@@ -197,7 +197,7 @@ namespace TxtAIEditor.Core.Services
             var startInfo = new ProcessStartInfo
             {
                 FileName = GitExecutablePath.Value,
-                Arguments = $"-c core.quotepath=false {arguments}",
+                Arguments = $"-c core.quotepath=false -c safe.directory=* {arguments}",
                 WorkingDirectory = workingDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
