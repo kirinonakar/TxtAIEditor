@@ -98,6 +98,19 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        public async Task<string> Update2DViewAsync(string tabId, string pythonExecutable, string workingDirectory, string figId, double panFracX, double panFracY, double zoom)
+        {
+            try
+            {
+                var session = await GetOrCreateSessionAsync(tabId, pythonExecutable, workingDirectory);
+                return await session.Update2DViewAsync(figId, panFracX, panFracY, zoom);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
         public void CloseSession(string tabId)
         {
             if (_sessions.TryRemove(tabId, out var session))
@@ -171,12 +184,27 @@ def _get_variables():
     return vars_list
 
 _active_figures = {}
+_figure_view_state = {}
+
+def _store_figure_limits(fig, fig_id):
+    limits = []
+    for ax in fig.axes:
+        if hasattr(ax, 'view_init') or getattr(ax, 'name', '') == '3d' or '3d' in str(type(ax)).lower():
+            continue
+        try:
+            limits.append({'xlim': list(ax.get_xlim()), 'ylim': list(ax.get_ylim())})
+        except Exception:
+            pass
+    if limits:
+        _figure_view_state[fig_id] = {'orig_limits': limits}
 
 def _render_figure_html(fig, fig_id=None):
     import io, base64
     if not fig_id:
         fig_id = str(id(fig))
     _active_figures[fig_id] = fig
+    if fig_id not in _figure_view_state:
+        _store_figure_limits(fig, fig_id)
 
     is_3d = False
     cur_elev = 30
@@ -202,6 +230,31 @@ def _render_figure_html(fig, fig_id=None):
 
     is_3d_str = 'true' if is_3d else 'false'
 
+    toolbar_3d = f'''<div class=""mpl-toolbar"">
+        <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
+        <div class=""mpl-rotate-ctrl"">
+            <span>Azim:</span>
+            <input type=""range"" class=""mpl-rotate-y-slider"" min=""-180"" max=""180"" value=""{cur_azim}"" />
+            <span class=""mpl-angle-val-y"">{cur_azim}°</span>
+        </div>
+        <div class=""mpl-rotate-ctrl"">
+            <span>Elev:</span>
+            <input type=""range"" class=""mpl-rotate-x-slider"" min=""-90"" max=""90"" value=""{cur_elev}"" />
+            <span class=""mpl-angle-val-x"">{cur_elev}°</span>
+        </div>
+        <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
+    </div>'''
+
+    toolbar_2d = '''<div class=""mpl-toolbar"">
+        <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
+        <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
+    </div>'''
+
+    toolbar = toolbar_3d if is_3d else toolbar_2d
+    status_3d = 'Drag: Rotate (Re-render) | Middle: Pan | Wheel: Zoom'
+    status_2d = 'Drag: Pan | Wheel: Zoom'
+    status_text = status_3d if is_3d else status_2d
+
     if colorbars:
         try:
             for cb in colorbars: cb.set_visible(False)
@@ -221,22 +274,7 @@ def _render_figure_html(fig, fig_id=None):
             for ax in fig.axes: ax.set_visible(True)
 
             return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}"">
-    <div class=""mpl-toolbar"">
-        <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
-        <button class=""mpl-btn mpl-btn-pan active"" title=""Pan Mode"">✋ Pan</button>
-        <button class=""mpl-btn mpl-btn-rotate"" title=""3D View Rotate"">🔄 3D Rotate</button>
-        <div class=""mpl-rotate-ctrl"">
-            <span>Azim(Azim):</span>
-            <input type=""range"" class=""mpl-rotate-y-slider"" min=""-180"" max=""180"" value=""{cur_azim}"" />
-            <span class=""mpl-angle-val-y"">{cur_azim}°</span>
-        </div>
-        <div class=""mpl-rotate-ctrl"">
-            <span>Elev(Elev):</span>
-            <input type=""range"" class=""mpl-rotate-x-slider"" min=""-90"" max=""90"" value=""{cur_elev}"" />
-            <span class=""mpl-angle-val-x"">{cur_elev}°</span>
-        </div>
-        <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
-    </div>
+    {toolbar}
     <div class=""mpl-viewport"">
         <div class=""mpl-plot-layer"">
             <img src=""data:image/png;base64,{b64_main}"" class=""mpl-plot-img"" />
@@ -246,7 +284,7 @@ def _render_figure_html(fig, fig_id=None):
         </div>
     </div>
     <div class=""mpl-status-bar"">
-        <span>3D Rotate: Drag / Right-Click (Elev/Azim Re-render) | Pan: Middle-Click | Wheel: Zoom</span>
+        <span>{status_text}</span>
     </div>
 </div><!--MPL_END-->'''
         except Exception:
@@ -257,29 +295,14 @@ def _render_figure_html(fig, fig_id=None):
     buf.seek(0)
     b64 = base64.b64encode(buf.read()).decode('utf-8')
     return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}"">
-    <div class=""mpl-toolbar"">
-        <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
-        <button class=""mpl-btn mpl-btn-pan active"" title=""Pan Mode"">✋ Pan</button>
-        <button class=""mpl-btn mpl-btn-rotate"" title=""3D View Rotate"">🔄 3D Rotate</button>
-        <div class=""mpl-rotate-ctrl"">
-            <span>Azim(Azim):</span>
-            <input type=""range"" class=""mpl-rotate-y-slider"" min=""-180"" max=""180"" value=""{cur_azim}"" />
-            <span class=""mpl-angle-val-y"">{cur_azim}°</span>
-        </div>
-        <div class=""mpl-rotate-ctrl"">
-            <span>Elev(Elev):</span>
-            <input type=""range"" class=""mpl-rotate-x-slider"" min=""-90"" max=""90"" value=""{cur_elev}"" />
-            <span class=""mpl-angle-val-x"">{cur_elev}°</span>
-        </div>
-        <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
-    </div>
+    {toolbar}
     <div class=""mpl-viewport"">
         <div class=""mpl-plot-layer"">
             <img src=""data:image/png;base64,{b64}"" class=""mpl-plot-img"" />
         </div>
     </div>
     <div class=""mpl-status-bar"">
-        <span>3D Rotate: Drag / Right-Click (Elev/Azim Re-render) | Pan: Middle-Click | Wheel: Zoom</span>
+        <span>{status_text}</span>
     </div>
 </div><!--MPL_END-->'''
 
@@ -326,6 +349,41 @@ while True:
                             pass
                 html = _render_figure_html(fig, fig_id=fig_id)
                 sys.stdout.write(json.dumps({'status': 'ok', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': html, 'elev': elev, 'azim': azim}, ensure_ascii=False) + '\n')
+                sys.stdout.flush()
+            else:
+                sys.stdout.write(json.dumps({'status': 'error', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': ''}, ensure_ascii=False) + '\n')
+                sys.stdout.flush()
+            continue
+
+        if msg.get('type') == 'update2DView':
+            fig_id = str(msg.get('figId', ''))
+            pan_frac_x = float(msg.get('panFracX', 0))
+            pan_frac_y = float(msg.get('panFracY', 0))
+            zoom_val = float(msg.get('zoom', 1.0))
+            if zoom_val <= 0: zoom_val = 1.0
+            fig = _active_figures.get(fig_id)
+            state = _figure_view_state.get(fig_id)
+            if fig is not None and state is not None:
+                orig_limits = state['orig_limits']
+                ax_idx = 0
+                for ax in fig.axes:
+                    if hasattr(ax, 'view_init') or getattr(ax, 'name', '') == '3d' or '3d' in str(type(ax)).lower():
+                        continue
+                    if ax_idx < len(orig_limits):
+                        lim = orig_limits[ax_idx]
+                        ox0, ox1 = lim['xlim']
+                        oy0, oy1 = lim['ylim']
+                        xr = ox1 - ox0
+                        yr = oy1 - oy0
+                        xc = (ox0 + ox1) / 2.0 + pan_frac_x * xr
+                        yc = (oy0 + oy1) / 2.0 + pan_frac_y * yr
+                        nxr = xr / zoom_val
+                        nyr = yr / zoom_val
+                        ax.set_xlim(xc - nxr / 2, xc + nxr / 2)
+                        ax.set_ylim(yc - nyr / 2, yc + nyr / 2)
+                        ax_idx += 1
+                html = _render_figure_html(fig, fig_id=fig_id)
+                sys.stdout.write(json.dumps({'status': 'ok', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': html}, ensure_ascii=False) + '\n')
                 sys.stdout.flush()
             else:
                 sys.stdout.write(json.dumps({'status': 'error', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': ''}, ensure_ascii=False) + '\n')
@@ -558,6 +616,41 @@ while True:
                 }
 
                 var command = JsonSerializer.Serialize(new { type = "updatePlotView", figId, elev, azim });
+                await _process.StandardInput.WriteLineAsync(command);
+                await _process.StandardInput.FlushAsync();
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                while (!cts.Token.IsCancellationRequested)
+                {
+                    if (_process.HasExited) return string.Empty;
+
+                    string? line = await ReadLineWithTimeoutAsync(_process.StandardOutput, cts.Token);
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(line);
+                        var root = doc.RootElement;
+                        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("type", out var t) && t.GetString() == "plotViewUpdated")
+                        {
+                            string html = root.TryGetProperty("html", out var h) ? h.GetString() ?? string.Empty : string.Empty;
+                            return html;
+                        }
+                    }
+                    catch { }
+                }
+
+                return string.Empty;
+            }
+
+            public async Task<string> Update2DViewAsync(string figId, double panFracX, double panFracY, double zoom)
+            {
+                if (_process == null || _process.HasExited)
+                {
+                    return string.Empty;
+                }
+
+                var command = JsonSerializer.Serialize(new { type = "update2DView", figId, panFracX, panFracY, zoom });
                 await _process.StandardInput.WriteLineAsync(command);
                 await _process.StandardInput.FlushAsync();
 

@@ -243,6 +243,14 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     double azim = root.TryGetProperty("azim", out var az) ? az.GetDouble() : -60.0;
                     _ = UpdatePlotViewAsync(sender, tab, figId, elev, azim);
                 }
+                else if (string.Equals(type, "update2DView", StringComparison.Ordinal))
+                {
+                    string figId = root.TryGetProperty("figId", out var f2d) ? f2d.GetString() ?? "" : "";
+                    double panFracX = root.TryGetProperty("panFracX", out var pfx) ? pfx.GetDouble() : 0.0;
+                    double panFracY = root.TryGetProperty("panFracY", out var pfy) ? pfy.GetDouble() : 0.0;
+                    double zoom = root.TryGetProperty("zoom", out var z) ? z.GetDouble() : 1.0;
+                    _ = Update2DViewAsync(sender, tab, figId, panFracX, panFracY, zoom);
+                }
                 else if (string.Equals(type, "saveNotebook", StringComparison.Ordinal))
                 {
                     string content = root.TryGetProperty("content", out var cont) ? cont.GetString() ?? "" : "";
@@ -281,6 +289,33 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 }
 
                 string html = await _kernelService.UpdatePlotViewAsync(tab.Id, python, workDir, figId, elev, azim);
+                if (!string.IsNullOrEmpty(html))
+                {
+                    string js = $"window.__notebookReceivePlotUpdate && window.__notebookReceivePlotUpdate({JsonSerializer.Serialize(figId)}, {JsonSerializer.Serialize(html)});";
+                    webView.DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        try
+                        {
+                            await webView.ExecuteScriptAsync(js);
+                        }
+                        catch { }
+                    });
+                }
+            }
+            catch { }
+        }
+
+        private async Task Update2DViewAsync(WebView2 webView, OpenedTab tab, string figId, double panFracX, double panFracY, double zoom)
+        {
+            try
+            {
+                if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
+                    !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
+                {
+                    return;
+                }
+
+                string html = await _kernelService.Update2DViewAsync(tab.Id, python, workDir, figId, panFracX, panFracY, zoom);
                 if (!string.IsNullOrEmpty(html))
                 {
                     string js = $"window.__notebookReceivePlotUpdate && window.__notebookReceivePlotUpdate({JsonSerializer.Serialize(figId)}, {JsonSerializer.Serialize(html)});";

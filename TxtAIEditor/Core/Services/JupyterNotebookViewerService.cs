@@ -651,7 +651,6 @@ strong { font-weight: 700; }
     background: var(--nb-output-bg);
     min-height: 200px;
     cursor: grab;
-    perspective: 1000px;
 }
 .mpl-viewport:active {
     cursor: grabbing;
@@ -659,15 +658,12 @@ strong { font-weight: 700; }
 .mpl-plot-layer {
     display: inline-block;
     transform-origin: center center;
-    transform-style: preserve-3d;
-    backface-visibility: hidden;
 }
 .mpl-plot-img {
     display: block;
     max-width: 100%;
     height: auto;
     pointer-events: none;
-    backface-visibility: hidden;
 }
 .mpl-cbar-layer {
     display: inline-block;
@@ -1712,23 +1708,17 @@ strong { font-weight: 700; }
                     const wrapper = document.createElement('div');
                     wrapper.className = 'mpl-interactive-wrapper';
                     wrapper.setAttribute('data-mpl', 'true');
+                    wrapper.setAttribute('data-is-3d', 'false');
                     wrapper.innerHTML = 
                         '<div class=""mpl-toolbar"">' +
                             '<button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>' +
-                            '<button class=""mpl-btn mpl-btn-pan active"" title=""Pan Mode"">✋ Pan</button>' +
-                            '<button class=""mpl-btn mpl-btn-rotate"" title=""Rotate Mode"">🔄 Rotate</button>' +
-                            '<div class=""mpl-rotate-ctrl"">' +
-                                '<span>Rotate:</span>' +
-                                '<input type=""range"" class=""mpl-rotate-slider"" min=""-180"" max=""180"" value=""0"" />' +
-                                '<span class=""mpl-angle-val"">0°</span>' +
-                            '</div>' +
                             '<button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>' +
                         '</div>' +
                         '<div class=""mpl-viewport"">' +
                             '<div class=""mpl-plot-layer""></div>' +
                         '</div>' +
                         '<div class=""mpl-status-bar"">' +
-                            '<span>Left: Pan/Rotate | Middle: Pan | Right: Rotate | Wheel: Zoom</span>' +
+                            '<span>Drag: Pan | Wheel: Zoom</span>' +
                         '</div>';
                     img.parentNode.insertBefore(wrapper, img);
                     const plotLayer = wrapper.querySelector('.mpl-plot-layer');
@@ -1743,35 +1733,34 @@ strong { font-weight: 700; }
 
                 const viewport = wrapper.querySelector('.mpl-viewport');
                 const plotLayer = wrapper.querySelector('.mpl-plot-layer');
-                const cbarLayer = wrapper.querySelector('.mpl-cbar-layer');
                 const btnReset = wrapper.querySelector('.mpl-btn-reset');
-                const btnPan = wrapper.querySelector('.mpl-btn-pan');
-                const btnRotate = wrapper.querySelector('.mpl-btn-rotate');
-                const sliderY = wrapper.querySelector('.mpl-rotate-y-slider') || wrapper.querySelector('.mpl-rotate-slider');
-                const angleValY = wrapper.querySelector('.mpl-angle-val-y') || wrapper.querySelector('.mpl-angle-val');
+                const btnDownload = wrapper.querySelector('.mpl-btn-download');
+                const sliderY = wrapper.querySelector('.mpl-rotate-y-slider');
+                const angleValY = wrapper.querySelector('.mpl-angle-val-y');
                 const sliderX = wrapper.querySelector('.mpl-rotate-x-slider');
                 const angleValX = wrapper.querySelector('.mpl-angle-val-x');
-                const btnDownload = wrapper.querySelector('.mpl-btn-download');
 
                 const is3D = wrapper.getAttribute('data-is-3d') === 'true';
                 const figId = wrapper.getAttribute('data-fig-id');
-                let elev = parseInt(wrapper.getAttribute('data-elev') || '30') || 30;
-                let azim = parseInt(wrapper.getAttribute('data-azim') || '-60') || -60;
+                let initElev = parseInt(wrapper.getAttribute('data-elev') || '30') || 30;
+                let initAzim = parseInt(wrapper.getAttribute('data-azim') || '-60') || -60;
+                let elev = initElev;
+                let azim = initAzim;
 
                 let panX = 0, panY = 0, scale = 1;
-                let rotateX = 0;
-                let rotateY = 0;
-                let rotateZ = 0;
-                let mode = 'pan';
                 let isDragging = false;
                 let dragBtn = -1;
                 let startX = 0, startY = 0;
                 let startPanX = 0, startPanY = 0;
-                let startRotateX = 0, startRotateY = 0;
                 let startElev = elev, startAzim = azim;
 
                 let is3DInFlight = false;
                 let pending3DElevAzim = null;
+
+                /* 2D cumulative data state */
+                let dataPanFracX = 0, dataPanFracY = 0, dataZoom = 1;
+                let is2DInFlight = false;
+                let pending2DState = null;
 
                 function send3DViewRequest(eVal, aVal) {
                     if (!is3D || !figId) return;
@@ -1792,6 +1781,26 @@ strong { font-weight: 700; }
                     }
                 }
 
+                function send2DViewRequest(pfx, pfy, z) {
+                    if (is3D || !figId) return;
+                    if (is2DInFlight) {
+                        pending2DState = { panFracX: pfx, panFracY: pfy, zoom: z };
+                        return;
+                    }
+                    is2DInFlight = true;
+                    try {
+                        window.chrome.webview.postMessage(JSON.stringify({
+                            type: 'update2DView',
+                            figId: figId,
+                            panFracX: pfx,
+                            panFracY: pfy,
+                            zoom: z
+                        }));
+                    } catch (ex) {
+                        is2DInFlight = false;
+                    }
+                }
+
                 let currentMouseX = 0, currentMouseY = 0;
 
                 wrapper.__on3DUpdateReceived = function(html) {
@@ -1809,33 +1818,49 @@ strong { font-weight: 700; }
                     }
 
                     if (is3D) {
-                        rotateX = 0;
-                        rotateY = 0;
                         if (isDragging) {
                             startX = currentMouseX;
                             startY = currentMouseY;
                             startElev = elev;
                             startAzim = azim;
                         }
+                        is3DInFlight = false;
+                        if (pending3DElevAzim) {
+                            const next = pending3DElevAzim;
+                            pending3DElevAzim = null;
+                            send3DViewRequest(next.elev, next.azim);
+                        }
+                    } else {
+                        /* 2D: reset CSS preview since new image has correct view */
+                        if (isDragging) {
+                            startX = currentMouseX;
+                            startY = currentMouseY;
+                            startPanX = 0;
+                            startPanY = 0;
+                        }
+                        panX = 0;
+                        panY = 0;
+                        scale = 1;
                         updateTransform();
-                    }
-
-                    is3DInFlight = false;
-                    if (pending3DElevAzim) {
-                        const next = pending3DElevAzim;
-                        pending3DElevAzim = null;
-                        send3DViewRequest(next.elev, next.azim);
+                        is2DInFlight = false;
+                        if (pending2DState) {
+                            const next = pending2DState;
+                            pending2DState = null;
+                            send2DViewRequest(next.panFracX, next.panFracY, next.zoom);
+                        }
                     }
                 };
 
                 function updateTransform() {
                     if (plotLayer) {
-                        plotLayer.style.transform = 'translate3d(' + panX + 'px, ' + panY + 'px, 0px) scale(' + scale + ') rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) rotateZ(' + rotateZ + 'deg)';
+                        plotLayer.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
                     }
-                    if (sliderY) sliderY.value = is3D ? azim : rotateY;
-                    if (angleValY) angleValY.textContent = (angleValY.classList.contains('mpl-angle-val-y') ? (is3D ? 'Azim:' : 'Y:') : '') + (is3D ? azim : rotateY) + '°';
-                    if (sliderX) sliderX.value = is3D ? elev : rotateX;
-                    if (angleValX) angleValX.textContent = (is3D ? 'Elev:' : 'X:') + (is3D ? elev : rotateX) + '°';
+                    if (is3D) {
+                        if (sliderY) sliderY.value = azim;
+                        if (angleValY) angleValY.textContent = 'Azim:' + azim + '°';
+                        if (sliderX) sliderX.value = elev;
+                        if (angleValX) angleValX.textContent = 'Elev:' + elev + '°';
+                    }
                 }
 
                 if (viewport) {
@@ -1847,8 +1872,6 @@ strong { font-weight: 700; }
                         startY = e.clientY;
                         startPanX = panX;
                         startPanY = panY;
-                        startRotateX = rotateX;
-                        startRotateY = rotateY;
                         startElev = elev;
                         startAzim = azim;
                     });
@@ -1860,35 +1883,19 @@ strong { font-weight: 700; }
                         const dx = e.clientX - startX;
                         const dy = e.clientY - startY;
 
-                        if (dragBtn === 0) {
-                            if (mode === 'pan') {
+                        if (is3D) {
+                            if (dragBtn === 1) {
                                 panX = startPanX + dx;
                                 panY = startPanY + dy;
                             } else {
-                                if (is3D) {
-                                    azim = Math.round(startAzim - dx * 0.5) % 360;
-                                    elev = Math.min(Math.max(-90, Math.round(startElev - dy * 0.5)), 90);
-                                    rotateY = dx * 0.4;
-                                    rotateX = -dy * 0.4;
-                                    send3DViewRequest(elev, azim);
-                                } else {
-                                    rotateY = Math.round(startRotateY + dx * 0.8) % 360;
-                                    rotateX = Math.min(Math.max(-85, Math.round(startRotateX - dy * 0.8)), 85);
-                                }
-                            }
-                        } else if (dragBtn === 1) {
-                            panX = startPanX + dx;
-                            panY = startPanY + dy;
-                        } else if (dragBtn === 2) {
-                            if (is3D) {
                                 azim = Math.round(startAzim - dx * 0.5) % 360;
                                 elev = Math.min(Math.max(-90, Math.round(startElev - dy * 0.5)), 90);
-                                rotateY = dx * 0.4;
-                                rotateX = -dy * 0.4;
                                 send3DViewRequest(elev, azim);
-                            } else {
-                                rotateY = Math.round(startRotateY + dx * 0.8) % 360;
-                                rotateX = Math.min(Math.max(-85, Math.round(startRotateX - dy * 0.8)), 85);
+                            }
+                        } else {
+                            if (dragBtn === 0 || dragBtn === 1) {
+                                panX = startPanX + dx;
+                                panY = startPanY + dy;
                             }
                         }
                         updateTransform();
@@ -1897,8 +1904,15 @@ strong { font-weight: 700; }
                     window.addEventListener('mouseup', function() {
                         if (isDragging) {
                             isDragging = false;
-                            if (is3D) {
+                            if (is3D && dragBtn !== 1) {
                                 send3DViewRequest(elev, azim);
+                            } else if (!is3D && figId && (panX !== 0 || panY !== 0)) {
+                                const img = wrapper.querySelector('.mpl-plot-img');
+                                const w = img ? (img.clientWidth || 600) : 600;
+                                const h = img ? (img.clientHeight || 400) : 400;
+                                dataPanFracX -= panX / w / dataZoom;
+                                dataPanFracY += panY / h / dataZoom;
+                                send2DViewRequest(dataPanFracX, dataPanFracY, dataZoom);
                             }
                         }
                     });
@@ -1912,6 +1926,10 @@ strong { font-weight: 700; }
                         const factor = e.deltaY < 0 ? 1.1 : 0.9;
                         scale = Math.min(Math.max(0.2, scale * factor), 5.0);
                         updateTransform();
+                        if (!is3D && figId) {
+                            dataZoom = Math.min(Math.max(0.2, dataZoom * factor), 5.0);
+                            send2DViewRequest(dataPanFracX, dataPanFracY, dataZoom);
+                        }
                     });
                 }
 
@@ -1920,10 +1938,8 @@ strong { font-weight: 700; }
                         if (is3D) {
                             azim = parseInt(sliderY.value) || 0;
                             send3DViewRequest(elev, azim);
-                        } else {
-                            rotateY = parseInt(sliderY.value) || 0;
+                            updateTransform();
                         }
-                        updateTransform();
                     });
                 }
 
@@ -1932,30 +1948,25 @@ strong { font-weight: 700; }
                         if (is3D) {
                             elev = parseInt(sliderX.value) || 0;
                             send3DViewRequest(elev, azim);
-                        } else {
-                            rotateX = parseInt(sliderX.value) || 0;
+                            updateTransform();
                         }
-                        updateTransform();
                     });
                 }
 
                 if (btnReset) {
                     btnReset.addEventListener('click', function() {
-                        panX = 0; panY = 0; scale = 1; rotateX = 0; rotateY = 0; rotateZ = 0;
+                        panX = 0; panY = 0; scale = 1;
+                        if (is3D) {
+                            elev = initElev;
+                            azim = initAzim;
+                            send3DViewRequest(elev, azim);
+                        } else if (figId) {
+                            dataPanFracX = 0;
+                            dataPanFracY = 0;
+                            dataZoom = 1;
+                            send2DViewRequest(0, 0, 1);
+                        }
                         updateTransform();
-                    });
-                }
-
-                if (btnPan && btnRotate) {
-                    btnPan.addEventListener('click', function() {
-                        mode = 'pan';
-                        btnPan.classList.add('active');
-                        btnRotate.classList.remove('active');
-                    });
-                    btnRotate.addEventListener('click', function() {
-                        mode = 'rotate';
-                        btnRotate.classList.add('active');
-                        btnPan.classList.remove('active');
                     });
                 }
 
