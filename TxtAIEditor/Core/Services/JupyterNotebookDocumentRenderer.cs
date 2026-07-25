@@ -30,7 +30,7 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine($"<title>{NotebookHtmlEncoder.Encode(fileName)}</title>");
             sb.AppendLine("<link rel=\"stylesheet\" href=\"http://txtaieditor.local/katex/katex.min.css\" />");
             sb.AppendLine("<style>");
-            sb.AppendLine(JupyterNotebookViewerAssets.GetCss());
+            sb.AppendLine(JupyterNotebookViewerStyles.GetCss());
             sb.AppendLine("</style>");
             sb.AppendLine("<script src=\"http://txtaieditor.local/katex/katex.min.js\"></script>");
             sb.AppendLine("</head>");
@@ -94,7 +94,7 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<script>");
             sb.AppendLine($"window.__notebookPath = {JsonSerializer.Serialize(filePath)};");
             sb.AppendLine($"window.__notebookDir = {JsonSerializer.Serialize(dirPath)};");
-            sb.AppendLine(JupyterNotebookViewerAssets.GetJavaScript());
+            sb.AppendLine(JupyterNotebookViewerScripts.GetJavaScript());
             sb.AppendLine("</script>");
             sb.AppendLine("</body>");
             sb.AppendLine("</html>");
