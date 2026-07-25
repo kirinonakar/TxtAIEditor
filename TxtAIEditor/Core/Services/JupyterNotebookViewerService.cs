@@ -430,10 +430,10 @@ body {
     color: var(--nb-fg);
     line-height: 1.5;
 }
-#notebook-container { max-width: 1000px; margin: 0 auto; padding: 16px; }
+#notebook-container { max-width: 1000px; margin: 0 auto; padding: 0 16px 16px 16px; }
 #notebook-header {
-    display: flex; flex-direction: column; gap: 10px;
-    padding: 12px 0; border-bottom: 2px solid var(--nb-border); margin-bottom: 16px;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 6px 0 8px 0; border-bottom: 2px solid var(--nb-border); margin-bottom: 12px;
     position: sticky; top: 0; background: var(--nb-bg); z-index: 100;
 }
 .notebook-header-top {
