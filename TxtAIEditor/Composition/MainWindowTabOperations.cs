@@ -14,6 +14,7 @@ namespace TxtAIEditor.Composition
             StatusBarController statusBar,
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
+            JupyterNotebookViewerController notebookViewer,
             TabReloadController tabReload,
             Action<OpenedTab> updateLanguageUi,
             Action updateWindowTitle)
@@ -32,7 +33,7 @@ namespace TxtAIEditor.Composition
                 return;
             }
 
-            if (pdfViewer.Reload(tab) || officeDocumentViewer.Reload(tab))
+            if (pdfViewer.Reload(tab) || officeDocumentViewer.Reload(tab) || notebookViewer.Reload(tab))
             {
                 UpdateViewerStatus(tab, statusBar, updateLanguageUi, updateWindowTitle);
                 return;

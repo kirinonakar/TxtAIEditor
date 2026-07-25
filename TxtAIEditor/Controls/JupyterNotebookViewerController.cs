@@ -132,6 +132,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 return false;
             }
 
+            tab.IsDirty = false;
             _ = NavigateAsync(tab, webView);
             return true;
         }

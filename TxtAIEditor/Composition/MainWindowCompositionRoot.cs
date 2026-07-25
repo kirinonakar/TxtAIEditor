@@ -268,6 +268,7 @@ namespace TxtAIEditor.Composition
                         statusBarController,
                         pdfViewerController,
                         officeDocumentViewerController,
+                        notebookViewerController,
                         tabReloadController,
                         callbacks.UpdateLanguageUi,
                         callbacks.UpdateWindowTitle),
