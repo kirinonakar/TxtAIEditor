@@ -126,22 +126,43 @@ namespace TxtAIEditor.Core.Services
 
     let lastActiveMarkdownCell = null;
     let lastActiveMarkdownRange = null;
+    let composingMarkdownEditor = null;
+    let pendingMarkdownCommand = null;
+
+    function rememberMarkdownSelection(editor) {
+        if (!editor || !editor.classList.contains('markdown-editor')) return false;
+        const cellDiv = editor.closest('.cell');
+        const sel = window.getSelection();
+        if (!cellDiv || !sel || sel.rangeCount === 0 ||
+            !editor.contains(sel.anchorNode) || !editor.contains(sel.focusNode)) {
+            return false;
+        }
+
+        lastActiveMarkdownCell = cellDiv;
+        lastActiveMarkdownRange = sel.getRangeAt(0).cloneRange();
+        return true;
+    }
 
     container.addEventListener('focusin', (e) => {
-        const cellDiv = e.target.closest('.cell');
+        const editor = e.target.closest('.markdown-editor');
+        const cellDiv = editor ? editor.closest('.cell') : null;
         if (cellDiv && getCellType(cellDiv) === 'markdown') {
             lastActiveMarkdownCell = cellDiv;
+            lastActiveMarkdownRange = null;
+            rememberMarkdownSelection(editor);
         }
     });
 
     document.addEventListener('selectionchange', () => {
-        const active = document.activeElement;
-        if (active && active.classList && active.classList.contains('markdown-editor')) {
-            const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0 && active.contains(sel.anchorNode)) {
-                lastActiveMarkdownRange = sel.getRangeAt(0).cloneRange();
-            }
-        }
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || !sel.anchorNode) return;
+        const anchorElement = sel.anchorNode.nodeType === Node.ELEMENT_NODE
+            ? sel.anchorNode
+            : sel.anchorNode.parentElement;
+        const editor = anchorElement && anchorElement.closest
+            ? anchorElement.closest('.markdown-editor')
+            : null;
+        rememberMarkdownSelection(editor);
     });
 
     container.addEventListener('focusout', (e) => {
@@ -149,6 +170,7 @@ namespace TxtAIEditor.Core.Services
         if (!editor) return;
         const cellDiv = editor.closest('.cell');
         if (!cellDiv || getCellType(cellDiv) !== 'markdown') return;
+        rememberMarkdownSelection(editor);
 
         setTimeout(() => {
             if (!document.hasFocus()) {
@@ -160,6 +182,30 @@ namespace TxtAIEditor.Core.Services
             }
             renderMarkdownCell(cellDiv);
         }, 150);
+    });
+
+    container.addEventListener('compositionstart', (e) => {
+        const editor = e.target.closest('.markdown-editor');
+        if (editor) {
+            composingMarkdownEditor = editor;
+        }
+    });
+
+    container.addEventListener('compositionend', (e) => {
+        const editor = e.target.closest('.markdown-editor');
+        if (!editor || editor !== composingMarkdownEditor) return;
+
+        composingMarkdownEditor = null;
+        rememberMarkdownSelection(editor);
+        const pending = pendingMarkdownCommand;
+        pendingMarkdownCommand = null;
+        if (pending) {
+            setTimeout(() => {
+                if (!pending.cell || !pending.cell.isConnected) return;
+                applyMarkdownCommandToCell(pending.cell, pending.command, pending.color);
+                notifyModified();
+            }, 0);
+        }
     });
 
     function focusEditorAtEnd(editor) {
@@ -362,18 +408,32 @@ namespace TxtAIEditor.Core.Services
 
     function applyMarkdownCommandToCell(cellDiv, command, color) {
         if (getCellType(cellDiv) !== 'markdown') return;
-        editMarkdownCell(cellDiv);
         const editor = cellDiv.querySelector('.markdown-editor');
         if (!editor) return;
 
-        editor.focus();
         const sel = window.getSelection();
         let range = null;
 
-        if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-            range = sel.getRangeAt(0);
-        } else if (lastActiveMarkdownRange && editor.contains(lastActiveMarkdownRange.anchorNode)) {
-            range = lastActiveMarkdownRange;
+        if (sel && sel.rangeCount > 0 &&
+            editor.contains(sel.anchorNode) && editor.contains(sel.focusNode)) {
+            range = sel.getRangeAt(0).cloneRange();
+        } else if (lastActiveMarkdownCell === cellDiv &&
+            lastActiveMarkdownRange &&
+            editor.contains(lastActiveMarkdownRange.startContainer) &&
+            editor.contains(lastActiveMarkdownRange.endContainer)) {
+            range = lastActiveMarkdownRange.cloneRange();
+        }
+
+        editMarkdownCell(cellDiv, false);
+        if (range) {
+            editor.focus();
+            const restoredSelection = window.getSelection();
+            if (restoredSelection) {
+                restoredSelection.removeAllRanges();
+                restoredSelection.addRange(range);
+            }
+        } else {
+            focusEditorAtEnd(editor);
         }
 
         if (command === 'heading') {
@@ -419,6 +479,15 @@ namespace TxtAIEditor.Core.Services
         const cmd = detail.command;
         const color = detail.color;
         if (!cmd) return;
+
+        if (composingMarkdownEditor) {
+            pendingMarkdownCommand = {
+                cell: composingMarkdownEditor.closest('.cell'),
+                command: cmd,
+                color
+            };
+            return;
+        }
 
         let activeCell = (document.activeElement && document.activeElement.closest) ? document.activeElement.closest('.cell') : null;
         if (!activeCell || getCellType(activeCell) !== 'markdown') {

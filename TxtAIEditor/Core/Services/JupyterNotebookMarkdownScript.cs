@@ -201,7 +201,7 @@ namespace TxtAIEditor.Core.Services
         preview.style.display = 'block';
     }
 
-    function editMarkdownCell(cellDiv) {
+    function editMarkdownCell(cellDiv, focusAtEnd = true) {
         if (getCellType(cellDiv) !== 'markdown') return;
         const editor = cellDiv.querySelector('.markdown-editor');
         const preview = cellDiv.querySelector('.markdown-preview');
@@ -209,7 +209,9 @@ namespace TxtAIEditor.Core.Services
 
         editor.style.display = 'block';
         preview.style.display = 'none';
-        focusEditorAtEnd(editor);
+        if (focusAtEnd) {
+            focusEditorAtEnd(editor);
+        }
     }
 
     function insertMarkdownFormatting(cellDiv, formatType) {
