@@ -263,6 +263,12 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     string content = root.TryGetProperty("content", out var cont) ? cont.GetString() ?? "" : "";
                     _ = ExportPyAsync(sender, tab, content);
                 }
+                else if (string.Equals(type, "savePlotImage", StringComparison.Ordinal))
+                {
+                    string imageData = root.TryGetProperty("imageData", out var id) ? id.GetString() ?? "" : "";
+                    string suggestedName = root.TryGetProperty("suggestedName", out var sn) ? sn.GetString() ?? "" : "";
+                    _ = SavePlotImageAsync(sender, tab, imageData, suggestedName);
+                }
                 else if (string.Equals(type, "markDirty", StringComparison.Ordinal))
                 {
                     sender.DispatcherQueue.TryEnqueue(() =>
@@ -470,6 +476,68 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             {
             }
             await Task.CompletedTask;
+        }
+
+        private async Task SavePlotImageAsync(WebView2 webView, OpenedTab tab, string imageData, string suggestedName)
+        {
+            bool success = false;
+            string savedFileName = string.Empty;
+            try
+            {
+                if (!string.IsNullOrEmpty(imageData))
+                {
+                    string base64 = imageData;
+                    int commaIdx = base64.IndexOf(',');
+                    if (commaIdx >= 0)
+                    {
+                        base64 = base64.Substring(commaIdx + 1);
+                    }
+                    byte[] bytes = Convert.FromBase64String(base64);
+
+                    string? dir = null;
+                    if (_tabWorkingDirectories.TryGetValue(tab.Id, out var targetDir) && !string.IsNullOrEmpty(targetDir) && Directory.Exists(targetDir))
+                    {
+                        dir = targetDir;
+                    }
+                    else if (!string.IsNullOrEmpty(tab.FilePath))
+                    {
+                        dir = Path.GetDirectoryName(tab.FilePath);
+                    }
+                    dir ??= Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+                    string prefix = !string.IsNullOrEmpty(tab.FilePath)
+                        ? Path.GetFileNameWithoutExtension(tab.FilePath) + "_plot"
+                        : "plot";
+
+                    string ext = ".png";
+                    if (imageData.StartsWith("data:image/jpeg", StringComparison.OrdinalIgnoreCase) ||
+                        imageData.StartsWith("data:image/jpg", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ext = ".jpg";
+                    }
+
+                    string candidateName = $"{prefix}{ext}";
+                    string fullPath = Path.Combine(dir, candidateName);
+                    int counter = 1;
+                    while (File.Exists(fullPath))
+                    {
+                        candidateName = $"{prefix}_{counter}{ext}";
+                        fullPath = Path.Combine(dir, candidateName);
+                        counter++;
+                    }
+
+                    await File.WriteAllBytesAsync(fullPath, bytes);
+                    savedFileName = candidateName;
+                    success = true;
+                }
+            }
+            catch
+            {
+                success = false;
+            }
+
+            string script = $"window.__notebookPlotSavedResult && window.__notebookPlotSavedResult({success.ToString().ToLowerInvariant()}, {JsonSerializer.Serialize(savedFileName)});";
+            await ExecuteScriptSafeAsync(webView, script);
         }
 
         private static async Task ExecuteScriptSafeAsync(WebView2 webView, string script)

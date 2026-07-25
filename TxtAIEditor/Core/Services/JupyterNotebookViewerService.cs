@@ -2198,6 +2198,21 @@ strong { font-weight: 700; }
             }
         }
     };
+
+    // Receive plot image saved result from host
+    window.__notebookPlotSavedResult = function(success, fileName) {
+        const btn = window.__lastSavePlotBtn;
+        if (btn) {
+            if (success) {
+                const orig = btn.getAttribute('data-orig-text') || '💾 Save PNG';
+                btn.textContent = 'Saved ' + (fileName || 'image') + '!';
+                setTimeout(() => { btn.textContent = orig; }, 2500);
+            } else {
+                btn.textContent = 'Save Failed';
+                setTimeout(() => { btn.textContent = '💾 Save PNG'; }, 2000);
+            }
+        }
+    };
     function initMplInteractiveContainers() {
         document.querySelectorAll('.cell-output').forEach(function(outputDiv) {
             outputDiv.querySelectorAll('img[src^=""data:image/png""]').forEach(function(img) {
@@ -2584,10 +2599,29 @@ strong { font-weight: 700; }
                             ctx.drawImage(cbarImg, w1 + 20, 0, w2, h2);
                         }
 
+                        const dataUrl = canvas.toDataURL('image/png');
+                        window.__lastSavePlotBtn = btnDownload;
+                        if (!btnDownload.getAttribute('data-orig-text')) {
+                            btnDownload.setAttribute('data-orig-text', btnDownload.textContent);
+                        }
+                        btnDownload.textContent = 'Saving...';
+
+                        try {
+                            if (window.chrome && window.chrome.webview) {
+                                window.chrome.webview.postMessage(JSON.stringify({
+                                    type: 'savePlotImage',
+                                    imageData: dataUrl
+                                }));
+                                return;
+                            }
+                        } catch (e) {}
+
                         const a = document.createElement('a');
                         a.download = 'matplotlib_plot.png';
-                        a.href = canvas.toDataURL('image/png');
+                        a.href = dataUrl;
                         a.click();
+                        btnDownload.textContent = 'Saved!';
+                        setTimeout(() => { btnDownload.textContent = '💾 Save PNG'; }, 2000);
                     });
                 }
             });
