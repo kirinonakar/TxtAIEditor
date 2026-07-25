@@ -193,6 +193,10 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
             webView.CoreWebView2.Settings.IsScriptEnabled = true;
+            webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                PreviewWebResourceService.ResourceHostName,
+                PreviewWebResourceService.WebResourcesPath,
+                CoreWebView2HostResourceAccessKind.Allow);
             webView.WebMessageReceived += OnWebMessageReceived;
             WebViewAppearanceService.ApplyPreferredColorScheme(webView.CoreWebView2, _settingsService.CurrentSettings.Theme);
             await InstallShortcutBridgeAsync(webView);

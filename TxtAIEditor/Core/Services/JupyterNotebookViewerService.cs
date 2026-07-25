@@ -61,9 +61,11 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<meta charset=\"UTF-8\" />");
             sb.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />");
             sb.AppendLine($"<title>{HtmlEncode(fileName)}</title>");
+            sb.AppendLine("<link rel=\"stylesheet\" href=\"http://txtaieditor.local/katex/katex.min.css\" />");
             sb.AppendLine("<style>");
             sb.AppendLine(GetNotebookCss());
             sb.AppendLine("</style>");
+            sb.AppendLine("<script src=\"http://txtaieditor.local/katex/katex.min.js\"></script>");
             sb.AppendLine("</head>");
             sb.AppendLine("<body>");
             sb.AppendLine("<div id=\"notebook-container\">");
@@ -634,11 +636,11 @@ strong { font-weight: 700; }
     display: block;
     max-width: 100%;
     box-sizing: border-box;
-    margin: 12px 0;
+    margin: 4px 0;
     border: 1px solid var(--nb-border);
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--nb-output-bg);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     overflow: hidden;
     user-select: none;
     font-family: 'Segoe UI', -apple-system, sans-serif;
@@ -646,11 +648,11 @@ strong { font-weight: 700; }
 .mpl-toolbar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
+    gap: 4px;
+    padding: 2px 8px;
     background: var(--nb-input-bg);
     border-bottom: 1px solid var(--nb-border);
-    font-size: 12px;
+    font-size: 11px;
     flex-wrap: wrap;
 }
 .mpl-btn {
@@ -694,9 +696,9 @@ strong { font-weight: 700; }
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    padding: 16px;
+    padding: 4px;
     background: var(--nb-output-bg);
-    min-height: 200px;
+    min-height: 120px;
     cursor: grab;
     max-width: 100%;
     box-sizing: border-box;
@@ -738,7 +740,7 @@ strong { font-weight: 700; }
 }
 .mpl-cbar-layer {
     display: inline-block;
-    margin-left: 12px;
+    margin-left: 8px;
     pointer-events: none;
 }
 .mpl-cbar-img {
@@ -747,12 +749,38 @@ strong { font-weight: 700; }
     height: auto;
 }
 .mpl-status-bar {
-    padding: 4px 12px;
-    font-size: 11px;
+    padding: 2px 8px;
+    font-size: 10px;
     color: #888;
     background: var(--nb-input-bg);
     border-top: 1px solid var(--nb-border);
     text-align: right;
+    min-height: 18px;
+}
+
+/* Syntax highlight token colors - light theme */
+.token-comment { color: #008000; }
+.token-string { color: #a31515; }
+.token-number { color: #098658; }
+.token-keyword { color: #0000ff; }
+.token-control { color: #795e26; }
+.token-type { color: #267f99; }
+.token-function { color: #795e26; }
+.token-variable { color: #001080; }
+.token-operator { color: #000000; }
+.token-punctuation { color: #000000; }
+/* Syntax highlight token colors - dark theme */
+@media (prefers-color-scheme: dark) {
+    .token-comment { color: #6a9955; }
+    .token-string { color: #ce9178; }
+    .token-number { color: #b5cea8; }
+    .token-keyword { color: #569cd6; }
+    .token-control { color: #c586c0; }
+    .token-type { color: #4ec9b0; }
+    .token-function { color: #dcdcaa; }
+    .token-variable { color: #9cdcfe; }
+    .token-operator { color: #d4d4d4; }
+    .token-punctuation { color: #d4d4d4; }
 }
 ";
         }
@@ -852,6 +880,16 @@ strong { font-weight: 700; }
         notifyModified();
     });
 
+    container.addEventListener('focusout', (e) => {
+        const editor = e.target.closest('.cell-input-area.code-editor');
+        if (!editor) return;
+        const cellDiv = editor.closest('.cell');
+        if (!cellDiv || getCellType(cellDiv) !== 'code') return;
+        setTimeout(() => {
+            applyCodeSyntaxHighlight(cellDiv);
+        }, 50);
+    });
+
     function renderMarkdownJs(md) {
         if (!md) return '';
         const lines = md.replace(/\r\n/g, '\n').split('\n');
@@ -922,6 +960,23 @@ strong { font-weight: 700; }
         return html;
     }
 
+    function renderLatex(text) {
+        if (!text || typeof katex === 'undefined') return text;
+        try {
+            // Display math $$...$$
+            text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, expr) => {
+                try { return katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false }); }
+                catch(e) { return `<span class=""token-comment"">$$${escapeHtml(expr)}$$</span>`; }
+            });
+            // Inline math $...$
+            text = text.replace(/(?<!\$)\$([^$\n]+?)\$(?!\$)/g, (_, expr) => {
+                try { return katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false }); }
+                catch(e) { return `<span class=""token-comment"">$${escapeHtml(expr)}$</span>`; }
+            });
+        } catch(e) {}
+        return text;
+    }
+
     function inlineMdJs(str) {
         let s = escapeHtml(str);
         s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src=""$2"" alt=""$1"" style=""max-width:100%;height:auto;display:inline-block;vertical-align:middle;margin:4px 0;"" />');
@@ -929,6 +984,7 @@ strong { font-weight: 700; }
         s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
         s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
         s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+        s = renderLatex(s);
         return s;
     }
 
@@ -1065,6 +1121,68 @@ strong { font-weight: 700; }
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /* Python syntax highlighting for code cells */
+    function highlightPythonCode(text) {
+        if (!text) return escapeHtml(text);
+        const language = 'python';
+        const isPython = true;
+        let workingText = text;
+        const tokens = [];
+        function stash(html) {
+            const placeholder = `\u0002_TOKEN_${tokens.length}_\u0002`;
+            tokens.push(html);
+            return placeholder;
+        }
+        // 1. Comments
+        workingText = workingText.replace(/#.*/g, m => stash(`<span class=""token-comment"">${escapeHtml(m)}</span>`));
+        // 2. Triple-quoted strings
+        workingText = workingText.replace(/""""""[\s\S]*?""""""|'''[\s\S]*?'''/g, m => stash(`<span class=""token-string"">${escapeHtml(m)}</span>`));
+        // 3. Strings
+        workingText = workingText.replace(/""(?:\\.|[^""\\])*""/g, m => stash(`<span class=""token-string"">${escapeHtml(m)}</span>`));
+        workingText = workingText.replace(/'(?:\\.|[^'\\])*'/g, m => stash(`<span class=""token-string"">${escapeHtml(m)}</span>`));
+        // 4. Numbers
+        workingText = workingText.replace(/\b\d+(?:\.\d+)?\b/g, m => stash(`<span class=""token-number"">${escapeHtml(m)}</span>`));
+        // 5. Control Flow
+        workingText = workingText.replace(/\b(if|elif|else|return|for|while|break|continue|try|except|finally|raise|yield|pass|assert|with|as)\b/g, m => stash(`<span class=""token-control"">${escapeHtml(m)}</span>`));
+        // 6. Keywords
+        workingText = workingText.replace(/\b(def|class|import|from|global|nonlocal|lambda|in|is|and|or|not|del)\b/g, m => stash(`<span class=""token-keyword"">${escapeHtml(m)}</span>`));
+        // 7. Builtins
+        workingText = workingText.replace(/\b(True|False|None|self|print|len|range|str|int|float|list|dict|set|tuple|object|open|enumerate|zip)\b/g, m => stash(`<span class=""token-type"">${escapeHtml(m)}</span>`));
+        // 8. Function calls
+        workingText = workingText.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, m => stash(`<span class=""token-function"">${escapeHtml(m)}</span>`));
+        // 9. Decorators
+        workingText = workingText.replace(/@[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*/g, m => stash(`<span class=""token-keyword"">${escapeHtml(m)}</span>`));
+        // 10. Operators
+        workingText = workingText.replace(/\*\*|\/\/|<<|>>|<=|>=|==|!=|<>|:=|->|&&|\|\||[+\-*\/%=<>&|^~]/g, m => stash(`<span class=""token-operator"">${escapeHtml(m)}</span>`));
+        // 11. Punctuation
+        workingText = workingText.replace(/[{}()\[\].;,:]/g, m => stash(`<span class=""token-punctuation"">${escapeHtml(m)}</span>`));
+
+        let escapedText = escapeHtml(workingText);
+        while (escapedText.includes('\u0002_TOKEN_')) {
+            escapedText = escapedText.replace(/\u0002_TOKEN_(\d+)_\u0002/g, (match, idx) => {
+                return tokens[Number(idx)];
+            });
+        }
+        return escapedText;
+    }
+
+    function applyCodeSyntaxHighlight(cellDiv) {
+        if (!cellDiv) return;
+        const editor = cellDiv.querySelector('.cell-input-area.code-editor');
+        if (!editor) return;
+        const pre = editor.querySelector('pre');
+        if (!pre) return;
+        const source = getCellSource(cellDiv);
+        if (!source) return;
+        pre.innerHTML = highlightPythonCode(source);
+    }
+
+    function applyAllCodeCellsHighlight() {
+        container.querySelectorAll('.cell[data-cell-type=""code""]').forEach(cellDiv => {
+            applyCodeSyntaxHighlight(cellDiv);
+        });
     }
 
     function escapeHtmlAttr(text) {
@@ -1324,8 +1442,9 @@ strong { font-weight: 700; }
                 '<button class=""cell-btn cell-move-down"" title=""Move Down"">↓</button>' +
                 '</div>';
         } else {
+            const highlightedCode = source ? highlightPythonCode(source) : '';
             div.innerHTML = '<div class=""cell-input code-cell"">' +
-                '<div class=""cell-input-area code-editor"" contenteditable=""true"" spellcheck=""false"" data-source=""' + escapeHtml(source || '') + '""><pre>' + escapeHtml(source || '') + '</pre></div>' +
+                '<div class=""cell-input-area code-editor"" contenteditable=""true"" spellcheck=""false"" data-source=""' + escapeHtml(source || '') + '""><pre>' + highlightedCode + '</pre></div>' +
                 '<div class=""cell-toolbar"">' +
                 '<button class=""cell-btn cell-run"" title=""Run (Shift+Enter)"">▶ Run</button>' +
                 '<button class=""cell-btn cell-run-below"" title=""Run Below"">▶|</button>' +
@@ -1781,7 +1900,7 @@ strong { font-weight: 700; }
             renderMarkdownCell(cellDiv);
         } else {
             const ed = cellDiv.querySelector('.cell-input-area');
-            if (ed) ed.innerHTML = '<pre>' + escapeHtml(head) + '</pre>';
+            if (ed) ed.innerHTML = '<pre>' + highlightPythonCode(head) + '</pre>';
         }
         cellDiv.setAttribute('data-source', head);
 
@@ -1807,7 +1926,7 @@ strong { font-weight: 700; }
             renderMarkdownCell(targetCell);
         } else {
             const ed = targetCell.querySelector('.cell-input-area');
-            if (ed) ed.innerHTML = '<pre>' + escapeHtml(merged) + '</pre>';
+            if (ed) ed.innerHTML = '<pre>' + highlightPythonCode(merged) + '</pre>';
         }
         targetCell.setAttribute('data-source', merged);
 
@@ -1984,6 +2103,40 @@ strong { font-weight: 700; }
         if (!input) return;
         const cellDiv = input.closest('.cell');
         if (!cellDiv) return;
+
+        if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+            const codeEditor = input.closest('.code-editor');
+            if (codeEditor) {
+                e.preventDefault();
+                document.execCommand('insertText', false, '    ');
+                notifyModified();
+                return;
+            }
+        } else if (e.key === 'Tab' && e.shiftKey && !e.ctrlKey && !e.altKey) {
+            const codeEditor = input.closest('.code-editor');
+            if (codeEditor) {
+                e.preventDefault();
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
+                    const node = range.startContainer;
+                    if (node.nodeType === Node.TEXT_NODE && node.textContent) {
+                        const start = range.startOffset;
+                        const lineStart = node.textContent.lastIndexOf('\n', start - 1) + 1;
+                        const linePrefix = node.textContent.slice(lineStart, start);
+                        if (linePrefix.startsWith('    ')) {
+                            node.textContent = node.textContent.slice(0, lineStart) + node.textContent.slice(lineStart + 4);
+                            range.setStart(node, start - 4);
+                            range.setEnd(node, start - 4);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        }
+                    }
+                }
+                notifyModified();
+                return;
+            }
+        }
 
         if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
             const editor = input.closest('.markdown-editor');
@@ -2650,6 +2803,7 @@ strong { font-weight: 700; }
     }
 
     setTimeout(initMplInteractiveContainers, 300);
+    applyAllCodeCellsHighlight();
 })();
 ";
         }
