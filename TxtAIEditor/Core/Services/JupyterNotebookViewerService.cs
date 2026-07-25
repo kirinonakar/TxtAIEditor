@@ -74,7 +74,6 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<div id=\"notebook-toolbar\">");
             sb.AppendLine("<button id=\"btn-add-code\" class=\"nb-btn nb-btn-add\">+ Code</button>");
             sb.AppendLine("<button id=\"btn-add-markdown\" class=\"nb-btn nb-btn-add\">+ Markdown</button>");
-            sb.AppendLine("<button id=\"btn-save\" class=\"nb-btn nb-btn-save\">Save</button>");
             sb.AppendLine("<button id=\"btn-run-all\" class=\"nb-btn nb-btn-run\">Run All</button>");
             sb.AppendLine($"<button id=\"btn-variables\" class=\"nb-btn nb-btn-vars\" title=\"{HtmlAttrEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}\">🔍 {HtmlEncode(_getString("JupyterVariablesButton", "Variables"))}</button>");
             sb.AppendLine("</div>");
@@ -1596,7 +1595,8 @@ strong { font-weight: 700; }
         notifyModified();
     });
 
-    document.getElementById('btn-save').addEventListener('click', saveNotebook);
+    const btnSave = document.getElementById('btn-save');
+    if (btnSave) btnSave.addEventListener('click', saveNotebook);
 
     document.getElementById('btn-run-all').addEventListener('click', async () => {
         const cells = Array.from(container.querySelectorAll('.cell'));
@@ -1719,11 +1719,15 @@ strong { font-weight: 700; }
         const btn = document.getElementById('btn-save');
         if (success) {
             isDirtyState = false;
-            btn.textContent = 'Saved!';
-            setTimeout(() => { btn.textContent = 'Save'; }, 1500);
+            if (btn) {
+                btn.textContent = 'Saved!';
+                setTimeout(() => { btn.textContent = 'Save'; }, 1500);
+            }
         } else {
-            btn.textContent = 'Save Failed';
-            setTimeout(() => { btn.textContent = 'Save'; }, 2000);
+            if (btn) {
+                btn.textContent = 'Save Failed';
+                setTimeout(() => { btn.textContent = 'Save'; }, 2000);
+            }
         }
     };
     function initMplInteractiveContainers() {
@@ -1991,7 +1995,7 @@ strong { font-weight: 700; }
                                 panY = startPanY + dy;
                             } else {
                                 azim = Math.round(startAzim - dx * 0.5) % 360;
-                                elev = Math.min(Math.max(-90, Math.round(startElev - dy * 0.5)), 90);
+                                elev = Math.min(Math.max(-90, Math.round(startElev + dy * 0.5)), 90);
                                 send3DViewRequest(elev, azim);
                             }
                         } else {
