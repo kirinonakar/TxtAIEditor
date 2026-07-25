@@ -173,9 +173,7 @@ namespace TxtAIEditor.Core.Services
             else
             {
                 sb.AppendLine($"<div class=\"cell-input code-cell\">");
-                sb.AppendLine($"<div class=\"cell-input-area code-editor\" contenteditable=\"true\" spellcheck=\"false\" data-source=\"{HtmlAttrEncode(source)}\">");
-                sb.AppendLine($"<pre>{HtmlEncode(source)}</pre>");
-                sb.AppendLine("</div>");
+                sb.AppendLine($"<div class=\"cell-input-area code-editor\" contenteditable=\"true\" spellcheck=\"false\" data-source=\"{HtmlAttrEncode(source)}\"><pre>{HtmlEncode(source)}</pre></div>");
                 sb.AppendLine("<div class=\"cell-toolbar\">");
                 sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Run (Shift+Enter)\">▶ Run</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-run-below\" title=\"Run Below\">▶|</button>");
@@ -891,7 +889,9 @@ strong { font-weight: 700; }
         const clone = pre.cloneNode(true);
         clone.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode('\n')));
         clone.querySelectorAll('div, p').forEach(div => {
-            div.before(document.createTextNode('\n'));
+            if (div.previousSibling) {
+                div.before(document.createTextNode('\n'));
+            }
         });
         const text = clone.textContent || '';
         return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -905,10 +905,12 @@ strong { font-weight: 700; }
             return cellDiv.getAttribute('data-source') || '';
         } else if (type === 'raw') {
             const editor = cellDiv.querySelector('.raw-editor, .cell-input-area');
-            return editor ? (editor.innerText || editor.textContent || '') : (cellDiv.getAttribute('data-source') || '');
+            if (editor) return getEditorText(editor);
+            return cellDiv.getAttribute('data-source') || '';
         } else {
             const input = cellDiv.querySelector('.cell-input-area');
-            return input ? (input.innerText || input.textContent || '') : '';
+            if (input) return getEditorText(input);
+            return cellDiv.getAttribute('data-source') || '';
         }
     }
 
