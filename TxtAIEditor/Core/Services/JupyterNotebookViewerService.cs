@@ -2296,21 +2296,27 @@ strong { font-weight: 700; }
                 const sel = window.getSelection();
                 if (sel && sel.isCollapsed && sel.rangeCount > 0) {
                     const range = sel.getRangeAt(0);
-                    const node = range.startContainer;
-                    if (node.nodeType === Node.TEXT_NODE && node.textContent) {
-                        const offset = range.startOffset;
-                        const textBefore = node.textContent.slice(0, offset);
-                        const lineStart = textBefore.lastIndexOf('\n') + 1;
-                        const linePrefix = textBefore.slice(lineStart);
-                        if (linePrefix.length > 0 && /^\s+$/.test(linePrefix)) {
-                            e.preventDefault();
-                            const deleteCount = linePrefix.length % 4 === 0 ? 4 : linePrefix.length % 4;
-                            range.setStart(node, offset - deleteCount);
-                            range.setEnd(node, offset);
-                            range.deleteContents();
-                            notifyModified();
-                            return;
+                    let textBefore = '';
+                    if (range.startContainer.nodeType === Node.TEXT_NODE) {
+                        textBefore = range.startContainer.textContent.slice(0, range.startOffset);
+                    } else if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
+                        const childNodes = Array.from(range.startContainer.childNodes);
+                        for (let i = 0; i < range.startOffset; i++) {
+                            textBefore += childNodes[i]?.textContent || '';
                         }
+                    }
+
+                    const lineStart = textBefore.lastIndexOf('\n') + 1;
+                    const linePrefix = textBefore.slice(lineStart);
+
+                    if (linePrefix.length > 0 && /^\s+$/.test(linePrefix)) {
+                        e.preventDefault();
+                        const deleteCount = linePrefix.length % 4 === 0 ? 4 : linePrefix.length % 4;
+                        for (let i = 0; i < deleteCount; i++) {
+                            document.execCommand('delete', false, null);
+                        }
+                        notifyModified();
+                        return;
                     }
                 }
             }
@@ -2327,19 +2333,23 @@ strong { font-weight: 700; }
             if (codeEditor) {
                 e.preventDefault();
                 const sel = window.getSelection();
-                if (sel && sel.rangeCount > 0) {
+                if (sel && sel.isCollapsed && sel.rangeCount > 0) {
                     const range = sel.getRangeAt(0);
-                    const node = range.startContainer;
-                    if (node.nodeType === Node.TEXT_NODE && node.textContent) {
-                        const start = range.startOffset;
-                        const lineStart = node.textContent.lastIndexOf('\n', start - 1) + 1;
-                        const linePrefix = node.textContent.slice(lineStart, start);
-                        if (linePrefix.startsWith('    ')) {
-                            node.textContent = node.textContent.slice(0, lineStart) + node.textContent.slice(lineStart + 4);
-                            range.setStart(node, start - 4);
-                            range.setEnd(node, start - 4);
-                            sel.removeAllRanges();
-                            sel.addRange(range);
+                    let textBefore = '';
+                    if (range.startContainer.nodeType === Node.TEXT_NODE) {
+                        textBefore = range.startContainer.textContent.slice(0, range.startOffset);
+                    } else if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
+                        const childNodes = Array.from(range.startContainer.childNodes);
+                        for (let i = 0; i < range.startOffset; i++) {
+                            textBefore += childNodes[i]?.textContent || '';
+                        }
+                    }
+                    const lineStart = textBefore.lastIndexOf('\n') + 1;
+                    const linePrefix = textBefore.slice(lineStart);
+                    if (linePrefix.length > 0 && /^\s+$/.test(linePrefix)) {
+                        const unindentCount = Math.min(4, linePrefix.length);
+                        for (let i = 0; i < unindentCount; i++) {
+                            document.execCommand('delete', false, null);
                         }
                     }
                 }
