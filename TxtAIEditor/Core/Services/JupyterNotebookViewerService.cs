@@ -573,18 +573,30 @@ strong { font-weight: 700; }
         return s;
     }
 
+    function getEditorText(editor) {
+        if (!editor) return '';
+        const pre = editor.querySelector('pre') || editor;
+        const clone = pre.cloneNode(true);
+        clone.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode('\n')));
+        clone.querySelectorAll('div, p').forEach(div => {
+            div.before(document.createTextNode('\n'));
+        });
+        const text = clone.textContent || '';
+        return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    }
+
     function getCellSource(cellDiv) {
         const type = getCellType(cellDiv);
         if (type === 'markdown') {
             const editor = cellDiv.querySelector('.markdown-editor');
-            if (editor) return editor.innerText;
+            if (editor) return getEditorText(editor);
             return cellDiv.getAttribute('data-source') || '';
         } else if (type === 'raw') {
             const editor = cellDiv.querySelector('.raw-editor, .cell-input-area');
-            return editor ? editor.innerText : (cellDiv.getAttribute('data-source') || '');
+            return editor ? (editor.innerText || editor.textContent || '') : (cellDiv.getAttribute('data-source') || '');
         } else {
             const input = cellDiv.querySelector('.cell-input-area');
-            return input ? input.innerText : '';
+            return input ? (input.innerText || input.textContent || '') : '';
         }
     }
 
@@ -594,7 +606,7 @@ strong { font-weight: 700; }
         const preview = cellDiv.querySelector('.markdown-preview');
         if (!editor || !preview) return;
 
-        const source = editor.innerText;
+        const source = getEditorText(editor);
         cellDiv.setAttribute('data-source', source);
         preview.innerHTML = renderMarkdownJs(source) || '<em style=""color:#888;"">(Empty Markdown Cell)</em>';
         editor.style.display = 'none';
@@ -803,10 +815,22 @@ strong { font-weight: 700; }
     }
 
     let lastActiveMarkdownCell = null;
+    let lastActiveMarkdownRange = null;
+
     container.addEventListener('focusin', (e) => {
         const cellDiv = e.target.closest('.cell');
         if (cellDiv && getCellType(cellDiv) === 'markdown') {
             lastActiveMarkdownCell = cellDiv;
+        }
+    });
+
+    document.addEventListener('selectionchange', () => {
+        const active = document.activeElement;
+        if (active && active.classList && active.classList.contains('markdown-editor')) {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && active.contains(sel.anchorNode)) {
+                lastActiveMarkdownRange = sel.getRangeAt(0).cloneRange();
+            }
         }
     });
 
@@ -817,6 +841,9 @@ strong { font-weight: 700; }
         if (!cellDiv || getCellType(cellDiv) !== 'markdown') return;
 
         setTimeout(() => {
+            if (!document.hasFocus()) {
+                return;
+            }
             const active = document.activeElement;
             if (active && cellDiv.contains(active)) {
                 return;
@@ -835,6 +862,32 @@ strong { font-weight: 700; }
             sel.removeAllRanges();
             sel.addRange(range);
         }
+    }
+
+    function focusEditorAtLine(editor, lineIndex) {
+        editor.focus();
+        const sel = window.getSelection();
+        if (!sel) return;
+        const pre = editor.querySelector('pre') || editor;
+        const textNode = pre.firstChild;
+        if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+            focusEditorAtEnd(editor);
+            return;
+        }
+        const text = textNode.nodeValue || '';
+        const lines = text.split('\n');
+        let offset = 0;
+        const target = Math.min(Math.max(0, lineIndex), lines.length - 1);
+        for (let i = 0; i <= target; i++) {
+            offset += lines[i].length;
+            if (i < target) offset += 1;
+        }
+        offset = Math.min(offset, text.length);
+        const range = document.createRange();
+        range.setStart(textNode, offset);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
     }
 
     function cycleHeadingText(lineText) {
@@ -868,7 +921,16 @@ strong { font-weight: 700; }
             const preRange = document.createRange();
             preRange.selectNodeContents(editor);
             preRange.setEnd(range.startContainer, range.startOffset);
-            const textBefore = preRange.toString();
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            tempDiv.style.visibility = 'hidden';
+            tempDiv.appendChild(preRange.cloneContents());
+            document.body.appendChild(tempDiv);
+            tempDiv.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode('\n')));
+            tempDiv.querySelectorAll('div, p').forEach(div => div.before(document.createTextNode('\n')));
+            const textBefore = (tempDiv.textContent || tempDiv.innerText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            tempDiv.remove();
             const lineIndex = textBefore.split('\n').length - 1;
             return Math.max(0, lineIndex);
         } catch {
@@ -877,7 +939,7 @@ strong { font-weight: 700; }
     }
 
     function cycleHeadingInEditor(editor, range) {
-        let text = editor.innerText || '';
+        let text = getEditorText(editor);
         const lines = text.split('\n');
         let targetIndex = 0;
         if (range) {
@@ -886,12 +948,12 @@ strong { font-weight: 700; }
         if (targetIndex >= 0 && targetIndex < lines.length) {
             lines[targetIndex] = cycleHeadingText(lines[targetIndex]);
             editor.innerHTML = '<pre>' + escapeHtml(lines.join('\n')) + '</pre>';
-            focusEditorAtEnd(editor);
+            focusEditorAtLine(editor, targetIndex);
         }
     }
 
     function togglePrefixInEditor(editor, range, prefix) {
-        let text = editor.innerText || '';
+        let text = getEditorText(editor);
         const lines = text.split('\n');
         let targetIndex = 0;
         if (range) {
@@ -900,7 +962,7 @@ strong { font-weight: 700; }
         if (targetIndex >= 0 && targetIndex < lines.length) {
             lines[targetIndex] = toggleLinePrefixText(lines[targetIndex], prefix);
             editor.innerHTML = '<pre>' + escapeHtml(lines.join('\n')) + '</pre>';
-            focusEditorAtEnd(editor);
+            focusEditorAtLine(editor, targetIndex);
         }
     }
 
@@ -980,7 +1042,7 @@ strong { font-weight: 700; }
                 sel.addRange(range);
             }
         } else {
-            const currentText = editor.innerText || '';
+            const currentText = getEditorText(editor);
             const needNewline = currentText.length > 0 && !currentText.endsWith('\n');
             editor.innerHTML = '<pre>' + escapeHtml(currentText + (needNewline ? '\n' : '') + opening + closing) + '</pre>';
             focusEditorAtEnd(editor);
@@ -999,6 +1061,8 @@ strong { font-weight: 700; }
 
         if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
             range = sel.getRangeAt(0);
+        } else if (lastActiveMarkdownRange && editor.contains(lastActiveMarkdownRange.anchorNode)) {
+            range = lastActiveMarkdownRange;
         }
 
         if (command === 'heading') {
@@ -1156,6 +1220,16 @@ strong { font-weight: 700; }
         if (!input) return;
         const cellDiv = input.closest('.cell');
         if (!cellDiv) return;
+
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+            const editor = input.closest('.markdown-editor');
+            if (editor) {
+                e.preventDefault();
+                document.execCommand('insertLineBreak');
+                notifyModified();
+                return;
+            }
+        }
 
         if (e.shiftKey && e.key === 'Enter') {
             e.preventDefault();
