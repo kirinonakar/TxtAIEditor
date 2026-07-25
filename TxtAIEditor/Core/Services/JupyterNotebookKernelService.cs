@@ -105,6 +105,88 @@ except Exception:
 
 _ns = {'__name__': '__main__'}
 
+def _render_figure_html(fig):
+    import io, base64
+    colorbars = []
+    try:
+        for ax in fig.axes:
+            label = str(getattr(ax, 'get_label', lambda: '')())
+            if getattr(ax, '_colorbar', None) is not None or label == '<colorbar>' or 'colorbar' in label.lower():
+                colorbars.append(ax)
+    except Exception:
+        pass
+
+    if colorbars:
+        try:
+            for cb in colorbars: cb.set_visible(False)
+            buf_main = io.BytesIO()
+            fig.savefig(buf_main, format='png', bbox_inches='tight', transparent=True)
+            buf_main.seek(0)
+            b64_main = base64.b64encode(buf_main.read()).decode('utf-8')
+
+            for cb in colorbars: cb.set_visible(True)
+            for ax in fig.axes:
+                if ax not in colorbars: ax.set_visible(False)
+            buf_cbar = io.BytesIO()
+            fig.savefig(buf_cbar, format='png', bbox_inches='tight', transparent=True)
+            buf_cbar.seek(0)
+            b64_cbar = base64.b64encode(buf_cbar.read()).decode('utf-8')
+
+            for ax in fig.axes: ax.set_visible(True)
+
+            return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"">
+    <div class=""mpl-toolbar"">
+        <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
+        <button class=""mpl-btn mpl-btn-pan active"" title=""Pan Mode"">✋ Pan</button>
+        <button class=""mpl-btn mpl-btn-rotate"" title=""Rotate Mode"">🔄 Rotate</button>
+        <div class=""mpl-rotate-ctrl"">
+            <span>Rotate:</span>
+            <input type=""range"" class=""mpl-rotate-slider"" min=""-180"" max=""180"" value=""0"" />
+            <span class=""mpl-angle-val"">0°</span>
+        </div>
+        <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
+    </div>
+    <div class=""mpl-viewport"">
+        <div class=""mpl-plot-layer"">
+            <img src=""data:image/png;base64,{b64_main}"" class=""mpl-plot-img"" />
+        </div>
+        <div class=""mpl-cbar-layer"">
+            <img src=""data:image/png;base64,{b64_cbar}"" class=""mpl-cbar-img"" />
+        </div>
+    </div>
+    <div class=""mpl-status-bar"">
+        <span>Left: Pan/Rotate | Middle: Pan | Right: Rotate | Wheel: Zoom</span>
+    </div>
+</div><!--MPL_END-->'''
+        except Exception:
+            pass
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight')
+    buf.seek(0)
+    b64 = base64.b64encode(buf.read()).decode('utf-8')
+    return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"">
+    <div class=""mpl-toolbar"">
+        <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
+        <button class=""mpl-btn mpl-btn-pan active"" title=""Pan Mode"">✋ Pan</button>
+        <button class=""mpl-btn mpl-btn-rotate"" title=""Rotate Mode"">🔄 Rotate</button>
+        <div class=""mpl-rotate-ctrl"">
+            <span>Rotate:</span>
+            <input type=""range"" class=""mpl-rotate-slider"" min=""-180"" max=""180"" value=""0"" />
+            <span class=""mpl-angle-val"">0°</span>
+        </div>
+        <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
+    </div>
+    <div class=""mpl-viewport"">
+        <div class=""mpl-plot-layer"">
+            <img src=""data:image/png;base64,{b64}"" class=""mpl-plot-img"" />
+        </div>
+    </div>
+    <div class=""mpl-status-bar"">
+        <span>Left: Pan/Rotate | Middle: Pan | Right: Rotate | Wheel: Zoom</span>
+    </div>
+</div><!--MPL_END-->'''
+
 def _capture_figures():
     imgs = []
     try:
@@ -114,11 +196,7 @@ def _capture_figures():
         if plt.get_fignums():
             for num in plt.get_fignums():
                 fig = plt.figure(num)
-                buf = io.BytesIO()
-                fig.savefig(buf, format='png', bbox_inches='tight')
-                buf.seek(0)
-                b64 = base64.b64encode(buf.read()).decode('utf-8')
-                imgs.append(f'<img src=""data:image/png;base64,{b64}"" style=""max-width:100%;height:auto;margin:8px 0;display:block;"" />')
+                imgs.append(_render_figure_html(fig))
             plt.close('all')
     except Exception:
         pass
@@ -133,11 +211,20 @@ while True:
         continue
     try:
         msg = json.loads(line)
-        code = msg.get('code', '')
+        raw_code = msg.get('code', '')
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()
         result_obj = None
         extra_html = []
+
+        clean_lines = []
+        for l in raw_code.split('\n'):
+            stripped = l.lstrip()
+            if stripped.startswith('%') or stripped.startswith('!'):
+                clean_lines.append('# ' + l)
+            else:
+                clean_lines.append(l)
+        code = '\n'.join(clean_lines)
 
         try:
             import matplotlib
@@ -146,11 +233,7 @@ while True:
             def _custom_show(*args, **kwargs):
                 for num in plt.get_fignums():
                     fig = plt.figure(num)
-                    buf = io.BytesIO()
-                    fig.savefig(buf, format='png', bbox_inches='tight')
-                    buf.seek(0)
-                    b64 = base64.b64encode(buf.read()).decode('utf-8')
-                    extra_html.append(f'<img src=""data:image/png;base64,{b64}"" style=""max-width:100%;height:auto;margin:8px 0;display:block;"" />')
+                    extra_html.append(_render_figure_html(fig))
                 plt.close('all')
             plt.show = _custom_show
         except Exception:

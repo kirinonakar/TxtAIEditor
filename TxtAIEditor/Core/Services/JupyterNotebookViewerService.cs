@@ -181,7 +181,7 @@ namespace TxtAIEditor.Core.Services
                     {
                         string name = outElement.TryGetProperty("name", out var n) ? n.GetString() ?? "stdout" : "stdout";
                         string cls = name == "stderr" ? "output-stderr" : "output-stdout";
-                        if (text.Contains("<img ") || text.Contains("<table"))
+                        if (text.Contains("<img ") || text.Contains("<table") || text.Contains("<!--MPL_START-->") || text.Contains("mpl-interactive-wrapper"))
                         {
                             sb.Append(text);
                         }
@@ -467,6 +467,106 @@ strong { font-weight: 700; }
     display: none; background: var(--nb-input-bg); padding: 12px 14px; min-height: 42px; font-size: 14px; line-height: 1.6; box-sizing: border-box;
 }
 .cell-toggle-type { opacity: 0.8; font-weight: 500; }
+.mpl-interactive-wrapper {
+    display: inline-block;
+    max-width: 100%;
+    margin: 12px 0;
+    border: 1px solid var(--nb-border);
+    border-radius: 8px;
+    background: var(--nb-output-bg);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    overflow: hidden;
+    user-select: none;
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+}
+.mpl-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--nb-input-bg);
+    border-bottom: 1px solid var(--nb-border);
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+.mpl-btn {
+    border: 1px solid var(--nb-border);
+    background: var(--nb-bg);
+    color: var(--nb-fg);
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s, border-color 0.15s;
+}
+.mpl-btn:hover {
+    background: var(--nb-accent);
+    color: #ffffff;
+}
+.mpl-btn.active {
+    background: var(--nb-accent);
+    color: #ffffff;
+    border-color: var(--nb-accent);
+}
+.mpl-rotate-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 4px;
+    font-size: 12px;
+}
+.mpl-rotate-slider {
+    width: 100px;
+    cursor: pointer;
+}
+.mpl-angle-val {
+    min-width: 32px;
+    font-size: 11px;
+    font-weight: bold;
+}
+.mpl-viewport {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 16px;
+    background: var(--nb-output-bg);
+    min-height: 200px;
+    cursor: grab;
+}
+.mpl-viewport:active {
+    cursor: grabbing;
+}
+.mpl-plot-layer {
+    display: inline-block;
+    transform-origin: center center;
+    transition: transform 0.05s ease-out;
+}
+.mpl-plot-img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    pointer-events: none;
+}
+.mpl-cbar-layer {
+    display: inline-block;
+    margin-left: 12px;
+    pointer-events: none;
+}
+.mpl-cbar-img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+.mpl-status-bar {
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #888;
+    background: var(--nb-input-bg);
+    border-top: 1px solid var(--nb-border);
+    text-align: right;
+}
 ";
         }
 
@@ -714,13 +814,14 @@ strong { font-weight: 700; }
 
     function renderStdoutWithImages(text) {
         if (!text) return '';
-        const parts = text.split(/(<img\s+src=""data:image\/[^"">]+""?[^>]*\/>)/gi);
+        const parts = text.split(/(<!--MPL_START-->[\s\S]*?<!--MPL_END-->|<img\s+src=""data:image\/[^"">]+""?[^>]*\/>)/gi);
         let html = '';
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
-            if (/^<img\s+src=""data:image\//i.test(part)) {
+            if (!part) continue;
+            if (part.startsWith('<!--MPL_START-->') || /^<img\s+src=""data:image\//i.test(part)) {
                 html += part;
-            } else if (part) {
+            } else {
                 html += '<span class=""output-stdout"">' + escapeHtml(part) + '</span>';
             }
         }
@@ -760,6 +861,7 @@ strong { font-weight: 700; }
             if (html) {
                 outputDiv.classList.add('has-output');
                 outputDiv.innerHTML = html;
+                setTimeout(initMplInteractiveContainers, 50);
             } else {
                 outputDiv.classList.remove('has-output');
                 outputDiv.innerHTML = '';
@@ -1313,6 +1415,181 @@ strong { font-weight: 700; }
             setTimeout(() => { btn.textContent = 'Save'; }, 2000);
         }
     };
+    function initMplInteractiveContainers() {
+        document.querySelectorAll('.cell-output').forEach(function(outputDiv) {
+            outputDiv.querySelectorAll('img[src^=""data:image/png""]').forEach(function(img) {
+                if (!img.closest('.mpl-interactive-wrapper')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'mpl-interactive-wrapper';
+                    wrapper.setAttribute('data-mpl', 'true');
+                    wrapper.innerHTML = 
+                        '<div class=""mpl-toolbar"">' +
+                            '<button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>' +
+                            '<button class=""mpl-btn mpl-btn-pan active"" title=""Pan Mode"">✋ Pan</button>' +
+                            '<button class=""mpl-btn mpl-btn-rotate"" title=""Rotate Mode"">🔄 Rotate</button>' +
+                            '<div class=""mpl-rotate-ctrl"">' +
+                                '<span>Rotate:</span>' +
+                                '<input type=""range"" class=""mpl-rotate-slider"" min=""-180"" max=""180"" value=""0"" />' +
+                                '<span class=""mpl-angle-val"">0°</span>' +
+                            '</div>' +
+                            '<button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>' +
+                        '</div>' +
+                        '<div class=""mpl-viewport"">' +
+                            '<div class=""mpl-plot-layer""></div>' +
+                        '</div>' +
+                        '<div class=""mpl-status-bar"">' +
+                            '<span>Left: Pan/Rotate | Middle: Pan | Right: Rotate | Wheel: Zoom</span>' +
+                        '</div>';
+                    img.parentNode.insertBefore(wrapper, img);
+                    const plotLayer = wrapper.querySelector('.mpl-plot-layer');
+                    img.className = 'mpl-plot-img';
+                    plotLayer.appendChild(img);
+                }
+            });
+
+            outputDiv.querySelectorAll('.mpl-interactive-wrapper').forEach(function(wrapper) {
+                if (wrapper.__mplInited) return;
+                wrapper.__mplInited = true;
+
+                const viewport = wrapper.querySelector('.mpl-viewport');
+                const plotLayer = wrapper.querySelector('.mpl-plot-layer');
+                const cbarLayer = wrapper.querySelector('.mpl-cbar-layer');
+                const btnReset = wrapper.querySelector('.mpl-btn-reset');
+                const btnPan = wrapper.querySelector('.mpl-btn-pan');
+                const btnRotate = wrapper.querySelector('.mpl-btn-rotate');
+                const slider = wrapper.querySelector('.mpl-rotate-slider');
+                const angleVal = wrapper.querySelector('.mpl-angle-val');
+                const btnDownload = wrapper.querySelector('.mpl-btn-download');
+
+                let panX = 0, panY = 0, scale = 1, angle = 0;
+                let mode = 'pan';
+                let isDragging = false;
+                let dragBtn = -1;
+                let startX = 0, startY = 0;
+                let startPanX = 0, startPanY = 0;
+                let startAngle = 0;
+
+                function updateTransform() {
+                    if (plotLayer) {
+                        plotLayer.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ') rotate(' + angle + 'deg)';
+                    }
+                    if (slider) slider.value = angle;
+                    if (angleVal) angleVal.textContent = angle + '°';
+                }
+
+                if (viewport) {
+                    viewport.addEventListener('mousedown', function(e) {
+                        e.preventDefault();
+                        isDragging = true;
+                        dragBtn = e.button;
+                        startX = e.clientX;
+                        startY = e.clientY;
+                        startPanX = panX;
+                        startPanY = panY;
+                        startAngle = angle;
+                    });
+
+                    window.addEventListener('mousemove', function(e) {
+                        if (!isDragging) return;
+                        const dx = e.clientX - startX;
+                        const dy = e.clientY - startY;
+
+                        if (dragBtn === 0) {
+                            if (mode === 'pan') {
+                                panX = startPanX + dx;
+                                panY = startPanY + dy;
+                            } else {
+                                angle = Math.round(startAngle + dx) % 360;
+                            }
+                        } else if (dragBtn === 1) {
+                            panX = startPanX + dx;
+                            panY = startPanY + dy;
+                        } else if (dragBtn === 2) {
+                            angle = Math.round(startAngle + dx) % 360;
+                        }
+                        updateTransform();
+                    });
+
+                    window.addEventListener('mouseup', function() {
+                        isDragging = false;
+                    });
+
+                    viewport.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                    });
+
+                    viewport.addEventListener('wheel', function(e) {
+                        e.preventDefault();
+                        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+                        scale = Math.min(Math.max(0.2, scale * factor), 5.0);
+                        updateTransform();
+                    });
+                }
+
+                if (slider) {
+                    slider.addEventListener('input', function() {
+                        angle = parseInt(slider.value) || 0;
+                        updateTransform();
+                    });
+                }
+
+                if (btnReset) {
+                    btnReset.addEventListener('click', function() {
+                        panX = 0; panY = 0; scale = 1; angle = 0;
+                        updateTransform();
+                    });
+                }
+
+                if (btnPan && btnRotate) {
+                    btnPan.addEventListener('click', function() {
+                        mode = 'pan';
+                        btnPan.classList.add('active');
+                        btnRotate.classList.remove('active');
+                    });
+                    btnRotate.addEventListener('click', function() {
+                        mode = 'rotate';
+                        btnRotate.classList.add('active');
+                        btnPan.classList.remove('active');
+                    });
+                }
+
+                if (btnDownload) {
+                    btnDownload.addEventListener('click', function() {
+                        const mainImg = wrapper.querySelector('.mpl-plot-img');
+                        const cbarImg = wrapper.querySelector('.mpl-cbar-img');
+                        if (!mainImg) return;
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) return;
+
+                        const w1 = mainImg.naturalWidth || mainImg.width || 600;
+                        const h1 = mainImg.naturalHeight || mainImg.height || 400;
+                        const w2 = cbarImg ? (cbarImg.naturalWidth || cbarImg.width || 100) : 0;
+                        const h2 = cbarImg ? (cbarImg.naturalHeight || cbarImg.height || 400) : 0;
+
+                        canvas.width = w1 + (w2 ? w2 + 20 : 0);
+                        canvas.height = Math.max(h1, h2);
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        ctx.drawImage(mainImg, 0, 0, w1, h1);
+                        if (cbarImg && w2) {
+                            ctx.drawImage(cbarImg, w1 + 20, 0, w2, h2);
+                        }
+
+                        const a = document.createElement('a');
+                        a.download = 'matplotlib_plot.png';
+                        a.href = canvas.toDataURL('image/png');
+                        a.click();
+                    });
+                }
+            });
+        });
+    }
+
+    setTimeout(initMplInteractiveContainers, 300);
 })();
 ";
         }
