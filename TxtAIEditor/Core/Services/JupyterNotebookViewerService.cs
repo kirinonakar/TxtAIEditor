@@ -1101,17 +1101,32 @@ strong { font-weight: 700; }
     }
 
     function renderLatex(text) {
-        if (!text || typeof katex === 'undefined') return text;
+        if (!text) return text;
+        if (typeof katex === 'undefined') return text;
         try {
             // Display math $$...$$
             text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, expr) => {
-                try { return katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false }); }
+                const cleanExpr = expr.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                try { return katex.renderToString(cleanExpr.trim(), { displayMode: true, throwOnError: false }); }
                 catch(e) { return `<span class=""token-comment"">$$${escapeHtml(expr)}$$</span>`; }
+            });
+            // Display math \[...\]
+            text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, expr) => {
+                const cleanExpr = expr.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                try { return katex.renderToString(cleanExpr.trim(), { displayMode: true, throwOnError: false }); }
+                catch(e) { return `<span class=""token-comment"">\\[${escapeHtml(expr)}\\]</span>`; }
             });
             // Inline math $...$
             text = text.replace(/(?<!\$)\$([^$\n]+?)\$(?!\$)/g, (_, expr) => {
-                try { return katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false }); }
+                const cleanExpr = expr.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                try { return katex.renderToString(cleanExpr.trim(), { displayMode: false, throwOnError: false }); }
                 catch(e) { return `<span class=""token-comment"">$${escapeHtml(expr)}$</span>`; }
+            });
+            // Inline math \(...\)
+            text = text.replace(/\\\(([\s\S]*?)\\\)/g, (_, expr) => {
+                const cleanExpr = expr.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                try { return katex.renderToString(cleanExpr.trim(), { displayMode: false, throwOnError: false }); }
+                catch(e) { return `<span class=""token-comment"">\\(${escapeHtml(expr)}\\)</span>`; }
             });
         } catch(e) {}
         return text;
@@ -1166,15 +1181,15 @@ strong { font-weight: 700; }
         const type = getCellType(cellDiv);
         if (type === 'markdown') {
             const editor = cellDiv.querySelector('.markdown-editor');
-            if (editor) return getEditorText(editor);
+            if (editor) return getEditorText(editor) || cellDiv.getAttribute('data-source') || '';
             return cellDiv.getAttribute('data-source') || '';
         } else if (type === 'raw') {
             const editor = cellDiv.querySelector('.raw-editor, .cell-input-area');
-            if (editor) return getEditorText(editor);
+            if (editor) return getEditorText(editor) || cellDiv.getAttribute('data-source') || '';
             return cellDiv.getAttribute('data-source') || '';
         } else {
             const input = cellDiv.querySelector('.cell-input-area');
-            if (input) return getEditorText(input);
+            if (input) return getEditorText(input) || cellDiv.getAttribute('data-source') || '';
             return cellDiv.getAttribute('data-source') || '';
         }
     }
@@ -1183,12 +1198,12 @@ strong { font-weight: 700; }
         if (getCellType(cellDiv) !== 'markdown') return;
         const editor = cellDiv.querySelector('.markdown-editor');
         const preview = cellDiv.querySelector('.markdown-preview');
-        if (!editor || !preview) return;
+        if (!preview) return;
 
-        const source = getEditorText(editor);
+        const source = (editor ? getEditorText(editor) : '') || cellDiv.getAttribute('data-source') || '';
         cellDiv.setAttribute('data-source', source);
         preview.innerHTML = renderMarkdownJs(source) || '<em style=""color:#888;"">(Empty Markdown Cell)</em>';
-        editor.style.display = 'none';
+        if (editor) editor.style.display = 'none';
         preview.style.display = 'block';
     }
 
@@ -3065,6 +3080,28 @@ strong { font-weight: 700; }
                 }
             });
         });
+    }
+
+    function renderAllMarkdownCells() {
+        container.querySelectorAll('.cell[data-cell-type=""markdown""]').forEach(function(cellDiv) {
+            renderMarkdownCell(cellDiv);
+        });
+    }
+
+    renderAllMarkdownCells();
+    if (typeof katex === 'undefined') {
+        try {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css';
+            document.head.appendChild(link);
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js';
+            script.onload = function() { renderAllMarkdownCells(); };
+            document.head.appendChild(script);
+        } catch(ex) {}
+    } else {
+        setTimeout(renderAllMarkdownCells, 100);
     }
 
     setTimeout(initMplInteractiveContainers, 300);
