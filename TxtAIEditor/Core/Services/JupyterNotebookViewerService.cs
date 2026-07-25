@@ -413,32 +413,32 @@ body {
 #cells-container { display: flex; flex-direction: column; gap: 8px; }
 .cell {
     border: 1px solid var(--nb-border); border-radius: 6px; overflow: hidden;
-    position: relative;
+    position: relative; box-sizing: border-box;
 }
 .cell-code { background: var(--nb-input-bg); }
-.cell-markdown { background: var(--nb-bg); padding: 12px 16px; }
-.cell-raw { background: var(--nb-input-bg); padding: 12px 16px; }
+.cell-markdown { background: var(--nb-bg); padding: 0; }
+.cell-raw { background: var(--nb-input-bg); padding: 0; }
 .cell-input-area {
-    padding: 10px 12px; min-height: 24px; font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 13.5px; white-space: pre-wrap; word-break: break-word; outline: none;
-    line-height: 1.45; cursor: text;
+    padding: 12px 14px; min-height: 42px; font-family: 'Consolas', 'Cascadia Code', 'Courier New', monospace;
+    font-size: 14px; white-space: pre-wrap; word-break: break-word; outline: none;
+    line-height: 1.6; cursor: text; box-sizing: border-box;
 }
 .cell-input-area:focus { background: var(--nb-bg); box-shadow: inset 0 0 0 2px var(--nb-accent); }
-.cell-input-area pre { white-space: pre-wrap; word-break: break-word; margin: 0; font-family: inherit; }
-.cell pre { white-space: pre-wrap; word-break: break-word; margin: 0; font-family: 'Consolas', monospace; font-size: 13.5px; }
+.cell-input-area pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: inherit; font-size: inherit; line-height: inherit; }
+.cell pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.6; }
 .cell-toolbar {
-    display: flex; gap: 4px; padding: 4px 8px; background: var(--nb-input-bg);
+    display: flex; gap: 4px; padding: 6px 10px; background: var(--nb-input-bg);
     border-top: 1px solid var(--nb-border);
 }
 .cell-btn {
-    padding: 3px 8px; border: none; border-radius: 3px; background: transparent;
-    color: var(--nb-fg); cursor: pointer; font-size: 12px; opacity: 0.6;
+    padding: 4px 10px; border: none; border-radius: 4px; background: transparent;
+    color: var(--nb-fg); cursor: pointer; font-size: 12px; opacity: 0.7;
 }
 .cell-btn:hover { opacity: 1; background: var(--nb-accent); color: #fff; }
 .cell-output {
-    padding: 8px 12px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
-    font-family: 'Consolas', monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word;
-    display: none; min-height: 0;
+    padding: 10px 14px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
+    font-family: 'Consolas', monospace; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    display: none; min-height: 0; box-sizing: border-box;
 }
 .cell-output.has-output { display: block; }
 .cell-output .output-stdout { color: var(--nb-fg); white-space: pre-wrap; }
@@ -457,13 +457,13 @@ code { background: var(--nb-input-bg); padding: 1px 4px; border-radius: 3px; fon
 strong { font-weight: 700; }
 .markdown-cell { padding: 0; }
 .markdown-preview {
-    padding: 10px 14px; min-height: 28px; cursor: pointer; border-radius: 4px; line-height: 1.5;
+    padding: 12px 14px; min-height: 42px; cursor: pointer; border-radius: 4px; line-height: 1.6; font-size: 14px; box-sizing: border-box;
 }
 .markdown-preview:hover {
     outline: 1px dashed var(--nb-accent);
 }
 .markdown-editor {
-    display: none; background: var(--nb-input-bg); padding: 10px 12px;
+    display: none; background: var(--nb-input-bg); padding: 12px 14px; min-height: 42px; font-size: 14px; line-height: 1.6; box-sizing: border-box;
 }
 .cell-toggle-type { opacity: 0.8; font-weight: 500; }
 ";
@@ -791,6 +791,21 @@ strong { font-weight: 700; }
         }
     });
 
+    container.addEventListener('focusout', (e) => {
+        const editor = e.target.closest('.markdown-editor');
+        if (!editor) return;
+        const cellDiv = editor.closest('.cell');
+        if (!cellDiv || getCellType(cellDiv) !== 'markdown') return;
+
+        setTimeout(() => {
+            const active = document.activeElement;
+            if (active && cellDiv.contains(active)) {
+                return;
+            }
+            renderMarkdownCell(cellDiv);
+        }, 150);
+    });
+
     function focusEditorAtEnd(editor) {
         editor.focus();
         const sel = window.getSelection();
@@ -809,57 +824,68 @@ strong { font-weight: 700; }
         const editor = cellDiv.querySelector('.markdown-editor');
         if (!editor) return;
 
-        let prefix = '', suffix = '', defaultText = '';
+        let prefix = '', suffix = '';
         switch (command) {
-            case 'bold': prefix = '**'; suffix = '**'; defaultText = 'bold'; break;
-            case 'italic': prefix = '*'; suffix = '*'; defaultText = 'italic'; break;
-            case 'underline': prefix = '<u>'; suffix = '</u>'; defaultText = 'underline'; break;
-            case 'highlight': prefix = '<mark>'; suffix = '</mark>'; defaultText = 'highlight'; break;
-            case 'heading': prefix = '# '; suffix = ''; defaultText = 'Heading'; break;
-            case 'ul': prefix = '- '; suffix = ''; defaultText = 'list item'; break;
-            case 'quote': prefix = '> '; suffix = ''; defaultText = 'quote'; break;
-            case 'inlineCode': prefix = '`'; suffix = '`'; defaultText = 'code'; break;
-            case 'codeBlock': prefix = '```\n'; suffix = '\n```'; defaultText = 'code'; break;
-            case 'task': prefix = '- [ ] '; suffix = ''; defaultText = 'task item'; break;
-            case 'table': prefix = '\n| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n'; suffix = ''; defaultText = ''; break;
-            case 'arrow': prefix = '-> '; suffix = ''; defaultText = ''; break;
+            case 'bold': prefix = '**'; suffix = '**'; break;
+            case 'italic': prefix = '*'; suffix = '*'; break;
+            case 'underline': prefix = '<u>'; suffix = '</u>'; break;
+            case 'highlight': prefix = '<mark>'; suffix = '</mark>'; break;
+            case 'heading': prefix = '# '; suffix = ''; break;
+            case 'ul': prefix = '- '; suffix = ''; break;
+            case 'ol': prefix = '1. '; suffix = ''; break;
+            case 'quote': prefix = '> '; suffix = ''; break;
+            case 'inlineCode': prefix = '`'; suffix = '`'; break;
+            case 'codeBlock': prefix = '```\n'; suffix = '\n```'; break;
+            case 'task': prefix = '- [ ] '; suffix = ''; break;
+            case 'link': prefix = '['; suffix = '](https://)'; break;
+            case 'image': prefix = '!['; suffix = '](image_url)'; break;
+            case 'table': prefix = '\n| Header 1 | Header 2 |\n| --- | --- |\n|  |  |\n'; suffix = ''; break;
+            case 'arrow': prefix = '-> '; suffix = ''; break;
             case 'textColor':
                 if (color) {
                     prefix = '<span style=""color:' + color + ';"">';
                     suffix = '</span>';
-                    defaultText = 'colored text';
                 }
                 break;
             default:
-                insertMarkdownFormatting(cellDiv, command);
                 return;
         }
 
+        if (!prefix && !suffix) return;
+
+        editor.focus();
         const sel = window.getSelection();
-        let selectedText = '';
         let range = null;
 
         if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
             range = sel.getRangeAt(0);
-            selectedText = range.toString();
         }
 
-        const textToWrap = selectedText || defaultText;
-        const inserted = prefix + textToWrap + suffix;
-
         if (range) {
-            range.deleteContents();
-            const textNode = document.createTextNode(inserted);
-            range.insertNode(textNode);
-            range.setStartAfter(textNode);
-            range.setEndAfter(textNode);
-            sel.removeAllRanges();
-            sel.addRange(range);
-            editor.focus();
+            const selectedText = range.toString();
+            if (selectedText.length > 0) {
+                range.deleteContents();
+                const wrappedNode = document.createTextNode(prefix + selectedText + suffix);
+                range.insertNode(wrappedNode);
+                range.setStart(wrappedNode, prefix.length);
+                range.setEnd(wrappedNode, prefix.length + selectedText.length);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else {
+                const pNode = document.createTextNode(prefix);
+                const sNode = document.createTextNode(suffix);
+                range.deleteContents();
+                if (suffix) range.insertNode(sNode);
+                range.insertNode(pNode);
+                range.setStartAfter(pNode);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
         } else {
             const currentText = editor.innerText || '';
             const needNewline = currentText.length > 0 && !currentText.endsWith('\n');
-            editor.innerHTML = '<pre>' + escapeHtml(currentText + (needNewline ? '\n' : '') + inserted) + '</pre>';
+            editor.innerHTML = '<pre>' + escapeHtml(currentText + (needNewline ? '\n' : '') + prefix + suffix) + '</pre>';
             focusEditorAtEnd(editor);
         }
     }
