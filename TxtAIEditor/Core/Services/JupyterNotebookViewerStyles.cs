@@ -424,7 +424,7 @@ strong { font-weight: 700; }
     overflow: hidden;
     pointer-events: none;
     display: none;
-    background: var(--nb-output-bg, white);
+    background: transparent;
 }
 .mpl-data-img-wrapper {
     position: absolute;

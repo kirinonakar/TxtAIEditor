@@ -259,6 +259,7 @@ def _get_2d_plot_bounds(fig):
         tight_bbox = fig.get_tightbbox(renderer)
         if not tight_bbox or tight_bbox.width <= 0 or tight_bbox.height <= 0:
             return None
+        tight_bbox = tight_bbox.padded(0.08)
 
         target_ax = None
         for ax in fig.axes:
@@ -294,6 +295,95 @@ def _get_2d_plot_bounds(fig):
         }
     except Exception:
         return None
+
+def _render_2d_figure_layers(fig, save_kwargs):
+    import io, base64
+
+    layer_kwargs = dict(save_kwargs)
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        render_bbox = fig.get_tightbbox(renderer)
+        if render_bbox and render_bbox.width > 0 and render_bbox.height > 0:
+            pad_inches = float(layer_kwargs.pop('pad_inches', 0.0) or 0.0)
+            layer_kwargs['bbox_inches'] = render_bbox.padded(pad_inches)
+    except Exception:
+        pass
+
+    data_artists = []
+    data_axes = []
+    other_axes = []
+    for ax in fig.axes:
+        label = str(getattr(ax, 'get_label', lambda: '')())
+        is_colorbar = getattr(ax, '_colorbar', None) is not None or label == '<colorbar>' or 'colorbar' in label.lower()
+        is_ax_3d = hasattr(ax, 'view_init') or getattr(ax, 'name', '') == '3d' or '3d' in str(type(ax)).lower()
+        if is_colorbar or is_ax_3d:
+            other_axes.append(ax)
+            continue
+
+        data_axes.append(ax)
+        candidates = (
+            list(getattr(ax, 'lines', [])) +
+            list(getattr(ax, 'collections', [])) +
+            list(getattr(ax, 'images', [])) +
+            list(getattr(ax, 'patches', [])) +
+            list(getattr(ax, 'texts', [])) +
+            list(getattr(ax, 'artists', []))
+        )
+        for artist in candidates:
+            if artist is getattr(ax, 'patch', None) or artist in data_artists:
+                continue
+            data_artists.append(artist)
+
+    data_visibility = [(artist, artist.get_visible()) for artist in data_artists]
+    try:
+        for artist, _ in data_visibility:
+            artist.set_visible(False)
+        background_buf = io.BytesIO()
+        fig.savefig(background_buf, facecolor='white', edgecolor='none', **layer_kwargs)
+        background_buf.seek(0)
+        background_b64 = base64.b64encode(background_buf.read()).decode('utf-8')
+    finally:
+        for artist, visible in data_visibility:
+            artist.set_visible(visible)
+
+    decoration_artists = [fig.patch]
+    decoration_artists.extend(list(getattr(fig, 'texts', [])))
+    decoration_artists.extend(list(getattr(fig, 'legends', [])))
+    for ax in data_axes:
+        decoration_artists.extend([
+            getattr(ax, 'patch', None),
+            getattr(ax, 'xaxis', None),
+            getattr(ax, 'yaxis', None),
+            getattr(ax, 'title', None),
+            getattr(ax, '_left_title', None),
+            getattr(ax, '_right_title', None),
+            ax.get_legend()
+        ])
+        decoration_artists.extend(list(getattr(ax, 'spines', {}).values()))
+    decoration_artists.extend(other_axes)
+
+    unique_decorations = []
+    for artist in decoration_artists:
+        if artist is not None and artist not in unique_decorations:
+            unique_decorations.append(artist)
+    decoration_visibility = [(artist, artist.get_visible()) for artist in unique_decorations]
+
+    data_buf = io.BytesIO()
+    try:
+        for artist, _ in decoration_visibility:
+            artist.set_visible(False)
+        data_kwargs = dict(layer_kwargs)
+        data_kwargs['format'] = 'png'
+        data_buf = io.BytesIO()
+        fig.savefig(data_buf, transparent=True, facecolor='none', edgecolor='none', **data_kwargs)
+        data_buf.seek(0)
+        data_b64 = base64.b64encode(data_buf.read()).decode('utf-8')
+    finally:
+        for artist, visible in decoration_visibility:
+            artist.set_visible(visible)
+
+    return background_b64, data_b64
 
 def _render_figure_html(fig, fig_id=None):
     import io, base64, json
@@ -375,6 +465,13 @@ def _render_figure_html(fig, fig_id=None):
     toolbar_2d = f'''<div class=""mpl-toolbar""><button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button><button class=""mpl-btn mpl-btn-zoom"" title=""Toggle Zoom Mode (Scroll Wheel)"">🔍 Zoom</button><button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button><span class=""mpl-status-text"">{status_text}</span></div>'''
 
     toolbar = toolbar_3d if is_3d else toolbar_2d
+
+    if not is_3d:
+        try:
+            b64_background, b64_data = _render_2d_figure_layers(fig, save_kwargs)
+            return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""false"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}""{bounds_attr}{style_attr}>{toolbar}<div class=""mpl-viewport""><div class=""mpl-plot-layer""><img src=""data:{mime};base64,{b64_background}"" class=""mpl-plot-img"" /><div class=""mpl-data-clip""><div class=""mpl-data-img-wrapper""><img src=""data:image/png;base64,{b64_data}"" class=""mpl-data-img"" /></div></div></div></div></div><!--MPL_END-->'''
+        except Exception:
+            pass
 
     if colorbars:
         try:

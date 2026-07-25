@@ -115,10 +115,6 @@ namespace TxtAIEditor.Core.Services
                     const dataImg = wrapper.querySelector('.mpl-data-img');
                     const mainImg = wrapper.querySelector('.mpl-plot-img');
 
-                    if (dataImg && mainImg && dataImg.src !== mainImg.src) {
-                        dataImg.src = mainImg.src;
-                    }
-
                     if (rawBounds && clipDiv && imgWrapper && mainImg) {
                         try {
                             const b = typeof rawBounds === 'string' ? JSON.parse(rawBounds) : rawBounds;
@@ -289,9 +285,10 @@ namespace TxtAIEditor.Core.Services
                             if (is3D && dragBtn !== 1) {
                                 send3DViewRequest(elev, azim);
                             } else if (!is3D && figId && (panX !== 0 || panY !== 0)) {
+                                const clip = wrapper.querySelector('.mpl-data-clip');
                                 const img = wrapper.querySelector('.mpl-plot-img');
-                                const w = img ? (img.clientWidth || 600) : 600;
-                                const h = img ? (img.clientHeight || 400) : 400;
+                                const w = clip ? (clip.clientWidth || 600) : (img ? (img.clientWidth || 600) : 600);
+                                const h = clip ? (clip.clientHeight || 400) : (img ? (img.clientHeight || 400) : 400);
                                 dataPanFracX -= panX / w / dataZoom;
                                 dataPanFracY += panY / h / dataZoom;
                                 send2DViewRequest(dataPanFracX, dataPanFracY, dataZoom);
@@ -365,6 +362,7 @@ namespace TxtAIEditor.Core.Services
                 if (btnDownload) {
                     btnDownload.addEventListener('click', function() {
                         const mainImg = wrapper.querySelector('.mpl-plot-img');
+                        const dataImg = wrapper.querySelector('.mpl-data-img');
                         const cbarImg = wrapper.querySelector('.mpl-cbar-img');
                         if (!mainImg) return;
 
@@ -384,6 +382,9 @@ namespace TxtAIEditor.Core.Services
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                         ctx.drawImage(mainImg, 0, 0, w1, h1);
+                        if (dataImg) {
+                            ctx.drawImage(dataImg, 0, 0, w1, h1);
+                        }
                         if (cbarImg && w2) {
                             ctx.drawImage(cbarImg, w1 + 20, 0, w2, h2);
                         }
