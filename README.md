@@ -86,6 +86,12 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   `Arrow Keys` (`Up`, `Down`) to navigate vertically.
     *   `Enter` to commit input and move focus down (auto-appends a new blank row at the end of the file), and `Shift + Enter` to move focus up.
 
+### 📓 Jupyter Notebook Integration
+*   **WebView2-based Viewer:** Open and edit `.ipynb` files with a rich interactive viewer and toggle between rendered and raw JSON source view.
+*   **Built-in Python Kernel:** Execute code cells with automatic virtual environment detection (`.venv`/`venv`) and per-tab kernel session management.
+*   **Interactive Matplotlib Plots:** Explore 2D plots with pan/zoom controls and 3D plots with rotational view adjustments — directly in the notebook.
+*   **Variable Explorer:** Examine active Python variables in a dedicated panel with name, type, size, and value columns, plus filtering and refresh.
+
 ### 🤖 AI Assistant
 *   **Multi-Provider:** Connect with Gemini, OpenAI, OpenRouter, OpenCode Go/Zen, Ollama/Ollama Cloud, Cerebras or local LM Studio endpoints.
 *   **Secure Storage:** API keys are securely saved via native Windows Credential Manager.
