@@ -182,6 +182,7 @@ namespace TxtAIEditor
                 ".xml" => "\uF158",
                 ".resw" => "\uF158",
                 ".json" => "\uE94A",
+                ".ipynb" => "\uE943",
                 ".yaml" => "\uE94A",
                 ".yml" => "\uE94A",
                 ".png" => "\uEB9F", // Picture icon

@@ -42,7 +42,7 @@
                                                 </MenuFlyoutItem>
                                                 <MenuFlyoutItem x:Name="ExplorerCreateNotebookMenuItem" Text="새 노트북" Click="OnCreateNotebookClick">
                                                     <MenuFlyoutItem.Icon>
-                                                        <FontIcon Glyph="&#xE94A;"/>
+                                                        <FontIcon Glyph="&#xE943;"/>
                                                     </MenuFlyoutItem.Icon>
                                                 </MenuFlyoutItem>
                                             </MenuFlyout>
