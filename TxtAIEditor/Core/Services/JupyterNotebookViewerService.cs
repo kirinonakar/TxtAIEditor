@@ -304,19 +304,13 @@ namespace TxtAIEditor.Core.Services
             {
                 string line = raw.TrimEnd();
 
-                if (line.StartsWith("> "))
+                if (System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s{0,3}>\s?"))
                 {
                     if (inList) { sb.AppendLine("</ul>"); inList = false; }
                     if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
                     if (!inQuote) { sb.AppendLine("<blockquote>"); inQuote = true; }
-                    sb.AppendLine($"<p>{InlineMd(line.Substring(2))}</p>");
-                }
-                else if (line.StartsWith(">"))
-                {
-                    if (inList) { sb.AppendLine("</ul>"); inList = false; }
-                    if (inOl) { sb.AppendLine("</ol>"); inOl = false; }
-                    if (!inQuote) { sb.AppendLine("<blockquote>"); inQuote = true; }
-                    sb.AppendLine($"<p>{InlineMd(line.Substring(1))}</p>");
+                    string quoteContent = System.Text.RegularExpressions.Regex.Replace(raw, @"^\s{0,3}>\s?", "");
+                    sb.AppendLine($"<p>{InlineMd(quoteContent)}</p>");
                 }
                 else if (line.StartsWith("# "))
                 {
@@ -641,10 +635,20 @@ body {
 .cell-btn.is-running, .nb-btn-run.is-running { background: #d32f2f !important; color: #fff !important; border-color: #d32f2f !important; opacity: 1 !important; }
 blockquote {
     border-left: 4px solid var(--nb-accent);
-    margin: 6px 0;
-    padding: 4px 12px;
+    margin: 8px 0;
+    padding: 6px 14px;
     background: rgba(128,128,128,0.08);
     border-radius: 0 4px 4px 0;
+    color: var(--nb-fg);
+}
+blockquote p {
+    margin: 4px 0;
+}
+blockquote p:first-child {
+    margin-top: 0;
+}
+blockquote p:last-child {
+    margin-bottom: 0;
 }
 .cell-output table.dataframe {
     border-collapse: collapse;
@@ -1037,16 +1041,12 @@ strong { font-weight: 700; }
 
             const trimmed = line.trimEnd();
 
-            if (trimmed.startsWith('> ')) {
+            if (/^\s{0,3}>\s?/.test(line)) {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (!inQuote) { html += '<blockquote>'; inQuote = true; }
-                html += '<p>' + inlineMdJs(trimmed.slice(2)) + '</p>';
-            } else if (trimmed.startsWith('>')) {
-                if (inList) { html += '</ul>'; inList = false; }
-                if (inOl) { html += '</ol>'; inOl = false; }
-                if (!inQuote) { html += '<blockquote>'; inQuote = true; }
-                html += '<p>' + inlineMdJs(trimmed.slice(1)) + '</p>';
+                const quoteContent = line.replace(/^\s{0,3}>\s?/, '');
+                html += '<p>' + inlineMdJs(quoteContent) + '</p>';
             } else if (/^#\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
