@@ -143,10 +143,27 @@ except Exception:
     pass
 
 _ns = {'__name__': '__main__'}
+_inline_backend_config = {'figure_format': 'retina', 'dpi': 200}
+
+def _process_magic(line):
+    line = line.strip()
+    if 'InlineBackend.figure_format' in line or 'InlineBackend.figure_formats' in line:
+        line_lower = line.lower()
+        if 'retina' in line_lower:
+            _inline_backend_config['figure_format'] = 'retina'
+            _inline_backend_config['dpi'] = 200
+        elif 'svg' in line_lower:
+            _inline_backend_config['figure_format'] = 'svg'
+        elif 'png' in line_lower:
+            _inline_backend_config['figure_format'] = 'png'
+            _inline_backend_config['dpi'] = 200
+        elif 'jpeg' in line_lower or 'jpg' in line_lower:
+            _inline_backend_config['figure_format'] = 'jpeg'
+            _inline_backend_config['dpi'] = 200
 
 def _get_variables():
     vars_list = []
-    ignored = {'sys', 'json', 'io', 'base64', 'contextlib', 'traceback', 'ast', 'plt', 'matplotlib', '_ns', '_get_variables', '_render_figure_html', '_capture_figures', '_custom_show'}
+    ignored = {'sys', 'json', 'io', 'base64', 'contextlib', 'traceback', 'ast', 'plt', 'matplotlib', '_ns', '_get_variables', '_render_figure_html', '_capture_figures', '_custom_show', '_inline_backend_config', '_process_magic'}
     for k, v in list(_ns.items()):
         if k.startswith('_') or k in ignored:
             continue
@@ -206,6 +223,30 @@ def _render_figure_html(fig, fig_id=None):
     if fig_id not in _figure_view_state:
         _store_figure_limits(fig, fig_id)
 
+    fmt = _inline_backend_config.get('figure_format', 'retina')
+    dpi_val = _inline_backend_config.get('dpi', 200)
+    try:
+        import matplotlib
+        import matplotlib.pyplot as plt
+        user_savefig_dpi = plt.rcParams.get('savefig.dpi', None)
+        if isinstance(user_savefig_dpi, (int, float)) and user_savefig_dpi > 0:
+            dpi_val = max(dpi_val, int(user_savefig_dpi))
+        elif hasattr(fig, 'dpi') and fig.dpi:
+            target_multiplier = 2 if fmt == 'retina' else 1
+            dpi_val = max(dpi_val, int(fig.dpi * target_multiplier))
+    except Exception:
+        pass
+
+    if fmt == 'svg':
+        mime = 'image/svg+xml'
+        save_kwargs = {'format': 'svg', 'bbox_inches': 'tight'}
+    elif fmt in ('jpeg', 'jpg'):
+        mime = 'image/jpeg'
+        save_kwargs = {'format': 'jpeg', 'bbox_inches': 'tight', 'dpi': dpi_val}
+    else:
+        mime = 'image/png'
+        save_kwargs = {'format': 'png', 'bbox_inches': 'tight', 'dpi': dpi_val}
+
     is_3d = False
     cur_elev = 30
     cur_azim = -60
@@ -259,7 +300,7 @@ def _render_figure_html(fig, fig_id=None):
         try:
             for cb in colorbars: cb.set_visible(False)
             buf_main = io.BytesIO()
-            fig.savefig(buf_main, format='png', bbox_inches='tight', facecolor='white', edgecolor='none')
+            fig.savefig(buf_main, facecolor='white', edgecolor='none', **save_kwargs)
             buf_main.seek(0)
             b64_main = base64.b64encode(buf_main.read()).decode('utf-8')
 
@@ -267,7 +308,7 @@ def _render_figure_html(fig, fig_id=None):
             for ax in fig.axes:
                 if ax not in colorbars: ax.set_visible(False)
             buf_cbar = io.BytesIO()
-            fig.savefig(buf_cbar, format='png', bbox_inches='tight', transparent=True)
+            fig.savefig(buf_cbar, transparent=True, **save_kwargs)
             buf_cbar.seek(0)
             b64_cbar = base64.b64encode(buf_cbar.read()).decode('utf-8')
 
@@ -277,10 +318,10 @@ def _render_figure_html(fig, fig_id=None):
     {toolbar}
     <div class=""mpl-viewport"">
         <div class=""mpl-plot-layer"">
-            <img src=""data:image/png;base64,{b64_main}"" class=""mpl-plot-img"" />
+            <img src=""data:{mime};base64,{b64_main}"" class=""mpl-plot-img"" />
         </div>
         <div class=""mpl-cbar-layer"">
-            <img src=""data:image/png;base64,{b64_cbar}"" class=""mpl-cbar-img"" />
+            <img src=""data:{mime};base64,{b64_cbar}"" class=""mpl-cbar-img"" />
         </div>
     </div>
     <div class=""mpl-status-bar"">
@@ -291,14 +332,14 @@ def _render_figure_html(fig, fig_id=None):
             pass
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', facecolor='white', edgecolor='none')
+    fig.savefig(buf, facecolor='white', edgecolor='none', **save_kwargs)
     buf.seek(0)
     b64 = base64.b64encode(buf.read()).decode('utf-8')
     return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""{is_3d_str}"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}"">
     {toolbar}
     <div class=""mpl-viewport"">
         <div class=""mpl-plot-layer"">
-            <img src=""data:image/png;base64,{b64}"" class=""mpl-plot-img"" />
+            <img src=""data:{mime};base64,{b64}"" class=""mpl-plot-img"" />
         </div>
     </div>
     <div class=""mpl-status-bar"">
@@ -400,6 +441,10 @@ while True:
         for l in raw_code.split('\n'):
             stripped = l.lstrip()
             if stripped.startswith('%') or stripped.startswith('!'):
+                try:
+                    _process_magic(stripped)
+                except Exception:
+                    pass
                 clean_lines.append('# ' + l)
             else:
                 clean_lines.append(l)
@@ -409,6 +454,15 @@ while True:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
+            plt.rcParams['figure.dpi'] = 144
+            plt.rcParams['savefig.dpi'] = 200
+            if sys.platform.startswith('win'):
+                plt.rcParams['font.family'] = 'Malgun Gothic'
+            elif sys.platform.startswith('darwin'):
+                plt.rcParams['font.family'] = 'AppleGothic'
+            else:
+                plt.rcParams['font.family'] = 'NanumGothic'
+            plt.rcParams['axes.unicode_minus'] = False
             def _custom_show(*args, **kwargs):
                 for num in plt.get_fignums():
                     fig = plt.figure(num)
