@@ -97,6 +97,12 @@ namespace TxtAIEditor.Core.Services
             private static readonly string KernelScript = @"
 import sys, json, io, contextlib, traceback, ast
 
+try:
+    if hasattr(sys.stdin, 'reconfigure'): sys.stdin.reconfigure(line_buffering=True)
+    if hasattr(sys.stdout, 'reconfigure'): sys.stdout.reconfigure(line_buffering=True)
+except Exception:
+    pass
+
 _ns = {'__name__': '__main__'}
 
 while True:
@@ -186,7 +192,9 @@ while True:
             {
                 if (_process == null || _process.HasExited)
                 {
-                    return new KernelExecutionResult("error", string.Empty, "Kernel process is not running.");
+                    string err = _process != null ? await _process.StandardError.ReadToEndAsync() : string.Empty;
+                    if (string.IsNullOrWhiteSpace(err)) err = "Kernel process is not running.";
+                    return new KernelExecutionResult("error", string.Empty, err);
                 }
 
                 var command = JsonSerializer.Serialize(new { code });
@@ -194,26 +202,49 @@ while True:
                 await _process.StandardInput.FlushAsync();
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-                string? line = await ReadLineWithTimeoutAsync(_process.StandardOutput, cts.Token);
-                if (line == null)
+                while (!cts.Token.IsCancellationRequested)
                 {
-                    return new KernelExecutionResult("error", string.Empty, "Kernel did not respond in time.");
+                    if (_process.HasExited)
+                    {
+                        string err = await _process.StandardError.ReadToEndAsync();
+                        if (string.IsNullOrWhiteSpace(err)) err = $"Kernel process exited with code {_process.ExitCode}.";
+                        return new KernelExecutionResult("error", string.Empty, err);
+                    }
+
+                    string? line = await ReadLineWithTimeoutAsync(_process.StandardOutput, cts.Token);
+                    if (line == null)
+                    {
+                        if (_process.HasExited)
+                        {
+                            string err = await _process.StandardError.ReadToEndAsync();
+                            if (string.IsNullOrWhiteSpace(err)) err = $"Kernel process exited with code {_process.ExitCode}.";
+                            return new KernelExecutionResult("error", string.Empty, err);
+                        }
+                        return new KernelExecutionResult("error", string.Empty, "Kernel did not respond in time.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(line);
+                        var root = doc.RootElement;
+                        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("status", out var s))
+                        {
+                            string status = s.GetString() ?? "ok";
+                            string stdout = root.TryGetProperty("stdout", out var so) ? so.GetString() ?? string.Empty : string.Empty;
+                            string stderr = root.TryGetProperty("stderr", out var se) ? se.GetString() ?? string.Empty : string.Empty;
+                            string result = root.TryGetProperty("result", out var r) ? r.GetString() ?? string.Empty : string.Empty;
+                            return new KernelExecutionResult(status, stdout, stderr, result);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore non-JSON output (e.g. package initialization text) and continue reading for kernel response
+                    }
                 }
 
-                try
-                {
-                    using var doc = JsonDocument.Parse(line);
-                    var root = doc.RootElement;
-                    string status = root.TryGetProperty("status", out var s) ? s.GetString() ?? "ok" : "ok";
-                    string stdout = root.TryGetProperty("stdout", out var so) ? so.GetString() ?? string.Empty : string.Empty;
-                    string stderr = root.TryGetProperty("stderr", out var se) ? se.GetString() ?? string.Empty : string.Empty;
-                    string result = root.TryGetProperty("result", out var r) ? r.GetString() ?? string.Empty : string.Empty;
-                    return new KernelExecutionResult(status, stdout, stderr, result);
-                }
-                catch (Exception ex)
-                {
-                    return new KernelExecutionResult("error", string.Empty, "Failed to parse kernel response: " + ex.Message);
-                }
+                return new KernelExecutionResult("error", string.Empty, "Kernel did not respond in time.");
             }
 
             private static async Task<string?> ReadLineWithTimeoutAsync(StreamReader reader, CancellationToken token)

@@ -117,24 +117,45 @@ namespace TxtAIEditor.Core.Services
             {
                 string html = RenderMarkdown(source);
                 sb.AppendLine($"<div class=\"cell-input markdown-cell\" data-source=\"{HtmlAttrEncode(source)}\">");
-                sb.AppendLine(html);
+                sb.AppendLine($"<div class=\"markdown-preview\">{html}</div>");
+                sb.AppendLine($"<div class=\"cell-input-area markdown-editor\" contenteditable=\"true\" spellcheck=\"false\" style=\"display:none;\"><pre>{HtmlEncode(source)}</pre></div>");
+                sb.AppendLine("</div>");
+                sb.AppendLine("<div class=\"cell-toolbar\">");
+                sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Render Markdown (Shift+Enter)\">▶ Render</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-edit\" title=\"Edit Markdown\">✎ Edit</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"bold\" title=\"Bold (**text**)\"><b>B</b></button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"italic\" title=\"Italic (*text*)\"><i>I</i></button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"heading\" title=\"Heading (# Header)\"><b>H</b></button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"link\" title=\"Insert Link ([text](url))\">🔗</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-md-fmt\" data-fmt=\"image\" title=\"Insert Image (![alt](url))\">🖼</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Code\">Code</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
                 sb.AppendLine("</div>");
             }
             else if (cellType == "raw")
             {
                 sb.AppendLine($"<div class=\"cell-input raw-cell\" data-source=\"{HtmlAttrEncode(source)}\">");
-                sb.AppendLine($"<pre>{HtmlEncode(source)}</pre>");
+                sb.AppendLine($"<div class=\"cell-input-area raw-editor\" contenteditable=\"true\" spellcheck=\"false\"><pre>{HtmlEncode(source)}</pre></div>");
+                sb.AppendLine("</div>");
+                sb.AppendLine("<div class=\"cell-toolbar\">");
+                sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Code\">Code</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
                 sb.AppendLine("</div>");
             }
             else
             {
                 sb.AppendLine($"<div class=\"cell-input code-cell\">");
-                sb.AppendLine($"<div class=\"cell-input-area\" contenteditable=\"true\" spellcheck=\"false\" data-source=\"{HtmlAttrEncode(source)}\">");
+                sb.AppendLine($"<div class=\"cell-input-area code-editor\" contenteditable=\"true\" spellcheck=\"false\" data-source=\"{HtmlAttrEncode(source)}\">");
                 sb.AppendLine($"<pre>{HtmlEncode(source)}</pre>");
                 sb.AppendLine("</div>");
                 sb.AppendLine("<div class=\"cell-toolbar\">");
-                sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Run\">▶</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Run (Shift+Enter)\">▶ Run</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-run-below\" title=\"Run Below\">▶|</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Markdown\">Markdown</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
@@ -287,6 +308,8 @@ namespace TxtAIEditor.Core.Services
         private static string InlineMd(string text)
         {
             text = HtmlEncode(text);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"!\[([^\]]*)\]\(([^)]+)\)", @"<img src=""$2"" alt=""$1"" style=""max-width:100%;height:auto;display:inline-block;vertical-align:middle;margin:4px 0;"" />");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\[([^\]]+)\]\(([^)]+)\)", @"<a href=""$2"" target=""_blank"">$1</a>");
             text = ReplaceSimple(text, "**", "<strong>", "</strong>");
             text = ReplaceSimple(text, "*", "<em>", "</em>");
             text = ReplaceSimple(text, "`", "<code>", "</code>");
@@ -420,6 +443,17 @@ ul, ol { padding-left: 24px; margin: 4px 0; }
 p { margin: 4px 0; }
 code { background: var(--nb-input-bg); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
 strong { font-weight: 700; }
+.markdown-cell { padding: 0; }
+.markdown-preview {
+    padding: 10px 14px; min-height: 28px; cursor: pointer; border-radius: 4px; line-height: 1.5;
+}
+.markdown-preview:hover {
+    outline: 1px dashed var(--nb-accent);
+}
+.markdown-editor {
+    display: none; background: var(--nb-input-bg); padding: 10px 12px;
+}
+.cell-toggle-type { opacity: 0.8; font-weight: 500; }
 ";
         }
 
@@ -430,17 +464,176 @@ strong { font-weight: 700; }
     const container = document.getElementById('cells-container');
     const path = window.__notebookPath;
 
-    function getCellSource(cellDiv) {
-        const input = cellDiv.querySelector('.cell-input-area, .markdown-cell, .raw-cell');
-        if (!input) return '';
-        return input.innerText;
+    function renderMarkdownJs(md) {
+        if (!md) return '';
+        const lines = md.replace(/\r\n/g, '\n').split('\n');
+        let html = '';
+        let inList = false, inOl = false, inCodeBlock = false;
+        let codeBuffer = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            if (line.trim().startsWith('```')) {
+                if (inCodeBlock) {
+                    html += '<pre><code>' + escapeHtml(codeBuffer.join('\n')) + '</code></pre>';
+                    codeBuffer = [];
+                    inCodeBlock = false;
+                } else {
+                    if (inList) { html += '</ul>'; inList = false; }
+                    if (inOl) { html += '</ol>'; inOl = false; }
+                    inCodeBlock = true;
+                }
+                continue;
+            }
+
+            if (inCodeBlock) {
+                codeBuffer.push(line);
+                continue;
+            }
+
+            const trimmed = line.trimEnd();
+
+            if (/^#\s+/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                html += '<h1>' + inlineMdJs(trimmed.slice(2)) + '</h1>';
+            } else if (/^##\s+/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                html += '<h2>' + inlineMdJs(trimmed.slice(3)) + '</h2>';
+            } else if (/^###\s+/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                html += '<h3>' + inlineMdJs(trimmed.slice(4)) + '</h3>';
+            } else if (/^####\s+/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                html += '<h4>' + inlineMdJs(trimmed.slice(5)) + '</h4>';
+            } else if (/^[-*]\s+/.test(trimmed)) {
+                if (inOl) { html += '</ol>'; inOl = false; }
+                if (!inList) { html += '<ul>'; inList = true; }
+                html += '<li>' + inlineMdJs(trimmed.slice(2)) + '</li>';
+            } else if (/^\d+\.\s+/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (!inOl) { html += '<ol>'; inOl = true; }
+                html += '<li>' + inlineMdJs(trimmed.replace(/^\d+\.\s+/, '')) + '</li>';
+            } else if (trimmed === '---' || trimmed === '***') {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                html += '<hr/>';
+            } else if (trimmed.length > 0) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                html += '<p>' + inlineMdJs(trimmed) + '</p>';
+            }
+        }
+        if (inList) html += '</ul>';
+        if (inOl) html += '</ol>';
+        if (inCodeBlock) html += '<pre><code>' + escapeHtml(codeBuffer.join('\n')) + '</code></pre>';
+        return html;
     }
 
-    function setCellSource(cellDiv, source) {
-        const input = cellDiv.querySelector('.cell-input-area');
-        if (input) {
-            input.innerHTML = '<pre>' + escapeHtml(source) + '</pre>';
+    function inlineMdJs(str) {
+        let s = escapeHtml(str);
+        s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src=""$2"" alt=""$1"" style=""max-width:100%;height:auto;display:inline-block;vertical-align:middle;margin:4px 0;"" />');
+        s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href=""$2"" target=""_blank"" rel=""noopener"">$1</a>');
+        s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+        return s;
+    }
+
+    function getCellSource(cellDiv) {
+        const type = getCellType(cellDiv);
+        if (type === 'markdown') {
+            const editor = cellDiv.querySelector('.markdown-editor');
+            if (editor) return editor.innerText;
+            return cellDiv.getAttribute('data-source') || '';
+        } else if (type === 'raw') {
+            const editor = cellDiv.querySelector('.raw-editor, .cell-input-area');
+            return editor ? editor.innerText : (cellDiv.getAttribute('data-source') || '');
+        } else {
+            const input = cellDiv.querySelector('.cell-input-area');
+            return input ? input.innerText : '';
         }
+    }
+
+    function renderMarkdownCell(cellDiv) {
+        if (getCellType(cellDiv) !== 'markdown') return;
+        const editor = cellDiv.querySelector('.markdown-editor');
+        const preview = cellDiv.querySelector('.markdown-preview');
+        if (!editor || !preview) return;
+
+        const source = editor.innerText;
+        cellDiv.setAttribute('data-source', source);
+        preview.innerHTML = renderMarkdownJs(source) || '<em style=""color:#888;"">(Empty Markdown Cell)</em>';
+        editor.style.display = 'none';
+        preview.style.display = 'block';
+    }
+
+    function editMarkdownCell(cellDiv) {
+        if (getCellType(cellDiv) !== 'markdown') return;
+        const editor = cellDiv.querySelector('.markdown-editor');
+        const preview = cellDiv.querySelector('.markdown-preview');
+        if (!editor || !preview) return;
+
+        editor.style.display = 'block';
+        preview.style.display = 'none';
+        editor.focus();
+    }
+
+    function insertMarkdownFormatting(cellDiv, formatType) {
+        if (getCellType(cellDiv) !== 'markdown') return;
+        editMarkdownCell(cellDiv);
+        const editor = cellDiv.querySelector('.markdown-editor');
+        if (!editor) return;
+
+        let prefix = '', suffix = '', defaultText = '';
+        switch (formatType) {
+            case 'bold':
+                prefix = '**'; suffix = '**'; defaultText = 'bold text';
+                break;
+            case 'italic':
+                prefix = '*'; suffix = '*'; defaultText = 'italic text';
+                break;
+            case 'heading':
+                prefix = '# '; suffix = ''; defaultText = 'Heading';
+                break;
+            case 'link':
+                prefix = '['; suffix = '](https://)'; defaultText = 'link text';
+                break;
+            case 'image':
+                prefix = '!['; suffix = '](image_url)'; defaultText = 'image alt';
+                break;
+        }
+
+        const sel = window.getSelection();
+        let selectedText = '';
+        let range = null;
+
+        if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+            range = sel.getRangeAt(0);
+            selectedText = range.toString();
+        }
+
+        const textToWrap = selectedText || defaultText;
+        const inserted = prefix + textToWrap + suffix;
+
+        if (range) {
+            range.deleteContents();
+            const textNode = document.createTextNode(inserted);
+            range.insertNode(textNode);
+            range.setStartAfter(textNode);
+            range.setEndAfter(textNode);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } else {
+            const currentText = editor.innerText || '';
+            const needNewline = currentText.length > 0 && !currentText.endsWith('\n');
+            editor.innerHTML = '<pre>' + escapeHtml(currentText + (needNewline ? '\n' : '') + inserted) + '</pre>';
+        }
+        editor.focus();
     }
 
     function escapeHtml(text) {
@@ -479,6 +672,10 @@ strong { font-weight: 700; }
 
     async function runCell(cellDiv) {
         const type = getCellType(cellDiv);
+        if (type === 'markdown') {
+            renderMarkdownCell(cellDiv);
+            return;
+        }
         if (type !== 'code') return;
         const source = getCellSource(cellDiv);
         const outputDiv = cellDiv.querySelector('.cell-output');
@@ -529,15 +726,31 @@ strong { font-weight: 700; }
         div.setAttribute('data-cell-index', idx);
 
         if (type === 'markdown') {
-            div.innerHTML = '<div class=""cell-input markdown-cell"" contenteditable=""true"" spellcheck=""false""><pre>' + escapeHtml(source || '') + '</pre></div>';
-        } else if (type === 'raw') {
-            div.innerHTML = '<div class=""cell-input raw-cell"" contenteditable=""true"" spellcheck=""false""><pre>' + escapeHtml(source || '') + '</pre></div>';
+            const html = renderMarkdownJs(source || '');
+            div.innerHTML = '<div class=""cell-input markdown-cell"" data-source=""' + escapeHtml(source || '') + '"">' +
+                '<div class=""markdown-preview"" style=""display:none;"">' + html + '</div>' +
+                '<div class=""cell-input-area markdown-editor"" contenteditable=""true"" spellcheck=""false"" style=""display:block;""><pre>' + escapeHtml(source || '') + '</pre></div>' +
+                '</div>' +
+                '<div class=""cell-toolbar"">' +
+                '<button class=""cell-btn cell-run"" title=""Render Markdown (Shift+Enter)"">▶ Render</button>' +
+                '<button class=""cell-btn cell-edit"" title=""Edit Markdown"">✎ Edit</button>' +
+                '<button class=""cell-btn cell-md-fmt"" data-fmt=""bold"" title=""Bold (**text**)""><b>B</b></button>' +
+                '<button class=""cell-btn cell-md-fmt"" data-fmt=""italic"" title=""Italic (*text*)""><i>I</i></button>' +
+                '<button class=""cell-btn cell-md-fmt"" data-fmt=""heading"" title=""Heading (# Header)""><b>H</b></button>' +
+                '<button class=""cell-btn cell-md-fmt"" data-fmt=""link"" title=""Insert Link ([text](url))"">🔗</button>' +
+                '<button class=""cell-btn cell-md-fmt"" data-fmt=""image"" title=""Insert Image (![alt](url))"">🖼</button>' +
+                '<button class=""cell-btn cell-toggle-type"" title=""Switch to Code"">Code</button>' +
+                '<button class=""cell-btn cell-delete"" title=""Delete"">✕</button>' +
+                '<button class=""cell-btn cell-move-up"" title=""Move Up"">↑</button>' +
+                '<button class=""cell-btn cell-move-down"" title=""Move Down"">↓</button>' +
+                '</div>';
         } else {
             div.innerHTML = '<div class=""cell-input code-cell"">' +
-                '<div class=""cell-input-area"" contenteditable=""true"" spellcheck=""false""><pre>' + escapeHtml(source || '') + '</pre></div>' +
+                '<div class=""cell-input-area code-editor"" contenteditable=""true"" spellcheck=""false"" data-source=""' + escapeHtml(source || '') + '""><pre>' + escapeHtml(source || '') + '</pre></div>' +
                 '<div class=""cell-toolbar"">' +
-                '<button class=""cell-btn cell-run"" title=""Run"">▶</button>' +
+                '<button class=""cell-btn cell-run"" title=""Run (Shift+Enter)"">▶ Run</button>' +
                 '<button class=""cell-btn cell-run-below"" title=""Run Below"">▶|</button>' +
+                '<button class=""cell-btn cell-toggle-type"" title=""Switch to Markdown"">Markdown</button>' +
                 '<button class=""cell-btn cell-delete"" title=""Delete"">✕</button>' +
                 '<button class=""cell-btn cell-move-up"" title=""Move Up"">↑</button>' +
                 '<button class=""cell-btn cell-move-down"" title=""Move Down"">↓</button>' +
@@ -554,15 +767,64 @@ strong { font-weight: 700; }
         });
     }
 
+    // Double click to edit markdown preview
+    container.addEventListener('dblclick', (e) => {
+        const preview = e.target.closest('.markdown-preview');
+        if (preview) {
+            const cellDiv = preview.closest('.cell');
+            if (cellDiv) editMarkdownCell(cellDiv);
+        }
+    });
+
     // Event delegation
     container.addEventListener('click', async (e) => {
+        const preview = e.target.closest('.markdown-preview');
+        if (preview) {
+            const cellDiv = preview.closest('.cell');
+            if (cellDiv) {
+                editMarkdownCell(cellDiv);
+                return;
+            }
+        }
+
+        const fmtBtn = e.target.closest('.cell-md-fmt');
+        if (fmtBtn) {
+            const cellDiv = fmtBtn.closest('.cell');
+            const fmt = fmtBtn.getAttribute('data-fmt');
+            if (cellDiv && fmt) {
+                insertMarkdownFormatting(cellDiv, fmt);
+                return;
+            }
+        }
+
         const btn = e.target.closest('.cell-btn');
         if (!btn) return;
         const cellDiv = btn.closest('.cell');
         if (!cellDiv) return;
 
         if (btn.classList.contains('cell-run')) {
-            await runCell(cellDiv);
+            if (getCellType(cellDiv) === 'markdown') {
+                renderMarkdownCell(cellDiv);
+            } else {
+                await runCell(cellDiv);
+            }
+        } else if (btn.classList.contains('cell-edit')) {
+            if (getCellType(cellDiv) === 'markdown') {
+                editMarkdownCell(cellDiv);
+            }
+        } else if (btn.classList.contains('cell-toggle-type')) {
+            const currentType = getCellType(cellDiv);
+            const source = getCellSource(cellDiv);
+            const newType = currentType === 'markdown' ? 'code' : 'markdown';
+            const newCell = createCell(newType, source);
+            cellDiv.replaceWith(newCell);
+            reindexCells();
+            if (newType === 'markdown') {
+                editMarkdownCell(newCell);
+            } else {
+                const editor = newCell.querySelector('.cell-input-area');
+                if (editor) editor.focus();
+            }
         } else if (btn.classList.contains('cell-run-below')) {
             const cells = Array.from(container.querySelectorAll('.cell'));
             const startIdx = parseInt(cellDiv.getAttribute('data-cell-index'));
@@ -591,32 +853,35 @@ strong { font-weight: 700; }
 
     // Keyboard shortcuts
     container.addEventListener('keydown', (e) => {
-        const input = e.target.closest('.cell-input-area, .markdown-cell, .raw-cell');
+        const input = e.target.closest('.cell-input-area, .markdown-editor, .raw-cell');
         if (!input) return;
         const cellDiv = input.closest('.cell');
         if (!cellDiv) return;
 
         if (e.shiftKey && e.key === 'Enter') {
             e.preventDefault();
-            if (getCellType(cellDiv) === 'code') {
-                runCell(cellDiv).then(() => {
-                    const next = cellDiv.nextElementSibling;
-                    if (next) {
-                        const nextInput = next.querySelector('.cell-input-area, .markdown-cell, .raw-cell');
-                        if (nextInput) { nextInput.focus(); }
-                    } else {
-                        const newCell = createCell('code', '');
-                        container.appendChild(newCell);
-                        reindexCells();
-                        newCell.querySelector('.cell-input-area').focus();
-                    }
-                });
-            } else {
-                const next = cellDiv.nextElementSibling;
-                if (next) {
-                    const nextInput = next.querySelector('.cell-input-area, .markdown-cell, .raw-cell');
-                    if (nextInput) { nextInput.focus(); }
+            const type = getCellType(cellDiv);
+            if (type === 'markdown') {
+                renderMarkdownCell(cellDiv);
+                let next = cellDiv.nextElementSibling;
+                if (!next) {
+                    next = createCell('code', '');
+                    container.appendChild(next);
+                    reindexCells();
                 }
+                const focusTarget = next.querySelector('.cell-input-area, .markdown-editor');
+                if (focusTarget) focusTarget.focus();
+            } else if (type === 'code') {
+                runCell(cellDiv).then(() => {
+                    let next = cellDiv.nextElementSibling;
+                    if (!next) {
+                        next = createCell('code', '');
+                        container.appendChild(next);
+                        reindexCells();
+                    }
+                    const focusTarget = next.querySelector('.cell-input-area, .markdown-editor');
+                    if (focusTarget) focusTarget.focus();
+                });
             }
         }
 
@@ -638,7 +903,7 @@ strong { font-weight: 700; }
         const cell = createCell('markdown', '');
         container.appendChild(cell);
         reindexCells();
-        cell.querySelector('.markdown-cell').focus();
+        editMarkdownCell(cell);
     });
 
     document.getElementById('btn-save').addEventListener('click', saveNotebook);
