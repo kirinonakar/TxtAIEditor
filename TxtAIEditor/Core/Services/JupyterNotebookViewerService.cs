@@ -1743,13 +1743,14 @@ strong { font-weight: 700; }
                     wrapper.innerHTML = 
                         '<div class=""mpl-toolbar"">' +
                             '<button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>' +
+                            '<button class=""mpl-btn mpl-btn-zoom"" title=""Toggle Zoom Mode (Scroll Wheel)"">🔍 Zoom</button>' +
                             '<button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>' +
                         '</div>' +
                         '<div class=""mpl-viewport"">' +
                             '<div class=""mpl-plot-layer""></div>' +
                         '</div>' +
                         '<div class=""mpl-status-bar"">' +
-                            '<span>Drag: Pan | Wheel: Zoom</span>' +
+                            '<span>Drag: Pan | Enable 🔍 Zoom + Wheel to Zoom</span>' +
                         '</div>';
                     img.parentNode.insertBefore(wrapper, img);
                     const plotLayer = wrapper.querySelector('.mpl-plot-layer');
@@ -1765,11 +1766,14 @@ strong { font-weight: 700; }
                 const viewport = wrapper.querySelector('.mpl-viewport');
                 const plotLayer = wrapper.querySelector('.mpl-plot-layer');
                 const btnReset = wrapper.querySelector('.mpl-btn-reset');
+                const btnZoom = wrapper.querySelector('.mpl-btn-zoom');
                 const btnDownload = wrapper.querySelector('.mpl-btn-download');
                 const sliderY = wrapper.querySelector('.mpl-rotate-y-slider');
                 const angleValY = wrapper.querySelector('.mpl-angle-val-y');
                 const sliderX = wrapper.querySelector('.mpl-rotate-x-slider');
                 const angleValX = wrapper.querySelector('.mpl-angle-val-x');
+
+                let isZoomActive = false;
 
                 const is3D = wrapper.getAttribute('data-is-3d') === 'true';
                 const figId = wrapper.getAttribute('data-fig-id');
@@ -2030,6 +2034,7 @@ strong { font-weight: 700; }
                     });
 
                     viewport.addEventListener('wheel', function(e) {
+                        if (!isZoomActive) return;
                         e.preventDefault();
                         const factor = e.deltaY < 0 ? 1.1 : 0.9;
                         scale = Math.min(Math.max(0.2, scale * factor), 5.0);
@@ -2038,6 +2043,13 @@ strong { font-weight: 700; }
                             dataZoom = Math.min(Math.max(0.2, dataZoom * factor), 5.0);
                             send2DViewRequest(dataPanFracX, dataPanFracY, dataZoom);
                         }
+                    });
+                }
+
+                if (btnZoom) {
+                    btnZoom.addEventListener('click', function() {
+                        isZoomActive = !isZoomActive;
+                        btnZoom.classList.toggle('active', isZoomActive);
                     });
                 }
 
@@ -2064,6 +2076,8 @@ strong { font-weight: 700; }
                 if (btnReset) {
                     btnReset.addEventListener('click', function() {
                         panX = 0; panY = 0; scale = 1;
+                        isZoomActive = false;
+                        if (btnZoom) btnZoom.classList.remove('active');
                         if (is3D) {
                             elev = initElev;
                             azim = initAzim;

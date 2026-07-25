@@ -333,6 +333,7 @@ def _render_figure_html(fig, fig_id=None):
 
     toolbar_3d = f'''<div class=""mpl-toolbar"">
         <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
+        <button class=""mpl-btn mpl-btn-zoom"" title=""Toggle Zoom Mode (Scroll Wheel)"">🔍 Zoom</button>
         <div class=""mpl-rotate-ctrl"">
             <span>Azim:</span>
             <input type=""range"" class=""mpl-rotate-y-slider"" min=""-180"" max=""180"" value=""{cur_azim}"" />
@@ -348,12 +349,13 @@ def _render_figure_html(fig, fig_id=None):
 
     toolbar_2d = '''<div class=""mpl-toolbar"">
         <button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>
+        <button class=""mpl-btn mpl-btn-zoom"" title=""Toggle Zoom Mode (Scroll Wheel)"">🔍 Zoom</button>
         <button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>
     </div>'''
 
     toolbar = toolbar_3d if is_3d else toolbar_2d
-    status_3d = 'Drag: Rotate (Re-render) | Middle: Pan | Wheel: Zoom'
-    status_2d = 'Drag: Pan | Wheel: Zoom'
+    status_3d = 'Drag: Rotate | Middle: Pan | Enable 🔍 Zoom + Wheel to Zoom'
+    status_2d = 'Drag: Pan | Enable 🔍 Zoom + Wheel to Zoom'
     status_text = status_3d if is_3d else status_2d
 
     if colorbars:
