@@ -153,6 +153,8 @@ namespace TxtAIEditor.Core.Services
                 sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Render Markdown (Shift+Enter)\">▶ Render</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-edit\" title=\"Edit Markdown\">✎ Edit</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Code\">Code</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"Insert Cell Above\">+ Above</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"Insert Cell Below\">+ Below</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
@@ -165,6 +167,8 @@ namespace TxtAIEditor.Core.Services
                 sb.AppendLine("</div>");
                 sb.AppendLine("<div class=\"cell-toolbar\">");
                 sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Code\">Code</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"Insert Cell Above\">+ Above</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"Insert Cell Below\">+ Below</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
@@ -178,6 +182,8 @@ namespace TxtAIEditor.Core.Services
                 sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Run (Shift+Enter)\">▶ Run</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-run-below\" title=\"Run Below\">▶|</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Markdown\">Markdown</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"Insert Cell Above\">+ Above</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"Insert Cell Below\">+ Below</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
@@ -550,6 +556,43 @@ body {
     color: var(--nb-fg); cursor: pointer; font-size: 12px; opacity: 0.7;
 }
 .cell-btn:hover { opacity: 1; background: var(--nb-accent); color: #fff; }
+.nb-context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: var(--nb-bg);
+    border: 1px solid var(--nb-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    padding: 6px 0;
+    min-width: 190px;
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    font-size: 13px;
+    color: var(--nb-fg);
+    user-select: none;
+    display: none;
+}
+.nb-context-menu-item {
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+.nb-context-menu-item:hover {
+    background: var(--nb-accent);
+    color: #ffffff;
+}
+.nb-context-menu-item.disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+}
+.nb-context-menu-divider {
+    height: 1px;
+    background: var(--nb-border);
+    margin: 4px 0;
+}
 .cell-output {
     padding: 10px 14px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
     font-family: 'Consolas', monospace; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
@@ -1109,6 +1152,8 @@ strong { font-weight: 700; }
                 '<button class=""cell-btn cell-run"" title=""Render Markdown (Shift+Enter)"">▶ Render</button>' +
                 '<button class=""cell-btn cell-edit"" title=""Edit Markdown"">✎ Edit</button>' +
                 '<button class=""cell-btn cell-toggle-type"" title=""Switch to Code"">Code</button>' +
+                '<button class=""cell-btn cell-add-above"" title=""Insert Cell Above"">+ Above</button>' +
+                '<button class=""cell-btn cell-add-below"" title=""Insert Cell Below"">+ Below</button>' +
                 '<button class=""cell-btn cell-delete"" title=""Delete"">✕</button>' +
                 '<button class=""cell-btn cell-move-up"" title=""Move Up"">↑</button>' +
                 '<button class=""cell-btn cell-move-down"" title=""Move Down"">↓</button>' +
@@ -1120,6 +1165,8 @@ strong { font-weight: 700; }
                 '<button class=""cell-btn cell-run"" title=""Run (Shift+Enter)"">▶ Run</button>' +
                 '<button class=""cell-btn cell-run-below"" title=""Run Below"">▶|</button>' +
                 '<button class=""cell-btn cell-toggle-type"" title=""Switch to Markdown"">Markdown</button>' +
+                '<button class=""cell-btn cell-add-above"" title=""Insert Cell Above"">+ Above</button>' +
+                '<button class=""cell-btn cell-add-below"" title=""Insert Cell Below"">+ Below</button>' +
                 '<button class=""cell-btn cell-delete"" title=""Delete"">✕</button>' +
                 '<button class=""cell-btn cell-move-up"" title=""Move Up"">↑</button>' +
                 '<button class=""cell-btn cell-move-down"" title=""Move Down"">↓</button>' +
@@ -1509,6 +1556,10 @@ strong { font-weight: 700; }
                     await runCell(cells[i]);
                 }
             }
+        } else if (btn.classList.contains('cell-add-above')) {
+            handleContextMenuAction('add-above', cellDiv);
+        } else if (btn.classList.contains('cell-add-below')) {
+            handleContextMenuAction('add-below', cellDiv);
         } else if (btn.classList.contains('cell-delete')) {
             cellDiv.remove();
             reindexCells();
@@ -1528,6 +1579,237 @@ strong { font-weight: 700; }
                 notifyModified();
             }
         }
+    });
+
+    let clipboardCell = null;
+
+    function splitCellAtCursor(cellDiv) {
+        if (!cellDiv) return;
+        const type = getCellType(cellDiv);
+        const fullSource = getCellSource(cellDiv);
+        let head = fullSource;
+        let tail = '';
+
+        const sel = window.getSelection();
+        const editor = cellDiv.querySelector('.cell-input-area, .markdown-editor');
+        if (sel && sel.rangeCount > 0 && editor && editor.contains(sel.anchorNode)) {
+            const range = sel.getRangeAt(0);
+            const preRange = range.cloneRange();
+            preRange.selectNodeContents(editor);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            const caretPos = preRange.toString().length;
+            head = fullSource.substring(0, caretPos);
+            tail = fullSource.substring(caretPos);
+        } else {
+            const lines = fullSource.split('\n');
+            if (lines.length > 1) {
+                const mid = Math.floor(lines.length / 2);
+                head = lines.slice(0, mid).join('\n');
+                tail = lines.slice(mid).join('\n');
+            }
+        }
+
+        if (type === 'markdown') {
+            const ed = cellDiv.querySelector('.markdown-editor');
+            if (ed) ed.innerHTML = '<pre>' + escapeHtml(head) + '</pre>';
+            renderMarkdownCell(cellDiv);
+        } else {
+            const ed = cellDiv.querySelector('.cell-input-area');
+            if (ed) ed.innerHTML = '<pre>' + escapeHtml(head) + '</pre>';
+        }
+        cellDiv.setAttribute('data-source', head);
+
+        const newCell = createCell(type, tail);
+        const next = cellDiv.nextElementSibling;
+        if (next) container.insertBefore(newCell, next);
+        else container.appendChild(newCell);
+        reindexCells();
+        notifyModified();
+    }
+
+    function mergeCells(targetCell, sourceCell) {
+        if (!targetCell || !sourceCell) return;
+        const targetType = getCellType(targetCell);
+        const targetSource = getCellSource(targetCell);
+        const sourceSource = getCellSource(sourceCell);
+
+        const merged = (targetSource ? targetSource + '\n' : '') + sourceSource;
+
+        if (targetType === 'markdown') {
+            const ed = targetCell.querySelector('.markdown-editor');
+            if (ed) ed.innerHTML = '<pre>' + escapeHtml(merged) + '</pre>';
+            renderMarkdownCell(targetCell);
+        } else {
+            const ed = targetCell.querySelector('.cell-input-area');
+            if (ed) ed.innerHTML = '<pre>' + escapeHtml(merged) + '</pre>';
+        }
+        targetCell.setAttribute('data-source', merged);
+
+        sourceCell.remove();
+        reindexCells();
+        notifyModified();
+    }
+
+    function showContextMenu(x, y, cellDiv) {
+        let menu = document.getElementById('nb-context-menu');
+        if (!menu) {
+            menu = document.createElement('div');
+            menu.id = 'nb-context-menu';
+            menu.className = 'nb-context-menu';
+            document.body.appendChild(menu);
+        }
+
+        const isCode = cellDiv && getCellType(cellDiv) === 'code';
+        const hasPrev = cellDiv && cellDiv.previousElementSibling && cellDiv.previousElementSibling.classList.contains('cell');
+        const hasNext = cellDiv && cellDiv.nextElementSibling && cellDiv.nextElementSibling.classList.contains('cell');
+        const outputDiv = cellDiv ? cellDiv.querySelector('.cell-output') : null;
+        const hasOutput = isCode && outputDiv && (outputDiv.classList.contains('has-output') || outputDiv.children.length > 0 || outputDiv.textContent.trim().length > 0);
+
+        menu.innerHTML = 
+            '<div class=""nb-context-menu-item"" data-action=""add-above"">➕ Insert Cell Above</div>' +
+            '<div class=""nb-context-menu-item"" data-action=""add-below"">➕ Insert Cell Below</div>' +
+            '<div class=""nb-context-menu-divider""></div>' +
+            '<div class=""nb-context-menu-item ' + (cellDiv ? '' : 'disabled') + '"" data-action=""cut"">✂️ Cut Cell</div>' +
+            '<div class=""nb-context-menu-item ' + (cellDiv ? '' : 'disabled') + '"" data-action=""copy"">📋 Copy Cell</div>' +
+            '<div class=""nb-context-menu-item ' + (clipboardCell ? '' : 'disabled') + '"" data-action=""paste-above"">📑 Paste Cell Above</div>' +
+            '<div class=""nb-context-menu-item ' + (clipboardCell ? '' : 'disabled') + '"" data-action=""paste-below"">📑 Paste Cell Below</div>' +
+            '<div class=""nb-context-menu-divider""></div>' +
+            '<div class=""nb-context-menu-item ' + (cellDiv ? '' : 'disabled') + '"" data-action=""split"">✂️| Split Cell</div>' +
+            '<div class=""nb-context-menu-item ' + (hasPrev ? '' : 'disabled') + '"" data-action=""merge-above"">⬆️ Merge Cell Above</div>' +
+            '<div class=""nb-context-menu-item ' + (hasNext ? '' : 'disabled') + '"" data-action=""merge-below"">⬇️ Merge Cell Below</div>' +
+            '<div class=""nb-context-menu-divider""></div>' +
+            '<div class=""nb-context-menu-item ' + (hasOutput ? '' : 'disabled') + '"" data-action=""clear-output"">🧹 Clear Cell Output</div>';
+
+        menu.style.display = 'block';
+        const rect = menu.getBoundingClientRect();
+        let left = x;
+        let top = y;
+        if (left + rect.width > window.innerWidth) left = window.innerWidth - rect.width - 8;
+        if (top + rect.height > window.innerHeight) top = window.innerHeight - rect.height - 8;
+        if (left < 0) left = 8;
+        if (top < 0) top = 8;
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+
+        menu.onclick = function(e) {
+            const item = e.target.closest('.nb-context-menu-item');
+            if (!item || item.classList.contains('disabled')) return;
+            const action = item.getAttribute('data-action');
+            hideContextMenu();
+            handleContextMenuAction(action, cellDiv);
+        };
+    }
+
+    function hideContextMenu() {
+        const menu = document.getElementById('nb-context-menu');
+        if (menu) menu.style.display = 'none';
+    }
+
+    function handleContextMenuAction(action, cellDiv) {
+        if (!cellDiv && (action === 'add-above' || action === 'add-below')) {
+            const cells = container.querySelectorAll('.cell');
+            cellDiv = cells.length > 0 ? cells[cells.length - 1] : null;
+        }
+
+        switch (action) {
+            case 'add-above': {
+                const newCell = createCell('code', '');
+                if (cellDiv) container.insertBefore(newCell, cellDiv);
+                else container.appendChild(newCell);
+                reindexCells();
+                const editor = newCell.querySelector('.cell-input-area');
+                if (editor) editor.focus();
+                notifyModified();
+                break;
+            }
+            case 'add-below': {
+                const newCell = createCell('code', '');
+                if (cellDiv) {
+                    const next = cellDiv.nextElementSibling;
+                    if (next) container.insertBefore(newCell, next);
+                    else container.appendChild(newCell);
+                } else {
+                    container.appendChild(newCell);
+                }
+                reindexCells();
+                const editor = newCell.querySelector('.cell-input-area');
+                if (editor) editor.focus();
+                notifyModified();
+                break;
+            }
+            case 'cut': {
+                if (!cellDiv) return;
+                clipboardCell = { type: getCellType(cellDiv), source: getCellSource(cellDiv) };
+                cellDiv.remove();
+                reindexCells();
+                notifyModified();
+                break;
+            }
+            case 'copy': {
+                if (!cellDiv) return;
+                clipboardCell = { type: getCellType(cellDiv), source: getCellSource(cellDiv) };
+                break;
+            }
+            case 'paste-above': {
+                if (!clipboardCell) return;
+                const newCell = createCell(clipboardCell.type, clipboardCell.source);
+                if (cellDiv) container.insertBefore(newCell, cellDiv);
+                else container.appendChild(newCell);
+                reindexCells();
+                notifyModified();
+                break;
+            }
+            case 'paste-below': {
+                if (!clipboardCell) return;
+                const newCell = createCell(clipboardCell.type, clipboardCell.source);
+                if (cellDiv) {
+                    const next = cellDiv.nextElementSibling;
+                    if (next) container.insertBefore(newCell, next);
+                    else container.appendChild(newCell);
+                } else {
+                    container.appendChild(newCell);
+                }
+                reindexCells();
+                notifyModified();
+                break;
+            }
+            case 'split': {
+                if (!cellDiv) return;
+                splitCellAtCursor(cellDiv);
+                break;
+            }
+            case 'merge-above': {
+                if (!cellDiv) return;
+                const prev = cellDiv.previousElementSibling;
+                if (prev && prev.classList.contains('cell')) mergeCells(prev, cellDiv);
+                break;
+            }
+            case 'merge-below': {
+                if (!cellDiv) return;
+                const next = cellDiv.nextElementSibling;
+                if (next && next.classList.contains('cell')) mergeCells(cellDiv, next);
+                break;
+            }
+            case 'clear-output': {
+                if (!cellDiv) return;
+                const outputDiv = cellDiv.querySelector('.cell-output');
+                if (outputDiv) {
+                    outputDiv.innerHTML = '';
+                    outputDiv.classList.remove('has-output');
+                    notifyModified();
+                }
+                break;
+            }
+        }
+    }
+
+    document.addEventListener('click', hideContextMenu);
+    document.addEventListener('scroll', hideContextMenu, true);
+    document.addEventListener('contextmenu', (e) => {
+        if (e.target.closest('.mpl-viewport, .mpl-toolbar')) return;
+        const cellDiv = e.target.closest('.cell');
+        e.preventDefault();
+        showContextMenu(e.clientX, e.clientY, cellDiv);
     });
 
     // Keyboard shortcuts
