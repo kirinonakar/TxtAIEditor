@@ -67,6 +67,7 @@ namespace TxtAIEditor.Controls
 
         public async Task SaveSessionAsync(AgentHistoryItem session, string currentSessionId)
         {
+            session.SessionHistoryText = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(session.SessionHistoryText);
             var existing = _history.FirstOrDefault(h => h.Id == session.Id);
             if (existing != null)
             {

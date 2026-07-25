@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using TxtAIEditor.Core.Models;
 using static TxtAIEditor.Controls.AgentToolHelpers;
 
@@ -8,6 +9,17 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentRunTranscriptService
     {
+        public static string ConvertToolCallTagsToLogTags(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text ?? string.Empty;
+            }
+
+            text = Regex.Replace(text, @"<tool_call(?=[\s>])", "<log_tool_call", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"</tool_call>", "</log_tool_call>", RegexOptions.IgnoreCase);
+            return text;
+        }
         public string BuildWithEditLedger(
             string transcript,
             int currentTaskStartEditIndex,

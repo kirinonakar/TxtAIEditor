@@ -6,8 +6,9 @@ namespace TxtAIEditor.Controls
     {
         public static void AppendLine(AgentRunContext context, string line = "")
         {
-            context.SessionHistory.AppendLine(line);
-            context.SessionHistoryTokenCount += AgentTokenEstimator.Estimate(line + Environment.NewLine);
+            string logLine = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(line);
+            context.SessionHistory.AppendLine(logLine);
+            context.SessionHistoryTokenCount += AgentTokenEstimator.Estimate(logLine + Environment.NewLine);
         }
 
         public static void AppendPromptTranscript(
