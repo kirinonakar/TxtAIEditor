@@ -456,6 +456,11 @@ namespace TxtAIEditor.Controls
                     if (inToolCall && !toolCallSyntaxReached)
                     {
                         int toolCallIndex = AgentToolCallParser.FindToolCallIndex(line);
+                        if (toolCallIndex < 0)
+                        {
+                            // Also check for <log_tool_call tags (converted from <tool_call for display)
+                            toolCallIndex = line.IndexOf("<log_tool_call", StringComparison.OrdinalIgnoreCase);
+                        }
                         if (toolCallIndex >= 0)
                         {
                             string visiblePrefix = line.Substring(0, toolCallIndex).TrimEnd();
@@ -469,7 +474,8 @@ namespace TxtAIEditor.Controls
                         else if (line.StartsWith("[Parsed tool call:", StringComparison.OrdinalIgnoreCase) ||
                             (line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) &&
                                 line.EndsWith(" arguments]", StringComparison.OrdinalIgnoreCase)) ||
-                            AgentToolCallParser.ContainsToolCallSyntax(line))
+                            AgentToolCallParser.ContainsToolCallSyntax(line) ||
+                            line.Contains("<log_tool_call", StringComparison.OrdinalIgnoreCase))
                         {
                             toolCallSyntaxReached = true;
                         }
