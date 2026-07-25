@@ -32,6 +32,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string> _reloadDirectoryRoot;
         private readonly Func<string, string, string> _getString;
         private readonly Action<string, string> _showErrorMessage;
+        private readonly Func<OpenedTab, Task<bool>>? _saveNotebookAsync;
 
         public TabSaveController(
             Window owner,
@@ -52,7 +53,8 @@ namespace TxtAIEditor.Controls
             Func<string> currentFolderProvider,
             Action<string> reloadDirectoryRoot,
             Func<string, string, string> getString,
-            Action<string, string> showErrorMessage)
+            Action<string, string> showErrorMessage,
+            Func<OpenedTab, Task<bool>>? saveNotebookAsync = null)
         {
             _owner = owner;
             _fileService = fileService;
@@ -73,6 +75,7 @@ namespace TxtAIEditor.Controls
             _reloadDirectoryRoot = reloadDirectoryRoot;
             _getString = getString;
             _showErrorMessage = showErrorMessage;
+            _saveNotebookAsync = saveNotebookAsync;
         }
 
         public async Task<bool> SaveAsync(OpenedTab tab)
@@ -82,8 +85,20 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (tab.IsReadOnlyViewer && !tab.IsHexViewer)
+            if (tab.IsReadOnlyViewer && !tab.IsHexViewer && !tab.IsNotebookViewer)
             {
+                return false;
+            }
+
+            if (tab.IsNotebookViewer)
+            {
+                if (_saveNotebookAsync != null && await _saveNotebookAsync(tab))
+                {
+                    tab.IsDirty = false;
+                    _cleanDirtyStateOnOtherTabs(tab);
+                    await CompleteSuccessfulSaveAsync(tab, syncLineEnding: false);
+                    return true;
+                }
                 return false;
             }
 
@@ -118,7 +133,7 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile && !tab.IsHexViewer)
+            if (tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile && !tab.IsHexViewer && !tab.IsNotebookViewer)
             {
                 return false;
             }
@@ -146,6 +161,18 @@ namespace TxtAIEditor.Controls
             {
                 ClearArchiveReadOnlyState(tab);
                 tab.RemotePath = null;
+                if (tab.IsNotebookViewer)
+                {
+                    if (_saveNotebookAsync != null && await _saveNotebookAsync(tab))
+                    {
+                        tab.IsDirty = false;
+                        _cleanDirtyStateOnOtherTabs(tab);
+                        await CompleteSuccessfulSaveAsync(tab, syncLineEnding: false);
+                        return true;
+                    }
+                    return false;
+                }
+
                 await SaveTabContentAndUploadAsync(tab);
                 tab.IsDirty = false;
                 _cleanDirtyStateOnOtherTabs(tab);

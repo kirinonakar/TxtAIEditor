@@ -35,7 +35,8 @@ namespace TxtAIEditor.Composition
         Func<bool> IsScrollSyncEnabled,
         Action<string, OpenedTab, int, int> UpdateRightPanelSelectionContext,
         Func<string, Task> NavigateExplorerToFolderAndRevealAsync,
-        Func<string, string, string> GetLocalizedString);
+        Func<string, string, string> GetLocalizedString,
+        Action? UpdateWindowTitle = null);
 
     internal sealed record MainWindowPreviewControllers(
         WebViewShortcutController WebViewShortcut,
@@ -125,7 +126,8 @@ namespace TxtAIEditor.Composition
                 tabNavigation.GetActiveTab,
                 webViewShortcut.Handle,
                 callbacks.GetLocalizedString,
-                notebookKernelService);
+                notebookKernelService,
+                callbacks.UpdateWindowTitle);
 
             var editorLinkNavigation = new EditorLinkNavigationController(
                 tabNavigation.GetActiveTab,

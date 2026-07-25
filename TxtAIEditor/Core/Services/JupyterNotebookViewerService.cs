@@ -24,6 +24,7 @@ namespace TxtAIEditor.Core.Services
             try
             {
                 json = await File.ReadAllTextAsync(filePath, Encoding.UTF8);
+                json = json.TrimStart('\uFEFF');
             }
             catch (Exception ex)
             {
@@ -475,6 +476,22 @@ strong { font-weight: 700; }
 (function() {
     const container = document.getElementById('cells-container');
     const path = window.__notebookPath;
+    let isDirtyState = false;
+
+    function notifyModified() {
+        if (!isDirtyState) {
+            isDirtyState = true;
+            try {
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage(JSON.stringify({ type: 'markDirty' }));
+                }
+            } catch (e) {}
+        }
+    }
+
+    container.addEventListener('input', () => {
+        notifyModified();
+    });
 
     function renderMarkdownJs(md) {
         if (!md) return '';
@@ -646,6 +663,7 @@ strong { font-weight: 700; }
             editor.innerHTML = '<pre>' + escapeHtml(currentText + (needNewline ? '\n' : '') + inserted) + '</pre>';
         }
         editor.focus();
+        notifyModified();
     }
 
     function escapeHtml(text) {
@@ -734,6 +752,7 @@ strong { font-weight: 700; }
                 outputDiv.classList.remove('has-output');
                 outputDiv.innerHTML = '';
             }
+            notifyModified();
         } catch (e) {
             outputDiv.innerHTML = '<span class=""output-error"">' + escapeHtml(String(e)) + '</span>';
         }
@@ -1017,6 +1036,7 @@ strong { font-weight: 700; }
         if (!opening && !closing) return;
 
         toggleWrapperInEditor(editor, range, opening, closing);
+        notifyModified();
     }
 
     window.addEventListener('appMarkdownCommand', (e) => {
@@ -1031,6 +1051,7 @@ strong { font-weight: 700; }
         }
         if (activeCell) {
             applyMarkdownCommandToCell(activeCell, cmd, color);
+            notifyModified();
         }
     });
 
@@ -1066,6 +1087,7 @@ strong { font-weight: 700; }
             const fmt = fmtBtn.getAttribute('data-fmt');
             if (cellDiv && fmt) {
                 insertMarkdownFormatting(cellDiv, fmt);
+                notifyModified();
                 return;
             }
         }
@@ -1098,6 +1120,7 @@ strong { font-weight: 700; }
                 const editor = newCell.querySelector('.cell-input-area');
                 if (editor) editor.focus();
             }
+            notifyModified();
         } else if (btn.classList.contains('cell-run-below')) {
             const cells = Array.from(container.querySelectorAll('.cell'));
             const startIdx = parseInt(cellDiv.getAttribute('data-cell-index'));
@@ -1109,17 +1132,20 @@ strong { font-weight: 700; }
         } else if (btn.classList.contains('cell-delete')) {
             cellDiv.remove();
             reindexCells();
+            notifyModified();
         } else if (btn.classList.contains('cell-move-up')) {
             const prev = cellDiv.previousElementSibling;
             if (prev) {
                 container.insertBefore(cellDiv, prev);
                 reindexCells();
+                notifyModified();
             }
         } else if (btn.classList.contains('cell-move-down')) {
             const next = cellDiv.nextElementSibling;
             if (next) {
                 container.insertBefore(next, cellDiv);
                 reindexCells();
+                notifyModified();
             }
         }
     });
@@ -1170,6 +1196,7 @@ strong { font-weight: 700; }
         container.appendChild(cell);
         reindexCells();
         cell.querySelector('.cell-input-area').focus();
+        notifyModified();
     });
 
     document.getElementById('btn-add-markdown').addEventListener('click', () => {
@@ -1177,6 +1204,7 @@ strong { font-weight: 700; }
         container.appendChild(cell);
         reindexCells();
         editMarkdownCell(cell);
+        notifyModified();
     });
 
     document.getElementById('btn-save').addEventListener('click', saveNotebook);
@@ -1203,6 +1231,7 @@ strong { font-weight: 700; }
     window.__notebookSaveResult = function(success, message) {
         const btn = document.getElementById('btn-save');
         if (success) {
+            isDirtyState = false;
             btn.textContent = 'Saved!';
             setTimeout(() => { btn.textContent = 'Save'; }, 1500);
         } else {

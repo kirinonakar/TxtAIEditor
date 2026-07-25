@@ -65,7 +65,8 @@ namespace TxtAIEditor.Composition
                     () => state.ScrollSyncEnabled,
                     callbacks.UpdateRightPanelSelectionContext,
                     navigateExplorerToFolderAndRevealAsync,
-                    callbacks.GetLocalizedString));
+                    callbacks.GetLocalizedString,
+                    callbacks.UpdateWindowTitle));
 
             return new MainWindowPreviewModule(controllers);
         }

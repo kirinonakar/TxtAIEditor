@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
 {
     public sealed class ExplorerFileActionsController
     {
+        private static readonly System.Text.Encoding Utf8NoBom = new System.Text.UTF8Encoding(false);
         private readonly LeftSidebarPane _leftSidebar;
         private readonly StatusBarPane _statusBar;
         private readonly MainWindowViewModel _viewModel;
@@ -458,7 +459,7 @@ namespace TxtAIEditor.Controls
                         fileName);
                     await _refreshRemoteExplorerAsync();
                     string localPath = await _remoteWorkspaceService.DownloadVirtualFileAsync(virtualPath);
-                    await File.WriteAllTextAsync(localPath, initialContent, System.Text.Encoding.UTF8);
+                    await File.WriteAllTextAsync(localPath, initialContent, Utf8NoBom);
                     await _remoteWorkspaceService.UploadLocalFileAsync(localPath, virtualPath);
                     await _loadFileIntoTabAsync(localPath);
                 }
@@ -484,7 +485,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                await File.WriteAllTextAsync(newFilePath, initialContent, System.Text.Encoding.UTF8);
+                await File.WriteAllTextAsync(newFilePath, initialContent, Utf8NoBom);
                 _loadDirectoryRoot(currentFolder);
                 await _loadFileIntoTabAsync(newFilePath);
             }

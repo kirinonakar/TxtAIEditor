@@ -16,10 +16,12 @@ namespace TxtAIEditor.Controls
 {
     public sealed class JupyterNotebookViewerController
     {
+        private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
         private readonly ISettingsService _settingsService;
         private readonly Func<OpenedTab?> _activeTabProvider;
         private readonly Action<string> _shortcutHandler;
         private readonly Func<string, string, string> _getString;
+        private readonly Action? _updateWindowTitle;
         private readonly JupyterNotebookViewerService _viewerService;
         private readonly JupyterNotebookKernelService _kernelService;
         private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
@@ -33,13 +35,15 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> activeTabProvider,
             Action<string> shortcutHandler,
             Func<string, string, string> getString,
-            JupyterNotebookKernelService kernelService)
+            JupyterNotebookKernelService kernelService,
+            Action? updateWindowTitle = null)
         {
             _settingsService = settingsService;
             _activeTabProvider = activeTabProvider;
             _shortcutHandler = shortcutHandler;
             _getString = getString;
             _kernelService = kernelService;
+            _updateWindowTitle = updateWindowTitle;
             _viewerService = new JupyterNotebookViewerService(getString);
         }
 
@@ -108,8 +112,10 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     return false;
                 }
 
-                await File.WriteAllTextAsync(tab.FilePath, content, Encoding.UTF8);
+                await File.WriteAllTextAsync(tab.FilePath, content, Utf8NoBom);
                 tab.IsDirty = false;
+                webView.DispatcherQueue.TryEnqueue(() => _updateWindowTitle?.Invoke());
+                await ExecuteScriptSafeAsync(webView, "window.__notebookSaveResult && window.__notebookSaveResult(true, '');");
                 return true;
             }
             catch
@@ -230,6 +236,14 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     string content = root.TryGetProperty("content", out var cont) ? cont.GetString() ?? "" : "";
                     _ = SaveNotebookAsync(sender, tab, content);
                 }
+                else if (string.Equals(type, "markDirty", StringComparison.Ordinal))
+                {
+                    sender.DispatcherQueue.TryEnqueue(() =>
+                    {
+                        tab.IsDirty = true;
+                        _updateWindowTitle?.Invoke();
+                    });
+                }
                 else if (string.Equals(type, "shortcut", StringComparison.Ordinal))
                 {
                     string name = root.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "";
@@ -286,7 +300,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             {
                 if (!string.IsNullOrEmpty(tab.FilePath))
                 {
-                    await File.WriteAllTextAsync(tab.FilePath, content, Encoding.UTF8);
+                    await File.WriteAllTextAsync(tab.FilePath, content, Utf8NoBom);
                     tab.IsDirty = false;
                     success = true;
                 }
@@ -294,6 +308,14 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             catch
             {
                 success = false;
+            }
+
+            if (success)
+            {
+                webView.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _updateWindowTitle?.Invoke();
+                });
             }
 
             string script = $"window.__notebookSaveResult && window.__notebookSaveResult({success.ToString().ToLowerInvariant()}, '');";

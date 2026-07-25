@@ -188,6 +188,7 @@ namespace TxtAIEditor.Composition
                 tabEncryptionController,
                 favoritesRecentController,
                 dialogController,
+                notebookViewerController,
                 new MainWindowDocumentCommandCallbacks(
                     callbacks.UpdateLanguageUi,
                     workspaceModule.RefreshGitStatusUiAsync,

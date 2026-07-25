@@ -47,6 +47,7 @@ namespace TxtAIEditor.Composition
             TabEncryptionController tabEncryption,
             FavoritesRecentController favoritesRecent,
             WindowDialogController dialog,
+            JupyterNotebookViewerController notebookViewer,
             MainWindowDocumentCommandCallbacks callbacks)
         {
             var tabSave = new TabSaveController(
@@ -68,7 +69,8 @@ namespace TxtAIEditor.Composition
                 callbacks.GetCurrentFolderPath,
                 callbacks.LoadDirectoryRoot,
                 callbacks.GetLocalizedString,
-                dialog.ShowErrorMessage);
+                dialog.ShowErrorMessage,
+                saveNotebookAsync: tab => notebookViewer.SaveAsync(tab));
 
             var autoSave = new AutoSaveController(
                 viewModel,
