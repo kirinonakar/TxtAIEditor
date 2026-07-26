@@ -291,26 +291,29 @@ def _get_2d_plot_bounds(fig):
             return None
         tight_bbox = tight_bbox.padded(0.08)
 
-        target_ax = None
+        target_axes = []
         for ax in fig.axes:
             if not (hasattr(ax, 'view_init') or getattr(ax, 'name', '') == '3d' or '3d' in str(type(ax)).lower()):
                 label = str(getattr(ax, 'get_label', lambda: '')())
                 if getattr(ax, '_colorbar', None) is not None or label == '<colorbar>' or 'colorbar' in label.lower():
                     continue
-                target_ax = ax
-                break
+                target_axes.append(ax)
 
-        if target_ax is None:
+        if not target_axes:
             return None
 
-        ax_bbox = target_ax.get_window_extent(renderer)
+        ax_bboxes = [ax.get_window_extent(renderer) for ax in target_axes]
+        ax_x0 = min(bbox.x0 for bbox in ax_bboxes)
+        ax_y0 = min(bbox.y0 for bbox in ax_bboxes)
+        ax_x1 = max(bbox.x1 for bbox in ax_bboxes)
+        ax_y1 = max(bbox.y1 for bbox in ax_bboxes)
         dpi = fig.dpi
         tb_x0, tb_y0, tb_w, tb_h = tight_bbox.x0 * dpi, tight_bbox.y0 * dpi, tight_bbox.width * dpi, tight_bbox.height * dpi
 
-        left_pct = (ax_bbox.x0 - tb_x0) / tb_w * 100.0
-        top_pct = (tb_y0 + tb_h - ax_bbox.y1) / tb_h * 100.0
-        width_pct = ax_bbox.width / tb_w * 100.0
-        height_pct = ax_bbox.height / tb_h * 100.0
+        left_pct = (ax_x0 - tb_x0) / tb_w * 100.0
+        top_pct = (tb_y0 + tb_h - ax_y1) / tb_h * 100.0
+        width_pct = (ax_x1 - ax_x0) / tb_w * 100.0
+        height_pct = (ax_y1 - ax_y0) / tb_h * 100.0
 
         left_pct = max(0.0, min(100.0, left_pct))
         top_pct = max(0.0, min(100.0, top_pct))
