@@ -6,6 +6,15 @@ namespace TxtAIEditor.Core.Services
         {
             return @"    let runningCells = new Set();
 
+    function notebookString(key, fallback) {
+        const strings = window.__notebookStrings || {};
+        return typeof strings[key] === 'string' && strings[key] ? strings[key] : fallback;
+    }
+
+    function shortcutTitle(key, fallback, shortcut) {
+        return notebookString(key, fallback) + ' (' + shortcut + ')';
+    }
+
     async function runCell(cellDiv) {
         const type = getCellType(cellDiv);
         if (type === 'markdown') {
@@ -98,9 +107,9 @@ namespace TxtAIEditor.Core.Services
                 '<button class=""cell-btn cell-run"" title=""Render Markdown (Shift+Enter)"">▶ Render</button>' +
                 '<button class=""cell-btn cell-edit"" title=""Edit Markdown"">✎ Edit</button>' +
                 '<button class=""cell-btn cell-toggle-type"" title=""Switch to Code"">Code</button>' +
-                '<button class=""cell-btn cell-add-above"" title=""Insert Cell Above"">+ Above</button>' +
-                '<button class=""cell-btn cell-add-below"" title=""Insert Cell Below"">+ Below</button>' +
-                '<button class=""cell-btn cell-delete"" title=""Delete"">✕</button>' +
+                '<button class=""cell-btn cell-add-above"" title=""' + shortcutTitle('insertAbove', 'Insert Cell Above', 'A') + '"">+ Above</button>' +
+                '<button class=""cell-btn cell-add-below"" title=""' + shortcutTitle('insertBelow', 'Insert Cell Below', 'B') + '"">+ Below</button>' +
+                '<button class=""cell-btn cell-delete"" title=""' + shortcutTitle('deleteCell', 'Delete Cell', 'D, D') + '"">✕</button>' +
                 '<button class=""cell-btn cell-move-up"" title=""Move Up"">↑</button>' +
                 '<button class=""cell-btn cell-move-down"" title=""Move Down"">↓</button>' +
                 '</div>';
@@ -112,21 +121,23 @@ namespace TxtAIEditor.Core.Services
                 '<button class=""cell-btn cell-run"" title=""Run (Shift+Enter)"">▶ Run</button>' +
                 '<button class=""cell-btn cell-run-below"" title=""Run Below"">▶|</button>' +
                 '<button class=""cell-btn cell-toggle-type"" title=""Switch to Markdown"">Markdown</button>' +
-                '<button class=""cell-btn cell-add-above"" title=""Insert Cell Above"">+ Above</button>' +
-                '<button class=""cell-btn cell-add-below"" title=""Insert Cell Below"">+ Below</button>' +
-                '<button class=""cell-btn cell-delete"" title=""Delete"">✕</button>' +
+                '<button class=""cell-btn cell-add-above"" title=""' + shortcutTitle('insertAbove', 'Insert Cell Above', 'A') + '"">+ Above</button>' +
+                '<button class=""cell-btn cell-add-below"" title=""' + shortcutTitle('insertBelow', 'Insert Cell Below', 'B') + '"">+ Below</button>' +
+                '<button class=""cell-btn cell-delete"" title=""' + shortcutTitle('deleteCell', 'Delete Cell', 'D, D') + '"">✕</button>' +
                 '<button class=""cell-btn cell-move-up"" title=""Move Up"">↑</button>' +
                 '<button class=""cell-btn cell-move-down"" title=""Move Down"">↓</button>' +
                 '</div>' +
                 '<div class=""cell-output""></div>' +
                 '</div>';
         }
+        prepareCell(div);
         return div;
     }
 
     let lastActiveMarkdownCell = null;
     let lastActiveMarkdownRange = null;
     let composingMarkdownEditor = null;
+    let composingCellEditor = null;
     let pendingMarkdownCommand = null;
 
     function rememberMarkdownSelection(editor) {
@@ -185,6 +196,7 @@ namespace TxtAIEditor.Core.Services
     });
 
     container.addEventListener('compositionstart', (e) => {
+        composingCellEditor = e.target.closest('.cell-input-area, [contenteditable=""true""]');
         const editor = e.target.closest('.markdown-editor');
         if (editor) {
             composingMarkdownEditor = editor;
@@ -192,6 +204,10 @@ namespace TxtAIEditor.Core.Services
     });
 
     container.addEventListener('compositionend', (e) => {
+        const endedEditor = e.target.closest('.cell-input-area, [contenteditable=""true""]');
+        if (endedEditor && endedEditor === composingCellEditor) {
+            composingCellEditor = null;
+        }
         const editor = e.target.closest('.markdown-editor');
         if (!editor || editor !== composingMarkdownEditor) return;
 
@@ -505,6 +521,122 @@ namespace TxtAIEditor.Core.Services
         });
     }
 
+    let selectedCell = null;
+    let draggedCell = null;
+    let commandMode = false;
+    let pendingDeleteAt = 0;
+
+    function selectCell(cellDiv, enterCommandMode) {
+        if (!cellDiv || !cellDiv.classList.contains('cell')) return;
+        if (selectedCell && selectedCell !== cellDiv) {
+            selectedCell.classList.remove('is-selected', 'is-command-mode');
+        }
+        selectedCell = cellDiv;
+        commandMode = !!enterCommandMode;
+        selectedCell.classList.add('is-selected');
+        selectedCell.classList.toggle('is-command-mode', commandMode);
+        window.__notebookSelectedCell = selectedCell;
+    }
+
+    window.__notebookSelectCell = selectCell;
+
+    function prepareCell(cellDiv) {
+        if (!cellDiv || cellDiv.dataset.notebookPrepared === 'true') return;
+        cellDiv.dataset.notebookPrepared = 'true';
+        const handle = document.createElement('button');
+        handle.type = 'button';
+        handle.className = 'cell-drag-handle';
+        handle.draggable = true;
+        handle.textContent = '⠿';
+        handle.title = notebookString('dragCell', 'Drag to reorder cell');
+        handle.setAttribute('aria-label', handle.title);
+        cellDiv.insertBefore(handle, cellDiv.firstChild);
+    }
+
+    function clearDragIndicators() {
+        container.querySelectorAll('.cell.drag-before, .cell.drag-after').forEach(cell => {
+            cell.classList.remove('drag-before', 'drag-after');
+        });
+    }
+
+    function getCellDropPosition(clientY) {
+        const cells = Array.from(container.querySelectorAll('.cell'))
+            .filter(cell => cell !== draggedCell);
+        if (cells.length === 0) return null;
+
+        for (const cell of cells) {
+            const rect = cell.getBoundingClientRect();
+            if (clientY < rect.top + rect.height / 2) {
+                return { cell, before: true };
+            }
+        }
+        return { cell: cells[cells.length - 1], before: false };
+    }
+
+    container.querySelectorAll('.cell').forEach(prepareCell);
+    const initialCell = container.querySelector('.cell');
+    if (initialCell) selectCell(initialCell, true);
+
+    container.addEventListener('focusin', e => {
+        const cellDiv = e.target.closest('.cell');
+        if (cellDiv) selectCell(cellDiv, false);
+    });
+
+    container.addEventListener('pointerdown', e => {
+        const cellDiv = e.target.closest('.cell');
+        if (!cellDiv) return;
+        const editingTarget = e.target.closest('[contenteditable=""true""], input, textarea, select');
+        selectCell(cellDiv, !editingTarget);
+    });
+
+    container.addEventListener('dragstart', e => {
+        const handle = e.target.closest('.cell-drag-handle');
+        if (!handle) {
+            e.preventDefault();
+            return;
+        }
+        draggedCell = handle.closest('.cell');
+        if (!draggedCell) return;
+        selectCell(draggedCell, true);
+        draggedCell.classList.add('is-dragging');
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedCell.getAttribute('data-cell-index') || '');
+        }
+    });
+
+    container.addEventListener('dragover', e => {
+        if (!draggedCell) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        clearDragIndicators();
+        const position = getCellDropPosition(e.clientY);
+        if (!position) return;
+        position.cell.classList.add(position.before ? 'drag-before' : 'drag-after');
+    });
+
+    container.addEventListener('drop', e => {
+        if (!draggedCell) return;
+        e.preventDefault();
+        const position = getCellDropPosition(e.clientY);
+        if (!position) return;
+        if (position.before) {
+            container.insertBefore(draggedCell, position.cell);
+        } else {
+            container.insertBefore(draggedCell, position.cell.nextElementSibling);
+        }
+        clearDragIndicators();
+        reindexCells();
+        selectCell(draggedCell, true);
+        notifyModified();
+    });
+
+    container.addEventListener('dragend', () => {
+        if (draggedCell) draggedCell.classList.remove('is-dragging');
+        draggedCell = null;
+        clearDragIndicators();
+    });
+
     // Double click to edit markdown preview
     container.addEventListener('dblclick', (e) => {
         const preview = e.target.closest('.markdown-preview');
@@ -558,6 +690,7 @@ namespace TxtAIEditor.Core.Services
             const newCell = createCell(newType, source);
             cellDiv.replaceWith(newCell);
             reindexCells();
+            selectCell(newCell, false);
             if (newType === 'markdown') {
                 editMarkdownCell(newCell);
             } else {
@@ -578,9 +711,7 @@ namespace TxtAIEditor.Core.Services
         } else if (btn.classList.contains('cell-add-below')) {
             handleContextMenuAction('add-below', cellDiv);
         } else if (btn.classList.contains('cell-delete')) {
-            cellDiv.remove();
-            reindexCells();
-            notifyModified();
+            handleContextMenuAction('delete', cellDiv);
         } else if (btn.classList.contains('cell-move-up')) {
             const prev = cellDiv.previousElementSibling;
             if (prev) {
@@ -682,20 +813,30 @@ namespace TxtAIEditor.Core.Services
         const outputDiv = cellDiv ? cellDiv.querySelector('.cell-output') : null;
         const hasOutput = isCode && outputDiv && (outputDiv.classList.contains('has-output') || outputDiv.children.length > 0 || outputDiv.textContent.trim().length > 0);
 
-        menu.innerHTML = 
-            '<div class=""nb-context-menu-item"" data-action=""add-above"">➕ Insert Cell Above</div>' +
-            '<div class=""nb-context-menu-item"" data-action=""add-below"">➕ Insert Cell Below</div>' +
+        function menuItem(icon, label, action, shortcut, disabled) {
+            return '<div class=""nb-context-menu-item ' + (disabled ? 'disabled' : '') + '"" data-action=""' + action + '"">' +
+                '<span>' + icon + '</span><span class=""nb-context-menu-label"">' + escapeHtml(label) + '</span>' +
+                (shortcut ? '<span class=""nb-context-menu-shortcut"">' + escapeHtml(shortcut) + '</span>' : '') +
+                '</div>';
+        }
+
+        menu.innerHTML =
+            menuItem('➕', notebookString('insertAbove', 'Insert Cell Above'), 'add-above', 'A', false) +
+            menuItem('➕', notebookString('insertBelow', 'Insert Cell Below'), 'add-below', 'B', false) +
             '<div class=""nb-context-menu-divider""></div>' +
-            '<div class=""nb-context-menu-item ' + (cellDiv ? '' : 'disabled') + '"" data-action=""cut"">✂️ Cut Cell</div>' +
-            '<div class=""nb-context-menu-item ' + (cellDiv ? '' : 'disabled') + '"" data-action=""copy"">📋 Copy Cell</div>' +
-            '<div class=""nb-context-menu-item ' + (clipboardCell ? '' : 'disabled') + '"" data-action=""paste-above"">📑 Paste Cell Above</div>' +
-            '<div class=""nb-context-menu-item ' + (clipboardCell ? '' : 'disabled') + '"" data-action=""paste-below"">📑 Paste Cell Below</div>' +
+            menuItem('✂️', notebookString('cutCell', 'Cut Cell'), 'cut', 'X', !cellDiv) +
+            menuItem('📋', notebookString('copyCell', 'Copy Cell'), 'copy', 'C', !cellDiv) +
+            menuItem('📑', notebookString('pasteAbove', 'Paste Cell Above'), 'paste-above', '', !clipboardCell) +
+            menuItem('📑', notebookString('pasteBelow', 'Paste Cell Below'), 'paste-below', 'V', !clipboardCell) +
+            menuItem('🗑️', notebookString('deleteCell', 'Delete Cell'), 'delete', 'D, D', !cellDiv) +
             '<div class=""nb-context-menu-divider""></div>' +
-            '<div class=""nb-context-menu-item ' + (cellDiv ? '' : 'disabled') + '"" data-action=""split"">✂️| Split Cell</div>' +
-            '<div class=""nb-context-menu-item ' + (hasPrev ? '' : 'disabled') + '"" data-action=""merge-above"">⬆️ Merge Cell Above</div>' +
-            '<div class=""nb-context-menu-item ' + (hasNext ? '' : 'disabled') + '"" data-action=""merge-below"">⬇️ Merge Cell Below</div>' +
+            menuItem('✂️|', notebookString('splitCell', 'Split Cell'), 'split', '', !cellDiv) +
+            menuItem('⬆️', notebookString('mergeAbove', 'Merge Cell Above'), 'merge-above', '', !hasPrev) +
+            menuItem('⬇️', notebookString('mergeBelow', 'Merge Cell Below'), 'merge-below', '', !hasNext) +
             '<div class=""nb-context-menu-divider""></div>' +
-            '<div class=""nb-context-menu-item ' + (hasOutput ? '' : 'disabled') + '"" data-action=""clear-output"">🧹 Clear Cell Output</div>';
+            menuItem('🧹', notebookString('clearOutput', 'Clear Cell Output'), 'clear-output', '', !hasOutput) +
+            '<div class=""nb-context-menu-divider""></div>' +
+            menuItem('⌨️', notebookString('commandMode', 'Command Mode'), 'command-mode', 'Esc', !cellDiv);
 
         menu.style.display = 'block';
         const rect = menu.getBoundingClientRect();
@@ -722,7 +863,7 @@ namespace TxtAIEditor.Core.Services
         if (menu) menu.style.display = 'none';
     }
 
-    function handleContextMenuAction(action, cellDiv) {
+    function handleContextMenuAction(action, cellDiv, enterEditMode = true) {
         if (!cellDiv && (action === 'add-above' || action === 'add-below')) {
             const cells = container.querySelectorAll('.cell');
             cellDiv = cells.length > 0 ? cells[cells.length - 1] : null;
@@ -734,8 +875,9 @@ namespace TxtAIEditor.Core.Services
                 if (cellDiv) container.insertBefore(newCell, cellDiv);
                 else container.appendChild(newCell);
                 reindexCells();
+                selectCell(newCell, !enterEditMode);
                 const editor = newCell.querySelector('.cell-input-area');
-                if (editor) editor.focus();
+                if (enterEditMode && editor) editor.focus();
                 notifyModified();
                 break;
             }
@@ -749,16 +891,23 @@ namespace TxtAIEditor.Core.Services
                     container.appendChild(newCell);
                 }
                 reindexCells();
+                selectCell(newCell, !enterEditMode);
                 const editor = newCell.querySelector('.cell-input-area');
-                if (editor) editor.focus();
+                if (enterEditMode && editor) editor.focus();
                 notifyModified();
                 break;
             }
             case 'cut': {
                 if (!cellDiv) return;
+                const fallbackCell = cellDiv.nextElementSibling || cellDiv.previousElementSibling;
                 clipboardCell = { type: getCellType(cellDiv), source: getCellSource(cellDiv) };
                 cellDiv.remove();
                 reindexCells();
+                if (fallbackCell && fallbackCell.classList.contains('cell')) selectCell(fallbackCell, true);
+                else {
+                    selectedCell = null;
+                    window.__notebookSelectedCell = null;
+                }
                 notifyModified();
                 break;
             }
@@ -767,12 +916,26 @@ namespace TxtAIEditor.Core.Services
                 clipboardCell = { type: getCellType(cellDiv), source: getCellSource(cellDiv) };
                 break;
             }
+            case 'delete': {
+                if (!cellDiv) return;
+                const fallbackCell = cellDiv.nextElementSibling || cellDiv.previousElementSibling;
+                cellDiv.remove();
+                reindexCells();
+                if (fallbackCell && fallbackCell.classList.contains('cell')) selectCell(fallbackCell, true);
+                else {
+                    selectedCell = null;
+                    window.__notebookSelectedCell = null;
+                }
+                notifyModified();
+                break;
+            }
             case 'paste-above': {
                 if (!clipboardCell) return;
                 const newCell = createCell(clipboardCell.type, clipboardCell.source);
                 if (cellDiv) container.insertBefore(newCell, cellDiv);
                 else container.appendChild(newCell);
                 reindexCells();
+                selectCell(newCell, !enterEditMode);
                 notifyModified();
                 break;
             }
@@ -787,6 +950,7 @@ namespace TxtAIEditor.Core.Services
                     container.appendChild(newCell);
                 }
                 reindexCells();
+                selectCell(newCell, !enterEditMode);
                 notifyModified();
                 break;
             }
@@ -798,13 +962,19 @@ namespace TxtAIEditor.Core.Services
             case 'merge-above': {
                 if (!cellDiv) return;
                 const prev = cellDiv.previousElementSibling;
-                if (prev && prev.classList.contains('cell')) mergeCells(prev, cellDiv);
+                if (prev && prev.classList.contains('cell')) {
+                    mergeCells(prev, cellDiv);
+                    selectCell(prev, true);
+                }
                 break;
             }
             case 'merge-below': {
                 if (!cellDiv) return;
                 const next = cellDiv.nextElementSibling;
-                if (next && next.classList.contains('cell')) mergeCells(cellDiv, next);
+                if (next && next.classList.contains('cell')) {
+                    mergeCells(cellDiv, next);
+                    selectCell(cellDiv, true);
+                }
                 break;
             }
             case 'clear-output': {
@@ -817,6 +987,13 @@ namespace TxtAIEditor.Core.Services
                 }
                 break;
             }
+            case 'command-mode': {
+                if (!cellDiv) return;
+                const active = document.activeElement;
+                if (active && active.blur) active.blur();
+                selectCell(cellDiv, true);
+                break;
+            }
         }
     }
 
@@ -826,8 +1003,62 @@ namespace TxtAIEditor.Core.Services
         if (e.target.closest('.mpl-viewport, .mpl-toolbar')) return;
         const cellDiv = e.target.closest('.cell');
         e.preventDefault();
+        if (cellDiv) selectCell(cellDiv, !e.target.closest('[contenteditable=""true""], input, textarea, select'));
         showContextMenu(e.clientX, e.clientY, cellDiv);
     });
+
+    document.addEventListener('keydown', e => {
+        if (e.target.closest && e.target.closest('#notebook-find-bar')) return;
+        if (e.isComposing || e.keyCode === 229 || composingCellEditor) return;
+        if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+
+        const activeCell = e.target.closest ? e.target.closest('.cell') : null;
+        if (e.key === 'Escape') {
+            const targetCell = activeCell || selectedCell;
+            if (!targetCell) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const active = document.activeElement;
+            if (active && active.blur) active.blur();
+            selectCell(targetCell, true);
+            pendingDeleteAt = 0;
+            return;
+        }
+
+        const active = document.activeElement;
+        const isEditing = active && active.closest &&
+            active.closest('[contenteditable=""true""], input, textarea, select');
+        if (!commandMode || isEditing || !selectedCell || !selectedCell.isConnected || e.repeat) return;
+
+        const key = String(e.key || '').toLowerCase();
+        if (key !== 'd') pendingDeleteAt = 0;
+
+        if (key === 'a') {
+            e.preventDefault();
+            handleContextMenuAction('add-above', selectedCell, false);
+        } else if (key === 'b') {
+            e.preventDefault();
+            handleContextMenuAction('add-below', selectedCell, false);
+        } else if (key === 'x') {
+            e.preventDefault();
+            handleContextMenuAction('cut', selectedCell, false);
+        } else if (key === 'c') {
+            e.preventDefault();
+            handleContextMenuAction('copy', selectedCell, false);
+        } else if (key === 'v') {
+            e.preventDefault();
+            handleContextMenuAction('paste-below', selectedCell, false);
+        } else if (key === 'd') {
+            e.preventDefault();
+            const now = Date.now();
+            if (pendingDeleteAt && now - pendingDeleteAt <= 600) {
+                pendingDeleteAt = 0;
+                handleContextMenuAction('delete', selectedCell, false);
+            } else {
+                pendingDeleteAt = now;
+            }
+        }
+    }, true);
 
     // Real-time stream output handler for tqdm / stdout / stderr
     window.__notebookReceiveStreamOutput = function(cellIndex, streamName, streamText) {

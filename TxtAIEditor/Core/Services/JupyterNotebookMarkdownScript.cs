@@ -378,11 +378,12 @@ namespace TxtAIEditor.Core.Services
         if (!cellDiv) return;
         const editor = cellDiv.querySelector('.cell-input-area.code-editor');
         if (!editor) return;
-        const pre = editor.querySelector('pre');
-        if (!pre) return;
-        const source = getCellSource(cellDiv);
-        if (!source) return;
-        pre.innerHTML = highlightPythonCode(source);
+        if (editor === composingCellEditor || editor.contains(document.activeElement)) return;
+
+        const source = getEditorText(editor);
+        editor.setAttribute('data-source', source);
+        cellDiv.setAttribute('data-source', source);
+        editor.innerHTML = '<pre>' + highlightPythonCode(source) + '</pre>';
     }
 
     function applyAllCodeCellsHighlight() {

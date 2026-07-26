@@ -58,6 +58,15 @@ namespace TxtAIEditor.Core.Services
                 } else if (key === 'p' || code === 'KeyP') {
                     name = 'print';
                 } else if (key === 'f' || code === 'KeyF') {
+                    if (!shift && window.__txtAiEditorNotebookFind &&
+                        window.__txtAiEditorNotebookFind.open()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (event.stopImmediatePropagation) {
+                            event.stopImmediatePropagation();
+                        }
+                        return;
+                    }
                     name = shift ? 'searchAll' : 'find';
                 } else if (code === 'Backquote' || key === '`' || key === '~' || key === 'dead') {
                     name = 'terminal';

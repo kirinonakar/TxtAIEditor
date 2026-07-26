@@ -72,6 +72,23 @@ namespace TxtAIEditor.Controls
             return _activeTabProvider()?.IsNotebookViewer == true;
         }
 
+        public async Task<bool> FocusFindInActiveViewerAsync()
+        {
+            var activeTab = _activeTabProvider();
+            if (activeTab?.IsNotebookViewer != true ||
+                !_viewerWebViews.TryGetValue(activeTab.Id, out var webView) ||
+                webView.CoreWebView2 == null)
+            {
+                return false;
+            }
+
+            webView.Focus(FocusState.Programmatic);
+            await ExecuteScriptSafeAsync(
+                webView,
+                "window.__txtAiEditorNotebookFind && window.__txtAiEditorNotebookFind.open();");
+            return true;
+        }
+
         public async Task ApplyMarkdownCommandAsync(string tabId, string command, string? color = null)
         {
             if (_viewerWebViews.TryGetValue(tabId, out var webView) && webView.CoreWebView2 != null)
@@ -733,6 +750,15 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             } else if (key === 'p' || code === 'KeyP') {
                 name = 'print';
             } else if (key === 'f' || code === 'KeyF') {
+                if (!shift && window.__txtAiEditorNotebookFind &&
+                    window.__txtAiEditorNotebookFind.open()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (event.stopImmediatePropagation) {
+                        event.stopImmediatePropagation();
+                    }
+                    return;
+                }
                 name = shift ? 'searchAll' : 'find';
             } else if (code === 'Backquote' || key === '`' || key === '~' || key === 'dead') {
                 name = 'terminal';

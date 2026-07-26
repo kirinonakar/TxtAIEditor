@@ -3534,5 +3534,25 @@
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>没有活动变量。</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>过滤变量...</value></data>
   <data name="JupyterClearOutputsButton" xml:space="preserve"><value>清除输出</value></data>
+  <data name="JupyterFindTooltip" xml:space="preserve"><value>在笔记本中查找 (Ctrl+F)</value></data>
+  <data name="JupyterFindPlaceholder" xml:space="preserve"><value>在笔记本中查找...</value></data>
+  <data name="JupyterFindPreviousTooltip" xml:space="preserve"><value>上一个匹配项 (Shift+Enter)</value></data>
+  <data name="JupyterFindNextTooltip" xml:space="preserve"><value>下一个匹配项 (Enter)</value></data>
+  <data name="JupyterFindCloseTooltip" xml:space="preserve"><value>关闭 (Esc)</value></data>
+  <data name="JupyterFindNoMatches" xml:space="preserve"><value>无匹配项</value></data>
+  <data name="JupyterFindMatchCount" xml:space="preserve"><value>{0} / {1}</value></data>
+  <data name="JupyterCellDragTooltip" xml:space="preserve"><value>拖动以重新排列单元格</value></data>
+  <data name="JupyterCellCommandMode" xml:space="preserve"><value>命令模式</value></data>
+  <data name="JupyterCellInsertAbove" xml:space="preserve"><value>在上方插入单元格</value></data>
+  <data name="JupyterCellInsertBelow" xml:space="preserve"><value>在下方插入单元格</value></data>
+  <data name="JupyterCellCut" xml:space="preserve"><value>剪切单元格</value></data>
+  <data name="JupyterCellCopy" xml:space="preserve"><value>复制单元格</value></data>
+  <data name="JupyterCellPasteAbove" xml:space="preserve"><value>粘贴到上方</value></data>
+  <data name="JupyterCellPasteBelow" xml:space="preserve"><value>粘贴到下方</value></data>
+  <data name="JupyterCellDelete" xml:space="preserve"><value>删除单元格</value></data>
+  <data name="JupyterCellSplit" xml:space="preserve"><value>拆分单元格</value></data>
+  <data name="JupyterCellMergeAbove" xml:space="preserve"><value>与上方单元格合并</value></data>
+  <data name="JupyterCellMergeBelow" xml:space="preserve"><value>与下方单元格合并</value></data>
+  <data name="JupyterCellClearOutput" xml:space="preserve"><value>清除单元格输出</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>所有文件</value></data>
 </root>

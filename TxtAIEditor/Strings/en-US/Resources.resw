@@ -3570,5 +3570,25 @@ Plan: {0}</value>
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>No active variables.</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>Filter variables...</value></data>
   <data name="JupyterClearOutputsButton" xml:space="preserve"><value>Clear Outputs</value></data>
+  <data name="JupyterFindTooltip" xml:space="preserve"><value>Find in notebook (Ctrl+F)</value></data>
+  <data name="JupyterFindPlaceholder" xml:space="preserve"><value>Find in notebook...</value></data>
+  <data name="JupyterFindPreviousTooltip" xml:space="preserve"><value>Previous match (Shift+Enter)</value></data>
+  <data name="JupyterFindNextTooltip" xml:space="preserve"><value>Next match (Enter)</value></data>
+  <data name="JupyterFindCloseTooltip" xml:space="preserve"><value>Close (Esc)</value></data>
+  <data name="JupyterFindNoMatches" xml:space="preserve"><value>No matches</value></data>
+  <data name="JupyterFindMatchCount" xml:space="preserve"><value>{0} of {1}</value></data>
+  <data name="JupyterCellDragTooltip" xml:space="preserve"><value>Drag to reorder cell</value></data>
+  <data name="JupyterCellCommandMode" xml:space="preserve"><value>Command Mode</value></data>
+  <data name="JupyterCellInsertAbove" xml:space="preserve"><value>Insert Cell Above</value></data>
+  <data name="JupyterCellInsertBelow" xml:space="preserve"><value>Insert Cell Below</value></data>
+  <data name="JupyterCellCut" xml:space="preserve"><value>Cut Cell</value></data>
+  <data name="JupyterCellCopy" xml:space="preserve"><value>Copy Cell</value></data>
+  <data name="JupyterCellPasteAbove" xml:space="preserve"><value>Paste Cell Above</value></data>
+  <data name="JupyterCellPasteBelow" xml:space="preserve"><value>Paste Cell Below</value></data>
+  <data name="JupyterCellDelete" xml:space="preserve"><value>Delete Cell</value></data>
+  <data name="JupyterCellSplit" xml:space="preserve"><value>Split Cell</value></data>
+  <data name="JupyterCellMergeAbove" xml:space="preserve"><value>Merge Cell Above</value></data>
+  <data name="JupyterCellMergeBelow" xml:space="preserve"><value>Merge Cell Below</value></data>
+  <data name="JupyterCellClearOutput" xml:space="preserve"><value>Clear Cell Output</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>All Files</value></data>
 </root>

@@ -3570,5 +3570,25 @@
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>정의된 변수가 없습니다.</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>변수 검색...</value></data>
   <data name="JupyterClearOutputsButton" xml:space="preserve"><value>출력 지우기</value></data>
+  <data name="JupyterFindTooltip" xml:space="preserve"><value>노트북에서 찾기 (Ctrl+F)</value></data>
+  <data name="JupyterFindPlaceholder" xml:space="preserve"><value>노트북에서 찾기...</value></data>
+  <data name="JupyterFindPreviousTooltip" xml:space="preserve"><value>이전 일치 항목 (Shift+Enter)</value></data>
+  <data name="JupyterFindNextTooltip" xml:space="preserve"><value>다음 일치 항목 (Enter)</value></data>
+  <data name="JupyterFindCloseTooltip" xml:space="preserve"><value>닫기 (Esc)</value></data>
+  <data name="JupyterFindNoMatches" xml:space="preserve"><value>일치 항목 없음</value></data>
+  <data name="JupyterFindMatchCount" xml:space="preserve"><value>{0} / {1}</value></data>
+  <data name="JupyterCellDragTooltip" xml:space="preserve"><value>드래그하여 셀 순서 변경</value></data>
+  <data name="JupyterCellCommandMode" xml:space="preserve"><value>명령 모드</value></data>
+  <data name="JupyterCellInsertAbove" xml:space="preserve"><value>위에 셀 삽입</value></data>
+  <data name="JupyterCellInsertBelow" xml:space="preserve"><value>아래에 셀 삽입</value></data>
+  <data name="JupyterCellCut" xml:space="preserve"><value>셀 잘라내기</value></data>
+  <data name="JupyterCellCopy" xml:space="preserve"><value>셀 복사</value></data>
+  <data name="JupyterCellPasteAbove" xml:space="preserve"><value>위에 셀 붙여넣기</value></data>
+  <data name="JupyterCellPasteBelow" xml:space="preserve"><value>아래에 셀 붙여넣기</value></data>
+  <data name="JupyterCellDelete" xml:space="preserve"><value>셀 삭제</value></data>
+  <data name="JupyterCellSplit" xml:space="preserve"><value>셀 분할</value></data>
+  <data name="JupyterCellMergeAbove" xml:space="preserve"><value>위 셀과 병합</value></data>
+  <data name="JupyterCellMergeBelow" xml:space="preserve"><value>아래 셀과 병합</value></data>
+  <data name="JupyterCellClearOutput" xml:space="preserve"><value>셀 출력 지우기</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>모든 형식</value></data>
 </root>

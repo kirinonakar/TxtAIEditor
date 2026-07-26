@@ -41,6 +41,7 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<div class=\"notebook-header-top\">");
             sb.AppendLine($"<span class=\"notebook-title\">{NotebookHtmlEncoder.Encode(fileName)}</span>");
             sb.AppendLine("<div id=\"notebook-toolbar\">");
+            sb.AppendLine($"<button id=\"btn-find\" class=\"nb-btn nb-btn-find\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindTooltip", "Find in notebook (Ctrl+F)"))}\">🔍</button>");
             sb.AppendLine("<button id=\"btn-add-code\" class=\"nb-btn nb-btn-add\">+ Code</button>");
             sb.AppendLine("<button id=\"btn-add-markdown\" class=\"nb-btn nb-btn-add\">+ Markdown</button>");
             sb.AppendLine("<button id=\"btn-run-all\" class=\"nb-btn nb-btn-run\">Run All</button>");
@@ -48,6 +49,14 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<button id=\"btn-export-py\" class=\"nb-btn nb-btn-export\" title=\"Save as Python Script (.py)\">🐍 Save as .py</button>");
             sb.AppendLine($"<button id=\"btn-variables\" class=\"nb-btn nb-btn-vars\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}\">🔍 {NotebookHtmlEncoder.Encode(_getString("JupyterVariablesButton", "Variables"))}</button>");
             sb.AppendLine("</div>");
+            sb.AppendLine("</div>");
+
+            sb.AppendLine("<div id=\"notebook-find-bar\" hidden>");
+            sb.AppendLine($"<input id=\"notebook-find-input\" type=\"search\" autocomplete=\"off\" spellcheck=\"false\" placeholder=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindPlaceholder", "Find in notebook..."))}\" />");
+            sb.AppendLine("<span id=\"notebook-find-count\" aria-live=\"polite\"></span>");
+            sb.AppendLine($"<button id=\"btn-find-previous\" class=\"nb-btn nb-btn-sm\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindPreviousTooltip", "Previous match (Shift+Enter)"))}\">↑</button>");
+            sb.AppendLine($"<button id=\"btn-find-next\" class=\"nb-btn nb-btn-sm\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindNextTooltip", "Next match (Enter)"))}\">↓</button>");
+            sb.AppendLine($"<button id=\"btn-find-close\" class=\"nb-btn nb-btn-sm\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindCloseTooltip", "Close (Esc)"))}\">✕</button>");
             sb.AppendLine("</div>");
 
             sb.AppendLine("<div id=\"variables-panel\" style=\"display:none;\">");
@@ -95,6 +104,7 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<script>");
             sb.AppendLine($"window.__notebookPath = {JsonSerializer.Serialize(filePath)};");
             sb.AppendLine($"window.__notebookDir = {JsonSerializer.Serialize(dirPath)};");
+            sb.AppendLine($"window.__notebookStrings = {BuildNotebookStringsJson()};");
             sb.AppendLine(JupyterNotebookViewerScripts.GetJavaScript());
             sb.AppendLine("</script>");
             sb.AppendLine("</body>");
@@ -124,9 +134,9 @@ namespace TxtAIEditor.Core.Services
                 sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Render Markdown (Shift+Enter)\">▶ Render</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-edit\" title=\"Edit Markdown\">✎ Edit</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Code\">Code</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"Insert Cell Above\">+ Above</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"Insert Cell Below\">+ Below</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"{BuildShortcutTitle("JupyterCellInsertAbove", "Insert Cell Above", "A")}\">+ Above</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"{BuildShortcutTitle("JupyterCellInsertBelow", "Insert Cell Below", "B")}\">+ Below</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"{BuildShortcutTitle("JupyterCellDelete", "Delete Cell", "D, D")}\">✕</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
                 sb.AppendLine("</div>");
@@ -138,9 +148,9 @@ namespace TxtAIEditor.Core.Services
                 sb.AppendLine("</div>");
                 sb.AppendLine("<div class=\"cell-toolbar\">");
                 sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Code\">Code</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"Insert Cell Above\">+ Above</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"Insert Cell Below\">+ Below</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"{BuildShortcutTitle("JupyterCellInsertAbove", "Insert Cell Above", "A")}\">+ Above</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"{BuildShortcutTitle("JupyterCellInsertBelow", "Insert Cell Below", "B")}\">+ Below</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"{BuildShortcutTitle("JupyterCellDelete", "Delete Cell", "D, D")}\">✕</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
                 sb.AppendLine("</div>");
@@ -153,9 +163,9 @@ namespace TxtAIEditor.Core.Services
                 sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Run (Shift+Enter)\">▶ Run</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-run-below\" title=\"Run Below\">▶|</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Markdown\">Markdown</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"Insert Cell Above\">+ Above</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"Insert Cell Below\">+ Below</button>");
-                sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"Delete\">✕</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-above\" title=\"{BuildShortcutTitle("JupyterCellInsertAbove", "Insert Cell Above", "A")}\">+ Above</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-add-below\" title=\"{BuildShortcutTitle("JupyterCellInsertBelow", "Insert Cell Below", "B")}\">+ Below</button>");
+                sb.AppendLine($"<button class=\"cell-btn cell-delete\" title=\"{BuildShortcutTitle("JupyterCellDelete", "Delete Cell", "D, D")}\">✕</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-up\" title=\"Move Up\">↑</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-move-down\" title=\"Move Down\">↓</button>");
                 sb.AppendLine("</div>");
@@ -167,6 +177,33 @@ namespace TxtAIEditor.Core.Services
 
             sb.AppendLine("</div>");
             return sb.ToString();
+        }
+
+        private string BuildShortcutTitle(string key, string fallback, string shortcut)
+        {
+            return NotebookHtmlEncoder.AttributeEncode($"{_getString(key, fallback)} ({shortcut})");
+        }
+
+        private string BuildNotebookStringsJson()
+        {
+            return JsonSerializer.Serialize(new Dictionary<string, string>
+            {
+                ["findNoMatches"] = _getString("JupyterFindNoMatches", "No matches"),
+                ["findMatchCount"] = _getString("JupyterFindMatchCount", "{0} of {1}"),
+                ["dragCell"] = _getString("JupyterCellDragTooltip", "Drag to reorder cell"),
+                ["commandMode"] = _getString("JupyterCellCommandMode", "Command Mode"),
+                ["insertAbove"] = _getString("JupyterCellInsertAbove", "Insert Cell Above"),
+                ["insertBelow"] = _getString("JupyterCellInsertBelow", "Insert Cell Below"),
+                ["cutCell"] = _getString("JupyterCellCut", "Cut Cell"),
+                ["copyCell"] = _getString("JupyterCellCopy", "Copy Cell"),
+                ["pasteAbove"] = _getString("JupyterCellPasteAbove", "Paste Cell Above"),
+                ["pasteBelow"] = _getString("JupyterCellPasteBelow", "Paste Cell Below"),
+                ["deleteCell"] = _getString("JupyterCellDelete", "Delete Cell"),
+                ["splitCell"] = _getString("JupyterCellSplit", "Split Cell"),
+                ["mergeAbove"] = _getString("JupyterCellMergeAbove", "Merge Cell Above"),
+                ["mergeBelow"] = _getString("JupyterCellMergeBelow", "Merge Cell Below"),
+                ["clearOutput"] = _getString("JupyterCellClearOutput", "Clear Cell Output")
+            });
         }
 
         private static string RenderCellOutputs(List<JsonElement>? outputs)

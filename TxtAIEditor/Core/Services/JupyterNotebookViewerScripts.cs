@@ -14,6 +14,8 @@ namespace TxtAIEditor.Core.Services
                 "\r\n",
                 JupyterNotebookCellInteractionScript.GetScript(),
                 "\r\n",
+                JupyterNotebookSearchScript.GetScript(),
+                "\r\n",
                 JupyterNotebookToolbarScript.GetScript(),
                 "\r\n",
                 JupyterNotebookPlotScript.GetScript(),

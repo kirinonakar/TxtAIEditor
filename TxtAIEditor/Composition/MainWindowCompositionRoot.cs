@@ -421,6 +421,7 @@ namespace TxtAIEditor.Composition
                 livePreviewController,
                 pdfViewerController,
                 officeDocumentViewerController,
+                notebookViewerController,
                 statusBarController,
                 llmAssistantController,
                 agentController,

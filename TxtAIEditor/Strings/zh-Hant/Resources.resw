@@ -3534,5 +3534,25 @@
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>沒有活動變數。</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>篩選變數...</value></data>
   <data name="JupyterClearOutputsButton" xml:space="preserve"><value>清除輸出</value></data>
+  <data name="JupyterFindTooltip" xml:space="preserve"><value>在筆記本中尋找 (Ctrl+F)</value></data>
+  <data name="JupyterFindPlaceholder" xml:space="preserve"><value>在筆記本中尋找...</value></data>
+  <data name="JupyterFindPreviousTooltip" xml:space="preserve"><value>上一個相符項目 (Shift+Enter)</value></data>
+  <data name="JupyterFindNextTooltip" xml:space="preserve"><value>下一個相符項目 (Enter)</value></data>
+  <data name="JupyterFindCloseTooltip" xml:space="preserve"><value>關閉 (Esc)</value></data>
+  <data name="JupyterFindNoMatches" xml:space="preserve"><value>沒有相符項目</value></data>
+  <data name="JupyterFindMatchCount" xml:space="preserve"><value>{0} / {1}</value></data>
+  <data name="JupyterCellDragTooltip" xml:space="preserve"><value>拖曳以重新排列儲存格</value></data>
+  <data name="JupyterCellCommandMode" xml:space="preserve"><value>命令模式</value></data>
+  <data name="JupyterCellInsertAbove" xml:space="preserve"><value>在上方插入儲存格</value></data>
+  <data name="JupyterCellInsertBelow" xml:space="preserve"><value>在下方插入儲存格</value></data>
+  <data name="JupyterCellCut" xml:space="preserve"><value>剪下儲存格</value></data>
+  <data name="JupyterCellCopy" xml:space="preserve"><value>複製儲存格</value></data>
+  <data name="JupyterCellPasteAbove" xml:space="preserve"><value>貼到上方</value></data>
+  <data name="JupyterCellPasteBelow" xml:space="preserve"><value>貼到下方</value></data>
+  <data name="JupyterCellDelete" xml:space="preserve"><value>刪除儲存格</value></data>
+  <data name="JupyterCellSplit" xml:space="preserve"><value>分割儲存格</value></data>
+  <data name="JupyterCellMergeAbove" xml:space="preserve"><value>與上方儲存格合併</value></data>
+  <data name="JupyterCellMergeBelow" xml:space="preserve"><value>與下方儲存格合併</value></data>
+  <data name="JupyterCellClearOutput" xml:space="preserve"><value>清除儲存格輸出</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>所有檔案</value></data>
 </root>
