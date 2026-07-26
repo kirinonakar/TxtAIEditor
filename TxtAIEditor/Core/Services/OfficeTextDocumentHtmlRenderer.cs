@@ -403,7 +403,9 @@ namespace TxtAIEditor.Core.Services
             {
                 case "p":
                     builder.Append(BuildHwpxParagraphHtml(archive, binaryItems, characterStyles, paragraphStyles, block));
-                    foreach (XElement table in block.Descendants().Where(e => e.Name.LocalName == "tbl"))
+                    foreach (XElement table in block.Descendants().Where(e =>
+                        e.Name.LocalName == "tbl" &&
+                        !IsInsideNestedElement(block, e, "tbl")))
                     {
                         builder.Append(BuildHwpxTableHtml(
                             archive,
@@ -525,7 +527,13 @@ namespace TxtAIEditor.Core.Services
             }
 
             var builder = new StringBuilder();
-            builder.Append("<div class=\"doc-table-wrap\"><table class=\"doc-table\"><tbody>");
+            string wrapperStyle = BuildHwpxTableWrapperStyle(table);
+            string tableStyle = BuildHwpxTableStyle(table);
+            builder.Append("<div class=\"doc-table-wrap hwpx-table-wrap\"");
+            AppendStyleAttribute(builder, wrapperStyle);
+            builder.Append("><table class=\"doc-table hwpx-table\"");
+            AppendStyleAttribute(builder, tableStyle);
+            builder.Append("><tbody>");
             foreach (XElement row in rows)
             {
                 builder.Append("<tr>");
@@ -556,10 +564,33 @@ namespace TxtAIEditor.Core.Services
                         borderFillId = GetAttributeValue(table, "borderFillIDRef");
                     }
 
+                    var cellStyles = new List<string>();
                     if (borderFillStyles.TryGetValue(borderFillId, out string? borderFillStyle))
                     {
-                        builder.Append(" style=\"").Append(Html(borderFillStyle)).Append('"');
+                        cellStyles.Add(borderFillStyle);
                     }
+
+                    if (TryReadHwpxDimensions(cell, "cellSz", out double cellWidth, out double cellHeight))
+                    {
+                        cellStyles.Add("width:" + HwpxPoints(cellWidth));
+                        cellStyles.Add("height:" + HwpxPoints(cellHeight));
+                    }
+
+                    string cellPadding = BuildHwpxBoxSpacingStyle(cell, "cellMargin", "padding");
+                    if (!string.IsNullOrWhiteSpace(cellPadding))
+                    {
+                        cellStyles.Add(cellPadding);
+                    }
+
+                    XElement? subList = cell.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
+                    string verticalAlignment = GetAttributeValue(subList, "vertAlign").ToUpperInvariant();
+                    cellStyles.Add("vertical-align:" + (verticalAlignment switch
+                    {
+                        "CENTER" => "middle",
+                        "BOTTOM" => "bottom",
+                        _ => "top"
+                    }));
+                    AppendStyleAttribute(builder, string.Join(';', cellStyles));
 
                     builder.Append('>');
                     int before = builder.Length;
@@ -584,6 +615,91 @@ namespace TxtAIEditor.Core.Services
 
             builder.Append("</tbody></table></div>");
             return builder.ToString();
+        }
+
+        private static string BuildHwpxTableWrapperStyle(XElement table)
+        {
+            XElement? outMargin = table.Elements().FirstOrDefault(e => e.Name.LocalName == "outMargin");
+            if (outMargin == null)
+            {
+                return string.Empty;
+            }
+
+            double top = ReadHwpxDoubleAttribute(outMargin, "top");
+            double bottom = ReadHwpxDoubleAttribute(outMargin, "bottom");
+            return "margin:" + HwpxPoints(top) + " 0 " + HwpxPoints(bottom);
+        }
+
+        private static string BuildHwpxTableStyle(XElement table)
+        {
+            var styles = new List<string>();
+            if (TryReadHwpxDimensions(table, "sz", out double width, out double height))
+            {
+                styles.Add("width:" + HwpxPoints(width));
+                styles.Add("height:" + HwpxPoints(height));
+            }
+
+            double cellSpacing = ReadHwpxDoubleAttribute(table, "cellSpacing");
+            if (cellSpacing > 0)
+            {
+                styles.Add("border-collapse:separate");
+                styles.Add("border-spacing:" + HwpxPoints(cellSpacing));
+            }
+            else
+            {
+                styles.Add("border-collapse:collapse");
+                styles.Add("border-spacing:0");
+            }
+
+            XElement? position = table.Elements().FirstOrDefault(e => e.Name.LocalName == "pos");
+            string horizontalAlignment = GetAttributeValue(position, "horzAlign").ToUpperInvariant();
+            switch (horizontalAlignment)
+            {
+                case "CENTER":
+                    styles.Add("margin-left:auto");
+                    styles.Add("margin-right:auto");
+                    break;
+                case "RIGHT":
+                    styles.Add("margin-left:auto");
+                    styles.Add("margin-right:0");
+                    break;
+                default:
+                    styles.Add("margin-left:0");
+                    styles.Add("margin-right:auto");
+                    break;
+            }
+
+            return string.Join(';', styles);
+        }
+
+        private static string BuildHwpxBoxSpacingStyle(
+            XElement element,
+            string spacingElementName,
+            string cssProperty)
+        {
+            XElement? spacing = element.Elements().FirstOrDefault(e => e.Name.LocalName == spacingElementName);
+            if (spacing == null)
+            {
+                return string.Empty;
+            }
+
+            double top = ReadHwpxDoubleAttribute(spacing, "top");
+            double right = ReadHwpxDoubleAttribute(spacing, "right");
+            double bottom = ReadHwpxDoubleAttribute(spacing, "bottom");
+            double left = ReadHwpxDoubleAttribute(spacing, "left");
+            return cssProperty + ':' +
+                HwpxPoints(top) + ' ' +
+                HwpxPoints(right) + ' ' +
+                HwpxPoints(bottom) + ' ' +
+                HwpxPoints(left);
+        }
+
+        private static void AppendStyleAttribute(StringBuilder builder, string style)
+        {
+            if (!string.IsNullOrWhiteSpace(style))
+            {
+                builder.Append(" style=\"").Append(Html(style)).Append('"');
+            }
         }
 
         private static bool TryAppendHwpxLayeredImageHtml(
@@ -676,21 +792,30 @@ namespace TxtAIEditor.Core.Services
 
         private static bool TryReadHwpxSize(XElement element, out double width, out double height)
         {
-            width = 0;
-            height = 0;
-            XElement? size = element.Elements().FirstOrDefault(e => e.Name.LocalName == "curSz");
+            return TryReadHwpxDimensions(element, "curSz", out width, out height);
+        }
+
+        private static bool TryReadHwpxDimensions(
+            XElement element,
+            string sizeElementName,
+            out double width,
+            out double height)
+        {
+            XElement? size = element.Elements().FirstOrDefault(e => e.Name.LocalName == sizeElementName);
+            width = ReadHwpxDoubleAttribute(size, "width");
+            height = ReadHwpxDoubleAttribute(size, "height");
+            return width > 0 && height > 0;
+        }
+
+        private static double ReadHwpxDoubleAttribute(XElement? element, string attributeName)
+        {
             return double.TryParse(
-                    GetAttributeValue(size, "width"),
-                    NumberStyles.Float,
-                    CultureInfo.InvariantCulture,
-                    out width) &&
-                double.TryParse(
-                    GetAttributeValue(size, "height"),
-                    NumberStyles.Float,
-                    CultureInfo.InvariantCulture,
-                    out height) &&
-                width > 0 &&
-                height > 0;
+                GetAttributeValue(element, attributeName),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out double value)
+                ? value
+                : 0;
         }
 
         private static void ReadHwpxOffset(XElement element, out double x, out double y)
@@ -725,6 +850,11 @@ namespace TxtAIEditor.Core.Services
             return CssNumber(value) + "%";
         }
 
+        private static string HwpxPoints(double value)
+        {
+            return CssNumber(value / 100.0) + "pt";
+        }
+
         private static void AppendHwpxImageHtml(
             StringBuilder builder,
             ZipArchive archive,
@@ -744,9 +874,25 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            builder.Append("<figure class=\"doc-image\"><img src=\"")
+            var styles = new List<string>();
+            if (TryReadHwpxSize(element, out double width, out double height) ||
+                TryReadHwpxDimensions(element, "sz", out width, out height))
+            {
+                styles.Add("width:" + HwpxPoints(width));
+                styles.Add("height:" + HwpxPoints(height));
+            }
+
+            string margin = BuildHwpxBoxSpacingStyle(element, "outMargin", "margin");
+            if (!string.IsNullOrWhiteSpace(margin))
+            {
+                styles.Add(margin);
+            }
+
+            builder.Append("<span class=\"doc-image hwpx-image\"");
+            AppendStyleAttribute(builder, string.Join(';', styles));
+            builder.Append("><img src=\"")
                 .Append(Html(dataUri))
-                .Append("\" alt=\"\"></figure>");
+                .Append("\" alt=\"\"></span>");
         }
 
         private static string GetHwpxTextStyle(XText textNode, IReadOnlyDictionary<string, string> characterStyles)
@@ -818,9 +964,10 @@ namespace TxtAIEditor.Core.Services
             foreach (XElement paragraphProperties in header.Descendants().Where(e => e.Name.LocalName == "paraPr"))
             {
                 string id = GetAttributeValue(paragraphProperties, "id");
+                var declarations = new List<string>();
                 XElement? alignment = paragraphProperties.Elements().FirstOrDefault(e => e.Name.LocalName == "align");
                 string horizontal = GetAttributeValue(alignment, "horizontal").ToUpperInvariant();
-                string style = horizontal switch
+                string alignmentStyle = horizontal switch
                 {
                     "RIGHT" => "text-align:right",
                     "CENTER" => "text-align:center",
@@ -829,10 +976,28 @@ namespace TxtAIEditor.Core.Services
                     "LEFT" => "text-align:left",
                     _ => string.Empty
                 };
-
-                if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(style))
+                if (!string.IsNullOrWhiteSpace(alignmentStyle))
                 {
-                    styles[id] = style;
+                    declarations.Add(alignmentStyle);
+                }
+
+                XElement? lineSpacing = paragraphProperties.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "lineSpacing");
+                string lineSpacingType = GetAttributeValue(lineSpacing, "type");
+                if (lineSpacingType.Equals("PERCENT", StringComparison.OrdinalIgnoreCase) &&
+                    double.TryParse(
+                        GetAttributeValue(lineSpacing, "value"),
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out double lineSpacingPercent) &&
+                    lineSpacingPercent > 0)
+                {
+                    declarations.Add("line-height:" + CssNumber(lineSpacingPercent / 100.0));
+                }
+
+                if (!string.IsNullOrWhiteSpace(id) && declarations.Count > 0)
+                {
+                    styles[id] = string.Join(';', declarations);
                 }
             }
 
@@ -855,12 +1020,18 @@ namespace TxtAIEditor.Core.Services
             {
                 string id = GetAttributeValue(borderFill, "id");
                 var declarations = new List<string>();
-                bool hasVisibleEdge = borderFill.Elements()
-                    .Where(e => edgeNames.Contains(e.Name.LocalName))
-                    .Any(edge => !GetAttributeValue(edge, "type").Equals("NONE", StringComparison.OrdinalIgnoreCase));
-                if (!hasVisibleEdge)
+                foreach ((string elementName, string cssSide) in new[]
                 {
-                    declarations.Add("border:none");
+                    ("leftBorder", "left"),
+                    ("rightBorder", "right"),
+                    ("topBorder", "top"),
+                    ("bottomBorder", "bottom")
+                })
+                {
+                    XElement? edge = borderFill.Elements().FirstOrDefault(e =>
+                        edgeNames.Contains(e.Name.LocalName) &&
+                        e.Name.LocalName.Equals(elementName, StringComparison.OrdinalIgnoreCase));
+                    declarations.Add(BuildHwpxBorderDeclaration(cssSide, edge));
                 }
 
                 XElement? windowBrush = borderFill
@@ -879,6 +1050,39 @@ namespace TxtAIEditor.Core.Services
             }
 
             return styles;
+        }
+
+        private static string BuildHwpxBorderDeclaration(string cssSide, XElement? edge)
+        {
+            string type = GetAttributeValue(edge, "type").ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(type) || type == "NONE")
+            {
+                return "border-" + cssSide + ":none";
+            }
+
+            string cssStyle = type switch
+            {
+                "DOT" => "dotted",
+                "DASH" or "DASH_DOT" or "DASH_DOT_DOT" or "LONG_DASH" => "dashed",
+                "DOUBLE_SLIM" or "SLIM_THICK" or "THICK_SLIM" or "SLIM_THICK_SLIM" => "double",
+                _ => "solid"
+            };
+            string width = NormalizeHwpxBorderWidth(GetAttributeValue(edge, "width"));
+            string color = GetAttributeValue(edge, "color");
+            if (!IsCssColor(color))
+            {
+                color = "#000000";
+            }
+
+            return "border-" + cssSide + ':' + width + ' ' + cssStyle + ' ' + color;
+        }
+
+        private static string NormalizeHwpxBorderWidth(string value)
+        {
+            Match match = Regex.Match(value ?? string.Empty, @"^\s*(\d+(?:\.\d+)?)\s*(mm|cm|pt|px)\s*$", RegexOptions.IgnoreCase);
+            return match.Success
+                ? match.Groups[1].Value + match.Groups[2].Value.ToLowerInvariant()
+                : "0.12mm";
         }
 
         private static async Task<IReadOnlyDictionary<string, string>> LoadHwpxCharacterStylesAsync(ZipArchive archive)
@@ -1226,6 +1430,17 @@ body { padding: 28px 16px 44px; }
 }
 .doc-table .doc-paragraph { margin-bottom: .35em; line-height: 1.45; }
 .doc-table .doc-paragraph:last-child { margin-bottom: 0; }
+.doc-table.hwpx-table {
+    width: auto;
+    table-layout: fixed;
+}
+.doc-table.hwpx-table td {
+    min-width: 0;
+    padding: 0;
+}
+.doc-table.hwpx-table .doc-paragraph {
+    margin: 0;
+}
 .doc-image {
     display: block;
     margin: .9em 0;
@@ -1234,6 +1449,15 @@ body { padding: 28px 16px 44px; }
     display: block;
     max-width: 100%;
     height: auto;
+}
+.hwpx-image {
+    max-width: none;
+    margin: 0;
+}
+.hwpx-image img {
+    width: 100%;
+    max-width: none;
+    height: 100%;
 }
 .hwpx-layered-image {
     position: relative;
