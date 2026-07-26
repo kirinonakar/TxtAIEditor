@@ -101,12 +101,12 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        public async Task<string> UpdatePlotViewAsync(string tabId, string pythonExecutable, string workingDirectory, string figId, double elev, double azim)
+        public async Task<string> UpdatePlotViewAsync(string tabId, string pythonExecutable, string workingDirectory, string figId, double elev, double azim, double zoom)
         {
             try
             {
                 var session = await GetOrCreateSessionAsync(tabId, pythonExecutable, workingDirectory);
-                return await session.UpdatePlotViewAsync(figId, elev, azim);
+                return await session.UpdatePlotViewAsync(figId, elev, azim, zoom);
             }
             catch
             {
@@ -258,15 +258,28 @@ _figure_view_state = {}
 
 def _store_figure_limits(fig, fig_id):
     limits = []
+    limits_3d = []
     for ax in fig.axes:
-        if hasattr(ax, 'view_init') or getattr(ax, 'name', '') == '3d' or '3d' in str(type(ax)).lower():
+        is_ax_3d = hasattr(ax, 'view_init') or getattr(ax, 'name', '') == '3d' or '3d' in str(type(ax)).lower()
+        if is_ax_3d:
+            try:
+                limits_3d.append({
+                    'xlim': list(ax.get_xlim3d()),
+                    'ylim': list(ax.get_ylim3d()),
+                    'zlim': list(ax.get_zlim3d())
+                })
+            except Exception:
+                pass
             continue
         try:
             limits.append({'xlim': list(ax.get_xlim()), 'ylim': list(ax.get_ylim())})
         except Exception:
             pass
-    if limits:
-        _figure_view_state[fig_id] = {'orig_limits': limits}
+    if limits or limits_3d:
+        _figure_view_state[fig_id] = {
+            'orig_limits': limits,
+            'orig_3d_limits': limits_3d
+        }
 
 def _get_2d_plot_bounds(fig):
     try:
@@ -551,16 +564,29 @@ while True:
             fig_id = str(msg.get('figId', ''))
             elev = float(msg.get('elev', 30))
             azim = float(msg.get('azim', -60))
+            zoom_val = float(msg.get('zoom', 1.0))
+            if zoom_val <= 0: zoom_val = 1.0
             fig = _active_figures.get(fig_id)
+            state = _figure_view_state.get(fig_id)
             if fig is not None:
+                orig_3d_limits = state.get('orig_3d_limits', []) if state is not None else []
+                ax_idx = 0
                 for ax in fig.axes:
                     if hasattr(ax, 'view_init'):
                         try:
                             ax.view_init(elev=elev, azim=azim)
                         except Exception:
                             pass
+                        if ax_idx < len(orig_3d_limits):
+                            lim = orig_3d_limits[ax_idx]
+                            for axis_name in ('x', 'y', 'z'):
+                                lo, hi = lim[axis_name + 'lim']
+                                center = (lo + hi) / 2.0
+                                radius = (hi - lo) / (2.0 * zoom_val)
+                                getattr(ax, 'set_' + axis_name + 'lim3d')(center - radius, center + radius)
+                            ax_idx += 1
                 html = _render_figure_html(fig, fig_id=fig_id)
-                sys.stdout.write(json.dumps({'status': 'ok', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': html, 'elev': elev, 'azim': azim}, ensure_ascii=False) + '\n')
+                sys.stdout.write(json.dumps({'status': 'ok', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': html, 'elev': elev, 'azim': azim, 'zoom': zoom_val}, ensure_ascii=False) + '\n')
                 sys.stdout.flush()
             else:
                 sys.stdout.write(json.dumps({'status': 'error', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': ''}, ensure_ascii=False) + '\n')
@@ -872,14 +898,14 @@ while True:
                 return "[]";
             }
 
-            public async Task<string> UpdatePlotViewAsync(string figId, double elev, double azim)
+            public async Task<string> UpdatePlotViewAsync(string figId, double elev, double azim, double zoom)
             {
                 if (_process == null || _process.HasExited)
                 {
                     return string.Empty;
                 }
 
-                var command = JsonSerializer.Serialize(new { type = "updatePlotView", figId, elev, azim });
+                var command = JsonSerializer.Serialize(new { type = "updatePlotView", figId, elev, azim, zoom });
                 await _process.StandardInput.WriteLineAsync(command);
                 await _process.StandardInput.FlushAsync();
 

@@ -64,17 +64,18 @@ namespace TxtAIEditor.Core.Services
                 let startElev = elev, startAzim = azim;
 
                 let is3DInFlight = false;
-                let pending3DElevAzim = null;
+                let pending3DState = null;
+                let dataZoom3D = 1;
 
                 /* 2D cumulative data state */
                 let dataPanFracX = 0, dataPanFracY = 0, dataZoom = 1;
                 let is2DInFlight = false;
                 let pending2DState = null;
 
-                function send3DViewRequest(eVal, aVal) {
+                function send3DViewRequest(eVal, aVal, z) {
                     if (!is3D || !figId) return;
                     if (is3DInFlight) {
-                        pending3DElevAzim = { elev: eVal, azim: aVal };
+                        pending3DState = { elev: eVal, azim: aVal, zoom: z };
                         return;
                     }
                     is3DInFlight = true;
@@ -83,7 +84,8 @@ namespace TxtAIEditor.Core.Services
                             type: 'updatePlotView',
                             figId: figId,
                             elev: eVal,
-                            azim: aVal
+                            azim: aVal,
+                            zoom: z
                         }));
                     } catch (ex) {
                         is3DInFlight = false;
@@ -203,10 +205,10 @@ namespace TxtAIEditor.Core.Services
                             startAzim = azim;
                         }
                         is3DInFlight = false;
-                        if (pending3DElevAzim) {
-                            const next = pending3DElevAzim;
-                            pending3DElevAzim = null;
-                            send3DViewRequest(next.elev, next.azim);
+                        if (pending3DState) {
+                            const next = pending3DState;
+                            pending3DState = null;
+                            send3DViewRequest(next.elev, next.azim, next.zoom);
                         }
                     } else {
                         /* 2D: reset CSS preview since new image has correct view */
@@ -269,7 +271,7 @@ namespace TxtAIEditor.Core.Services
                             if (dragBtn === 2) {
                                 azim = Math.round(startAzim - dx * 0.5) % 360;
                                 elev = Math.min(Math.max(-90, Math.round(startElev + dy * 0.5)), 90);
-                                send3DViewRequest(elev, azim);
+                                send3DViewRequest(elev, azim, dataZoom3D);
                             } else {
                                 panX = startPanX + dx;
                                 panY = startPanY + dy;
@@ -287,7 +289,7 @@ namespace TxtAIEditor.Core.Services
                         if (isDragging) {
                             isDragging = false;
                             if (is3D && dragBtn === 2) {
-                                send3DViewRequest(elev, azim);
+                                send3DViewRequest(elev, azim, dataZoom3D);
                             } else if (!is3D && figId && (panX !== 0 || panY !== 0)) {
                                 const clip = wrapper.querySelector('.mpl-data-clip');
                                 const img = wrapper.querySelector('.mpl-plot-img');
@@ -308,9 +310,10 @@ namespace TxtAIEditor.Core.Services
                         if (!isZoomActive) return;
                         e.preventDefault();
                         const factor = e.deltaY < 0 ? 1.1 : 0.9;
-                        scale = Math.min(Math.max(0.2, scale * factor), 5.0);
-                        updateTransform();
-                        if (!is3D && figId) {
+                        if (is3D && figId) {
+                            dataZoom3D = Math.min(Math.max(0.2, dataZoom3D * factor), 5.0);
+                            send3DViewRequest(elev, azim, dataZoom3D);
+                        } else if (figId) {
                             dataZoom = Math.min(Math.max(0.2, dataZoom * factor), 5.0);
                             send2DViewRequest(dataPanFracX, dataPanFracY, dataZoom);
                         }
@@ -328,7 +331,7 @@ namespace TxtAIEditor.Core.Services
                     sliderY.addEventListener('input', function() {
                         if (is3D) {
                             azim = parseInt(sliderY.value) || 0;
-                            send3DViewRequest(elev, azim);
+                            send3DViewRequest(elev, azim, dataZoom3D);
                             updateTransform();
                         }
                     });
@@ -338,7 +341,7 @@ namespace TxtAIEditor.Core.Services
                     sliderX.addEventListener('input', function() {
                         if (is3D) {
                             elev = parseInt(sliderX.value) || 0;
-                            send3DViewRequest(elev, azim);
+                            send3DViewRequest(elev, azim, dataZoom3D);
                             updateTransform();
                         }
                     });
@@ -352,7 +355,8 @@ namespace TxtAIEditor.Core.Services
                         if (is3D) {
                             elev = initElev;
                             azim = initAzim;
-                            send3DViewRequest(elev, azim);
+                            dataZoom3D = 1;
+                            send3DViewRequest(elev, azim, dataZoom3D);
                         } else if (figId) {
                             dataPanFracX = 0;
                             dataPanFracY = 0;

@@ -256,7 +256,8 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     string figId = root.TryGetProperty("figId", out var f) ? f.GetString() ?? "" : "";
                     double elev = root.TryGetProperty("elev", out var el) ? el.GetDouble() : 30.0;
                     double azim = root.TryGetProperty("azim", out var az) ? az.GetDouble() : -60.0;
-                    _ = UpdatePlotViewAsync(sender, tab, figId, elev, azim);
+                    double zoom = root.TryGetProperty("zoom", out var z3d) ? z3d.GetDouble() : 1.0;
+                    _ = UpdatePlotViewAsync(sender, tab, figId, elev, azim, zoom);
                 }
                 else if (string.Equals(type, "update2DView", StringComparison.Ordinal))
                 {
@@ -304,7 +305,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             }
         }
 
-        private async Task UpdatePlotViewAsync(WebView2 webView, OpenedTab tab, string figId, double elev, double azim)
+        private async Task UpdatePlotViewAsync(WebView2 webView, OpenedTab tab, string figId, double elev, double azim, double zoom)
         {
             try
             {
@@ -314,7 +315,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     return;
                 }
 
-                string html = await _kernelService.UpdatePlotViewAsync(tab.Id, python, workDir, figId, elev, azim);
+                string html = await _kernelService.UpdatePlotViewAsync(tab.Id, python, workDir, figId, elev, azim, zoom);
                 if (!string.IsNullOrEmpty(html))
                 {
                     string js = $"window.__notebookReceivePlotUpdate && window.__notebookReceivePlotUpdate({JsonSerializer.Serialize(figId)}, {JsonSerializer.Serialize(html)});";
