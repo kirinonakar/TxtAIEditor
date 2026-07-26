@@ -150,11 +150,12 @@ namespace TxtAIEditor.Core.Services
 
     function inlineMdJs(str) {
         let s = escapeHtml(str);
-        s = s.replace(/&lt;span style=&quot;color:\s*([^&;\""|]+);?&quot;&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style=""color:$1;"">$2</span>');
-        s = s.replace(/&lt;span style=&quot;background-color:\s*([^&;\""|]+);?&quot;&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style=""background-color:$1;"">$2</span>');
-        s = s.replace(/&lt;font color=&quot;([^&;\""|]+)&quot;&gt;([\s\S]*?)&lt;\/font&gt;/gi, '<font color=""$1"">$2</font>');
+        s = s.replace(/&lt;span style=(?:&quot;|&#39;|')([^&]*?)(?:&quot;|&#39;|')\s*&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style=""$1"">$2</span>');
+        s = s.replace(/&lt;font color=(?:&quot;|&#39;|')([^&]*?)(?:&quot;|&#39;|')\s*&gt;([\s\S]*?)&lt;\/font&gt;/gi, '<font color=""$1"">$2</font>');
         s = s.replace(/&lt;mark&gt;([\s\S]*?)&lt;\/mark&gt;/gi, '<mark>$1</mark>');
         s = s.replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<u>$1</u>');
+        s = s.replace(/&lt;b&gt;([\s\S]*?)&lt;\/b&gt;/gi, '<b>$1</b>');
+        s = s.replace(/&lt;i&gt;([\s\S]*?)&lt;\/i&gt;/gi, '<i>$1</i>');
         s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src=""$2"" alt=""$1"" style=""max-width:100%;height:auto;display:inline-block;vertical-align:middle;margin:4px 0;"" />');
         s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href=""$2"" target=""_blank"" rel=""noopener"">$1</a>');
         s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');

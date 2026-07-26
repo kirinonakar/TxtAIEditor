@@ -118,7 +118,56 @@ namespace TxtAIEditor.Core.Services
         });
         return JSON.stringify({ cells: cells, metadata: {}, nbformat: 4, nbformat_minor: 5 }, null, 1);
     };
-    const getNotebookJson = window.getNotebookJson;
+    window.parseTqdmText = function parseTqdmText(text) {
+        if (!text) return { lastTqdm: null, nonTqdmText: '' };
+        const lines = text.split('\n');
+        let lastTqdm = null;
+        const nonTqdmLines = [];
+
+        const tqdmRegex = /^(.*?)\s*(\d{1,3})%\s*\|([^|]*)\|\s*(?:(\d+(?:\/\d+)?)\s*)?(?:\[(.*?)\])?/;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const cr = String.fromCharCode(13);
+            const crParts = line.split(cr);
+            for (let j = 0; j < crParts.length; j++) {
+                const part = crParts[j].trim();
+                if (!part) continue;
+                const match = part.match(tqdmRegex);
+                if (match && (match[2] || match[3])) {
+                    const pct = parseInt(match[2], 10);
+                    const desc = match[1] ? match[1].trim() : '';
+                    const counts = match[4] ? match[4].trim() : '';
+                    const stats = match[5] ? match[5].trim() : '';
+                    lastTqdm = { desc, pct, counts, stats };
+                } else {
+                    nonTqdmLines.push(part);
+                }
+            }
+        }
+        return { lastTqdm, nonTqdmText: nonTqdmLines.join('\n') };
+    };
+
+    window.buildTqdmWidgetHtml = function buildTqdmWidgetHtml(tqdmData) {
+        if (!tqdmData) return '';
+        const pct = Math.min(100, Math.max(0, tqdmData.pct));
+        const isComplete = (pct === 100) || (tqdmData.counts && tqdmData.counts.split('/')[0] === tqdmData.counts.split('/')[1]);
+        const completeCls = isComplete ? ' is-complete' : '';
+        const descHtml = tqdmData.desc ? '<span class=""nb-tqdm-desc"">' + escapeHtmlAttr(tqdmData.desc) + '</span>' : '';
+        const countsHtml = tqdmData.counts ? escapeHtmlAttr(tqdmData.counts) : '';
+        const statsHtml = tqdmData.stats ? '[' + escapeHtmlAttr(tqdmData.stats) + ']' : '';
+        const infoText = [countsHtml, statsHtml].filter(Boolean).join(' ');
+
+        return '<div class=""nb-tqdm-widget' + completeCls + '"">' +
+            '<div class=""nb-tqdm-header"">' +
+            '<div class=""nb-tqdm-title"">' + descHtml + '<span class=""nb-tqdm-pct"">' + pct + '%</span></div>' +
+            '<div class=""nb-tqdm-stats"">' + infoText + '</div>' +
+            '</div>' +
+            '<div class=""nb-tqdm-track"">' +
+            '<div class=""nb-tqdm-fill"" style=""width: ' + pct + '%;""></div>' +
+            '</div>' +
+            '</div>';
+    };
 
     function renderCellOutputsFromResponse(resp) {
         if (!resp) return '';
@@ -149,31 +198,59 @@ namespace TxtAIEditor.Core.Services
                         outObj.data[""text/html""] = part;
                     }
                     html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '>' + part + '</div>';
+                } else if (window.parseTqdmText && (part.includes('%|') || part.includes('% |'))) {
+                    const parsed = window.parseTqdmText(part);
+                    if (parsed.lastTqdm) {
+                        html += '<div class=""output-entry"">' + window.buildTqdmWidgetHtml(parsed.lastTqdm) + '</div>';
+                    }
+                    if (parsed.nonTqdmText) {
+                        const outObj = {
+                            output_type: ""stream"",
+                            name: ""stdout"",
+                            text: parsed.nonTqdmText.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
+                        };
+                        html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""output-stdout"">' + escapeHtmlAttr(parsed.nonTqdmText) + '</span></div>';
+                    }
                 } else {
                     const outObj = {
                         output_type: ""stream"",
                         name: ""stdout"",
                         text: part.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
                     };
-                    html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""output-stdout"">' + escapeHtml(part) + '</span></div>';
+                    html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""output-stdout"">' + escapeHtmlAttr(part) + '</span></div>';
                 }
             }
         }
 
         if (resp.stderr) {
             const isErrStatus = resp.status === 'error';
-            const outObj = isErrStatus ? {
-                output_type: ""error"",
-                ename: ""ExecutionError"",
-                evalue: resp.stderr,
-                traceback: resp.stderr.split('\n')
-            } : {
-                output_type: ""stream"",
-                name: ""stderr"",
-                text: resp.stderr.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
-            };
-            const cls = isErrStatus ? ""output-error"" : ""output-stderr"";
-            html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""' + cls + '""' + '>' + escapeHtml(resp.stderr) + '</span></div>';
+            if (!isErrStatus && window.parseTqdmText && (resp.stderr.includes('%|') || resp.stderr.includes('% |'))) {
+                const parsed = window.parseTqdmText(resp.stderr);
+                if (parsed.lastTqdm) {
+                    html += '<div class=""output-entry"">' + window.buildTqdmWidgetHtml(parsed.lastTqdm) + '</div>';
+                }
+                if (parsed.nonTqdmText) {
+                    const outObj = {
+                        output_type: ""stream"",
+                        name: ""stderr"",
+                        text: parsed.nonTqdmText.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
+                    };
+                    html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""output-stderr"">' + escapeHtmlAttr(parsed.nonTqdmText) + '</span></div>';
+                }
+            } else {
+                const outObj = isErrStatus ? {
+                    output_type: ""error"",
+                    ename: ""ExecutionError"",
+                    evalue: resp.stderr,
+                    traceback: resp.stderr.split('\n')
+                } : {
+                    output_type: ""stream"",
+                    name: ""stderr"",
+                    text: resp.stderr.split('\n').map((l, idx, arr) => idx < arr.length - 1 ? l + '\n' : l)
+                };
+                const cls = isErrStatus ? ""output-error"" : ""output-stderr"";
+                html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '><span class=""' + cls + '""' + '>' + escapeHtmlAttr(resp.stderr) + '</span></div>';
+            }
         }
 
         if (resp.result) {
@@ -184,7 +261,7 @@ namespace TxtAIEditor.Core.Services
                 metadata: {},
                 execution_count: null
             };
-            const resultHtml = isHtmlResult ? resp.result : ('<span class=""output-result"">' + escapeHtml(resp.result) + '</span>');
+            const resultHtml = isHtmlResult ? resp.result : ('<span class=""output-result"">' + escapeHtmlAttr(resp.result) + '</span>');
             html += '<div class=""output-entry"" data-output=""' + escapeHtmlAttr(JSON.stringify(outObj)) + '""' + '>' + resultHtml + '</div>';
         }
 

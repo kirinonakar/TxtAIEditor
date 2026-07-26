@@ -121,11 +121,12 @@ namespace TxtAIEditor.Core.Services
         private static string InlineMd(string text)
         {
             text = NotebookHtmlEncoder.Encode(text);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;span style=&quot;color:\s*([^&;]+);?&quot;&gt;([\s\S]*?)&lt;/span&gt;", @"<span style=""color:$1;"">$2</span>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;span style=&quot;background-color:\s*([^&;]+);?&quot;&gt;([\s\S]*?)&lt;/span&gt;", @"<span style=""background-color:$1;"">$2</span>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;font color=&quot;([^&;]+)&quot;&gt;([\s\S]*?)&lt;/font&gt;", @"<font color=""$1"">$2</font>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;mark&gt;([\s\S]*?)&lt;/mark&gt;", @"<mark>$1</mark>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;u&gt;([\s\S]*?)&lt;/u&gt;", @"<u>$1</u>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;span style=(?:&quot;|&#39;|')([^&]*?)(?:&quot;|&#39;|')\s*&gt;([\s\S]*?)&lt;\/span&gt;", @"<span style=""$1"">$2</span>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;font color=(?:&quot;|&#39;|')([^&]*?)(?:&quot;|&#39;|')\s*&gt;([\s\S]*?)&lt;\/font&gt;", @"<font color=""$1"">$2</font>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;mark&gt;([\s\S]*?)&lt;\/mark&gt;", @"<mark>$1</mark>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;u&gt;([\s\S]*?)&lt;\/u&gt;", @"<u>$1</u>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;b&gt;([\s\S]*?)&lt;\/b&gt;", @"<b>$1</b>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;i&gt;([\s\S]*?)&lt;\/i&gt;", @"<i>$1</i>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             text = System.Text.RegularExpressions.Regex.Replace(text, @"!\[([^\]]*)\]\(([^)]+)\)", @"<img src=""$2"" alt=""$1"" style=""max-width:100%;height:auto;display:inline-block;vertical-align:middle;margin:4px 0;"" />");
             text = System.Text.RegularExpressions.Regex.Replace(text, @"\[([^\]]+)\]\(([^)]+)\)", @"<a href=""$2"" target=""_blank"">$1</a>");
             text = ReplaceSimple(text, "**", "<strong>", "</strong>");

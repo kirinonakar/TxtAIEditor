@@ -975,6 +975,30 @@ namespace TxtAIEditor.Core.Services
         currentText += streamText;
         streamSpan.setAttribute('data-raw-text', currentText);
 
+        if (window.parseTqdmText && (currentText.includes('%|') || currentText.includes('% |'))) {
+            const parsed = window.parseTqdmText(currentText);
+            if (parsed.lastTqdm) {
+                let tqdmContainer = outputDiv.querySelector('.tqdm-entry');
+                if (!tqdmContainer) {
+                    tqdmContainer = document.createElement('div');
+                    tqdmContainer.className = 'output-entry tqdm-entry';
+                    outputDiv.appendChild(tqdmContainer);
+                }
+                tqdmContainer.innerHTML = window.buildTqdmWidgetHtml(parsed.lastTqdm);
+
+                if (parsed.nonTqdmText) {
+                    streamSpan.textContent = parsed.nonTqdmText;
+                    const parent = streamSpan.closest('.output-entry');
+                    if (parent && parent !== tqdmContainer) parent.style.display = '';
+                } else {
+                    streamSpan.textContent = '';
+                    const parent = streamSpan.closest('.output-entry');
+                    if (parent && parent !== tqdmContainer) parent.style.display = 'none';
+                }
+                return;
+            }
+        }
+
         function processCarriageReturns(str) {
             const cr = String.fromCharCode(13);
             const lines = str.split('\n');

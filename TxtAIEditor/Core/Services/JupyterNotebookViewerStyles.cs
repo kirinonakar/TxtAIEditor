@@ -199,13 +199,14 @@ body {
     margin: 4px 0;
 }
 .cell-output {
-    padding: 8px 14px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
+    padding: 2px 14px 6px 14px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
     font-family: 'Consolas', monospace; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
     display: none; min-height: 0; box-sizing: border-box;
 }
 .cell-output.has-output { display: block; }
 .cell-output .output-entry { margin: 0; padding: 0; }
-.cell-output .output-entry + .output-entry { margin-top: 6px; }
+.cell-output .output-entry:first-child { margin-top: 0; }
+.cell-output .output-entry + .output-entry { margin-top: 4px; }
 .cell-output .output-stdout { color: var(--nb-fg); white-space: pre-wrap; }
 .cell-output .output-stderr { color: var(--nb-error); }
 .cell-output .output-error { color: var(--nb-error); }
@@ -231,7 +232,7 @@ blockquote p:last-child {
 }
 .cell-output table.dataframe {
     border-collapse: collapse;
-    margin: 2px 0;
+    margin: 0 0 2px 0;
     font-size: 13px;
     font-family: 'Segoe UI', 'Consolas', monospace;
     width: auto;
@@ -247,7 +248,7 @@ blockquote p:last-child {
     margin-top: 0;
 }
 .cell-output table.dataframe th, .cell-output table.dataframe td {
-    padding: 3px 10px;
+    padding: 2px 8px;
     border: 1px solid var(--nb-border);
     text-align: right;
     vertical-align: middle;
@@ -266,6 +267,83 @@ blockquote p:last-child {
 ul.task-list { list-style-type: none; padding-left: 4px; margin: 4px 0; }
 li.task-list-item { list-style-type: none; display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 li.task-list-item input[type=""checkbox""] { margin-right: 4px; cursor: default; }
+
+/* tqdm progress bar widget - Jupyter Lab style */
+.nb-tqdm-widget {
+    margin: 6px 0;
+    padding: 8px 12px;
+    background: var(--nb-input-bg);
+    border-radius: 6px;
+    border: 1px solid var(--nb-border);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12.5px;
+    color: var(--nb-fg);
+    box-sizing: border-box;
+    max-width: 650px;
+}
+.nb-tqdm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+.nb-tqdm-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+}
+.nb-tqdm-desc {
+    font-weight: 600;
+    color: var(--nb-fg);
+}
+.nb-tqdm-pct {
+    background: rgba(66, 133, 244, 0.15);
+    color: var(--nb-accent);
+    font-weight: 700;
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    letter-spacing: 0.3px;
+}
+.nb-tqdm-widget.is-complete .nb-tqdm-pct {
+    background: rgba(76, 175, 80, 0.18);
+    color: #2e7d32;
+}
+@media (prefers-color-scheme: dark) {
+    .nb-tqdm-widget.is-complete .nb-tqdm-pct {
+        background: rgba(76, 175, 80, 0.25);
+        color: #81c784;
+    }
+}
+.nb-tqdm-stats {
+    color: #666;
+    font-size: 12px;
+    font-family: 'Consolas', monospace;
+}
+@media (prefers-color-scheme: dark) {
+    .nb-tqdm-stats { color: #aaa; }
+}
+.nb-tqdm-track {
+    height: 10px;
+    background: rgba(128, 128, 128, 0.2);
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+}
+.nb-tqdm-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, #4285f4, #669df6);
+    transition: width 0.15s ease-in-out;
+}
+.nb-tqdm-widget.is-complete .nb-tqdm-fill {
+    background: linear-gradient(90deg, #4caf50, #66bb6a);
+    width: 100% !important;
+}
+
 .nb-input-request-box {
     margin: 6px 0;
     padding: 8px 12px;
