@@ -8,7 +8,7 @@ namespace TxtAIEditor.Core.Services
         if (!md) return '';
         const lines = md.replace(/\r\n/g, '\n').split('\n');
         let html = '';
-        let inList = false, inOl = false, inQuote = false, inCodeBlock = false;
+        let inList = false, inTaskList = false, inOl = false, inQuote = false, inCodeBlock = false;
         let codeBuffer = [];
 
         for (let i = 0; i < lines.length; i++) {
@@ -21,6 +21,7 @@ namespace TxtAIEditor.Core.Services
                     inCodeBlock = false;
                 } else {
                     if (inList) { html += '</ul>'; inList = false; }
+                    if (inTaskList) { html += '</ul>'; inTaskList = false; }
                     if (inOl) { html += '</ol>'; inOl = false; }
                     if (inQuote) { html += '</blockquote>'; inQuote = false; }
                     inCodeBlock = true;
@@ -35,59 +36,80 @@ namespace TxtAIEditor.Core.Services
 
             const trimmed = line.trimEnd();
 
+            const taskMatch = trimmed.match(/^[-*+]\s+\[([ xX])\]\s+(.*)/);
+
             if (/^\s{0,3}>\s?/.test(line)) {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (!inQuote) { html += '<blockquote>'; inQuote = true; }
                 const quoteContent = line.replace(/^\s{0,3}>\s?/, '');
                 html += '<p>' + inlineMdJs(quoteContent) + '</p>';
             } else if (/^#\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<h1>' + inlineMdJs(trimmed.slice(2)) + '</h1>';
             } else if (/^##\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<h2>' + inlineMdJs(trimmed.slice(3)) + '</h2>';
             } else if (/^###\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<h3>' + inlineMdJs(trimmed.slice(4)) + '</h3>';
             } else if (/^####\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<h4>' + inlineMdJs(trimmed.slice(5)) + '</h4>';
+            } else if (taskMatch) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
+                if (!inTaskList) { html += '<ul class=""task-list"">'; inTaskList = true; }
+                const isChecked = taskMatch[1].toLowerCase() === 'x';
+                const checkedAttr = isChecked ? ' checked=""checked""' : '';
+                html += '<li class=""task-list-item""><input type=""checkbox"" disabled' + checkedAttr + ' /> ' + inlineMdJs(taskMatch[2]) + '</li>';
             } else if (/^[-*]\s+/.test(trimmed)) {
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 if (!inList) { html += '<ul>'; inList = true; }
                 html += '<li>' + inlineMdJs(trimmed.slice(2)) + '</li>';
             } else if (/^\d+\.\s+/.test(trimmed)) {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 if (!inOl) { html += '<ol>'; inOl = true; }
                 html += '<li>' + inlineMdJs(trimmed.replace(/^\d+\.\s+/, '')) + '</li>';
             } else if (trimmed === '---' || trimmed === '***') {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<hr/>';
             } else if (trimmed.length > 0) {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<p>' + inlineMdJs(trimmed) + '</p>';
             } else {
                 if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
             }
         }
         if (inList) html += '</ul>';
+        if (inTaskList) html += '</ul>';
         if (inOl) html += '</ol>';
         if (inQuote) html += '</blockquote>';
         if (inCodeBlock) html += '<pre><code>' + escapeHtml(codeBuffer.join('\n')) + '</code></pre>';
@@ -128,6 +150,11 @@ namespace TxtAIEditor.Core.Services
 
     function inlineMdJs(str) {
         let s = escapeHtml(str);
+        s = s.replace(/&lt;span style=&quot;color:\s*([^&;\""|]+);?&quot;&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style=""color:$1;"">$2</span>');
+        s = s.replace(/&lt;span style=&quot;background-color:\s*([^&;\""|]+);?&quot;&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style=""background-color:$1;"">$2</span>');
+        s = s.replace(/&lt;font color=&quot;([^&;\""|]+)&quot;&gt;([\s\S]*?)&lt;\/font&gt;/gi, '<font color=""$1"">$2</font>');
+        s = s.replace(/&lt;mark&gt;([\s\S]*?)&lt;\/mark&gt;/gi, '<mark>$1</mark>');
+        s = s.replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<u>$1</u>');
         s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src=""$2"" alt=""$1"" style=""max-width:100%;height:auto;display:inline-block;vertical-align:middle;margin:4px 0;"" />');
         s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href=""$2"" target=""_blank"" rel=""noopener"">$1</a>');
         s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');

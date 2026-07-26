@@ -59,12 +59,12 @@ namespace TxtAIEditor.Core.Services
             return session;
         }
 
-        public async Task<KernelExecutionResult> ExecuteAsync(string tabId, string pythonExecutable, string workingDirectory, string code, Func<string, Task>? onInputRequest = null)
+        public async Task<KernelExecutionResult> ExecuteAsync(string tabId, string pythonExecutable, string workingDirectory, string code, Func<string, Task>? onInputRequest = null, Func<string, string, Task>? onStreamOutput = null)
         {
             try
             {
                 var session = await GetOrCreateSessionAsync(tabId, pythonExecutable, workingDirectory);
-                return await session.ExecuteAsync(code, onInputRequest);
+                return await session.ExecuteAsync(code, onInputRequest, onStreamOutput);
             }
             catch (Exception ex)
             {
@@ -177,6 +177,23 @@ def _custom_input(prompt=''):
         return ''
 
 builtins.input = _custom_input
+
+class _StreamWrapper(io.TextIOBase):
+    def __init__(self, name, buf):
+        self.name = name
+        self.buf = buf
+    def write(self, s):
+        if not s: return 0
+        res = self.buf.write(s)
+        try:
+            sys.__stdout__.write(json.dumps({'type': 'stream', 'name': self.name, 'text': str(s)}, ensure_ascii=False) + '\n')
+            sys.__stdout__.flush()
+        except Exception:
+            pass
+        return res
+    def flush(self):
+        try: self.buf.flush()
+        except Exception: pass
 
 _ns = {'__name__': '__main__'}
 _inline_backend_config = {'figure_format': 'retina', 'dpi': 200}
@@ -588,6 +605,8 @@ while True:
         raw_code = msg.get('code', '')
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()
+        stream_out = _StreamWrapper('stdout', stdout_buf)
+        stream_err = _StreamWrapper('stderr', stderr_buf)
         result_obj = None
         extra_html = []
 
@@ -626,7 +645,7 @@ while True:
         except Exception:
             pass
 
-        with contextlib.redirect_stdout(stdout_buf), contextlib.redirect_stderr(stderr_buf):
+        with contextlib.redirect_stdout(stream_out), contextlib.redirect_stderr(stream_err):
             try:
                 tree = ast.parse(code, mode='exec')
                 if tree.body:
@@ -727,7 +746,7 @@ while True:
                 }
             }
 
-            public async Task<KernelExecutionResult> ExecuteAsync(string code, Func<string, Task>? onInputRequest = null)
+            public async Task<KernelExecutionResult> ExecuteAsync(string code, Func<string, Task>? onInputRequest = null, Func<string, string, Task>? onStreamOutput = null)
             {
                 if (_process == null || _process.HasExited)
                 {
@@ -770,14 +789,28 @@ while True:
                         var root = doc.RootElement;
                         if (root.ValueKind == JsonValueKind.Object)
                         {
-                            if (root.TryGetProperty("type", out var tProp) && string.Equals(tProp.GetString(), "input_request", StringComparison.Ordinal))
+                            if (root.TryGetProperty("type", out var tProp))
                             {
-                                string prompt = root.TryGetProperty("prompt", out var pProp) ? pProp.GetString() ?? "" : "";
-                                if (onInputRequest != null)
+                                string typeStr = tProp.GetString() ?? "";
+                                if (string.Equals(typeStr, "input_request", StringComparison.Ordinal))
                                 {
-                                    await onInputRequest(prompt);
+                                    string prompt = root.TryGetProperty("prompt", out var pProp) ? pProp.GetString() ?? "" : "";
+                                    if (onInputRequest != null)
+                                    {
+                                        await onInputRequest(prompt);
+                                    }
+                                    continue;
                                 }
-                                continue;
+                                if (string.Equals(typeStr, "stream", StringComparison.Ordinal))
+                                {
+                                    string sName = root.TryGetProperty("name", out var nProp) ? nProp.GetString() ?? "stdout" : "stdout";
+                                    string sText = root.TryGetProperty("text", out var txtProp) ? txtProp.GetString() ?? "" : "";
+                                    if (onStreamOutput != null)
+                                    {
+                                        await onStreamOutput(sName, sText);
+                                    }
+                                    continue;
+                                }
                             }
 
                             if (root.TryGetProperty("status", out var s))

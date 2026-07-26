@@ -925,8 +925,12 @@ namespace TxtAIEditor.Core.Services
                     container.appendChild(next);
                     reindexCells();
                 }
-                const focusTarget = next.querySelector('.cell-input-area, .markdown-editor');
-                if (focusTarget) focusTarget.focus();
+                if (getCellType(next) === 'markdown') {
+                    editMarkdownCell(next);
+                } else {
+                    const focusTarget = next.querySelector('.cell-input-area, .markdown-editor');
+                    if (focusTarget) focusTarget.focus();
+                }
             } else if (type === 'code') {
                 runCell(cellDiv).then(() => {
                     let next = cellDiv.nextElementSibling;
@@ -935,11 +939,54 @@ namespace TxtAIEditor.Core.Services
                         container.appendChild(next);
                         reindexCells();
                     }
-                    const focusTarget = next.querySelector('.cell-input-area, .markdown-editor');
-                    if (focusTarget) focusTarget.focus();
+                    if (getCellType(next) === 'markdown') {
+                        editMarkdownCell(next);
+                    } else {
+                        const focusTarget = next.querySelector('.cell-input-area, .markdown-editor');
+                        if (focusTarget) focusTarget.focus();
+                    }
                 });
             }
         }
+
+    // Real-time stream output handler for tqdm / stdout / stderr
+    window.__notebookReceiveStreamOutput = function(cellIndex, streamName, streamText) {
+        const cellDiv = container.querySelector('.cell[data-cell-index=""' + cellIndex + '""]');
+        if (!cellDiv) return;
+        const outputDiv = cellDiv.querySelector('.cell-output');
+        if (!outputDiv) return;
+
+        outputDiv.classList.add('has-output');
+        if ((outputDiv.textContent || '').trim() === 'Running...') {
+            outputDiv.innerHTML = '';
+        }
+
+        let streamSpan = outputDiv.querySelector('.stream-output-' + streamName);
+        if (!streamSpan) {
+            const entry = document.createElement('div');
+            entry.className = 'output-entry';
+            const cls = streamName === 'stderr' ? 'output-stderr' : 'output-stdout';
+            entry.innerHTML = '<span class=""' + cls + ' stream-output-' + streamName + '""></span>';
+            outputDiv.appendChild(entry);
+            streamSpan = entry.querySelector('.stream-output-' + streamName);
+        }
+
+        let currentText = streamSpan.getAttribute('data-raw-text') || '';
+        currentText += streamText;
+        streamSpan.setAttribute('data-raw-text', currentText);
+
+        function processCarriageReturns(str) {
+            const cr = String.fromCharCode(13);
+            const lines = str.split('\n');
+            const processed = lines.map(line => {
+                const parts = line.split(cr);
+                return parts[parts.length - 1];
+            });
+            return processed.join('\n');
+        }
+
+        streamSpan.textContent = processCarriageReturns(currentText);
+    };
 
         if (e.ctrlKey && e.key === 's') {
             e.preventDefault();

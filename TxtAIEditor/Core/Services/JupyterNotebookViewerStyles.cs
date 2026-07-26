@@ -231,7 +231,7 @@ blockquote p:last-child {
 }
 .cell-output table.dataframe {
     border-collapse: collapse;
-    margin: 4px 0;
+    margin: 2px 0;
     font-size: 13px;
     font-family: 'Segoe UI', 'Consolas', monospace;
     width: auto;
@@ -243,8 +243,11 @@ blockquote p:last-child {
     border-radius: 4px;
     box-sizing: border-box;
 }
+.cell-output .output-entry:first-child table.dataframe {
+    margin-top: 0;
+}
 .cell-output table.dataframe th, .cell-output table.dataframe td {
-    padding: 5px 12px;
+    padding: 3px 10px;
     border: 1px solid var(--nb-border);
     text-align: right;
     vertical-align: middle;
@@ -260,6 +263,9 @@ blockquote p:last-child {
 .cell-output table.dataframe tbody tr:nth-child(even) {
     background: rgba(128,128,128,0.05);
 }
+ul.task-list { list-style-type: none; padding-left: 4px; margin: 4px 0; }
+li.task-list-item { list-style-type: none; display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+li.task-list-item input[type=""checkbox""] { margin-right: 4px; cursor: default; }
 .nb-input-request-box {
     margin: 6px 0;
     padding: 8px 12px;

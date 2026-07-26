@@ -3566,5 +3566,6 @@ Plan: {0}</value>
   <data name="JupyterVariablesValue" xml:space="preserve"><value>Value</value></data>
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>No active variables.</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>Filter variables...</value></data>
+  <data name="JupyterClearOutputsButton" xml:space="preserve"><value>Clear Outputs</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>All Files</value></data>
 </root>

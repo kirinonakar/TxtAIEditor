@@ -3530,5 +3530,6 @@
   <data name="JupyterVariablesValue" xml:space="preserve"><value>值</value></data>
   <data name="JupyterVariablesEmpty" xml:space="preserve"><value>没有活动变量。</value></data>
   <data name="JupyterVariablesFilterPlaceholder" xml:space="preserve"><value>过滤变量...</value></data>
+  <data name="JupyterClearOutputsButton" xml:space="preserve"><value>清除输出</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>所有文件</value></data>
 </root>

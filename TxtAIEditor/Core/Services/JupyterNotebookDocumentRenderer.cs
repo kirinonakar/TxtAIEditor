@@ -44,6 +44,7 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<button id=\"btn-add-code\" class=\"nb-btn nb-btn-add\">+ Code</button>");
             sb.AppendLine("<button id=\"btn-add-markdown\" class=\"nb-btn nb-btn-add\">+ Markdown</button>");
             sb.AppendLine("<button id=\"btn-run-all\" class=\"nb-btn nb-btn-run\">Run All</button>");
+            sb.AppendLine($"<button id=\"btn-clear-outputs\" class=\"nb-btn nb-btn-clear\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterClearOutputsButton", "Clear Outputs"))}\">🧹 {NotebookHtmlEncoder.Encode(_getString("JupyterClearOutputsButton", "Clear Outputs"))}</button>");
             sb.AppendLine("<button id=\"btn-export-py\" class=\"nb-btn nb-btn-export\" title=\"Save as Python Script (.py)\">🐍 Save as .py</button>");
             sb.AppendLine($"<button id=\"btn-variables\" class=\"nb-btn nb-btn-vars\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}\">🔍 {NotebookHtmlEncoder.Encode(_getString("JupyterVariablesButton", "Variables"))}</button>");
             sb.AppendLine("</div>");

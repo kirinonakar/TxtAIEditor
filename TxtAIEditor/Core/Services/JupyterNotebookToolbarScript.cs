@@ -57,6 +57,17 @@ namespace TxtAIEditor.Core.Services
         });
     }
 
+    const btnClearOutputs = document.getElementById('btn-clear-outputs');
+    if (btnClearOutputs) {
+        btnClearOutputs.addEventListener('click', () => {
+            container.querySelectorAll('.cell-output').forEach(outputDiv => {
+                outputDiv.innerHTML = '';
+                outputDiv.classList.remove('has-output');
+            });
+            notifyModified();
+        });
+    }
+
     function exportToPythonScript() {
         const cells = Array.from(container.querySelectorAll('.cell'));
         let pyScript = '# -*- coding: utf-8 -*-\n\n';

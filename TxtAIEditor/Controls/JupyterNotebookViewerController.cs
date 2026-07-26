@@ -377,6 +377,14 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                         try { await webView.ExecuteScriptAsync(script); } catch { }
                     });
                     await Task.CompletedTask;
+                }, async (streamName, streamText) =>
+                {
+                    string script = $"window.__notebookReceiveStreamOutput && window.__notebookReceiveStreamOutput({cellIndex}, {JsonSerializer.Serialize(streamName)}, {JsonSerializer.Serialize(streamText)});";
+                    webView.DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        try { await webView.ExecuteScriptAsync(script); } catch { }
+                    });
+                    await Task.CompletedTask;
                 });
 
                 await SendResultAsync(webView, cellIndex, result.Status, result.Stdout, result.Stderr, result.Result, result.VariablesJson);
