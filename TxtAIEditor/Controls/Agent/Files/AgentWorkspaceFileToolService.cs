@@ -150,7 +150,12 @@ namespace TxtAIEditor.Controls
                 int lineNumber = start + i;
                 builder.Append(lineNumber.ToString().PadLeft(5));
                 builder.Append(" | ");
-                builder.AppendLine(readLines[i]);
+                string line = readLines[i];
+                if (line.Length > 1000)
+                {
+                    line = line.Substring(0, 1000) + "...";
+                }
+                builder.AppendLine(line);
             }
 
             if (lastRead < currentLine)

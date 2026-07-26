@@ -111,7 +111,7 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "read_file",
-                    Description = "Read a specific line range from a file.",
+                    Description = "Read a specific line range from a file (lines longer than 1000 characters are truncated).",
                     Parameters = new
                     {
                         type = "object",
