@@ -3555,9 +3555,12 @@ Plan: {0}</value>
   <data name="CreateNotebookInvalidName" xml:space="preserve"><value>The notebook name contains invalid characters.</value></data>
   <data name="TabMenuNotebookViewSource" xml:space="preserve"><value>View Source</value></data>
   <data name="ExplorerDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="ExplorerUpload" xml:space="preserve"><value>Upload</value></data>
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>Downloading...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>Download completed.</value></data>
   <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>Download failed</value></data>
+  <data name="RemoteUploadingStatus" xml:space="preserve"><value>Uploading...</value></data>
+  <data name="RemoteUploadFailedTitle" xml:space="preserve"><value>Upload failed</value></data>
   <data name="JupyterVariablesButton" xml:space="preserve"><value>Variables</value></data>
   <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>Variable Explorer</value></data>
   <data name="JupyterVariablesName" xml:space="preserve"><value>Name</value></data>

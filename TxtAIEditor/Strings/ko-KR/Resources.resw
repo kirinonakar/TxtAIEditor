@@ -3555,9 +3555,12 @@
   <data name="CreateNotebookInvalidName" xml:space="preserve"><value>노트북 이름에 사용할 수 없는 문자가 포함되어 있습니다.</value></data>
   <data name="TabMenuNotebookViewSource" xml:space="preserve"><value>소스 보기</value></data>
   <data name="ExplorerDownload" xml:space="preserve"><value>다운로드</value></data>
+  <data name="ExplorerUpload" xml:space="preserve"><value>업로드</value></data>
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>다운로드 중...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>다운로드가 완료되었습니다.</value></data>
   <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>다운로드 실패</value></data>
+  <data name="RemoteUploadingStatus" xml:space="preserve"><value>업로드 중...</value></data>
+  <data name="RemoteUploadFailedTitle" xml:space="preserve"><value>업로드 실패</value></data>
   <data name="JupyterVariablesButton" xml:space="preserve"><value>변수</value></data>
   <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>변수 탐색기</value></data>
   <data name="JupyterVariablesName" xml:space="preserve"><value>변수명</value></data>

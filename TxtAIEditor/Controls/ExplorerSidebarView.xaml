@@ -146,6 +146,11 @@
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
+                                                        <MenuFlyoutItem x:Name="ExplorerUploadRemoteMenuItem" Visibility="Collapsed" Text="업로드" Click="OnUploadRemoteItemClick" Tag="{Binding}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE898;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
                                                         <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem x:Name="ExplorerCopyFileNameMenuItem" Text="파일이름 복사" Icon="Copy" Click="OnCopyFileNameClick" Tag="{Binding}"/>
                                                         <MenuFlyoutItem x:Name="ExplorerCopyFilePathMenuItem" Text="경로 복사" Icon="Link" Click="OnCopyFilePathClick" Tag="{Binding}"/>
@@ -220,6 +225,11 @@
                                                         <MenuFlyoutItem x:Name="ExplorerTreeDownloadRemoteMenuItem" Visibility="Collapsed" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding Content}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutItem x:Name="ExplorerTreeUploadRemoteMenuItem" Visibility="Collapsed" Text="업로드" Click="OnUploadRemoteItemClick" Tag="{Binding Content}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE898;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
                                                         <MenuFlyoutSeparator/>

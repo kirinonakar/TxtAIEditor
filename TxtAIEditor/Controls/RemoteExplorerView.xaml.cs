@@ -456,6 +456,64 @@ namespace TxtAIEditor.Controls
                 });
         }
 
+        private void OnRemoteEntryContextFlyoutOpening(object sender, object e)
+        {
+            if (sender is not MenuFlyout flyout || flyout.Items.Count < 2)
+            {
+                return;
+            }
+
+            if (flyout.Items[0] is MenuFlyoutItem downloadItem)
+            {
+                downloadItem.Text = Get("ExplorerDownload", "다운로드");
+            }
+
+            if (flyout.Items[1] is MenuFlyoutItem uploadItem)
+            {
+                uploadItem.Text = Get("ExplorerUpload", "업로드");
+            }
+        }
+
+        private async void OnRemoteEntryUploadClick(object sender, RoutedEventArgs e)
+        {
+            if (_connection == null ||
+                sender is not FrameworkElement element ||
+                element.Tag is not RemoteDirectoryEntry entry)
+            {
+                return;
+            }
+
+            IntPtr hwnd = App.MainWindow != null ? WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow) : IntPtr.Zero;
+            Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(windowId)
+            {
+                SuggestedStartLocation = Microsoft.Windows.Storage.Pickers.PickerLocationId.ComputerFolder
+            };
+            picker.FileTypeFilter.Add("*");
+
+            var pickResult = await picker.PickSingleFileAsync();
+            if (pickResult == null || string.IsNullOrWhiteSpace(pickResult.Path))
+            {
+                return;
+            }
+
+            string fileName = System.IO.Path.GetFileName(pickResult.Path);
+            string targetDirectory = entry.IsDirectory
+                ? entry.FullPath
+                : RemoteExplorerService.GetParentPath(entry.FullPath);
+            string targetRemotePath = $"{targetDirectory.TrimEnd('/')}/{fileName}";
+            string uploadStatusPrefix = Get("RemoteUploadingStatus", "업로드 중...");
+
+            await RunBusyAsync(
+                $"{uploadStatusPrefix} ({fileName})",
+                cancellationToken => _explorerService.UploadFileAsync(
+                    _connection,
+                    pickResult.Path,
+                    targetRemotePath,
+                    cancellationToken));
+            await LoadCurrentDirectoryAsync();
+        }
+
         private async void OnRemoteUpClick(object sender, RoutedEventArgs e)
         {
             if (_connection == null)

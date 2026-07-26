@@ -126,6 +126,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.CompressFolderToZipClick += OnCompressFolderToZipClick;
             _leftSidebar.CompressFolderToSevenZipClick += OnCompressFolderToSevenZipClick;
             _leftSidebar.DownloadRemoteItemClick += OnDownloadRemoteItemClick;
+            _leftSidebar.UploadRemoteItemClick += OnUploadRemoteItemClick;
             _leftSidebar.CopyFileNameClick += OnCopyFileNameClick;
             _leftSidebar.CopyFilePathClick += OnCopyFilePathClick;
             _leftSidebar.CopyFolderPathClick += OnCopyFolderPathClick;
@@ -150,7 +151,7 @@ namespace TxtAIEditor.Controls
                     _leftSidebar.FileList.SelectedItem = listItem;
                 }
 
-                if (element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 16)
+                if (element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 17)
                 {
                     LocalizeContextFlyout(flyout);
                     ConfigureContextFlyout(
@@ -514,11 +515,12 @@ namespace TxtAIEditor.Controls
             ((MenuFlyoutItem)flyout.Items[6]).Text = _getString("ExplorerCompressFolderToZip", "ZIP으로 압축하기");
             ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerCompressFolderToSevenZip", "7z로 압축하기");
             ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerDownload", "다운로드");
-            ((MenuFlyoutItem)flyout.Items[10]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
-            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
-            ((MenuFlyoutItem)flyout.Items[12]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
-            ((MenuFlyoutItem)flyout.Items[14]).Text = _getString("ExplorerRename", "이름 바꾸기");
-            ((MenuFlyoutItem)flyout.Items[15]).Text = _getString("ExplorerDelete", "삭제");
+            ((MenuFlyoutItem)flyout.Items[9]).Text = _getString("ExplorerUpload", "업로드");
+            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
+            ((MenuFlyoutItem)flyout.Items[12]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
+            ((MenuFlyoutItem)flyout.Items[13]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
+            ((MenuFlyoutItem)flyout.Items[15]).Text = _getString("ExplorerRename", "이름 바꾸기");
+            ((MenuFlyoutItem)flyout.Items[16]).Text = _getString("ExplorerDelete", "삭제");
         }
 
         private void ConfigureContextFlyout(MenuFlyout flyout, ExplorerItem? item)
@@ -586,17 +588,22 @@ namespace TxtAIEditor.Controls
                 downloadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 12 && flyout.Items[12] is MenuFlyoutItem copyFolderPathItem)
+            if (flyout.Items.Count > 9 && flyout.Items[9] is MenuFlyoutItem uploadRemoteItem)
+            {
+                uploadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (flyout.Items.Count > 13 && flyout.Items[13] is MenuFlyoutItem copyFolderPathItem)
             {
                 copyFolderPathItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
 
-            if (flyout.Items.Count > 14 && flyout.Items[14] is MenuFlyoutItem renameItem)
+            if (flyout.Items.Count > 15 && flyout.Items[15] is MenuFlyoutItem renameItem)
             {
                 renameItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
 
-            if (flyout.Items.Count > 15 && flyout.Items[15] is MenuFlyoutItem deleteItem)
+            if (flyout.Items.Count > 16 && flyout.Items[16] is MenuFlyoutItem deleteItem)
             {
                 deleteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
             }
@@ -994,6 +1001,66 @@ namespace TxtAIEditor.Controls
             finally
             {
                 isCompleted = true;
+                _statusBar.HideProgress();
+            }
+        }
+
+        private async void OnUploadRemoteItemClick(object sender, RoutedEventArgs e)
+        {
+            ExplorerItem? item = GetExplorerItem(sender);
+            if (item == null || !item.IsRemote)
+            {
+                return;
+            }
+
+            var picker = new Windows.Storage.Pickers.FileOpenPicker
+            {
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder
+            };
+            picker.FileTypeFilter.Add("*");
+            _initializePickerWindow(picker);
+
+            Windows.Storage.StorageFile? file = await picker.PickSingleFileAsync();
+            if (file == null || string.IsNullOrWhiteSpace(file.Path))
+            {
+                return;
+            }
+
+            string targetDirectory = item.IsFolder
+                ? item.Path
+                : RemotePath.GetParent(item.Path);
+            if (string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                return;
+            }
+
+            string targetVirtualPath = RemotePath.Combine(targetDirectory, file.Name);
+            using System.Threading.CancellationTokenSource cts = new();
+            string uploadStatusPrefix = _getString("RemoteUploadingStatus", "업로드 중...");
+
+            try
+            {
+                _statusBar.ShowProgress(
+                    $"{uploadStatusPrefix} ({file.Name})",
+                    0,
+                    () => cts.Cancel());
+                await _remoteWorkspaceService.UploadLocalFileAsync(
+                    file.Path,
+                    targetVirtualPath,
+                    cts.Token);
+                await _refreshRemoteExplorerAsync();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("RemoteUploadFailedTitle", "업로드 실패"),
+                    ex.Message);
+            }
+            finally
+            {
                 _statusBar.HideProgress();
             }
         }

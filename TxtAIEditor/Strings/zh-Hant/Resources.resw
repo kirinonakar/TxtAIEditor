@@ -3519,9 +3519,12 @@
   <data name="CreateNotebookInvalidName" xml:space="preserve"><value>Notebook 名稱包含無效字元。</value></data>
   <data name="TabMenuNotebookViewSource" xml:space="preserve"><value>檢視原始碼</value></data>
   <data name="ExplorerDownload" xml:space="preserve"><value>下載</value></data>
+  <data name="ExplorerUpload" xml:space="preserve"><value>上傳</value></data>
   <data name="RemoteDownloadingStatus" xml:space="preserve"><value>下載中...</value></data>
   <data name="RemoteDownloadCompleted" xml:space="preserve"><value>下載完成。</value></data>
   <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>下載失敗</value></data>
+  <data name="RemoteUploadingStatus" xml:space="preserve"><value>上傳中...</value></data>
+  <data name="RemoteUploadFailedTitle" xml:space="preserve"><value>上傳失敗</value></data>
   <data name="JupyterVariablesButton" xml:space="preserve"><value>變數</value></data>
   <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>變數資源管理器</value></data>
   <data name="JupyterVariablesName" xml:space="preserve"><value>名稱</value></data>

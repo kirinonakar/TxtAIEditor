@@ -42,6 +42,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? CompressFolderToZipClick { add => ExplorerView.CompressFolderToZipClick += value; remove => ExplorerView.CompressFolderToZipClick -= value; }
         public event RoutedEventHandler? CompressFolderToSevenZipClick { add => ExplorerView.CompressFolderToSevenZipClick += value; remove => ExplorerView.CompressFolderToSevenZipClick -= value; }
         public event RoutedEventHandler? DownloadRemoteItemClick { add => ExplorerView.DownloadRemoteItemClick += value; remove => ExplorerView.DownloadRemoteItemClick -= value; }
+        public event RoutedEventHandler? UploadRemoteItemClick { add => ExplorerView.UploadRemoteItemClick += value; remove => ExplorerView.UploadRemoteItemClick -= value; }
 
         public Func<string>? HomeFolderPathProvider
         {
