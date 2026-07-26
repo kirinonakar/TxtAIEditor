@@ -220,6 +220,8 @@ body {
     font-size: 13px;
     line-height: 26px;
     user-select: none;
+    touch-action: none;
+    -webkit-user-drag: none;
 }
 .cell:hover .cell-drag-handle,
 .cell.is-selected .cell-drag-handle {
@@ -231,6 +233,11 @@ body {
     color: #fff;
 }
 .cell-drag-handle:active { cursor: grabbing; }
+body.is-cell-reordering,
+body.is-cell-reordering * {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
 .cell > .cell-input,
 .cell > .cell-output {
     padding-left: 24px;

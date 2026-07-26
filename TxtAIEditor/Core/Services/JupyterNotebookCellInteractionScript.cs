@@ -523,6 +523,11 @@ namespace TxtAIEditor.Core.Services
 
     let selectedCell = null;
     let draggedCell = null;
+    let dragPointerId = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragDropPosition = null;
+    let dragHasMoved = false;
     let commandMode = false;
     let pendingDeleteAt = 0;
 
@@ -543,10 +548,11 @@ namespace TxtAIEditor.Core.Services
     function prepareCell(cellDiv) {
         if (!cellDiv || cellDiv.dataset.notebookPrepared === 'true') return;
         cellDiv.dataset.notebookPrepared = 'true';
-        const handle = document.createElement('button');
-        handle.type = 'button';
+        const handle = document.createElement('div');
         handle.className = 'cell-drag-handle';
-        handle.draggable = true;
+        handle.draggable = false;
+        handle.tabIndex = 0;
+        handle.setAttribute('role', 'button');
         handle.textContent = '⠿';
         handle.title = notebookString('dragCell', 'Drag to reorder cell');
         handle.setAttribute('aria-label', handle.title);
@@ -573,6 +579,28 @@ namespace TxtAIEditor.Core.Services
         return { cell: cells[cells.length - 1], before: false };
     }
 
+    function finishCellPointerDrag(commitMove) {
+        const movingCell = draggedCell;
+        if (commitMove && dragHasMoved && movingCell && dragDropPosition) {
+            if (dragDropPosition.before) {
+                container.insertBefore(movingCell, dragDropPosition.cell);
+            } else {
+                container.insertBefore(movingCell, dragDropPosition.cell.nextElementSibling);
+            }
+            reindexCells();
+            selectCell(movingCell, true);
+            notifyModified();
+        }
+
+        if (movingCell) movingCell.classList.remove('is-dragging');
+        document.body.classList.remove('is-cell-reordering');
+        clearDragIndicators();
+        draggedCell = null;
+        dragPointerId = null;
+        dragDropPosition = null;
+        dragHasMoved = false;
+    }
+
     container.querySelectorAll('.cell').forEach(prepareCell);
     const initialCell = container.querySelector('.cell');
     if (initialCell) selectCell(initialCell, true);
@@ -585,56 +613,61 @@ namespace TxtAIEditor.Core.Services
     container.addEventListener('pointerdown', e => {
         const cellDiv = e.target.closest('.cell');
         if (!cellDiv) return;
+        const handle = e.target.closest('.cell-drag-handle');
+        if (handle && !composingCellEditor) {
+            e.preventDefault();
+            e.stopPropagation();
+            draggedCell = cellDiv;
+            dragPointerId = e.pointerId;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            dragDropPosition = null;
+            dragHasMoved = false;
+            selectCell(cellDiv, true);
+            try {
+                handle.setPointerCapture(e.pointerId);
+            } catch {}
+            return;
+        }
         const editingTarget = e.target.closest('[contenteditable=""true""], input, textarea, select');
         selectCell(cellDiv, !editingTarget);
     });
 
-    container.addEventListener('dragstart', e => {
-        const handle = e.target.closest('.cell-drag-handle');
-        if (!handle) {
-            e.preventDefault();
-            return;
-        }
-        draggedCell = handle.closest('.cell');
-        if (!draggedCell) return;
-        selectCell(draggedCell, true);
-        draggedCell.classList.add('is-dragging');
-        if (e.dataTransfer) {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', draggedCell.getAttribute('data-cell-index') || '');
-        }
-    });
+    container.addEventListener('pointermove', e => {
+        if (!draggedCell || e.pointerId !== dragPointerId) return;
+        const distance = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+        if (!dragHasMoved && distance < 4) return;
 
-    container.addEventListener('dragover', e => {
-        if (!draggedCell) return;
         e.preventDefault();
-        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-        clearDragIndicators();
-        const position = getCellDropPosition(e.clientY);
-        if (!position) return;
-        position.cell.classList.add(position.before ? 'drag-before' : 'drag-after');
-    });
-
-    container.addEventListener('drop', e => {
-        if (!draggedCell) return;
-        e.preventDefault();
-        const position = getCellDropPosition(e.clientY);
-        if (!position) return;
-        if (position.before) {
-            container.insertBefore(draggedCell, position.cell);
-        } else {
-            container.insertBefore(draggedCell, position.cell.nextElementSibling);
+        if (!dragHasMoved) {
+            dragHasMoved = true;
+            draggedCell.classList.add('is-dragging');
+            document.body.classList.add('is-cell-reordering');
         }
+
         clearDragIndicators();
-        reindexCells();
-        selectCell(draggedCell, true);
-        notifyModified();
+        dragDropPosition = getCellDropPosition(e.clientY);
+        if (dragDropPosition) {
+            dragDropPosition.cell.classList.add(dragDropPosition.before ? 'drag-before' : 'drag-after');
+        }
+
+        const edgeSize = 48;
+        if (e.clientY < edgeSize) {
+            window.scrollBy(0, -Math.min(18, edgeSize - e.clientY));
+        } else if (e.clientY > window.innerHeight - edgeSize) {
+            window.scrollBy(0, Math.min(18, e.clientY - (window.innerHeight - edgeSize)));
+        }
     });
 
-    container.addEventListener('dragend', () => {
-        if (draggedCell) draggedCell.classList.remove('is-dragging');
-        draggedCell = null;
-        clearDragIndicators();
+    container.addEventListener('pointerup', e => {
+        if (!draggedCell || e.pointerId !== dragPointerId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        finishCellPointerDrag(true);
+    });
+
+    container.addEventListener('pointercancel', e => {
+        if (e.pointerId === dragPointerId) finishCellPointerDrag(false);
     });
 
     // Double click to edit markdown preview
