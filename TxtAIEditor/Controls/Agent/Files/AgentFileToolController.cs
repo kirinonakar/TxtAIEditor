@@ -557,34 +557,11 @@ namespace TxtAIEditor.Controls
 
             string insertAfter = GetFirstStringArgument(arguments, "insert_after", "insertAfter");
             string insertBefore = GetFirstStringArgument(arguments, "insert_before", "insertBefore");
+            string rawBefore = GetFirstStringArgument(arguments, "before", "beforeLines", "before_lines", "previous");
+            string rawAfter = GetFirstStringArgument(arguments, "after", "afterLines", "after_lines", "next");
 
-            string before = string.Empty;
-            string after = string.Empty;
-
-            if (!string.IsNullOrEmpty(insertAfter) || !string.IsNullOrEmpty(insertBefore))
-            {
-                before = insertAfter;
-                after = insertBefore;
-            }
-            else
-            {
-                string rawBefore = GetFirstStringArgument(arguments, "before", "beforeLines", "before_lines", "previous");
-                string rawAfter = GetFirstStringArgument(arguments, "after", "afterLines", "after_lines", "next");
-
-                if (!string.IsNullOrEmpty(rawBefore) && !string.IsNullOrEmpty(rawAfter))
-                {
-                    before = rawBefore;
-                    after = rawAfter;
-                }
-                else if (!string.IsNullOrEmpty(rawAfter))
-                {
-                    before = rawAfter;
-                }
-                else if (!string.IsNullOrEmpty(rawBefore))
-                {
-                    after = rawBefore;
-                }
-            }
+            string before = !string.IsNullOrEmpty(insertAfter) ? insertAfter : rawBefore;
+            string after = !string.IsNullOrEmpty(insertBefore) ? insertBefore : rawAfter;
 
             return await _fileTools.InsertIntoFileAsync(path, content, before, after);
         }

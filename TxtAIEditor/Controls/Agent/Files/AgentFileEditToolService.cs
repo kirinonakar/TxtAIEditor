@@ -873,9 +873,9 @@ namespace TxtAIEditor.Controls
             string normalizedBefore = NormalizeNewlines(before ?? string.Empty);
             string normalizedAfter = NormalizeNewlines(after ?? string.Empty);
 
-            if (string.IsNullOrEmpty(normalizedBefore) && string.IsNullOrEmpty(normalizedAfter))
+            if (string.IsNullOrEmpty(normalizedBefore) || string.IsNullOrEmpty(normalizedAfter))
             {
-                return "insert_to_file failed: at least one of before or after context must be provided.";
+                return "insert_to_file failed: both before and after context must be provided.";
             }
 
             int insertIndex = FindInsertionPoint(fileContent, normalizedBefore, normalizedAfter);

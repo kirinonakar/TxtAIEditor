@@ -64,6 +64,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- If an explicitly requested command must write text, specify -Encoding utf8. For Set-Content, read existing text with Get-Content -Raw and write with Set-Content -NoNewline; the host adds missing safety switches.");
             builder.AppendLine();
             builder.AppendLine("Paths and edits:");
+            builder.AppendLine("- When modifying files, consider the apply_patch tool first, and use other tools as needed.");
             builder.AppendLine("- Preserve user-provided file names exactly, including non-English names: 자산.csv stays 자산.csv, 분석2.md stays 분석2.md.");
             builder.AppendLine("- If [User-referenced file names] is present, prefer listed workspace matches for reads and the exact mentioned name for requested outputs.");
             builder.AppendLine("- Preserve each existing file's encoding, LF/CRLF style, and final-newline state. Edit user or project files with the dedicated file tools, which preserve these properties and record changes in the edit ledger; do not use Set-Content for project-file edits.");

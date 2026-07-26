@@ -296,7 +296,7 @@ namespace TxtAIEditor.Controls
                             insert_after = new { type = "string", description = "Unique context lines to insert after" },
                             insert_before = new { type = "string", description = "Unique context lines to insert before" }
                         },
-                        required = new[] { "path", "content" }
+                        required = new[] { "path", "content", "insert_after", "insert_before" }
                     }
                 },
                 new LlmTool
