@@ -145,19 +145,19 @@ body {
 .cell-markdown { background: var(--nb-bg); padding: 0; }
 .cell-raw { background: var(--nb-input-bg); padding: 0; }
 .cell-input-area {
-    padding: 12px 14px; min-height: 42px; font-family: 'Consolas', 'Cascadia Code', 'Courier New', monospace;
+    padding: 8px 12px; min-height: 38px; font-family: 'Consolas', 'Cascadia Code', 'Courier New', monospace;
     font-size: 14px; white-space: pre-wrap; word-break: break-word; outline: none;
-    line-height: 1.6; cursor: text; box-sizing: border-box;
+    line-height: 1.5; cursor: text; box-sizing: border-box;
 }
 .cell-input-area:focus { background: var(--nb-bg); box-shadow: inset 0 0 0 2px var(--nb-accent); }
 .cell-input-area pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: inherit; font-size: inherit; line-height: inherit; }
-.cell pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.6; }
+.cell pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; }
 .cell-toolbar {
-    display: flex; gap: 4px; padding: 6px 10px; background: var(--nb-input-bg);
+    display: flex; gap: 4px; padding: 4px 10px; background: var(--nb-input-bg);
     border-top: 1px solid var(--nb-border);
 }
 .cell-btn {
-    padding: 4px 10px; border: none; border-radius: 4px; background: transparent;
+    padding: 3px 8px; border: none; border-radius: 4px; background: transparent;
     color: var(--nb-fg); cursor: pointer; font-size: 12px; opacity: 0.7;
 }
 .cell-btn:hover { opacity: 1; background: var(--nb-accent); color: #fff; }
@@ -199,7 +199,7 @@ body {
     margin: 4px 0;
 }
 .cell-output {
-    padding: 2px 14px 6px 14px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
+    padding: 0px 12px 4px 12px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
     font-family: 'Consolas', monospace; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
     display: none; min-height: 0; box-sizing: border-box;
 }

@@ -121,8 +121,8 @@ namespace TxtAIEditor.Core.Services
         private static string InlineMd(string text)
         {
             text = NotebookHtmlEncoder.Encode(text);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;span style=(?:&quot;|&#39;|')([^&]*?)(?:&quot;|&#39;|')\s*&gt;([\s\S]*?)&lt;\/span&gt;", @"<span style=""$1"">$2</span>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;font color=(?:&quot;|&#39;|')([^&]*?)(?:&quot;|&#39;|')\s*&gt;([\s\S]*?)&lt;\/font&gt;", @"<font color=""$1"">$2</font>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;span\s+style=(?:&quot;|&#39;|'|"")([\s\S]*?)(?:&quot;|&#39;|'|"")\s*&gt;([\s\S]*?)&lt;\/span&gt;", @"<span style=""$1"">$2</span>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;font\s+color=(?:&quot;|&#39;|'|"")([\s\S]*?)(?:&quot;|&#39;|'|"")\s*&gt;([\s\S]*?)&lt;\/font&gt;", @"<font color=""$1"">$2</font>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;mark&gt;([\s\S]*?)&lt;\/mark&gt;", @"<mark>$1</mark>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;u&gt;([\s\S]*?)&lt;\/u&gt;", @"<u>$1</u>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             text = System.Text.RegularExpressions.Regex.Replace(text, @"&lt;b&gt;([\s\S]*?)&lt;\/b&gt;", @"<b>$1</b>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);

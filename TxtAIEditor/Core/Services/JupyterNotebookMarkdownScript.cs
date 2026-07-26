@@ -150,8 +150,8 @@ namespace TxtAIEditor.Core.Services
 
     function inlineMdJs(str) {
         let s = escapeHtml(str);
-        s = s.replace(/&lt;span style=(?:&quot;|&#39;|')([^&]*?)(?:&quot;|&#39;|')\s*&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style=""$1"">$2</span>');
-        s = s.replace(/&lt;font color=(?:&quot;|&#39;|')([^&]*?)(?:&quot;|&#39;|')\s*&gt;([\s\S]*?)&lt;\/font&gt;/gi, '<font color=""$1"">$2</font>');
+        s = s.replace(/&lt;span\s+style=(?:&quot;|&#39;|'|"")([\s\S]*?)(?:&quot;|&#39;|'|"")\s*&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style=""$1"">$2</span>');
+        s = s.replace(/&lt;font\s+color=(?:&quot;|&#39;|'|"")([\s\S]*?)(?:&quot;|&#39;|'|"")\s*&gt;([\s\S]*?)&lt;\/font&gt;/gi, '<font color=""$1"">$2</font>');
         s = s.replace(/&lt;mark&gt;([\s\S]*?)&lt;\/mark&gt;/gi, '<mark>$1</mark>');
         s = s.replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<u>$1</u>');
         s = s.replace(/&lt;b&gt;([\s\S]*?)&lt;\/b&gt;/gi, '<b>$1</b>');
