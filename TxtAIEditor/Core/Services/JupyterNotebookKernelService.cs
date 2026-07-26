@@ -416,7 +416,12 @@ def _render_2d_figure_layers(fig, save_kwargs):
         for artist, visible in decoration_visibility:
             artist.set_visible(visible)
 
-    return background_b64, data_b64
+    notebook_buf = io.BytesIO()
+    fig.savefig(notebook_buf, facecolor='white', edgecolor='none', **layer_kwargs)
+    notebook_buf.seek(0)
+    notebook_b64 = base64.b64encode(notebook_buf.read()).decode('utf-8')
+
+    return background_b64, data_b64, notebook_b64
 
 def _render_figure_html(fig, fig_id=None):
     import io, base64, json
@@ -501,8 +506,8 @@ def _render_figure_html(fig, fig_id=None):
 
     if not is_3d:
         try:
-            b64_background, b64_data = _render_2d_figure_layers(fig, save_kwargs)
-            return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""false"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}""{bounds_attr}{style_attr}>{toolbar}<div class=""mpl-viewport""><div class=""mpl-plot-layer""><img src=""data:{mime};base64,{b64_background}"" class=""mpl-plot-img"" /><div class=""mpl-data-clip""><div class=""mpl-data-img-wrapper""><img src=""data:image/png;base64,{b64_data}"" class=""mpl-data-img"" /></div></div></div></div></div><!--MPL_END-->'''
+            b64_background, b64_data, b64_notebook = _render_2d_figure_layers(fig, save_kwargs)
+            return f'''<!--MPL_START--><div class=""mpl-interactive-wrapper"" data-mpl=""true"" data-is-3d=""false"" data-fig-id=""{fig_id}"" data-elev=""{cur_elev}"" data-azim=""{cur_azim}""{bounds_attr}{style_attr}><img src=""data:{mime};base64,{b64_notebook}"" class=""mpl-notebook-img"" hidden />{toolbar}<div class=""mpl-viewport""><div class=""mpl-plot-layer""><img src=""data:{mime};base64,{b64_background}"" class=""mpl-plot-img"" /><div class=""mpl-data-clip""><div class=""mpl-data-img-wrapper""><img src=""data:image/png;base64,{b64_data}"" class=""mpl-data-img"" /></div></div></div></div></div><!--MPL_END-->'''
         except Exception:
             pass
 

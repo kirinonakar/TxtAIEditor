@@ -50,7 +50,8 @@ namespace TxtAIEditor.Core.Services
                             } catch (ex) {}
 
                             if (outObj) {
-                                const img = e.querySelector('img[src^=""data:image/""]');
+                                const img = e.querySelector('.mpl-notebook-img') ||
+                                    e.querySelector('img[src^=""data:image/""]');
                                 const imgData = extractImageMimeAndBase64(img);
                                 if (imgData) {
                                     outObj.data = outObj.data || {};
@@ -64,7 +65,17 @@ namespace TxtAIEditor.Core.Services
                         });
                     } else {
                         const imgs = outputDiv.querySelectorAll('img[src^=""data:image/""]');
-                        imgs.forEach(img => {
+                        const seenMplWrappers = new Set();
+                        imgs.forEach(foundImg => {
+                            let img = foundImg;
+                            const mplWrapper = foundImg.closest('.mpl-interactive-wrapper');
+                            if (mplWrapper) {
+                                if (seenMplWrappers.has(mplWrapper)) return;
+                                seenMplWrappers.add(mplWrapper);
+                                img = mplWrapper.querySelector('.mpl-notebook-img') ||
+                                    mplWrapper.querySelector('.mpl-plot-img') ||
+                                    foundImg;
+                            }
                             const imgData = extractImageMimeAndBase64(img);
                             if (imgData) {
                                 outputs.push({
