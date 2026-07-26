@@ -383,11 +383,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 }, async (streamName, streamText) =>
                 {
                     string script = $"window.__notebookReceiveStreamOutput && window.__notebookReceiveStreamOutput({cellIndex}, {JsonSerializer.Serialize(streamName)}, {JsonSerializer.Serialize(streamText)});";
-                    webView.DispatcherQueue.TryEnqueue(async () =>
-                    {
-                        try { await webView.ExecuteScriptAsync(script); } catch { }
-                    });
-                    await Task.CompletedTask;
+                    await ExecuteScriptOnDispatcherAsync(webView, script);
                 });
 
                 await SendResultAsync(webView, cellIndex, result.Status, result.Stdout, result.Stderr, result.Result, result.VariablesJson);
@@ -586,6 +582,34 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             catch
             {
             }
+        }
+
+        private static Task ExecuteScriptOnDispatcherAsync(WebView2 webView, string script)
+        {
+            if (webView.DispatcherQueue.HasThreadAccess)
+            {
+                return ExecuteScriptSafeAsync(webView, script);
+            }
+
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool enqueued = webView.DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    await ExecuteScriptSafeAsync(webView, script);
+                }
+                finally
+                {
+                    completion.TrySetResult(true);
+                }
+            });
+
+            if (!enqueued)
+            {
+                completion.TrySetResult(false);
+            }
+
+            return completion.Task;
         }
 
         private async Task NavigateAsync(OpenedTab tab, WebView2 webView)

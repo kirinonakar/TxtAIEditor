@@ -829,6 +829,69 @@ namespace TxtAIEditor.Core.Services
         showContextMenu(e.clientX, e.clientY, cellDiv);
     });
 
+    // Real-time stream output handler for tqdm / stdout / stderr
+    window.__notebookReceiveStreamOutput = function(cellIndex, streamName, streamText) {
+        const cellDiv = container.querySelector('.cell[data-cell-index=""' + cellIndex + '""]');
+        if (!cellDiv) return;
+        const outputDiv = cellDiv.querySelector('.cell-output');
+        if (!outputDiv) return;
+
+        outputDiv.classList.add('has-output');
+        if ((outputDiv.textContent || '').trim() === 'Running...') {
+            outputDiv.innerHTML = '';
+        }
+
+        let streamSpan = outputDiv.querySelector('.stream-output-' + streamName);
+        if (!streamSpan) {
+            const entry = document.createElement('div');
+            entry.className = 'output-entry';
+            const cls = streamName === 'stderr' ? 'output-stderr' : 'output-stdout';
+            entry.innerHTML = '<span class=""' + cls + ' stream-output-' + streamName + '""></span>';
+            outputDiv.appendChild(entry);
+            streamSpan = entry.querySelector('.stream-output-' + streamName);
+        }
+
+        let currentText = streamSpan.getAttribute('data-raw-text') || '';
+        currentText += streamText;
+        streamSpan.setAttribute('data-raw-text', currentText);
+
+        if (window.parseTqdmText && (currentText.includes('%|') || currentText.includes('% |'))) {
+            const parsed = window.parseTqdmText(currentText);
+            if (parsed.lastTqdm) {
+                let tqdmContainer = outputDiv.querySelector('.tqdm-entry');
+                if (!tqdmContainer) {
+                    tqdmContainer = document.createElement('div');
+                    tqdmContainer.className = 'output-entry tqdm-entry';
+                    outputDiv.appendChild(tqdmContainer);
+                }
+                tqdmContainer.innerHTML = window.buildTqdmWidgetHtml(parsed.lastTqdm);
+
+                if (parsed.nonTqdmText) {
+                    streamSpan.textContent = parsed.nonTqdmText;
+                    const parent = streamSpan.closest('.output-entry');
+                    if (parent && parent !== tqdmContainer) parent.style.display = '';
+                } else {
+                    streamSpan.textContent = '';
+                    const parent = streamSpan.closest('.output-entry');
+                    if (parent && parent !== tqdmContainer) parent.style.display = 'none';
+                }
+                return;
+            }
+        }
+
+        function processCarriageReturns(str) {
+            const cr = String.fromCharCode(13);
+            const lines = str.split('\n');
+            const processed = lines.map(line => {
+                const parts = line.split(cr);
+                return parts[parts.length - 1];
+            });
+            return processed.join('\n');
+        }
+
+        streamSpan.textContent = processCarriageReturns(currentText);
+    };
+
     // Keyboard shortcuts
     container.addEventListener('keydown', (e) => {
         const input = e.target.closest('.cell-input-area, .markdown-editor, .raw-cell');
@@ -948,69 +1011,6 @@ namespace TxtAIEditor.Core.Services
                 });
             }
         }
-
-    // Real-time stream output handler for tqdm / stdout / stderr
-    window.__notebookReceiveStreamOutput = function(cellIndex, streamName, streamText) {
-        const cellDiv = container.querySelector('.cell[data-cell-index=""' + cellIndex + '""]');
-        if (!cellDiv) return;
-        const outputDiv = cellDiv.querySelector('.cell-output');
-        if (!outputDiv) return;
-
-        outputDiv.classList.add('has-output');
-        if ((outputDiv.textContent || '').trim() === 'Running...') {
-            outputDiv.innerHTML = '';
-        }
-
-        let streamSpan = outputDiv.querySelector('.stream-output-' + streamName);
-        if (!streamSpan) {
-            const entry = document.createElement('div');
-            entry.className = 'output-entry';
-            const cls = streamName === 'stderr' ? 'output-stderr' : 'output-stdout';
-            entry.innerHTML = '<span class=""' + cls + ' stream-output-' + streamName + '""></span>';
-            outputDiv.appendChild(entry);
-            streamSpan = entry.querySelector('.stream-output-' + streamName);
-        }
-
-        let currentText = streamSpan.getAttribute('data-raw-text') || '';
-        currentText += streamText;
-        streamSpan.setAttribute('data-raw-text', currentText);
-
-        if (window.parseTqdmText && (currentText.includes('%|') || currentText.includes('% |'))) {
-            const parsed = window.parseTqdmText(currentText);
-            if (parsed.lastTqdm) {
-                let tqdmContainer = outputDiv.querySelector('.tqdm-entry');
-                if (!tqdmContainer) {
-                    tqdmContainer = document.createElement('div');
-                    tqdmContainer.className = 'output-entry tqdm-entry';
-                    outputDiv.appendChild(tqdmContainer);
-                }
-                tqdmContainer.innerHTML = window.buildTqdmWidgetHtml(parsed.lastTqdm);
-
-                if (parsed.nonTqdmText) {
-                    streamSpan.textContent = parsed.nonTqdmText;
-                    const parent = streamSpan.closest('.output-entry');
-                    if (parent && parent !== tqdmContainer) parent.style.display = '';
-                } else {
-                    streamSpan.textContent = '';
-                    const parent = streamSpan.closest('.output-entry');
-                    if (parent && parent !== tqdmContainer) parent.style.display = 'none';
-                }
-                return;
-            }
-        }
-
-        function processCarriageReturns(str) {
-            const cr = String.fromCharCode(13);
-            const lines = str.split('\n');
-            const processed = lines.map(line => {
-                const parts = line.split(cr);
-                return parts[parts.length - 1];
-            });
-            return processed.join('\n');
-        }
-
-        streamSpan.textContent = processCarriageReturns(currentText);
-    };
 
         if (e.ctrlKey && e.key === 's') {
             e.preventDefault();
