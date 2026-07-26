@@ -8,16 +8,20 @@ namespace TxtAIEditor.Core.Services
         document.querySelectorAll('.cell-output').forEach(function(outputDiv) {
             outputDiv.querySelectorAll('img[src^=""data:image/png""]').forEach(function(img) {
                 if (!img.closest('.mpl-interactive-wrapper')) {
+                    const is3DImg = (img.getAttribute('data-is-3d') === 'true') || img.hasAttribute('data-elev');
                     const wrapper = document.createElement('div');
                     wrapper.className = 'mpl-interactive-wrapper';
                     wrapper.setAttribute('data-mpl', 'true');
-                    wrapper.setAttribute('data-is-3d', 'false');
+                    wrapper.setAttribute('data-is-3d', is3DImg ? 'true' : 'false');
+                    const statusText = is3DImg
+                        ? 'Drag: Pan | 🔍 Zoom + Wheel: Zoom | Right-Click Drag: Rotate'
+                        : 'Drag: Pan | 🔍 Zoom + Wheel: Zoom';
                     wrapper.innerHTML = 
                         '<div class=""mpl-toolbar"">' +
                             '<button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button>' +
                             '<button class=""mpl-btn mpl-btn-zoom"" title=""Toggle Zoom Mode (Scroll Wheel)"">🔍 Zoom</button>' +
                             '<button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button>' +
-                            '<span class=""mpl-status-text"">Drag: Pan | Enable 🔍 Zoom + Wheel to Zoom</span>' +
+                            '<span class=""mpl-status-text"">' + statusText + '</span>' +
                         '</div>' +
                         '<div class=""mpl-viewport"">' +
                             '<div class=""mpl-plot-layer""></div>' +
@@ -262,13 +266,13 @@ namespace TxtAIEditor.Core.Services
                         const dy = e.clientY - startY;
 
                         if (is3D) {
-                            if (dragBtn === 1) {
-                                panX = startPanX + dx;
-                                panY = startPanY + dy;
-                            } else {
+                            if (dragBtn === 2) {
                                 azim = Math.round(startAzim - dx * 0.5) % 360;
                                 elev = Math.min(Math.max(-90, Math.round(startElev + dy * 0.5)), 90);
                                 send3DViewRequest(elev, azim);
+                            } else {
+                                panX = startPanX + dx;
+                                panY = startPanY + dy;
                             }
                         } else {
                             if (dragBtn === 0 || dragBtn === 1) {
@@ -282,7 +286,7 @@ namespace TxtAIEditor.Core.Services
                     window.addEventListener('mouseup', function() {
                         if (isDragging) {
                             isDragging = false;
-                            if (is3D && dragBtn !== 1) {
+                            if (is3D && dragBtn === 2) {
                                 send3DViewRequest(elev, azim);
                             } else if (!is3D && figId && (panX !== 0 || panY !== 0)) {
                                 const clip = wrapper.querySelector('.mpl-data-clip');

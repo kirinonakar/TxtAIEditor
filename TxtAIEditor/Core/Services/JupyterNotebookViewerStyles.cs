@@ -472,6 +472,18 @@ strong { font-weight: 700; }
     font-size: 11px;
     font-weight: bold;
 }
+.mpl-status-text {
+    margin-left: auto;
+    font-size: 11px;
+    color: #666666;
+    white-space: nowrap;
+    padding-left: 8px;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    user-select: none;
+}
+@media (prefers-color-scheme: dark) {
+    .mpl-status-text { color: #aaaaaa; }
+}
 .mpl-viewport {
     position: relative;
     display: flex;

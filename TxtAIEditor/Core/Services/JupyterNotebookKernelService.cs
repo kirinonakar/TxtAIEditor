@@ -473,8 +473,8 @@ def _render_figure_html(fig, fig_id=None):
         pass
 
     is_3d_str = 'true' if is_3d else 'false'
-    status_3d = 'Drag: Rotate | Middle: Pan | Enable 🔍 Zoom + Wheel to Zoom'
-    status_2d = 'Drag: Pan | Enable 🔍 Zoom + Wheel to Zoom'
+    status_3d = 'Drag: Pan | 🔍 Zoom + Wheel: Zoom | Right-Click Drag: Rotate'
+    status_2d = 'Drag: Pan | 🔍 Zoom + Wheel: Zoom'
     status_text = status_3d if is_3d else status_2d
 
     toolbar_3d = f'''<div class=""mpl-toolbar""><button class=""mpl-btn mpl-btn-reset"" title=""Reset View"">🔄 Reset</button><button class=""mpl-btn mpl-btn-zoom"" title=""Toggle Zoom Mode (Scroll Wheel)"">🔍 Zoom</button><div class=""mpl-rotate-ctrl""><span>Azim:</span><input type=""range"" class=""mpl-rotate-y-slider"" min=""-180"" max=""180"" value=""{cur_azim}"" /><span class=""mpl-angle-val-y"">{cur_azim}°</span></div><div class=""mpl-rotate-ctrl""><span>Elev:</span><input type=""range"" class=""mpl-rotate-x-slider"" min=""-90"" max=""90"" value=""{cur_elev}"" /><span class=""mpl-angle-val-x"">{cur_elev}°</span></div><button class=""mpl-btn mpl-btn-download"" title=""Download Image"">💾 Save PNG</button><span class=""mpl-status-text"">{status_text}</span></div>'''
