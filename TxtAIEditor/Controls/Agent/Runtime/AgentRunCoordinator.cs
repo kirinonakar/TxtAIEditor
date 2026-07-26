@@ -284,13 +284,9 @@ namespace TxtAIEditor.Controls
                 const int maxMakePlanRetries = 2;
                 int skillMentionRetryCount = 0;
                 const int maxSkillMentionRetries = 2;
-                int repeatedDuplicateToolSkipCount = 0;
-                string? lastDuplicateToolInvocationKey = null;
-                string? lastSuccessfulToolInvocationKey = null;
-                const int maxRepeatedDuplicateToolSkips = 3;
                 bool planningMode = requestedPlanningMode;
                 int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls >= 50 ? runContext.LlmSettings.LlmMaxToolCalls : 100;
-                var successfulToolResults = new Dictionary<string, string>(StringComparer.Ordinal);
+                var toolInvocationCounts = new Dictionary<string, int>(StringComparer.Ordinal);
                 int currentTaskStartEditIndex = runContext.SessionEdits.Count;
 
                 for (int step = 0; step < maxToolSteps; step++)
@@ -683,60 +679,26 @@ namespace TxtAIEditor.Controls
 
                         string normalizedToolName = NormalizeToolName(currentToolName);
                         string toolInvocationKey = BuildToolInvocationKey(normalizedToolName, currentArguments);
-                        bool skippedDuplicateTool = false;
+                        toolInvocationCounts[toolInvocationKey] = toolInvocationCounts.TryGetValue(toolInvocationKey, out int prevCount) ? prevCount + 1 : 1;
+                        int currentInvocationCount = toolInvocationCounts[toolInvocationKey];
                         string toolResult;
                         string toolResultForTranscript;
                         toolCallFormatRetryCount = 0;
 
                         if (!planningMode && normalizedToolName == "make_plan")
                         {
-                            lastSuccessfulToolInvocationKey = null;
                             toolResult = "make_plan failed: this tool is only available when planning mode is enabled.";
                             toolResultForTranscript = toolResult;
                         }
                         else if (planningMode && IsMutatingTool(normalizedToolName) && normalizedToolName != "make_plan")
                         {
-                            lastSuccessfulToolInvocationKey = null;
                             toolResult =
                                 "blocked: planning mode is plan-only and cannot run file/editor mutation tools. " +
                                 "Continue with safe inspection if needed, or write the detailed Markdown plan as the final answer.";
                             toolResultForTranscript = toolResult;
                         }
-                        else if (ShouldReuseCachedSuccessfulTool(
-                                normalizedToolName,
-                                toolInvocationKey,
-                                lastSuccessfulToolInvocationKey) &&
-                            successfulToolResults.TryGetValue(toolInvocationKey, out string? cachedToolResult))
-                        {
-                            skippedDuplicateTool = true;
-                            toolResult = cachedToolResult ?? string.Empty;
-                            if (string.Equals(lastDuplicateToolInvocationKey, toolInvocationKey, StringComparison.Ordinal))
-                            {
-                                repeatedDuplicateToolSkipCount++;
-                            }
-                            else
-                            {
-                                lastDuplicateToolInvocationKey = toolInvocationKey;
-                                repeatedDuplicateToolSkipCount = 1;
-                            }
-
-                            var duplicateResultBuilder = new StringBuilder();
-                            duplicateResultBuilder.AppendLine("[Tool execution skipped: identical successful call already ran earlier in this agent run. Cached result follows; use it instead of calling the tool again.]");
-                            duplicateResultBuilder.AppendLine(toolResult);
-                            if (repeatedDuplicateToolSkipCount >= 2)
-                            {
-                                duplicateResultBuilder.AppendLine();
-                                duplicateResultBuilder.AppendLine("[Loop guard] You repeated the same skipped tool call. Choose exactly one different next action, or write the final answer. Do not call this tool again unless a later mutating tool changes the relevant files or workspace state.");
-                            }
-
-                            stopAfterLoopGuard = repeatedDuplicateToolSkipCount >= maxRepeatedDuplicateToolSkips;
-                            toolResultForTranscript = duplicateResultBuilder.ToString().TrimEnd();
-                        }
                         else
                         {
-                            lastSuccessfulToolInvocationKey = null;
-                            lastDuplicateToolInvocationKey = null;
-                            repeatedDuplicateToolSkipCount = 0;
                             await _toolExecutionSessionGate.WaitAsync(cancellationToken);
                             try
                             {
@@ -768,27 +730,22 @@ namespace TxtAIEditor.Controls
                                 if (IsMutatingTool(normalizedToolName) ||
                                     string.Equals(normalizedToolName, "run_powershell", StringComparison.Ordinal))
                                 {
-                                    successfulToolResults.Clear();
-                                }
-
-                                if (ShouldSkipDuplicateSuccessfulTool(normalizedToolName))
-                                {
-                                    successfulToolResults[toolInvocationKey] = toolResult;
-                                    lastSuccessfulToolInvocationKey = toolInvocationKey;
+                                    toolInvocationCounts.Clear();
                                 }
                             }
                         }
 
                         if (IsSuccessfulToolResult(toolResult))
                         {
-                            if (!skippedDuplicateTool)
+                            toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
+                            if (normalizedToolName == "read_file" && currentInvocationCount >= 4)
                             {
-                                toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
+                                toolResultForTranscript += $"\n\n[Loop guard] You have called read_file with the exact same parameters {currentInvocationCount} times in this request. Do not repeat this tool call meaninglessly. Stop and think carefully about the information already retrieved, choose a different next action, or write your final answer.";
+                                if (currentInvocationCount >= 6)
+                                {
+                                    stopAfterLoopGuard = true;
+                                }
                             }
-                        }
-                        else
-                        {
-                            successfulToolResults.Remove(toolInvocationKey);
                         }
 
                         toolResultForTranscript = _runTranscriptService.AddToolTimingNote(
@@ -796,7 +753,7 @@ namespace TxtAIEditor.Controls
                             toolResultForTranscript,
                             toolResult);
 
-                        toolCallResults.Add((currentToolName, currentArguments, toolResult, toolResultForTranscript, skippedDuplicateTool, normalizedToolName));
+                        toolCallResults.Add((currentToolName, currentArguments, toolResult, toolResultForTranscript, false, normalizedToolName));
 
                         if (!IsSuccessfulToolResult(toolResult) || stopAfterLoopGuard)
                         {
@@ -843,12 +800,10 @@ namespace TxtAIEditor.Controls
                             tcRes.NormalizedName,
                             tcRes.Args,
                             tcRes.Result,
-                            tcRes.Skipped,
+                            false,
                             runContext.LlmSettings.LlmAgentVerbose);
 
-                        string outputHeader = tcRes.Skipped
-                            ? _getString("AgentDuplicateToolSkipped", "도구 중복 호출 건너뜀")
-                            : _getString("AgentToolRunning", "도구 실행 중");
+                        string outputHeader = _getString("AgentToolRunning", "도구 실행 중");
                         await _runOutputController.AppendRunOutputLineAsync(runContext, $"{outputHeader}: {tcRes.Name}");
                         await _runOutputController.AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
                     }

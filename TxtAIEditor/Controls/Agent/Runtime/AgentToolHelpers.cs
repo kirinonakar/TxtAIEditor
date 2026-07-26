@@ -182,41 +182,6 @@ namespace TxtAIEditor.Controls
             return Array.Empty<string>();
         }
 
-        public static bool ShouldSkipDuplicateSuccessfulTool(string normalizedToolName)
-        {
-            return normalizedToolName is "skill_use"
-                or "run_powershell"
-                or "run_rg"
-                or "run_rga"
-                or "search_text"
-                or "read_image"
-                or "create_file"
-                or "extract_document"
-                or "overwrite_file"
-                or "replace_in_file"
-                or "search_replace"
-                or "replace_range"
-                or "append_to_file"
-                or "merge_files"
-                or "split_file"
-                or "apply_patch"
-                or "insert_to_file"
-                or "insert_text"
-                or "web_search_exa"
-                or "web_fetch"
-                or "web_fetch_exa";
-        }
-
-        public static bool ShouldReuseCachedSuccessfulTool(
-            string normalizedToolName,
-            string toolInvocationKey,
-            string? lastSuccessfulToolInvocationKey)
-        {
-            return ShouldSkipDuplicateSuccessfulTool(normalizedToolName) &&
-                (IsMutatingTool(normalizedToolName) ||
-                    string.Equals(lastSuccessfulToolInvocationKey, toolInvocationKey, StringComparison.Ordinal));
-        }
-
         public static bool IsMutatingTool(string normalizedToolName)
         {
             return normalizedToolName is "create_file"
