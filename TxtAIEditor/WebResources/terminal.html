@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
@@ -193,25 +193,46 @@
       return (value || '').replace(/[.,;)\]}]+$/g, '');
     }
 
-    function isTerminalPathCandidate(value) {
+    function isTerminalPathCandidate(value, fullLine, matchIndex) {
       // Reject text containing non-file URLs to prevent path patterns
       // from matching across URL-hosting lines (e.g. "Uvicorn running on http://127.0.0.1:7860")
       if (/:\/\//.test(value) && !/^file:\/\//i.test(value)) return false;
+      if (typeof matchIndex === 'number' && fullLine) {
+        const prefix = fullLine.substring(0, matchIndex);
+        if (/(?:https?|ftp|file|ws|wss):(?:\/\/)?$/i.test(prefix) || /:\/\/?$/.test(prefix) || /(?:https?|ftp|file|ws|wss):\/\/[^\s<>"']*$/i.test(prefix)) {
+          return false;
+        }
+      }
       return /^(?:file:\/\/\/|[A-Za-z]:\\|\\\\|\/)/.test(value) ||
         /[\\/]/.test(value) ||
         /\.[A-Za-z0-9_+~-]{1,12}$/.test(value) ||
         /:\d+(?::\d+)?$/.test(value);
     }
 
-    // URL pattern: http/https/ftp URLs, but only when the entire matched text is a URL
-    // (not a multi-word line that happens to contain a URL)
-    const terminalUrlPattern = /\bhttps?:\/\/[^\s<>"']+(?:\/[^\s<>"']*)?\b/gi;
+    // URL pattern: http/https URLs in terminal output
+    const terminalUrlPattern = /\bhttps?:\/\/[^\s<>"']+/gi;
+
+    function trimTerminalUrl(value) {
+      if (!value) return '';
+      let url = value.replace(/[.,;:!?"'>]+$/g, '');
+      url = url.replace(/\)+$/g, (m, offset, str) => {
+        const openCount = (str.match(/\(/g) || []).length;
+        const closeCount = (str.match(/\)/g) || []).length;
+        return closeCount > openCount ? '' : m;
+      });
+      url = url.replace(/\]+$/g, (m, offset, str) => {
+        const openCount = (str.match(/\[/g) || []).length;
+        const closeCount = (str.match(/\]/g) || []).length;
+        return closeCount > openCount ? '' : m;
+      });
+      return url;
+    }
 
     function isUrlOnly(value) {
       return /^https?:\/\//i.test(value);
     }
 
-    function registerLinkProvider(pattern, filter, messageType) {
+    function registerLinkProvider(pattern, filter, messageType, customTrimmer) {
       term.registerLinkProvider({
         provideLinks(lineNumber, callback) {
           const line = term.buffer.active.getLine(lineNumber - 1)?.translateToString(true) || '';
@@ -224,9 +245,13 @@
             if (match[1]) {
               start += match[0].length - match[1].length;
             }
-            text = trimTerminalPath(text);
+            if (customTrimmer) {
+              text = customTrimmer(text);
+            } else {
+              text = trimTerminalPath(text);
+            }
             if (!text) continue;
-            if (filter && !filter(text)) continue;
+            if (filter && !filter(text, line, match.index)) continue;
 
             const end = start + text.length - 1;
             links.push({
@@ -247,11 +272,11 @@
       });
     }
 
-    // Register path link provider (file paths)
-    registerLinkProvider(terminalPathPattern, isTerminalPathCandidate, 'openPath');
+    // Register URL link provider (http/https URLs) FIRST
+    registerLinkProvider(terminalUrlPattern, isUrlOnly, 'openUrl', trimTerminalUrl);
 
-    // Register URL link provider (http/https URLs)
-    registerLinkProvider(terminalUrlPattern, isUrlOnly, 'openUrl');
+    // Register path link provider (file paths) SECOND
+    registerLinkProvider(terminalPathPattern, isTerminalPathCandidate, 'openPath');
 
     function fitAndNotify() {
       cancelAnimationFrame(pendingFit);
