@@ -256,8 +256,10 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     string figId = root.TryGetProperty("figId", out var f) ? f.GetString() ?? "" : "";
                     double elev = root.TryGetProperty("elev", out var el) ? el.GetDouble() : 30.0;
                     double azim = root.TryGetProperty("azim", out var az) ? az.GetDouble() : -60.0;
+                    double panFracX = root.TryGetProperty("panFracX", out var pfx3d) ? pfx3d.GetDouble() : 0.0;
+                    double panFracY = root.TryGetProperty("panFracY", out var pfy3d) ? pfy3d.GetDouble() : 0.0;
                     double zoom = root.TryGetProperty("zoom", out var z3d) ? z3d.GetDouble() : 1.0;
-                    _ = UpdatePlotViewAsync(sender, tab, figId, elev, azim, zoom);
+                    _ = UpdatePlotViewAsync(sender, tab, figId, elev, azim, panFracX, panFracY, zoom);
                 }
                 else if (string.Equals(type, "update2DView", StringComparison.Ordinal))
                 {
@@ -305,7 +307,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             }
         }
 
-        private async Task UpdatePlotViewAsync(WebView2 webView, OpenedTab tab, string figId, double elev, double azim, double zoom)
+        private async Task UpdatePlotViewAsync(WebView2 webView, OpenedTab tab, string figId, double elev, double azim, double panFracX, double panFracY, double zoom)
         {
             try
             {
@@ -315,7 +317,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     return;
                 }
 
-                string html = await _kernelService.UpdatePlotViewAsync(tab.Id, python, workDir, figId, elev, azim, zoom);
+                string html = await _kernelService.UpdatePlotViewAsync(tab.Id, python, workDir, figId, elev, azim, panFracX, panFracY, zoom);
                 if (!string.IsNullOrEmpty(html))
                 {
                     string js = $"window.__notebookReceivePlotUpdate && window.__notebookReceivePlotUpdate({JsonSerializer.Serialize(figId)}, {JsonSerializer.Serialize(html)});";

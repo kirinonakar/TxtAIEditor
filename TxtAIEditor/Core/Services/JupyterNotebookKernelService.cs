@@ -101,12 +101,12 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        public async Task<string> UpdatePlotViewAsync(string tabId, string pythonExecutable, string workingDirectory, string figId, double elev, double azim, double zoom)
+        public async Task<string> UpdatePlotViewAsync(string tabId, string pythonExecutable, string workingDirectory, string figId, double elev, double azim, double panFracX, double panFracY, double zoom)
         {
             try
             {
                 var session = await GetOrCreateSessionAsync(tabId, pythonExecutable, workingDirectory);
-                return await session.UpdatePlotViewAsync(figId, elev, azim, zoom);
+                return await session.UpdatePlotViewAsync(figId, elev, azim, panFracX, panFracY, zoom);
             }
             catch
             {
@@ -564,6 +564,8 @@ while True:
             fig_id = str(msg.get('figId', ''))
             elev = float(msg.get('elev', 30))
             azim = float(msg.get('azim', -60))
+            pan_frac_x = float(msg.get('panFracX', 0))
+            pan_frac_y = float(msg.get('panFracY', 0))
             zoom_val = float(msg.get('zoom', 1.0))
             if zoom_val <= 0: zoom_val = 1.0
             fig = _active_figures.get(fig_id)
@@ -581,12 +583,13 @@ while True:
                             lim = orig_3d_limits[ax_idx]
                             for axis_name in ('x', 'y', 'z'):
                                 lo, hi = lim[axis_name + 'lim']
-                                center = (lo + hi) / 2.0
+                                pan_frac = pan_frac_x if axis_name == 'x' else pan_frac_y if axis_name == 'y' else 0.0
+                                center = (lo + hi) / 2.0 + pan_frac * (hi - lo)
                                 radius = (hi - lo) / (2.0 * zoom_val)
                                 getattr(ax, 'set_' + axis_name + 'lim3d')(center - radius, center + radius)
                             ax_idx += 1
                 html = _render_figure_html(fig, fig_id=fig_id)
-                sys.stdout.write(json.dumps({'status': 'ok', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': html, 'elev': elev, 'azim': azim, 'zoom': zoom_val}, ensure_ascii=False) + '\n')
+                sys.stdout.write(json.dumps({'status': 'ok', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': html, 'elev': elev, 'azim': azim, 'panFracX': pan_frac_x, 'panFracY': pan_frac_y, 'zoom': zoom_val}, ensure_ascii=False) + '\n')
                 sys.stdout.flush()
             else:
                 sys.stdout.write(json.dumps({'status': 'error', 'type': 'plotViewUpdated', 'figId': fig_id, 'html': ''}, ensure_ascii=False) + '\n')
@@ -898,14 +901,14 @@ while True:
                 return "[]";
             }
 
-            public async Task<string> UpdatePlotViewAsync(string figId, double elev, double azim, double zoom)
+            public async Task<string> UpdatePlotViewAsync(string figId, double elev, double azim, double panFracX, double panFracY, double zoom)
             {
                 if (_process == null || _process.HasExited)
                 {
                     return string.Empty;
                 }
 
-                var command = JsonSerializer.Serialize(new { type = "updatePlotView", figId, elev, azim, zoom });
+                var command = JsonSerializer.Serialize(new { type = "updatePlotView", figId, elev, azim, panFracX, panFracY, zoom });
                 await _process.StandardInput.WriteLineAsync(command);
                 await _process.StandardInput.FlushAsync();
 

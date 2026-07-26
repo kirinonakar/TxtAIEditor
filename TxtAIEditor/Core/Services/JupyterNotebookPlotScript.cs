@@ -65,6 +65,7 @@ namespace TxtAIEditor.Core.Services
 
                 let is3DInFlight = false;
                 let pending3DState = null;
+                let dataPanFrac3DX = 0, dataPanFrac3DY = 0;
                 let dataZoom3D = 1;
 
                 /* 2D cumulative data state */
@@ -72,10 +73,10 @@ namespace TxtAIEditor.Core.Services
                 let is2DInFlight = false;
                 let pending2DState = null;
 
-                function send3DViewRequest(eVal, aVal, z) {
+                function send3DViewRequest(eVal, aVal, pfx, pfy, z) {
                     if (!is3D || !figId) return;
                     if (is3DInFlight) {
-                        pending3DState = { elev: eVal, azim: aVal, zoom: z };
+                        pending3DState = { elev: eVal, azim: aVal, panFracX: pfx, panFracY: pfy, zoom: z };
                         return;
                     }
                     is3DInFlight = true;
@@ -85,6 +86,8 @@ namespace TxtAIEditor.Core.Services
                             figId: figId,
                             elev: eVal,
                             azim: aVal,
+                            panFracX: pfx,
+                            panFracY: pfy,
                             zoom: z
                         }));
                     } catch (ex) {
@@ -203,12 +206,17 @@ namespace TxtAIEditor.Core.Services
                             startY = currentMouseY;
                             startElev = elev;
                             startAzim = azim;
+                        } else {
+                            panX = 0;
+                            panY = 0;
+                            scale = 1;
+                            updateTransform();
                         }
                         is3DInFlight = false;
                         if (pending3DState) {
                             const next = pending3DState;
                             pending3DState = null;
-                            send3DViewRequest(next.elev, next.azim, next.zoom);
+                            send3DViewRequest(next.elev, next.azim, next.panFracX, next.panFracY, next.zoom);
                         }
                     } else {
                         /* 2D: reset CSS preview since new image has correct view */
@@ -271,7 +279,7 @@ namespace TxtAIEditor.Core.Services
                             if (dragBtn === 2) {
                                 azim = Math.round(startAzim - dx * 0.5) % 360;
                                 elev = Math.min(Math.max(-90, Math.round(startElev + dy * 0.5)), 90);
-                                send3DViewRequest(elev, azim, dataZoom3D);
+                                send3DViewRequest(elev, azim, dataPanFrac3DX, dataPanFrac3DY, dataZoom3D);
                             } else {
                                 panX = startPanX + dx;
                                 panY = startPanY + dy;
@@ -289,7 +297,14 @@ namespace TxtAIEditor.Core.Services
                         if (isDragging) {
                             isDragging = false;
                             if (is3D && dragBtn === 2) {
-                                send3DViewRequest(elev, azim, dataZoom3D);
+                                send3DViewRequest(elev, azim, dataPanFrac3DX, dataPanFrac3DY, dataZoom3D);
+                            } else if (is3D && figId && (panX !== 0 || panY !== 0)) {
+                                const img = wrapper.querySelector('.mpl-plot-img');
+                                const w = img ? (img.clientWidth || 600) : 600;
+                                const h = img ? (img.clientHeight || 400) : 400;
+                                dataPanFrac3DX -= panX / w / dataZoom3D;
+                                dataPanFrac3DY += panY / h / dataZoom3D;
+                                send3DViewRequest(elev, azim, dataPanFrac3DX, dataPanFrac3DY, dataZoom3D);
                             } else if (!is3D && figId && (panX !== 0 || panY !== 0)) {
                                 const clip = wrapper.querySelector('.mpl-data-clip');
                                 const img = wrapper.querySelector('.mpl-plot-img');
@@ -312,7 +327,7 @@ namespace TxtAIEditor.Core.Services
                         const factor = e.deltaY < 0 ? 1.1 : 0.9;
                         if (is3D && figId) {
                             dataZoom3D = Math.min(Math.max(0.2, dataZoom3D * factor), 5.0);
-                            send3DViewRequest(elev, azim, dataZoom3D);
+                            send3DViewRequest(elev, azim, dataPanFrac3DX, dataPanFrac3DY, dataZoom3D);
                         } else if (figId) {
                             dataZoom = Math.min(Math.max(0.2, dataZoom * factor), 5.0);
                             send2DViewRequest(dataPanFracX, dataPanFracY, dataZoom);
@@ -331,7 +346,7 @@ namespace TxtAIEditor.Core.Services
                     sliderY.addEventListener('input', function() {
                         if (is3D) {
                             azim = parseInt(sliderY.value) || 0;
-                            send3DViewRequest(elev, azim, dataZoom3D);
+                            send3DViewRequest(elev, azim, dataPanFrac3DX, dataPanFrac3DY, dataZoom3D);
                             updateTransform();
                         }
                     });
@@ -341,7 +356,7 @@ namespace TxtAIEditor.Core.Services
                     sliderX.addEventListener('input', function() {
                         if (is3D) {
                             elev = parseInt(sliderX.value) || 0;
-                            send3DViewRequest(elev, azim, dataZoom3D);
+                            send3DViewRequest(elev, azim, dataPanFrac3DX, dataPanFrac3DY, dataZoom3D);
                             updateTransform();
                         }
                     });
@@ -355,8 +370,10 @@ namespace TxtAIEditor.Core.Services
                         if (is3D) {
                             elev = initElev;
                             azim = initAzim;
+                            dataPanFrac3DX = 0;
+                            dataPanFrac3DY = 0;
                             dataZoom3D = 1;
-                            send3DViewRequest(elev, azim, dataZoom3D);
+                            send3DViewRequest(elev, azim, dataPanFrac3DX, dataPanFrac3DY, dataZoom3D);
                         } else if (figId) {
                             dataPanFracX = 0;
                             dataPanFracY = 0;
