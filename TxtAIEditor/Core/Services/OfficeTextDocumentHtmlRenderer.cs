@@ -61,6 +61,8 @@ namespace TxtAIEditor.Core.Services
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems = await LoadHwpxBinaryItemsAsync(archive).ConfigureAwait(false);
             IReadOnlyDictionary<string, string> characterStyles = await LoadHwpxCharacterStylesAsync(archive).ConfigureAwait(false);
+            IReadOnlyDictionary<string, string> paragraphStyles = await LoadHwpxParagraphStylesAsync(archive).ConfigureAwait(false);
+            IReadOnlyDictionary<string, string> borderFillStyles = await LoadHwpxBorderFillStylesAsync(archive).ConfigureAwait(false);
             var sectionEntries = archive.Entries
                 .Where(entry => Regex.IsMatch(entry.FullName, @"^Contents/section\d+\.xml$", RegexOptions.IgnoreCase))
                 .OrderBy(entry => GetTrailingNumber(entry.FullName))
@@ -86,7 +88,14 @@ namespace TxtAIEditor.Core.Services
             foreach (ZipArchiveEntry sectionEntry in sectionEntries)
             {
                 XDocument section = await LoadXmlEntryAsync(sectionEntry).ConfigureAwait(false);
-                AppendHwpxChildrenHtml(content, archive, binaryItems, characterStyles, section.Root?.Elements() ?? Enumerable.Empty<XElement>());
+                AppendHwpxChildrenHtml(
+                    content,
+                    archive,
+                    binaryItems,
+                    characterStyles,
+                    paragraphStyles,
+                    borderFillStyles,
+                    section.Root?.Elements() ?? Enumerable.Empty<XElement>());
             }
 
             if (content.Length == 0)
@@ -364,11 +373,20 @@ namespace TxtAIEditor.Core.Services
             ZipArchive archive,
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
             IReadOnlyDictionary<string, string> characterStyles,
+            IReadOnlyDictionary<string, string> paragraphStyles,
+            IReadOnlyDictionary<string, string> borderFillStyles,
             IEnumerable<XElement> elements)
         {
             foreach (XElement element in elements)
             {
-                AppendHwpxBlockHtml(builder, archive, binaryItems, characterStyles, element);
+                AppendHwpxBlockHtml(
+                    builder,
+                    archive,
+                    binaryItems,
+                    characterStyles,
+                    paragraphStyles,
+                    borderFillStyles,
+                    element);
             }
         }
 
@@ -377,23 +395,44 @@ namespace TxtAIEditor.Core.Services
             ZipArchive archive,
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
             IReadOnlyDictionary<string, string> characterStyles,
+            IReadOnlyDictionary<string, string> paragraphStyles,
+            IReadOnlyDictionary<string, string> borderFillStyles,
             XElement block)
         {
             switch (block.Name.LocalName)
             {
                 case "p":
-                    builder.Append(BuildHwpxParagraphHtml(archive, binaryItems, characterStyles, block));
+                    builder.Append(BuildHwpxParagraphHtml(archive, binaryItems, characterStyles, paragraphStyles, block));
                     foreach (XElement table in block.Descendants().Where(e => e.Name.LocalName == "tbl"))
                     {
-                        builder.Append(BuildHwpxTableHtml(archive, binaryItems, characterStyles, table));
+                        builder.Append(BuildHwpxTableHtml(
+                            archive,
+                            binaryItems,
+                            characterStyles,
+                            paragraphStyles,
+                            borderFillStyles,
+                            table));
                     }
 
                     break;
                 case "tbl":
-                    builder.Append(BuildHwpxTableHtml(archive, binaryItems, characterStyles, block));
+                    builder.Append(BuildHwpxTableHtml(
+                        archive,
+                        binaryItems,
+                        characterStyles,
+                        paragraphStyles,
+                        borderFillStyles,
+                        block));
                     break;
                 default:
-                    AppendHwpxChildrenHtml(builder, archive, binaryItems, characterStyles, block.Elements());
+                    AppendHwpxChildrenHtml(
+                        builder,
+                        archive,
+                        binaryItems,
+                        characterStyles,
+                        paragraphStyles,
+                        borderFillStyles,
+                        block.Elements());
                     break;
             }
         }
@@ -402,6 +441,7 @@ namespace TxtAIEditor.Core.Services
             ZipArchive archive,
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
             IReadOnlyDictionary<string, string> characterStyles,
+            IReadOnlyDictionary<string, string> paragraphStyles,
             XElement paragraph)
         {
             var content = new StringBuilder();
@@ -461,15 +501,21 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
+            string paragraphStyle = GetHwpxParagraphStyle(paragraph, paragraphStyles);
+            string styleAttribute = string.IsNullOrWhiteSpace(paragraphStyle)
+                ? string.Empty
+                : " style=\"" + Html(paragraphStyle) + "\"";
             return content.Length == 0
-                ? "<p class=\"doc-paragraph empty-paragraph\"></p>"
-                : "<p class=\"doc-paragraph\">" + content + "</p>";
+                ? "<p class=\"doc-paragraph empty-paragraph\"" + styleAttribute + "></p>"
+                : "<p class=\"doc-paragraph\"" + styleAttribute + ">" + content + "</p>";
         }
 
         private static string BuildHwpxTableHtml(
             ZipArchive archive,
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
             IReadOnlyDictionary<string, string> characterStyles,
+            IReadOnlyDictionary<string, string> paragraphStyles,
+            IReadOnlyDictionary<string, string> borderFillStyles,
             XElement table)
         {
             var rows = table.Elements().Where(e => e.Name.LocalName == "tr").ToList();
@@ -504,9 +550,27 @@ namespace TxtAIEditor.Core.Services
                         builder.Append(" rowspan=\"").Append(Html(rowspan)).Append('"');
                     }
 
+                    string borderFillId = GetAttributeValue(cell, "borderFillIDRef");
+                    if (string.IsNullOrWhiteSpace(borderFillId))
+                    {
+                        borderFillId = GetAttributeValue(table, "borderFillIDRef");
+                    }
+
+                    if (borderFillStyles.TryGetValue(borderFillId, out string? borderFillStyle))
+                    {
+                        builder.Append(" style=\"").Append(Html(borderFillStyle)).Append('"');
+                    }
+
                     builder.Append('>');
                     int before = builder.Length;
-                    AppendHwpxChildrenHtml(builder, archive, binaryItems, characterStyles, cell.Elements());
+                    AppendHwpxChildrenHtml(
+                        builder,
+                        archive,
+                        binaryItems,
+                        characterStyles,
+                        paragraphStyles,
+                        borderFillStyles,
+                        cell.Elements());
                     if (builder.Length == before)
                     {
                         builder.Append("&nbsp;");
@@ -732,6 +796,89 @@ namespace TxtAIEditor.Core.Services
             }
 
             return string.Empty;
+        }
+
+        private static string GetHwpxParagraphStyle(
+            XElement paragraph,
+            IReadOnlyDictionary<string, string> paragraphStyles)
+        {
+            string styleId = GetAttributeValue(paragraph, "paraPrIDRef");
+            return paragraphStyles.TryGetValue(styleId, out string? style) ? style : string.Empty;
+        }
+
+        private static async Task<IReadOnlyDictionary<string, string>> LoadHwpxParagraphStylesAsync(ZipArchive archive)
+        {
+            XDocument? header = await TryLoadXmlEntryAsync(archive, "Contents/header.xml").ConfigureAwait(false);
+            if (header == null)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var styles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (XElement paragraphProperties in header.Descendants().Where(e => e.Name.LocalName == "paraPr"))
+            {
+                string id = GetAttributeValue(paragraphProperties, "id");
+                XElement? alignment = paragraphProperties.Elements().FirstOrDefault(e => e.Name.LocalName == "align");
+                string horizontal = GetAttributeValue(alignment, "horizontal").ToUpperInvariant();
+                string style = horizontal switch
+                {
+                    "RIGHT" => "text-align:right",
+                    "CENTER" => "text-align:center",
+                    "JUSTIFY" => "text-align:justify",
+                    "DISTRIBUTE" or "DISTRIBUTE_SPACE" => "text-align:justify;text-align-last:justify",
+                    "LEFT" => "text-align:left",
+                    _ => string.Empty
+                };
+
+                if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(style))
+                {
+                    styles[id] = style;
+                }
+            }
+
+            return styles;
+        }
+
+        private static async Task<IReadOnlyDictionary<string, string>> LoadHwpxBorderFillStylesAsync(ZipArchive archive)
+        {
+            XDocument? header = await TryLoadXmlEntryAsync(archive, "Contents/header.xml").ConfigureAwait(false);
+            var styles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (header == null)
+            {
+                return styles;
+            }
+
+            var edgeNames = new HashSet<string>(
+                new[] { "leftBorder", "rightBorder", "topBorder", "bottomBorder" },
+                StringComparer.OrdinalIgnoreCase);
+            foreach (XElement borderFill in header.Descendants().Where(e => e.Name.LocalName == "borderFill"))
+            {
+                string id = GetAttributeValue(borderFill, "id");
+                var declarations = new List<string>();
+                bool hasVisibleEdge = borderFill.Elements()
+                    .Where(e => edgeNames.Contains(e.Name.LocalName))
+                    .Any(edge => !GetAttributeValue(edge, "type").Equals("NONE", StringComparison.OrdinalIgnoreCase));
+                if (!hasVisibleEdge)
+                {
+                    declarations.Add("border:none");
+                }
+
+                XElement? windowBrush = borderFill
+                    .Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "winBrush");
+                string faceColor = GetAttributeValue(windowBrush, "faceColor");
+                if (IsCssColor(faceColor))
+                {
+                    declarations.Add("background-color:" + faceColor);
+                }
+
+                if (!string.IsNullOrWhiteSpace(id) && declarations.Count > 0)
+                {
+                    styles[id] = string.Join(';', declarations);
+                }
+            }
+
+            return styles;
         }
 
         private static async Task<IReadOnlyDictionary<string, string>> LoadHwpxCharacterStylesAsync(ZipArchive archive)
@@ -1077,7 +1224,6 @@ body { padding: 28px 16px 44px; }
     vertical-align: top;
     overflow-wrap: anywhere;
 }
-.doc-table tr:first-child td { background: color-mix(in srgb, var(--table-head) 72%, transparent); }
 .doc-table .doc-paragraph { margin-bottom: .35em; line-height: 1.45; }
 .doc-table .doc-paragraph:last-child { margin-bottom: 0; }
 .doc-image {
@@ -1088,7 +1234,6 @@ body { padding: 28px 16px 44px; }
     display: block;
     max-width: 100%;
     height: auto;
-    border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
 }
 .hwpx-layered-image {
     position: relative;
