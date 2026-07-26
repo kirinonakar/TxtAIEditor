@@ -10,6 +10,7 @@ namespace TxtAIEditor.Core.Services
         let html = '';
         let inList = false, inTaskList = false, inOl = false, inQuote = false, inCodeBlock = false;
         let codeBuffer = [];
+        let htmlBlockDepth = 0;
 
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i];
@@ -34,7 +35,11 @@ namespace TxtAIEditor.Core.Services
                 continue;
             }
 
-            const trimmed = line.trimEnd();
+            const trimmed = line.trim();
+            const openMatches = trimmed.match(/<(?:table|thead|tbody|tr|th|td|div|p|ul|ol|li|section|header|footer|figure|figcaption|center)\b[^>]*>/gi) || [];
+            const openers = openMatches.filter(m => !m.endsWith('/>')).length;
+            const closers = (trimmed.match(/<\/(?:table|thead|tbody|tr|th|td|div|p|ul|ol|li|section|header|footer|figure|figcaption|center)\b/gi) || []).length;
+            const isHtmlLine = htmlBlockDepth > 0 || openers > 0 || closers > 0 || /^<\/?(?:table|thead|tbody|tr|th|td|div|p|ul|ol|li|h1|h2|h3|h4|h5|h6|blockquote|section|header|footer|figure|figcaption|center)\b/i.test(trimmed);
 
             const taskMatch = trimmed.match(/^[-*+]\s+\[([ xX])\]\s+(.*)/);
 
@@ -95,6 +100,12 @@ namespace TxtAIEditor.Core.Services
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
                 html += '<hr/>';
+            } else if (isHtmlLine) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inTaskList) { html += '</ul>'; inTaskList = false; }
+                if (inOl) { html += '</ol>'; inOl = false; }
+                if (inQuote) { html += '</blockquote>'; inQuote = false; }
+                html += inlineMdJs(line) + '\n';
             } else if (trimmed.length > 0) {
                 if (inList) { html += '</ul>'; inList = false; }
                 if (inTaskList) { html += '</ul>'; inTaskList = false; }
@@ -107,6 +118,7 @@ namespace TxtAIEditor.Core.Services
                 if (inOl) { html += '</ol>'; inOl = false; }
                 if (inQuote) { html += '</blockquote>'; inQuote = false; }
             }
+            htmlBlockDepth = Math.max(0, htmlBlockDepth + openers - closers);
         }
         if (inList) html += '</ul>';
         if (inTaskList) html += '</ul>';
@@ -148,14 +160,29 @@ namespace TxtAIEditor.Core.Services
         return text;
     }
 
+    function unescapeSafeHtmlTagsJs(text) {
+        if (!text) return text;
+        const allowedTags = new Set([
+            'table', 'thead', 'tbody', 'tr', 'th', 'td',
+            'a', 'img', 'div', 'p', 'span', 'br', 'font',
+            'mark', 'u', 'b', 'i', 'strong', 'em', 'code',
+            'sub', 'sup', 'hr', 'ul', 'ol', 'li', 'h1',
+            'h2', 'h3', 'h4', 'h5', 'h6', 'center', 'figure', 'figcaption'
+        ]);
+        return text.replace(/&lt;(\/?[a-zA-Z][a-zA-Z0-9:-]*)([\s\S]*?)&gt;/gi, (match, rawTagName, rawAttrs) => {
+            const tagName = rawTagName.replace(/^\//, '').toLowerCase();
+            if (!allowedTags.has(tagName)) return match;
+            const decodedAttrs = rawAttrs.replace(/&quot;/g, '""').replace(/&#39;/g, String.fromCharCode(39)).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+            const cleanAttrs = decodedAttrs
+                .replace(/\bon[a-z]+\s*=\s*(?:""[^""]*""|'[^']*'|[^\s>]+)/gi, '')
+                .replace(/(?:href|src)\s*=\s*(?:""\s*javascript:[^""]*""|'\s*javascript:[^']*')/gi, '');
+            return '<' + rawTagName + cleanAttrs + '>';
+        });
+    }
+
     function inlineMdJs(str) {
         let s = escapeHtml(str);
-        s = s.replace(/&lt;span\s+style=(?:&quot;|&#39;|'|"")([\s\S]*?)(?:&quot;|&#39;|'|"")\s*&gt;([\s\S]*?)&lt;\/span&gt;/gi, '<span style=""$1"">$2</span>');
-        s = s.replace(/&lt;font\s+color=(?:&quot;|&#39;|'|"")([\s\S]*?)(?:&quot;|&#39;|'|"")\s*&gt;([\s\S]*?)&lt;\/font&gt;/gi, '<font color=""$1"">$2</font>');
-        s = s.replace(/&lt;mark&gt;([\s\S]*?)&lt;\/mark&gt;/gi, '<mark>$1</mark>');
-        s = s.replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<u>$1</u>');
-        s = s.replace(/&lt;b&gt;([\s\S]*?)&lt;\/b&gt;/gi, '<b>$1</b>');
-        s = s.replace(/&lt;i&gt;([\s\S]*?)&lt;\/i&gt;/gi, '<i>$1</i>');
+        s = unescapeSafeHtmlTagsJs(s);
         s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src=""$2"" alt=""$1"" style=""max-width:100%;height:auto;display:inline-block;vertical-align:middle;margin:4px 0;"" />');
         s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href=""$2"" target=""_blank"" rel=""noopener"">$1</a>');
         s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');

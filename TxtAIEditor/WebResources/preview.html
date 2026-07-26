@@ -266,6 +266,67 @@
             font-weight: 600;
         }
 
+        .tfo-notebook-buttons,
+        table.tfo-notebook-buttons {
+            display: inline-table !important;
+            float: none !important;
+            clear: both !important;
+            border-collapse: separate !important;
+            border-spacing: 8px 4px !important;
+            margin: 10px 0 !important;
+            border: none !important;
+            background: transparent !important;
+            width: auto !important;
+        }
+
+        .tfo-notebook-buttons tr,
+        .tfo-notebook-buttons tbody tr {
+            background: transparent !important;
+        }
+
+        .tfo-notebook-buttons td {
+            border: none !important;
+            padding: 0 !important;
+            vertical-align: middle !important;
+            background: transparent !important;
+            white-space: nowrap !important;
+        }
+
+        .tfo-notebook-buttons a {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 6px 12px !important;
+            border-radius: 6px !important;
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            line-height: 1.4 !important;
+            text-decoration: none !important;
+            color: var(--fg) !important;
+            background-color: color-mix(in srgb, var(--fg) 8%, transparent) !important;
+            border: 1px solid var(--border) !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .tfo-notebook-buttons a:hover {
+            background-color: var(--link) !important;
+            color: #ffffff !important;
+            border-color: var(--link) !important;
+            text-decoration: none !important;
+        }
+
+        .tfo-notebook-buttons img {
+            width: 20px !important;
+            height: 20px !important;
+            max-width: 20px !important;
+            max-height: 20px !important;
+            object-fit: contain !important;
+            vertical-align: middle !important;
+            margin: 0 !important;
+            display: inline-block !important;
+        }
+
         blockquote {
             padding-left: 12px;
             color: var(--muted);

@@ -296,17 +296,21 @@ function sanitizeInlineHtmlTag(tag) {
     if (!match) return escapeHtml(raw);
     const isClosing = /^<\s*\//.test(raw);
     const tagName = match[1].toLowerCase();
-    const allowedInlineTags = new Set(['span', 'strong', 'em', 'b', 'i', 'u', 'big', 'small', 'mark', 's', 'code', 'sub', 'sup', 'kbd']);
+    const allowedInlineTags = new Set([
+        'span', 'strong', 'em', 'b', 'i', 'u', 'big', 'small', 'mark', 's', 'code', 'sub', 'sup', 'kbd',
+        'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'p', 'br', 'font', 'center', 'hr',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+    ]);
     if (!allowedInlineTags.has(tagName)) return escapeHtml(raw);
     if (isClosing) return `</${tagName}>`;
-    if (tagName === 'span') {
-        const styleMatch = /\bstyle\s*=\s*(["'])(.*?)\1/i.exec(match[2] || '');
-        if (styleMatch) {
-            const colorMatch = /(?:^|;)\s*color\s*:\s*(#[0-9a-fA-F]{6})\s*;?\s*(?:$|;)/i.exec(styleMatch[2]);
-            if (colorMatch) return `<span style="color: ${colorMatch[1].toUpperCase()}">`;
-        }
-    }
-    return `<${tagName}>`;
+
+    const rawAttrs = match[2] || '';
+    const cleanAttrs = rawAttrs
+        .replace(/\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(/(?:href|src)\s*=\s*(?:"\s*javascript:[^"]*"|'\s*javascript:[^']*')/gi, '');
+
+    const isSelfClosing = /\/>\s*$/.test(raw) || tagName === 'img' || tagName === 'br' || tagName === 'hr';
+    return `<${tagName}${cleanAttrs}${isSelfClosing ? ' /' : ''}>`;
 }
 
 function stashHtmlTags(value, stash) {
@@ -582,8 +586,8 @@ function renderLatexBlockAt(lineNumber, maxLine, getLine) {
 
 function htmlBlockTagName(line) {
     const trimmed = (line || '').trim();
-    const match = /^<([A-Za-z][A-Za-z0-9:-]*)(?:\s[^<>]*?)?>\s*$/.exec(trimmed);
-    if (!match || /\/>\s*$/.test(trimmed)) return '';
+    const match = /^<([A-Za-z][A-Za-z0-9:-]*)(?:\s[^>]*)?>/.exec(trimmed);
+    if (!match) return '';
     const tag = match[1].toLowerCase();
     return [
         'h1', 'h2', 'h3', 'h4', 'h5', 'h6',

@@ -153,8 +153,8 @@ body {
 .cell-input-area pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: inherit; font-size: inherit; line-height: inherit; }
 .cell pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; }
 .cell-toolbar {
-    display: flex; gap: 4px; padding: 2px 8px; background: var(--nb-input-bg);
-    border-top: 1px solid var(--nb-border);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 8px; background: var(--nb-input-bg);
+    border-top: 1px solid var(--nb-border); clear: both;
 }
 .cell-btn {
     padding: 3px 8px; border: none; border-radius: 4px; background: transparent;
@@ -273,6 +273,63 @@ blockquote p:last-child {
 ul.task-list { list-style-type: none; padding-left: 4px; margin: 4px 0; }
 li.task-list-item { list-style-type: none; display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 li.task-list-item input[type=""checkbox""] { margin-right: 4px; cursor: default; }
+
+/* TensorFlow / Colab Notebook Action Buttons (.tfo-notebook-buttons) */
+.tfo-notebook-buttons,
+table.tfo-notebook-buttons {
+    display: inline-table !important;
+    float: none !important;
+    clear: both !important;
+    border-collapse: separate !important;
+    border-spacing: 8px 4px !important;
+    margin: 10px 0 !important;
+    border: none !important;
+    background: transparent !important;
+    width: auto !important;
+}
+.tfo-notebook-buttons tr,
+.tfo-notebook-buttons tbody tr {
+    background: transparent !important;
+}
+.tfo-notebook-buttons td {
+    border: none !important;
+    padding: 0 !important;
+    vertical-align: middle !important;
+    background: transparent !important;
+    white-space: nowrap !important;
+}
+.tfo-notebook-buttons a {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 1.4 !important;
+    text-decoration: none !important;
+    color: var(--nb-fg) !important;
+    background-color: var(--nb-input-bg) !important;
+    border: 1px solid var(--nb-border) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.tfo-notebook-buttons a:hover {
+    background-color: var(--nb-accent) !important;
+    color: #ffffff !important;
+    border-color: var(--nb-accent) !important;
+    text-decoration: none !important;
+}
+.tfo-notebook-buttons img {
+    width: 20px !important;
+    height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
+    object-fit: contain !important;
+    vertical-align: middle !important;
+    margin: 0 !important;
+    display: inline-block !important;
+}
 
 /* tqdm progress bar widget - Jupyter Lab style */
 .nb-tqdm-widget {
@@ -402,6 +459,7 @@ strong { font-weight: 700; }
 .markdown-cell { padding: 0; }
 .markdown-preview {
     padding: 12px 14px; min-height: 42px; cursor: pointer; border-radius: 4px; line-height: 1.6; font-size: 14px; box-sizing: border-box;
+    display: flow-root; clear: both;
 }
 .markdown-preview:hover {
     outline: 1px dashed var(--nb-accent);
