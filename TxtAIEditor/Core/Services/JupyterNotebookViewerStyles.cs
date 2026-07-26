@@ -80,6 +80,18 @@ body {
     text-align: center;
     white-space: nowrap;
 }
+::highlight(notebook-search-results) {
+    background: #ffe082;
+    color: #1a1a1a;
+}
+::highlight(notebook-search-active) {
+    background: #ff9800;
+    color: #111111;
+}
+.cell.is-find-current {
+    border-color: #ff9800;
+    box-shadow: 0 0 0 2px #ff9800;
+}
 #variables-panel {
     background: var(--nb-input-bg);
     border: 1px solid var(--nb-border);

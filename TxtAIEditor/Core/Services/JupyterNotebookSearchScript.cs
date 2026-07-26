@@ -15,23 +15,63 @@ namespace TxtAIEditor.Core.Services
     let notebookFindMatchCount = 0;
     let notebookFindMatchIndex = 0;
     let notebookFindComposing = false;
+    let notebookFindMatches = [];
 
-    function countNotebookMatches(query) {
-        if (!query) return 0;
+    function clearNotebookFindHighlights() {
+        container.querySelectorAll('.cell.is-find-current').forEach(cell => {
+            cell.classList.remove('is-find-current');
+        });
+        if (window.CSS && CSS.highlights) {
+            CSS.highlights.delete('notebook-search-results');
+            CSS.highlights.delete('notebook-search-active');
+        }
+    }
+
+    function collectNotebookMatches(query) {
+        if (!query) return [];
         const needle = query.toLocaleLowerCase();
-        let count = 0;
-        container.querySelectorAll('.cell').forEach(cell => {
-            const output = cell.querySelector('.cell-output');
-            const corpus = (getCellSource(cell) + '\n' + (output ? output.innerText || '' : '')).toLocaleLowerCase();
-            let offset = 0;
-            while (offset <= corpus.length - needle.length) {
-                const found = corpus.indexOf(needle, offset);
-                if (found < 0) break;
-                count++;
-                offset = found + Math.max(needle.length, 1);
+        const matches = [];
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                const parent = node.parentElement;
+                if (!parent || !node.nodeValue || !node.nodeValue.trim()) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                if (parent.closest('.cell-toolbar, .cell-drag-handle, #nb-context-menu') ||
+                    parent.getClientRects().length === 0) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
             }
         });
-        return count;
+
+        let node = walker.nextNode();
+        while (node) {
+            const text = (node.nodeValue || '').toLocaleLowerCase();
+            let offset = 0;
+            while (offset <= text.length - needle.length) {
+                const found = text.indexOf(needle, offset);
+                if (found < 0) break;
+                const range = document.createRange();
+                range.setStart(node, found);
+                range.setEnd(node, found + needle.length);
+                const cell = node.parentElement.closest('.cell');
+                if (cell) matches.push({ range, cell });
+                offset = found + Math.max(needle.length, 1);
+            }
+            node = walker.nextNode();
+        }
+        return matches;
+    }
+
+    function applyNotebookFindHighlights() {
+        if (!window.CSS || !CSS.highlights || typeof Highlight !== 'function') return;
+        CSS.highlights.delete('notebook-search-results');
+        const highlight = new Highlight();
+        notebookFindMatches.forEach(match => highlight.add(match.range));
+        if (highlight.size > 0) {
+            CSS.highlights.set('notebook-search-results', highlight);
+        }
     }
 
     function updateNotebookFindCount() {
@@ -50,60 +90,71 @@ namespace TxtAIEditor.Core.Services
             .replace('{1}', String(notebookFindMatchCount));
     }
 
-    function resetNotebookFindOrigin() {
-        const selection = window.getSelection();
-        const title = document.querySelector('.notebook-title');
-        if (!selection || !title) return;
-        const range = document.createRange();
-        range.selectNodeContents(title);
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
+    function refreshNotebookFindMatches() {
+        const query = notebookFindInput ? notebookFindInput.value : '';
+        clearNotebookFindHighlights();
+        notebookFindQuery = query;
+        notebookFindMatchIndex = 0;
+        notebookFindMatches = collectNotebookMatches(query);
+        notebookFindMatchCount = notebookFindMatches.length;
+        applyNotebookFindHighlights();
+        updateNotebookFindCount();
     }
 
-    function findNotebookMatch(backwards, resetOrigin) {
+    function focusNotebookFindInputAtEnd() {
+        if (!notebookFindInput || notebookFindBar.hidden) return;
+        const end = notebookFindInput.value.length;
+        notebookFindInput.focus({ preventScroll: true });
+        notebookFindInput.setSelectionRange(end, end);
+    }
+
+    function findNotebookMatch(backwards) {
         const query = notebookFindInput ? notebookFindInput.value : '';
         if (!query) {
-            notebookFindQuery = '';
-            notebookFindMatchCount = 0;
-            notebookFindMatchIndex = 0;
-            updateNotebookFindCount();
+            refreshNotebookFindMatches();
             return false;
         }
 
-        const changed = query !== notebookFindQuery;
-        if (changed) {
-            notebookFindQuery = query;
-            notebookFindMatchCount = countNotebookMatches(query);
-            notebookFindMatchIndex = 0;
+        if (query !== notebookFindQuery ||
+            notebookFindMatches.some(match => !match.range.startContainer.isConnected)) {
+            refreshNotebookFindMatches();
         }
 
-        if (resetOrigin || changed) {
-            resetNotebookFindOrigin();
+        if (notebookFindMatchCount === 0) {
+            updateNotebookFindCount();
+            focusNotebookFindInputAtEnd();
+            return false;
         }
 
-        const selectionStart = notebookFindInput ? notebookFindInput.selectionStart : null;
-        const selectionEnd = notebookFindInput ? notebookFindInput.selectionEnd : null;
-        const found = window.find(query, false, !!backwards, true, false, false, false);
-        if (notebookFindInput && !notebookFindBar.hidden) {
-            notebookFindInput.focus({ preventScroll: true });
-            if (selectionStart !== null && selectionEnd !== null) {
-                notebookFindInput.setSelectionRange(selectionStart, selectionEnd);
-            }
+        if (backwards) {
+            notebookFindMatchIndex = notebookFindMatchIndex <= 1
+                ? notebookFindMatchCount
+                : notebookFindMatchIndex - 1;
+        } else {
+            notebookFindMatchIndex = notebookFindMatchIndex >= notebookFindMatchCount
+                ? 1
+                : notebookFindMatchIndex + 1;
         }
-        if (found && notebookFindMatchCount > 0) {
-            if (backwards) {
-                notebookFindMatchIndex = notebookFindMatchIndex <= 1
-                    ? notebookFindMatchCount
-                    : notebookFindMatchIndex - 1;
-            } else {
-                notebookFindMatchIndex = notebookFindMatchIndex >= notebookFindMatchCount
-                    ? 1
-                    : notebookFindMatchIndex + 1;
-            }
+
+        const activeMatch = notebookFindMatches[notebookFindMatchIndex - 1];
+        container.querySelectorAll('.cell.is-find-current').forEach(cell => {
+            cell.classList.remove('is-find-current');
+        });
+        activeMatch.cell.classList.add('is-find-current');
+        if (window.__notebookSelectCell) {
+            window.__notebookSelectCell(activeMatch.cell, false);
         }
+
+        if (window.CSS && CSS.highlights && typeof Highlight === 'function') {
+            CSS.highlights.set('notebook-search-active', new Highlight(activeMatch.range));
+        }
+
+        const rect = activeMatch.range.getBoundingClientRect();
+        const targetTop = window.scrollY + rect.top - (window.innerHeight / 2) + (rect.height / 2);
+        window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+        focusNotebookFindInputAtEnd();
         updateNotebookFindCount();
-        return found;
+        return true;
     }
 
     function openNotebookFind() {
@@ -111,6 +162,7 @@ namespace TxtAIEditor.Core.Services
         notebookFindBar.hidden = false;
         notebookFindInput.focus();
         notebookFindInput.select();
+        refreshNotebookFindMatches();
         return true;
     }
 
@@ -118,6 +170,7 @@ namespace TxtAIEditor.Core.Services
         if (!notebookFindBar) return;
         if (notebookFindInput) notebookFindInput.blur();
         notebookFindBar.hidden = true;
+        clearNotebookFindHighlights();
         if (window.__notebookSelectedCell && window.__notebookSelectedCell.isConnected) {
             window.__notebookSelectCell(window.__notebookSelectedCell, true);
         }
@@ -127,10 +180,10 @@ namespace TxtAIEditor.Core.Services
         notebookFindButton.addEventListener('click', openNotebookFind);
     }
     if (notebookFindPrevious) {
-        notebookFindPrevious.addEventListener('click', () => findNotebookMatch(true, false));
+        notebookFindPrevious.addEventListener('click', () => findNotebookMatch(true));
     }
     if (notebookFindNext) {
-        notebookFindNext.addEventListener('click', () => findNotebookMatch(false, false));
+        notebookFindNext.addEventListener('click', () => findNotebookMatch(false));
     }
     if (notebookFindClose) {
         notebookFindClose.addEventListener('click', closeNotebookFind);
@@ -141,10 +194,11 @@ namespace TxtAIEditor.Core.Services
         });
         notebookFindInput.addEventListener('compositionend', () => {
             notebookFindComposing = false;
-            findNotebookMatch(false, true);
+            refreshNotebookFindMatches();
+            focusNotebookFindInputAtEnd();
         });
         notebookFindInput.addEventListener('input', () => {
-            if (!notebookFindComposing) findNotebookMatch(false, true);
+            if (!notebookFindComposing) refreshNotebookFindMatches();
         });
         notebookFindInput.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
@@ -152,7 +206,7 @@ namespace TxtAIEditor.Core.Services
                 closeNotebookFind();
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                findNotebookMatch(e.shiftKey, false);
+                findNotebookMatch(e.shiftKey);
             }
         });
     }
