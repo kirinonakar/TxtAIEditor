@@ -237,6 +237,64 @@ namespace TxtAIEditor.Core.Services
         }
     }
 
+    function focusEditorAtStart(editor) {
+        editor.focus();
+        const sel = window.getSelection();
+        if (!sel) return;
+        const target = editor.querySelector('pre') || editor;
+        const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+        const textNode = walker.nextNode();
+        const range = document.createRange();
+        if (textNode) {
+            range.setStart(textNode, 0);
+        } else {
+            range.setStart(target, 0);
+        }
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    function isCaretOnBoundaryLine(editor, direction) {
+        const sel = window.getSelection();
+        if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return false;
+        const caret = sel.getRangeAt(0);
+        if (!editor.contains(caret.startContainer)) return false;
+
+        const probe = document.createRange();
+        probe.selectNodeContents(editor);
+        if (direction < 0) {
+            probe.setEnd(caret.startContainer, caret.startOffset);
+        } else {
+            probe.setStart(caret.startContainer, caret.startOffset);
+        }
+        const holder = document.createElement('div');
+        holder.appendChild(probe.cloneContents());
+        return !getEditorText(holder).includes('\n');
+    }
+
+    function moveEditorFocusToAdjacentCell(cellDiv, direction) {
+        const cells = Array.from(container.querySelectorAll('.cell'));
+        const currentIndex = cells.indexOf(cellDiv);
+        const targetCell = cells[currentIndex + direction];
+        if (!targetCell) return false;
+
+        selectCell(targetCell, false);
+        if (getCellType(targetCell) === 'markdown') {
+            editMarkdownCell(targetCell, false);
+        }
+        const targetEditor = targetCell.querySelector('.code-editor, .markdown-editor, .raw-editor, .cell-input-area');
+        if (!targetEditor) return false;
+
+        if (direction < 0) {
+            focusEditorAtEnd(targetEditor);
+        } else {
+            focusEditorAtStart(targetEditor);
+        }
+        targetCell.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        return true;
+    }
+
     function focusEditorAtLine(editor, lineIndex) {
         editor.focus();
         const sel = window.getSelection();
@@ -544,6 +602,29 @@ namespace TxtAIEditor.Core.Services
     }
 
     window.__notebookSelectCell = selectCell;
+
+    function selectAdjacentCell(direction) {
+        if (!selectedCell) return;
+        const cells = Array.from(container.querySelectorAll('.cell'));
+        const currentIndex = cells.indexOf(selectedCell);
+        if (currentIndex < 0) return;
+        const targetIndex = Math.max(0, Math.min(cells.length - 1, currentIndex + direction));
+        const targetCell = cells[targetIndex];
+        selectCell(targetCell, true);
+        targetCell.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    function enterSelectedCellEditMode() {
+        if (!selectedCell || !selectedCell.isConnected) return;
+        selectCell(selectedCell, false);
+        if (getCellType(selectedCell) === 'markdown') {
+            editMarkdownCell(selectedCell);
+            return;
+        }
+
+        const editor = selectedCell.querySelector('.code-editor, .raw-editor, .cell-input-area');
+        if (editor) focusEditorAtEnd(editor);
+    }
 
     function prepareCell(cellDiv) {
         if (!cellDiv || cellDiv.dataset.notebookPrepared === 'true') return;
@@ -1061,9 +1142,24 @@ namespace TxtAIEditor.Core.Services
         const active = document.activeElement;
         const isEditing = active && active.closest &&
             active.closest('[contenteditable=""true""], input, textarea, select');
-        if (!commandMode || isEditing || !selectedCell || !selectedCell.isConnected || e.repeat) return;
+        if (!commandMode || isEditing || !selectedCell || !selectedCell.isConnected) return;
 
         const key = String(e.key || '').toLowerCase();
+        if (key === 'arrowup' || key === 'arrowdown') {
+            e.preventDefault();
+            e.stopPropagation();
+            pendingDeleteAt = 0;
+            selectAdjacentCell(key === 'arrowup' ? -1 : 1);
+            return;
+        }
+        if (key === 'enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            pendingDeleteAt = 0;
+            enterSelectedCellEditMode();
+            return;
+        }
+        if (e.repeat) return;
         if (key !== 'd') pendingDeleteAt = 0;
 
         if (key === 'a') {
@@ -1162,6 +1258,18 @@ namespace TxtAIEditor.Core.Services
         if (!input) return;
         const cellDiv = input.closest('.cell');
         if (!cellDiv) return;
+
+        if (!e.isComposing && e.keyCode !== 229 &&
+            !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey &&
+            (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            const direction = e.key === 'ArrowUp' ? -1 : 1;
+            if (isCaretOnBoundaryLine(input, direction) &&
+                moveEditorFocusToAdjacentCell(cellDiv, direction)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+        }
 
         if (e.key === 'Backspace' && !e.ctrlKey && !e.altKey && !e.metaKey) {
             const codeEditor = input.closest('.code-editor');
