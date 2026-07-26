@@ -153,7 +153,7 @@ body {
 .cell-input-area pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: inherit; font-size: inherit; line-height: inherit; }
 .cell pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 0; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; }
 .cell-toolbar {
-    display: flex; gap: 4px; padding: 4px 10px; background: var(--nb-input-bg);
+    display: flex; gap: 4px; padding: 2px 8px; background: var(--nb-input-bg);
     border-top: 1px solid var(--nb-border);
 }
 .cell-btn {
@@ -199,18 +199,21 @@ body {
     margin: 4px 0;
 }
 .cell-output {
-    padding: 0px 12px 4px 12px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
-    font-family: 'Consolas', monospace; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    padding: 6px 12px 8px 12px; background: var(--nb-output-bg); border-top: 1px solid var(--nb-border);
+    font-family: 'Consolas', monospace; font-size: 13.5px; line-height: 1.5; word-break: break-word;
     display: none; min-height: 0; box-sizing: border-box;
 }
 .cell-output.has-output { display: block; }
-.cell-output .output-entry { margin: 0; padding: 0; }
+.cell-output .output-entry { margin: 0; padding: 0; white-space: normal; }
 .cell-output .output-entry:first-child { margin-top: 0; }
-.cell-output .output-entry + .output-entry { margin-top: 4px; }
-.cell-output .output-stdout { color: var(--nb-fg); white-space: pre-wrap; }
-.cell-output .output-stderr { color: var(--nb-error); }
-.cell-output .output-error { color: var(--nb-error); }
-.cell-output .output-result { color: var(--nb-accent); font-style: italic; }
+.cell-output .output-entry + .output-entry { margin-top: 6px; }
+.cell-output .output-entry > div { margin-top: 0; padding-top: 0; }
+.cell-output .output-entry p { margin: 4px 0; }
+.cell-output .output-entry p:first-child { margin-top: 0; }
+.cell-output .output-stdout { color: var(--nb-fg); white-space: pre-wrap; display: inline-block; width: 100%; }
+.cell-output .output-stderr { color: var(--nb-error); white-space: pre-wrap; display: inline-block; width: 100%; }
+.cell-output .output-error { color: var(--nb-error); white-space: pre-wrap; display: inline-block; width: 100%; }
+.cell-output .output-result { color: var(--nb-accent); font-style: italic; white-space: pre-wrap; }
 .cell-running .cell-run { background: var(--nb-accent); color: #fff; opacity: 1; }
 .cell-btn.is-running, .nb-btn-run.is-running { background: #d32f2f !important; color: #fff !important; border-color: #d32f2f !important; opacity: 1 !important; }
 blockquote {
@@ -232,7 +235,7 @@ blockquote p:last-child {
 }
 .cell-output table.dataframe {
     border-collapse: collapse;
-    margin: 0 0 2px 0;
+    margin: 6px 0 8px 0;
     font-size: 13px;
     font-family: 'Segoe UI', 'Consolas', monospace;
     width: auto;
@@ -243,9 +246,12 @@ blockquote p:last-child {
     border: 1px solid var(--nb-border);
     border-radius: 4px;
     box-sizing: border-box;
+    white-space: normal;
 }
-.cell-output .output-entry:first-child table.dataframe {
-    margin-top: 0;
+.cell-output .output-entry:first-child table.dataframe,
+.cell-output .output-entry:first-child > div > table.dataframe,
+.cell-output .output-entry:first-child > table.dataframe {
+    margin-top: 6px;
 }
 .cell-output table.dataframe th, .cell-output table.dataframe td {
     padding: 2px 8px;
