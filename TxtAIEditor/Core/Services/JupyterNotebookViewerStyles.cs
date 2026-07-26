@@ -422,10 +422,11 @@ strong { font-weight: 700; }
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 6px;
+    padding: 3px 6px;
     margin: 0;
-    line-height: 1;
-    height: 26px;
+    line-height: 1.2;
+    min-height: 26px;
+    height: auto;
     box-sizing: border-box;
     background: var(--nb-input-bg);
     border-bottom: 1px solid var(--nb-border);
@@ -458,26 +459,26 @@ strong { font-weight: 700; }
 .mpl-rotate-ctrl {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin: 0 4px;
+    gap: 4px;
+    margin: 0 2px;
     font-size: 11px;
     line-height: 1;
 }
-.mpl-rotate-slider {
-    width: 100px;
+.mpl-rotate-y-slider, .mpl-rotate-x-slider, .mpl-rotate-slider {
+    width: 60px;
     cursor: pointer;
 }
-.mpl-angle-val {
-    min-width: 32px;
+.mpl-angle-val, .mpl-angle-val-x, .mpl-angle-val-y {
+    min-width: 28px;
     font-size: 11px;
-    font-weight: bold;
+    font-weight: 600;
 }
 .mpl-status-text {
     margin-left: auto;
     font-size: 11px;
     color: #666666;
     white-space: nowrap;
-    padding-left: 8px;
+    padding-left: 6px;
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     user-select: none;
 }
