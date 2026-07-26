@@ -845,21 +845,34 @@ namespace TxtAIEditor.Core.Services
 
     let clipboardCell = null;
 
-    function splitCellAtCursor(cellDiv) {
+    function getCaretOffsetInEditor(editor) {
+        const sel = window.getSelection();
+        if (!editor || !sel || sel.rangeCount === 0) return null;
+        const caret = sel.getRangeAt(0);
+        if (!editor.contains(caret.startContainer)) return null;
+
+        const beforeCaret = document.createRange();
+        beforeCaret.selectNodeContents(editor);
+        beforeCaret.setEnd(caret.startContainer, caret.startOffset);
+        const holder = document.createElement('div');
+        holder.appendChild(beforeCaret.cloneContents());
+        return getEditorText(holder).length;
+    }
+
+    function splitCellAtCursor(cellDiv, preservedCaretOffset = null) {
         if (!cellDiv) return;
         const type = getCellType(cellDiv);
         const fullSource = getCellSource(cellDiv);
         let head = fullSource;
         let tail = '';
 
-        const sel = window.getSelection();
-        const editor = cellDiv.querySelector('.cell-input-area, .markdown-editor');
-        if (sel && sel.rangeCount > 0 && editor && editor.contains(sel.anchorNode)) {
-            const range = sel.getRangeAt(0);
-            const preRange = range.cloneRange();
-            preRange.selectNodeContents(editor);
-            preRange.setEnd(range.startContainer, range.startOffset);
-            const caretPos = preRange.toString().length;
+        const editor = cellDiv.querySelector('.code-editor, .markdown-editor, .raw-editor, .cell-input-area');
+        const liveCaretOffset = getCaretOffsetInEditor(editor);
+        const requestedOffset = Number.isInteger(preservedCaretOffset)
+            ? preservedCaretOffset
+            : liveCaretOffset;
+        if (Number.isInteger(requestedOffset)) {
+            const caretPos = Math.max(0, Math.min(fullSource.length, requestedOffset));
             head = fullSource.substring(0, caretPos);
             tail = fullSource.substring(caretPos);
         } else {
@@ -873,11 +886,17 @@ namespace TxtAIEditor.Core.Services
 
         if (type === 'markdown') {
             const ed = cellDiv.querySelector('.markdown-editor');
-            if (ed) ed.innerHTML = '<pre>' + escapeHtml(head) + '</pre>';
+            if (ed) {
+                ed.innerHTML = '<pre>' + escapeHtml(head) + '</pre>';
+                ed.setAttribute('data-source', head);
+            }
             renderMarkdownCell(cellDiv);
         } else {
             const ed = cellDiv.querySelector('.cell-input-area');
-            if (ed) ed.innerHTML = '<pre>' + highlightPythonCode(head) + '</pre>';
+            if (ed) {
+                ed.innerHTML = '<pre>' + highlightPythonCode(head) + '</pre>';
+                ed.setAttribute('data-source', head);
+            }
         }
         cellDiv.setAttribute('data-source', head);
 
@@ -886,6 +905,10 @@ namespace TxtAIEditor.Core.Services
         if (next) container.insertBefore(newCell, next);
         else container.appendChild(newCell);
         reindexCells();
+        selectCell(newCell, false);
+        if (type === 'markdown') editMarkdownCell(newCell, false);
+        const newEditor = newCell.querySelector('.code-editor, .markdown-editor, .raw-editor, .cell-input-area');
+        if (newEditor) focusEditorAtStart(newEditor);
         notifyModified();
     }
 
@@ -912,7 +935,7 @@ namespace TxtAIEditor.Core.Services
         notifyModified();
     }
 
-    function showContextMenu(x, y, cellDiv) {
+    function showContextMenu(x, y, cellDiv, preservedCaretOffset = null) {
         let menu = document.getElementById('nb-context-menu');
         if (!menu) {
             menu = document.createElement('div');
@@ -968,7 +991,7 @@ namespace TxtAIEditor.Core.Services
             if (!item || item.classList.contains('disabled')) return;
             const action = item.getAttribute('data-action');
             hideContextMenu();
-            handleContextMenuAction(action, cellDiv);
+            handleContextMenuAction(action, cellDiv, true, preservedCaretOffset);
         };
     }
 
@@ -977,7 +1000,7 @@ namespace TxtAIEditor.Core.Services
         if (menu) menu.style.display = 'none';
     }
 
-    function handleContextMenuAction(action, cellDiv, enterEditMode = true) {
+    function handleContextMenuAction(action, cellDiv, enterEditMode = true, preservedCaretOffset = null) {
         if (!cellDiv && (action === 'add-above' || action === 'add-below')) {
             const cells = container.querySelectorAll('.cell');
             cellDiv = cells.length > 0 ? cells[cells.length - 1] : null;
@@ -1070,7 +1093,7 @@ namespace TxtAIEditor.Core.Services
             }
             case 'split': {
                 if (!cellDiv) return;
-                splitCellAtCursor(cellDiv);
+                splitCellAtCursor(cellDiv, preservedCaretOffset);
                 break;
             }
             case 'merge-above': {
@@ -1116,9 +1139,13 @@ namespace TxtAIEditor.Core.Services
     document.addEventListener('contextmenu', (e) => {
         if (e.target.closest('.mpl-viewport, .mpl-toolbar')) return;
         const cellDiv = e.target.closest('.cell');
+        const editor = e.target.closest('.code-editor, .markdown-editor, .raw-editor, .cell-input-area');
+        const preservedCaretOffset = cellDiv && editor
+            ? getCaretOffsetInEditor(editor)
+            : null;
         e.preventDefault();
         if (cellDiv) selectCell(cellDiv, !e.target.closest('[contenteditable=""true""], input, textarea, select'));
-        showContextMenu(e.clientX, e.clientY, cellDiv);
+        showContextMenu(e.clientX, e.clientY, cellDiv, preservedCaretOffset);
     });
 
     document.addEventListener('keydown', e => {
