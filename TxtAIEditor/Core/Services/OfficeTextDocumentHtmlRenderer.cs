@@ -302,6 +302,11 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyDictionary<string, string> relationships,
             XElement table)
         {
+            if (!HasDocxTableContent(table))
+            {
+                return string.Empty;
+            }
+
             var builder = new StringBuilder();
             builder.Append("<div class=\"doc-table-wrap\"><table class=\"doc-table\"><tbody>");
             foreach (XElement row in table.Elements().Where(e => e.Name.LocalName == "tr"))
@@ -336,6 +341,13 @@ namespace TxtAIEditor.Core.Services
 
             builder.Append("</tbody></table></div>");
             return builder.ToString();
+        }
+
+        private static bool HasDocxTableContent(XElement table)
+        {
+            return table.Descendants().Any(element =>
+                element.Name.LocalName is "drawing" or "pict" ||
+                (element.Name.LocalName == "t" && !string.IsNullOrWhiteSpace(element.Value)));
         }
 
         private static string ReadDocxGridSpan(XElement cell)
@@ -394,9 +406,11 @@ namespace TxtAIEditor.Core.Services
         {
             var content = new StringBuilder();
             var renderedImages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var renderedContainers = new HashSet<XElement>();
             foreach (XNode node in paragraph.DescendantNodes())
             {
-                if (IsInsideNestedElement(paragraph, node, "tbl"))
+                if (IsInsideNestedElement(paragraph, node, "tbl") ||
+                    IsInsideRenderedContainer(paragraph, node, renderedContainers))
                 {
                     continue;
                 }
@@ -431,6 +445,18 @@ namespace TxtAIEditor.Core.Services
                     case "pic":
                     case "img":
                         AppendHwpxImageHtml(content, archive, binaryItems, element, renderedImages);
+                        break;
+                    case "container":
+                        if (TryAppendHwpxLayeredImageHtml(
+                            content,
+                            archive,
+                            binaryItems,
+                            characterStyles,
+                            element,
+                            renderedImages))
+                        {
+                            renderedContainers.Add(element);
+                        }
                         break;
                 }
             }
@@ -494,6 +520,145 @@ namespace TxtAIEditor.Core.Services
 
             builder.Append("</tbody></table></div>");
             return builder.ToString();
+        }
+
+        private static bool TryAppendHwpxLayeredImageHtml(
+            StringBuilder builder,
+            ZipArchive archive,
+            IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
+            IReadOnlyDictionary<string, string> characterStyles,
+            XElement container,
+            ISet<string> renderedImages)
+        {
+            XElement? picture = container.Descendants().FirstOrDefault(e => e.Name.LocalName == "pic");
+            XElement? drawText = container.Descendants().FirstOrDefault(e => e.Name.LocalName == "drawText");
+            XElement? textShape = drawText?.Ancestors().FirstOrDefault(e => ReferenceEquals(e.Parent, container));
+            if (picture == null || drawText == null || textShape == null)
+            {
+                return false;
+            }
+
+            string imagePath = ResolveHwpxImagePath(picture, binaryItems);
+            if (string.IsNullOrWhiteSpace(imagePath) || renderedImages.Contains(imagePath))
+            {
+                return false;
+            }
+
+            string? dataUri = TryReadImageDataUri(archive, imagePath);
+            if (string.IsNullOrWhiteSpace(dataUri))
+            {
+                return false;
+            }
+
+            var text = new StringBuilder();
+            foreach (XElement textParagraph in drawText.Descendants().Where(e => e.Name.LocalName == "p"))
+            {
+                if (text.Length > 0)
+                {
+                    text.Append("<br>");
+                }
+
+                foreach (XNode node in textParagraph.DescendantNodes())
+                {
+                    if (node is XText textNode && textNode.Parent?.Name.LocalName == "t")
+                    {
+                        AppendStyledText(text, textNode.Value, GetHwpxTextStyle(textNode, characterStyles));
+                    }
+                    else if (node is XElement element && element.Name.LocalName is "lineBreak" or "br" or "cr")
+                    {
+                        text.Append("<br>");
+                    }
+                }
+            }
+
+            if (text.Length == 0 ||
+                !TryReadHwpxSize(container, out double containerWidth, out double containerHeight))
+            {
+                return false;
+            }
+
+            ReadHwpxOffset(container, out double containerX, out double containerY);
+            ReadHwpxOffset(textShape, out double textX, out double textY);
+            if (!TryReadHwpxSize(textShape, out double textWidth, out double textHeight))
+            {
+                return false;
+            }
+
+            double left = Math.Clamp((textX - containerX) / containerWidth * 100.0, 0.0, 100.0);
+            double top = Math.Clamp((textY - containerY) / containerHeight * 100.0, 0.0, 100.0);
+            double width = Math.Clamp(textWidth / containerWidth * 100.0, 0.0, 100.0 - left);
+            double height = Math.Clamp(textHeight / containerHeight * 100.0, 0.0, 100.0 - top);
+
+            renderedImages.Add(imagePath);
+            builder.Append("<span class=\"hwpx-layered-image\" style=\"aspect-ratio:")
+                .Append(CssNumber(containerWidth))
+                .Append('/')
+                .Append(CssNumber(containerHeight))
+                .Append("\"><img src=\"")
+                .Append(Html(dataUri))
+                .Append("\" alt=\"\"><span class=\"hwpx-layered-text\" style=\"left:")
+                .Append(CssPercent(left))
+                .Append(";top:")
+                .Append(CssPercent(top))
+                .Append(";width:")
+                .Append(CssPercent(width))
+                .Append(";height:")
+                .Append(CssPercent(height))
+                .Append("\">")
+                .Append(text)
+                .Append("</span></span>");
+            return true;
+        }
+
+        private static bool TryReadHwpxSize(XElement element, out double width, out double height)
+        {
+            width = 0;
+            height = 0;
+            XElement? size = element.Elements().FirstOrDefault(e => e.Name.LocalName == "curSz");
+            return double.TryParse(
+                    GetAttributeValue(size, "width"),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out width) &&
+                double.TryParse(
+                    GetAttributeValue(size, "height"),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out height) &&
+                width > 0 &&
+                height > 0;
+        }
+
+        private static void ReadHwpxOffset(XElement element, out double x, out double y)
+        {
+            XElement? offset = element.Elements().FirstOrDefault(e => e.Name.LocalName == "offset");
+            if (!double.TryParse(
+                GetAttributeValue(offset, "x"),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out x))
+            {
+                x = 0;
+            }
+
+            if (!double.TryParse(
+                GetAttributeValue(offset, "y"),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out y))
+            {
+                y = 0;
+            }
+        }
+
+        private static string CssNumber(double value)
+        {
+            return value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private static string CssPercent(double value)
+        {
+            return CssNumber(value) + "%";
         }
 
         private static void AppendHwpxImageHtml(
@@ -808,6 +973,25 @@ namespace TxtAIEditor.Core.Services
             return false;
         }
 
+        private static bool IsInsideRenderedContainer(
+            XElement root,
+            XNode node,
+            ISet<XElement> renderedContainers)
+        {
+            XElement? parent = node.Parent;
+            while (parent != null && !ReferenceEquals(parent, root))
+            {
+                if (renderedContainers.Contains(parent))
+                {
+                    return true;
+                }
+
+                parent = parent.Parent;
+            }
+
+            return false;
+        }
+
         private static string ReadPositiveIntegerAttribute(XElement element, string attributeName)
         {
             string value = GetAttributeValue(element, attributeName);
@@ -905,6 +1089,30 @@ body { padding: 28px 16px 44px; }
     max-width: 100%;
     height: auto;
     border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+.hwpx-layered-image {
+    position: relative;
+    display: block;
+    width: 100%;
+    margin: .9em 0;
+    overflow: hidden;
+}
+.hwpx-layered-image > img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.hwpx-layered-text {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    line-height: 1.2;
+    text-align: center;
+    white-space: pre-wrap;
 }
 @media (max-width: 640px) {
     body { padding: 0; }
