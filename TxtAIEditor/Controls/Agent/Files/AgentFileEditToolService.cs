@@ -448,8 +448,30 @@ namespace TxtAIEditor.Controls
             {
                 if (!TryValidateExpectedSnippet(expectedSnippet, targetText))
                 {
-                    return WithFailureContext(
-                        $"replace_range failed: expectedSnippet did not exactly match the text in the requested range ({startLine}-{endLine}).");
+                    string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
+                    int requestedStartLine = startLine;
+                    int requestedEndLine = endLine;
+                    int adjustedStartLine;
+                    int adjustedEndLine;
+                    if (!TryResolveNearbyExpectedSnippetRange(
+                            lines,
+                            startLine,
+                            endLine,
+                            normalizedExpected,
+                            allowedStartLine,
+                            allowedEndLine,
+                            out adjustedStartLine,
+                            out adjustedEndLine))
+                    {
+                        return WithFailureContext(
+                            $"replace_range failed: expectedSnippet did not exactly match the requested range ({requestedStartLine}-{requestedEndLine}) or a unique range within ±3 lines.");
+                    }
+
+                    startLine = adjustedStartLine;
+                    endLine = adjustedEndLine;
+                    lineCount = endLine - startLine + 1;
+                    targetText = string.Join("\n", lines.Skip(startLine - 1).Take(lineCount));
+                    rangeAdjustmentNote = $" (range adjusted from {requestedStartLine}-{requestedEndLine} to {startLine}-{endLine})";
                 }
             }
             else
@@ -1330,14 +1352,20 @@ namespace TxtAIEditor.Controls
 
             int requestedLineCount = endLine - startLine + 1;
             int expectedLineCount = CountNormalizedLines(normalizedExpected);
-            if (expectedLineCount < Math.Max(2, requestedLineCount - 2))
+            const int margin = 3;
+            if (Math.Abs(expectedLineCount - requestedLineCount) > margin)
             {
                 return false;
             }
 
-            int margin = Math.Min(10, Math.Max(3, Math.Abs(expectedLineCount - requestedLineCount) + 2));
-            int windowStartLine = Math.Max(allowedStartLine ?? 1, startLine - margin);
-            int windowEndLine = Math.Min(allowedEndLine ?? lines.Length, endLine + margin);
+            int earliestStartForEndMargin = endLine - margin - expectedLineCount + 1;
+            int latestEndForStartMargin = startLine + margin + expectedLineCount - 1;
+            int windowStartLine = Math.Max(
+                allowedStartLine ?? 1,
+                Math.Max(startLine - margin, earliestStartForEndMargin));
+            int windowEndLine = Math.Min(
+                allowedEndLine ?? lines.Length,
+                Math.Min(endLine + margin, latestEndForStartMargin));
             if (windowEndLine - windowStartLine + 1 < expectedLineCount)
             {
                 return false;
