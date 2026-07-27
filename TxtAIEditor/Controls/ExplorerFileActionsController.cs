@@ -1131,9 +1131,10 @@ namespace TxtAIEditor.Controls
             int remainingFiles,
             int totalFiles)
         {
+            string displayFile = AbbreviateFileName(currentFile);
             if (totalFiles <= 1)
             {
-                return $"{statusPrefix} ({currentFile})";
+                return $"{statusPrefix} ({displayFile})";
             }
 
             string remainingText = string.Format(
@@ -1141,7 +1142,21 @@ namespace TxtAIEditor.Controls
                     "RemoteTransferRemainingFilesFormat",
                     "남은 파일 {0:N0}개"),
                 Math.Max(0, remainingFiles));
-            return $"{statusPrefix} ({currentFile}, {remainingText})";
+            return $"{statusPrefix} ({displayFile}, {remainingText})";
+        }
+
+        private static string AbbreviateFileName(string fileName)
+        {
+            const int maxTextElements = 40;
+            var fileNameInfo = new System.Globalization.StringInfo(fileName);
+            if (fileNameInfo.LengthInTextElements <= maxTextElements)
+            {
+                return fileName;
+            }
+
+            return fileNameInfo.SubstringByTextElements(
+                0,
+                maxTextElements - 1) + "…";
         }
 
         private void OnCopyFileNameClick(object sender, RoutedEventArgs e)

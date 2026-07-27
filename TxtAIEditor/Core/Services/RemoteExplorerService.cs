@@ -1281,12 +1281,14 @@ namespace TxtAIEditor.Core.Services
             private readonly Stream _source;
             private readonly IProgress<double>? _progress;
             private readonly long _length;
+            private readonly long _initialPosition;
 
             public ProgressHttpContent(Stream source, IProgress<double>? progress)
             {
                 _source = source;
                 _progress = progress;
                 _length = source.Length;
+                _initialPosition = source.Position;
                 Headers.ContentLength = _length;
             }
 
@@ -1305,6 +1307,14 @@ namespace TxtAIEditor.Core.Services
                 TransportContext? context,
                 CancellationToken cancellationToken)
             {
+                if (!_source.CanSeek)
+                {
+                    throw new InvalidOperationException(
+                        "WebDAV upload content must support request retries.");
+                }
+
+                _source.Position = _initialPosition;
+                _progress?.Report(0.0);
                 byte[] buffer = new byte[81920];
                 long totalRead = 0;
                 int bytesRead;
