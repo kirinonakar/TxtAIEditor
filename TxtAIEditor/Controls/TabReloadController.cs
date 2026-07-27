@@ -240,7 +240,9 @@ namespace TxtAIEditor.Controls
                 content);
 
             tab.IsReadOnlyTextFile = true;
-            tab.ArchiveEntryPath = ArchiveExplorerService.NormalizeEntryPath(tab.ArchiveEntryPath);
+            tab.SetArchiveEntryOrigin(
+                tab.ArchiveSourcePath,
+                ArchiveExplorerService.NormalizeEntryPath(tab.ArchiveEntryPath));
 
             var session = new EditorDocumentSession(tab, readResult.Model);
             _editorSessions[tab.Id] = session;
@@ -297,7 +299,7 @@ namespace TxtAIEditor.Controls
             }
 
             tab.IsDirty = false;
-            tab.OriginalContent = tab.Content;
+            tab.OriginalContent = tab.ContentPreview;
             tab.OriginalLineEnding = hexModel.LineEnding;
             tab.OriginalEncodingName = tab.EncodingName;
             tab.RefreshPreviewResourceVersion();

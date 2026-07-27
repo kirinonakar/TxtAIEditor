@@ -329,7 +329,7 @@ namespace TxtAIEditor.Controls
             if (!tab.IsLanguageManuallySelected &&
                 (detected == "plaintext" || string.IsNullOrEmpty(detected)))
             {
-                string content = tab.Content;
+                string content = tab.ContentPreview;
                 if (_sessionProvider(tab.Id) is { } session)
                 {
                     content = session.GetText(2000);

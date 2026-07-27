@@ -214,15 +214,15 @@ namespace TxtAIEditor.Controls
                 FilePath = filePath,
                 HexSourceFilePath = filePath,
                 Title = Path.GetFileName(filePath),
-                Content = string.Empty,
+                ContentPreview = string.Empty,
                 Language = "hex",
                 EncodingName = string.Empty,
                 EncodingWasAutoDetected = false,
-                IsHexViewer = true
+                ContentKind = TabContentKind.Hex
             };
 
             var session = new EditorDocumentSession(tab, model);
-            tab.OriginalContent = tab.Content;
+            tab.OriginalContent = tab.ContentPreview;
             tab.OriginalLineEnding = model.LineEnding;
             tab.OriginalEncodingName = tab.EncodingName;
 
@@ -515,7 +515,7 @@ namespace TxtAIEditor.Controls
                 hexParts.WebView,
                 hexParts.Bridge,
                 viewerSession,
-                tab.Content,
+                tab.ContentPreview,
                 tab.Language,
                 tab.EncodingName,
                 tab.EncodingWasAutoDetected,
@@ -568,7 +568,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            tab.Content = state.Content;
+            tab.ContentPreview = state.Content;
             tab.IsHexViewer = false;
             tab.HexSourceFilePath = state.HexSourceFilePath;
             tab.Language = state.Language;
@@ -854,11 +854,11 @@ namespace TxtAIEditor.Controls
             {
                 FilePath = filePath,
                 Title = Path.GetFileName(filePath),
-                Content = string.Empty,
+                ContentPreview = string.Empty,
                 Language = "pdf",
                 EncodingName = string.Empty,
                 EncodingWasAutoDetected = false,
-                IsPdfViewer = true
+                ContentKind = TabContentKind.Pdf
             };
 
             AddOpenTab(tab);
@@ -892,11 +892,11 @@ namespace TxtAIEditor.Controls
             {
                 FilePath = filePath,
                 Title = Path.GetFileName(filePath),
-                Content = string.Empty,
+                ContentPreview = string.Empty,
                 Language = extension.TrimStart('.'),
                 EncodingName = string.Empty,
                 EncodingWasAutoDetected = false,
-                IsOfficeDocumentViewer = true
+                ContentKind = TabContentKind.OfficeDocument
             };
 
             AddOpenTab(tab);
@@ -929,11 +929,11 @@ namespace TxtAIEditor.Controls
             {
                 FilePath = filePath,
                 Title = Path.GetFileName(filePath),
-                Content = string.Empty,
+                ContentPreview = string.Empty,
                 Language = "python",
                 EncodingName = string.Empty,
                 EncodingWasAutoDetected = false,
-                IsNotebookViewer = true
+                ContentKind = TabContentKind.Notebook
             };
 
             AddOpenTab(tab, targetIndex);
@@ -1066,11 +1066,11 @@ namespace TxtAIEditor.Controls
             {
                 FilePath = filePath,
                 Title = Path.GetFileName(filePath),
-                Content = string.Empty,
+                ContentPreview = string.Empty,
                 Language = "image",
                 EncodingName = string.Empty,
                 EncodingWasAutoDetected = false,
-                IsImageViewer = true
+                ContentKind = TabContentKind.Image
             };
 
             AddOpenTab(tab);
@@ -1101,11 +1101,11 @@ namespace TxtAIEditor.Controls
             {
                 FilePath = filePath,
                 Title = Path.GetFileName(filePath),
-                Content = string.Empty,
+                ContentPreview = string.Empty,
                 Language = SupportedFileTypes.IsAudioFile(filePath) ? "audio" : "video",
                 EncodingName = string.Empty,
                 EncodingWasAutoDetected = false,
-                IsMediaViewer = true
+                ContentKind = TabContentKind.Media
             };
 
             AddOpenTab(tab);
@@ -1134,7 +1134,7 @@ namespace TxtAIEditor.Controls
         {
             if (_remoteWorkspaceService.TryGetVirtualPath(tab.FilePath, out string remotePath))
             {
-                tab.RemotePath = remotePath;
+                tab.SetRemoteFileOrigin(remotePath, tab.FilePath);
                 tab.Title = RemotePath.GetName(remotePath);
             }
 

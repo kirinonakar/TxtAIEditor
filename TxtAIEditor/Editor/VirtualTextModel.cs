@@ -886,25 +886,134 @@ namespace TxtAIEditor.Editor
         public IReadOnlyList<TextLinePatch>? LinePatches { get; init; }
     }
 
-    public sealed class EditorDocumentBuffer
+    public sealed class EditorDocument
     {
         private const int ChangeLogCapacity = 1_000;
         private ITextModel _model;
         private readonly Queue<EditorDocumentChange> _changeLog = new(ChangeLogCapacity);
+        private string _encodingName;
+        private bool _encodingWasAutoDetected;
+        private string _originalContent;
+        private string[]? _originalLines;
+        private string? _originalLineEnding;
+        private string? _originalEncodingName;
+        private DocumentOrigin _origin;
+        private bool _isDirty;
 
-        public EditorDocumentBuffer(ITextModel model)
+        public EditorDocument(
+            ITextModel model,
+            string encodingName,
+            bool encodingWasAutoDetected,
+            string originalContent,
+            string? originalLineEnding,
+            string? originalEncodingName,
+            DocumentOrigin origin,
+            bool isDirty)
         {
             _model = model;
+            _encodingName = encodingName;
+            _encodingWasAutoDetected = encodingWasAutoDetected;
+            _originalContent = originalContent;
+            _originalLineEnding = originalLineEnding;
+            _originalEncodingName = originalEncodingName;
+            _origin = origin;
+            _isDirty = isDirty;
             DocumentId = Guid.NewGuid().ToString("N");
+            if (isDirty)
+            {
+                UndoManager.MarkUnsavedState();
+            }
         }
 
         public event EventHandler<EditorDocumentChange>? Changed;
+        public event Action<string>? StateChanged;
 
         public string DocumentId { get; }
 
         public long Version { get; private set; }
 
         public ITextModel Model => _model;
+
+        public string EncodingName
+        {
+            get => _encodingName;
+            set => SetState(ref _encodingName, value ?? string.Empty, nameof(EncodingName));
+        }
+
+        public bool EncodingWasAutoDetected
+        {
+            get => _encodingWasAutoDetected;
+            set => SetState(ref _encodingWasAutoDetected, value, nameof(EncodingWasAutoDetected));
+        }
+
+        public string OriginalContent
+        {
+            get => _originalContent;
+            set
+            {
+                string normalized = value ?? string.Empty;
+                if (string.Equals(_originalContent, normalized, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                _originalContent = normalized;
+                _originalLines = null;
+                StateChanged?.Invoke(nameof(OriginalContent));
+                StateChanged?.Invoke(nameof(OriginalLines));
+            }
+        }
+
+        public string[] OriginalLines =>
+            _originalLines ??= _originalContent
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n')
+                .Split('\n');
+
+        public string? OriginalLineEnding
+        {
+            get => _originalLineEnding;
+            set => SetState(ref _originalLineEnding, value, nameof(OriginalLineEnding));
+        }
+
+        public string? OriginalEncodingName
+        {
+            get => _originalEncodingName;
+            set => SetState(ref _originalEncodingName, value, nameof(OriginalEncodingName));
+        }
+
+        public DocumentOrigin Origin
+        {
+            get => _origin;
+            set => SetState(
+                ref _origin,
+                value ?? UntitledOrigin.Instance,
+                nameof(Origin));
+        }
+
+        public bool IsDirty
+        {
+            get => _isDirty;
+            set
+            {
+                if (_isDirty == value)
+                {
+                    return;
+                }
+
+                if (value)
+                {
+                    UndoManager.MarkUnsavedState();
+                }
+                else
+                {
+                    UndoManager.MarkSavedState();
+                }
+
+                _isDirty = value;
+                StateChanged?.Invoke(nameof(IsDirty));
+            }
+        }
 
         internal UndoManager UndoManager { get; } = new();
 
@@ -1027,48 +1136,75 @@ namespace TxtAIEditor.Editor
                 _changeLog.Dequeue();
             }
         }
+
+        private void SetState<T>(ref T field, T value, string propertyName)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+            {
+                return;
+            }
+
+            field = value;
+            StateChanged?.Invoke(propertyName);
+        }
     }
 
+    // A per-view session over a shared EditorDocument. Split views have distinct
+    // ViewIds/ViewVersions while referencing the same Document instance.
     public sealed class EditorDocumentSession
     {
         private const int MaxSearchMatches = 50_000;
         private static readonly TimeSpan MaxSearchElapsed = TimeSpan.FromSeconds(8);
-        private EditorDocumentBuffer _buffer;
+        private EditorDocument _document;
 
         public EditorDocumentSession(OpenedTab tab, ITextModel model)
         {
             Tab = tab;
-            _buffer = new EditorDocumentBuffer(model);
-            ViewVersion = _buffer.Version;
-            Tab.Content = model is HexDumpTextModel ? string.Empty : model.GetText(120_000);
+            _document = new EditorDocument(
+                model,
+                tab.EncodingName,
+                tab.EncodingWasAutoDetected,
+                tab.OriginalContent,
+                tab.OriginalLineEnding,
+                tab.OriginalEncodingName,
+                tab.Origin,
+                tab.IsDirty);
+            Tab.AttachDocument(_document);
+            ViewVersion = _document.Version;
+            Tab.ContentPreview = model is HexDumpTextModel ? string.Empty : model.GetText(120_000);
         }
 
         public OpenedTab Tab { get; }
 
-        public ITextModel Model => _buffer.Model;
+        public EditorDocument Document => _document;
 
-        public string DocumentId => _buffer.DocumentId;
+        public string ViewId => Tab.Id;
 
-        public long DocumentVersion => _buffer.Version;
+        public ITextModel Model => _document.Model;
+
+        public string DocumentId => _document.DocumentId;
+
+        public long DocumentVersion => _document.Version;
 
         public long ViewVersion { get; private set; }
 
-        public EditorDocumentChange? LastChange => _buffer.LastChange;
+        public EditorDocumentChange? LastChange => _document.LastChange;
 
-        public bool IsAtSavedState => _buffer.UndoManager.IsAtSavedState;
+        public bool IsAtSavedState => _document.UndoManager.IsAtSavedState;
 
         public bool TryGetChangesSince(
             long version,
             out IReadOnlyList<EditorDocumentChange> changes) =>
-            _buffer.TryGetChangesSince(version, out changes);
+            _document.TryGetChangesSince(version, out changes);
 
         public bool SharesDocumentWith(EditorDocumentSession other) =>
-            ReferenceEquals(_buffer, other._buffer);
+            ReferenceEquals(_document, other._document);
 
         public void ShareDocumentWith(EditorDocumentSession source)
         {
-            _buffer = source._buffer;
-            ViewVersion = _buffer.Version;
+            _document = source._document;
+            Tab.AttachDocument(_document);
+            ViewVersion = _document.Version;
             RefreshTabContentPreview();
         }
 
@@ -1079,17 +1215,19 @@ namespace TxtAIEditor.Editor
 
         public void MarkSavedState()
         {
-            _buffer.UndoManager.MarkSavedState();
+            _document.UndoManager.MarkSavedState();
+            _document.IsDirty = false;
         }
 
         public void MarkUnsavedState()
         {
-            _buffer.UndoManager.MarkUnsavedState();
+            _document.UndoManager.MarkUnsavedState();
+            _document.IsDirty = true;
         }
 
         public async Task<bool> WaitForDocumentVersionAsync(long version, int timeoutMs = 700)
         {
-            EditorDocumentBuffer buffer = _buffer;
+            EditorDocument buffer = _document;
             if (buffer.Version >= version) return true;
 
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1118,13 +1256,14 @@ namespace TxtAIEditor.Editor
 
         public void UpdateContentFromSync(string text, bool markUnsaved = false)
         {
-            EditorDocumentChange change = _buffer.ReplaceModel(
+            EditorDocumentChange change = _document.ReplaceModel(
                 Tab.Id,
                 TextModelFactory.FromText(text),
                 clearUndo: true);
             if (markUnsaved)
             {
-                _buffer.UndoManager.MarkUnsavedState();
+                _document.UndoManager.MarkUnsavedState();
+                _document.IsDirty = true;
             }
             ViewVersion = change.Version;
             RefreshTabContentPreview();
@@ -1132,19 +1271,19 @@ namespace TxtAIEditor.Editor
 
         public void UpdateModelFromSync(ITextModel model)
         {
-            EditorDocumentChange change = _buffer.ReplaceModel(Tab.Id, model, clearUndo: true);
+            EditorDocumentChange change = _document.ReplaceModel(Tab.Id, model, clearUndo: true);
             ViewVersion = change.Version;
             RefreshTabContentPreview();
         }
 
         public void BeginUndoGroup()
         {
-            _buffer.UndoManager.BeginTransaction("editor");
+            _document.UndoManager.BeginTransaction("editor");
         }
 
         public void EndUndoGroup()
         {
-            _buffer.UndoManager.EndTransaction();
+            _document.UndoManager.EndTransaction();
         }
 
         public IReadOnlyList<string> GetLines(int startLine, int count) => Model.GetLines(startLine, count);
@@ -1172,7 +1311,7 @@ namespace TxtAIEditor.Editor
 
             if (trackUndo)
             {
-                _buffer.UndoManager.AddEdit(new ReplaceLineEdit(lineNumber, before, after));
+                _document.UndoManager.AddEdit(new ReplaceLineEdit(lineNumber, before, after));
             }
 
             Model.ReplaceLine(lineNumber, after);
@@ -1187,7 +1326,7 @@ namespace TxtAIEditor.Editor
             }
 
             string original = Model.GetLine(lineNumber);
-            _buffer.UndoManager.AddEdit(new SplitLineEdit(
+            _document.UndoManager.AddEdit(new SplitLineEdit(
                 lineNumber,
                 original,
                 NormalizeSingleLine(before),
@@ -1201,7 +1340,7 @@ namespace TxtAIEditor.Editor
         {
             int safeLineNumber = Math.Clamp(lineNumber, 1, Model.LineCount + 1);
             string inserted = NormalizeSingleLine(text);
-            _buffer.UndoManager.AddEdit(new InsertLineEdit(safeLineNumber, inserted));
+            _document.UndoManager.AddEdit(new InsertLineEdit(safeLineNumber, inserted));
             Model.InsertLine(safeLineNumber, inserted);
             CommitViewChange(safeLineNumber, oldLineCount: 0, newLineCount: 1);
             return Model.LineCount;
@@ -1253,7 +1392,7 @@ namespace TxtAIEditor.Editor
                 replacementEnd.Column,
                 replacedText);
 
-            _buffer.UndoManager.AddEdit(new RangeTextEdit(forward, reverse));
+            _document.UndoManager.AddEdit(new RangeTextEdit(forward, reverse));
             Model.ApplyEdit(forward);
             CommitViewChange(
                 safeStartLine,
@@ -1303,7 +1442,7 @@ namespace TxtAIEditor.Editor
                 return Model.LineCount;
             }
 
-            _buffer.UndoManager.AddEdit(new MergeLineEdit(
+            _document.UndoManager.AddEdit(new MergeLineEdit(
                 lineNumber,
                 Model.GetLine(lineNumber - 1),
                 Model.GetLine(lineNumber)));
@@ -1320,7 +1459,7 @@ namespace TxtAIEditor.Editor
             }
 
             bool wasOnlyLine = Model.LineCount == 1;
-            _buffer.UndoManager.AddEdit(new DeleteLineEdit(
+            _document.UndoManager.AddEdit(new DeleteLineEdit(
                 lineNumber,
                 Model.GetLine(lineNumber),
                 wasOnlyLine));
@@ -1344,7 +1483,7 @@ namespace TxtAIEditor.Editor
 
         public UndoResult? Undo()
         {
-            UndoResult? result = _buffer.UndoManager.Undo(Model);
+            UndoResult? result = _document.UndoManager.Undo(Model);
             if (result == null)
             {
                 return null;
@@ -1357,7 +1496,7 @@ namespace TxtAIEditor.Editor
 
         public UndoResult? Redo()
         {
-            UndoResult? result = _buffer.UndoManager.Redo(Model);
+            UndoResult? result = _document.UndoManager.Redo(Model);
             if (result == null)
             {
                 return null;
@@ -1370,7 +1509,7 @@ namespace TxtAIEditor.Editor
 
         public async Task<UndoResult?> UndoAsync(IProgress<TextOperationProgress>? progress = null)
         {
-            UndoResult? result = await _buffer.UndoManager.UndoAsync(Model, progress);
+            UndoResult? result = await _document.UndoManager.UndoAsync(Model, progress);
             if (result == null)
             {
                 return null;
@@ -1383,7 +1522,7 @@ namespace TxtAIEditor.Editor
 
         public async Task<UndoResult?> RedoAsync(IProgress<TextOperationProgress>? progress = null)
         {
-            UndoResult? result = await _buffer.UndoManager.RedoAsync(Model, progress);
+            UndoResult? result = await _document.UndoManager.RedoAsync(Model, progress);
             if (result == null)
             {
                 return null;
@@ -1486,13 +1625,13 @@ namespace TxtAIEditor.Editor
 
             TextLinePatch[] patches = plan.Replacements.Select(replacement =>
                 new TextLinePatch(replacement.LineNumber, replacement.AfterText)).ToArray();
-            _buffer.UndoManager.BeginTransaction("replaceAll");
+            _document.UndoManager.BeginTransaction("replaceAll");
             try
             {
                 for (int i = 0; i < plan.Replacements.Count; i++)
                 {
                     LineReplacement replacement = plan.Replacements[i];
-                    _buffer.UndoManager.AddEdit(new ReplaceLineEdit(
+                    _document.UndoManager.AddEdit(new ReplaceLineEdit(
                         replacement.LineNumber,
                         replacement.BeforeText,
                         replacement.AfterText));
@@ -1506,7 +1645,7 @@ namespace TxtAIEditor.Editor
             }
             finally
             {
-                _buffer.UndoManager.EndTransaction();
+                _document.UndoManager.EndTransaction();
             }
 
             CommitLinePatches(patches);
@@ -1557,12 +1696,12 @@ namespace TxtAIEditor.Editor
             {
                 TextLinePatch[] patches = replacements.Select(replacement =>
                     new TextLinePatch(replacement.LineNumber, replacement.AfterText)).ToArray();
-                _buffer.UndoManager.BeginTransaction("replaceAll");
+                _document.UndoManager.BeginTransaction("replaceAll");
                 try
                 {
                     foreach (LineReplacement replacement in replacements)
                     {
-                        _buffer.UndoManager.AddEdit(new ReplaceLineEdit(
+                        _document.UndoManager.AddEdit(new ReplaceLineEdit(
                             replacement.LineNumber,
                             replacement.BeforeText,
                             replacement.AfterText));
@@ -1571,7 +1710,7 @@ namespace TxtAIEditor.Editor
                 }
                 finally
                 {
-                    _buffer.UndoManager.EndTransaction();
+                    _document.UndoManager.EndTransaction();
                 }
 
                 CommitViewChange(1, originalLineCount, Model.LineCount);
@@ -1732,7 +1871,7 @@ namespace TxtAIEditor.Editor
 
         public void RefreshTabContentPreview()
         {
-            Tab.Content = Model is HexDumpTextModel ? string.Empty : Model.GetText(120_000);
+            Tab.ContentPreview = Model is HexDumpTextModel ? string.Empty : Model.GetText(120_000);
         }
 
         private static string NormalizeSingleLine(string text)
@@ -1742,7 +1881,7 @@ namespace TxtAIEditor.Editor
 
         private void CommitViewChange(int startLine, int oldLineCount, int newLineCount)
         {
-            EditorDocumentChange change = _buffer.CommitChange(
+            EditorDocumentChange change = _document.CommitChange(
                 Tab.Id,
                 startLine,
                 oldLineCount,
@@ -1752,7 +1891,7 @@ namespace TxtAIEditor.Editor
 
         private void CommitLinePatches(IReadOnlyList<TextLinePatch> patches)
         {
-            EditorDocumentChange change = _buffer.CommitLinePatches(Tab.Id, patches);
+            EditorDocumentChange change = _document.CommitLinePatches(Tab.Id, patches);
             ViewVersion = change.Version;
         }
 

@@ -131,7 +131,7 @@ namespace TxtAIEditor.Controls
 
             string? path = activeTab.FilePath;
             bool hasSourceSession = _editorSessions.TryGetValue(activeTab.Id, out var sourceSession);
-            string content = hasSourceSession ? string.Empty : activeTab.Content ?? string.Empty;
+            string content = hasSourceSession ? string.Empty : activeTab.ContentPreview;
 
             bool isDirty = _isAnySameFileTabDirty(activeTab);
             var newTab = _openEditorTab(
@@ -159,7 +159,7 @@ namespace TxtAIEditor.Controls
                 _editorSessions.TryGetValue(newTab.Id, out var splitViewSession))
             {
                 splitViewSession.ShareDocumentWith(sourceSession);
-                newTab.Content = activeTab.Content ?? string.Empty;
+                newTab.ContentPreview = activeTab.ContentPreview;
                 newTab.OriginalContent = activeTab.OriginalContent;
                 newTab.OriginalLineEnding = activeTab.OriginalLineEnding;
                 newTab.OriginalEncodingName = activeTab.OriginalEncodingName;
@@ -266,7 +266,7 @@ namespace TxtAIEditor.Controls
                         keeperSession.RefreshTabContentPreview();
                     }
                 }
-                keeper.Content = duplicateText;
+                keeper.ContentPreview = duplicateText;
 
                 if (_tabBridges.TryGetValue(keeper.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {

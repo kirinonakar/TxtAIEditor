@@ -45,19 +45,19 @@ namespace TxtAIEditor.Controls
             }
 
             var session = _sessionProvider(tab.Id);
-            return session?.GetText(maxChars) ?? tab.Content ?? string.Empty;
+            return session?.GetText(maxChars) ?? tab.ContentPreview;
         }
 
         private static string GetCachedOrExtractedText(OpenedTab tab, int maxChars, Func<string> extractText)
         {
-            string cached = tab.Content ?? string.Empty;
+            string cached = tab.ContentPreview;
             if (!string.IsNullOrWhiteSpace(cached))
             {
                 return cached.Length > maxChars ? cached.Substring(0, maxChars) : cached;
             }
 
             string extracted = extractText();
-            tab.Content = extracted;
+            tab.ContentPreview = extracted;
             return extracted;
         }
     }

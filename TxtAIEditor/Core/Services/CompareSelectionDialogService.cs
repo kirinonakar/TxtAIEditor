@@ -78,7 +78,7 @@ namespace TxtAIEditor.Core.Services
             bool validA = tabA != null || (!string.IsNullOrEmpty(pathA) && File.Exists(pathA));
             bool validB = tabB != null || (!string.IsNullOrEmpty(pathB) && File.Exists(pathB));
 
-            return new CompareFileSelection(validA && validB, pathA, pathB, tabA?.Content, tabB?.Content);
+            return new CompareFileSelection(validA && validB, pathA, pathB, tabA?.ContentPreview, tabB?.ContentPreview);
         }
 
         private static ComboBox CreateSourceCombo(IEnumerable<string> choices)

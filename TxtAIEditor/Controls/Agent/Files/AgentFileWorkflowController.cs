@@ -239,7 +239,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            tab.Content = oldContent;
+            tab.ContentPreview = oldContent;
             if (_editorSessions.TryGetValue(tab.Id, out var session))
             {
                 session.UpdateContentFromSync(oldContent);

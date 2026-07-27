@@ -149,7 +149,7 @@ namespace TxtAIEditor.Controls
             {
                 Title = title,
                 FilePath = string.Empty,
-                Content = string.Empty
+                ContentPreview = string.Empty
             };
 
             _viewModel.Tabs.Add(tab);

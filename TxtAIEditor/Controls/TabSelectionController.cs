@@ -144,7 +144,7 @@ namespace TxtAIEditor.Controls
                         {
                             _editorSessions.TryGetValue(tab.Id, out var session);
                             await bridgeGroup.Bridge.SetTextAsync(
-                                tab.Content,
+                                tab.ContentPreview,
                                 shouldFocus: false,
                                 session?.DocumentId,
                                 session?.DocumentVersion,

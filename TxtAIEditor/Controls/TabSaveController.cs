@@ -149,9 +149,7 @@ namespace TxtAIEditor.Controls
             string oldLanguage = tab.Language;
             string oldEncodingName = tab.EncodingName;
             bool oldIsReadOnlyTextFile = tab.IsReadOnlyTextFile;
-            string? oldArchiveSourcePath = tab.ArchiveSourcePath;
-            string? oldArchiveEntryPath = tab.ArchiveEntryPath;
-            string? oldRemotePath = tab.RemotePath;
+            DocumentOrigin oldOrigin = tab.Origin;
             if (!TryChooseSavePath(tab, initialDir))
             {
                 return false;
@@ -160,7 +158,7 @@ namespace TxtAIEditor.Controls
             try
             {
                 ClearArchiveReadOnlyState(tab);
-                tab.RemotePath = null;
+                tab.SetLocalFileOrigin(tab.FilePath!);
                 if (tab.IsNotebookViewer)
                 {
                     if (_saveNotebookAsync != null && await _saveNotebookAsync(tab))
@@ -186,9 +184,7 @@ namespace TxtAIEditor.Controls
                 tab.Language = oldLanguage;
                 tab.EncodingName = oldEncodingName;
                 tab.IsReadOnlyTextFile = oldIsReadOnlyTextFile;
-                tab.ArchiveSourcePath = oldArchiveSourcePath;
-                tab.ArchiveEntryPath = oldArchiveEntryPath;
-                tab.RemotePath = oldRemotePath;
+                tab.SetOrigin(oldOrigin);
                 return false;
             }
             catch (Exception ex)
@@ -198,9 +194,7 @@ namespace TxtAIEditor.Controls
                 tab.Language = oldLanguage;
                 tab.EncodingName = oldEncodingName;
                 tab.IsReadOnlyTextFile = oldIsReadOnlyTextFile;
-                tab.ArchiveSourcePath = oldArchiveSourcePath;
-                tab.ArchiveEntryPath = oldArchiveEntryPath;
-                tab.RemotePath = oldRemotePath;
+                tab.SetOrigin(oldOrigin);
                 _showErrorMessage(
                     _getString("SaveFile", "저장") + " - " + _getString("SaveAsFile", "다른 이름으로 저장"),
                     ex.Message);
@@ -284,8 +278,6 @@ return tab.FilePath != null
             }
 
             tab.IsReadOnlyTextFile = false;
-            tab.ArchiveSourcePath = null;
-            tab.ArchiveEntryPath = null;
         }
 
         private async Task<long?> FlushTabEditorBeforeSaveAsync(OpenedTab tab)
@@ -328,9 +320,11 @@ return tab.FilePath != null
                     throw new InvalidOperationException(_getString("EncryptedTabMissingPassword", "암호화된 탭의 암호가 없습니다. 파일을 다시 열어 암호를 입력해 주세요."));
                 }
 
-                string text = session != null ? (session.Model is HexDumpTextModel ? string.Empty : session.GetText()) : tab.Content;
+                string text = session != null ? (session.Model is HexDumpTextModel ? string.Empty : session.GetText()) : tab.ContentPreview;
                 await _secureNoteEncryptionService.SaveEncryptedTextFileAsync(tab.FilePath!, text, password);
-                tab.Content = session != null && session.Model is HexDumpTextModel ? string.Empty : (session?.GetText(120_000) ?? tab.Content);
+                tab.ContentPreview = session != null && session.Model is HexDumpTextModel
+                    ? string.Empty
+                    : session?.GetText(120_000) ?? tab.ContentPreview;
                 return;
             }
 
@@ -361,11 +355,11 @@ return tab.FilePath != null
                     saveProgressActive = false;
                     _statusBarController.HideTextOperationProgress();
                 }
-                tab.Content = session.Model is HexDumpTextModel ? string.Empty : session.GetText(120_000);
+                tab.ContentPreview = session.Model is HexDumpTextModel ? string.Empty : session.GetText(120_000);
                 return;
             }
 
-            await _fileService.SaveTextFileAsync(tab.FilePath!, tab.Content, tab.EncodingName);
+            await _fileService.SaveTextFileAsync(tab.FilePath!, tab.ContentPreview, tab.EncodingName);
         }
 
         private async Task SaveTabContentAndUploadAsync(OpenedTab tab)

@@ -124,7 +124,7 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                savedContent = sourceTab.Content;
+                savedContent = sourceTab.ContentPreview;
             }
 
             foreach (var tab in GetTabsForSameFile(sourceTab))

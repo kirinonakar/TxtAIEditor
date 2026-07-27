@@ -204,7 +204,7 @@ namespace TxtAIEditor.Composition
                 },
                 editTabAsync: async (tab, newContent) =>
                 {
-                    tab.Content = newContent;
+                    tab.ContentPreview = newContent;
                     EditorDocumentSession? session = null;
                     if (editorSessions.TryGetValue(tab.Id, out session))
                     {

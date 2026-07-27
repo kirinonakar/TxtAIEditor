@@ -428,11 +428,11 @@ namespace TxtAIEditor.Controls
             string entryPath,
             bool isReadOnlyTextFile)
         {
-            tab.ArchiveSourcePath = archivePath;
-            tab.ArchiveEntryPath = ArchiveExplorerService.NormalizeEntryPath(entryPath);
+            string normalizedEntryPath = ArchiveExplorerService.NormalizeEntryPath(entryPath);
+            tab.SetArchiveEntryOrigin(archivePath, normalizedEntryPath);
             tab.IsReadOnlyTextFile = isReadOnlyTextFile;
 
-            string title = Path.GetFileName(tab.ArchiveEntryPath.Replace('/', Path.DirectorySeparatorChar));
+            string title = Path.GetFileName(normalizedEntryPath.Replace('/', Path.DirectorySeparatorChar));
             if (!string.IsNullOrWhiteSpace(title))
             {
                 tab.Title = title;

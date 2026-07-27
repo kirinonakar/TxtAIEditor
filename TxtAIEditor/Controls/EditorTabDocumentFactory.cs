@@ -45,17 +45,17 @@ namespace TxtAIEditor.Controls
             {
                 tab.FilePath = filePath;
                 tab.Title = Path.GetFileName(filePath);
-                tab.Content = content;
+                tab.ContentPreview = content;
                 tab.Language = _languageDetectionService.GetEditorLanguageName(filePath);
                 if (IsExtractedDocumentViewerFile(filePath))
                 {
-                    tab.IsDocxViewer = true;
+                    tab.ContentKind = TabContentKind.ExtractedDocumentText;
                 }
             }
             else
             {
                 tab.Title = _getString("UntitledNewTab", "제목 없음");
-                tab.Content = content;
+                tab.ContentPreview = content;
             }
 
             var documentModel = textModel ?? TextModelFactory.FromText(content);

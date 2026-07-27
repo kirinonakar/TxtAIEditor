@@ -83,7 +83,7 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    tab.Content = content;
+                    tab.ContentPreview = content;
                     tab.IsDirty = false;
 
                     if (IsTabCurrentlyVisible(tab))
@@ -92,7 +92,7 @@ namespace TxtAIEditor.Controls
                         if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                         {
                             await bridgeGroup.Bridge.SetTextAsync(
-                                tab.Content,
+                                tab.ContentPreview,
                                 shouldFocus: false,
                                 session?.DocumentId,
                                 session?.DocumentVersion,

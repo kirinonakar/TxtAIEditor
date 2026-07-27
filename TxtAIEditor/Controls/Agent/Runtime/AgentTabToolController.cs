@@ -197,7 +197,7 @@ namespace TxtAIEditor.Controls
                     RelativePath = relativePath,
                     FullPath = finalPath,
                     OldContent = string.Empty,
-                    NewContent = tab.Content,
+                    NewContent = tab.ContentPreview,
                     IsNewFile = string.IsNullOrEmpty(originalFilePath)
                 };
                 await _runOnUIThreadAsync(() => _sessionEditController.Track(preview));
@@ -239,7 +239,7 @@ namespace TxtAIEditor.Controls
                     return "edit_tab failed: content argument is missing.";
                 }
 
-                string oldContent = tab.Content;
+                string oldContent = tab.ContentPreview;
                 if (string.Equals(oldContent, content, StringComparison.Ordinal))
                 {
                     return "edit_tab completed: content is already identical.";

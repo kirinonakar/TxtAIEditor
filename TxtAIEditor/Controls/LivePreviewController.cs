@@ -343,7 +343,7 @@ namespace TxtAIEditor.Controls
 
                 if (string.Equals(mode, "csv", StringComparison.Ordinal))
                 {
-                    string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
+                    string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.ContentPreview;
                     var csvMsg = new
                     {
                         action = "renderCsvPreview",
@@ -365,7 +365,7 @@ namespace TxtAIEditor.Controls
 
                 if (string.Equals(mode, "html", StringComparison.Ordinal))
                 {
-                    string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
+                    string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.ContentPreview;
                     var htmlMsg = new
                     {
                         action = "renderHtmlPreview",
@@ -784,7 +784,7 @@ namespace TxtAIEditor.Controls
                     string previewDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "Preview");
                     Directory.CreateDirectory(previewDir);
                     targetPath = Path.Combine(previewDir, $"preview-{tab.Id}.html");
-                    string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
+                    string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.ContentPreview;
                     await File.WriteAllTextAsync(targetPath, previewText, Encoding.UTF8);
                 }
 
@@ -863,7 +863,7 @@ namespace TxtAIEditor.Controls
             }
 
             targetPath = Path.Combine(previewDir, $"open-{tab.Id}{extension}");
-            string content = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
+            string content = _sessionProvider(tab.Id)?.GetText() ?? tab.ContentPreview;
             await File.WriteAllTextAsync(targetPath, content, Encoding.UTF8);
             return targetPath;
         }
@@ -994,7 +994,7 @@ namespace TxtAIEditor.Controls
 
             string extension = ResolveTemporaryExtension(tab);
             string targetPath = Path.Combine(previewDir, $"preview-{tab.Id}{extension}");
-            string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.Content ?? string.Empty;
+            string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.ContentPreview;
             await File.WriteAllTextAsync(targetPath, previewText, Encoding.UTF8);
             return targetPath;
         }

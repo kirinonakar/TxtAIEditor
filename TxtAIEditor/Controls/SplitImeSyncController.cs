@@ -52,7 +52,7 @@ namespace TxtAIEditor.Controls
                 {
                     string updatedText = sourceSession.GetText();
                     otherSession!.UpdateContentFromSync(updatedText, markUnsaved: sourceDirty);
-                    otherTab.Content = updatedText;
+                    otherTab.ContentPreview = updatedText;
                 }
                 else if (hasOtherSession)
                 {
