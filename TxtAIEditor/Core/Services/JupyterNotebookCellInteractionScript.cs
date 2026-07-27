@@ -255,6 +255,41 @@ namespace TxtAIEditor.Core.Services
         sel.addRange(range);
     }
 
+    function scrollEditorCaretIntoView(editor, direction) {
+        editor.scrollIntoView({
+            block: direction < 0 ? 'end' : 'start',
+            inline: 'nearest',
+            behavior: 'auto'
+        });
+
+        const header = document.getElementById('notebook-header');
+        const headerRect = header?.getBoundingClientRect();
+        const viewportTop = Math.max(8, (headerRect?.bottom || 0) + 8);
+        const viewportBottom = window.innerHeight - 8;
+        const sel = window.getSelection();
+        const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+        let caretRect = range?.getBoundingClientRect();
+
+        if (!caretRect || (caretRect.width === 0 && caretRect.height === 0)) {
+            const editorRect = editor.getBoundingClientRect();
+            const lineHeight = parseFloat(window.getComputedStyle(editor).lineHeight) || 21;
+            caretRect = direction < 0
+                ? { top: editorRect.bottom - lineHeight, bottom: editorRect.bottom }
+                : { top: editorRect.top, bottom: editorRect.top + lineHeight };
+        }
+
+        let scrollDelta = 0;
+        if (caretRect.top < viewportTop) {
+            scrollDelta = caretRect.top - viewportTop;
+        } else if (caretRect.bottom > viewportBottom) {
+            scrollDelta = caretRect.bottom - viewportBottom;
+        }
+
+        if (Math.abs(scrollDelta) >= 1) {
+            window.scrollBy({ top: scrollDelta, left: 0, behavior: 'auto' });
+        }
+    }
+
     function isCaretOnBoundaryLine(editor, direction) {
         const sel = window.getSelection();
         if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return false;
@@ -293,7 +328,7 @@ namespace TxtAIEditor.Core.Services
         } else {
             focusEditorAtStart(targetEditor);
         }
-        targetCell.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        scrollEditorCaretIntoView(targetEditor, direction);
         return true;
     }
 
