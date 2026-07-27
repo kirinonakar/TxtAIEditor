@@ -83,19 +83,23 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            int lineCount = session.Model.LineCount;
-            var lines = session.GetLines(1, lineCount);
-            if (lines == null || lines.Count == 0)
-            {
-                _viewModel.TocItems.Clear();
-                return;
-            }
-
+            ITextModel model = session.Model;
+            int lineCount = model.LineCount;
+            long documentVersion = session.DocumentVersion;
             bool aozoraMode = _isAozoraMode();
             string lang = tab.Language?.ToLowerInvariant() ?? string.Empty;
             bool isTextFile = tab.FilePath != null && tab.FilePath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
 
-            _ = BuildTocInBackgroundAsync(refreshVersion, tab.Id, lines, aozoraMode, lang, isTextFile);
+            _ = BuildTocInBackgroundAsync(
+                refreshVersion,
+                tab.Id,
+                session,
+                model,
+                lineCount,
+                documentVersion,
+                aozoraMode,
+                lang,
+                isTextFile);
         }
 
         public void RefreshTocAfterDocumentChange(OpenedTab tab)
@@ -152,7 +156,10 @@ namespace TxtAIEditor.Controls
         private async Task BuildTocInBackgroundAsync(
             int refreshVersion,
             string tabId,
-            IReadOnlyList<string> lines,
+            EditorDocumentSession session,
+            ITextModel model,
+            int lineCount,
+            long documentVersion,
             bool aozoraMode,
             string lang,
             bool isTextFile)
@@ -160,7 +167,13 @@ namespace TxtAIEditor.Controls
             List<TocItem> newItems;
             try
             {
-                newItems = await Task.Run(() => BuildTocItems(lines, aozoraMode, lang, isTextFile));
+                newItems = await Task.Run(() =>
+                {
+                    IReadOnlyList<string> lines = model.GetLines(1, lineCount);
+                    return lines.Count == 0
+                        ? new List<TocItem>()
+                        : BuildTocItems(lines, aozoraMode, lang, isTextFile);
+                });
             }
             catch
             {
@@ -170,7 +183,16 @@ namespace TxtAIEditor.Controls
             bool ApplyIfCurrent()
             {
                 var activeTab = _getActiveTab();
-                if (refreshVersion != _refreshVersion || activeTab?.Id != tabId)
+                if (refreshVersion != _refreshVersion || activeTab == null || activeTab.Id != tabId)
+                {
+                    return false;
+                }
+
+                var currentSession = _getSession(activeTab);
+                if (currentSession == null ||
+                    !ReferenceEquals(currentSession, session) ||
+                    currentSession.DocumentVersion != documentVersion ||
+                    !ReferenceEquals(currentSession.Model, model))
                 {
                     return false;
                 }
