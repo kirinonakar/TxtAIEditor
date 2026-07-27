@@ -8,6 +8,7 @@ import {
     post,
     queueRender,
     receiveLineBlock,
+    recomputeDirtyLines,
     selectionInfo,
     setOriginalLines,
     setupModel,
