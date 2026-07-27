@@ -8,7 +8,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
-using TxtAIEditor.Core.Services;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
 
@@ -122,10 +121,6 @@ namespace TxtAIEditor.Controls
                 var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
                 if (tab != null)
                 {
-                    _editorSessions.TryGetValue(tab.Id, out var activeSession);
-                    FreezeDiagnosticLogger.SetActiveDocument(
-                        tab.FilePath,
-                        activeSession?.Model.LineCount ?? 0);
                     FocusDocumentViewer(activeTabItem, tab);
                     _dispatcherQueue.TryEnqueue(
                         DispatcherQueuePriority.Low,
@@ -135,13 +130,7 @@ namespace TxtAIEditor.Controls
                     _statusBarController.UpdateTotalLines(tab);
                     _statusBarController.UpdateSelectionStats(null);
 
-                    var previewStopwatch = Stopwatch.StartNew();
                     _updateLivePreview(tab);
-                    FreezeDiagnosticLogger.LogSlowOperation(
-                        "tab-selection-preview-refresh",
-                        previewStopwatch.ElapsedMilliseconds,
-                        thresholdMilliseconds: 25,
-                        $"lines={activeSession?.Model.LineCount ?? 0}; language={tab.Language}");
 
                     _updateLanguageUi(tab);
                     _syncCsvTableModeUi(tab);
@@ -169,13 +158,7 @@ namespace TxtAIEditor.Controls
                         await bridgeGroup2.Bridge.RequestSelectionAsync();
                     }
 
-                    var tocStopwatch = Stopwatch.StartNew();
                     _tocController.RefreshToc(tab);
-                    FreezeDiagnosticLogger.LogSlowOperation(
-                        "tab-selection-toc-refresh",
-                        tocStopwatch.ElapsedMilliseconds,
-                        thresholdMilliseconds: 25,
-                        $"lines={activeSession?.Model.LineCount ?? 0}; language={tab.Language}");
                 }
             }
             _updateWindowTitle();

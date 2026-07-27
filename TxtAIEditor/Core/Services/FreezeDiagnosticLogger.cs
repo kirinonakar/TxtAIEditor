@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -14,6 +13,8 @@ namespace TxtAIEditor.Core.Services
         private const long MaximumLogBytes = 5L * 1024 * 1024;
         private const int HeartbeatIntervalMilliseconds = 250;
         private const int UiStallThresholdMilliseconds = 700;
+        private static readonly TimeSpan ScrollLeadWindow = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan FreezeLogCooldown = TimeSpan.FromSeconds(1);
 
         private static readonly object StateGate = new();
         private static readonly UTF8Encoding Utf8WithoutBom = new(false);
@@ -33,11 +34,12 @@ namespace TxtAIEditor.Core.Services
 
         private static DispatcherQueueTimer? _heartbeatTimer;
         private static long _lastHeartbeatTimestamp;
-        private static string _activeDocumentName = string.Empty;
-        private static int _activeDocumentLineCount;
+        private static long _lastScrollActivityTimestamp;
+        private static long _lastFreezeLogTimestamp;
         private static long _lineRequestWindowStarted;
         private static int _lineRequestCount;
         private static int _lineRequestLines;
+        private static int _lastLineResponseMilliseconds;
 
         public static string LogFilePath => CurrentLogPath;
 
@@ -57,42 +59,25 @@ namespace TxtAIEditor.Core.Services
                 _heartbeatTimer.Tick += OnHeartbeatTick;
                 _heartbeatTimer.Start();
             }
-
-            Version? appVersion = Assembly.GetExecutingAssembly().GetName().Version;
-            Write(
-                "session-start",
-                $"appVersion={appVersion}; runtime={Environment.Version}; os={Environment.OSVersion}; log={CurrentLogPath}");
         }
 
-        public static void SetActiveDocument(string? filePath, int lineCount)
+        public static void MarkEditorScrollActivity()
         {
-            string documentName = string.IsNullOrWhiteSpace(filePath)
-                ? "(untitled)"
-                : Path.GetFileName(filePath);
-
             lock (StateGate)
             {
-                _activeDocumentName = documentName;
-                _activeDocumentLineCount = Math.Max(0, lineCount);
+                _lastScrollActivityTimestamp = Stopwatch.GetTimestamp();
             }
-
-            Write("active-document", $"name={documentName}; lines={Math.Max(0, lineCount)}");
         }
 
-        public static void LogSlowOperation(
-            string operation,
-            long elapsedMilliseconds,
-            int thresholdMilliseconds,
-            string? details = null)
+        public static void RecordWebViewScrollFreeze(int gapMilliseconds)
         {
-            if (elapsedMilliseconds < thresholdMilliseconds)
+            long now = Stopwatch.GetTimestamp();
+            if (!TryReserveFreezeLog(now))
             {
                 return;
             }
 
-            Write(
-                "slow-operation",
-                $"operation={operation}; elapsedMs={elapsedMilliseconds}; {details}");
+            WriteScrollFreeze("webview", Math.Max(0, gapMilliseconds), now);
         }
 
         public static void RecordEditorLineRequest(
@@ -100,9 +85,6 @@ namespace TxtAIEditor.Core.Services
             int lineCount,
             long sendElapsedMilliseconds)
         {
-            bool shouldLogBurst = false;
-            int requestCount;
-            int requestedLines;
             long now = Stopwatch.GetTimestamp();
 
             lock (StateGate)
@@ -117,26 +99,11 @@ namespace TxtAIEditor.Core.Services
 
                 _lineRequestCount++;
                 _lineRequestLines += Math.Max(0, lineCount);
-                requestCount = _lineRequestCount;
-                requestedLines = _lineRequestLines;
-                shouldLogBurst = requestCount >= 8 && (requestCount & (requestCount - 1)) == 0;
+                _lastLineResponseMilliseconds = (int)Math.Max(0, sendElapsedMilliseconds);
             }
-
-            if (shouldLogBurst)
-            {
-                Write(
-                    "editor-line-request-burst",
-                    $"requests={requestCount}; lines={requestedLines}; windowMs=1000; latestStartLine={startLine}");
-            }
-
-            LogSlowOperation(
-                "editor-line-response",
-                sendElapsedMilliseconds,
-                thresholdMilliseconds: 25,
-                $"startLine={startLine}; lines={lineCount}");
         }
 
-        public static void Write(string eventName, string? details = null)
+        private static void Write(string eventName, string? details = null)
         {
             _ = WriterTask;
             string safeEventName = Sanitize(eventName);
@@ -166,30 +133,68 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            string documentName;
-            int lineCount;
+            long lastScrollActivity;
             lock (StateGate)
             {
-                documentName = _activeDocumentName;
-                lineCount = _activeDocumentLineCount;
+                lastScrollActivity = _lastScrollActivityTimestamp;
+            }
+
+            bool scrollWasActiveAtStallStart = lastScrollActivity > 0 &&
+                (lastScrollActivity >= previous ||
+                 Stopwatch.GetElapsedTime(lastScrollActivity, previous) <= ScrollLeadWindow);
+            if (!scrollWasActiveAtStallStart || !TryReserveFreezeLog(now))
+            {
+                return;
+            }
+
+            WriteScrollFreeze("xaml-ui", gapMilliseconds, now);
+        }
+
+        private static bool TryReserveFreezeLog(long now)
+        {
+            lock (StateGate)
+            {
+                if (_lastFreezeLogTimestamp > 0 &&
+                    Stopwatch.GetElapsedTime(_lastFreezeLogTimestamp, now) < FreezeLogCooldown)
+                {
+                    return false;
+                }
+
+                _lastFreezeLogTimestamp = now;
+                return true;
+            }
+        }
+
+        private static void WriteScrollFreeze(string surface, long gapMilliseconds, long now)
+        {
+            int lineRequestCount;
+            int requestedLines;
+            int lastLineResponseMilliseconds;
+            lock (StateGate)
+            {
+                bool hasRecentLineRequests = _lineRequestWindowStarted > 0 &&
+                    Stopwatch.GetElapsedTime(_lineRequestWindowStarted, now) < TimeSpan.FromSeconds(2);
+                lineRequestCount = hasRecentLineRequests ? _lineRequestCount : 0;
+                requestedLines = hasRecentLineRequests ? _lineRequestLines : 0;
+                lastLineResponseMilliseconds = hasRecentLineRequests ? _lastLineResponseMilliseconds : 0;
             }
 
             try
             {
                 using Process process = Process.GetCurrentProcess();
                 Write(
-                    "ui-stall",
-                    $"gapMs={gapMilliseconds}; estimatedBlockedMs={Math.Max(0, gapMilliseconds - HeartbeatIntervalMilliseconds)}; " +
-                    $"document={documentName}; lines={lineCount}; workingSetMb={process.WorkingSet64 / (1024 * 1024)}; " +
-                    $"privateMb={process.PrivateMemorySize64 / (1024 * 1024)}; managedMb={GC.GetTotalMemory(false) / (1024 * 1024)}; " +
-                    $"gc0={GC.CollectionCount(0)}; gc1={GC.CollectionCount(1)}; gc2={GC.CollectionCount(2)}");
+                    "scroll-freeze",
+                    $"surface={surface}; gapMs={gapMilliseconds}; " +
+                    $"lineRequests={lineRequestCount}; requestedLines={requestedLines}; lastLineResponseMs={lastLineResponseMilliseconds}; " +
+                    $"workingSetMb={process.WorkingSet64 / (1024 * 1024)}; privateMb={process.PrivateMemorySize64 / (1024 * 1024)}; " +
+                    $"managedMb={GC.GetTotalMemory(false) / (1024 * 1024)}; gc0={GC.CollectionCount(0)}; " +
+                    $"gc1={GC.CollectionCount(1)}; gc2={GC.CollectionCount(2)}");
             }
             catch (Exception ex)
             {
                 Write(
-                    "ui-stall",
-                    $"gapMs={gapMilliseconds}; estimatedBlockedMs={Math.Max(0, gapMilliseconds - HeartbeatIntervalMilliseconds)}; " +
-                    $"document={documentName}; lines={lineCount}; metricsError={ex.GetType().Name}");
+                    "scroll-freeze",
+                    $"surface={surface}; gapMs={gapMilliseconds}; metricsError={ex.GetType().Name}");
             }
         }
 

@@ -83,6 +83,49 @@ export function bindEditorEvents({
     let lastSetScrollTop = -1;
     let lastProgrammaticScrollTime = 0;
     let scrollWorkFrame = 0;
+    let scrollActivityPostTime = Number.NEGATIVE_INFINITY;
+    let scrollFreezeMonitorFrame = 0;
+    let lastScrollFreezeMonitorTime = 0;
+    let scrollFreezeMonitorDeadline = 0;
+    let lastScrollFreezeReportTime = Number.NEGATIVE_INFINITY;
+
+    function monitorScrollFrames(now) {
+        scrollFreezeMonitorFrame = 0;
+        const frameGap = lastScrollFreezeMonitorTime > 0
+            ? now - lastScrollFreezeMonitorTime
+            : 0;
+        if (frameGap >= 700 &&
+            now - lastScrollFreezeReportTime >= 1000 &&
+            document.visibilityState === 'visible' &&
+            document.hasFocus()) {
+            lastScrollFreezeReportTime = now;
+            post({
+                type: 'scrollFreezeDetected',
+                gapMs: Math.round(frameGap)
+            });
+        }
+
+        lastScrollFreezeMonitorTime = now;
+        if (now < scrollFreezeMonitorDeadline) {
+            scrollFreezeMonitorFrame = requestAnimationFrame(monitorScrollFrames);
+        } else {
+            lastScrollFreezeMonitorTime = 0;
+        }
+    }
+
+    function markScrollActivity() {
+        const now = performance.now();
+        scrollFreezeMonitorDeadline = Math.max(scrollFreezeMonitorDeadline, now + 1500);
+        if (now - scrollActivityPostTime >= 200) {
+            scrollActivityPostTime = now;
+            post({ type: 'scrollActivity' });
+        }
+        if (!scrollFreezeMonitorFrame) {
+            lastScrollFreezeMonitorTime = now;
+            scrollFreezeMonitorFrame = requestAnimationFrame(monitorScrollFrames);
+        }
+    }
+
     scrollContainer.addEventListener('wheel', event => {
         if (!usesCompressedScroll() || event.ctrlKey || event.deltaY === 0) return;
 
@@ -102,6 +145,7 @@ export function bindEditorEvents({
     }, { passive: false });
 
     scrollContainer.addEventListener('scroll', () => {
+        markScrollActivity();
         hideContextMenu();
         if (state.preservedScrollTop !== null &&
             Math.abs(scrollContainer.scrollTop - state.preservedScrollTop) > 1) {

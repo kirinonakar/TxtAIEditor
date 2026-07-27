@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace TxtAIEditor.Editor
@@ -154,6 +155,12 @@ namespace TxtAIEditor.Editor
                     break;
                 case "editorScroll":
                     HandleEditorScroll(root);
+                    break;
+                case "scrollActivity":
+                    FreezeDiagnosticLogger.MarkEditorScrollActivity();
+                    break;
+                case "scrollFreezeDetected":
+                    FreezeDiagnosticLogger.RecordWebViewScrollFreeze(GetInt32(root, "gapMs"));
                     break;
                 case "scrollSyncChanged":
                     if (root.TryGetProperty("enabled", out JsonElement enabled))
