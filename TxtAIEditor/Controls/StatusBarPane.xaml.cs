@@ -64,12 +64,21 @@ namespace TxtAIEditor.Controls
 
         private Action? _cancelAction;
         private int _currentProgressSessionId;
+        private int _progressDispatchGeneration;
         private bool _isProgressActive;
 
         public void ShowProgress(string statusText, double value, Action? cancelAction = null)
         {
+            int dispatchGeneration = System.Threading.Volatile.Read(
+                ref _progressDispatchGeneration);
             void DoShow()
             {
+                if (dispatchGeneration != System.Threading.Volatile.Read(
+                        ref _progressDispatchGeneration))
+                {
+                    return;
+                }
+
                 if (!_isProgressActive)
                 {
                     _currentProgressSessionId++;
@@ -96,17 +105,28 @@ namespace TxtAIEditor.Controls
             }
 
             _cancelAction = cancelAction;
+            double boundedValue = double.IsFinite(value)
+                ? Math.Clamp(value, 0.0, 100.0)
+                : 0.0;
             StatusProgressText.Text = statusText;
-            StatusProgressBar.Value = value;
-            StatusProgressPercent.Text = $"{(int)value}%";
+            StatusProgressBar.Value = boundedValue;
+            StatusProgressPercent.Text = $"{(int)boundedValue}%";
             StatusProgressCancelButton.Visibility = cancelAction != null ? Visibility.Visible : Visibility.Collapsed;
             StatusProgressPanel.Visibility = Visibility.Visible;
         }
 
         public void HideProgress()
         {
+            int dispatchGeneration = System.Threading.Interlocked.Increment(
+                ref _progressDispatchGeneration);
             void DoHide()
             {
+                if (dispatchGeneration != System.Threading.Volatile.Read(
+                        ref _progressDispatchGeneration))
+                {
+                    return;
+                }
+
                 _currentProgressSessionId++;
                 _isProgressActive = false;
                 _cancelAction = null;

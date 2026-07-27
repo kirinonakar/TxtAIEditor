@@ -139,8 +139,6 @@ namespace TxtAIEditor.Composition
                 services.LocalizationService,
                 () => services.SettingsService.CurrentSettings.HomeFolderPath);
 
-            ui.LeftSidebar.HomeFolderPathProvider = () => services.SettingsService.CurrentSettings.HomeFolderPath;
-
             fileTabLoad.PreserveWorkspaceOnFileOpenProvider = () => explorerNavigation.IsTreeMode;
 
             var favoritesRecent = new FavoritesRecentController(

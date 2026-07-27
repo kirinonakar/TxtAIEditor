@@ -44,11 +44,6 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? DownloadRemoteItemClick { add => ExplorerView.DownloadRemoteItemClick += value; remove => ExplorerView.DownloadRemoteItemClick -= value; }
         public event RoutedEventHandler? UploadRemoteItemClick { add => ExplorerView.UploadRemoteItemClick += value; remove => ExplorerView.UploadRemoteItemClick -= value; }
 
-        public Func<string>? HomeFolderPathProvider
-        {
-            get => ExplorerView.HomeFolderPathProvider;
-            set => ExplorerView.HomeFolderPathProvider = value;
-        }
         public event RoutedEventHandler? CopyFileNameClick { add => ExplorerView.CopyFileNameClick += value; remove => ExplorerView.CopyFileNameClick -= value; }
         public event RoutedEventHandler? CopyFilePathClick { add => ExplorerView.CopyFilePathClick += value; remove => ExplorerView.CopyFilePathClick -= value; }
         public event RoutedEventHandler? CopyFolderPathClick { add => ExplorerView.CopyFolderPathClick += value; remove => ExplorerView.CopyFolderPathClick -= value; }

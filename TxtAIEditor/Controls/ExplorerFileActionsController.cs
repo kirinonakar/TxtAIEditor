@@ -977,12 +977,16 @@ namespace TxtAIEditor.Controls
                     item.Path,
                     item.IsFolder,
                     targetLocalDirectory,
-                    (currentFile, percent) =>
+                    (currentFile, remainingFiles, totalFiles, percent) =>
                     {
                         if (!isCompleted && !cts.IsCancellationRequested)
                         {
                             _statusBar.ShowProgress(
-                                $"{downloadStatusPrefix} ({currentFile})",
+                                FormatRemoteTransferStatus(
+                                    downloadStatusPrefix,
+                                    currentFile,
+                                    remainingFiles,
+                                    totalFiles),
                                 percent,
                                 () => cts.Cancel());
                         }
@@ -1020,8 +1024,8 @@ namespace TxtAIEditor.Controls
             picker.FileTypeFilter.Add("*");
             _initializePickerWindow(picker);
 
-            Windows.Storage.StorageFile? file = await picker.PickSingleFileAsync();
-            if (file == null || string.IsNullOrWhiteSpace(file.Path))
+            var selectedFiles = await picker.PickMultipleFilesAsync();
+            if (selectedFiles.Count == 0)
             {
                 return;
             }
@@ -1034,20 +1038,75 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            string targetVirtualPath = RemotePath.Combine(targetDirectory, file.Name);
             using System.Threading.CancellationTokenSource cts = new();
             string uploadStatusPrefix = _getString("RemoteUploadingStatus", "업로드 중...");
+            bool isCompleted = false;
 
             try
             {
+                var uploadFiles = selectedFiles
+                    .Where(file => !string.IsNullOrWhiteSpace(file.Path))
+                    .Select(file => (
+                        File: file,
+                        Size: Math.Max(1L, new FileInfo(file.Path).Length)))
+                    .ToList();
+                if (uploadFiles.Count == 0)
+                {
+                    return;
+                }
+
+                int totalFiles = uploadFiles.Count;
+                double totalWork = uploadFiles.Sum(file => (double)file.Size);
+                double completedWork = 0.0;
                 _statusBar.ShowProgress(
-                    $"{uploadStatusPrefix} ({file.Name})",
+                    FormatRemoteTransferStatus(
+                        uploadStatusPrefix,
+                        uploadFiles[0].File.Name,
+                        totalFiles,
+                        totalFiles),
                     0,
                     () => cts.Cancel());
-                await _remoteWorkspaceService.UploadLocalFileAsync(
-                    file.Path,
-                    targetVirtualPath,
-                    cts.Token);
+
+                for (int index = 0; index < totalFiles; index++)
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    var (file, fileSize) = uploadFiles[index];
+                    string targetVirtualPath = RemotePath.Combine(
+                        targetDirectory,
+                        file.Name);
+                    await _remoteWorkspaceService.UploadLocalFileAsync(
+                        file.Path,
+                        targetVirtualPath,
+                        percent =>
+                        {
+                            if (!isCompleted && !cts.IsCancellationRequested)
+                            {
+                                double boundedFilePercent = Math.Clamp(
+                                    percent,
+                                    0.0,
+                                    100.0);
+                                double overallPercent =
+                                    (completedWork +
+                                     fileSize * boundedFilePercent / 100.0) *
+                                    100.0 /
+                                    totalWork;
+                                int remainingFiles = boundedFilePercent >= 100.0
+                                    ? totalFiles - index - 1
+                                    : totalFiles - index;
+                                _statusBar.ShowProgress(
+                                    FormatRemoteTransferStatus(
+                                        uploadStatusPrefix,
+                                        file.Name,
+                                        remainingFiles,
+                                        totalFiles),
+                                    overallPercent,
+                                    () => cts.Cancel());
+                            }
+                        },
+                        cts.Token);
+                    completedWork += fileSize;
+                }
+
                 await _refreshRemoteExplorerAsync();
             }
             catch (OperationCanceledException)
@@ -1061,8 +1120,28 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
+                isCompleted = true;
                 _statusBar.HideProgress();
             }
+        }
+
+        private string FormatRemoteTransferStatus(
+            string statusPrefix,
+            string currentFile,
+            int remainingFiles,
+            int totalFiles)
+        {
+            if (totalFiles <= 1)
+            {
+                return $"{statusPrefix} ({currentFile})";
+            }
+
+            string remainingText = string.Format(
+                _getString(
+                    "RemoteTransferRemainingFilesFormat",
+                    "남은 파일 {0:N0}개"),
+                Math.Max(0, remainingFiles));
+            return $"{statusPrefix} ({currentFile}, {remainingText})";
         }
 
         private void OnCopyFileNameClick(object sender, RoutedEventArgs e)

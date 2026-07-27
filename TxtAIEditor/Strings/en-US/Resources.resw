@@ -3564,6 +3564,7 @@ Plan: {0}</value>
   <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>Download failed</value></data>
   <data name="RemoteUploadingStatus" xml:space="preserve"><value>Uploading...</value></data>
   <data name="RemoteUploadFailedTitle" xml:space="preserve"><value>Upload failed</value></data>
+  <data name="RemoteTransferRemainingFilesFormat" xml:space="preserve"><value>{0:N0} files remaining</value></data>
   <data name="JupyterVariablesButton" xml:space="preserve"><value>Variables</value></data>
   <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>Variable Explorer</value></data>
   <data name="JupyterVariablesName" xml:space="preserve"><value>Name</value></data>

@@ -3528,6 +3528,7 @@
   <data name="RemoteDownloadFailedTitle" xml:space="preserve"><value>下载失败</value></data>
   <data name="RemoteUploadingStatus" xml:space="preserve"><value>上传中...</value></data>
   <data name="RemoteUploadFailedTitle" xml:space="preserve"><value>上传失败</value></data>
+  <data name="RemoteTransferRemainingFilesFormat" xml:space="preserve"><value>剩余 {0:N0} 个文件</value></data>
   <data name="JupyterVariablesButton" xml:space="preserve"><value>变量</value></data>
   <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>变量资源管理器</value></data>
   <data name="JupyterVariablesName" xml:space="preserve"><value>名称</value></data>

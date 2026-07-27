@@ -158,7 +158,7 @@ namespace TxtAIEditor.Core.Services
             string virtualPath,
             bool isDirectory,
             string targetLocalDirectory,
-            Action<string, double>? progressCallback,
+            Action<string, int, int, double>? progressCallback,
             CancellationToken cancellationToken = default)
         {
             (RemoteConnectionSettings connection, string remotePath) =
@@ -178,15 +178,19 @@ namespace TxtAIEditor.Core.Services
             }
             else
             {
-                progressCallback?.Invoke(itemName, 0.0);
-                Progress<double> progress = new(p => progressCallback?.Invoke(itemName, p));
+                progressCallback?.Invoke(itemName, 1, 1, 0.0);
+                DirectProgress<double> progress = new(p => progressCallback?.Invoke(
+                    itemName,
+                    p >= 100.0 ? 0 : 1,
+                    1,
+                    p));
                 await _explorerService.DownloadFileToPathAsync(
                     connection,
                     remotePath,
                     targetLocalPath,
                     progress,
                     cancellationToken);
-                progressCallback?.Invoke(itemName, 100.0);
+                progressCallback?.Invoke(itemName, 0, 1, 100.0);
             }
         }
 
@@ -224,12 +228,29 @@ namespace TxtAIEditor.Core.Services
             string virtualPath,
             CancellationToken cancellationToken = default)
         {
+            await UploadLocalFileAsync(
+                localPath,
+                virtualPath,
+                progressCallback: null,
+                cancellationToken);
+        }
+
+        public async Task UploadLocalFileAsync(
+            string localPath,
+            string virtualPath,
+            Action<double>? progressCallback,
+            CancellationToken cancellationToken = default)
+        {
             (RemoteConnectionSettings connection, string remotePath) =
                 await ResolveConnectionAsync(virtualPath);
+            DirectProgress<double>? progress = progressCallback == null
+                ? null
+                : new DirectProgress<double>(progressCallback);
             await _explorerService.UploadFileAsync(
                 connection,
                 localPath,
                 remotePath,
+                progress,
                 cancellationToken);
             _localToRemote[localPath] = virtualPath;
             FileUploaded?.Invoke(this, virtualPath);
@@ -318,6 +339,21 @@ namespace TxtAIEditor.Core.Services
             return connection == null
                 ? throw new InvalidOperationException("The remote server credentials are unavailable.")
                 : (connection, remotePath);
+        }
+
+        private sealed class DirectProgress<T> : IProgress<T>
+        {
+            private readonly Action<T> _callback;
+
+            public DirectProgress(Action<T> callback)
+            {
+                _callback = callback;
+            }
+
+            public void Report(T value)
+            {
+                _callback(value);
+            }
         }
     }
 }
