@@ -12,6 +12,9 @@ namespace TxtAIEditor.Controls
         private const int MaxTextLength = 160;
         private const int RpcEChangedMode = unchecked((int)0x80010106);
         private const int UiaValueValuePropertyId = 30045;
+        private const int UiaTextPatternId = 10014;
+        private const int TextRangeEndpointStart = 0;
+        private const int TextRangeEndpointEnd = 1;
         private static readonly Guid CUiAutomationClassId = new("FF48DBA4-60EF-4201-AA87-54103EEF594E");
 
         private readonly Dictionary<string, string> _refByIdentity = new(StringComparer.Ordinal);
@@ -58,6 +61,152 @@ namespace TxtAIEditor.Controls
             }
 
             return TryGetCurrentTarget(elementRef, window, out target);
+        }
+
+        public bool TryCollapseTextSelection(IntPtr window)
+        {
+            int initializationResult = CoInitializeEx(IntPtr.Zero, 0);
+            bool shouldUninitialize = initializationResult >= 0;
+            if (initializationResult < 0 && initializationResult != RpcEChangedMode)
+            {
+                return false;
+            }
+
+            try
+            {
+                return TryCollapseTextSelectionCore(window);
+            }
+            catch (COMException)
+            {
+                return false;
+            }
+            catch (InvalidComObjectException)
+            {
+                return false;
+            }
+            finally
+            {
+                if (shouldUninitialize)
+                {
+                    CoUninitialize();
+                }
+            }
+        }
+
+        private static bool TryCollapseTextSelectionCore(IntPtr window)
+        {
+            object automationObject = Activator.CreateInstance(
+                Type.GetTypeFromCLSID(CUiAutomationClassId, throwOnError: true)!)
+                ?? throw new InvalidOperationException(
+                    "Windows UI Automation could not be initialized.");
+            var automation = (IUIAutomation)automationObject;
+            IUIAutomationTreeWalker? walker = null;
+            IUIAutomationElement? root = null;
+            var stack = new Stack<IUIAutomationElement>();
+
+            try
+            {
+                ThrowIfFailed(automation.ElementFromHandle(window, out root));
+                ThrowIfFailed(automation.GetControlViewWalker(out walker));
+                if (root == null || walker == null)
+                {
+                    return false;
+                }
+
+                stack.Push(root);
+                root = null;
+                int visited = 0;
+                while (stack.Count > 0 && ++visited <= 3_000)
+                {
+                    IUIAutomationElement element = stack.Pop();
+                    try
+                    {
+                        if (element.GetCurrentControlType(out int controlType) >= 0 &&
+                            controlType == 50030 &&
+                            element.GetCurrentIsOffscreen(out int isOffscreen) >= 0 &&
+                            isOffscreen == 0 &&
+                            TryCollapseElementTextSelection(element))
+                        {
+                            return true;
+                        }
+
+                        List<IUIAutomationElement> children = GetChildren(walker, element);
+                        for (int index = children.Count - 1; index >= 0; index--)
+                        {
+                            stack.Push(children[index]);
+                        }
+                    }
+                    finally
+                    {
+                        ReleaseComObject(element);
+                    }
+                }
+
+                return false;
+            }
+            finally
+            {
+                while (stack.Count > 0)
+                {
+                    ReleaseComObject(stack.Pop());
+                }
+
+                ReleaseComObject(root);
+                ReleaseComObject(walker);
+                ReleaseComObject(automationObject);
+            }
+        }
+
+        private static bool TryCollapseElementTextSelection(IUIAutomationElement element)
+        {
+            Guid textPatternGuid = typeof(IUIAutomationTextPattern).GUID;
+            IntPtr patternPointer = IntPtr.Zero;
+            object? patternObject = null;
+            IUIAutomationTextRangeArray? ranges = null;
+            IUIAutomationTextRange? range = null;
+
+            try
+            {
+                if (element.GetCurrentPatternAs(
+                        UiaTextPatternId,
+                        ref textPatternGuid,
+                        out patternPointer) < 0 ||
+                    patternPointer == IntPtr.Zero)
+                {
+                    return false;
+                }
+
+                patternObject = Marshal.GetObjectForIUnknown(patternPointer);
+                Marshal.Release(patternPointer);
+                patternPointer = IntPtr.Zero;
+                if (patternObject is not IUIAutomationTextPattern textPattern ||
+                    textPattern.GetSelection(out ranges) < 0 ||
+                    ranges == null ||
+                    ranges.get_Length(out int length) < 0 ||
+                    length == 0 ||
+                    ranges.GetElement(0, out range) < 0 ||
+                    range == null)
+                {
+                    return false;
+                }
+
+                return range.MoveEndpointByRange(
+                        TextRangeEndpointEnd,
+                        range,
+                        TextRangeEndpointStart) >= 0 &&
+                    range.Select() >= 0;
+            }
+            finally
+            {
+                if (patternPointer != IntPtr.Zero)
+                {
+                    Marshal.Release(patternPointer);
+                }
+
+                ReleaseComObject(range);
+                ReleaseComObject(ranges);
+                ReleaseComObject(patternObject);
+            }
         }
 
         private bool TryGetCurrentTarget(string elementRef, IntPtr window, out AccessibilityTarget target)
@@ -444,6 +593,13 @@ namespace TxtAIEditor.Controls
             public int Bottom;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativePoint
+        {
+            public int X;
+            public int Y;
+        }
+
         [ComImport]
         [Guid("30CBE57D-D9D0-452A-AB13-7AC5AC4825EE")]
         [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -472,6 +628,76 @@ namespace TxtAIEditor.Controls
             [PreserveSig] int GetFirstChildElement(IUIAutomationElement element, out IUIAutomationElement? child);
             [PreserveSig] int GetLastChildElement(IUIAutomationElement element, out IUIAutomationElement? child);
             [PreserveSig] int GetNextSiblingElement(IUIAutomationElement element, out IUIAutomationElement? sibling);
+        }
+
+        [ComImport]
+        [Guid("32EBA289-3583-42C9-9C59-3B6D9A1E9B6A")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IUIAutomationTextPattern
+        {
+            [PreserveSig] int RangeFromPoint(NativePoint point, out IUIAutomationTextRange? range);
+            [PreserveSig] int RangeFromChild(IUIAutomationElement child, out IUIAutomationTextRange? range);
+            [PreserveSig] int GetSelection(out IUIAutomationTextRangeArray? ranges);
+            [PreserveSig] int GetVisibleRanges(out IUIAutomationTextRangeArray? ranges);
+            [PreserveSig] int get_DocumentRange(out IUIAutomationTextRange? range);
+            [PreserveSig] int get_SupportedTextSelection(out int supportedTextSelection);
+        }
+
+        [ComImport]
+        [Guid("CE4AE76A-E717-4C98-81EA-47371D028EB6")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IUIAutomationTextRangeArray
+        {
+            [PreserveSig] int get_Length(out int length);
+            [PreserveSig] int GetElement(int index, out IUIAutomationTextRange? element);
+        }
+
+        [ComImport]
+        [Guid("A543CC6A-F4AE-494B-8239-C814481187A8")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IUIAutomationTextRange
+        {
+            [PreserveSig] int Clone(out IUIAutomationTextRange? clonedRange);
+            [PreserveSig] int Compare(IUIAutomationTextRange range, out int areSame);
+            [PreserveSig] int CompareEndpoints(
+                int sourceEndpoint,
+                IUIAutomationTextRange range,
+                int targetEndpoint,
+                out int comparison);
+            [PreserveSig] int ExpandToEnclosingUnit(int textUnit);
+            [PreserveSig] int FindAttribute(
+                int attributeId,
+                [MarshalAs(UnmanagedType.Struct)] object value,
+                int backward,
+                out IUIAutomationTextRange? found);
+            [PreserveSig] int FindText(
+                [MarshalAs(UnmanagedType.BStr)] string text,
+                int backward,
+                int ignoreCase,
+                out IUIAutomationTextRange? found);
+            [PreserveSig] int GetAttributeValue(
+                int attributeId,
+                [MarshalAs(UnmanagedType.Struct)] out object value);
+            [PreserveSig] int GetBoundingRectangles(out IntPtr boundingRectangles);
+            [PreserveSig] int GetEnclosingElement(out IUIAutomationElement? enclosingElement);
+            [PreserveSig] int GetText(
+                int maxLength,
+                [MarshalAs(UnmanagedType.BStr)] out string text);
+            [PreserveSig] int Move(int textUnit, int count, out int moved);
+            [PreserveSig] int MoveEndpointByUnit(
+                int endpoint,
+                int textUnit,
+                int count,
+                out int moved);
+            [PreserveSig] int MoveEndpointByRange(
+                int sourceEndpoint,
+                IUIAutomationTextRange range,
+                int targetEndpoint);
+            [PreserveSig] int Select();
+            [PreserveSig] int AddToSelection();
+            [PreserveSig] int RemoveFromSelection();
+            [PreserveSig] int ScrollIntoView(int alignToTop);
+            [PreserveSig] int GetChildren(out IntPtr children);
         }
 
         [ComImport]

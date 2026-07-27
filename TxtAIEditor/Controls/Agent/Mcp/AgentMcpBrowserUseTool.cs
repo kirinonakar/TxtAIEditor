@@ -457,12 +457,29 @@ namespace TxtAIEditor.Controls
             SendVirtualKey(0x1B); // Escape restores the page focus in common browsers.
             await Task.Delay(100, cancellationToken);
 
-            string text = await CopyFocusedSelectionAsync(selectAll: true, cancellationToken);
-            if (string.Equals(text.Trim(), url.Trim(), StringComparison.OrdinalIgnoreCase))
+            string text;
+            try
             {
-                SendVirtualKey(0x75); // F6: cycle focus from browser chrome to page.
-                await Task.Delay(100, cancellationToken);
                 text = await CopyFocusedSelectionAsync(selectAll: true, cancellationToken);
+                if (string.Equals(text.Trim(), url.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    SendVirtualKey(0x75); // F6: cycle focus from browser chrome to page.
+                    await Task.Delay(100, cancellationToken);
+                    text = await CopyFocusedSelectionAsync(selectAll: true, cancellationToken);
+                }
+            }
+            finally
+            {
+                await Task.Delay(80, CancellationToken.None);
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    if (_accessibility.TryCollapseTextSelection(browserWindow))
+                    {
+                        break;
+                    }
+
+                    await Task.Delay(80, CancellationToken.None);
+                }
             }
 
             SendVirtualKey(0x1B);
@@ -1141,31 +1158,21 @@ namespace TxtAIEditor.Controls
                 await Task.Delay(80, cancellationToken);
             }
 
-            try
+            uint sequence = _inputService.GetClipboardSequence();
+            SendShortcut(0x11, 0x43);
+            DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(2);
+            while (DateTimeOffset.UtcNow < deadline)
             {
-                uint sequence = _inputService.GetClipboardSequence();
-                SendShortcut(0x11, 0x43);
-                DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(2);
-                while (DateTimeOffset.UtcNow < deadline)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_inputService.GetClipboardSequence() != sequence && TryReadClipboardText(out string text))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (_inputService.GetClipboardSequence() != sequence && TryReadClipboardText(out string text))
-                    {
-                        return text;
-                    }
-
-                    await Task.Delay(40, cancellationToken);
+                    return text;
                 }
 
-                return string.Empty;
+                await Task.Delay(40, cancellationToken);
             }
-            finally
-            {
-                if (selectAll)
-                {
-                    SendVirtualKey(0x27); // Right Arrow collapses the Ctrl+A selection and restores normal page shading.
-                }
-            }
+
+            return string.Empty;
         }
 
         private async Task<string> BuildStatusResultAsync(string header, IntPtr browserWindow, bool includeUrl, CancellationToken cancellationToken)
