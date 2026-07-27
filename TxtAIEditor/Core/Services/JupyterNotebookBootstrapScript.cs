@@ -101,13 +101,19 @@ namespace TxtAIEditor.Core.Services
         }
     }
 
-    container.addEventListener('input', () => {
+    container.addEventListener('input', (e) => {
         notifyModified();
+        const editor = e.target ? e.target.closest('.cell-input-area.code-editor') : null;
+        if (editor && editor !== composingCellEditor) {
+            updateCellInputHighlight(editor);
+            triggerNbAutocomplete(editor);
+        }
     });
 
     container.addEventListener('focusout', (e) => {
         const editor = e.target.closest('.cell-input-area.code-editor');
         if (!editor) return;
+        hideNbAutocomplete();
         const cellDiv = editor.closest('.cell');
         if (!cellDiv || getCellType(cellDiv) !== 'code') return;
         setTimeout(() => {

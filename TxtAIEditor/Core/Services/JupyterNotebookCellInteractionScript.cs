@@ -6,6 +6,213 @@ namespace TxtAIEditor.Core.Services
         {
             return @"    let runningCells = new Set();
 
+    const nbAutocompleteState = {
+        isOpen: false,
+        candidates: [],
+        activeIndex: 0,
+        editor: null,
+        wordStart: 0,
+        wordEnd: 0,
+        caretOffset: 0,
+        word: ''
+    };
+
+    const pyKeywords = [
+        'def', 'class', 'import', 'from', 'return', 'if', 'else', 'elif',
+        'for', 'while', 'try', 'except', 'finally', 'raise', 'yield', 'with',
+        'as', 'pass', 'break', 'continue', 'lambda', 'global', 'nonlocal',
+        'assert', 'async', 'await', 'del', 'in', 'is', 'and', 'or', 'not'
+    ];
+    const pyBuiltins = [
+        'print', 'len', 'range', 'str', 'int', 'float', 'list', 'dict', 'set',
+        'tuple', 'object', 'open', 'enumerate', 'zip', 'abs', 'min', 'max',
+        'sum', 'sorted', 'map', 'filter', 'any', 'all', 'dir', 'help', 'input',
+        'super', 'isinstance', 'issubclass', 'type', 'vars', 'True', 'False', 'None'
+    ];
+    const pyLibraries = [
+        'numpy', 'pandas', 'matplotlib', 'pyplot', 'plt', 'np', 'pd', 'sns',
+        'seaborn', 'torch', 'tensorflow', 'tf', 'sklearn', 'scipy', 'os', 'sys',
+        'json', 're', 'math', 'datetime', 'random', 'Path', 'DataFrame', 'Series',
+        'ndarray', 'tqdm'
+    ];
+
+    function getWordUnderCaretInEditor(editor) {
+        const caretOffset = getCaretOffsetInEditor(editor);
+        if (!Number.isInteger(caretOffset)) return null;
+        const text = getEditorText(editor);
+        let start = caretOffset;
+        while (start > 0 && /[\w_]/.test(text[start - 1])) {
+            start--;
+        }
+        let end = caretOffset;
+        while (end < text.length && /[\w_]/.test(text[end])) {
+            end++;
+        }
+        const word = text.slice(start, caretOffset);
+        return { word, start, end, caretOffset, text };
+    }
+
+    function getNbAutocompleteCandidates(word) {
+        if (!word || word.length < 1) return [];
+        const lowerWord = word.toLowerCase();
+        const seen = new Set();
+        const candidates = [];
+
+        function addCandidate(label, kind, detail) {
+            if (!label || label.length <= word.length) return;
+            const lowerLabel = label.toLowerCase();
+            if (!lowerLabel.startsWith(lowerWord)) return;
+            if (seen.has(lowerLabel)) return;
+            seen.add(lowerLabel);
+            candidates.push({ label, kind, detail });
+        }
+
+        pyKeywords.forEach(k => addCandidate(k, 'keyword', '키워드'));
+        pyBuiltins.forEach(b => addCandidate(b, 'builtin', '내장함수'));
+        pyLibraries.forEach(l => addCandidate(l, 'library', '라이브러리'));
+
+        container.querySelectorAll('.cell-input-area').forEach(cellEd => {
+            const cellText = getEditorText(cellEd);
+            const matches = cellText.match(/[\w_]{2,}/g) || [];
+            matches.forEach(w => addCandidate(w, 'word', '코드'));
+        });
+
+        return candidates.slice(0, 10);
+    }
+
+    function getOrCreateNbAutocompletePopup() {
+        let popup = document.getElementById('nb-autocomplete-popup');
+        if (!popup) {
+            popup = document.createElement('div');
+            popup.id = 'nb-autocomplete-popup';
+            popup.className = 'nb-autocomplete-popup';
+            popup.hidden = true;
+            document.body.appendChild(popup);
+        }
+        return popup;
+    }
+
+    function renderNbAutocomplete() {
+        const popup = getOrCreateNbAutocompletePopup();
+        if (!nbAutocompleteState.isOpen || nbAutocompleteState.candidates.length === 0) {
+            popup.hidden = true;
+            return;
+        }
+
+        const itemsHtml = nbAutocompleteState.candidates.map((c, idx) => {
+            const activeCls = idx === nbAutocompleteState.activeIndex ? ' active' : '';
+            return '<button type=""button"" class=""nb-autocomplete-item' + activeCls + '"" data-index=""' + idx + '"">' +
+                   '<span class=""nb-autocomplete-label"">' + escapeHtml(c.label) + '</span>' +
+                   (c.detail ? '<span class=""nb-autocomplete-detail"">' + escapeHtml(c.detail) + '</span>' : '') +
+                   '</button>';
+        }).join('');
+
+        popup.innerHTML = itemsHtml;
+        popup.hidden = false;
+
+        const sel = window.getSelection();
+        let caretRect = null;
+        if (sel && sel.rangeCount > 0) {
+            const r = sel.getRangeAt(0).cloneRange();
+            r.collapse(false);
+            const rects = r.getClientRects();
+            if (rects.length > 0) caretRect = rects[0];
+        }
+        if (!caretRect && nbAutocompleteState.editor) {
+            caretRect = nbAutocompleteState.editor.getBoundingClientRect();
+        }
+
+        if (caretRect) {
+            const popupRect = popup.getBoundingClientRect();
+            let left = caretRect.left;
+            let top = caretRect.bottom + 4;
+            if (left + popupRect.width > window.innerWidth) {
+                left = window.innerWidth - popupRect.width - 10;
+            }
+            if (top + popupRect.height > window.innerHeight) {
+                top = caretRect.top - popupRect.height - 4;
+            }
+            popup.style.left = Math.max(10, left) + 'px';
+            popup.style.top = Math.max(10, top) + 'px';
+        }
+    }
+
+    function triggerNbAutocomplete(editor) {
+        if (!editor || editor === composingCellEditor) {
+            hideNbAutocomplete();
+            return;
+        }
+        const info = getWordUnderCaretInEditor(editor);
+        if (!info || !info.word || info.word.length < 1) {
+            hideNbAutocomplete();
+            return;
+        }
+
+        const candidates = getNbAutocompleteCandidates(info.word);
+        if (candidates.length === 0) {
+            hideNbAutocomplete();
+            return;
+        }
+
+        nbAutocompleteState.isOpen = true;
+        nbAutocompleteState.candidates = candidates;
+        nbAutocompleteState.activeIndex = 0;
+        nbAutocompleteState.editor = editor;
+        nbAutocompleteState.wordStart = info.start;
+        nbAutocompleteState.wordEnd = info.end;
+        nbAutocompleteState.caretOffset = info.caretOffset;
+        nbAutocompleteState.word = info.word;
+
+        renderNbAutocomplete();
+    }
+
+    function hideNbAutocomplete() {
+        nbAutocompleteState.isOpen = false;
+        nbAutocompleteState.candidates = [];
+        nbAutocompleteState.activeIndex = 0;
+        nbAutocompleteState.editor = null;
+        const popup = document.getElementById('nb-autocomplete-popup');
+        if (popup) popup.hidden = true;
+    }
+
+    function moveNbAutocompleteIndex(delta) {
+        if (!nbAutocompleteState.isOpen || nbAutocompleteState.candidates.length === 0) return;
+        const len = nbAutocompleteState.candidates.length;
+        nbAutocompleteState.activeIndex = (nbAutocompleteState.activeIndex + delta + len) % len;
+        renderNbAutocomplete();
+        const popup = document.getElementById('nb-autocomplete-popup');
+        const activeItem = popup ? popup.querySelector('.nb-autocomplete-item.active') : null;
+        if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
+    }
+
+    function insertSelectedNbCandidate() {
+        if (!nbAutocompleteState.isOpen || !nbAutocompleteState.editor) return;
+        const candidate = nbAutocompleteState.candidates[nbAutocompleteState.activeIndex];
+        const editor = nbAutocompleteState.editor;
+        if (!candidate || !editor) {
+            hideNbAutocomplete();
+            return;
+        }
+
+        const source = getEditorText(editor);
+        const wordStart = nbAutocompleteState.wordStart;
+        const wordEnd = nbAutocompleteState.wordEnd;
+        const insertText = candidate.label;
+
+        const newSource = source.slice(0, wordStart) + insertText + source.slice(wordEnd);
+        const newCaretOffset = wordStart + insertText.length;
+
+        const cellDiv = editor.closest('.cell');
+        editor.setAttribute('data-source', newSource);
+        if (cellDiv) cellDiv.setAttribute('data-source', newSource);
+
+        editor.innerHTML = '<pre>' + highlightPythonCode(newSource) + '</pre>';
+        setCaretOffsetInEditor(editor, newCaretOffset);
+
+        hideNbAutocomplete();
+        notifyModified();
+    }
+
     function notebookString(key, fallback) {
         const strings = window.__notebookStrings || {};
         return typeof strings[key] === 'string' && strings[key] ? strings[key] : fallback;
@@ -207,6 +414,12 @@ namespace TxtAIEditor.Core.Services
         const endedEditor = e.target.closest('.cell-input-area, [contenteditable=""true""]');
         if (endedEditor && endedEditor === composingCellEditor) {
             composingCellEditor = null;
+            if (endedEditor.classList.contains('code-editor')) {
+                setTimeout(() => {
+                    updateCellInputHighlight(endedEditor);
+                    triggerNbAutocomplete(endedEditor);
+                }, 0);
+            }
         }
         const editor = e.target.closest('.markdown-editor');
         if (!editor || editor !== composingMarkdownEditor) return;
@@ -1171,7 +1384,17 @@ namespace TxtAIEditor.Core.Services
         }
     }
 
-    document.addEventListener('click', hideContextMenu);
+    document.addEventListener('click', (e) => {
+        const item = e.target.closest('.nb-autocomplete-item');
+        if (item) {
+            const idx = parseInt(item.getAttribute('data-index') || '0');
+            nbAutocompleteState.activeIndex = idx;
+            insertSelectedNbCandidate();
+            return;
+        }
+        hideNbAutocomplete();
+        hideContextMenu();
+    });
     document.addEventListener('scroll', hideContextMenu, true);
     document.addEventListener('contextmenu', (e) => {
         if (e.target.closest('.mpl-viewport, .mpl-toolbar')) return;
@@ -1342,6 +1565,33 @@ namespace TxtAIEditor.Core.Services
         if (!input) return;
         const cellDiv = input.closest('.cell');
         if (!cellDiv) return;
+
+        if (nbAutocompleteState.isOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                e.stopPropagation();
+                moveNbAutocompleteIndex(1);
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                e.stopPropagation();
+                moveNbAutocompleteIndex(-1);
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                e.stopPropagation();
+                insertSelectedNbCandidate();
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                hideNbAutocomplete();
+                return;
+            }
+        }
 
         if (!e.isComposing && e.keyCode !== 229 &&
             !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey &&

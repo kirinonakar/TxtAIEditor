@@ -366,19 +366,109 @@ namespace TxtAIEditor.Core.Services
         workingText = workingText.replace(/[{}()\[\].;,:]/g, m => stash(`<span class=""token-punctuation"">${escapeHtml(m)}</span>`));
 
         let escapedText = escapeHtml(workingText);
+        const bracketStack = [];
+        const matchingBrackets = { ')': '(', '}': '{', ']': '[' };
+        const opening = { '(': '(', '{': '{', '[': '[' };
+        const closing = { ')': '(', '}': '{', ']': '[' };
+
         while (escapedText.includes('\u0002_TOKEN_')) {
             escapedText = escapedText.replace(/\u0002_TOKEN_(\d+)_\u0002/g, (match, idx) => {
-                return tokens[Number(idx)];
+                let tokenHtml = tokens[Number(idx)];
+                if (!tokenHtml.includes('token-comment') && !tokenHtml.includes('token-string')) {
+                    tokenHtml = tokenHtml.replace(/[(){}\[\]]/g, ch => {
+                        if (opening[ch]) {
+                            const depth = bracketStack.length;
+                            bracketStack.push(ch);
+                            return `<span class=""bracket-depth-${depth % 6}"">${ch}</span>`;
+                        }
+                        if (closing[ch]) {
+                            const target = matchingBrackets[ch];
+                            if (bracketStack.length > 0 && bracketStack[bracketStack.length - 1] === target) {
+                                bracketStack.pop();
+                            } else {
+                                bracketStack.pop();
+                            }
+                            const depth = bracketStack.length;
+                            return `<span class=""bracket-depth-${depth % 6}"">${ch}</span>`;
+                        }
+                        return ch;
+                    });
+                }
+                return tokenHtml;
             });
         }
         return escapedText;
     }
 
-    function applyCodeSyntaxHighlight(cellDiv) {
+    function getCaretOffsetInEditor(editor) {
+        const sel = window.getSelection();
+        if (!editor || !sel || sel.rangeCount === 0) return null;
+        const caret = sel.getRangeAt(0);
+        if (!editor.contains(caret.startContainer)) return null;
+
+        const beforeCaret = document.createRange();
+        beforeCaret.selectNodeContents(editor);
+        beforeCaret.setEnd(caret.startContainer, caret.startOffset);
+        const holder = document.createElement('div');
+        holder.appendChild(beforeCaret.cloneContents());
+        return getEditorText(holder).length;
+    }
+
+    function setCaretOffsetInEditor(editor, targetOffset) {
+        if (!editor || !Number.isInteger(targetOffset)) return;
+        const sel = window.getSelection();
+        if (!sel) return;
+        const pre = editor.querySelector('pre') || editor;
+        const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+        let currentOffset = 0;
+        let targetNode = null;
+        let nodeOffset = 0;
+        let textNode;
+
+        while ((textNode = walker.nextNode())) {
+            const len = textNode.nodeValue.length;
+            if (currentOffset + len >= targetOffset) {
+                targetNode = textNode;
+                nodeOffset = targetOffset - currentOffset;
+                break;
+            }
+            currentOffset += len;
+        }
+
+        const range = document.createRange();
+        if (targetNode) {
+            range.setStart(targetNode, nodeOffset);
+        } else {
+            range.selectNodeContents(pre);
+        }
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    function updateCellInputHighlight(editor) {
+        if (!editor || editor === composingCellEditor) return;
+        const cellDiv = editor.closest('.cell');
+        const caretOffset = getCaretOffsetInEditor(editor);
+        const source = getEditorText(editor);
+        editor.setAttribute('data-source', source);
+        if (cellDiv) cellDiv.setAttribute('data-source', source);
+
+        editor.innerHTML = '<pre>' + highlightPythonCode(source) + '</pre>';
+        if (Number.isInteger(caretOffset)) {
+            setCaretOffsetInEditor(editor, caretOffset);
+        }
+    }
+
+    function applyCodeSyntaxHighlight(cellDiv, force = false) {
         if (!cellDiv) return;
         const editor = cellDiv.querySelector('.cell-input-area.code-editor');
         if (!editor) return;
-        if (editor === composingCellEditor || editor.contains(document.activeElement)) return;
+        if (editor === composingCellEditor) return;
+        if (!force && editor.contains(document.activeElement)) {
+            updateCellInputHighlight(editor);
+            return;
+        }
 
         const source = getEditorText(editor);
         editor.setAttribute('data-source', source);
