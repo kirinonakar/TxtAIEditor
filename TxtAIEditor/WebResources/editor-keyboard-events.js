@@ -702,7 +702,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
 
         if ((event.key === ' ' || event.code === 'Space') && !event.ctrlKey && !event.metaKey && !event.altKey) {
             event.preventDefault();
-            markNativeBeforeInputHandled(['insertSpace', 'insertText'], 120);
+            markNativeBeforeInputHandled(['insertSpace'], 120);
             scheduleModelRepeatEdit('Space', event.repeat);
             return;
         }
@@ -746,7 +746,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
             event.preventDefault();
             const keyName = normalizedModelRepeatKey(event);
             if (keyName === 'Enter') {
-                markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph', 'insertText', 'insertSpace'], 120);
+                markNativeBeforeInputHandled(['insertLineBreak'], 120);
             } else {
                 state.lastDeleteKeyDown = {
                     key: keyName,
@@ -764,7 +764,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
 
         if (event.key === 'Enter') {
             event.preventDefault();
-            markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph', 'insertText', 'insertSpace'], 120);
+            markNativeBeforeInputHandled(['insertLineBreak'], 120);
             splitCurrentLine(element);
             return;
         }

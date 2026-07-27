@@ -75,6 +75,7 @@ export function createModelRepeatInputHandlers({
         const types = state.repeatEdit.suppressBeforeInputTypes;
         if (types.has(inputType)) return true;
         if (types.has('insertSpace') && inputType.startsWith('insert') && event.data === ' ') return true;
+        if (types.has('insertLineBreak') && beforeInputMatchesRepeatKey(event, 'Enter')) return true;
         return false;
     }
 
