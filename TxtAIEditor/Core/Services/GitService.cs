@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
@@ -414,15 +416,201 @@ namespace TxtAIEditor.Core.Services
             return true;
         }
 
-        public async Task<bool> CommitAsync(string repoPath, string message)
+        public async Task<bool> CommitAsync(
+            string repoPath,
+            string message,
+            bool stripJupyterOutputs = false)
         {
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(message))
                 return false;
+
+            if (stripJupyterOutputs &&
+                !await StripJupyterNotebookOutputsFromIndexAsync(repoPath))
+            {
+                return false;
+            }
 
             // Escape quotes in commit message
             string escapedMsg = message.Replace("\"", "\\\"");
             string output = await RunGitCommandAsync(repoPath, $"commit -m \"{escapedMsg}\"");
             return !output.StartsWith("fatal:");
+        }
+
+        private async Task<bool> StripJupyterNotebookOutputsFromIndexAsync(string repoPath)
+        {
+            string workingDir = FindRepositoryRoot(repoPath) ?? repoPath;
+            string stagedPathsOutput = await RunGitCommandAsync(
+                workingDir,
+                "diff --cached --name-only --diff-filter=ACMR -z -- \"*.ipynb\"");
+            if (stagedPathsOutput.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var indexUpdates = new List<(string Mode, string Hash, string Path)>();
+            foreach (string path in stagedPathsOutput.Split('\0', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string quotedPath = QuotePath(path);
+                string stagedContent = await RunGitCommandAsync(
+                    workingDir,
+                    $"show :\"{quotedPath}\"");
+                if (stagedContent.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase) ||
+                    !TryStripJupyterNotebookOutputs(stagedContent, out string cleanedContent, out bool changed))
+                {
+                    return false;
+                }
+
+                if (!changed)
+                {
+                    continue;
+                }
+
+                string indexEntry = await RunGitCommandAsync(
+                    workingDir,
+                    $"ls-files --stage -z -- \"{quotedPath}\"");
+                if (indexEntry.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                int modeSeparator = indexEntry.IndexOf(' ');
+                if (modeSeparator <= 0)
+                {
+                    return false;
+                }
+
+                string mode = indexEntry[..modeSeparator];
+                string hash = (await RunGitCommandWithInputAsync(
+                    workingDir,
+                    "hash-object -w --stdin",
+                    cleanedContent)).Trim();
+                if (hash.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase) ||
+                    hash.Length == 0)
+                {
+                    return false;
+                }
+
+                indexUpdates.Add((mode, hash, path));
+            }
+
+            foreach ((string mode, string hash, string path) in indexUpdates)
+            {
+                string output = await RunGitCommandAsync(
+                    workingDir,
+                    $"update-index --add --cacheinfo {mode} {hash} \"{QuotePath(path)}\"");
+                if (output.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool TryStripJupyterNotebookOutputs(
+            string content,
+            out string cleanedContent,
+            out bool changed)
+        {
+            cleanedContent = content;
+            changed = false;
+
+            try
+            {
+                JsonNode? root = JsonNode.Parse(content);
+                if (root is not JsonObject notebook ||
+                    notebook["cells"] is not JsonArray cells)
+                {
+                    return false;
+                }
+
+                foreach (JsonNode? node in cells)
+                {
+                    if (node is not JsonObject cell ||
+                        !string.Equals(
+                            cell["cell_type"]?.GetValue<string>(),
+                            "code",
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (cell["outputs"] is JsonArray outputs && outputs.Count > 0)
+                    {
+                        cell["outputs"] = new JsonArray();
+                        changed = true;
+                    }
+
+                    if (cell["execution_count"] != null)
+                    {
+                        cell["execution_count"] = null;
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                {
+                    cleanedContent = notebook.ToJsonString(new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    }) + Environment.NewLine;
+                }
+
+                return true;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }
+
+        private async Task<string> RunGitCommandWithInputAsync(
+            string workingDir,
+            string arguments,
+            string input)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = GitExecutablePath.Value,
+                Arguments = $"-c core.quotepath=false -c safe.directory=* {arguments}",
+                WorkingDirectory = workingDir,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            startInfo.Environment["LANG"] = "C.UTF-8";
+            startInfo.Environment["LC_ALL"] = "C.UTF-8";
+            startInfo.Environment["OUTPUT_CHARSET"] = "UTF-8";
+
+            using var process = new Process { StartInfo = startInfo };
+            try
+            {
+                process.Start();
+                Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+                Task<string> errorTask = process.StandardError.ReadToEndAsync();
+                await process.StandardInput.WriteAsync(input);
+                process.StandardInput.Close();
+                await process.WaitForExitAsync();
+
+                string output = await outputTask;
+                string error = await errorTask;
+                return process.ExitCode == 0
+                    ? output
+                    : BuildGitFailureOutput(error, output);
+            }
+            catch (Exception ex)
+            {
+                return $"fatal: {ex.Message}";
+            }
         }
 
         public async Task<bool> PushAsync(string repoPath)

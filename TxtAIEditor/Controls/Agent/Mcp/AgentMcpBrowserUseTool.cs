@@ -1141,21 +1141,31 @@ namespace TxtAIEditor.Controls
                 await Task.Delay(80, cancellationToken);
             }
 
-            uint sequence = _inputService.GetClipboardSequence();
-            SendShortcut(0x11, 0x43);
-            DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(2);
-            while (DateTimeOffset.UtcNow < deadline)
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (_inputService.GetClipboardSequence() != sequence && TryReadClipboardText(out string text))
+                uint sequence = _inputService.GetClipboardSequence();
+                SendShortcut(0x11, 0x43);
+                DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(2);
+                while (DateTimeOffset.UtcNow < deadline)
                 {
-                    return text;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (_inputService.GetClipboardSequence() != sequence && TryReadClipboardText(out string text))
+                    {
+                        return text;
+                    }
+
+                    await Task.Delay(40, cancellationToken);
                 }
 
-                await Task.Delay(40, cancellationToken);
+                return string.Empty;
             }
-
-            return string.Empty;
+            finally
+            {
+                if (selectAll)
+                {
+                    SendVirtualKey(0x27); // Right Arrow collapses the Ctrl+A selection and restores normal page shading.
+                }
+            }
         }
 
         private async Task<string> BuildStatusResultAsync(string header, IntPtr browserWindow, bool includeUrl, CancellationToken cancellationToken)

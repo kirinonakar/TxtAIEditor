@@ -93,6 +93,7 @@ namespace TxtAIEditor.Core.Models
 
         // Git Config
         public bool AutoGitDetect { get; set; } = true;
+        public bool StripJupyterOutputsOnCommit { get; set; } = true;
 
         // Favorites
         public List<string> FavoritePaths { get; set; } = new List<string>();

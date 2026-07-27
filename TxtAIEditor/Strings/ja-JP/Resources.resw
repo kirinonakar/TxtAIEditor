@@ -338,6 +338,9 @@
   <data name="SettingsAutoSaveAllowNonGitFolders" xml:space="preserve">
     <value>Gitフォルダー以外でも自動保存を許可する</value>
   </data>
+  <data name="SettingsStripJupyterOutputsOnCommit" xml:space="preserve">
+    <value>Git コミット時に Jupyter Notebook の出力を自動削除</value>
+  </data>
   <data name="SettingsLivePreview" xml:space="preserve">
     <value>デフォルトでプレビューを有効にする</value>
   </data>

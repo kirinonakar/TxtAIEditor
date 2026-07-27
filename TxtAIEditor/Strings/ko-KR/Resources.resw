@@ -338,6 +338,9 @@
   <data name="SettingsAutoSaveAllowNonGitFolders" xml:space="preserve">
     <value>Git 폴더가 아니어도 Autosave 허용</value>
   </data>
+  <data name="SettingsStripJupyterOutputsOnCommit" xml:space="preserve">
+    <value>Git 커밋 시 Jupyter Notebook 출력 자동 제거</value>
+  </data>
   <data name="SettingsLivePreview" xml:space="preserve">
     <value>프리뷰 기본 활성화</value>
   </data>

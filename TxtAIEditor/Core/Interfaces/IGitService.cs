@@ -19,7 +19,7 @@ namespace TxtAIEditor.Core.Interfaces
         Task<bool> UnstageFileAsync(string repoPath, string filePath);
         Task<bool> RestoreFileAsync(string repoPath, string filePath);
         Task<bool> RestoreAllAsync(string repoPath);
-        Task<bool> CommitAsync(string repoPath, string message);
+        Task<bool> CommitAsync(string repoPath, string message, bool stripJupyterOutputs = false);
         Task<bool> PushAsync(string repoPath);
         Task<bool> PullAsync(string repoPath);
         Task<bool> RebaseAsync(string repoPath);

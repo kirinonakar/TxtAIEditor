@@ -261,16 +261,13 @@ namespace TxtAIEditor.Core.Services
         const caret = sel.getRangeAt(0);
         if (!editor.contains(caret.startContainer)) return false;
 
-        const probe = document.createRange();
-        probe.selectNodeContents(editor);
+        const caretOffset = getCaretOffsetInEditor(editor);
+        if (!Number.isInteger(caretOffset)) return false;
+        const text = getEditorText(editor);
         if (direction < 0) {
-            probe.setEnd(caret.startContainer, caret.startOffset);
-        } else {
-            probe.setStart(caret.startContainer, caret.startOffset);
+            return !text.slice(0, caretOffset).includes('\n');
         }
-        const holder = document.createElement('div');
-        holder.appendChild(probe.cloneContents());
-        return !getEditorText(holder).includes('\n');
+        return !text.slice(caretOffset).includes('\n');
     }
 
     function moveEditorFocusToAdjacentCell(cellDiv, direction) {

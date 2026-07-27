@@ -30,6 +30,7 @@ namespace TxtAIEditor.Controls
         private readonly TextBlock _statusGitBranch;
         private readonly Func<string> _repoPathProvider;
         private readonly Func<string> _folderPathProvider;
+        private readonly Func<bool> _stripJupyterOutputsOnCommitProvider;
         private readonly Func<XamlRoot> _xamlRootProvider;
         private readonly Func<string, string, string> _getString;
         private readonly Action<string, string> _showError;
@@ -53,6 +54,7 @@ namespace TxtAIEditor.Controls
             TextBlock statusGitBranch,
             Func<string> repoPathProvider,
             Func<string> folderPathProvider,
+            Func<bool> stripJupyterOutputsOnCommitProvider,
             Func<XamlRoot> xamlRootProvider,
             Func<string, string, string> getString,
             Action<string, string> showError,
@@ -69,6 +71,7 @@ namespace TxtAIEditor.Controls
             _statusGitBranch = statusGitBranch;
             _repoPathProvider = repoPathProvider;
             _folderPathProvider = folderPathProvider;
+            _stripJupyterOutputsOnCommitProvider = stripJupyterOutputsOnCommitProvider;
             _xamlRootProvider = xamlRootProvider;
             _getString = getString;
             _showError = showError;
@@ -378,7 +381,10 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            bool success = await _gitService.CommitAsync(repoPath, message);
+            bool success = await _gitService.CommitAsync(
+                repoPath,
+                message,
+                _stripJupyterOutputsOnCommitProvider());
             if (success)
             {
                 _leftSidebar.GitCommitMessage.Text = string.Empty;
@@ -427,7 +433,10 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            bool commitSuccess = await _gitService.CommitAsync(repoPath, message);
+            bool commitSuccess = await _gitService.CommitAsync(
+                repoPath,
+                message,
+                _stripJupyterOutputsOnCommitProvider());
             if (!commitSuccess)
             {
                 await RefreshAsync(repoPath);

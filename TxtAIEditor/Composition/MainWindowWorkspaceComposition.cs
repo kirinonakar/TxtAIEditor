@@ -77,6 +77,7 @@ namespace TxtAIEditor.Composition
                 ui.StatusBar.GitBranchText,
                 callbacks.GetCurrentRepoPathForGitRefresh,
                 callbacks.GetCurrentFolderPath,
+                () => services.SettingsService.CurrentSettings.StripJupyterOutputsOnCommit,
                 () => ui.RootElement.XamlRoot,
                 callbacks.GetLocalizedString,
                 dialog.ShowErrorMessage,

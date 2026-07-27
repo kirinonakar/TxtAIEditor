@@ -20,6 +20,7 @@ namespace TxtAIEditor.Core.Services
         private readonly CheckBox _autocompleteTabCheck;
         private readonly CheckBox _autoSaveCheck;
         private readonly CheckBox _autoSaveAllowNonGitCheck;
+        private readonly CheckBox _stripJupyterOutputsOnCommitCheck;
         private readonly CheckBox _defaultMarkdownCheck;
         private readonly CheckBox _defaultMarkdownToolbarCheck;
         private readonly CheckBox _startInTreeModeCheck;
@@ -44,6 +45,11 @@ namespace TxtAIEditor.Core.Services
             _autocompleteTabCheck = new CheckBox { Content = getString("SettingsAutocompleteTab", "Tab으로 자동완성"), IsChecked = settings.AutocompleteOnTab };
             _autoSaveCheck = new CheckBox { Content = getString("SettingsAutoSave", "Autosave 사용"), IsChecked = settings.AutoSave };
             _autoSaveAllowNonGitCheck = new CheckBox { Content = getString("SettingsAutoSaveAllowNonGitFolders", "Git 폴더가 아니어도 Autosave 허용"), IsChecked = settings.AutoSaveAllowNonGitFolders };
+            _stripJupyterOutputsOnCommitCheck = new CheckBox
+            {
+                Content = getString("SettingsStripJupyterOutputsOnCommit", "Git 커밋 시 Jupyter Notebook 출력 자동 제거"),
+                IsChecked = settings.StripJupyterOutputsOnCommit
+            };
             _defaultMarkdownCheck = new CheckBox { Content = getString("SettingsLivePreview", "실시간 미리보기 기본 활성화"), IsChecked = settings.DefaultMarkdownEnabled };
             _defaultMarkdownToolbarCheck = new CheckBox { Content = getString("SettingsMarkdownToolbar", "기본 마크다운 툴바 활성화"), IsChecked = settings.DefaultMarkdownToolbarEnabled };
             _startInTreeModeCheck = new CheckBox { Content = getString("SettingsStartInTreeMode", "트리 모드로 시작"), IsChecked = settings.StartInTreeMode };
@@ -67,6 +73,7 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(_autocompleteTabCheck);
             section.Children.Add(_autoSaveCheck);
             section.Children.Add(_autoSaveAllowNonGitCheck);
+            section.Children.Add(_stripJupyterOutputsOnCommitCheck);
             section.Children.Add(_defaultMarkdownCheck);
             section.Children.Add(_defaultMarkdownToolbarCheck);
             section.Children.Add(_startInTreeModeCheck);
@@ -89,6 +96,7 @@ namespace TxtAIEditor.Core.Services
             settings.AutocompleteOnTab = _autocompleteTabCheck.IsChecked == true;
             settings.AutoSave = _autoSaveCheck.IsChecked == true;
             settings.AutoSaveAllowNonGitFolders = _autoSaveAllowNonGitCheck.IsChecked == true;
+            settings.StripJupyterOutputsOnCommit = _stripJupyterOutputsOnCommitCheck.IsChecked == true;
             if (int.TryParse(_tabSizeBox.Text.Trim(), out int tabSize))
             {
                 settings.TabSize = Math.Clamp(tabSize, 1, 16);

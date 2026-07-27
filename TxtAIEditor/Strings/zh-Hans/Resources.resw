@@ -338,6 +338,9 @@
   <data name="SettingsAutoSaveAllowNonGitFolders" xml:space="preserve">
     <value>允许在 Git 文件夹外部自动保存</value>
   </data>
+  <data name="SettingsStripJupyterOutputsOnCommit" xml:space="preserve">
+    <value>Git 提交时自动移除 Jupyter Notebook 输出</value>
+  </data>
   <data name="SettingsLivePreview" xml:space="preserve">
     <value>默认启用预览</value>
   </data>
