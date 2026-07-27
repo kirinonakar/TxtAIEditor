@@ -259,8 +259,8 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            return tab.FilePath != null
-                ? Path.GetFileNameWithoutExtension(tab.FilePath)
+return tab.FilePath != null
+                ? Path.GetFileName(tab.FilePath)
                 : tab.Title;
         }
 
