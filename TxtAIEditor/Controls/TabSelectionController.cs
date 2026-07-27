@@ -4,8 +4,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
 
@@ -119,10 +122,27 @@ namespace TxtAIEditor.Controls
                 var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
                 if (tab != null)
                 {
+                    _editorSessions.TryGetValue(tab.Id, out var activeSession);
+                    FreezeDiagnosticLogger.SetActiveDocument(
+                        tab.FilePath,
+                        activeSession?.Model.LineCount ?? 0);
+                    FocusDocumentViewer(activeTabItem, tab);
+                    _dispatcherQueue.TryEnqueue(
+                        DispatcherQueuePriority.Low,
+                        () => FocusDocumentViewer(activeTabItem, tab));
+
                     _statusBarController.UpdateFileStats(tab);
                     _statusBarController.UpdateTotalLines(tab);
                     _statusBarController.UpdateSelectionStats(null);
+
+                    var previewStopwatch = Stopwatch.StartNew();
                     _updateLivePreview(tab);
+                    FreezeDiagnosticLogger.LogSlowOperation(
+                        "tab-selection-preview-refresh",
+                        previewStopwatch.ElapsedMilliseconds,
+                        thresholdMilliseconds: 25,
+                        $"lines={activeSession?.Model.LineCount ?? 0}; language={tab.Language}");
+
                     _updateLanguageUi(tab);
                     _syncCsvTableModeUi(tab);
                     _statusBarController.SyncEncodingCombo(tab);
@@ -148,10 +168,51 @@ namespace TxtAIEditor.Controls
                     {
                         await bridgeGroup2.Bridge.RequestSelectionAsync();
                     }
+
+                    var tocStopwatch = Stopwatch.StartNew();
                     _tocController.RefreshToc(tab);
+                    FreezeDiagnosticLogger.LogSlowOperation(
+                        "tab-selection-toc-refresh",
+                        tocStopwatch.ElapsedMilliseconds,
+                        thresholdMilliseconds: 25,
+                        $"lines={activeSession?.Model.LineCount ?? 0}; language={tab.Language}");
                 }
             }
             _updateWindowTitle();
+        }
+
+        private static void FocusDocumentViewer(TabViewItem tabItem, OpenedTab tab)
+        {
+            if ((!tab.IsNotebookViewer &&
+                 !tab.IsOfficeDocumentViewer &&
+                 !tab.IsPdfViewer &&
+                 !tab.IsDocxViewer) ||
+                !tabItem.IsSelected ||
+                tabItem.Content is not DependencyObject content)
+            {
+                return;
+            }
+
+            FindFirstWebView(content)?.Focus(FocusState.Programmatic);
+        }
+
+        private static WebView2? FindFirstWebView(DependencyObject root)
+        {
+            if (root is WebView2 webView)
+            {
+                return webView;
+            }
+
+            int childCount = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < childCount; i++)
+            {
+                if (FindFirstWebView(VisualTreeHelper.GetChild(root, i)) is WebView2 childWebView)
+                {
+                    return childWebView;
+                }
+            }
+
+            return null;
         }
 
         private void OnPrimarySelectionChanged(object sender, SelectionChangedEventArgs e)

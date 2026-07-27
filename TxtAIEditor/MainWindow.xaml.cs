@@ -64,6 +64,7 @@ namespace TxtAIEditor
         public MainWindow()
         {
             this.InitializeComponent();
+            FreezeDiagnosticLogger.StartUiFreezeMonitor(DispatcherQueue);
             WindowPlacementService.SetWindowIcon(AppWindow);
 
             // Start pre-warming the shared WebView2 environment in the background

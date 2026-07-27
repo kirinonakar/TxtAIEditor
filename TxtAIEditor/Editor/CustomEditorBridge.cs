@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Editor
 {
@@ -172,6 +174,7 @@ namespace TxtAIEditor.Editor
 
         public async Task SendLinesAsync(int requestId, int startLine, IReadOnlyList<string> lines)
         {
+            var stopwatch = Stopwatch.StartNew();
             var msg = new
             {
                 action = "receiveLines",
@@ -180,6 +183,10 @@ namespace TxtAIEditor.Editor
                 lines = lines
             };
             await SendMessageAsync(msg);
+            FreezeDiagnosticLogger.RecordEditorLineRequest(
+                startLine,
+                lines.Count,
+                stopwatch.ElapsedMilliseconds);
         }
 
         public async Task UpdateLineCountAsync(int lineCount)
