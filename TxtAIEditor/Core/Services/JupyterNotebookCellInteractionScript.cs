@@ -59,11 +59,12 @@ namespace TxtAIEditor.Core.Services
         const candidates = [];
 
         function addCandidate(label, kind, detail) {
-            if (!label || label.length <= word.length) return;
+            if (!label || label === word) return;
+            if (label.length < word.length) return;
             const lowerLabel = label.toLowerCase();
             if (!lowerLabel.startsWith(lowerWord)) return;
-            if (seen.has(lowerLabel)) return;
-            seen.add(lowerLabel);
+            if (seen.has(label)) return;
+            seen.add(label);
             candidates.push({ label, kind, detail });
         }
 
@@ -77,6 +78,7 @@ namespace TxtAIEditor.Core.Services
             matches.forEach(w => addCandidate(w, 'word', '코드'));
         });
 
+        candidates.sort((a, b) => a.label.localeCompare(b.label));
         return candidates.slice(0, 10);
     }
 

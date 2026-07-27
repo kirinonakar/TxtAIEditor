@@ -121,12 +121,10 @@ function autocompleteReplaceEnd(candidate, text, replaceStart, caret, wordEnd) {
 }
 
 function isAutocompleteSameAsInput(candidate, typedText) {
-    const normalizedTypedText = normalizeAutocompleteComparisonText(typedText);
-    if (!normalizedTypedText) return false;
-
-    const normalizedLabel = normalizeAutocompleteComparisonText(candidate.label);
-    const normalizedInsertText = normalizeAutocompleteComparisonText(candidate.insertText);
-    return normalizedLabel === normalizedTypedText || normalizedInsertText === normalizedTypedText;
+    if (!typedText) return false;
+    const label = String(candidate.label || '');
+    const insertText = String(candidate.insertText || '');
+    return label === typedText || insertText === typedText;
 }
 
 function getAutocompleteCandidates(currentWord, fullTextBeforeCaret) {
@@ -201,7 +199,7 @@ function getAutocompleteCandidates(currentWord, fullTextBeforeCaret) {
 
         if (!matched) continue;
 
-        const key = `snippet:${lowerKeyword}`;
+        const key = `snippet:${keyword}`;
         if (seen.has(key)) continue;
         seen.add(key);
         const prefixText = state.autocompleteSnippetPrefix || '스니펫: ';
@@ -224,7 +222,7 @@ function getAutocompleteCandidates(currentWord, fullTextBeforeCaret) {
     for (const dictWord of state.autocompleteWords) {
         const word = String(dictWord || '').trim();
         if (!word) continue;
-        if (word.length <= currentWord.length) continue;
+        if (word.length < currentWord.length) continue;
         if (word === currentWord) continue;
 
         let isWordMatched = false;
@@ -235,7 +233,7 @@ function getAutocompleteCandidates(currentWord, fullTextBeforeCaret) {
         }
 
         if (isWordMatched) {
-            const key = `dict:${word.toLowerCase()}`;
+            const key = `dict:${word}`;
             if (seen.has(key)) continue;
             seen.add(key);
             const candidate = {
@@ -255,7 +253,7 @@ function getAutocompleteCandidates(currentWord, fullTextBeforeCaret) {
         const words = text.match(/[\w\-ㄱ-ㅎㅏ-ㅣ가-힣]+/g);
         if (!words) continue;
         for (const word of words) {
-            if (word.length <= currentWord.length) continue;
+            if (word.length < currentWord.length) continue;
             if (word === currentWord) continue;
 
             let isWordMatched = false;
@@ -266,7 +264,7 @@ function getAutocompleteCandidates(currentWord, fullTextBeforeCaret) {
             }
 
             if (isWordMatched) {
-                const key = `word:${word.toLowerCase()}`;
+                const key = `word:${word}`;
                 if (seen.has(key)) continue;
                 seen.add(key);
                 const candidate = {
