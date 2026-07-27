@@ -1188,7 +1188,7 @@ namespace TxtAIEditor.Core.Services
     document.addEventListener('keydown', e => {
         if (e.target.closest && e.target.closest('#notebook-find-bar')) return;
         if (e.isComposing || e.keyCode === 229 || composingCellEditor) return;
-        if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
 
         const activeCell = e.target.closest ? e.target.closest('.cell') : null;
         if (e.key === 'Escape') {
@@ -1209,6 +1209,26 @@ namespace TxtAIEditor.Core.Services
         if (!commandMode || isEditing || !selectedCell || !selectedCell.isConnected) return;
 
         const key = String(e.key || '').toLowerCase();
+        if (e.shiftKey) {
+            if (key !== 'enter') return;
+            e.preventDefault();
+            e.stopPropagation();
+            pendingDeleteAt = 0;
+            const executedCell = selectedCell;
+            runCell(executedCell).then(() => {
+                if (!executedCell.isConnected) return;
+                let nextCell = executedCell.nextElementSibling;
+                if (!nextCell) {
+                    nextCell = createCell('code', '');
+                    container.appendChild(nextCell);
+                    reindexCells();
+                    notifyModified();
+                }
+                selectCell(nextCell, true);
+                nextCell.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            });
+            return;
+        }
         if (key === 'arrowup' || key === 'arrowdown') {
             e.preventDefault();
             e.stopPropagation();
