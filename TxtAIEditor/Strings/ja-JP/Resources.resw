@@ -3559,4 +3559,10 @@
   <data name="JupyterCellMergeBelow" xml:space="preserve"><value>下のセルと結合</value></data>
   <data name="JupyterCellClearOutput" xml:space="preserve"><value>セルの出力をクリア</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>すべてのファイル</value></data>
+  <data name="OpenTabsListTooltip" xml:space="preserve">
+    <value>開いているタブの一覧</value>
+  </data>
+  <data name="NoOpenTabs" xml:space="preserve">
+    <value>開いているタブはありません</value>
+  </data>
 </root>

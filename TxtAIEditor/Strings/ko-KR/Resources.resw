@@ -3595,4 +3595,10 @@
   <data name="JupyterCellMergeBelow" xml:space="preserve"><value>아래 셀과 병합</value></data>
   <data name="JupyterCellClearOutput" xml:space="preserve"><value>셀 출력 지우기</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>모든 형식</value></data>
+  <data name="OpenTabsListTooltip" xml:space="preserve">
+    <value>열린 탭 목록</value>
+  </data>
+  <data name="NoOpenTabs" xml:space="preserve">
+    <value>열린 탭이 없습니다</value>
+  </data>
 </root>

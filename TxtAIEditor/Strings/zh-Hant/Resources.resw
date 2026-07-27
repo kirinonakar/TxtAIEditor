@@ -3559,4 +3559,10 @@
   <data name="JupyterCellMergeBelow" xml:space="preserve"><value>與下方儲存格合併</value></data>
   <data name="JupyterCellClearOutput" xml:space="preserve"><value>清除儲存格輸出</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>所有檔案</value></data>
+  <data name="OpenTabsListTooltip" xml:space="preserve">
+    <value>開啟的索引標籤</value>
+  </data>
+  <data name="NoOpenTabs" xml:space="preserve">
+    <value>沒有開啟的索引標籤</value>
+  </data>
 </root>

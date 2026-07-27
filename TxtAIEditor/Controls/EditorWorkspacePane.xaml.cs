@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
@@ -36,6 +37,7 @@ namespace TxtAIEditor.Controls
         private double _terminalSplitterStartHeight = 0;
         private double _terminalSplitterStartPointerY = 0;
         private bool _tabActionSpacerUpdateQueued;
+        private string _noOpenTabsText = "열린 탭이 없습니다";
 
         public EditorWorkspacePane()
         {
@@ -397,11 +399,17 @@ namespace TxtAIEditor.Controls
             _pendingTerminalLocalization = getString;
             string leftTooltip = getString("MoveTabLeftTooltip", "왼쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)");
             string rightTooltip = getString("MoveTabRightTooltip", "오른쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)");
+            string openTabsTooltip = getString("OpenTabsListTooltip", "열린 탭 목록");
+            _noOpenTabsText = getString("NoOpenTabs", "열린 탭이 없습니다");
 
             ToolTipService.SetToolTip(MoveTabLeftBtn, leftTooltip);
             ToolTipService.SetToolTip(MoveTabRightBtn, rightTooltip);
             ToolTipService.SetToolTip(MoveTab2LeftBtn, leftTooltip);
             ToolTipService.SetToolTip(MoveTab2RightBtn, rightTooltip);
+            ToolTipService.SetToolTip(OpenTabsListBtn, openTabsTooltip);
+            ToolTipService.SetToolTip(OpenTabsList2Btn, openTabsTooltip);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(OpenTabsListBtn, openTabsTooltip);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(OpenTabsList2Btn, openTabsTooltip);
             StickyNoteBar.Localize(getString);
             _terminalPane?.Localize(getString);
         }
@@ -814,5 +822,78 @@ namespace TxtAIEditor.Controls
 
         private void OnMoveTabLeftClick(object sender, RoutedEventArgs e) => MoveTabLeftClick?.Invoke(sender, e);
         private void OnMoveTabRightClick(object sender, RoutedEventArgs e) => MoveTabRightClick?.Invoke(sender, e);
+
+        private void OnOpenTabsListClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button)
+            {
+                return;
+            }
+
+            var tabView = ReferenceEquals(button, OpenTabsList2Btn)
+                ? EditorTabView2
+                : EditorTabView;
+            var flyout = new MenuFlyout
+            {
+                Placement = FlyoutPlacementMode.BottomEdgeAlignedRight
+            };
+
+            foreach (var item in tabView.TabItems)
+            {
+                if (item is not TabViewItem tabItem)
+                {
+                    continue;
+                }
+
+                var menuItem = new MenuFlyoutItem
+                {
+                    Text = GetOpenTabMenuTitle(tabItem),
+                    MinWidth = 220,
+                    MaxWidth = 420
+                };
+
+                if (ReferenceEquals(tabView.SelectedItem, tabItem))
+                {
+                    menuItem.Icon = new FontIcon
+                    {
+                        Glyph = "\uE73E",
+                        FontSize = 12
+                    };
+                }
+
+                menuItem.Click += (_, _) => ActivateTabFromList(tabView, tabItem);
+                flyout.Items.Add(menuItem);
+            }
+
+            if (flyout.Items.Count == 0)
+            {
+                flyout.Items.Add(new MenuFlyoutItem
+                {
+                    Text = _noOpenTabsText,
+                    IsEnabled = false,
+                    MinWidth = 220
+                });
+            }
+
+            flyout.ShowAt(button);
+        }
+
+        private void ActivateTabFromList(TabView tabView, TabViewItem tabItem)
+        {
+            ActiveTabView = tabView;
+            tabView.SelectedItem = tabItem;
+            tabItem.StartBringIntoView();
+            tabView.Focus(FocusState.Programmatic);
+        }
+
+        private static string GetOpenTabMenuTitle(TabViewItem tabItem)
+        {
+            if (tabItem.Header is TabHeaderControl header && header.OpenedTab is OpenedTab tab)
+            {
+                return tab.DisplayTitle;
+            }
+
+            return tabItem.Header?.ToString() ?? string.Empty;
+        }
     }
 }

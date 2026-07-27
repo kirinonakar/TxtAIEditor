@@ -3595,4 +3595,10 @@ Plan: {0}</value>
   <data name="JupyterCellMergeBelow" xml:space="preserve"><value>Merge Cell Below</value></data>
   <data name="JupyterCellClearOutput" xml:space="preserve"><value>Clear Cell Output</value></data>
   <data name="SaveDialogAllFilesFilter" xml:space="preserve"><value>All Files</value></data>
+  <data name="OpenTabsListTooltip" xml:space="preserve">
+    <value>Open tabs</value>
+  </data>
+  <data name="NoOpenTabs" xml:space="preserve">
+    <value>No open tabs</value>
+  </data>
 </root>

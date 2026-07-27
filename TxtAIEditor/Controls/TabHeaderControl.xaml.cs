@@ -27,6 +27,7 @@ namespace TxtAIEditor.Controls
         }
 
         public event EventHandler<TabEncryptionMenuRequestedEventArgs>? EncryptionMenuRequested;
+        public OpenedTab? OpenedTab => _tab;
 
         public void Configure(OpenedTab tab, string encryptedTooltip, string? workspaceFolderPath = null)
         {
