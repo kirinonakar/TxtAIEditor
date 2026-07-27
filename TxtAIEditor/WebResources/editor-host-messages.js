@@ -8,7 +8,6 @@ import {
     post,
     queueRender,
     receiveLineBlock,
-    recomputeDirtyLines,
     selectionInfo,
     setOriginalLines,
     setupModel,
@@ -218,8 +217,10 @@ export function createHostMessageHandler({
                 const lines = Array.isArray(msg.lines) ? msg.lines : [];
                 setOriginalLines(lines);
                 if (state.showDirtyLines) {
-                    recomputeDirtyLines();
-                    queueRender(true);
+                    // Resetting the saved baseline also clears every dirty marker.
+                    // Do not recompute from the virtualized cache: unloaded lines are
+                    // absent there and would be mistaken for empty, changed lines.
+                    syncRenderedDirtyLineClasses();
                 }
             }
             break;
