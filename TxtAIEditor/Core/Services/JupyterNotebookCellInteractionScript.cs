@@ -267,7 +267,12 @@ namespace TxtAIEditor.Core.Services
         if (direction < 0) {
             return !text.slice(0, caretOffset).includes('\n');
         }
-        return !text.slice(caretOffset).includes('\n');
+        const textWithoutTerminalBreak = text.endsWith('\n')
+            ? text.slice(0, -1)
+            : text;
+        return !textWithoutTerminalBreak
+            .slice(Math.min(caretOffset, textWithoutTerminalBreak.length))
+            .includes('\n');
     }
 
     function moveEditorFocusToAdjacentCell(cellDiv, direction) {

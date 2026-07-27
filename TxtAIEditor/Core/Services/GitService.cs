@@ -122,6 +122,8 @@ namespace TxtAIEditor.Core.Services
                         }
                     }
                 }
+
+                await SuppressJupyterOutputOnlyWorktreeChangesAsync(workingDir, statuses);
             }
             catch (Exception ex)
             {
@@ -129,6 +131,46 @@ namespace TxtAIEditor.Core.Services
             }
 
             return statuses;
+        }
+
+        private async Task SuppressJupyterOutputOnlyWorktreeChangesAsync(
+            string repoPath,
+            Dictionary<string, string> statuses)
+        {
+            foreach ((string fullPath, string status) in statuses.ToList())
+            {
+                if (status.Length < 2 ||
+                    status[1] != 'M' ||
+                    !Path.GetExtension(fullPath).Equals(".ipynb", StringComparison.OrdinalIgnoreCase) ||
+                    !File.Exists(fullPath))
+                {
+                    continue;
+                }
+
+                string relativePath = ToGitPathSpec(repoPath, fullPath);
+                string indexContent = await RunGitCommandAsync(
+                    repoPath,
+                    $"show :\"{QuotePath(relativePath)}\"");
+                if (indexContent.StartsWith("fatal:", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string workingContent = await File.ReadAllTextAsync(fullPath);
+                if (!AreJupyterNotebooksEqualWithoutOutputs(workingContent, indexContent))
+                {
+                    continue;
+                }
+
+                if (status[0] == ' ')
+                {
+                    statuses.Remove(fullPath);
+                }
+                else
+                {
+                    statuses[fullPath] = $"{status[0]} ";
+                }
+            }
         }
 
         private static string NormalizeStatusPath(string path)
@@ -513,13 +555,45 @@ namespace TxtAIEditor.Core.Services
             out bool changed)
         {
             cleanedContent = content;
+            if (!TryCreateOutputFreeJupyterNotebook(content, out JsonObject? notebook, out changed) ||
+                notebook == null)
+            {
+                return false;
+            }
+
+            if (changed)
+            {
+                cleanedContent = notebook.ToJsonString(new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                }) + Environment.NewLine;
+            }
+
+            return true;
+        }
+
+        private static bool AreJupyterNotebooksEqualWithoutOutputs(
+            string firstContent,
+            string secondContent)
+        {
+            return TryCreateOutputFreeJupyterNotebook(firstContent, out JsonObject? first, out _) &&
+                TryCreateOutputFreeJupyterNotebook(secondContent, out JsonObject? second, out _) &&
+                JsonNode.DeepEquals(first, second);
+        }
+
+        private static bool TryCreateOutputFreeJupyterNotebook(
+            string content,
+            out JsonObject? notebook,
+            out bool changed)
+        {
+            notebook = null;
             changed = false;
 
             try
             {
                 JsonNode? root = JsonNode.Parse(content);
-                if (root is not JsonObject notebook ||
-                    notebook["cells"] is not JsonArray cells)
+                if (root is not JsonObject parsedNotebook ||
+                    parsedNotebook["cells"] is not JsonArray cells)
                 {
                     return false;
                 }
@@ -535,27 +609,27 @@ namespace TxtAIEditor.Core.Services
                         continue;
                     }
 
-                    if (cell["outputs"] is JsonArray outputs && outputs.Count > 0)
+                    bool hasOutputsProperty = cell.TryGetPropertyValue(
+                        "outputs",
+                        out JsonNode? outputsNode);
+                    if (hasOutputsProperty &&
+                        (outputsNode is not JsonArray outputs || outputs.Count > 0))
                     {
-                        cell["outputs"] = new JsonArray();
                         changed = true;
                     }
+                    cell["outputs"] = new JsonArray();
 
-                    if (cell["execution_count"] != null)
+                    bool hasExecutionCountProperty = cell.TryGetPropertyValue(
+                        "execution_count",
+                        out JsonNode? executionCountNode);
+                    if (hasExecutionCountProperty && executionCountNode != null)
                     {
-                        cell["execution_count"] = null;
                         changed = true;
                     }
+                    cell["execution_count"] = null;
                 }
 
-                if (changed)
-                {
-                    cleanedContent = notebook.ToJsonString(new JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    }) + Environment.NewLine;
-                }
-
+                notebook = parsedNotebook;
                 return true;
             }
             catch (JsonException)
