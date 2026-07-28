@@ -230,6 +230,7 @@ export function createHostMessageHandler({
     syncHostScroll,
     findEditablePreviewBlockContaining,
     clearPendingInlineLivePreviewFocus,
+    ensureInlinePreviewDependencies,
     handleOpenableHoverResult
 }) {
     return function handleCsharpMessage(msg) {
@@ -246,6 +247,9 @@ export function createHostMessageHandler({
             }
             pendingModelResynchronization = null;
             applyModelInitialization(msg);
+            if (state.inlineLivePreviewEnabled && state.language !== 'html') {
+                void ensureInlinePreviewDependencies?.();
+            }
             break;
         case 'updateDirtyLines':
             {
@@ -399,6 +403,9 @@ export function createHostMessageHandler({
                     state.language = nextLanguage;
                     syncLanguageClass();
                     state.lineEndStacks.clear();
+                    if (state.inlineLivePreviewEnabled && state.language !== 'html') {
+                        void ensureInlinePreviewDependencies?.();
+                    }
                     queueRender(true);
                 }
             }
@@ -582,6 +589,9 @@ export function createHostMessageHandler({
             state.inlineLivePreviewEnabled = !!msg.enabled;
             state.livePreviewBaseHref = msg.baseHref || '';
             clearPendingInlineLivePreviewFocus();
+            if (state.inlineLivePreviewEnabled && state.language !== 'html') {
+                void ensureInlinePreviewDependencies?.();
+            }
             if (state.inlineLivePreviewEnabled && state.language !== 'html') {
                 const activeEl = document.activeElement?.closest?.('.line-text');
                 const activeLine = activeEl ? Number(activeEl.dataset.line) : state.currentLine;

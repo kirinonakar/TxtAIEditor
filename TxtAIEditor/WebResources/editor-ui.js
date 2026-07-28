@@ -45,6 +45,68 @@ const renderer = createEditorRenderer({
     setCaret
 });
 
+const previewDependencyVersion = encodeURIComponent(window.__TxtAIEditorVersion || Date.now());
+let previewDependencyPromise = null;
+
+function ensurePreviewStylesheet() {
+    if (document.querySelector('link[data-editor-preview-dependency="katex"]')) {
+        return;
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `katex/katex.min.css?v=${previewDependencyVersion}`;
+    link.dataset.editorPreviewDependency = 'katex';
+    document.head.appendChild(link);
+}
+
+function loadPreviewScript(name, source, globalName) {
+    if (window[globalName]) {
+        return Promise.resolve();
+    }
+
+    const existing = document.querySelector(`script[data-editor-preview-dependency="${name}"]`);
+    if (existing) {
+        return new Promise((resolve, reject) => {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', reject, { once: true });
+        });
+    }
+
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = `${source}?v=${previewDependencyVersion}`;
+        script.dataset.editorPreviewDependency = name;
+        script.addEventListener('load', resolve, { once: true });
+        script.addEventListener('error', () => {
+            script.remove();
+            reject(new Error(`Failed to load ${source}`));
+        }, { once: true });
+        document.head.appendChild(script);
+    });
+}
+
+function ensureInlinePreviewDependencies() {
+    if (previewDependencyPromise) {
+        return previewDependencyPromise;
+    }
+
+    ensurePreviewStylesheet();
+    previewDependencyPromise = Promise.all([
+        loadPreviewScript('katex', 'katex/katex.min.js', 'katex'),
+        loadPreviewScript('mermaid', 'mermaid/mermaid.min.js', 'mermaid')
+    ]).then(() => {
+        initializeMermaid(new URLSearchParams(window.location.search).get('theme') || 'Dark');
+        state.lastRangeKey = '';
+        queueRender(true);
+    }).catch(error => {
+        previewDependencyPromise = null;
+        console.error('Failed to load inline preview dependencies:', error);
+    });
+
+    return previewDependencyPromise;
+}
+
 const {
     clearPendingInlineLivePreviewFocus,
     focusLineWithRetry,
@@ -62,7 +124,6 @@ configureEditorCoreRuntime({
     render
 });
 
-initializeMermaid(new URLSearchParams(window.location.search).get('theme') || 'Dark');
 bindPrintSupport();
 
 const findReplaceController = createFindReplaceController({ revealLine });
@@ -88,6 +149,7 @@ const handleCsharpMessage = createHostMessageHandler({
     syncHostScroll: editorEvents.syncHostScroll,
     findEditablePreviewBlockContaining,
     clearPendingInlineLivePreviewFocus,
+    ensureInlinePreviewDependencies,
     handleOpenableHoverResult: editorEvents.handleOpenableHoverResult
 });
 
