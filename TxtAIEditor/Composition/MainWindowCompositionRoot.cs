@@ -85,6 +85,8 @@ namespace TxtAIEditor.Composition
                 () => moduleBindings.ToolbarCommand,
                 ToggleLeftPanelAsync,
                 ToggleRightPanelAsync,
+                () => moduleBindings.ExplorerNavigation.SetTreeMode(
+                    !moduleBindings.ExplorerNavigation.IsTreeMode),
                 folderPath => moduleBindings.ExplorerNavigation.NavigateToFolderAsync(
                     folderPath,
                     revealInLeftPanel: true));
@@ -202,6 +204,8 @@ namespace TxtAIEditor.Composition
                     () => moduleBindings.ToolbarCommand?.ToggleTheme(),
                     shellModule.ToggleStickyNoteMode,
                     () => moduleBindings.ToolbarCommand?.ToggleLivePreview(),
+                    () => explorerNavigationController.SetTreeMode(!explorerNavigationController.IsTreeMode),
+                    () => moduleBindings.ToolbarCommand?.ToggleCsvTableMode(),
                     TogglePreviewWidth,
                     shellFacade.ToggleMaximize,
                     () => moduleBindings.ToolbarCommand?.ToggleWordWrap(),

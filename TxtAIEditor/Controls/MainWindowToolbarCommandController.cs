@@ -147,6 +147,23 @@ namespace TxtAIEditor.Controls
             _ = ToggleWordWrapAsync();
         }
 
+        public void ToggleCsvTableMode()
+        {
+            var tab = _tabNavigationController.GetActiveTab();
+            if (tab == null ||
+                tab.IsImageViewer ||
+                tab.IsMediaViewer ||
+                tab.IsPdfViewer ||
+                tab.IsDocxViewer ||
+                tab.IsOfficeDocumentViewer ||
+                tab.IsHexViewer)
+            {
+                return;
+            }
+
+            _ = SetCsvTableModeAsync(tab, !tab.IsCsvTableModeEnabled);
+        }
+
         public void SyncCsvTableMode(OpenedTab tab)
         {
             _topToolbar.CsvTableIsChecked = tab.IsCsvTableModeEnabled;

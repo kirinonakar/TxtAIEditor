@@ -22,6 +22,8 @@ namespace TxtAIEditor.Controls
         private readonly Action _toggleStickyNote;
         private readonly TerminalShortcutService _terminalShortcutService;
         private readonly Action _toggleLivePreview;
+        private readonly Action _toggleExplorerTreeMode;
+        private readonly Action _toggleCsvTableMode;
         private readonly Action _togglePreviewWidth;
         private readonly Action _toggleMaximize;
         private readonly Action _toggleWordWrap;
@@ -42,6 +44,8 @@ namespace TxtAIEditor.Controls
             Action toggleStickyNote,
             TerminalShortcutService terminalShortcutService,
             Action toggleLivePreview,
+            Action toggleExplorerTreeMode,
+            Action toggleCsvTableMode,
             Action togglePreviewWidth,
             Action toggleMaximize,
             Action toggleWordWrap)
@@ -61,6 +65,8 @@ namespace TxtAIEditor.Controls
             _toggleStickyNote = toggleStickyNote;
             _terminalShortcutService = terminalShortcutService;
             _toggleLivePreview = toggleLivePreview;
+            _toggleExplorerTreeMode = toggleExplorerTreeMode;
+            _toggleCsvTableMode = toggleCsvTableMode;
             _togglePreviewWidth = togglePreviewWidth;
             _toggleMaximize = toggleMaximize;
             _toggleWordWrap = toggleWordWrap;
@@ -152,12 +158,23 @@ namespace TxtAIEditor.Controls
             _toggleWordWrap();
         }
 
+        public void HandleFunctionKeyShortcut(Windows.System.VirtualKey key)
+        {
+            TryHandleFunctionKeyShortcut(key);
+        }
+
         private bool TryHandleFunctionKeyShortcut(Windows.System.VirtualKey key)
         {
             switch (key)
             {
+                case Windows.System.VirtualKey.F3:
+                    _toggleExplorerTreeMode();
+                    return true;
                 case Windows.System.VirtualKey.F4:
                     _toggleLivePreview();
+                    return true;
+                case Windows.System.VirtualKey.F7:
+                    _toggleCsvTableMode();
                     return true;
                 case Windows.System.VirtualKey.F9:
                     _toggleTopMost();

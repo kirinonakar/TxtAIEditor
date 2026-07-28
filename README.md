@@ -167,7 +167,9 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 | `Ctrl + Mouse Wheel` | Zoom In / Out |
 | `Ctrl + Enter` | Send AI Prompt |
 | `Alt + Z` | Toggle Word Wrap |
+| `F3` | Toggle Explorer Tree Mode |
 | `F4` | Toggle Live Preview |
+| `F7` | Toggle CSV Table Mode |
 | `F9` | Toggle Always on Top |
 | `F10` | Toggle Theme (Light / Dark / Pastel Dark) |
 | `F11` | Toggle Maximize Window |

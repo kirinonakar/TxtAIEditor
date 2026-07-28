@@ -367,9 +367,15 @@
         }
 
         window.addEventListener('keydown', event => {
-            if (event.key === 'F4') {
+            if (event.key === 'F3') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f3' });
+            } else if (event.key === 'F4') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'f4' });
+            } else if (event.key === 'F7') {
+                event.preventDefault();
+                post({ type: 'shortcut', name: 'f7' });
             } else if (event.key === 'F9') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'f9' });

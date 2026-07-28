@@ -1262,6 +1262,12 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ShortcutDescLivePreview" xml:space="preserve">
     <value>Toggle Live Preview</value>
   </data>
+  <data name="ShortcutDescExplorerTreeMode" xml:space="preserve">
+    <value>Toggle Explorer Tree Mode</value>
+  </data>
+  <data name="ShortcutDescCsvTableMode" xml:space="preserve">
+    <value>Toggle CSV Table Mode</value>
+  </data>
   <data name="ShortcutDescWordWrap" xml:space="preserve">
     <value>Toggle Word Wrap</value>
   </data>

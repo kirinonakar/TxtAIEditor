@@ -470,9 +470,19 @@ export function bindKeyboardEvents({ openFindPanel }) {
             return;
         }
 
+        if (event.key === 'F3') {
+            event.preventDefault();
+            post({ type: 'shortcut', name: 'f3' });
+            return;
+        }
         if (event.key === 'F4') {
             event.preventDefault();
             post({ type: 'shortcut', name: 'f4' });
+            return;
+        }
+        if (event.key === 'F7') {
+            event.preventDefault();
+            post({ type: 'shortcut', name: 'f7' });
             return;
         }
         if (event.key === 'F9') {

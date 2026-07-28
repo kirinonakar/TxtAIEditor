@@ -186,6 +186,7 @@ namespace TxtAIEditor.Controls
 
             coreWebView.Settings.IsWebMessageEnabled = true;
             coreWebView.Settings.IsScriptEnabled = true;
+            coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = false;
             coreWebView.Settings.AreDefaultContextMenusEnabled = false;
             coreWebView.Settings.AreDevToolsEnabled = false;
 

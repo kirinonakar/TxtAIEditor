@@ -136,7 +136,7 @@ namespace TxtAIEditor.Controls
 
             webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
-            webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
+            webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = true;
             webView.CoreWebView2.Settings.IsScriptEnabled = true;
             webView.WebMessageReceived += OnWebMessageReceived;
@@ -301,8 +301,12 @@ namespace TxtAIEditor.Controls
         let name = '';
 
         if (!ctrl && !alt) {
-            if (key === 'f4' || code === 'F4') {
+            if (key === 'f3' || code === 'F3') {
+                name = 'f3';
+            } else if (key === 'f4' || code === 'F4') {
                 name = 'f4';
+            } else if (key === 'f7' || code === 'F7') {
+                name = 'f7';
             } else if (key === 'f9' || code === 'F9') {
                 name = 'f9';
             } else if (key === 'f10' || code === 'F10') {

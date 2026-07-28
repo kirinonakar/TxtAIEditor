@@ -39,6 +39,8 @@ namespace TxtAIEditor.Composition
         Action ToggleTheme,
         Action ToggleStickyNote,
         Action ToggleLivePreview,
+        Action ToggleExplorerTreeMode,
+        Action ToggleCsvTableMode,
         Action TogglePreviewWidth,
         Action ToggleMaximize,
         Action ToggleWordWrap,
@@ -213,6 +215,8 @@ namespace TxtAIEditor.Composition
                 callbacks.ToggleStickyNote,
                 terminalShortcut,
                 callbacks.ToggleLivePreview,
+                callbacks.ToggleExplorerTreeMode,
+                callbacks.ToggleCsvTableMode,
                 callbacks.TogglePreviewWidth,
                 callbacks.ToggleMaximize,
                 callbacks.ToggleWordWrap);

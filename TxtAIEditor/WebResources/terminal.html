@@ -161,6 +161,18 @@
       windowsPty: { backend: 'conpty' }
     });
 
+    window.addEventListener('keydown', event => {
+      const key = String(event.key || '').toLowerCase();
+      if (key !== 'f3' && key !== 'f7') {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      vscodeBridge?.postMessage({ type: 'shortcut', name: key });
+    }, true);
+
     term.loadAddon(fitAddon);
     term.open(terminalElement);
     term.onData(data => vscodeBridge?.postMessage({ type: 'input', sessionId: activeSessionId, data }));

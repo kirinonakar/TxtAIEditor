@@ -32,6 +32,7 @@ namespace TxtAIEditor.Composition
             Func<MainWindowToolbarCommandController?> getToolbarCommand,
             Func<Task> toggleLeftPanelAsync,
             Func<Task> toggleRightPanelAsync,
+            Action toggleExplorerTreeMode,
             Func<string, Task> navigateExplorerToFolderAndRevealAsync)
         {
             var shell = dependencies.Shell.Composition;
@@ -52,7 +53,9 @@ namespace TxtAIEditor.Composition
                     () => getToolbarCommand()?.SaveActive(),
                     () => getToolbarCommand()?.SaveActiveAs(),
                     () => getToolbarCommand()?.OpenFile(),
+                    toggleExplorerTreeMode,
                     () => getToolbarCommand()?.ToggleLivePreview(),
+                    () => getToolbarCommand()?.ToggleCsvTableMode(),
                     () => getToolbarCommand()?.ToggleTheme(),
                     shellFacade.ToggleMaximize,
                     () => getToolbarCommand()?.Print(),

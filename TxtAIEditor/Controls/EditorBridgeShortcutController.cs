@@ -14,6 +14,8 @@ namespace TxtAIEditor.Controls
         private readonly Action _toggleMaximize;
         private readonly Action _toggleStickyNote;
         private readonly Action _toggleWordWrap;
+        private readonly Action _toggleExplorerTreeMode;
+        private readonly Action _toggleCsvTableMode;
         private readonly Func<Task> _toggleLeftPanelAsync;
         private readonly Func<Task> _toggleRightPanelAsync;
         private readonly Action _togglePreviewWidth;
@@ -38,6 +40,8 @@ namespace TxtAIEditor.Controls
             Action toggleMaximize,
             Action toggleStickyNote,
             Action toggleWordWrap,
+            Action toggleExplorerTreeMode,
+            Action toggleCsvTableMode,
             Func<Task> toggleLeftPanelAsync,
             Func<Task> toggleRightPanelAsync,
             Action togglePreviewWidth,
@@ -60,6 +64,8 @@ namespace TxtAIEditor.Controls
             _toggleMaximize = toggleMaximize;
             _toggleStickyNote = toggleStickyNote;
             _toggleWordWrap = toggleWordWrap;
+            _toggleExplorerTreeMode = toggleExplorerTreeMode;
+            _toggleCsvTableMode = toggleCsvTableMode;
             _toggleLeftPanelAsync = toggleLeftPanelAsync;
             _toggleRightPanelAsync = toggleRightPanelAsync;
             _togglePreviewWidth = togglePreviewWidth;
@@ -86,8 +92,14 @@ namespace TxtAIEditor.Controls
         {
             switch (shortcutName)
             {
+                case "f3":
+                    _toggleExplorerTreeMode();
+                    break;
                 case "f4":
                     _toggleLivePreview();
+                    break;
+                case "f7":
+                    _toggleCsvTableMode();
                     break;
                 case "f9":
                     _toggleTopMost();

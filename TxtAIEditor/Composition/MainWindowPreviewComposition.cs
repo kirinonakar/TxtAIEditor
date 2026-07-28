@@ -18,7 +18,9 @@ namespace TxtAIEditor.Composition
         Action SaveRequested,
         Action SaveAsRequested,
         Action OpenRequested,
+        Action ToggleExplorerTreeModeRequested,
         Action ToggleLivePreviewRequested,
+        Action ToggleCsvTableModeRequested,
         Action ToggleThemeRequested,
         Action ToggleMaximizeRequested,
         Action PrintRequested,
@@ -172,7 +174,11 @@ namespace TxtAIEditor.Composition
 
             public void Open() => _callbacks.OpenRequested();
 
+            public void ToggleExplorerTreeMode() => _callbacks.ToggleExplorerTreeModeRequested();
+
             public void ToggleLivePreview() => _callbacks.ToggleLivePreviewRequested();
+
+            public void ToggleCsvTableMode() => _callbacks.ToggleCsvTableModeRequested();
 
             public void ToggleTopMost() => _stickyNoteMode.ToggleTopMostFromShortcut();
 

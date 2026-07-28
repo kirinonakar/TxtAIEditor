@@ -1,6 +1,7 @@
 function shortcutNameFromKeyboardEvent(event) {
     const key = String(event?.key || '').toLowerCase();
-    if (key === 'f4' || key === 'f9' || key === 'f10' || key === 'f11' || key === 'f12') {
+    if (key === 'f3' || key === 'f4' || key === 'f7' ||
+        key === 'f9' || key === 'f10' || key === 'f11' || key === 'f12') {
         return key;
     }
 
@@ -122,7 +123,8 @@ function htmlPreviewFrameBridge() {
     document.addEventListener('keydown', event => {
         const key = String(event.key || '').toLowerCase();
         let shortcut = '';
-        if (key === 'f4' || key === 'f9' || key === 'f10' || key === 'f11' || key === 'f12') {
+        if (key === 'f3' || key === 'f4' || key === 'f7' ||
+            key === 'f9' || key === 'f10' || key === 'f11' || key === 'f12') {
             shortcut = key;
         } else if (event.altKey && !event.ctrlKey && !event.metaKey && key === 'z') {
             shortcut = 'wordWrap';

@@ -455,6 +455,15 @@ namespace TxtAIEditor.Controls
     function handleKeyDown(event) {
         const ctrl = event.ctrlKey || event.metaKey;
         const key = event.key ? event.key.toLowerCase() : '';
+        if (!ctrl && (key === 'f3' || key === 'f7')) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation?.();
+            try {
+                chrome.webview.postMessage({ type: 'shortcut', name: key });
+            } catch {}
+            return;
+        }
         if (ctrl && key === 'f') {
             event.preventDefault();
             event.stopPropagation();

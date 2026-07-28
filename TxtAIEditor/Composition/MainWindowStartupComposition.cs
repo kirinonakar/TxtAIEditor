@@ -177,6 +177,7 @@ namespace TxtAIEditor.Composition
                 fileOpenDrop,
                 shellPanelLayout,
                 rootKeyboardShortcut);
+            ui.TerminalPane.FunctionKeyShortcutPressed += rootKeyboardShortcut.HandleFunctionKeyShortcut;
 
             if (window.Content is FrameworkElement rootElement)
             {

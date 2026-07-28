@@ -31,8 +31,14 @@ namespace TxtAIEditor.Controls
                 case "open":
                     _commands.Open();
                     break;
+                case "f3":
+                    _commands.ToggleExplorerTreeMode();
+                    break;
                 case "f4":
                     _commands.ToggleLivePreview();
+                    break;
+                case "f7":
+                    _commands.ToggleCsvTableMode();
                     break;
                 case "f9":
                     _commands.ToggleTopMost();

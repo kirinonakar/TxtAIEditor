@@ -55,6 +55,8 @@ namespace TxtAIEditor.Composition
                 () => getToolbarCommand()?.ToggleTheme(),
                 shellFacade.ToggleMaximize,
                 () => getToolbarCommand()?.ToggleWordWrap(),
+                () => workspace.SetExplorerTreeMode(!workspace.Controllers.ExplorerNavigation.IsTreeMode),
+                () => getToolbarCommand()?.ToggleCsvTableMode(),
                 toggleLeftPanelAsync,
                 toggleRightPanelAsync,
                 togglePreviewWidth,

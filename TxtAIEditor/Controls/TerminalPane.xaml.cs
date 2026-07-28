@@ -18,6 +18,8 @@ namespace TxtAIEditor.Controls
 {
     public sealed partial class TerminalPane : UserControl
     {
+        public event Action<Windows.System.VirtualKey>? FunctionKeyShortcutPressed;
+
         private readonly ObservableCollection<TerminalSession> _terminalSessions = new ObservableCollection<TerminalSession>();
         private TerminalSession? _activeTerminalSession;
         private Func<string, string, string>? _getString;
@@ -364,6 +366,7 @@ namespace TxtAIEditor.Controls
                 await TerminalWebView.EnsureCoreWebView2Async(env);
                 TerminalWebView.CoreWebView2.Settings.IsWebMessageEnabled = true;
                 TerminalWebView.CoreWebView2.Settings.IsScriptEnabled = true;
+                TerminalWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
                 TerminalWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
                 TerminalWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 TerminalWebView.CoreWebView2.WebMessageReceived += OnTerminalWebMessageReceived;
@@ -459,6 +462,20 @@ namespace TxtAIEditor.Controls
                         _ = Windows.System.Launcher.LaunchUriAsync(new Uri(url));
                     }
                     return;
+                }
+
+                if (type.Equals("shortcut", StringComparison.OrdinalIgnoreCase) &&
+                    root.TryGetProperty("name", out var shortcutNameElement))
+                {
+                    string shortcutName = shortcutNameElement.GetString() ?? string.Empty;
+                    if (shortcutName.Equals("f3", StringComparison.OrdinalIgnoreCase))
+                    {
+                        FunctionKeyShortcutPressed?.Invoke(Windows.System.VirtualKey.F3);
+                    }
+                    else if (shortcutName.Equals("f7", StringComparison.OrdinalIgnoreCase))
+                    {
+                        FunctionKeyShortcutPressed?.Invoke(Windows.System.VirtualKey.F7);
+                    }
                 }
             }
             catch (Exception ex)

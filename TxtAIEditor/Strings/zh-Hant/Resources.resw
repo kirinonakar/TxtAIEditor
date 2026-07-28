@@ -1262,6 +1262,12 @@
   <data name="ShortcutDescLivePreview" xml:space="preserve">
     <value>切換即時預覽</value>
   </data>
+  <data name="ShortcutDescExplorerTreeMode" xml:space="preserve">
+    <value>切換檔案總管樹狀模式</value>
+  </data>
+  <data name="ShortcutDescCsvTableMode" xml:space="preserve">
+    <value>切換 CSV 表格模式</value>
+  </data>
   <data name="ShortcutDescWordWrap" xml:space="preserve">
     <value>切換自動換行</value>
   </data>

@@ -16,6 +16,10 @@ namespace TxtAIEditor.Controls
 
         void ToggleLivePreview();
 
+        void ToggleExplorerTreeMode();
+
+        void ToggleCsvTableMode();
+
         void ToggleTopMost();
 
         void ToggleTheme();

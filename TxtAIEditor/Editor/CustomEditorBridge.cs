@@ -66,6 +66,7 @@ namespace TxtAIEditor.Editor
                 
                 _webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
                 _webView.CoreWebView2.Settings.IsScriptEnabled = true;
+                _webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
                 
                 // Disable browser context menu to keep it premium
                 _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
