@@ -30,12 +30,12 @@ namespace TxtAIEditor.Core.Services
             }
 
             var originalCombo = CreateSourceCombo(tabChoices);
-            var originalPathBox = new TextBox { PlaceholderText = getString("CompareOriginalPathPlaceholder", "원본 파일 경로..."), IsReadOnly = true, Height = 32, TextWrapping = TextWrapping.NoWrap };
+            var originalPathBox = new TextBox { PlaceholderText = getString("CompareOriginalPathPlaceholder", "원본 파일 경로..."), IsReadOnly = false, Height = 32, TextWrapping = TextWrapping.NoWrap };
             var originalBrowseButton = new Button { Content = getString("CompareBrowse", "찾아보기..."), Height = 32 };
             var originalRow = CreatePathRow(originalPathBox, originalBrowseButton);
 
             var modifiedCombo = CreateSourceCombo(tabChoices);
-            var modifiedPathBox = new TextBox { PlaceholderText = getString("CompareModifiedPathPlaceholder", "비교 대상 파일 경로..."), IsReadOnly = true, Height = 32, TextWrapping = TextWrapping.NoWrap };
+            var modifiedPathBox = new TextBox { PlaceholderText = getString("CompareModifiedPathPlaceholder", "비교 대상 파일 경로..."), IsReadOnly = false, Height = 32, TextWrapping = TextWrapping.NoWrap };
             var modifiedBrowseButton = new Button { Content = getString("CompareBrowse", "찾아보기..."), Height = 32 };
             var modifiedRow = CreatePathRow(modifiedPathBox, modifiedBrowseButton);
 
@@ -47,11 +47,78 @@ namespace TxtAIEditor.Core.Services
             panel.Children.Add(modifiedCombo);
             panel.Children.Add(modifiedRow);
 
-            originalCombo.SelectionChanged += (_, _) => SyncPathBoxFromCombo(originalCombo, originalBrowseButton, originalPathBox);
-            modifiedCombo.SelectionChanged += (_, _) => SyncPathBoxFromCombo(modifiedCombo, modifiedBrowseButton, modifiedPathBox);
+            string? originalTabPathText = null;
+            string? modifiedTabPathText = null;
 
-            originalBrowseButton.Click += async (_, _) => originalPathBox.Text = await PickFileAsync(owner) ?? originalPathBox.Text;
-            modifiedBrowseButton.Click += async (_, _) => modifiedPathBox.Text = await PickFileAsync(owner) ?? modifiedPathBox.Text;
+            originalCombo.SelectionChanged += (_, _) =>
+            {
+                if (originalCombo.SelectedIndex > 0 && originalCombo.SelectedIndex - 1 < tabs.Count)
+                {
+                    var tab = tabs[originalCombo.SelectedIndex - 1];
+                    originalTabPathText = string.IsNullOrEmpty(tab.FilePath) ? tab.Title : tab.FilePath;
+                    originalPathBox.Text = originalTabPathText;
+                }
+                else if (originalCombo.SelectedIndex == 0)
+                {
+                    originalTabPathText = null;
+                    originalPathBox.Text = string.Empty;
+                }
+            };
+
+            originalPathBox.TextChanged += (_, _) =>
+            {
+                if (originalCombo.SelectedIndex > 0 && originalPathBox.Text != originalTabPathText)
+                {
+                    originalTabPathText = null;
+                    originalCombo.SelectedIndex = 0;
+                }
+            };
+
+            modifiedCombo.SelectionChanged += (_, _) =>
+            {
+                if (modifiedCombo.SelectedIndex > 0 && modifiedCombo.SelectedIndex - 1 < tabs.Count)
+                {
+                    var tab = tabs[modifiedCombo.SelectedIndex - 1];
+                    modifiedTabPathText = string.IsNullOrEmpty(tab.FilePath) ? tab.Title : tab.FilePath;
+                    modifiedPathBox.Text = modifiedTabPathText;
+                }
+                else if (modifiedCombo.SelectedIndex == 0)
+                {
+                    modifiedTabPathText = null;
+                    modifiedPathBox.Text = string.Empty;
+                }
+            };
+
+            modifiedPathBox.TextChanged += (_, _) =>
+            {
+                if (modifiedCombo.SelectedIndex > 0 && modifiedPathBox.Text != modifiedTabPathText)
+                {
+                    modifiedTabPathText = null;
+                    modifiedCombo.SelectedIndex = 0;
+                }
+            };
+
+            originalBrowseButton.Click += async (_, _) =>
+            {
+                var file = await PickFileAsync(owner);
+                if (!string.IsNullOrEmpty(file))
+                {
+                    originalTabPathText = null;
+                    originalCombo.SelectedIndex = 0;
+                    originalPathBox.Text = file;
+                }
+            };
+
+            modifiedBrowseButton.Click += async (_, _) =>
+            {
+                var file = await PickFileAsync(owner);
+                if (!string.IsNullOrEmpty(file))
+                {
+                    modifiedTabPathText = null;
+                    modifiedCombo.SelectedIndex = 0;
+                    modifiedPathBox.Text = file;
+                }
+            };
 
             var dialog = new ContentDialog
             {
@@ -111,13 +178,6 @@ namespace TxtAIEditor.Core.Services
             row.Children.Add(pathBox);
             row.Children.Add(browseButton);
             return row;
-        }
-
-        private static void SyncPathBoxFromCombo(ComboBox combo, Button browseButton, TextBox pathBox)
-        {
-            bool isBrowse = combo.SelectedIndex == 0;
-            browseButton.IsEnabled = isBrowse;
-            pathBox.Text = isBrowse ? string.Empty : combo.SelectedItem.ToString();
         }
 
         private static async Task<string?> PickFileAsync(Window owner)
