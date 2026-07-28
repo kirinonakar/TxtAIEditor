@@ -1273,6 +1273,13 @@
         }
 
         function handleKeyDown(event) {
+            if (String(event.key || '').toLowerCase() === 'f7') {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                return;
+            }
+
             const shortcut = shortcutNameFromKeyboardEvent(event);
             if (!shortcut) return;
             event.preventDefault();
@@ -1285,7 +1292,8 @@
             if (event.source !== htmlPreview.contentWindow ||
                 message?.source !== 'txtaieditor-html-preview' ||
                 message?.type !== 'shortcut' ||
-                !message.name) {
+                !message.name ||
+                String(message.name).toLowerCase() === 'f7') {
                 return;
             }
             post({ type: 'shortcut', name: String(message.name) });

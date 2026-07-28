@@ -216,7 +216,6 @@ namespace TxtAIEditor.Composition
                 terminalShortcut,
                 callbacks.ToggleLivePreview,
                 callbacks.ToggleExplorerTreeMode,
-                callbacks.ToggleCsvTableMode,
                 callbacks.TogglePreviewWidth,
                 callbacks.ToggleMaximize,
                 callbacks.ToggleWordWrap);

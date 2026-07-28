@@ -120,7 +120,6 @@ namespace TxtAIEditor.Composition
                 stickyNoteMode.ToggleMode,
                 callbacks.ToggleWordWrapRequested,
                 callbacks.ToggleExplorerTreeModeRequested,
-                callbacks.ToggleCsvTableModeRequested,
                 callbacks.ToggleLeftPanelAsync,
                 callbacks.ToggleRightPanelAsync,
                 callbacks.TogglePreviewWidthRequested,

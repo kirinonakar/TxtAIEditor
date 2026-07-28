@@ -482,7 +482,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
         }
         if (event.key === 'F7') {
             event.preventDefault();
-            post({ type: 'shortcut', name: 'f7' });
+            event.stopPropagation();
+            event.stopImmediatePropagation();
             return;
         }
         if (event.key === 'F9') {

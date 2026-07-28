@@ -472,10 +472,6 @@ namespace TxtAIEditor.Controls
                     {
                         FunctionKeyShortcutPressed?.Invoke(Windows.System.VirtualKey.F3);
                     }
-                    else if (shortcutName.Equals("f7", StringComparison.OrdinalIgnoreCase))
-                    {
-                        FunctionKeyShortcutPressed?.Invoke(Windows.System.VirtualKey.F7);
-                    }
                 }
             }
             catch (Exception ex)

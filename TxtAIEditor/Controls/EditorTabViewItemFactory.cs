@@ -820,6 +820,13 @@ audio {{
         const key = String(event.key || '').toLowerCase();
         const code = String(event.code || '');
 
+        if (key === 'f7' || code === 'F7') {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+            return;
+        }
+
         let name = '';
 
         if (!ctrl && !alt) {
@@ -827,8 +834,6 @@ audio {{
                 name = 'f3';
             } else if (key === 'f4' || code === 'F4') {
                 name = 'f4';
-            } else if (key === 'f7' || code === 'F7') {
-                name = 'f7';
             } else if (key === 'f9' || code === 'F9') {
                 name = 'f9';
             } else if (key === 'f10' || code === 'F10') {

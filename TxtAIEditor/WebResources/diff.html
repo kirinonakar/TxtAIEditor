@@ -375,7 +375,8 @@
                 post({ type: 'shortcut', name: 'f4' });
             } else if (event.key === 'F7') {
                 event.preventDefault();
-                post({ type: 'shortcut', name: 'f7' });
+                event.stopPropagation();
+                event.stopImmediatePropagation();
             } else if (event.key === 'F9') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'f9' });

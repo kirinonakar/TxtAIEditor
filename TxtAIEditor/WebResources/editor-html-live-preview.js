@@ -54,7 +54,8 @@ function createFullHtmlLivePreviewRenderer() {
         if (event.source !== htmlLivePreview.contentWindow ||
             message?.source !== 'txtaieditor-html-preview' ||
             message?.type !== 'shortcut' ||
-            !message.name) {
+            !message.name ||
+            String(message.name).toLowerCase() === 'f7') {
             return;
         }
         post({ type: 'shortcut', name: String(message.name) });

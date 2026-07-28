@@ -37,9 +37,6 @@ namespace TxtAIEditor.Controls
                 case "f4":
                     _commands.ToggleLivePreview();
                     break;
-                case "f7":
-                    _commands.ToggleCsvTableMode();
-                    break;
                 case "f9":
                     _commands.ToggleTopMost();
                     break;

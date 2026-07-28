@@ -121,7 +121,6 @@ namespace TxtAIEditor.Core.Services
                 ("Alt + Z", getString("ShortcutDescWordWrap", "Word Wrap 토글")),
                 ("F3", getString("ShortcutDescExplorerTreeMode", "탐색기 트리 모드 토글")),
                 ("F4", getString("ShortcutDescLivePreview", "라이브 프리뷰 토글")),
-                ("F7", getString("ShortcutDescCsvTableMode", "CSV 테이블 모드 토글")),
                 ("F9", getString("ShortcutDescTopMost", "항상위 토글")),
                 ("F10", getString("ShortcutDescTheme", "테마 토글")),
                 ("F11", getString("ShortcutDescMaximize", "창 최대화 토글")),

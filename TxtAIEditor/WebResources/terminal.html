@@ -170,7 +170,9 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      vscodeBridge?.postMessage({ type: 'shortcut', name: key });
+      if (key === 'f3') {
+        vscodeBridge?.postMessage({ type: 'shortcut', name: key });
+      }
     }, true);
 
     term.loadAddon(fitAddon);
