@@ -70,7 +70,9 @@ namespace TxtAIEditor.Composition
         public static MainWindowInteractionControllers Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowWorkspaceServices workspaceServices,
+            MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
             ShellPanelLayoutService shellPanelLayout,
             TerminalShortcutService terminalShortcut,
@@ -87,8 +89,8 @@ namespace TxtAIEditor.Composition
                 ui.LeftSidebar,
                 ui.StatusBar,
                 viewModel,
-                services.ArchiveExplorerService,
-                services.RemoteWorkspaceService,
+                workspaceServices.ArchiveExplorerService,
+                workspaceServices.RemoteWorkspaceService,
                 ui.EditorTabView,
                 ui.EditorTabView2,
                 callbacks.GetCurrentFolderPath,
@@ -111,12 +113,14 @@ namespace TxtAIEditor.Composition
                 callbacks.IsExplorerRemoteView,
                 callbacks.RefreshRemoteExplorerAsync,
                 callbacks.InitializePickerWindow,
-                () => services.SettingsService.CurrentSettings.HomeFolderPath);
+                () => commonServices.SettingsService.CurrentSettings.HomeFolderPath);
 
             return ComposeAfterExplorerActions(
                 window,
                 ui,
-                services,
+                commonServices,
+                workspaceServices,
+                editorServices,
                 viewModel,
                 shellPanelLayout,
                 terminalShortcut,
@@ -134,7 +138,9 @@ namespace TxtAIEditor.Composition
         private static MainWindowInteractionControllers ComposeAfterExplorerActions(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowWorkspaceServices workspaceServices,
+            MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
             ShellPanelLayoutService shellPanelLayout,
             TerminalShortcutService terminalShortcut,
@@ -157,7 +163,7 @@ namespace TxtAIEditor.Composition
                 callbacks.GetCurrentRepoPath,
                 callbacks.LoadFileIntoTabAtLineAsync,
                 callbacks.NavigateExplorerToFolderAndRevealAsync,
-                services.RemoteWorkspaceService);
+                workspaceServices.RemoteWorkspaceService);
 
             var tabContextMenu = new TabContextMenuController(
                 favoritesRecent,
@@ -211,7 +217,7 @@ namespace TxtAIEditor.Composition
                 callbacks.ToggleWordWrap);
 
             var snippets = new SnippetsController(
-                services.SnippetService,
+                editorServices.SnippetService,
                 viewModel,
                 ui.LeftSidebar,
                 () => ui.RootElement.XamlRoot,

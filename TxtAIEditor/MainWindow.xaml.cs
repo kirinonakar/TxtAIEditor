@@ -71,11 +71,12 @@ namespace TxtAIEditor
 
             var ui = CreateUiRefs();
             var services = MainWindowServices.Create(GetLocalizedString);
-            _localizationService = services.LocalizationService;
+            _localizationService = services.Common.LocalizationService;
             _operations = new MainWindowRuntimeOperations(
                 this,
                 ui,
-                services,
+                services.Common,
+                services.Editor,
                 _viewModel,
                 _state,
                 () => Controllers);
@@ -87,7 +88,7 @@ namespace TxtAIEditor
                 _viewModel,
                 _state,
                 InitialEditorLineWarmupCount,
-                Operations.CreateCompositionCallbacks());
+                Operations.CreateHostFacades());
 
             // Load local configurations and boot initial states
             // Setup custom title bar

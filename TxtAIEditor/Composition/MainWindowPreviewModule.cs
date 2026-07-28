@@ -21,11 +21,14 @@ namespace TxtAIEditor.Composition
 
         public static MainWindowPreviewModule Compose(
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowDocumentServices documentServices,
             MainWindowViewModel viewModel,
             MainWindowState state,
             MainWindowPreviewModuleDependencies dependencies,
-            MainWindowCompositionRootCallbacks callbacks,
+            IMainWindowShellFacade shellFacade,
+            IMainWindowEditorFacade editorFacade,
+            IMainWindowDocumentFacade documentFacade,
             Func<MainWindowToolbarCommandController?> getToolbarCommand,
             Func<Task> toggleLeftPanelAsync,
             Func<Task> toggleRightPanelAsync,
@@ -34,7 +37,8 @@ namespace TxtAIEditor.Composition
             var shell = dependencies.Shell;
             var controllers = MainWindowPreviewComposition.Compose(
                 ui,
-                services,
+                commonServices,
+                documentServices,
                 viewModel,
                 state.TabBridges,
                 shell.TabNavigation,
@@ -43,30 +47,30 @@ namespace TxtAIEditor.Composition
                 tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
                 new MainWindowPreviewCompositionCallbacks(
                     () => getToolbarCommand()?.Find(),
-                    callbacks.FocusSearchPanel,
-                    () => callbacks.OpenNewTab(),
+                    shellFacade.FocusSearchPanel,
+                    () => documentFacade.OpenEmptyTab(),
                     () => getToolbarCommand()?.SaveActive(),
                     () => getToolbarCommand()?.SaveActiveAs(),
                     () => getToolbarCommand()?.OpenFile(),
                     () => getToolbarCommand()?.ToggleLivePreview(),
                     () => getToolbarCommand()?.ToggleTheme(),
-                    callbacks.ToggleMaximize,
+                    shellFacade.ToggleMaximize,
                     () => getToolbarCommand()?.Print(),
                     () => _ = toggleLeftPanelAsync(),
                     () => _ = toggleRightPanelAsync(),
                     () => getToolbarCommand()?.ToggleTerminal(),
                     () => getToolbarCommand()?.ToggleWordWrap(),
                     shell.ShellPanelLayout.TogglePreviewWidth,
-                    callbacks.CloseActiveTab,
-                    callbacks.LoadFileIntoTabAsync,
+                    documentFacade.CloseActiveTab,
+                    documentFacade.LoadFileIntoTabAsync,
                     MainWindowMessageJson.Normalize,
                     () => state.CurrentFolderPath,
                     () => state.CurrentRepoPath,
                     () => state.ScrollSyncEnabled,
-                    callbacks.UpdateRightPanelSelectionContext,
+                    editorFacade.UpdateRightPanelSelectionContext,
                     navigateExplorerToFolderAndRevealAsync,
-                    callbacks.GetLocalizedString,
-                    callbacks.UpdateWindowTitle));
+                    shellFacade.GetLocalizedString,
+                    shellFacade.UpdateWindowTitle));
 
             return new MainWindowPreviewModule(controllers);
         }

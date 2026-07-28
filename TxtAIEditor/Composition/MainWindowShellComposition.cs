@@ -40,7 +40,9 @@ namespace TxtAIEditor.Composition
         public static MainWindowShellControllers Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowWorkspaceServices workspaceServices,
+            MainWindowShellServices shellServices,
             MainWindowViewModel viewModel,
             IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Func<string, EditorDocumentSession?> getEditorSession,
@@ -78,7 +80,7 @@ namespace TxtAIEditor.Composition
                 window,
                 ui.AppTitleTextBlock,
                 tabNavigation.GetActiveTab,
-                services.RemoteWorkspaceService);
+                workspaceServices.RemoteWorkspaceService);
 
             var tabEncryption = new TabEncryptionController(
                 callbacks.GetLocalizedString,
@@ -97,7 +99,7 @@ namespace TxtAIEditor.Composition
                 ui.StatusBar,
                 shellPanelLayout,
                 ui.StatusBar.LeftPanelToggleButton,
-                services.StickyNoteService,
+                shellServices.StickyNoteService,
                 callbacks.ApplyLeftSidebarVisibility,
                 callbacks.ApplyPreviewVisibility);
 
@@ -106,7 +108,7 @@ namespace TxtAIEditor.Composition
                 tabNavigation.GetActiveTab,
                 tab => tabNavigation.GetActiveTab() == tab,
                 getEditorSession,
-                services.LanguageDetectionService,
+                commonServices.LanguageDetectionService,
                 tabBridges,
                 callbacks.GetLocalizedString,
                 () => ui.RootElement.XamlRoot,

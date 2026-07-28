@@ -50,7 +50,10 @@ namespace TxtAIEditor.Composition
         public static MainWindowEditorRuntimeControllers Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowDocumentServices documentServices,
+            MainWindowWorkspaceServices workspaceServices,
+            MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
@@ -161,20 +164,20 @@ namespace TxtAIEditor.Composition
                 callbacks.IsScrollSyncEnabled,
                 callbacks.SetScrollSyncEnabled);
 
-            var documentFactory = new EditorTabDocumentFactory(services.LanguageDetectionService, callbacks.GetLocalizedString);
-            var itemFactory = new EditorTabViewItemFactory(services.LocalizationService, webViewShortcut.Handle);
+            var documentFactory = new EditorTabDocumentFactory(commonServices.LanguageDetectionService, callbacks.GetLocalizedString);
+            var itemFactory = new EditorTabViewItemFactory(commonServices.LocalizationService, webViewShortcut.Handle);
 
             var editorTabOpen = new EditorTabOpenController(
-                services.SettingsService,
-                services.SnippetService,
-                services.RemoteWorkspaceService,
+                commonServices.SettingsService,
+                editorServices.SnippetService,
+                workspaceServices.RemoteWorkspaceService,
                 viewModel,
                 ui.EditorWorkspace,
                 documentFactory,
                 itemFactory,
                 favoritesRecent,
                 statusBar,
-                services.UnsavedChangesDialogService,
+                documentServices.UnsavedChangesDialogService,
                 tabEncryption,
                 pdfViewer,
                 officeDocumentViewer,

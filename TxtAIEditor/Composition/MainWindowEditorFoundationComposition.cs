@@ -49,7 +49,10 @@ namespace TxtAIEditor.Composition
     {
         public static MainWindowEditorFoundationControllers Compose(
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowDocumentServices documentServices,
+            MainWindowWorkspaceServices workspaceServices,
+            MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
@@ -65,9 +68,9 @@ namespace TxtAIEditor.Composition
             MainWindowEditorFoundationCallbacks callbacks)
         {
             var tabReload = new TabReloadController(
-                services.SecureNoteEncryptionService,
-                services.ArchiveExplorerService,
-                services.SettingsService,
+                documentServices.SecureNoteEncryptionService,
+                workspaceServices.ArchiveExplorerService,
+                commonServices.SettingsService,
                 tabBridges,
                 editorSessions,
                 statusBar,
@@ -84,7 +87,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 tabBridges,
                 editorSessions,
-                () => services.SettingsService.CurrentSettings.ShowDirtyLines,
+                () => commonServices.SettingsService.CurrentSettings.ShowDirtyLines,
                 callbacks.UpdateWindowTitle);
 
             var activeEditorInsertion = new ActiveEditorInsertionController(
@@ -94,7 +97,7 @@ namespace TxtAIEditor.Composition
                 tabDirtyState);
 
             var tabTextContext = new TabTextContextProvider(
-                services.PdfTextExtractionService,
+                editorServices.PdfTextExtractionService,
                 getEditorSession);
 
             var splitImeSync = new SplitImeSyncController(
@@ -140,7 +143,7 @@ namespace TxtAIEditor.Composition
                 editorLineNavigation);
 
             var searchReplace = new SearchReplaceController(
-                services.FileSearchService,
+                workspaceServices.FileSearchService,
                 viewModel,
                 ui.LeftSidebar.SearchQuery,
                 ui.LeftSidebar.ReplaceQuery,

@@ -22,7 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly ISettingsService _settingsService;
         private readonly FileOpenDropController _fileOpenDropController;
         private readonly TabNavigationController _tabNavigationController;
-        private readonly TabSaveController _tabSaveController;
+        private readonly ITabSaveCommands _tabSaveCommands;
         private readonly TerminalPanelController _terminalPanelController;
         private readonly MainWindowSettingsController _settingsController;
         private readonly StickyNoteModeController _stickyNoteModeController;
@@ -52,7 +52,7 @@ namespace TxtAIEditor.Controls
             ISettingsService settingsService,
             FileOpenDropController fileOpenDropController,
             TabNavigationController tabNavigationController,
-            TabSaveController tabSaveController,
+            ITabSaveCommands tabSaveCommands,
             TerminalPanelController terminalPanelController,
             MainWindowSettingsController settingsController,
             StickyNoteModeController stickyNoteModeController,
@@ -81,7 +81,7 @@ namespace TxtAIEditor.Controls
             _settingsService = settingsService;
             _fileOpenDropController = fileOpenDropController;
             _tabNavigationController = tabNavigationController;
-            _tabSaveController = tabSaveController;
+            _tabSaveCommands = tabSaveCommands;
             _terminalPanelController = terminalPanelController;
             _settingsController = settingsController;
             _stickyNoteModeController = stickyNoteModeController;
@@ -220,7 +220,7 @@ namespace TxtAIEditor.Controls
             var tab = _tabNavigationController.GetActiveTab();
             if (tab != null)
             {
-                await _tabSaveController.SaveAsync(tab);
+                await _tabSaveCommands.SaveAsync(tab);
             }
         }
 
@@ -229,7 +229,7 @@ namespace TxtAIEditor.Controls
             var tab = _tabNavigationController.GetActiveTab();
             if (tab != null)
             {
-                await _tabSaveController.SaveAsAsync(tab);
+                await _tabSaveCommands.SaveAsAsync(tab);
             }
         }
 

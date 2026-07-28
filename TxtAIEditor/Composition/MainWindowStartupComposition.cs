@@ -44,13 +44,14 @@ namespace TxtAIEditor.Composition
         public static MainWindowStartupControllers Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowShellServices shellServices,
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             TerminalShortcutService terminalShortcut,
             FunctionKeyShortcutService functionKeyShortcut,
-            AutoSaveController autoSave,
+            IAutoSaveLifecycle autoSaveLifecycle,
             DispatcherTimer gitAutoRefreshTimer,
             LivePreviewController livePreview,
             PdfViewerController pdfViewer,
@@ -66,7 +67,7 @@ namespace TxtAIEditor.Composition
             FileOpenDropController fileOpenDrop,
             ShellPanelLayoutService shellPanelLayout,
             RootKeyboardShortcutController rootKeyboardShortcut,
-            TabSaveController tabSave,
+            ITabSaveCommands tabSaveCommands,
             TerminalPanelController terminalPanel,
             StickyNoteModeController stickyNoteMode,
             ShellPaneController shellPane,
@@ -79,7 +80,7 @@ namespace TxtAIEditor.Composition
                 ui.AppTitleBar,
                 terminalShortcut,
                 functionKeyShortcut,
-                autoSave,
+                autoSaveLifecycle,
                 gitAutoRefreshTimer,
                 ui.EditorWorkspace,
                 tabBridges,
@@ -90,10 +91,10 @@ namespace TxtAIEditor.Composition
                 () => window.Content as FrameworkElement,
                 () => ui.RootElement.XamlRoot,
                 callbacks.GetCurrentElementTheme,
-                services.SettingsService,
-                services.SettingsDialogService,
-                services.UiPersonalizationService,
-                services.LocalizationService,
+                commonServices.SettingsService,
+                shellServices.SettingsDialogService,
+                shellServices.UiPersonalizationService,
+                commonServices.LocalizationService,
                 ui.TopToolbar,
                 ui.MarkdownToolbar,
                 ui.MarkdownToolbarHost,
@@ -127,7 +128,7 @@ namespace TxtAIEditor.Composition
 
             var startup = new MainWindowStartupController(
                 window,
-                services.SettingsService,
+                commonServices.SettingsService,
                 viewModel,
                 ui.EditorWorkspace,
                 ui.TopToolbar,
@@ -159,9 +160,9 @@ namespace TxtAIEditor.Composition
 
             ui.PreviewGrid.SelectedTabChanged += async (_, selectedTabKey) =>
             {
-                EditorSettings currentSettings = services.SettingsService.CurrentSettings;
+                EditorSettings currentSettings = commonServices.SettingsService.CurrentSettings;
                 currentSettings.RightSidebarSelectedTab = selectedTabKey;
-                await services.SettingsService.SaveSettingsAsync(currentSettings);
+                await commonServices.SettingsService.SaveSettingsAsync(currentSettings);
             };
 
             var shellInteraction = new MainWindowShellInteractionController(
@@ -193,10 +194,10 @@ namespace TxtAIEditor.Composition
                 ui.EditorTabView,
                 ui.LeftSidebar.SearchQuery,
                 viewModel,
-                services.SettingsService,
+                commonServices.SettingsService,
                 fileOpenDrop,
                 tabNavigation,
-                tabSave,
+                tabSaveCommands,
                 terminalPanel,
                 settings,
                 stickyNoteMode,
@@ -204,7 +205,7 @@ namespace TxtAIEditor.Composition
                 officeDocumentViewer,
                 notebookViewer,
                 shellPane,
-                services.CompareSelectionDialogService,
+                shellServices.CompareSelectionDialogService,
                 compareTab,
                 dialog,
                 tabBridges,

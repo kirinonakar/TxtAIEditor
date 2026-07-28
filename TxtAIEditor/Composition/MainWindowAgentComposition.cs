@@ -46,7 +46,7 @@ namespace TxtAIEditor.Composition
     internal sealed record MainWindowAgentModuleDependencies(
         MainWindowShellControllers Shell,
         MainWindowEditorFoundationControllers Editor,
-        MainWindowDocumentCommandControllers Documents,
+        ITabCloseCommands Documents,
         MainWindowPreviewModule Preview);
 
     internal sealed record MainWindowAgentModuleFacade(
@@ -58,43 +58,55 @@ namespace TxtAIEditor.Composition
         public static MainWindowAgentModuleFacade Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowWorkspaceServices workspaceServices,
+            MainWindowEditorServices editorServices,
+            MainWindowAgentServices agentServices,
             MainWindowViewModel viewModel,
             MainWindowState state,
             MainWindowAgentModuleDependencies dependencies,
             MainWindowWorkspaceControllers workspace,
-            MainWindowCompositionRootCallbacks callbacks)
+            IMainWindowShellFacade shellFacade,
+            IMainWindowDocumentFacade documentFacade,
+            IMainWindowAgentFacade agentFacade,
+            IMainWindowWorkspaceFacade workspaceFacade)
         {
             var explorerNavigation = workspace.ExplorerNavigation;
             return Compose(
                 window,
                 ui,
-                services,
+                commonServices,
+                workspaceServices,
+                editorServices,
+                agentServices,
                 viewModel,
                 state.TabBridges,
                 state.EditorSessions,
                 dependencies,
                 new MainWindowAgentCompositionCallbacks(
-                    callbacks.GetSelectedExplorerItem,
+                    workspaceFacade.GetSelectedExplorerItem,
                     () => state.CurrentFolderPath,
                     () => state.CurrentRepoPath,
                     explorerNavigation.LoadDirectoryRoot,
                     workspace.GitStatusRefresh.QueueRefresh,
-                    callbacks.GetAgentSessionEdits,
-                    callbacks.LoadFileIntoTabForAgentAsync,
+                    agentFacade.GetAgentSessionEdits,
+                    agentFacade.LoadFileIntoTabForAgentAsync,
                     folderPath => explorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel: true),
-                    callbacks.OpenGeneratedTab,
-                    callbacks.SaveTabAsync,
-                    callbacks.InitializePickerWindow,
+                    documentFacade.OpenGeneratedTab,
+                    documentFacade.SaveTabAsync,
+                    shellFacade.InitializePickerWindow,
                     explorerNavigation.RefreshCurrentFolder,
-                    callbacks.GetLocalizedString,
-                    callbacks.UpdateWindowTitle));
+                    shellFacade.GetLocalizedString,
+                    shellFacade.UpdateWindowTitle));
         }
 
         public static MainWindowAgentModuleFacade Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowWorkspaceServices workspaceServices,
+            MainWindowEditorServices editorServices,
+            MainWindowAgentServices agentServices,
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
@@ -107,9 +119,9 @@ namespace TxtAIEditor.Composition
             var preview = dependencies.Preview.Controllers;
 
             var llmAssistant = new LlmAssistantController(
-                services.LlmService,
-                services.SettingsService,
-                services.LanguageDetectionService,
+                agentServices.LlmService,
+                commonServices.SettingsService,
+                commonServices.LanguageDetectionService,
                 ui.PreviewGrid,
                 () => ui.RootElement.XamlRoot,
                 shell.TabNavigation.GetActiveTab,
@@ -120,7 +132,7 @@ namespace TxtAIEditor.Composition
                     content,
                     ensureUniqueUntitledName: false,
                     viewModel,
-                    services,
+                    commonServices,
                     editorSessions,
                     editor.TabDirtyState,
                     callbacks),
@@ -143,10 +155,10 @@ namespace TxtAIEditor.Composition
                 ui.EditorTabView2,
                 tabBridges,
                 editorSessions,
-                documents.TabClose,
+                documents,
                 editor.SearchReplaceTabSync,
                 preview.CompareTab,
-                services.RemoteWorkspaceService,
+                workspaceServices.RemoteWorkspaceService,
                 callbacks);
 
             var agentFileTools = new AgentFileToolService(
@@ -154,17 +166,17 @@ namespace TxtAIEditor.Composition
                 callbacks.GetLocalizedString)
             {
                 FileDisplayPathProvider = fullPath =>
-                    services.RemoteWorkspaceService.TryGetVirtualPath(
+                    workspaceServices.RemoteWorkspaceService.TryGetVirtualPath(
                         fullPath,
                         out string remotePath)
-                        ? services.RemoteWorkspaceService.GetDisplayPath(remotePath)
+                        ? workspaceServices.RemoteWorkspaceService.GetDisplayPath(remotePath)
                         : null
             };
 
             var agent = new AgentController(
-                services.LlmService,
-                services.SettingsService,
-                services.CredentialService,
+                agentServices.LlmService,
+                commonServices.SettingsService,
+                agentServices.CredentialService,
                 ui.PreviewGrid.AgentPane,
                 shell.TabNavigation.GetActiveTab,
                 () => viewModel.Tabs.ToList(),
@@ -175,16 +187,16 @@ namespace TxtAIEditor.Composition
                     content,
                     ensureUniqueUntitledName: true,
                     viewModel,
-                    services,
+                    commonServices,
                     editorSessions,
                     editor.TabDirtyState,
                     callbacks),
                 shell.Dialog.ShowErrorMessage,
                 callbacks.GetLocalizedString,
                 agentFileTools,
-                services.PdfTextExtractionService,
+                editorServices.PdfTextExtractionService,
                 callbacks.InitializePickerWindow,
-                path => services.GitService.FindRepositoryRoot(path) != null,
+                path => workspaceServices.GitService.FindRepositoryRoot(path) != null,
                 agentFileWorkflow.OpenDiffViewAsync,
                 agentFileWorkflow.HandleFileModifiedAsync,
                 openFileInEditorAsync: callbacks.LoadFileIntoTabForAgentAsync,
@@ -199,7 +211,7 @@ namespace TxtAIEditor.Composition
                     {
                         tab.FilePath = targetPath;
                         tab.Title = Path.GetFileName(targetPath);
-                        tab.Language = services.LanguageDetectionService.GetEditorLanguageName(targetPath);
+                        tab.Language = commonServices.LanguageDetectionService.GetEditorLanguageName(targetPath);
                     }
 
                     return await callbacks.SaveTabAsync(tab);
@@ -242,7 +254,7 @@ namespace TxtAIEditor.Composition
             string content,
             bool ensureUniqueUntitledName,
             MainWindowViewModel viewModel,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
             Dictionary<string, EditorDocumentSession> editorSessions,
             TabDirtyStateController tabDirtyState,
             MainWindowAgentCompositionCallbacks callbacks)
@@ -275,7 +287,7 @@ namespace TxtAIEditor.Composition
             var tab = callbacks.OpenGeneratedTab(content);
             tab.Title = uniqueTitle;
             tab.Language = !string.IsNullOrWhiteSpace(title)
-                ? services.LanguageDetectionService.GetEditorLanguageName(title)
+                ? commonServices.LanguageDetectionService.GetEditorLanguageName(title)
                 : "plaintext";
             if (editorSessions.TryGetValue(tab.Id, out var session))
             {

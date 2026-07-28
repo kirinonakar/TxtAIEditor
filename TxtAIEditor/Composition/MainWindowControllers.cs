@@ -10,22 +10,6 @@ namespace TxtAIEditor.Composition
         MainWindowEditorFoundationControllers Foundation,
         MainWindowEditorRuntimeControllers Runtime);
 
-    internal sealed record DocumentControllers(
-        TabSaveController TabSave,
-        AutoSaveController AutoSave,
-        TabCloseController TabClose,
-        TabMoveController TabMove,
-        WindowCloseController WindowClose)
-    {
-        public static DocumentControllers From(MainWindowDocumentCommandControllers controllers) =>
-            new(
-                controllers.TabSave,
-                controllers.AutoSave,
-                controllers.TabClose,
-                controllers.TabMove,
-                controllers.WindowClose);
-    }
-
     internal sealed record LifecycleControllers(
         MainWindowLifecycleController Window,
         MainWindowSettingsController Settings,
@@ -45,7 +29,7 @@ namespace TxtAIEditor.Composition
     internal sealed record MainWindowControllers(
         ShellControllers Shell,
         EditorControllers Editor,
-        DocumentControllers Documents,
+        MainWindowDocumentModule Documents,
         MainWindowPreviewModule Preview,
         MainWindowAgentModuleFacade Agents,
         MainWindowWorkspaceModule Workspace,

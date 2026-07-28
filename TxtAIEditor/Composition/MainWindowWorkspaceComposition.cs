@@ -51,7 +51,9 @@ namespace TxtAIEditor.Composition
         public static MainWindowWorkspaceControllers Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowDocumentServices documentServices,
+            MainWindowWorkspaceServices workspaceServices,
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             TabEncryptionController tabEncryption,
@@ -70,14 +72,14 @@ namespace TxtAIEditor.Composition
             };
 
             var gitPanel = new GitPanelController(
-                services.GitService,
-                services.FileService,
+                workspaceServices.GitService,
+                documentServices.FileService,
                 viewModel,
                 ui.LeftSidebar,
                 ui.StatusBar.GitBranchText,
                 callbacks.GetCurrentRepoPathForGitRefresh,
                 callbacks.GetCurrentFolderPath,
-                () => services.SettingsService.CurrentSettings.StripJupyterOutputsOnCommit,
+                () => commonServices.SettingsService.CurrentSettings.StripJupyterOutputsOnCommit,
                 () => ui.RootElement.XamlRoot,
                 callbacks.GetLocalizedString,
                 dialog.ShowErrorMessage,
@@ -101,9 +103,9 @@ namespace TxtAIEditor.Composition
                 gitPanel.RefreshAsync);
 
             var fileTabLoad = new FileTabLoadController(
-                services.GitService,
-                services.SecureNoteEncryptionService,
-                services.ArchiveExplorerService,
+                workspaceServices.GitService,
+                documentServices.SecureNoteEncryptionService,
+                workspaceServices.ArchiveExplorerService,
                 viewModel,
                 ui.EditorTabView,
                 ui.EditorTabView2,
@@ -124,10 +126,10 @@ namespace TxtAIEditor.Composition
             var explorerNavigation = new ExplorerNavigationController(
                 ui.LeftSidebar,
                 viewModel,
-                services.ExplorerDirectoryService,
-                services.ArchiveExplorerService,
-                services.RemoteWorkspaceService,
-                services.GitService,
+                workspaceServices.ExplorerDirectoryService,
+                workspaceServices.ArchiveExplorerService,
+                workspaceServices.RemoteWorkspaceService,
+                workspaceServices.GitService,
                 callbacks.InitializePickerWindow,
                 callbacks.SetCurrentFolderPath,
                 callbacks.SetCurrentRepoPath,
@@ -136,15 +138,15 @@ namespace TxtAIEditor.Composition
                 callbacks.ShowLeftSidebarPage,
                 callbacks.LoadFileIntoTabAsync,
                 async (archivePath, entryPath) => { await fileTabLoad.LoadArchiveEntryAsync(archivePath, entryPath); },
-                services.LocalizationService,
-                () => services.SettingsService.CurrentSettings.HomeFolderPath);
+                commonServices.LocalizationService,
+                () => commonServices.SettingsService.CurrentSettings.HomeFolderPath);
 
             fileTabLoad.PreserveWorkspaceOnFileOpenProvider = () => explorerNavigation.IsTreeMode;
 
             var favoritesRecent = new FavoritesRecentController(
-                services.SettingsService,
-                services.RecentFilesService,
-                services.RemoteWorkspaceService,
+                commonServices.SettingsService,
+                workspaceServices.RecentFilesService,
+                workspaceServices.RemoteWorkspaceService,
                 viewModel,
                 ui.LeftSidebar,
                 callback => window.DispatcherQueue.TryEnqueue(() => callback()),

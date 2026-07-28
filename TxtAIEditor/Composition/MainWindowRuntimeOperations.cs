@@ -14,11 +14,19 @@ using TxtAIEditor.ViewModels;
 
 namespace TxtAIEditor.Composition
 {
-    internal sealed class MainWindowRuntimeOperations
+    internal sealed class MainWindowRuntimeOperations :
+        IMainWindowShellFacade,
+        IMainWindowEditorFacade,
+        IMainWindowDocumentFacade,
+        IMainWindowPreviewFacade,
+        IMainWindowAgentFacade,
+        IMainWindowWorkspaceFacade,
+        IMainWindowLifecycleFacade
     {
         private readonly MainWindow _window;
         private readonly MainWindowUiRefs _ui;
-        private readonly MainWindowServices _services;
+        private readonly MainWindowCommonServices _commonServices;
+        private readonly MainWindowEditorServices _editorServices;
         private readonly MainWindowViewModel _viewModel;
         private readonly MainWindowState _state;
         private readonly Func<MainWindowControllers> _getControllers;
@@ -27,14 +35,16 @@ namespace TxtAIEditor.Composition
         public MainWindowRuntimeOperations(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
             MainWindowState state,
             Func<MainWindowControllers> getControllers)
         {
             _window = window;
             _ui = ui;
-            _services = services;
+            _commonServices = commonServices;
+            _editorServices = editorServices;
             _viewModel = viewModel;
             _state = state;
             _getControllers = getControllers;
@@ -50,67 +60,28 @@ namespace TxtAIEditor.Composition
 
         private MainWindowControllers Controllers => _getControllers();
 
-        public MainWindowCompositionRootCallbacks CreateCompositionCallbacks()
+        public MainWindowHostFacades CreateHostFacades()
         {
-            return new MainWindowCompositionRootCallbacks(
-                GetCurrentElementTheme,
-                GetLocalizedString,
-                UpdateWindowTitle,
-                ReloadTabWithEncodingAsync,
-                MarkTabDirtyFromStatusBar,
-                PerformLineNavigationAsync,
-                ToggleMaximize,
-                LoadFileIntoTabAsync,
-                LoadFileIntoTabAsync,
-                LoadFileIntoTabForAgentAsync,
-                UpdateRightPanelSelectionContext,
-                UpdateLivePreview,
-                UpdateLanguageUi,
-                SchedulePreview,
-                FocusSearchPanel,
-                EnsureLeftPanelVisible,
-                ShowLeftSidebarPage,
-                request => OpenNewTab(request),
-                () => OpenNewTab(),
-                OpenGeneratedTab,
-                OpenImageTab,
-                OpenMediaTab,
-                OpenPdfTab,
-                OpenOfficeDocumentTab,
-                OpenHexTab,
-                OpenNotebookTab,
-                OpenNotebookSourceTabAsync,
-                OpenNotebookViewerTabAsync,
-                SetHexViewModeAsync,
-                CloseActiveTab,
-                SyncSnippetsToOpenEditorsAsync,
-                InitializePickerWindow,
-                GetAgentSessionEdits,
-                CloseTabAndCleanup,
-                CloseReadOnlyViewer,
-                SaveTabAsync,
-                GetPreviewBaseHref,
-                RefreshActivePreview,
-                LocalizeUi,
-                SyncAgentSettingsAfterLoad,
-                UpdateAutoSaveStatus,
-                GetSelectedExplorerItem,
-                SetCurrentRepoPath,
-                SetCurrentFolderPath,
-                () => IsStartupInitializationComplete,
-                OnGitFileRestored);
+            return new MainWindowHostFacades(
+                this,
+                this,
+                this,
+                this,
+                this,
+                this,
+                this);
         }
 
         public async Task PrepareForInitialActivationAsync()
         {
             try
             {
-                if (!_services.SettingsService.IsLoaded)
+                if (!_commonServices.SettingsService.IsLoaded)
                 {
-                    await _services.SettingsService.LoadSettingsAsync();
+                    await _commonServices.SettingsService.LoadSettingsAsync();
                 }
 
-                WindowPlacementService.ApplySavedWindowPlacement(_window.AppWindow, _services.SettingsService.CurrentSettings);
+                WindowPlacementService.ApplySavedWindowPlacement(_window.AppWindow, _commonServices.SettingsService.CurrentSettings);
                 SyncAgentSettingsAfterLoad();
             }
             catch (Exception ex)
@@ -196,6 +167,8 @@ namespace TxtAIEditor.Composition
         }
 
         public OpenedTab OpenGeneratedTab(string content) => OpenNewTab(null, content);
+
+        public OpenedTab OpenEmptyTab() => OpenNewTab();
 
         public OpenedTab OpenPdfTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenPdfTab(filePath);
 
@@ -301,15 +274,15 @@ namespace TxtAIEditor.Composition
 
         public string GetLocalizedString(string key, string fallback)
         {
-            return _services.LocalizationService.GetString(key, fallback);
+            return _commonServices.LocalizationService.GetString(key, fallback);
         }
 
         public void LocalizeUi() => Controllers.Lifecycle.Settings.LocalizeUi();
 
         public async Task SyncSnippetsToOpenEditorsAsync()
         {
-            var snippets = _services.SnippetService.GetSnippets();
-            var autocompleteWords = _services.SnippetService.GetAutocompleteWords();
+            var snippets = _editorServices.SnippetService.GetSnippets();
+            var autocompleteWords = _editorServices.SnippetService.GetAutocompleteWords();
             foreach (var grp in _state.TabBridges.Values)
             {
                 if (grp.Bridge != null)
@@ -337,7 +310,7 @@ namespace TxtAIEditor.Composition
         public void CloseTabAndCleanup(OpenedTab tab, TabViewItem tabItem)
         {
             Controllers.Editor.Runtime.EditorTabOpen.ForgetHexViewState(tab.Id);
-            Controllers.Documents.TabClose.CloseAndCleanup(tab, tabItem);
+            Controllers.Documents.CloseAndCleanup(tab, tabItem);
         }
 
         public void CloseReadOnlyViewer(string tabId)
@@ -374,7 +347,7 @@ namespace TxtAIEditor.Composition
             await Controllers.Editor.Foundation.TabReload.ReloadWithEncodingAsync(tab, encodingName);
         }
 
-        public void OnGitFileRestored(object? sender, string filePath)
+        public void HandleGitFileRestored(object? sender, string filePath)
         {
             _window.DispatcherQueue.TryEnqueue(async () =>
             {
@@ -418,26 +391,26 @@ namespace TxtAIEditor.Composition
 
         public void UpdateWindowTitle() => Controllers.Shell.Core.WindowTitle.Update();
 
-        public Task<bool> SaveTabAsync(OpenedTab tab) => Controllers.Documents.TabSave.SaveAsync(tab);
+        public Task<bool> SaveTabAsync(OpenedTab tab) => Controllers.Documents.SaveAsync(tab);
 
         public void CloseActiveTab()
         {
-            Controllers.Documents.TabClose.CloseActive(Controllers.Shell.Core.TabNavigation.GetCurrentActiveTabView());
+            Controllers.Documents.CloseActive(Controllers.Shell.Core.TabNavigation.GetCurrentActiveTabView());
         }
 
         public async Task HandleAppWindowClosingAsync(Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
-            await Controllers.Documents.WindowClose.HandleClosingAsync(args);
+            await Controllers.Documents.HandleWindowClosingAsync(args);
         }
 
         public ElementTheme GetCurrentElementTheme()
         {
-            if (string.Equals(_services.SettingsService.CurrentSettings.Theme, "Light", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(_commonServices.SettingsService.CurrentSettings.Theme, "Light", StringComparison.OrdinalIgnoreCase))
             {
                 return ElementTheme.Light;
             }
 
-            if (string.Equals(_services.SettingsService.CurrentSettings.Theme, "Dark", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(_commonServices.SettingsService.CurrentSettings.Theme, "Dark", StringComparison.OrdinalIgnoreCase))
             {
                 return ElementTheme.Dark;
             }
@@ -462,7 +435,7 @@ namespace TxtAIEditor.Composition
 
         public void UpdateAutoSaveStatus()
         {
-            Controllers.Documents.AutoSave.UpdateStatus();
+            Controllers.Documents.UpdateAutoSaveStatus();
         }
 
         public ExplorerItem? GetSelectedExplorerItem()

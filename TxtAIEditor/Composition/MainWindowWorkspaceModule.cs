@@ -14,19 +14,22 @@ namespace TxtAIEditor.Composition
     internal sealed class MainWindowWorkspaceModule
     {
         private readonly MainWindowState _state;
-        private readonly MainWindowServices _services;
+        private readonly MainWindowCommonServices _commonServices;
+        private readonly MainWindowWorkspaceServices _workspaceServices;
         private readonly TabNavigationController _tabNavigation;
         private readonly Action<string> _setCurrentRepoPath;
         private MainWindowWorkspaceControllers? _controllers;
 
         private MainWindowWorkspaceModule(
             MainWindowState state,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowWorkspaceServices workspaceServices,
             TabNavigationController tabNavigation,
             Action<string> setCurrentRepoPath)
         {
             _state = state;
-            _services = services;
+            _commonServices = commonServices;
+            _workspaceServices = workspaceServices;
             _tabNavigation = tabNavigation;
             _setCurrentRepoPath = setCurrentRepoPath;
         }
@@ -37,24 +40,32 @@ namespace TxtAIEditor.Composition
         public static MainWindowWorkspaceModule Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowDocumentServices documentServices,
+            MainWindowWorkspaceServices workspaceServices,
             MainWindowViewModel viewModel,
             MainWindowState state,
             MainWindowWorkspaceModuleDependencies dependencies,
-            MainWindowCompositionRootCallbacks callbacks,
+            IMainWindowShellFacade shellFacade,
+            IMainWindowDocumentFacade documentFacade,
+            IMainWindowPreviewFacade previewFacade,
+            IMainWindowWorkspaceFacade workspaceFacade,
             Func<MainWindowToolbarCommandController?> getToolbarCommand)
         {
             var shell = dependencies.Shell;
             var module = new MainWindowWorkspaceModule(
                 state,
-                services,
+                commonServices,
+                workspaceServices,
                 shell.TabNavigation,
-                callbacks.SetCurrentRepoPath);
+                workspaceFacade.SetCurrentRepoPath);
 
             var controllers = MainWindowWorkspaceComposition.Compose(
                 window,
                 ui,
-                services,
+                commonServices,
+                documentServices,
+                workspaceServices,
                 viewModel,
                 state.TabBridges,
                 shell.TabEncryption,
@@ -66,27 +77,27 @@ namespace TxtAIEditor.Composition
                     shell.StickyNoteMode.ToggleMode,
                     module.GetCurrentRepoPathForGitRefresh,
                     () => state.CurrentFolderPath,
-                    callbacks.GetLocalizedString,
+                    shellFacade.GetLocalizedString,
                     module.TryGetExplorerNavigation,
-                    callbacks.SetCurrentRepoPath,
-                    callbacks.SetCurrentFolderPath,
+                    workspaceFacade.SetCurrentRepoPath,
+                    workspaceFacade.SetCurrentFolderPath,
                     module.RefreshGitStatusUiAsync,
-                    callbacks.EnsureLeftPanelVisible,
-                    callbacks.ShowLeftSidebarPage,
-                    callbacks.LoadFileIntoTabAsync,
-                    callbacks.InitializePickerWindow,
+                    shellFacade.EnsureLeftPanelVisible,
+                    shellFacade.ShowLeftSidebarPage,
+                    documentFacade.LoadFileIntoTabAsync,
+                    shellFacade.InitializePickerWindow,
                     folderPath => module.NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel: true),
-                    callbacks.OpenNewTabFromRequest,
-                    callbacks.OpenImageTab,
-                    callbacks.OpenMediaTab,
-                    callbacks.OpenPdfTab,
-                    callbacks.OpenOfficeDocumentTab,
-                    callbacks.OpenHexTab,
-                    callbacks.OpenNotebookTab,
+                    documentFacade.OpenNewTab,
+                    previewFacade.OpenImageTab,
+                    previewFacade.OpenMediaTab,
+                    previewFacade.OpenPdfTab,
+                    previewFacade.OpenOfficeDocumentTab,
+                    previewFacade.OpenHexTab,
+                    previewFacade.OpenNotebookTab,
                     module.QueueGitStatusRefresh));
 
             module.Bind(controllers);
-            controllers.GitPanel.FileRestored += callbacks.GitFileRestored;
+            controllers.GitPanel.FileRestored += workspaceFacade.HandleGitFileRestored;
             return module;
         }
 
@@ -137,12 +148,12 @@ namespace TxtAIEditor.Composition
             MainWindowWorkspaceOperations.GetSearchRoot(_state);
 
         public long GetLargeFileThresholdBytes() =>
-            MainWindowWorkspaceOperations.GetLargeFileThresholdBytes(_services.SettingsService);
+            MainWindowWorkspaceOperations.GetLargeFileThresholdBytes(_commonServices.SettingsService);
 
         public Task RefreshGitStatusUiAsync() =>
             MainWindowWorkspaceOperations.RefreshGitStatusUiAsync(
                 _state,
-                _services.GitService,
+                _workspaceServices.GitService,
                 Controllers.GitAutoRefreshTimer,
                 _tabNavigation,
                 Controllers.GitStatusRefresh,
@@ -155,7 +166,7 @@ namespace TxtAIEditor.Composition
         private string GetCurrentRepoPathForGitRefresh() =>
             MainWindowWorkspaceOperations.GetCurrentRepoPathForGitRefresh(
                 _state,
-                _services.GitService,
+                _workspaceServices.GitService,
                 _tabNavigation,
                 _setCurrentRepoPath);
 

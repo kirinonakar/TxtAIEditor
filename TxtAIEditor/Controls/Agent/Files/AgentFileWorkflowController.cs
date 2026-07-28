@@ -18,7 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly TabView _secondaryTabView;
         private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
-        private readonly TabCloseController _tabCloseController;
+        private readonly ITabCloseCommands _tabCloseCommands;
         private readonly SearchReplaceTabSyncController _tabSyncController;
         private readonly CompareTabController _compareTabController;
         private readonly RemoteWorkspaceService _remoteWorkspaceService;
@@ -30,7 +30,7 @@ namespace TxtAIEditor.Controls
             TabView secondaryTabView,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
-            TabCloseController tabCloseController,
+            ITabCloseCommands tabCloseCommands,
             SearchReplaceTabSyncController tabSyncController,
             CompareTabController compareTabController,
             RemoteWorkspaceService remoteWorkspaceService,
@@ -41,7 +41,7 @@ namespace TxtAIEditor.Controls
             _secondaryTabView = secondaryTabView;
             _tabBridges = tabBridges;
             _editorSessions = editorSessions;
-            _tabCloseController = tabCloseController;
+            _tabCloseCommands = tabCloseCommands;
             _tabSyncController = tabSyncController;
             _compareTabController = compareTabController;
             _remoteWorkspaceService = remoteWorkspaceService;
@@ -160,7 +160,7 @@ namespace TxtAIEditor.Controls
             var tabItem = FindTabItem(tab.Id);
             if (tabItem != null)
             {
-                _tabCloseController.CloseAndCleanup(tab, tabItem);
+                _tabCloseCommands.CloseAndCleanup(tab, tabItem);
             }
         }
 
@@ -228,7 +228,7 @@ namespace TxtAIEditor.Controls
                 var tabItem = FindTabItem(tab.Id);
                 if (tabItem != null)
                 {
-                    _tabCloseController.CloseAndCleanup(tab, tabItem);
+                    _tabCloseCommands.CloseAndCleanup(tab, tabItem);
                 }
 
                 if (!string.IsNullOrEmpty(tab.FilePath))

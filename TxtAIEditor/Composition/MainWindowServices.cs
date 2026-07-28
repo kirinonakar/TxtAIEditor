@@ -4,75 +4,63 @@ using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Composition
 {
-    public sealed class MainWindowServices
+    internal sealed record MainWindowCommonServices(
+        ISettingsService SettingsService,
+        ILocalizationService LocalizationService,
+        ILanguageDetectionService LanguageDetectionService);
+
+    internal sealed record MainWindowDocumentServices(
+        IFileService FileService,
+        IFileSaveDialogService FileSaveDialogService,
+        SecureNoteEncryptionService SecureNoteEncryptionService,
+        UnsavedChangesDialogService UnsavedChangesDialogService);
+
+    internal sealed record MainWindowWorkspaceServices(
+        IGitService GitService,
+        IRecentFilesService RecentFilesService,
+        IFileSearchService FileSearchService,
+        ExplorerDirectoryService ExplorerDirectoryService,
+        RemoteWorkspaceService RemoteWorkspaceService,
+        ArchiveExplorerService ArchiveExplorerService);
+
+    internal sealed record MainWindowEditorServices(
+        ISnippetService SnippetService,
+        PdfTextExtractionService PdfTextExtractionService);
+
+    internal sealed record MainWindowAgentServices(
+        ICredentialService CredentialService,
+        ILLMService LlmService);
+
+    internal sealed record MainWindowShellServices(
+        IStickyNoteService StickyNoteService,
+        ISettingsDialogService SettingsDialogService,
+        IUiPersonalizationService UiPersonalizationService,
+        CompareSelectionDialogService CompareSelectionDialogService);
+
+    internal sealed class MainWindowServices
     {
         private MainWindowServices(
-            IFileService fileService,
-            ISettingsService settingsService,
-            ICredentialService credentialService,
-            ILocalizationService localizationService,
-            ILLMService llmService,
-            IGitService gitService,
-            ISnippetService snippetService,
-            ILanguageDetectionService languageDetectionService,
-            IRecentFilesService recentFilesService,
-            IFileSearchService fileSearchService,
-            IStickyNoteService stickyNoteService,
-            ISettingsDialogService settingsDialogService,
-            IUiPersonalizationService uiPersonalizationService,
-            ExplorerDirectoryService explorerDirectoryService,
-            RemoteWorkspaceService remoteWorkspaceService,
-            ArchiveExplorerService archiveExplorerService,
-            PdfTextExtractionService pdfTextExtractionService,
-            SecureNoteEncryptionService secureNoteEncryptionService,
-            IFileSaveDialogService fileSaveDialogService,
-            CompareSelectionDialogService compareSelectionDialogService,
-            UnsavedChangesDialogService unsavedChangesDialogService)
+            MainWindowCommonServices common,
+            MainWindowDocumentServices documents,
+            MainWindowWorkspaceServices workspace,
+            MainWindowEditorServices editor,
+            MainWindowAgentServices agents,
+            MainWindowShellServices shell)
         {
-            FileService = fileService;
-            SettingsService = settingsService;
-            CredentialService = credentialService;
-            LocalizationService = localizationService;
-            LlmService = llmService;
-            GitService = gitService;
-            SnippetService = snippetService;
-            LanguageDetectionService = languageDetectionService;
-            RecentFilesService = recentFilesService;
-            FileSearchService = fileSearchService;
-            StickyNoteService = stickyNoteService;
-            SettingsDialogService = settingsDialogService;
-            UiPersonalizationService = uiPersonalizationService;
-            ExplorerDirectoryService = explorerDirectoryService;
-            RemoteWorkspaceService = remoteWorkspaceService;
-            ArchiveExplorerService = archiveExplorerService;
-            PdfTextExtractionService = pdfTextExtractionService;
-            SecureNoteEncryptionService = secureNoteEncryptionService;
-            FileSaveDialogService = fileSaveDialogService;
-            CompareSelectionDialogService = compareSelectionDialogService;
-            UnsavedChangesDialogService = unsavedChangesDialogService;
+            Common = common;
+            Documents = documents;
+            Workspace = workspace;
+            Editor = editor;
+            Agents = agents;
+            Shell = shell;
         }
 
-        public IFileService FileService { get; }
-        public ISettingsService SettingsService { get; }
-        public ICredentialService CredentialService { get; }
-        public ILocalizationService LocalizationService { get; }
-        public ILLMService LlmService { get; }
-        public IGitService GitService { get; }
-        public ISnippetService SnippetService { get; }
-        public ILanguageDetectionService LanguageDetectionService { get; }
-        public IRecentFilesService RecentFilesService { get; }
-        public IFileSearchService FileSearchService { get; }
-        public IStickyNoteService StickyNoteService { get; }
-        public ISettingsDialogService SettingsDialogService { get; }
-        public IUiPersonalizationService UiPersonalizationService { get; }
-        public ExplorerDirectoryService ExplorerDirectoryService { get; }
-        public RemoteWorkspaceService RemoteWorkspaceService { get; }
-        public ArchiveExplorerService ArchiveExplorerService { get; }
-        public PdfTextExtractionService PdfTextExtractionService { get; }
-        public SecureNoteEncryptionService SecureNoteEncryptionService { get; }
-        public IFileSaveDialogService FileSaveDialogService { get; }
-        public CompareSelectionDialogService CompareSelectionDialogService { get; }
-        public UnsavedChangesDialogService UnsavedChangesDialogService { get; }
+        public MainWindowCommonServices Common { get; }
+        public MainWindowDocumentServices Documents { get; }
+        public MainWindowWorkspaceServices Workspace { get; }
+        public MainWindowEditorServices Editor { get; }
+        public MainWindowAgentServices Agents { get; }
+        public MainWindowShellServices Shell { get; }
 
         public static MainWindowServices Create(Func<string, string, string> getString)
         {
@@ -99,27 +87,33 @@ namespace TxtAIEditor.Composition
             var unsavedChangesDialogService = new UnsavedChangesDialogService();
 
             return new MainWindowServices(
-                fileService,
-                settingsService,
-                credentialService,
-                localizationService,
-                llmService,
-                gitService,
-                snippetService,
-                languageDetectionService,
-                recentFilesService,
-                fileSearchService,
-                stickyNoteService,
-                settingsDialogService,
-                uiPersonalizationService,
-                explorerDirectoryService,
-                remoteWorkspaceService,
-                archiveExplorerService,
-                pdfTextExtractionService,
-                secureNoteEncryptionService,
-                fileSaveDialogService,
-                compareSelectionDialogService,
-                unsavedChangesDialogService);
+                new MainWindowCommonServices(
+                    settingsService,
+                    localizationService,
+                    languageDetectionService),
+                new MainWindowDocumentServices(
+                    fileService,
+                    fileSaveDialogService,
+                    secureNoteEncryptionService,
+                    unsavedChangesDialogService),
+                new MainWindowWorkspaceServices(
+                    gitService,
+                    recentFilesService,
+                    fileSearchService,
+                    explorerDirectoryService,
+                    remoteWorkspaceService,
+                    archiveExplorerService),
+                new MainWindowEditorServices(
+                    snippetService,
+                    pdfTextExtractionService),
+                new MainWindowAgentServices(
+                    credentialService,
+                    llmService),
+                new MainWindowShellServices(
+                    stickyNoteService,
+                    settingsDialogService,
+                    uiPersonalizationService,
+                    compareSelectionDialogService));
         }
     }
 }

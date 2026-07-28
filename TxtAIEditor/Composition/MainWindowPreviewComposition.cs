@@ -54,7 +54,8 @@ namespace TxtAIEditor.Composition
     {
         public static MainWindowPreviewControllers Compose(
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowDocumentServices documentServices,
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             TabNavigationController tabNavigation,
@@ -73,8 +74,8 @@ namespace TxtAIEditor.Composition
                 tabNavigation.GetOppositeTabView);
 
             var compareTab = new CompareTabController(
-                services.FileService,
-                services.SettingsService,
+                documentServices.FileService,
+                commonServices.SettingsService,
                 callbacks.LoadFileAsync,
                 viewModel,
                 ui.EditorWorkspace,
@@ -86,7 +87,7 @@ namespace TxtAIEditor.Composition
 
             var livePreview = new LivePreviewController(
                 ui.PreviewGrid,
-                services.SettingsService,
+                commonServices.SettingsService,
                 tabBridges,
                 tabNavigation.GetActiveTab,
                 getEditorSession,
@@ -100,7 +101,7 @@ namespace TxtAIEditor.Composition
                 callbacks.GetLocalizedString);
 
             var editorWebViewInitialization = new EditorWebViewInitializationController(
-                services.SettingsService,
+                commonServices.SettingsService,
                 livePreview);
 
             var editorLineNavigation = new EditorLineNavigationController(
@@ -108,21 +109,21 @@ namespace TxtAIEditor.Composition
                 tabBridges);
 
             var pdfViewer = new PdfViewerController(
-                services.SettingsService,
+                commonServices.SettingsService,
                 tabNavigation.GetActiveTab,
                 callbacks.UpdateRightPanelSelectionContext,
                 webViewShortcut.Handle,
                 callbacks.GetLocalizedString);
 
             var officeDocumentViewer = new OfficeDocumentViewerController(
-                services.SettingsService,
+                commonServices.SettingsService,
                 tabNavigation.GetActiveTab,
                 webViewShortcut.Handle,
                 callbacks.GetLocalizedString);
 
             var notebookKernelService = new JupyterNotebookKernelService(callbacks.GetLocalizedString);
             var notebookViewer = new JupyterNotebookViewerController(
-                services.SettingsService,
+                commonServices.SettingsService,
                 tabNavigation.GetActiveTab,
                 webViewShortcut.Handle,
                 callbacks.GetLocalizedString,

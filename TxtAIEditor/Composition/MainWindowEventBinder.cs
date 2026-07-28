@@ -11,8 +11,7 @@ namespace TxtAIEditor.Composition
         public static void Bind(
             MainWindowUiRefs ui,
             SearchReplaceController searchReplace,
-            TabMoveController tabMove,
-            TabCloseController tabClose,
+            MainWindowDocumentModule documents,
             MainWindowToolbarCommandController toolbarCommand,
             Action openNewTab,
             Func<Task> saveUiLayoutSettingsAsync)
@@ -50,9 +49,9 @@ namespace TxtAIEditor.Composition
             };
 
             ui.EditorWorkspace.PrimaryAddTabButtonClick += (_, _) => openNewTab();
-            ui.EditorWorkspace.PrimaryTabCloseRequested += (_, args) => tabClose.CloseRequested(args);
-            ui.EditorWorkspace.MoveTabLeftClick += (_, _) => tabMove.MoveLeft();
-            ui.EditorWorkspace.MoveTabRightClick += (_, _) => tabMove.MoveRight();
+            ui.EditorWorkspace.PrimaryTabCloseRequested += (_, args) => documents.CloseRequested(args);
+            ui.EditorWorkspace.MoveTabLeftClick += (_, _) => documents.MoveActiveTabLeft();
+            ui.EditorWorkspace.MoveTabRightClick += (_, _) => documents.MoveActiveTabRight();
             ui.EditorWorkspace.TerminalPanelHeightChanged += async (_, _) => await saveUiLayoutSettingsAsync();
 
             ui.PreviewGrid.ModelNameClick += (_, _) => toolbarCommand.ShowModelSettings();

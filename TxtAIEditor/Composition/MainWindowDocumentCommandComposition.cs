@@ -36,7 +36,9 @@ namespace TxtAIEditor.Composition
         public static MainWindowDocumentCommandControllers Compose(
             MainWindow window,
             MainWindowUiRefs ui,
-            MainWindowServices services,
+            MainWindowCommonServices commonServices,
+            MainWindowDocumentServices documentServices,
+            MainWindowWorkspaceServices workspaceServices,
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
@@ -52,11 +54,11 @@ namespace TxtAIEditor.Composition
         {
             var tabSave = new TabSaveController(
                 window,
-                services.FileService,
-                services.FileSaveDialogService,
-                services.SecureNoteEncryptionService,
-                services.RemoteWorkspaceService,
-                services.LanguageDetectionService,
+                documentServices.FileService,
+                documentServices.FileSaveDialogService,
+                documentServices.SecureNoteEncryptionService,
+                workspaceServices.RemoteWorkspaceService,
+                commonServices.LanguageDetectionService,
                 statusBar,
                 tabNavigation.IsOpen,
                 tabId => editorSessions.TryGetValue(tabId, out var session) ? session : null,
@@ -74,7 +76,7 @@ namespace TxtAIEditor.Composition
 
             var autoSave = new AutoSaveController(
                 viewModel,
-                () => services.SettingsService.CurrentSettings,
+                () => commonServices.SettingsService.CurrentSettings,
                 callbacks.GetCurrentRepoPath,
                 callbacks.GetSearchRoot,
                 tabSave.SaveAsync);
@@ -86,7 +88,7 @@ namespace TxtAIEditor.Composition
                 tabBridges,
                 editorSessions,
                 livePreview,
-                services.UnsavedChangesDialogService,
+                documentServices.UnsavedChangesDialogService,
                 () => ui.RootElement.XamlRoot,
                 callbacks.GetCurrentElementTheme,
                 callbacks.GetLocalizedString,
@@ -105,7 +107,7 @@ namespace TxtAIEditor.Composition
 
             var windowClose = new WindowCloseController(
                 viewModel,
-                services.UnsavedChangesDialogService,
+                documentServices.UnsavedChangesDialogService,
                 callbacks.SaveUiLayoutSettingsAsync,
                 () => ui.RootElement.XamlRoot,
                 callbacks.GetCurrentElementTheme,

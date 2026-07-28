@@ -13,7 +13,7 @@ namespace TxtAIEditor.Controls
         private readonly UIElement _titleBar;
         private readonly TerminalShortcutService _terminalShortcutService;
         private readonly FunctionKeyShortcutService _functionKeyShortcutService;
-        private readonly AutoSaveController _autoSaveController;
+        private readonly IAutoSaveLifecycle _autoSaveLifecycle;
         private readonly DispatcherTimer _gitAutoRefreshTimer;
         private readonly EditorWorkspacePane _editorWorkspace;
         private readonly IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
@@ -24,7 +24,7 @@ namespace TxtAIEditor.Controls
             UIElement titleBar,
             TerminalShortcutService terminalShortcutService,
             FunctionKeyShortcutService functionKeyShortcutService,
-            AutoSaveController autoSaveController,
+            IAutoSaveLifecycle autoSaveLifecycle,
             DispatcherTimer gitAutoRefreshTimer,
             EditorWorkspacePane editorWorkspace,
             IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
@@ -34,7 +34,7 @@ namespace TxtAIEditor.Controls
             _titleBar = titleBar;
             _terminalShortcutService = terminalShortcutService;
             _functionKeyShortcutService = functionKeyShortcutService;
-            _autoSaveController = autoSaveController;
+            _autoSaveLifecycle = autoSaveLifecycle;
             _gitAutoRefreshTimer = gitAutoRefreshTimer;
             _editorWorkspace = editorWorkspace;
             _tabBridges = tabBridges;
@@ -96,7 +96,7 @@ namespace TxtAIEditor.Controls
             RunCleanup(StopShortcuts, suppressErrors);
             RunCleanup(() =>
             {
-                _autoSaveController.Stop();
+                _autoSaveLifecycle.Stop();
                 _gitAutoRefreshTimer.Stop();
             }, suppressErrors);
             RunCleanup(_editorWorkspace.StopAllTerminalSessions, suppressErrors);
