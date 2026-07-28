@@ -1208,13 +1208,22 @@ function measureRenderedRows(renderOnChange = true) {
     const anchorLine = lineAt(scrollContainer.scrollTop);
     const anchorOffset = scrollContainer.scrollTop - lineTop(anchorLine);
     const oldEditingLineTop = state.editingLine ? lineTop(state.editingLine) : null;
+    const containerRect = scrollContainer.getBoundingClientRect();
     let changed = false;
     for (const row of viewport.querySelectorAll('.line-row')) {
         const lineNumber = Number(row.dataset.line || 0);
         if (!lineNumber) continue;
+        const rowRect = row.getBoundingClientRect();
+        // Live preview keeps a large lookbehind window in the DOM. Its first
+        // line can move into the middle of a merged Markdown block as the
+        // virtual window advances, so rows far above the viewport may have a
+        // different temporary shape. Re-measuring those rows moves the current
+        // scroll anchor by their accumulated delta and can make the viewport
+        // oscillate at a render-window boundary.
+        if (rowRect.bottom <= containerRect.top) continue;
         const isSkipped = row.classList.contains('live-preview-skipped');
         const minimum = isSkipped ? 0 : state.lineHeight;
-        const measuredHeight = Math.max(row.getBoundingClientRect().height || 0, row.scrollHeight || 0);
+        const measuredHeight = Math.max(rowRect.height || 0, row.scrollHeight || 0);
         const measured = Math.max(minimum, Math.ceil(measuredHeight));
         if (setMeasuredLineHeight(lineNumber, measured)) {
             changed = true;
