@@ -96,8 +96,15 @@ namespace TxtAIEditor.Controls
                     tab.EncryptionPassword = password;
                     ApplyTabReloadState(tab, encryptedModel, "UTF-8", false);
 
-                    var encryptedSession = new EditorDocumentSession(tab, encryptedModel);
-                    _editorSessions[tab.Id] = encryptedSession;
+                    if (!_editorSessions.TryGetValue(tab.Id, out var encryptedSession))
+                    {
+                        encryptedSession = new EditorDocumentSession(tab, encryptedModel);
+                        _editorSessions[tab.Id] = encryptedSession;
+                    }
+                    else
+                    {
+                        encryptedSession.UpdateModelFromSync(encryptedModel);
+                    }
                     await InitializeBridgeModelAsync(tab, encryptedSession, isReadOnly);
                     CompleteEncodingReload(tab);
                     return;
@@ -110,8 +117,15 @@ namespace TxtAIEditor.Controls
                     readResult.EncodingName,
                     readResult.EncodingWasAutoDetected);
 
-                var session = new EditorDocumentSession(tab, readResult.Model);
-                _editorSessions[tab.Id] = session;
+                if (!_editorSessions.TryGetValue(tab.Id, out var session))
+                {
+                    session = new EditorDocumentSession(tab, readResult.Model);
+                    _editorSessions[tab.Id] = session;
+                }
+                else
+                {
+                    session.UpdateModelFromSync(readResult.Model);
+                }
                 await InitializeBridgeModelAsync(tab, session, isReadOnly);
                 CompleteEncodingReload(tab);
             }
@@ -157,7 +171,7 @@ namespace TxtAIEditor.Controls
                         docxSession.UpdateContentFromSync(extractedText);
                     }
 
-                    await SetBridgeTextAsync(tab, extractedText);
+                    await ResynchronizeBridgeAsync(tab, extractedText);
                     CompleteDiskReload(tab);
                     return;
                 }
@@ -180,13 +194,12 @@ namespace TxtAIEditor.Controls
                         encryptedSession.UpdateContentFromSync(decryptedText);
                     }
 
-                    await SetBridgeTextAsync(tab, decryptedText);
+                    await ResynchronizeBridgeAsync(tab, decryptedText);
                     CompleteDiskReload(tab);
                     return;
                 }
 
                 var readResult = await LineArrayTextModel.LoadFromFileAsync(tab.FilePath, "Auto");
-                string content = readResult.Model.GetText();
                 ApplyTabReloadState(
                     tab,
                     readResult.Model,
@@ -195,10 +208,10 @@ namespace TxtAIEditor.Controls
 
                 if (_editorSessions.TryGetValue(tab.Id, out var session))
                 {
-                    session.UpdateContentFromSync(content);
+                    session.UpdateModelFromSync(readResult.Model);
                 }
 
-                await SetBridgeTextAsync(tab, content);
+                await ResynchronizeBridgeAsync(tab);
                 CompleteDiskReload(tab);
             }
             catch (Exception ex)
@@ -229,7 +242,6 @@ namespace TxtAIEditor.Controls
 
             byte[] bytes = await _archiveExplorerService.ReadEntryBytesAsync(tab.ArchiveSourcePath, tab.ArchiveEntryPath);
             var readResult = LoadArchiveTextEntry(bytes, encodingName);
-            string content = readResult.Model.GetText();
             ApplyTabReloadState(
                 tab,
                 readResult.Model,
@@ -241,8 +253,15 @@ namespace TxtAIEditor.Controls
                 tab.ArchiveSourcePath,
                 ArchiveExplorerService.NormalizeEntryPath(tab.ArchiveEntryPath));
 
-            var session = new EditorDocumentSession(tab, readResult.Model);
-            _editorSessions[tab.Id] = session;
+            if (!_editorSessions.TryGetValue(tab.Id, out var session))
+            {
+                session = new EditorDocumentSession(tab, readResult.Model);
+                _editorSessions[tab.Id] = session;
+            }
+            else
+            {
+                session.UpdateModelFromSync(readResult.Model);
+            }
             await InitializeBridgeModelAsync(tab, session, isReadOnly: true);
             CompleteEncodingReload(tab);
         }
@@ -304,18 +323,24 @@ namespace TxtAIEditor.Controls
             CompleteDiskReload(tab);
         }
 
-        private async Task SetBridgeTextAsync(OpenedTab tab, string text)
+        private async Task ResynchronizeBridgeAsync(
+            OpenedTab tab,
+            string? fallbackText = null)
         {
             if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
             {
                 _editorSessions.TryGetValue(tab.Id, out var session);
-                await bridgeGroup.Bridge.SetTextAsync(
-                    text,
-                    shouldFocus: true,
-                    session?.DocumentId,
-                    session?.DocumentVersion,
-                    tab.Id);
-                session?.MarkViewSynchronized(session.DocumentVersion);
+                if (session != null)
+                {
+                    await bridgeGroup.Bridge.ResynchronizeModelAsync(session);
+                }
+                else if (fallbackText != null)
+                {
+                    await bridgeGroup.Bridge.SetTextAsync(
+                        fallbackText,
+                        shouldFocus: true,
+                        viewId: tab.Id);
+                }
             }
         }
 

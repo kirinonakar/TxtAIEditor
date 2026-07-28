@@ -74,7 +74,7 @@ namespace TxtAIEditor.Controls
                     Math.Min(Math.Max(0, request.BaseVersion), session.DocumentVersion),
                     Change: null);
                 await bridge.SendEditRejectedAsync(invalidResult);
-                await ResynchronizeRejectedEditAsync(bridge, tab, session);
+                await ResynchronizeRejectedEditAsync(bridge, session);
                 return;
             }
 
@@ -82,7 +82,7 @@ namespace TxtAIEditor.Controls
             if (!result.IsAccepted)
             {
                 await bridge.SendEditRejectedAsync(result);
-                await ResynchronizeRejectedEditAsync(bridge, tab, session);
+                await ResynchronizeRejectedEditAsync(bridge, session);
                 return;
             }
 
@@ -345,15 +345,9 @@ namespace TxtAIEditor.Controls
 
         private static Task ResynchronizeRejectedEditAsync(
             CustomEditorBridge bridge,
-            OpenedTab tab,
             EditorDocumentSession session)
         {
-            return bridge.SetTextAsync(
-                session.GetText(),
-                shouldFocus: false,
-                session.DocumentId,
-                session.DocumentVersion,
-                tab.Id);
+            return bridge.ResynchronizeModelAsync(session);
         }
 
         private void MarkDirty(OpenedTab tab, TabViewItem tabItem)

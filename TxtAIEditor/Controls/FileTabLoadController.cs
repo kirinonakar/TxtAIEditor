@@ -282,12 +282,22 @@ namespace TxtAIEditor.Controls
         private OpenedTab? FocusExistingTab(string filePath)
         {
             string extension = Path.GetExtension(filePath);
+            string normalizedFilePath = NormalizePathForComparison(filePath);
             bool isHexDefault = extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
                                 extension.Equals(".dll", StringComparison.OrdinalIgnoreCase);
             var existingTab = _viewModel.Tabs.FirstOrDefault(t =>
                 isHexDefault
-                    ? (t.IsHexViewer && string.Equals(t.HexSourceFilePath, filePath, StringComparison.OrdinalIgnoreCase))
-                    : string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+                    ? (t.IsHexViewer &&
+                       !string.IsNullOrWhiteSpace(t.HexSourceFilePath) &&
+                       string.Equals(
+                           NormalizePathForComparison(t.HexSourceFilePath),
+                           normalizedFilePath,
+                           StringComparison.OrdinalIgnoreCase))
+                    : (!string.IsNullOrWhiteSpace(t.FilePath) &&
+                       string.Equals(
+                           NormalizePathForComparison(t.FilePath),
+                           normalizedFilePath,
+                           StringComparison.OrdinalIgnoreCase)));
             if (existingTab == null)
             {
                 return null;

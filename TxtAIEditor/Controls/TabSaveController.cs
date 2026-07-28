@@ -33,6 +33,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Action<string, string> _showErrorMessage;
         private readonly Func<OpenedTab, Task<bool>>? _saveNotebookAsync;
+        private readonly SaveCoordinator _saveCoordinator = new();
 
         public TabSaveController(
             Window owner,
@@ -78,7 +79,10 @@ namespace TxtAIEditor.Controls
             _saveNotebookAsync = saveNotebookAsync;
         }
 
-        public async Task<bool> SaveAsync(OpenedTab tab)
+        public Task<bool> SaveAsync(OpenedTab tab) =>
+            _saveCoordinator.RunAsync(tab, () => SaveCoreAsync(tab));
+
+        private async Task<bool> SaveCoreAsync(OpenedTab tab)
         {
             if (!_isTabOpen(tab))
             {
@@ -126,7 +130,10 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public async Task<bool> SaveAsAsync(OpenedTab tab)
+        public Task<bool> SaveAsAsync(OpenedTab tab) =>
+            _saveCoordinator.RunAsync(tab, () => SaveAsCoreAsync(tab));
+
+        private async Task<bool> SaveAsCoreAsync(OpenedTab tab)
         {
             if (!_isTabOpen(tab))
             {

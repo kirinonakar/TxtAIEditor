@@ -24,6 +24,12 @@ namespace TxtAIEditor.Editor
         private string? _pendingSetTextViewId;
         private bool _isSplitView = false;
         private string _currentLanguage = "plaintext";
+        private EditorSettings? _modelSettings;
+        private bool _modelIsReadOnly;
+        private bool? _modelInlineLivePreviewEnabled;
+        private string? _modelLivePreviewBaseHref;
+        private int _modelWarmupLineCount = 200;
+        private int _firstVisibleLine = 1;
         private readonly object _flushLock = new object();
         private readonly Dictionary<int, TaskCompletionSource<long>> _pendingFlushRequests = new Dictionary<int, TaskCompletionSource<long>>();
         private int _flushRequestSeq = 0;
@@ -55,6 +61,7 @@ namespace TxtAIEditor.Editor
             _messageRouter = new CustomEditorMessageRouter(webView, SendMessageAsync);
             _messageRouter.ReadyReceived += HandleEditorReady;
             _messageRouter.FlushCompleted += HandleFlushCompleted;
+            _messageRouter.ScrollChanged += HandleScrollChanged;
         }
 
         public async Task InitializeAsync()
@@ -130,9 +137,19 @@ namespace TxtAIEditor.Editor
             long documentVersion = 0,
             string? viewId = null,
             bool? inlineLivePreviewEnabled = null,
-            string? livePreviewBaseHref = null)
+            string? livePreviewBaseHref = null,
+            int initialStartLine = 1,
+            bool isResynchronization = false)
         {
             _currentLanguage = string.IsNullOrWhiteSpace(language) ? "plaintext" : language;
+            _modelSettings = settings;
+            _modelIsReadOnly = isReadOnly;
+            _modelInlineLivePreviewEnabled = inlineLivePreviewEnabled;
+            _modelLivePreviewBaseHref = livePreviewBaseHref;
+            if (!isResynchronization && initialLines is { Count: > 0 })
+            {
+                _modelWarmupLineCount = initialLines.Count;
+            }
             _messageRouter.SetDocumentContext(documentId, viewId);
             object message = CustomEditorMessageFactory.CreateInitializeModel(
                 lineCount,
@@ -146,6 +163,8 @@ namespace TxtAIEditor.Editor
                 _isSplitView,
                 inlineLivePreviewEnabled,
                 livePreviewBaseHref,
+                initialStartLine,
+                isResynchronization,
                 _localizationService);
             await SendMessageAsync(message);
 
@@ -155,6 +174,36 @@ namespace TxtAIEditor.Editor
             {
                 await SendMessageAsync(new { action = "updateDirtyLines", dirtyLines = _currentDirtyLines });
             }
+        }
+
+        public async Task ResynchronizeModelAsync(EditorDocumentSession session)
+        {
+            if (_modelSettings == null)
+            {
+                return;
+            }
+
+            int lineCount = Math.Max(1, session.Model.LineCount);
+            int warmupLineCount = Math.Max(1, _modelWarmupLineCount);
+            int initialStartLine = Math.Clamp(
+                _firstVisibleLine - (warmupLineCount / 4),
+                1,
+                Math.Max(1, lineCount - warmupLineCount + 1));
+
+            await InitializeModelAsync(
+                lineCount,
+                _currentLanguage,
+                _modelSettings,
+                _modelIsReadOnly,
+                session.GetLines(initialStartLine, warmupLineCount),
+                session.DocumentId,
+                session.DocumentVersion,
+                session.ViewId,
+                _modelInlineLivePreviewEnabled,
+                _modelLivePreviewBaseHref,
+                initialStartLine,
+                isResynchronization: true);
+            session.MarkViewSynchronized(session.DocumentVersion);
         }
 
         public async Task SendLinesAsync(int requestId, int startLine, IReadOnlyList<string> lines)
@@ -656,6 +705,11 @@ namespace TxtAIEditor.Editor
             }
 
             pending?.TrySetResult(documentVersion);
+        }
+
+        private void HandleScrollChanged(int firstLine, double offset)
+        {
+            _firstVisibleLine = Math.Max(1, firstLine);
         }
     }
 }

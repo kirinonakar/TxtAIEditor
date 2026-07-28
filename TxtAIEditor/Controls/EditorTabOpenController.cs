@@ -200,9 +200,49 @@ namespace TxtAIEditor.Controls
                 encryptionPassword);
             var tab = documentParts.Tab;
             var session = documentParts.Session;
+            ShareExistingFileDocument(tab, session);
             OpenEditorDocumentTab(tab, session, documentParts.IsReadOnly, updateLanguageUi: false, targetIndex: targetIndex);
 
             return tab;
+        }
+
+        private void ShareExistingFileDocument(
+            OpenedTab tab,
+            EditorDocumentSession session)
+        {
+            if (string.IsNullOrWhiteSpace(tab.FilePath) ||
+                session.Model is HexDumpTextModel)
+            {
+                return;
+            }
+
+            string pathKey = NormalizePathForDocumentSharing(tab.FilePath);
+            EditorDocumentSession? existingSession = _editorSessions.Values.FirstOrDefault(candidate =>
+                candidate.Model is not HexDumpTextModel &&
+                candidate.Tab.IsEncrypted == tab.IsEncrypted &&
+                !string.IsNullOrWhiteSpace(candidate.Tab.FilePath) &&
+                string.Equals(
+                    NormalizePathForDocumentSharing(candidate.Tab.FilePath),
+                    pathKey,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (existingSession != null)
+            {
+                session.ShareDocumentWith(existingSession);
+            }
+        }
+
+        private static string NormalizePathForDocumentSharing(string filePath)
+        {
+            try
+            {
+                return Path.GetFullPath(filePath)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+            catch
+            {
+                return filePath;
+            }
         }
 
         public OpenedTab OpenHexTab(string filePath)

@@ -26,11 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Action? _updateWindowTitle;
         private readonly JupyterNotebookViewerService _viewerService;
         private readonly JupyterNotebookKernelService _kernelService;
-        private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
-        private readonly Dictionary<string, string> _viewerHtmlPaths = new Dictionary<string, string>();
-        private readonly Dictionary<string, string> _tabPythonExecutables = new Dictionary<string, string>();
-        private readonly Dictionary<string, string> _tabWorkingDirectories = new Dictionary<string, string>();
-        private readonly Dictionary<WebView2, string> _webViewToTabId = new Dictionary<WebView2, string>();
+        private readonly Dictionary<string, NotebookSession> _sessions = new();
 
         public JupyterNotebookViewerController(
             ISettingsService settingsService,
@@ -51,9 +47,6 @@ namespace TxtAIEditor.Controls
 
         public void Register(OpenedTab tab, WebView2 webView)
         {
-            _viewerWebViews[tab.Id] = webView;
-            _webViewToTabId[webView] = tab.Id;
-
             string? dir = null;
             if (!string.IsNullOrEmpty(tab.FilePath))
             {
@@ -61,10 +54,19 @@ namespace TxtAIEditor.Controls
             }
             dir ??= Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-            _tabWorkingDirectories[tab.Id] = dir;
-            _tabPythonExecutables[tab.Id] = _kernelService.ResolvePythonExecutable(dir);
+            if (_sessions.Remove(tab.Id, out NotebookSession? existingSession))
+            {
+                _ = existingSession.DisposeAsync();
+            }
 
-            _ = InitializeAsync(tab, webView);
+            var session = new NotebookSession(
+                tab.Id,
+                webView,
+                _kernelService.ResolvePythonExecutable(dir),
+                dir);
+            _sessions[tab.Id] = session;
+
+            _ = InitializeAsync(tab, session);
         }
 
         public bool IsActiveViewer()
@@ -76,12 +78,13 @@ namespace TxtAIEditor.Controls
         {
             var activeTab = _activeTabProvider();
             if (activeTab?.IsNotebookViewer != true ||
-                !_viewerWebViews.TryGetValue(activeTab.Id, out var webView) ||
-                webView.CoreWebView2 == null)
+                !_sessions.TryGetValue(activeTab.Id, out var session) ||
+                session.WebView.CoreWebView2 == null)
             {
                 return false;
             }
 
+            WebView2 webView = session.WebView;
             webView.Focus(FocusState.Programmatic);
             await ExecuteScriptSafeAsync(
                 webView,
@@ -91,20 +94,24 @@ namespace TxtAIEditor.Controls
 
         public async Task ApplyMarkdownCommandAsync(string tabId, string command, string? color = null)
         {
-            if (_viewerWebViews.TryGetValue(tabId, out var webView) && webView.CoreWebView2 != null)
+            if (_sessions.TryGetValue(tabId, out var session) &&
+                session.WebView.CoreWebView2 != null)
             {
+                WebView2 webView = session.WebView;
                 var payload = JsonSerializer.Serialize(new { command, color });
                 await webView.CoreWebView2.ExecuteScriptAsync($"window.dispatchEvent(new CustomEvent('appMarkdownCommand', {{ detail: {payload} }}));");
                 webView.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
             }
         }
-public async Task<bool> SaveAsync(OpenedTab tab)
+        public async Task<bool> SaveAsync(OpenedTab tab)
         {
-            if (!tab.IsNotebookViewer || !_viewerWebViews.TryGetValue(tab.Id, out var webView))
+            if (!tab.IsNotebookViewer ||
+                !_sessions.TryGetValue(tab.Id, out var session))
             {
                 return false;
             }
 
+            WebView2 webView = session.WebView;
             if (webView.CoreWebView2 == null || string.IsNullOrEmpty(tab.FilePath))
             {
                 return false;
@@ -145,61 +152,60 @@ public async Task<bool> SaveAsync(OpenedTab tab)
 
         public bool Reload(OpenedTab tab)
         {
-            if (!tab.IsNotebookViewer || !_viewerWebViews.TryGetValue(tab.Id, out var webView))
+            if (!tab.IsNotebookViewer ||
+                !_sessions.TryGetValue(tab.Id, out var session))
             {
                 return false;
             }
 
             tab.IsDirty = false;
-            _ = NavigateAsync(tab, webView);
+            _ = NavigateAsync(tab, session);
             return true;
         }
 
         public void Close(string tabId)
         {
-            if (_viewerWebViews.TryGetValue(tabId, out var webView))
+            if (_sessions.Remove(tabId, out NotebookSession? session))
             {
-                webView.Close();
-                _viewerWebViews.Remove(tabId);
+                _ = session.DisposeAsync();
             }
-
-            _kernelService.CloseSession(tabId);
-            _tabPythonExecutables.Remove(tabId);
-            _tabWorkingDirectories.Remove(tabId);
-            DeleteViewerHtml(tabId);
         }
 
         public void ApplyPreferredColorScheme(string theme)
         {
-            foreach (var webView in _viewerWebViews.Values)
+            foreach (NotebookSession session in _sessions.Values)
             {
-                WebViewAppearanceService.ApplyPreferredColorScheme(webView?.CoreWebView2, theme);
+                WebViewAppearanceService.ApplyPreferredColorScheme(
+                    session.WebView.CoreWebView2,
+                    theme);
             }
         }
 
-        private async Task InitializeAsync(OpenedTab tab, WebView2 webView)
+        private async Task InitializeAsync(OpenedTab tab, NotebookSession session)
         {
             try
             {
+                WebView2 webView = session.WebView;
                 var env = await WebViewEnvironmentProvider.GetSharedAsync();
                 await webView.EnsureCoreWebView2Async(env);
 
-                if (!_viewerWebViews.TryGetValue(tab.Id, out var registeredWebView) ||
-                    !ReferenceEquals(registeredWebView, webView))
+                if (!_sessions.TryGetValue(tab.Id, out var registeredSession) ||
+                    !ReferenceEquals(registeredSession, session))
                 {
                     return;
                 }
 
-                await ConfigureAsync(webView);
-                await NavigateAsync(tab, webView);
+                await ConfigureAsync(session);
+                await NavigateAsync(tab, session);
             }
             catch
             {
             }
         }
 
-        private async Task ConfigureAsync(WebView2 webView)
+        private async Task ConfigureAsync(NotebookSession session)
         {
+            WebView2 webView = session.WebView;
             if (webView.CoreWebView2 == null)
             {
                 return;
@@ -214,15 +220,24 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 PreviewWebResourceService.ResourceHostName,
                 PreviewWebResourceService.WebResourcesPath,
                 CoreWebView2HostResourceAccessKind.Allow);
-            webView.WebMessageReceived += OnWebMessageReceived;
+            void OnSessionWebMessageReceived(
+                WebView2 sender,
+                CoreWebView2WebMessageReceivedEventArgs args) =>
+                OnWebMessageReceived(session, args);
+            webView.WebMessageReceived += OnSessionWebMessageReceived;
+            session.AttachWebMessageHandler(
+                () => webView.WebMessageReceived -= OnSessionWebMessageReceived);
             WebViewAppearanceService.ApplyPreferredColorScheme(webView.CoreWebView2, _settingsService.CurrentSettings.Theme);
             await InstallShortcutBridgeAsync(webView);
         }
 
-        private void OnWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+        private void OnWebMessageReceived(
+            NotebookSession session,
+            CoreWebView2WebMessageReceivedEventArgs args)
         {
             try
             {
+                WebView2 sender = session.WebView;
                 string raw = MainWindowMessageJson.Normalize(args);
                 if (string.IsNullOrWhiteSpace(raw))
                 {
@@ -238,13 +253,8 @@ public async Task<bool> SaveAsync(OpenedTab tab)
 
                 string type = typeProp.GetString() ?? string.Empty;
 
-                if (!_webViewToTabId.TryGetValue(sender, out string? tabId))
-                {
-                    return;
-                }
-
                 var tab = _activeTabProvider();
-                if (tab == null || tab.Id != tabId)
+                if (tab == null || tab.Id != session.TabId)
                 {
                     return;
                 }
@@ -253,20 +263,20 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                 {
                     string code = root.TryGetProperty("code", out var c) ? c.GetString() ?? "" : "";
                     int cellIndex = root.TryGetProperty("cellIndex", out var ci) ? ci.GetInt32() : 0;
-                    _ = ExecuteCellAsync(sender, tab, cellIndex, code);
+                    _ = ExecuteCellAsync(session, cellIndex, code);
                 }
                 else if (string.Equals(type, "stopExecution", StringComparison.Ordinal))
                 {
-                    _kernelService.InterruptSession(tab.Id);
+                    session.InterruptKernel();
                 }
                 else if (string.Equals(type, "inputReply", StringComparison.Ordinal))
                 {
                     string val = root.TryGetProperty("value", out var vVal) ? vVal.GetString() ?? "" : "";
-                    _ = _kernelService.SendInputReplyAsync(tab.Id, val);
+                    _ = session.SendInputReplyAsync(val);
                 }
                 else if (string.Equals(type, "getVariables", StringComparison.Ordinal))
                 {
-                    _ = GetVariablesAsync(sender, tab);
+                    _ = GetVariablesAsync(session);
                 }
                 else if (string.Equals(type, "updatePlotView", StringComparison.Ordinal))
                 {
@@ -276,7 +286,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     double panFracX = root.TryGetProperty("panFracX", out var pfx3d) ? pfx3d.GetDouble() : 0.0;
                     double panFracY = root.TryGetProperty("panFracY", out var pfy3d) ? pfy3d.GetDouble() : 0.0;
                     double zoom = root.TryGetProperty("zoom", out var z3d) ? z3d.GetDouble() : 1.0;
-                    _ = UpdatePlotViewAsync(sender, tab, figId, elev, azim, panFracX, panFracY, zoom);
+                    _ = UpdatePlotViewAsync(session, figId, elev, azim, panFracX, panFracY, zoom);
                 }
                 else if (string.Equals(type, "update2DView", StringComparison.Ordinal))
                 {
@@ -284,7 +294,7 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     double panFracX = root.TryGetProperty("panFracX", out var pfx) ? pfx.GetDouble() : 0.0;
                     double panFracY = root.TryGetProperty("panFracY", out var pfy) ? pfy.GetDouble() : 0.0;
                     double zoom = root.TryGetProperty("zoom", out var z) ? z.GetDouble() : 1.0;
-                    _ = Update2DViewAsync(sender, tab, figId, panFracX, panFracY, zoom);
+                    _ = Update2DViewAsync(session, figId, panFracX, panFracY, zoom);
                 }
                 else if (string.Equals(type, "saveNotebook", StringComparison.Ordinal))
                 {
@@ -324,17 +334,27 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             }
         }
 
-        private async Task UpdatePlotViewAsync(WebView2 webView, OpenedTab tab, string figId, double elev, double azim, double panFracX, double panFracY, double zoom)
+        private async Task UpdatePlotViewAsync(
+            NotebookSession session,
+            string figId,
+            double elev,
+            double azim,
+            double panFracX,
+            double panFracY,
+            double zoom)
         {
             try
             {
-                if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
-                    !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
-                {
-                    return;
-                }
-
-                string html = await _kernelService.UpdatePlotViewAsync(tab.Id, python, workDir, figId, elev, azim, panFracX, panFracY, zoom);
+                WebView2 webView = session.WebView;
+                string html = await session.RunKernelAsync(
+                    _kernelService,
+                    kernel => kernel.UpdatePlotViewAsync(
+                        figId,
+                        elev,
+                        azim,
+                        panFracX,
+                        panFracY,
+                        zoom));
                 if (!string.IsNullOrEmpty(html))
                 {
                     string js = $"window.__notebookReceivePlotUpdate && window.__notebookReceivePlotUpdate({JsonSerializer.Serialize(figId)}, {JsonSerializer.Serialize(html)});";
@@ -351,17 +371,23 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             catch { }
         }
 
-        private async Task Update2DViewAsync(WebView2 webView, OpenedTab tab, string figId, double panFracX, double panFracY, double zoom)
+        private async Task Update2DViewAsync(
+            NotebookSession session,
+            string figId,
+            double panFracX,
+            double panFracY,
+            double zoom)
         {
             try
             {
-                if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
-                    !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
-                {
-                    return;
-                }
-
-                string html = await _kernelService.Update2DViewAsync(tab.Id, python, workDir, figId, panFracX, panFracY, zoom);
+                WebView2 webView = session.WebView;
+                string html = await session.RunKernelAsync(
+                    _kernelService,
+                    kernel => kernel.Update2DViewAsync(
+                        figId,
+                        panFracX,
+                        panFracY,
+                        zoom));
                 if (!string.IsNullOrEmpty(html))
                 {
                     string js = $"window.__notebookReceivePlotUpdate && window.__notebookReceivePlotUpdate({JsonSerializer.Serialize(figId)}, {JsonSerializer.Serialize(html)});";
@@ -378,30 +404,29 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             catch { }
         }
 
-        private async Task ExecuteCellAsync(WebView2 webView, OpenedTab tab, int cellIndex, string code)
+        private async Task ExecuteCellAsync(
+            NotebookSession session,
+            int cellIndex,
+            string code)
         {
+            WebView2 webView = session.WebView;
             try
             {
-                if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
-                    !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
-                {
-                    await SendResultAsync(webView, cellIndex, "error", "", "Kernel session not found.", "", "[]");
-                    return;
-                }
-
-                var result = await _kernelService.ExecuteAsync(tab.Id, python, workDir, code, async (prompt) =>
-                {
-                    string script = $"window.__notebookReceiveInputRequest && window.__notebookReceiveInputRequest({cellIndex}, {JsonSerializer.Serialize(prompt)});";
-                    webView.DispatcherQueue.TryEnqueue(async () =>
+                var result = await session.RunKernelAsync(
+                    _kernelService,
+                    kernel => kernel.ExecuteAsync(code, async (prompt) =>
                     {
-                        try { await webView.ExecuteScriptAsync(script); } catch { }
-                    });
-                    await Task.CompletedTask;
-                }, async (streamName, streamText) =>
-                {
-                    string script = $"window.__notebookReceiveStreamOutput && window.__notebookReceiveStreamOutput({cellIndex}, {JsonSerializer.Serialize(streamName)}, {JsonSerializer.Serialize(streamText)});";
-                    await ExecuteScriptOnDispatcherAsync(webView, script);
-                });
+                        string script = $"window.__notebookReceiveInputRequest && window.__notebookReceiveInputRequest({cellIndex}, {JsonSerializer.Serialize(prompt)});";
+                        webView.DispatcherQueue.TryEnqueue(async () =>
+                        {
+                            try { await webView.ExecuteScriptAsync(script); } catch { }
+                        });
+                        await Task.CompletedTask;
+                    }, async (streamName, streamText) =>
+                    {
+                        string script = $"window.__notebookReceiveStreamOutput && window.__notebookReceiveStreamOutput({cellIndex}, {JsonSerializer.Serialize(streamName)}, {JsonSerializer.Serialize(streamText)});";
+                        await ExecuteScriptOnDispatcherAsync(webView, script);
+                    }));
 
                 await SendResultAsync(webView, cellIndex, result.Status, result.Stdout, result.Stderr, result.Result, result.VariablesJson);
             }
@@ -411,18 +436,14 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             }
         }
 
-        private async Task GetVariablesAsync(WebView2 webView, OpenedTab tab)
+        private async Task GetVariablesAsync(NotebookSession session)
         {
+            WebView2 webView = session.WebView;
             try
             {
-                if (!_tabPythonExecutables.TryGetValue(tab.Id, out var python) ||
-                    !_tabWorkingDirectories.TryGetValue(tab.Id, out var workDir))
-                {
-                    await SendVariablesAsync(webView, "[]");
-                    return;
-                }
-
-                string varsJson = await _kernelService.GetVariablesAsync(tab.Id, python, workDir);
+                string varsJson = await session.RunKernelAsync(
+                    _kernelService,
+                    kernel => kernel.GetVariablesAsync());
                 await SendVariablesAsync(webView, varsJson);
             }
             catch
@@ -540,9 +561,10 @@ public async Task<bool> SaveAsync(OpenedTab tab)
                     byte[] bytes = Convert.FromBase64String(base64);
 
                     string? dir = null;
-                    if (_tabWorkingDirectories.TryGetValue(tab.Id, out var targetDir) && !string.IsNullOrEmpty(targetDir) && Directory.Exists(targetDir))
+                    if (_sessions.TryGetValue(tab.Id, out NotebookSession? session) &&
+                        Directory.Exists(session.WorkingDirectory))
                     {
-                        dir = targetDir;
+                        dir = session.WorkingDirectory;
                     }
                     else if (!string.IsNullOrEmpty(tab.FilePath))
                     {
@@ -629,7 +651,9 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             return completion.Task;
         }
 
-        private async Task NavigateAsync(OpenedTab tab, WebView2 webView)
+        private async Task NavigateAsync(
+            OpenedTab tab,
+            NotebookSession session)
         {
             if (string.IsNullOrWhiteSpace(tab.FilePath))
             {
@@ -639,44 +663,24 @@ public async Task<bool> SaveAsync(OpenedTab tab)
             try
             {
                 string html = await _viewerService.BuildHtmlAsync(tab.FilePath);
-                string htmlPath = await WriteViewerHtmlAsync(tab.Id, html);
-                webView.Source = new Uri(htmlPath, UriKind.Absolute);
+                string htmlPath = await WriteViewerHtmlAsync(session, html);
+                session.WebView.Source = new Uri(htmlPath, UriKind.Absolute);
             }
             catch
             {
             }
         }
 
-        private async Task<string> WriteViewerHtmlAsync(string tabId, string html)
+        private static async Task<string> WriteViewerHtmlAsync(
+            NotebookSession session,
+            string html)
         {
-            DeleteViewerHtml(tabId);
-
             string folder = Path.Combine(Path.GetTempPath(), "TxtAIEditor", "NotebookViewer");
             Directory.CreateDirectory(folder);
-            string path = Path.Combine(folder, tabId + ".html");
+            string path = Path.Combine(folder, session.TabId + ".html");
             await File.WriteAllTextAsync(path, html, Encoding.UTF8);
-            _viewerHtmlPaths[tabId] = path;
+            session.ReplaceHtmlPath(path);
             return path;
-        }
-
-        private void DeleteViewerHtml(string tabId)
-        {
-            if (!_viewerHtmlPaths.TryGetValue(tabId, out string? path))
-            {
-                return;
-            }
-
-            _viewerHtmlPaths.Remove(tabId);
-            try
-            {
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                }
-            }
-            catch
-            {
-            }
         }
 
         private static async Task InstallShortcutBridgeAsync(WebView2 webView)

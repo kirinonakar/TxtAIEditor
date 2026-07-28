@@ -244,30 +244,27 @@ namespace TxtAIEditor.Controls
             if (duplicate.IsDirty && !keeper.IsDirty &&
                 _editorSessions.TryGetValue(duplicate.Id, out var duplicateSession))
             {
-                string duplicateText = duplicateSession.GetText();
                 if (_editorSessions.TryGetValue(keeper.Id, out var keeperSession))
                 {
                     if (!keeperSession.SharesDocumentWith(duplicateSession))
                     {
-                        keeperSession.UpdateContentFromSync(duplicateText, markUnsaved: true);
+                        keeperSession.ShareDocumentWith(
+                            duplicateSession,
+                            markViewSynchronized: false);
                     }
                     else
                     {
                         keeperSession.RefreshTabContentPreview();
                     }
                 }
-                keeper.ContentPreview = duplicateText;
 
                 if (_tabBridges.TryGetValue(keeper.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {
                     _editorSessions.TryGetValue(keeper.Id, out var keeperBridgeSession);
-                    _ = bridgeGroup.Bridge.SetTextAsync(
-                        duplicateText,
-                        shouldFocus: false,
-                        keeperBridgeSession?.DocumentId,
-                        keeperBridgeSession?.DocumentVersion,
-                        keeper.Id);
-                    keeperBridgeSession?.MarkViewSynchronized(keeperBridgeSession.DocumentVersion);
+                    if (keeperBridgeSession != null)
+                    {
+                        _ = bridgeGroup.Bridge.ResynchronizeModelAsync(keeperBridgeSession);
+                    }
                 }
             }
 

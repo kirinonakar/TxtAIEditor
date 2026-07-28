@@ -22,6 +22,8 @@ namespace TxtAIEditor.Editor
             bool isSplitView,
             bool? inlineLivePreviewEnabled,
             string? livePreviewBaseHref,
+            int initialStartLine,
+            bool isResynchronization,
             ILocalizationService? localizationService)
         {
             Dictionary<string, object?> message = CreateOptions(
@@ -35,8 +37,9 @@ namespace TxtAIEditor.Editor
             message["viewId"] = viewId;
             message["documentVersion"] = documentVersion;
             message["lineCount"] = Math.Max(1, lineCount);
-            message["initialStartLine"] = 1;
+            message["initialStartLine"] = Math.Max(1, initialStartLine);
             message["initialLines"] = initialLines ?? Array.Empty<string>();
+            message["isResynchronization"] = isResynchronization;
             message["language"] = language;
             message["inlineLivePreviewEnabled"] = inlineLivePreviewEnabled;
             message["livePreviewBaseHref"] = livePreviewBaseHref;

@@ -247,13 +247,17 @@ namespace TxtAIEditor.Controls
 
             if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
             {
-                await bridgeGroup.Bridge.SetTextAsync(
-                    oldContent,
-                    shouldFocus: false,
-                    session?.DocumentId,
-                    session?.DocumentVersion,
-                    tab.Id);
-                session?.MarkViewSynchronized(session.DocumentVersion);
+                if (session != null)
+                {
+                    await bridgeGroup.Bridge.ResynchronizeModelAsync(session);
+                }
+                else
+                {
+                    await bridgeGroup.Bridge.SetTextAsync(
+                        oldContent,
+                        shouldFocus: false,
+                        viewId: tab.Id);
+                }
             }
         }
 

@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab, Task<bool>> _saveTabAsync;
         private readonly DispatcherTimer _timer;
         private bool _enabled;
+        private bool _isSaving;
 
         public AutoSaveController(
             MainWindowViewModel viewModel,
@@ -43,7 +44,7 @@ namespace TxtAIEditor.Controls
             if (settings == null) return;
 
             _enabled = settings.AutoSave && !string.IsNullOrEmpty(GetAutoSaveRoot(settings));
-            if (_enabled)
+            if (_enabled && !_isSaving)
             {
                 _timer.Start();
             }
@@ -55,46 +56,61 @@ namespace TxtAIEditor.Controls
 
         public void Stop()
         {
+            _enabled = false;
             _timer.Stop();
         }
 
         private async void OnTimerTick(object? sender, object e)
         {
-            if (!_enabled) return;
+            if (!_enabled || _isSaving) return;
 
-            var settings = _settingsProvider();
-            if (settings == null) return;
+            _isSaving = true;
+            _timer.Stop();
 
-            string autoSaveRoot = GetAutoSaveRoot(settings);
-            if (string.IsNullOrEmpty(autoSaveRoot)) return;
-
-            string rootPath;
             try
             {
-                rootPath = Path.GetFullPath(autoSaveRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            }
-            catch
-            {
-                return;
-            }
+                var settings = _settingsProvider();
+                if (settings == null) return;
 
-            var dirtyTabs = _viewModel.Tabs.Where(t =>
-            {
-                if (!t.IsDirty || string.IsNullOrEmpty(t.FilePath)) return false;
+                string autoSaveRoot = GetAutoSaveRoot(settings);
+                if (string.IsNullOrEmpty(autoSaveRoot)) return;
+
+                string rootPath;
                 try
                 {
-                    string fullPath = Path.GetFullPath(t.FilePath);
-                    return fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase);
+                    rootPath = Path.GetFullPath(autoSaveRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
                 }
                 catch
                 {
-                    return false;
+                    return;
                 }
-            }).ToList();
 
-            foreach (var tab in dirtyTabs)
+                var dirtyTabs = _viewModel.Tabs.Where(t =>
+                {
+                    if (!t.IsDirty || string.IsNullOrEmpty(t.FilePath)) return false;
+                    try
+                    {
+                        string fullPath = Path.GetFullPath(t.FilePath);
+                        return fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }).ToList();
+
+                foreach (var tab in dirtyTabs)
+                {
+                    await _saveTabAsync(tab);
+                }
+            }
+            finally
             {
-                await _saveTabAsync(tab);
+                _isSaving = false;
+                if (_enabled)
+                {
+                    _timer.Start();
+                }
             }
         }
 

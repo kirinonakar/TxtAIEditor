@@ -100,6 +100,7 @@ namespace TxtAIEditor.Composition
         {
             Controllers.PdfViewer.Close(tabId);
             Controllers.OfficeDocumentViewer.Close(tabId);
+            Controllers.NotebookViewer.Close(tabId);
         }
     }
 }

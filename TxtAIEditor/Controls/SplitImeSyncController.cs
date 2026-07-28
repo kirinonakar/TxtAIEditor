@@ -47,12 +47,15 @@ namespace TxtAIEditor.Controls
             {
                 bool hasOtherSession = _editorSessions.TryGetValue(otherTab.Id, out var otherSession);
                 bool sharesDocument = hasOtherSession && otherSession!.SharesDocumentWith(sourceSession);
+                bool requiresModelResynchronization = false;
 
                 if (hasOtherSession && !sharesDocument)
                 {
-                    string updatedText = sourceSession.GetText();
-                    otherSession!.UpdateContentFromSync(updatedText, markUnsaved: sourceDirty);
-                    otherTab.ContentPreview = updatedText;
+                    otherSession!.ShareDocumentWith(
+                        sourceSession,
+                        markViewSynchronized: false);
+                    sharesDocument = true;
+                    requiresModelResynchronization = true;
                 }
                 else if (hasOtherSession)
                 {
@@ -61,7 +64,8 @@ namespace TxtAIEditor.Controls
 
                 if (updateUi && _tabBridges.TryGetValue(otherTab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {
-                    if (sharesDocument && otherSession != null &&
+                    if (!requiresModelResynchronization &&
+                        sharesDocument && otherSession != null &&
                         otherSession.ViewVersion < sourceSession.DocumentVersion &&
                         sourceSession.TryGetChangesSince(
                             otherSession.ViewVersion,
@@ -72,17 +76,14 @@ namespace TxtAIEditor.Controls
                             otherSession,
                             replayChanges);
                     }
-                    else if (!sharesDocument ||
+                    else if (requiresModelResynchronization ||
+                        !sharesDocument ||
                         (otherSession != null && otherSession.ViewVersion < sourceSession.DocumentVersion))
                     {
-                        string updatedText = sourceSession.GetText();
-                        await bridgeGroup.Bridge.SetTextAsync(
-                            updatedText,
-                            shouldFocus: false,
-                            sourceSession.DocumentId,
-                            sourceSession.DocumentVersion,
-                            otherTab.Id);
-                        otherSession?.MarkViewSynchronized(sourceSession.DocumentVersion);
+                        if (otherSession != null)
+                        {
+                            await bridgeGroup.Bridge.ResynchronizeModelAsync(otherSession);
+                        }
                     }
                 }
 

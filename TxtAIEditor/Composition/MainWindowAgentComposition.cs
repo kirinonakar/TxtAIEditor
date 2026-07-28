@@ -227,13 +227,17 @@ namespace TxtAIEditor.Composition
 
                     if (tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                     {
-                        await bridgeGroup.Bridge.SetTextAsync(
-                            newContent,
-                            shouldFocus: false,
-                            session?.DocumentId,
-                            session?.DocumentVersion,
-                            tab.Id);
-                        session?.MarkViewSynchronized(session.DocumentVersion);
+                        if (session != null)
+                        {
+                            await bridgeGroup.Bridge.ResynchronizeModelAsync(session);
+                        }
+                        else
+                        {
+                            await bridgeGroup.Bridge.SetTextAsync(
+                                newContent,
+                                shouldFocus: false,
+                                viewId: tab.Id);
+                        }
                     }
 
                     editor.TabDirtyState.MarkTabDirty(tab);

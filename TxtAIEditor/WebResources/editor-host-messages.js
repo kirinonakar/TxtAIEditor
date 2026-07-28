@@ -60,6 +60,71 @@ function syncRenderedDirtyLineClasses() {
     }
 }
 
+let pendingModelResynchronization = null;
+
+function isImeCompositionActive() {
+    return !!(
+        state.isComposing ||
+        state.rangeComposition ||
+        state.columnComposition);
+}
+
+function applyModelInitialization(msg) {
+    state.initialized = true;
+    state.hostDocumentId = String(msg.documentId || '');
+    state.hostDocumentVersion = Math.max(0, Number(msg.documentVersion || 0));
+    state.viewId = String(msg.viewId || '');
+    state.messageSequence = 0;
+    state.pendingLinePatchBatch = null;
+    state.language = msg.language || 'plaintext';
+    syncLanguageClass();
+    state.isSplitView = !!msg.isSplitView;
+    if (msg.inlineLivePreviewEnabled !== undefined && msg.inlineLivePreviewEnabled !== null) {
+        state.inlineLivePreviewEnabled = !!msg.inlineLivePreviewEnabled;
+        state.livePreviewBaseHref = msg.livePreviewBaseHref || '';
+        state.inlineLivePreviewSourceLine = state.inlineLivePreviewEnabled && state.language !== 'html'
+            ? Math.min(
+                Math.max(1, Number(msg.lineCount || 1)),
+                Math.max(1, Number(state.currentLine || 1)))
+            : null;
+        state.inlineLivePreviewEditableBlock = null;
+        document.body.classList.toggle('inline-live-preview-enabled', state.inlineLivePreviewEnabled);
+    }
+    state.livePreviewLocalResourceVersion = String(Date.now());
+    applyOptions(msg);
+    updateCsvLocalization(msg);
+    setupModel(msg.lineCount || 1);
+    const initialLines = Array.isArray(msg.initialLines) ? msg.initialLines : [];
+    if (receiveLineBlock(msg.initialStartLine || 1, initialLines) > 0) {
+        queueRender(true);
+    }
+    document.getElementById('loading-overlay')?.classList.add('hidden');
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => post({ type: 'initialRenderComplete' }));
+    });
+}
+
+document.addEventListener('compositionend', () => {
+    if (!pendingModelResynchronization) {
+        return;
+    }
+
+    queueMicrotask(() => {
+        if (isImeCompositionActive() || !pendingModelResynchronization) {
+            return;
+        }
+
+        const pending = pendingModelResynchronization;
+        pendingModelResynchronization = null;
+        const pendingDirtyLines = new Map(state.dirtyLines);
+        applyModelInitialization(pending);
+        if (state.showDirtyLines && pendingDirtyLines.size > 0) {
+            state.dirtyLines = pendingDirtyLines;
+            syncRenderedDirtyLineClasses();
+        }
+    });
+});
+
 function findSearchMatchIndexFromPosition(matches, line, column, reverse) {
     if (!Array.isArray(matches) || matches.length === 0) {
         return -1;
@@ -175,40 +240,12 @@ export function createHostMessageHandler({
     }
     switch (msg.action) {
         case 'initModel':
-            state.initialized = true;
-            state.hostDocumentId = String(msg.documentId || '');
-            state.hostDocumentVersion = Math.max(0, Number(msg.documentVersion || 0));
-            state.viewId = String(msg.viewId || '');
-            state.messageSequence = 0;
-            state.pendingLinePatchBatch = null;
-            state.language = msg.language || 'plaintext';
-            syncLanguageClass();
-            state.isSplitView = !!msg.isSplitView;
-            if (msg.inlineLivePreviewEnabled !== undefined && msg.inlineLivePreviewEnabled !== null) {
-                state.inlineLivePreviewEnabled = !!msg.inlineLivePreviewEnabled;
-                state.livePreviewBaseHref = msg.livePreviewBaseHref || '';
-                state.inlineLivePreviewSourceLine = state.inlineLivePreviewEnabled && state.language !== 'html'
-                    ? Math.min(
-                        Math.max(1, Number(msg.lineCount || 1)),
-                        Math.max(1, Number(state.currentLine || 1)))
-                    : null;
-                state.inlineLivePreviewEditableBlock = null;
-                document.body.classList.toggle('inline-live-preview-enabled', state.inlineLivePreviewEnabled);
+            if (msg.isResynchronization === true && isImeCompositionActive()) {
+                pendingModelResynchronization = msg;
+                break;
             }
-            state.livePreviewLocalResourceVersion = String(Date.now());
-            applyOptions(msg);
-            updateCsvLocalization(msg);
-            setupModel(msg.lineCount || 1);
-            {
-                const initialLines = Array.isArray(msg.initialLines) ? msg.initialLines : [];
-                if (receiveLineBlock(msg.initialStartLine || 1, initialLines) > 0) {
-                    queueRender(true);
-                }
-            }
-            document.getElementById('loading-overlay')?.classList.add('hidden');
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => post({ type: 'initialRenderComplete' }));
-            });
+            pendingModelResynchronization = null;
+            applyModelInitialization(msg);
             break;
         case 'updateDirtyLines':
             {

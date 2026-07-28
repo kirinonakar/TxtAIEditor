@@ -65,17 +65,22 @@ namespace TxtAIEditor.Controls
             try
             {
                 var readResult = await LineArrayTextModel.LoadFromFileAsync(filePath, "Auto");
-                string content = readResult.Model.GetText();
-                var updatedDocumentIds = new HashSet<string>(StringComparer.Ordinal);
+                EditorDocumentSession? sharedSession = matchedTabs
+                    .Select(tab => _editorSessions.TryGetValue(tab.Id, out var session) ? session : null)
+                    .FirstOrDefault(session => session != null);
+                sharedSession?.UpdateModelFromSync(readResult.Model);
 
                 foreach (var tab in matchedTabs)
                 {
                     EditorDocumentSession? session = null;
                     if (_editorSessions.TryGetValue(tab.Id, out session))
                     {
-                        if (updatedDocumentIds.Add(session.DocumentId))
+                        if (sharedSession != null &&
+                            !session.SharesDocumentWith(sharedSession))
                         {
-                            session.UpdateContentFromSync(content);
+                            session.ShareDocumentWith(
+                                sharedSession,
+                                markViewSynchronized: false);
                         }
                         else
                         {
@@ -83,7 +88,6 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    tab.ContentPreview = content;
                     tab.IsDirty = false;
 
                     if (IsTabCurrentlyVisible(tab))
@@ -91,13 +95,10 @@ namespace TxtAIEditor.Controls
                         tab.IsPendingReload = false;
                         if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                         {
-                            await bridgeGroup.Bridge.SetTextAsync(
-                                tab.ContentPreview,
-                                shouldFocus: false,
-                                session?.DocumentId,
-                                session?.DocumentVersion,
-                                tab.Id);
-                            session?.MarkViewSynchronized(session.DocumentVersion);
+                            if (session != null)
+                            {
+                                await bridgeGroup.Bridge.ResynchronizeModelAsync(session);
+                            }
                         }
                     }
                     else

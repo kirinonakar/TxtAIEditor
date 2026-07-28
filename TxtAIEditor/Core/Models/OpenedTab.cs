@@ -7,6 +7,8 @@ namespace TxtAIEditor.Core.Models
 {
     public class OpenedTab : INotifyPropertyChanged
     {
+        public const int ContentPreviewMaxChars = 120_000;
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         public string Id { get; } = Guid.NewGuid().ToString();
@@ -66,7 +68,21 @@ namespace TxtAIEditor.Core.Models
 
         // This is a bounded UI/search cache. EditorDocument.TextModel is the
         // authoritative text source for editor tabs.
-        public string ContentPreview { get; set; } = string.Empty;
+        private string _contentPreview = string.Empty;
+        public string ContentPreview
+        {
+            get => _contentPreview;
+            set
+            {
+                string boundedValue = value ?? string.Empty;
+                if (boundedValue.Length > ContentPreviewMaxChars)
+                {
+                    boundedValue = boundedValue[..ContentPreviewMaxChars];
+                }
+
+                _contentPreview = boundedValue;
+            }
+        }
 
         private string? _originalLineEnding;
         public string? OriginalLineEnding

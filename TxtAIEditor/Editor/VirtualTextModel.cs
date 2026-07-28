@@ -1201,11 +1201,15 @@ namespace TxtAIEditor.Editor
         public bool SharesDocumentWith(EditorDocumentSession other) =>
             ReferenceEquals(_document, other._document);
 
-        public void ShareDocumentWith(EditorDocumentSession source)
+        public void ShareDocumentWith(
+            EditorDocumentSession source,
+            bool markViewSynchronized = true)
         {
             _document = source._document;
             Tab.AttachDocument(_document);
-            ViewVersion = _document.Version;
+            ViewVersion = markViewSynchronized
+                ? _document.Version
+                : -1;
             RefreshTabContentPreview();
         }
 
