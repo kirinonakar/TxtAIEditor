@@ -12,7 +12,9 @@ using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
 using Windows.Storage.Pickers;
 using System.Text.RegularExpressions;
-
+using System.Runtime.InteropServices;
+using System.Text;
+ 
 namespace TxtAIEditor.Controls
 {
     public sealed class ExplorerNavigationController
@@ -697,6 +699,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (string.Equals(Path.GetExtension(item.Path), LnkExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                HandleLnkFile(lnkPath: item.Path);
+                return;
+            }
+
             _ = _loadFileIntoTabAsync(item.Path);
         }
 
@@ -1144,8 +1152,11 @@ namespace TxtAIEditor.Controls
             else if (item.IsArchive || _archiveExplorerService.IsSupportedArchiveFile(item.Path))
             {
                 LoadArchiveDirectoryRoot(item.Path, string.Empty);
+            } else if (string.Equals(Path.GetExtension(item.Path), LnkExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                HandleLnkFile(lnkPath: item.Path);
             }
-            else
+			else
             {
                 _ = _loadFileIntoTabAsync(item.Path);
             }
@@ -1712,7 +1723,160 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private const string LnkExtension = ".lnk";
+
+        private static string? ResolveShortcutTarget(string lnkPath)
+        {
+            if (!string.Equals(Path.GetExtension(lnkPath), LnkExtension, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            try
+            {
+                var shellLinkType = Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046"))
+                    ?? throw new InvalidOperationException("Failed to get ShellLink type");
+                object shellLink = Activator.CreateInstance(shellLinkType)!;
+
+                var persistFile = (IPersistFile)shellLink;
+                persistFile.Load(lnkPath, 0); // STGM_READ
+
+                var link = (IShellLinkW)shellLink;
+                // Resolve the link (SLR_NO_UI = 0x01 avoids showing error dialogs)
+                link.Resolve(IntPtr.Zero, 0x01);
+
+                var sb = new StringBuilder(1024);
+                link.GetPath(sb, sb.Capacity, IntPtr.Zero, 0x00);
+                string targetPath = sb.ToString();
+
+                if (string.IsNullOrWhiteSpace(targetPath))
+                {
+                    sb.Clear();
+                    link.GetPath(sb, sb.Capacity, IntPtr.Zero, 0x04); // SLGP_RAWPATH
+                    targetPath = sb.ToString();
+                }
+
+                if (string.IsNullOrWhiteSpace(targetPath))
+                {
+                    if (link.GetIDList(out IntPtr pidl) == 0 && pidl != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            var idListSb = new StringBuilder(1024);
+                            if (SHGetPathFromIDListW(pidl, idListSb))
+                            {
+                                targetPath = idListSb.ToString();
+                            }
+                        }
+                        finally
+                        {
+                            Marshal.FreeCoTaskMem(pidl);
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(targetPath))
+                {
+                    targetPath = Environment.ExpandEnvironmentVariables(targetPath);
+                }
+
+                return targetPath;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to resolve shortcut target for '{lnkPath}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private void HandleLnkFile(string lnkPath)
+        {
+            string? target = ResolveShortcutTarget(lnkPath);
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                _ = _loadFileIntoTabAsync(lnkPath);
+                return;
+            }
+
+            if (!Directory.Exists(target) && !File.Exists(target) && !Path.IsPathRooted(target))
+            {
+                string? lnkDir = Path.GetDirectoryName(lnkPath);
+                if (!string.IsNullOrEmpty(lnkDir))
+                {
+                    string combined = Path.GetFullPath(Path.Combine(lnkDir, target));
+                    if (Directory.Exists(combined) || File.Exists(combined))
+                    {
+                        target = combined;
+                    }
+                }
+            }
+
+            if (Directory.Exists(target))
+            {
+                UpdateRepoPath(target);
+                LoadDirectoryRoot(target);
+            }
+            else if (File.Exists(target))
+            {
+                _ = _loadFileIntoTabAsync(target);
+            }
+            else
+            {
+                _ = _loadFileIntoTabAsync(lnkPath);
+            }
+        }
+
         [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, ExactSpelling = true)]
         private static extern int StrCmpLogicalW(string x, string y);
+
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, ExactSpelling = true)]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool SHGetPathFromIDListW(IntPtr pidl, [Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszPath);
     }
+}
+
+[ComImport]
+[Guid("00021401-0000-0000-C000-000000000046")]
+internal class ShellLink
+{
+}
+
+[ComImport]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+[Guid("000214F9-0000-0000-C000-000000000046")]
+internal interface IShellLinkW
+{
+    void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszFile, int cchMaxPath, IntPtr pfd, uint fFlags);
+    [PreserveSig]
+    int GetIDList(out IntPtr ppidl);
+    void SetIDList(IntPtr pidl);
+    void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszName, int cchMaxName);
+    void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+    void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszDir, int cchMaxPath);
+    void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
+    void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszArgs, int cchMaxPath);
+    void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
+    void GetHotkey(out short pwHotkey);
+    void SetHotkey(short wHotkey);
+    void GetShowCmd(out int piShowCmd);
+    void SetShowCmd(int iShowCmd);
+    void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszIconPath, int cchIconPath, out int piIcon);
+    void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
+    void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, uint dwReserved);
+    void Resolve(IntPtr hwnd, uint fFlags);
+    void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
+}
+
+[ComImport]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+[Guid("0000010B-0000-0000-C000-000000000046")]
+internal interface IPersistFile
+{
+    // IPersist
+    void GetClassID(out Guid pClassID);
+    // IPersistFile
+    [PreserveSig]
+    int IsDirty();
+    void Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, uint dwMode);
+    void Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, [MarshalAs(UnmanagedType.Bool)] bool fRemember);
+    void SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
+    void GetCurFile([MarshalAs(UnmanagedType.LPWStr)] out string ppszFileName);
 }

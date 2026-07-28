@@ -468,7 +468,7 @@
                     Background="{ThemeResource ToolbarBackgroundBrush}"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="1"
-                    Padding="10"
+                    Padding="10,4,10,4"
                     CornerRadius="4"
                     Visibility="Collapsed">
                 <Grid RowSpacing="6">
