@@ -8,7 +8,7 @@ using TxtAIEditor.ViewModels;
 namespace TxtAIEditor.Composition
 {
     internal sealed record MainWindowWorkspaceModuleDependencies(
-        MainWindowShellControllers Shell,
+        MainWindowShellModule Shell,
         MainWindowPreviewModule Preview);
 
     internal sealed class MainWindowWorkspaceModule
@@ -52,7 +52,7 @@ namespace TxtAIEditor.Composition
             IMainWindowWorkspaceFacade workspaceFacade,
             Func<MainWindowToolbarCommandController?> getToolbarCommand)
         {
-            var shell = dependencies.Shell;
+            var shell = dependencies.Shell.Composition;
             var module = new MainWindowWorkspaceModule(
                 state,
                 commonServices,
@@ -136,11 +136,11 @@ namespace TxtAIEditor.Composition
 
         public Task OpenShellPathAsync(
             string path,
-            ShellPanelLayoutService shellPanelLayout,
+            MainWindowShellModule shell,
             Func<string, Task> loadFileIntoTabAsync) =>
             MainWindowWorkspaceOperations.OpenShellPathAsync(
                 path,
-                shellPanelLayout,
+                shell.Composition.ShellPanelLayout,
                 Controllers.ExplorerNavigation,
                 loadFileIntoTabAsync);
 

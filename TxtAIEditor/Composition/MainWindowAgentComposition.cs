@@ -44,7 +44,7 @@ namespace TxtAIEditor.Composition
     }
 
     internal sealed record MainWindowAgentModuleDependencies(
-        MainWindowShellControllers Shell,
+        MainWindowShellModule Shell,
         MainWindowEditorFoundationControllers Editor,
         ITabCloseCommands Documents,
         MainWindowPreviewModule Preview);
@@ -113,7 +113,7 @@ namespace TxtAIEditor.Composition
             MainWindowAgentModuleDependencies dependencies,
             MainWindowAgentCompositionCallbacks callbacks)
         {
-            var shell = dependencies.Shell;
+            var shell = dependencies.Shell.Composition;
             var editor = dependencies.Editor;
             var documents = dependencies.Documents;
             var preview = dependencies.Preview.Controllers;

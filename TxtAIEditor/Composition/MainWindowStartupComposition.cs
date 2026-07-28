@@ -49,7 +49,7 @@ namespace TxtAIEditor.Composition
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
-            TerminalShortcutService terminalShortcut,
+            MainWindowShellModule shellModule,
             FunctionKeyShortcutService functionKeyShortcut,
             IAutoSaveLifecycle autoSaveLifecycle,
             DispatcherTimer gitAutoRefreshTimer,
@@ -57,24 +57,27 @@ namespace TxtAIEditor.Composition
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
             JupyterNotebookViewerController notebookViewer,
-            StatusBarController statusBar,
             LlmAssistantController llmAssistant,
             AgentController agent,
-            TabNavigationController tabNavigation,
             TabDirtyStateController tabDirtyState,
             SnippetsController snippets,
             FavoritesRecentController favoritesRecent,
             FileOpenDropController fileOpenDrop,
-            ShellPanelLayoutService shellPanelLayout,
             RootKeyboardShortcutController rootKeyboardShortcut,
             ITabSaveCommands tabSaveCommands,
             TerminalPanelController terminalPanel,
-            StickyNoteModeController stickyNoteMode,
             ShellPaneController shellPane,
             CompareTabController compareTab,
-            WindowDialogController dialog,
             MainWindowStartupCallbacks callbacks)
         {
+            var shell = shellModule.Composition;
+            var terminalShortcut = shell.TerminalShortcut;
+            var statusBar = shell.StatusBar;
+            var tabNavigation = shell.TabNavigation;
+            var shellPanelLayout = shell.ShellPanelLayout;
+            var stickyNoteMode = shell.StickyNoteMode;
+            var dialog = shell.Dialog;
+
             var lifecycle = new MainWindowLifecycleController(
                 window,
                 ui.AppTitleBar,

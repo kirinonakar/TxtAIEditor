@@ -34,13 +34,6 @@ namespace TxtAIEditor.Composition
             var workspaceFacade = host.Workspace;
             var lifecycleFacade = host.Lifecycle;
 
-            Task SaveUiLayoutSettingsAsync(ShellPanelLayoutService shellPanelLayout) =>
-                MainWindowLayoutOperations.SaveUiLayoutSettingsAsync(
-                    window.AppWindow,
-                    commonServices.SettingsService,
-                    ui.EditorWorkspace,
-                    shellPanelLayout);
-
             void ApplyLeftSidebarVisibility(bool show) =>
                 moduleBindings.ShellPane.ApplyLeftSidebarVisibility(show);
 
@@ -60,45 +53,27 @@ namespace TxtAIEditor.Composition
             void ApplyEditorSurfaceBackground(EditorSettings settings) =>
                 moduleBindings.Settings.ApplyEditorSurfaceBackground(settings);
 
-            var shellControllers = MainWindowShellComposition.Compose(
+            var shellModule = MainWindowShellModule.Compose(
                 window,
                 ui,
                 commonServices,
                 workspaceServices,
                 shellServices,
                 viewModel,
-                state.TabBridges,
-                tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
-                new MainWindowShellCompositionCallbacks(
-                    SaveUiLayoutSettingsAsync,
-                    () => moduleBindings.ToolbarCommand?.ToggleTerminal(),
-                    shellFacade.GetCurrentElementTheme,
-                    shellFacade.GetLocalizedString,
-                    shellFacade.UpdateWindowTitle,
-                    ApplyLeftSidebarVisibility,
-                    ApplyPreviewVisibility,
-                    editorFacade.ReloadTabWithEncodingAsync,
-                    editorFacade.MarkTabDirtyFromStatusBar,
-                    editorFacade.PerformLineNavigationAsync,
-                    editorFacade.UpdateLivePreview));
-            var shellPanelLayoutService = shellControllers.ShellPanelLayout;
-            var tabNavigationController = shellControllers.TabNavigation;
-            var terminalShortcutService = shellControllers.TerminalShortcut;
-            var dialogController = shellControllers.Dialog;
-            var tabEncryptionController = shellControllers.TabEncryption;
-            var stickyNoteModeController = shellControllers.StickyNoteMode;
-            var statusBarController = shellControllers.StatusBar;
-
+                state,
+                shellFacade,
+                editorFacade,
+                () => moduleBindings.ToolbarCommand?.ToggleTerminal(),
+                ApplyLeftSidebarVisibility,
+                ApplyPreviewVisibility);
             Task SaveSidebarVisibilitySettingsAsync() =>
-                MainWindowLayoutOperations.SaveSidebarVisibilitySettingsAsync(
-                    commonServices.SettingsService,
-                    shellPanelLayoutService);
+                shellModule.SaveSidebarVisibilitySettingsAsync();
 
             void ApplySavedPanelWidths(EditorSettings settings) =>
-                shellPanelLayoutService.ApplySavedPanelWidths(settings.LeftSidebarWidth, settings.RightSidebarWidth);
+                shellModule.ApplySavedPanelWidths(settings);
 
             void TogglePreviewWidth() =>
-                shellPanelLayoutService.TogglePreviewWidth();
+                shellModule.TogglePreviewWidth();
 
             var previewModule = MainWindowPreviewModule.Compose(
                 ui,
@@ -106,7 +81,7 @@ namespace TxtAIEditor.Composition
                 documentServices,
                 viewModel,
                 state,
-                new MainWindowPreviewModuleDependencies(shellControllers),
+                new MainWindowPreviewModuleDependencies(shellModule),
                 shellFacade,
                 editorFacade,
                 documentFacade,
@@ -135,7 +110,7 @@ namespace TxtAIEditor.Composition
                 workspaceServices,
                 viewModel,
                 state,
-                new MainWindowWorkspaceModuleDependencies(shellControllers, previewModule),
+                new MainWindowWorkspaceModuleDependencies(shellModule, previewModule),
                 shellFacade,
                 documentFacade,
                 previewFacade,
@@ -157,12 +132,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 state.TabBridges,
                 state.EditorSessions,
-                tabNavigationController,
-                tabEncryptionController,
-                stickyNoteModeController,
-                statusBarController,
-                dialogController,
-                terminalShortcutService,
+                shellModule,
                 editorLineNavigationController,
                 initialEditorLineWarmupCount,
                 tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
@@ -209,20 +179,17 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 state,
                 new MainWindowDocumentModuleDependencies(
-                    statusBarController,
-                    tabNavigationController,
+                    shellModule,
                     livePreviewController,
                     tabDirtyStateController,
-                    tabEncryptionController,
                     favoritesRecentController,
-                    dialogController,
                     notebookViewerController),
                 workspaceModule,
                 shellFacade,
                 editorFacade,
                 documentFacade,
                 previewFacade,
-                () => SaveUiLayoutSettingsAsync(shellPanelLayoutService));
+                shellModule.SaveUiLayoutSettingsAsync);
 
             var interactionControllers = MainWindowInteractionComposition.Compose(
                 window,
@@ -231,13 +198,9 @@ namespace TxtAIEditor.Composition
                 workspaceServices,
                 editorServices,
                 viewModel,
-                shellPanelLayoutService,
-                terminalShortcutService,
-                tabNavigationController,
-                tabEncryptionController,
+                shellModule,
                 activeEditorInsertionController,
                 favoritesRecentController,
-                dialogController,
                 pdfViewerController,
                 officeDocumentViewerController,
                 new MainWindowInteractionCallbacks(
@@ -268,9 +231,9 @@ namespace TxtAIEditor.Composition
                     () => moduleBindings.ToolbarCommand?.OpenFile(),
                     () => moduleBindings.ToolbarCommand?.Find(),
                     () => moduleBindings.ToolbarCommand?.Print(),
-                    stickyNoteModeController.ToggleTopMostFromShortcut,
+                    shellModule.ToggleTopMostFromShortcut,
                     () => moduleBindings.ToolbarCommand?.ToggleTheme(),
-                    stickyNoteModeController.ToggleMode,
+                    shellModule.ToggleStickyNoteMode,
                     () => moduleBindings.ToolbarCommand?.ToggleLivePreview(),
                     TogglePreviewWidth,
                     shellFacade.ToggleMaximize,
@@ -281,10 +244,9 @@ namespace TxtAIEditor.Composition
                     shellFacade.InitializePickerWindow,
                     shellFacade.GetLocalizedString,
                     shellFacade.GetCurrentElementTheme,
-                    (tab, tabItem) => MainWindowTabOperations.ReloadAsync(
+                    (tab, tabItem) => shellModule.ReloadTabAsync(
                         tab,
                         tabItem,
-                        statusBarController,
                         pdfViewerController,
                         officeDocumentViewerController,
                         notebookViewerController,
@@ -332,7 +294,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 state,
                 new MainWindowAgentModuleDependencies(
-                    shellControllers,
+                    shellModule,
                     editorFoundationControllers,
                     documentModule,
                     previewModule),
@@ -354,10 +316,8 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 state.TabBridges,
                 state.EditorSessions,
-                statusBarController,
-                tabNavigationController,
+                shellModule,
                 tabDirtyStateController,
-                tabEncryptionController,
                 livePreviewController,
                 pdfViewerController,
                 officeDocumentViewerController,
@@ -372,8 +332,6 @@ namespace TxtAIEditor.Composition
                 favoritesRecentController,
                 llmAssistantController,
                 agentController,
-                dialogController,
-                shellPanelLayoutService,
                 initialEditorLineWarmupCount,
                 new MainWindowEditorRuntimeCallbacks(
                     editorFacade.SchedulePreview,
@@ -443,7 +401,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 state.TabBridges,
                 state.EditorSessions,
-                terminalShortcutService,
+                shellModule,
                 functionKeyShortcutService,
                 documentModule,
                 gitAutoRefreshTimer,
@@ -451,22 +409,17 @@ namespace TxtAIEditor.Composition
                 pdfViewerController,
                 officeDocumentViewerController,
                 notebookViewerController,
-                statusBarController,
                 llmAssistantController,
                 agentController,
-                tabNavigationController,
                 editorFoundationControllers.TabDirtyState,
                 snippetsController,
                 favoritesRecentController,
                 fileOpenDropController,
-                shellPanelLayoutService,
                 rootKeyboardShortcutController,
                 documentModule,
                 terminalPanelController,
-                stickyNoteModeController,
                 shellPaneController,
                 compareTabController,
-                dialogController,
                 new MainWindowStartupCallbacks(
                     () => state.CurrentRepoPath,
                     () => state.CurrentFolderPath,
@@ -497,10 +450,11 @@ namespace TxtAIEditor.Composition
                 documentModule,
                 toolbarCommandController,
                 () => documentFacade.OpenEmptyTab(),
-                () => SaveUiLayoutSettingsAsync(shellPanelLayoutService));
+                shellModule.SaveUiLayoutSettingsAsync);
 
+            shellModule.BindInteractions(interactionControllers);
             return new MainWindowControllers(
-                new ShellControllers(shellControllers, interactionControllers),
+                shellModule,
                 new EditorControllers(editorFoundationControllers, editorRuntimeControllers),
                 documentModule,
                 previewModule,

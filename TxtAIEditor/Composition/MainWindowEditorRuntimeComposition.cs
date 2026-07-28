@@ -57,10 +57,8 @@ namespace TxtAIEditor.Composition
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
-            StatusBarController statusBar,
-            TabNavigationController tabNavigation,
+            MainWindowShellModule shellModule,
             TabDirtyStateController tabDirtyState,
-            TabEncryptionController tabEncryption,
             LivePreviewController livePreview,
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
@@ -75,11 +73,16 @@ namespace TxtAIEditor.Composition
             FavoritesRecentController favoritesRecent,
             LlmAssistantController llmAssistant,
             AgentController agent,
-            WindowDialogController dialog,
-            ShellPanelLayoutService shellPanelLayout,
             int initialEditorLineWarmupCount,
             MainWindowEditorRuntimeCallbacks callbacks)
         {
+            var shell = shellModule.Composition;
+            var statusBar = shell.StatusBar;
+            var tabNavigation = shell.TabNavigation;
+            var tabEncryption = shell.TabEncryption;
+            var dialog = shell.Dialog;
+            var shellPanelLayout = shell.ShellPanelLayout;
+
             var toc = new TocController(
                 viewModel,
                 ui.LeftSidebar,

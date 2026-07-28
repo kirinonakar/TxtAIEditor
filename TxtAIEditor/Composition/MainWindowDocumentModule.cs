@@ -8,13 +8,10 @@ using TxtAIEditor.ViewModels;
 namespace TxtAIEditor.Composition
 {
     internal sealed record MainWindowDocumentModuleDependencies(
-        StatusBarController StatusBar,
-        TabNavigationController TabNavigation,
+        MainWindowShellModule Shell,
         LivePreviewController LivePreview,
         TabDirtyStateController TabDirtyState,
-        TabEncryptionController TabEncryption,
         FavoritesRecentController FavoritesRecent,
-        WindowDialogController Dialog,
         JupyterNotebookViewerController NotebookViewer);
 
     internal sealed class MainWindowDocumentModule :
@@ -45,6 +42,7 @@ namespace TxtAIEditor.Composition
             IMainWindowPreviewFacade previewFacade,
             Func<Task> saveUiLayoutSettingsAsync)
         {
+            var shell = dependencies.Shell.Composition;
             var callbacks = new MainWindowDocumentCommandCallbacks(
                 editorFacade.UpdateLanguageUi,
                 workspace.RefreshGitStatusUiAsync,
@@ -68,13 +66,13 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 state.TabBridges,
                 state.EditorSessions,
-                dependencies.StatusBar,
-                dependencies.TabNavigation,
+                shell.StatusBar,
+                shell.TabNavigation,
                 dependencies.LivePreview,
                 dependencies.TabDirtyState,
-                dependencies.TabEncryption,
+                shell.TabEncryption,
                 dependencies.FavoritesRecent,
-                dependencies.Dialog,
+                shell.Dialog,
                 dependencies.NotebookViewer,
                 callbacks);
 

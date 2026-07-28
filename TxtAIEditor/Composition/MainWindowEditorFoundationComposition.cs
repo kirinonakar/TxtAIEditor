@@ -56,17 +56,20 @@ namespace TxtAIEditor.Composition
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
-            TabNavigationController tabNavigation,
-            TabEncryptionController tabEncryption,
-            StickyNoteModeController stickyNoteMode,
-            StatusBarController statusBar,
-            WindowDialogController dialog,
-            TerminalShortcutService terminalShortcut,
+            MainWindowShellModule shellModule,
             EditorLineNavigationController editorLineNavigation,
             int initialEditorLineWarmupCount,
             Func<string, EditorDocumentSession?> getEditorSession,
             MainWindowEditorFoundationCallbacks callbacks)
         {
+            var shell = shellModule.Composition;
+            var tabNavigation = shell.TabNavigation;
+            var tabEncryption = shell.TabEncryption;
+            var stickyNoteMode = shell.StickyNoteMode;
+            var statusBar = shell.StatusBar;
+            var dialog = shell.Dialog;
+            var terminalShortcut = shell.TerminalShortcut;
+
             var tabReload = new TabReloadController(
                 documentServices.SecureNoteEncryptionService,
                 workspaceServices.ArchiveExplorerService,

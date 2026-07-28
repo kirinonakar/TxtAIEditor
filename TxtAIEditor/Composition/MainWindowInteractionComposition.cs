@@ -74,17 +74,17 @@ namespace TxtAIEditor.Composition
             MainWindowWorkspaceServices workspaceServices,
             MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
-            ShellPanelLayoutService shellPanelLayout,
-            TerminalShortcutService terminalShortcut,
-            TabNavigationController tabNavigation,
-            TabEncryptionController tabEncryption,
+            MainWindowShellModule shellModule,
             ActiveEditorInsertionController activeEditorInsertion,
             FavoritesRecentController favoritesRecent,
-            WindowDialogController dialog,
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
             MainWindowInteractionCallbacks callbacks)
         {
+            var shell = shellModule.Composition;
+            var tabNavigation = shell.TabNavigation;
+            var dialog = shell.Dialog;
+
             var explorerFileActions = new ExplorerFileActionsController(
                 ui.LeftSidebar,
                 ui.StatusBar,
@@ -122,13 +122,9 @@ namespace TxtAIEditor.Composition
                 workspaceServices,
                 editorServices,
                 viewModel,
-                shellPanelLayout,
-                terminalShortcut,
-                tabNavigation,
-                tabEncryption,
+                shellModule,
                 activeEditorInsertion,
                 favoritesRecent,
-                dialog,
                 pdfViewer,
                 officeDocumentViewer,
                 callbacks,
@@ -142,18 +138,21 @@ namespace TxtAIEditor.Composition
             MainWindowWorkspaceServices workspaceServices,
             MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
-            ShellPanelLayoutService shellPanelLayout,
-            TerminalShortcutService terminalShortcut,
-            TabNavigationController tabNavigation,
-            TabEncryptionController tabEncryption,
+            MainWindowShellModule shellModule,
             ActiveEditorInsertionController activeEditorInsertion,
             FavoritesRecentController favoritesRecent,
-            WindowDialogController dialog,
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
             MainWindowInteractionCallbacks callbacks,
             ExplorerFileActionsController explorerFileActions)
         {
+            var shell = shellModule.Composition;
+            var shellPanelLayout = shell.ShellPanelLayout;
+            var terminalShortcut = shell.TerminalShortcut;
+            var tabNavigation = shell.TabNavigation;
+            var tabEncryption = shell.TabEncryption;
+            var dialog = shell.Dialog;
+
             var terminalPanel = new TerminalPanelController(
                 window,
                 ui.EditorWorkspace,

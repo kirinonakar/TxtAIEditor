@@ -194,7 +194,7 @@ namespace TxtAIEditor.Composition
             }
             catch (Exception ex)
             {
-                Controllers.Shell.Core.Dialog.ShowErrorMessage(
+                Controllers.Shell.ShowErrorMessage(
                     GetLocalizedString("HexViewOpenFailedTitle", "Hex 보기 실패"),
                     ex.Message);
             }
@@ -261,7 +261,7 @@ namespace TxtAIEditor.Composition
                 _ui.PreviewGrid.SelectionStats.Text = string.Format(fmt, selectedText.Length.ToString("N0"), StatusBarController.EstimateTokenCount(selectedText).ToString("N0"));
             }
 
-            Controllers.Shell.Core.StatusBar.UpdateSelectionStats(selectedText);
+            Controllers.Shell.UpdateSelectionStats(selectedText);
         }
 
         public void ShowLeftSidebarPage(int index) => Controllers.Editor.Runtime.ShellPane.ShowLeftSidebarPage(index);
@@ -298,7 +298,7 @@ namespace TxtAIEditor.Composition
         {
             return Controllers.Workspace.OpenShellPathAsync(
                 path,
-                Controllers.Shell.Core.ShellPanelLayout,
+                Controllers.Shell,
                 LoadFileIntoTabAsync);
         }
 
@@ -336,9 +336,7 @@ namespace TxtAIEditor.Composition
         {
             if (tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile)
             {
-                Controllers.Shell.Core.StatusBar.UpdateFileStats(tab);
-                Controllers.Shell.Core.StatusBar.UpdateTotalLines(tab);
-                Controllers.Shell.Core.StatusBar.SyncLineEndingText(tab);
+                Controllers.Shell.UpdateReadOnlyTabStatus(tab);
                 UpdateLanguageUi(tab);
                 UpdateWindowTitle();
                 return;
@@ -389,13 +387,13 @@ namespace TxtAIEditor.Composition
             InitializeWithWindow.Initialize(picker, hwnd);
         }
 
-        public void UpdateWindowTitle() => Controllers.Shell.Core.WindowTitle.Update();
+        public void UpdateWindowTitle() => Controllers.Shell.UpdateWindowTitle();
 
         public Task<bool> SaveTabAsync(OpenedTab tab) => Controllers.Documents.SaveAsync(tab);
 
         public void CloseActiveTab()
         {
-            Controllers.Documents.CloseActive(Controllers.Shell.Core.TabNavigation.GetCurrentActiveTabView());
+            Controllers.Documents.CloseActive(Controllers.Shell.GetCurrentActiveTabView());
         }
 
         public async Task HandleAppWindowClosingAsync(Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
@@ -420,7 +418,7 @@ namespace TxtAIEditor.Composition
                 : ElementTheme.Default;
         }
 
-        public void UpdateLanguageUi(OpenedTab tab) => Controllers.Shell.Core.StatusBar.UpdateLanguage(tab);
+        public void UpdateLanguageUi(OpenedTab tab) => Controllers.Shell.UpdateLanguage(tab);
 
         public async Task PerformLineNavigationAsync(string tabId, int targetLine)
         {
@@ -445,7 +443,7 @@ namespace TxtAIEditor.Composition
 
         private void ActivateLoadedTab(OpenedTab tab)
         {
-            var tabView = Controllers.Shell.Core.TabNavigation.GetTabView(tab);
+            var tabView = Controllers.Shell.GetTabView(tab);
             var tabItem = tabView != null ? TabNavigationController.FindItem(tabView, tab.Id) : null;
 
             if (tabView != null && tabItem != null)

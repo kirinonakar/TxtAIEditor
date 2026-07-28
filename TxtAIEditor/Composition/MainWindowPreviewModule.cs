@@ -8,7 +8,7 @@ using TxtAIEditor.ViewModels;
 namespace TxtAIEditor.Composition
 {
     internal sealed record MainWindowPreviewModuleDependencies(
-        MainWindowShellControllers Shell);
+        MainWindowShellModule Shell);
 
     internal sealed class MainWindowPreviewModule
     {
@@ -34,7 +34,7 @@ namespace TxtAIEditor.Composition
             Func<Task> toggleRightPanelAsync,
             Func<string, Task> navigateExplorerToFolderAndRevealAsync)
         {
-            var shell = dependencies.Shell;
+            var shell = dependencies.Shell.Composition;
             var controllers = MainWindowPreviewComposition.Compose(
                 ui,
                 commonServices,
