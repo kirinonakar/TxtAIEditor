@@ -121,7 +121,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(ExplorerHomeButton, homeFolderText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerHomeButton, homeFolderText);
 
-            var treeModeText = getString("ExplorerTreeModeTooltip", "트리 모드");
+            var treeModeText = getString("ExplorerTreeModeTooltip", "트리 모드 (F3)");
             ToolTipService.SetToolTip(ExplorerTreeModeButton, treeModeText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerTreeModeButton, treeModeText);
         }

@@ -3487,7 +3487,7 @@
     <value>다시 실행 중: {0} / {1}</value>
   </data>
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
-    <value>트리 모드</value>
+    <value>트리 모드 (F3)</value>
   </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>context 압축이 시행되었습니다.</value>

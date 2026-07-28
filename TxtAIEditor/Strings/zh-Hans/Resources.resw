@@ -3451,7 +3451,7 @@
     <value>正在重做：{0} / {1}</value>
   </data>
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
-    <value>树状模式</value>
+    <value>树状模式 (F3)</value>
   </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>已执行上下文压缩。</value>

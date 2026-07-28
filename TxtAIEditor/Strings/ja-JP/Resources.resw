@@ -3451,7 +3451,7 @@
     <value>やり直しています: {0} / {1}</value>
   </data>
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
-    <value>ツリーモード</value>
+    <value>ツリーモード (F3)</value>
   </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>コンテキストの圧縮が実行されました。</value>

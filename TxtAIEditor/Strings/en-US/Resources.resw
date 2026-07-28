@@ -3487,7 +3487,7 @@ Plan: {0}</value>
     <value>Redoing: {0} / {1}</value>
   </data>
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
-    <value>Tree mode</value>
+    <value>Tree mode (F3)</value>
   </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>Context compression was performed.</value>
