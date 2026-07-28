@@ -2529,6 +2529,12 @@
   <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
     <value>关闭列表</value>
   </data>
+  <data name="AgentModifiedFilesMinimizeTooltip" xml:space="preserve">
+    <value>最小化已修改文件列表</value>
+  </data>
+  <data name="AgentModifiedFilesRestoreTooltip" xml:space="preserve">
+    <value>恢复已修改文件列表</value>
+  </data>
   <data name="AgentAddAttachmentTooltip" xml:space="preserve">
     <value>添加图像或文件</value>
   </data>

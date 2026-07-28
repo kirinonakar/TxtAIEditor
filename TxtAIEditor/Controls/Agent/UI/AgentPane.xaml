@@ -480,18 +480,28 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock x:Name="AgentModifiedFilesHeader"
-                                       Text="변경됨 (클릭 시 비교)"
-                                       FontWeight="SemiBold"
-                                       FontSize="12"/>
-                            <TextBlock x:Name="AgentModifiedFilesDescription"
-                                       Text="수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요."
-                                       FontSize="11"
-                                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                        </StackPanel>
+                        <TextBlock x:Name="AgentModifiedFilesHeader"
+                                   Grid.Column="0"
+                                   Text="변경됨 (클릭 시 비교)"
+                                   FontWeight="SemiBold"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"/>
                         <Button Grid.Column="1"
+                                x:Name="AgentModifiedFilesToggleButton"
+                                Click="OnModifiedFilesToggleClick"
+                                Width="24"
+                                Height="24"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                VerticalAlignment="Top">
+                            <FontIcon x:Name="AgentModifiedFilesToggleIcon"
+                                      Glyph="&#xE70D;"
+                                      FontSize="11"/>
+                        </Button>
+                        <Button Grid.Column="2"
                                 x:Name="AgentModifiedFilesCloseButton"
                                 Click="OnModifiedFilesCloseClick"
                                 Width="24"
@@ -505,51 +515,59 @@
                         </Button>
                     </Grid>
                     
-                    <ListView x:Name="AgentModifiedFilesList"
-                              Grid.Row="1"
-                              MinHeight="60"
-                              MaxHeight="150"
-                              Margin="0,4,0,0"
-                              SelectionMode="Single"
-                              IsItemClickEnabled="True"
-                              ItemClick="OnModifiedFilesListItemClick">
-                        <ListView.ItemContainerStyle>
-                            <Style TargetType="ListViewItem">
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                <Setter Property="MinHeight" Value="32"/>
-                                <Setter Property="Padding" Value="4,2,4,2"/>
-                            </Style>
-                        </ListView.ItemContainerStyle>
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="local:AgentFileEditPreview">
-                                <Grid HorizontalAlignment="Stretch" Margin="0,2,0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                        <FontIcon Glyph="&#xE7C3;" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                                        <TextBlock Text="{Binding DisplayRelativePath}" 
-                                                   FontSize="11" 
-                                                   TextWrapping="NoWrap" 
-                                                   TextTrimming="CharacterEllipsis"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <Button Grid.Column="1"
-                                            Click="OnRevertFileClick"
-                                            Tag="{Binding}"
-                                            Width="24"
-                                            Height="24"
-                                            Padding="0"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            ToolTipService.ToolTip="이 파일의 변경 취소">
-                                        <FontIcon Glyph="&#xE7A7;" FontSize="11"/>
-                                    </Button>
-                                </Grid>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
+                    <StackPanel x:Name="AgentModifiedFilesContent"
+                                Grid.Row="1"
+                                Spacing="6">
+                        <TextBlock x:Name="AgentModifiedFilesDescription"
+                                   Text="수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요."
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                        <ListView x:Name="AgentModifiedFilesList"
+                                  MinHeight="60"
+                                  MaxHeight="150"
+                                  Margin="0,4,0,0"
+                                  SelectionMode="Single"
+                                  IsItemClickEnabled="True"
+                                  ItemClick="OnModifiedFilesListItemClick">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="MinHeight" Value="32"/>
+                                    <Setter Property="Padding" Value="4,2,4,2"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="local:AgentFileEditPreview">
+                                    <Grid HorizontalAlignment="Stretch" Margin="0,2,0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <FontIcon Glyph="&#xE7C3;" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                                            <TextBlock Text="{Binding DisplayRelativePath}"
+                                                       FontSize="11"
+                                                       TextWrapping="NoWrap"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Click="OnRevertFileClick"
+                                                Tag="{Binding}"
+                                                Width="24"
+                                                Height="24"
+                                                Padding="0"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                ToolTipService.ToolTip="이 파일의 변경 취소">
+                                            <FontIcon Glyph="&#xE7A7;" FontSize="11"/>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
                 </Grid>
             </Border>
         </StackPanel>

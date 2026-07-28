@@ -16,9 +16,13 @@ namespace TxtAIEditor.Controls
         private readonly Border _powerShellCommandPanel;
         private readonly TextBlock _powerShellConfirmCommand;
         private readonly Border _modifiedFilesPanel;
+        private readonly StackPanel _modifiedFilesContent;
         private readonly ListView _modifiedFilesList;
+        private readonly FontIcon _modifiedFilesToggleIcon;
         private readonly Action<AgentFileEditPreview> _fileDiffRequested;
         private readonly Action<AgentFileEditPreview> _fileRevertRequested;
+
+        public bool IsModifiedFilesMinimized { get; private set; }
 
         public AgentPaneReviewController(
             FrameworkElement resourceOwner,
@@ -29,7 +33,9 @@ namespace TxtAIEditor.Controls
             Border powerShellCommandPanel,
             TextBlock powerShellConfirmCommand,
             Border modifiedFilesPanel,
+            StackPanel modifiedFilesContent,
             ListView modifiedFilesList,
+            FontIcon modifiedFilesToggleIcon,
             Action<AgentFileEditPreview> fileDiffRequested,
             Action<AgentFileEditPreview> fileRevertRequested)
         {
@@ -41,7 +47,9 @@ namespace TxtAIEditor.Controls
             _powerShellCommandPanel = powerShellCommandPanel;
             _powerShellConfirmCommand = powerShellConfirmCommand;
             _modifiedFilesPanel = modifiedFilesPanel;
+            _modifiedFilesContent = modifiedFilesContent;
             _modifiedFilesList = modifiedFilesList;
+            _modifiedFilesToggleIcon = modifiedFilesToggleIcon;
             _fileDiffRequested = fileDiffRequested;
             _fileRevertRequested = fileRevertRequested;
         }
@@ -105,6 +113,17 @@ namespace TxtAIEditor.Controls
         {
             _modifiedFilesPanel.Visibility = Visibility.Collapsed;
             UpdateHostVisibility();
+        }
+
+        public void ToggleModifiedFiles()
+        {
+            IsModifiedFilesMinimized = !IsModifiedFilesMinimized;
+            _modifiedFilesContent.Visibility = IsModifiedFilesMinimized
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            _modifiedFilesToggleIcon.Glyph = IsModifiedFilesMinimized
+                ? "\uE70E"
+                : "\uE70D";
         }
 
         private void UpdateHostVisibility()

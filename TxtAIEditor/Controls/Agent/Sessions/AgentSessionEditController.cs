@@ -69,12 +69,18 @@ namespace TxtAIEditor.Controls
 
         public void Replace(IEnumerable<AgentFileEditPreview>? edits, string sessionId)
         {
+            var replacementEdits = edits?.Select(Clone).ToList() ?? new List<AgentFileEditPreview>();
+            bool sessionChanged = !string.Equals(CurrentSessionId, sessionId, StringComparison.Ordinal);
+
             CurrentSessionId = sessionId;
-            _sessionEdits.Clear();
-            if (edits != null)
+
+            if (!sessionChanged && AreEquivalent(_sessionEdits, replacementEdits))
             {
-                _sessionEdits.AddRange(edits.Select(Clone));
+                return;
             }
+
+            _sessionEdits.Clear();
+            _sessionEdits.AddRange(replacementEdits);
 
             UpdateModificationNumbers();
             UpdateModifiedFilesList();
@@ -287,6 +293,36 @@ namespace TxtAIEditor.Controls
                 ModificationNumber = preview.ModificationNumber,
                 TotalModifications = preview.TotalModifications
             };
+        }
+
+        private static bool AreEquivalent(
+            IReadOnlyList<AgentFileEditPreview> currentEdits,
+            IReadOnlyList<AgentFileEditPreview> replacementEdits)
+        {
+            if (currentEdits.Count != replacementEdits.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < currentEdits.Count; i++)
+            {
+                AgentFileEditPreview current = currentEdits[i];
+                AgentFileEditPreview replacement = replacementEdits[i];
+                if (!string.Equals(current.ActionName, replacement.ActionName, StringComparison.Ordinal) ||
+                    !string.Equals(current.RelativePath, replacement.RelativePath, StringComparison.Ordinal) ||
+                    !string.Equals(current.FullPath, replacement.FullPath, StringComparison.Ordinal) ||
+                    !string.Equals(current.DisplayPath, replacement.DisplayPath, StringComparison.Ordinal) ||
+                    !string.Equals(current.OldContent, replacement.OldContent, StringComparison.Ordinal) ||
+                    !string.Equals(current.NewContent, replacement.NewContent, StringComparison.Ordinal) ||
+                    current.IsNewFile != replacement.IsNewFile ||
+                    current.ModificationNumber != replacement.ModificationNumber ||
+                    current.TotalModifications != replacement.TotalModifications)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static string GetSessionEditKey(string fullPath, string relativePath)

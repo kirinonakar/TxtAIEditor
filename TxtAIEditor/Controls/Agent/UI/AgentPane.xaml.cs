@@ -148,7 +148,9 @@ namespace TxtAIEditor.Controls
                 AgentPowerShellCommandPanel,
                 AgentPowerShellConfirmCommand,
                 AgentModifiedFilesPanel,
+                AgentModifiedFilesContent,
                 AgentModifiedFilesList,
+                AgentModifiedFilesToggleIcon,
                 preview => FileDiffRequested?.Invoke(this, preview),
                 preview => FileRevertRequested?.Invoke(this, preview));
 
@@ -276,6 +278,7 @@ namespace TxtAIEditor.Controls
             AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (클릭 시 비교)");
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
             ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
+            UpdateModifiedFilesToggleAccessibility();
             _menuCoordinator.RebuildAll();
             _sessionMenuCoordinator.Localize(getString, newSessionButtonText);
         }
@@ -790,6 +793,27 @@ private Style? _accentRunButtonStyle;
         {
             _reviewController.CloseModifiedFiles();
         }
+
+        private void OnModifiedFilesToggleClick(object sender, RoutedEventArgs e)
+        {
+            _reviewController.ToggleModifiedFiles();
+            UpdateModifiedFilesToggleAccessibility();
+        }
+
+        private void UpdateModifiedFilesToggleAccessibility()
+        {
+            if (_getString == null)
+            {
+                return;
+            }
+
+            string text = _reviewController.IsModifiedFilesMinimized
+                ? _getString("AgentModifiedFilesRestoreTooltip", "변경 파일 목록 복구")
+                : _getString("AgentModifiedFilesMinimizeTooltip", "변경 파일 목록 최소화");
+            ToolTipService.SetToolTip(AgentModifiedFilesToggleButton, text);
+            AutomationProperties.SetName(AgentModifiedFilesToggleButton, text);
+        }
+
         public void UpdateModelName(string text)
         {
             if (!string.Equals(AgentModelNameText.Text, text, StringComparison.Ordinal))

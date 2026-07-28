@@ -2529,6 +2529,12 @@
   <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
     <value>リストを閉じる</value>
   </data>
+  <data name="AgentModifiedFilesMinimizeTooltip" xml:space="preserve">
+    <value>変更ファイル一覧を最小化</value>
+  </data>
+  <data name="AgentModifiedFilesRestoreTooltip" xml:space="preserve">
+    <value>変更ファイル一覧を復元</value>
+  </data>
   <data name="AgentAddAttachmentTooltip" xml:space="preserve">
     <value>画像またはファイルを追加</value>
   </data>

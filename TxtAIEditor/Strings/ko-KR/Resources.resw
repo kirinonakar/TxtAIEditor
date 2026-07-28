@@ -2529,6 +2529,12 @@
   <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
     <value>목록 닫기</value>
   </data>
+  <data name="AgentModifiedFilesMinimizeTooltip" xml:space="preserve">
+    <value>변경 파일 목록 최소화</value>
+  </data>
+  <data name="AgentModifiedFilesRestoreTooltip" xml:space="preserve">
+    <value>변경 파일 목록 복구</value>
+  </data>
   <data name="AgentAddAttachmentTooltip" xml:space="preserve">
     <value>이미지 또는 파일 추가</value>
   </data>

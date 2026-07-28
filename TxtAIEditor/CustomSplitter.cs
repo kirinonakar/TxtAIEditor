@@ -29,6 +29,7 @@ namespace TxtAIEditor
 
         private bool _isHorizontalSplitter;
         private bool _isPointerOver;
+        private bool _isDragging;
 
         public CustomSplitter()
         {
@@ -38,6 +39,9 @@ namespace TxtAIEditor
 
             this.PointerEntered += CustomSplitter_PointerEntered;
             this.PointerExited += CustomSplitter_PointerExited;
+            this.PointerPressed += CustomSplitter_PointerPressed;
+            this.PointerReleased += CustomSplitter_PointerReleased;
+            this.PointerCanceled += CustomSplitter_PointerCanceled;
             this.PointerCaptureLost += CustomSplitter_PointerCaptureLost;
             this.Loaded += CustomSplitter_Loaded;
             this.Unloaded += CustomSplitter_Unloaded;
@@ -80,7 +84,9 @@ namespace TxtAIEditor
 
         public void RefreshTheme()
         {
-            ApplyBackground(_isPointerOver ? SplitterHoverBackgroundBrushKey : SplitterBackgroundBrushKey);
+            ApplyBackground(IsResizePointerActive
+                ? SplitterHoverBackgroundBrushKey
+                : SplitterBackgroundBrushKey);
         }
 
         private void CustomSplitter_Loaded(object sender, RoutedEventArgs e)
@@ -97,22 +103,61 @@ namespace TxtAIEditor
         private void CustomSplitter_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
             _isPointerOver = true;
-            _isHorizontalSplitter = IsHorizontalSplitter();
-            this.ProtectedCursor = InputSystemCursor.Create(_isHorizontalSplitter
-                ? InputSystemCursorShape.SizeNorthSouth
-                : InputSystemCursorShape.SizeWestEast);
+            if (!_isDragging)
+            {
+                _isHorizontalSplitter = IsHorizontalSplitter();
+            }
 
-            ApplyBackground(SplitterHoverBackgroundBrushKey);
+            UpdatePointerVisualState();
         }
 
         private void CustomSplitter_PointerExited(object sender, PointerRoutedEventArgs e)
         {
-            ClearPointerState();
+            _isPointerOver = false;
+            UpdatePointerVisualState();
+        }
+
+        private void CustomSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            _isDragging = true;
+            _isHorizontalSplitter = IsHorizontalSplitter();
+            UpdatePointerVisualState();
+        }
+
+        private void CustomSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (!_isDragging)
+            {
+                return;
+            }
+
+            _isDragging = false;
+            _isPointerOver = IsPointerWithinBounds(e);
+            UpdatePointerVisualState();
+        }
+
+        private void CustomSplitter_PointerCanceled(object sender, PointerRoutedEventArgs e)
+        {
+            _isDragging = false;
+            _isPointerOver = IsPointerWithinBounds(e);
+            UpdatePointerVisualState();
         }
 
         private void CustomSplitter_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
         {
-            ClearPointerState();
+            if (_isDragging && e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            _isDragging = false;
+            _isPointerOver = IsPointerWithinBounds(e);
+            UpdatePointerVisualState();
         }
 
         private void CustomSplitter_Unloaded(object sender, RoutedEventArgs e)
@@ -123,8 +168,35 @@ namespace TxtAIEditor
         private void ClearPointerState()
         {
             _isPointerOver = false;
+            _isDragging = false;
             this.ProtectedCursor = null;
             ApplyBackground(SplitterBackgroundBrushKey);
+        }
+
+        private bool IsResizePointerActive => _isPointerOver || _isDragging;
+
+        private void UpdatePointerVisualState()
+        {
+            if (IsResizePointerActive)
+            {
+                this.ProtectedCursor = InputSystemCursor.Create(_isHorizontalSplitter
+                    ? InputSystemCursorShape.SizeNorthSouth
+                    : InputSystemCursorShape.SizeWestEast);
+                ApplyBackground(SplitterHoverBackgroundBrushKey);
+                return;
+            }
+
+            this.ProtectedCursor = null;
+            ApplyBackground(SplitterBackgroundBrushKey);
+        }
+
+        private bool IsPointerWithinBounds(PointerRoutedEventArgs e)
+        {
+            var position = e.GetCurrentPoint(this).Position;
+            return position.X >= 0 &&
+                position.Y >= 0 &&
+                position.X <= ActualWidth &&
+                position.Y <= ActualHeight;
         }
 
         private void UpdateVisualLineLayout()

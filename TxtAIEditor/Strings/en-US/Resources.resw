@@ -2529,6 +2529,12 @@ Plan: {0}</value>
   <data name="AgentModifiedFilesCloseTooltip" xml:space="preserve">
     <value>Close list</value>
   </data>
+  <data name="AgentModifiedFilesMinimizeTooltip" xml:space="preserve">
+    <value>Minimize modified files</value>
+  </data>
+  <data name="AgentModifiedFilesRestoreTooltip" xml:space="preserve">
+    <value>Restore modified files</value>
+  </data>
   <data name="AgentAddAttachmentTooltip" xml:space="preserve">
     <value>Add image or file</value>
   </data>
