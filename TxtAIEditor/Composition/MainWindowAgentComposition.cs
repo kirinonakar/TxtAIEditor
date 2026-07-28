@@ -121,6 +121,7 @@ namespace TxtAIEditor.Composition
                     ensureUniqueUntitledName: false,
                     viewModel,
                     services,
+                    editorSessions,
                     editor.TabDirtyState,
                     callbacks),
                 shell.Dialog.ShowErrorMessage,
@@ -175,6 +176,7 @@ namespace TxtAIEditor.Composition
                     ensureUniqueUntitledName: true,
                     viewModel,
                     services,
+                    editorSessions,
                     editor.TabDirtyState,
                     callbacks),
                 shell.Dialog.ShowErrorMessage,
@@ -241,6 +243,7 @@ namespace TxtAIEditor.Composition
             bool ensureUniqueUntitledName,
             MainWindowViewModel viewModel,
             MainWindowServices services,
+            Dictionary<string, EditorDocumentSession> editorSessions,
             TabDirtyStateController tabDirtyState,
             MainWindowAgentCompositionCallbacks callbacks)
         {
@@ -274,7 +277,11 @@ namespace TxtAIEditor.Composition
             tab.Language = !string.IsNullOrWhiteSpace(title)
                 ? services.LanguageDetectionService.GetEditorLanguageName(title)
                 : "plaintext";
-            tab.OriginalContent = string.Empty;
+            if (editorSessions.TryGetValue(tab.Id, out var session))
+            {
+                session.SetSavedBaseline(new[] { string.Empty });
+                session.MarkUnsavedState();
+            }
             tabDirtyState.MarkTabDirty(tab);
             callbacks.UpdateWindowTitle();
             return tab;

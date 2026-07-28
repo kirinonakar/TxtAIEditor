@@ -60,7 +60,6 @@ namespace TxtAIEditor.Controls
 
             var documentModel = textModel ?? TextModelFactory.FromText(content);
             var session = new EditorDocumentSession(tab, documentModel);
-            tab.OriginalContent = documentModel.GetText();
             tab.OriginalLineEnding = documentModel.LineEnding;
             tab.OriginalEncodingName = encodingName;
 

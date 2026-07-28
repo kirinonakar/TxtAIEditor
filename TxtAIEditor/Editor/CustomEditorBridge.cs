@@ -27,7 +27,6 @@ namespace TxtAIEditor.Editor
         private readonly object _flushLock = new object();
         private readonly Dictionary<int, TaskCompletionSource<long>> _pendingFlushRequests = new Dictionary<int, TaskCompletionSource<long>>();
         private int _flushRequestSeq = 0;
-        private IReadOnlyList<string>? _currentOriginalLines;
         private Dictionary<int, string>? _currentDirtyLines;
 
         public event Action<bool>? ContentChanged { add => _messageRouter.ContentChanged += value; remove => _messageRouter.ContentChanged -= value; }
@@ -113,14 +112,6 @@ namespace TxtAIEditor.Editor
             await SendMessageAsync(msg);
         }
 
-        public async Task ResetOriginalLinesAsync(IReadOnlyList<string> lines)
-        {
-            _currentOriginalLines = lines.ToArray();
-            _currentDirtyLines = new Dictionary<int, string>();
-            var msg = new { action = "resetOriginalLines", lines = _currentOriginalLines };
-            await SendMessageAsync(msg);
-        }
-
         public async Task UpdateDirtyLinesAsync(Dictionary<int, string> dirtyLines)
         {
             _currentDirtyLines = new Dictionary<int, string>(dirtyLines);
@@ -157,13 +148,8 @@ namespace TxtAIEditor.Editor
                 _localizationService);
             await SendMessageAsync(message);
 
-            // A split view can inherit its saved baseline and dirty markers before its
-            // WebView has finished initializing. Reapply the latest state after initModel,
-            // which clears both collections on the JavaScript side.
-            if (_currentOriginalLines != null)
-            {
-                await SendMessageAsync(new { action = "resetOriginalLines", lines = _currentOriginalLines });
-            }
+            // A split view can inherit dirty markers before its WebView has finished
+            // initializing. Reapply the latest host-owned state after initModel.
             if (settings.ShowDirtyLines && _currentDirtyLines != null)
             {
                 await SendMessageAsync(new { action = "updateDirtyLines", dirtyLines = _currentDirtyLines });

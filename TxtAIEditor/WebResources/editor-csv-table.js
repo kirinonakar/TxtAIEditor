@@ -619,7 +619,7 @@ function replaceJsonDocumentText(nextText) {
     if (state.showDirtyLines) {
         for (let line = 1; line <= state.lineCount; line++) {
             if (!cleanDirtyMarker(line)) {
-                state.dirtyLines.set(line, line <= state.originalLines.length ? 'mod' : 'add');
+                state.dirtyLines.set(line, 'mod');
             }
         }
     }

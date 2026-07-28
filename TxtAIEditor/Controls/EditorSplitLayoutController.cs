@@ -41,7 +41,6 @@ namespace TxtAIEditor.Controls
         private readonly Action<TabView, TabViewItem> _queueTabSelectionChanged;
         private readonly Action _clearTabSelectionQueue;
         private readonly Action _updateWindowTitle;
-        private readonly int _initialEditorLineWarmupCount;
 
         public EditorSplitLayoutController(
             TopCommandBarPane topToolbar,
@@ -62,8 +61,7 @@ namespace TxtAIEditor.Controls
             Action<TabView, TabViewTabCloseRequestedEventArgs> closeTabRequested,
             Action<TabView, TabViewItem> queueTabSelectionChanged,
             Action clearTabSelectionQueue,
-            Action updateWindowTitle,
-            int initialEditorLineWarmupCount)
+            Action updateWindowTitle)
         {
             _topToolbar = topToolbar;
             _editorWorkspace = editorWorkspace;
@@ -84,7 +82,6 @@ namespace TxtAIEditor.Controls
             _queueTabSelectionChanged = queueTabSelectionChanged;
             _clearTabSelectionQueue = clearTabSelectionQueue;
             _updateWindowTitle = updateWindowTitle;
-            _initialEditorLineWarmupCount = initialEditorLineWarmupCount;
 
             WireEvents();
         }
@@ -160,15 +157,8 @@ namespace TxtAIEditor.Controls
             {
                 splitViewSession.ShareDocumentWith(sourceSession);
                 newTab.ContentPreview = activeTab.ContentPreview;
-                newTab.OriginalContent = activeTab.OriginalContent;
                 newTab.OriginalLineEnding = activeTab.OriginalLineEnding;
                 newTab.OriginalEncodingName = activeTab.OriginalEncodingName;
-
-                if (_tabBridges.TryGetValue(newTab.Id, out var splitBridgeGroup) && splitBridgeGroup.Bridge != null)
-                {
-                    _ = splitBridgeGroup.Bridge.ResetOriginalLinesAsync(
-                        newTab.OriginalLines.Take(_initialEditorLineWarmupCount).ToArray());
-                }
             }
 
             newTab.IsDirty = isDirty;
@@ -282,11 +272,17 @@ namespace TxtAIEditor.Controls
             }
 
             keeper.IsDirty |= duplicate.IsDirty;
-            keeper.OriginalContent = duplicate.OriginalContent;
             keeper.OriginalLineEnding = duplicate.OriginalLineEnding;
             keeper.OriginalEncodingName = duplicate.OriginalEncodingName;
             keeper.EncodingName = duplicate.EncodingName;
             keeper.EncodingWasAutoDetected = duplicate.EncodingWasAutoDetected;
+
+            if (_editorSessions.TryGetValue(keeper.Id, out var keeperSavedSession) &&
+                _editorSessions.TryGetValue(duplicate.Id, out var duplicateSavedSession) &&
+                !keeperSavedSession.SharesDocumentWith(duplicateSavedSession))
+            {
+                keeperSavedSession.CopySavedBaselineFrom(duplicateSavedSession);
+            }
         }
 
         private void OnEditorTabView2AddTabClick(TabView sender, object args)

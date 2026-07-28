@@ -72,7 +72,6 @@ namespace TxtAIEditor.Controls
             string EncodingName,
             bool EncodingWasAutoDetected,
             bool InlineLivePreviewEnabled,
-            string OriginalContent,
             string? OriginalLineEnding,
             string? OriginalEncodingName,
             string? HexSourceFilePath,
@@ -222,7 +221,6 @@ namespace TxtAIEditor.Controls
             };
 
             var session = new EditorDocumentSession(tab, model);
-            tab.OriginalContent = tab.ContentPreview;
             tab.OriginalLineEnding = model.LineEnding;
             tab.OriginalEncodingName = tab.EncodingName;
 
@@ -341,7 +339,6 @@ namespace TxtAIEditor.Controls
             var diskSession = new EditorDocumentSession(tab, TextModelFactory.FromText(diskText));
             diskSession.RefreshTabContentPreview();
             _editorSessions[tab.Id] = diskSession;
-            tab.OriginalContent = diskText;
             tab.OriginalLineEnding = diskSession.Model.LineEnding;
             tab.OriginalEncodingName = tab.EncodingName;
             tab.IsDirty = false;
@@ -399,7 +396,6 @@ namespace TxtAIEditor.Controls
                 tab.EncodingName,
                 tab.EncodingWasAutoDetected,
                 tab.InlineLivePreviewEnabled,
-                tab.OriginalContent,
                 tab.OriginalLineEnding,
                 tab.OriginalEncodingName,
                 tab.HexSourceFilePath,
@@ -441,15 +437,18 @@ namespace TxtAIEditor.Controls
             tab.InlineLivePreviewEnabled = state.InlineLivePreviewEnabled;
 
             EditorDocumentSession restoredSession;
+            bool hexWasDirty = tab.IsDirty;
             if (!discardPendingHexEdits &&
                 (!ReferenceEquals(hexModel, state.InitialHexModel) || hexModel.HasEverBeenEdited))
             {
                 string restoredText = DecodeText(hexModel.GetCurrentBytes(), state.EncodingName);
                 restoredSession = new EditorDocumentSession(tab, TextModelFactory.FromText(restoredText));
+                restoredSession.CopySavedBaselineFrom(state.TextSession);
             }
             else
             {
                 restoredSession = state.TextSession;
+                tab.AttachDocument(restoredSession.Document);
                 restoredSession.RefreshTabContentPreview();
             }
 
@@ -458,16 +457,18 @@ namespace TxtAIEditor.Controls
             {
                 tab.IsDirty = state.WasDirty;
             }
+            else
+            {
+                tab.IsDirty = hexWasDirty;
+            }
 
             if (tab.IsDirty)
             {
-                tab.OriginalContent = state.OriginalContent;
                 tab.OriginalLineEnding = state.OriginalLineEnding;
                 tab.OriginalEncodingName = state.OriginalEncodingName;
             }
             else
             {
-                tab.OriginalContent = restoredSession.GetText();
                 tab.OriginalLineEnding = restoredSession.Model.LineEnding;
                 tab.OriginalEncodingName = tab.EncodingName;
             }

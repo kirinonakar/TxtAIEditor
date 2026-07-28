@@ -225,8 +225,7 @@ namespace TxtAIEditor.Composition
                 callbacks.CloseTabRequested,
                 tabSelection.QueueChanged,
                 tabSelection.ClearQueue,
-                callbacks.UpdateWindowTitle,
-                initialEditorLineWarmupCount);
+                callbacks.UpdateWindowTitle);
 
             return new MainWindowEditorRuntimeControllers(
                 toc,

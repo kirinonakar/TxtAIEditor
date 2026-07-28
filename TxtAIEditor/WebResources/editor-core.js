@@ -9,7 +9,6 @@ const HEX_RENDER_OVERSCAN = 48;
 const BROWSER_SCROLL_HEIGHT_LIMIT = 12000000;
 const HEX_CACHE_RETAIN_LINES = 512;
 const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
-const MAX_DIRTY_DIFF_CELLS = 4000000;
 
 const runtime = {
     drawEditableSelectionOverlays: () => { },
@@ -131,7 +130,6 @@ const state = {
         suppressBeforeInputUntil: 0,
         suppressBeforeInputTypes: new Set()
     },
-    originalLines: [],
     dirtyLines: new Map(),
     csvVirtualLineCount: 0,
     longLineProtectionFormat: '... too long ({0} characters total)'
@@ -1288,11 +1286,6 @@ function shiftLineMap(map, fromLine, delta) {
     }
 }
 
-function setOriginalLines(lines) {
-    state.originalLines = Array.isArray(lines) ? lines.slice() : [];
-    state.dirtyLines.clear();
-}
-
 function markDirty(lineNumber, type) {
     if (!state.showDirtyLines) return;
     const existing = state.dirtyLines.get(lineNumber);
@@ -1301,226 +1294,9 @@ function markDirty(lineNumber, type) {
 }
 
 function cleanDirtyMarker(lineNumber) {
-    if (!state.showDirtyLines) return true;
-    const origIdx = lineNumber - 1;
-    if (origIdx >= 0 && origIdx < state.originalLines.length) {
-        const currentText = state.cache.get(lineNumber);
-        if (currentText !== undefined && currentText === state.originalLines[origIdx]) {
-            state.dirtyLines.delete(lineNumber);
-            return true;
-        }
-    }
-    return false;
-}
-function recomputeDirtyLines() {
-    if (!state.showDirtyLines) {
-        state.dirtyLines.clear();
-        return;
-    }
-
-    const orig = state.originalLines || [];
-    const current = [];
-    for (let i = 1; i <= state.lineCount; i++) {
-        current.push(state.cache.get(i) ?? '');
-    }
-
-    state.dirtyLines = computeDirtyLineMarkers(orig, current);
-}
-
-function computeDirtyLineMarkers(orig, current) {
-    const markers = new Map();
-
-    let prefixMatchCount = 0;
-    const maxPrefix = Math.min(orig.length, current.length);
-    while (prefixMatchCount < maxPrefix && orig[prefixMatchCount] === current[prefixMatchCount]) {
-        prefixMatchCount++;
-    }
-
-    let suffixMatchCount = 0;
-    const maxSuffix = Math.min(orig.length - prefixMatchCount, current.length - prefixMatchCount);
-    while (suffixMatchCount < maxSuffix &&
-           orig[orig.length - 1 - suffixMatchCount] === current[current.length - 1 - suffixMatchCount]) {
-        suffixMatchCount++;
-    }
-
-    const unmatchedOrigCount = orig.length - prefixMatchCount - suffixMatchCount;
-    const unmatchedCurrentCount = current.length - prefixMatchCount - suffixMatchCount;
-    const limitOrig = orig.length - suffixMatchCount;
-    const limitCurr = current.length - suffixMatchCount;
-
-    if (unmatchedOrigCount === 0) {
-        for (let line = prefixMatchCount; line < limitCurr; line++) {
-            markers.set(line + 1, 'add');
-        }
-        return markers;
-    }
-
-    if (unmatchedCurrentCount === 0) {
-        markDeletionMarker(markers, prefixMatchCount, 0, current.length);
-        return markers;
-    }
-
-    const cellCount = unmatchedOrigCount * unmatchedCurrentCount;
-    if (cellCount <= MAX_DIRTY_DIFF_CELLS) {
-        const matches = computeLcsMatches(orig, prefixMatchCount, limitOrig, current, prefixMatchCount, limitCurr);
-        let previousOrig = prefixMatchCount;
-        let previousCurrent = prefixMatchCount;
-
-        for (const match of matches) {
-            addDirtyMarkersForGap(
-                markers,
-                previousOrig,
-                match.origIndex,
-                previousCurrent,
-                match.currentIndex,
-                current.length);
-            previousOrig = match.origIndex + 1;
-            previousCurrent = match.currentIndex + 1;
-        }
-
-        addDirtyMarkersForGap(
-            markers,
-            previousOrig,
-            limitOrig,
-            previousCurrent,
-            limitCurr,
-            current.length);
-
-        return markers;
-    }
-
-    return computeDirtyLineMarkersGreedy(
-        orig,
-        current,
-        prefixMatchCount,
-        suffixMatchCount,
-        unmatchedOrigCount,
-        unmatchedCurrentCount);
-}
-
-function computeLcsMatches(orig, origStart, origEnd, current, currentStart, currentEnd) {
-    const origCount = origEnd - origStart;
-    const currentCount = currentEnd - currentStart;
-    const columns = currentCount + 1;
-    const table = new Uint32Array((origCount + 1) * columns);
-
-    for (let oi = origCount - 1; oi >= 0; oi--) {
-        for (let ci = currentCount - 1; ci >= 0; ci--) {
-            const index = oi * columns + ci;
-            table[index] = orig[origStart + oi] === current[currentStart + ci]
-                ? table[(oi + 1) * columns + ci + 1] + 1
-                : Math.max(table[(oi + 1) * columns + ci], table[oi * columns + ci + 1]);
-        }
-    }
-
-    const matches = [];
-    let oi = 0;
-    let ci = 0;
-    while (oi < origCount && ci < currentCount) {
-        if (orig[origStart + oi] === current[currentStart + ci]) {
-            matches.push({ origIndex: origStart + oi, currentIndex: currentStart + ci });
-            oi++;
-            ci++;
-        } else if (table[(oi + 1) * columns + ci] >= table[oi * columns + ci + 1]) {
-            oi++;
-        } else {
-            ci++;
-        }
-    }
-
-    return matches;
-}
-
-function addDirtyMarkersForGap(markers, origStart, origEnd, currentStart, currentEnd, currentLineCount) {
-    const deletedCount = origEnd - origStart;
-    const insertedCount = currentEnd - currentStart;
-    if (deletedCount <= 0 && insertedCount <= 0) return;
-
-    const modifiedCount = Math.min(deletedCount, insertedCount);
-    for (let i = 0; i < modifiedCount; i++) {
-        markers.set(currentStart + i + 1, 'mod');
-    }
-
-    for (let i = modifiedCount; i < insertedCount; i++) {
-        markers.set(currentStart + i + 1, 'add');
-    }
-
-    if (deletedCount > insertedCount) {
-        markDeletionMarker(markers, currentStart, insertedCount, currentLineCount);
-    }
-}
-
-function markDeletionMarker(markers, currentStart, insertedCount, currentLineCount) {
-    if (currentLineCount <= 0) return;
-
-    let markerLine;
-    if (insertedCount === 0) {
-        markerLine = Math.max(1, Math.min(currentStart, currentLineCount));
-    } else if (currentStart + insertedCount < currentLineCount) {
-        markerLine = currentStart + insertedCount + 1;
-    } else {
-        markerLine = Math.max(1, Math.min(currentStart + insertedCount, currentLineCount));
-    }
-
-    if (!markers.has(markerLine)) {
-        markers.set(markerLine, 'del');
-    }
-}
-
-function computeDirtyLineMarkersGreedy(
-    orig,
-    current,
-    prefixMatchCount,
-    suffixMatchCount,
-    unmatchedOrigCount,
-    unmatchedCurrentCount) {
-    const markers = new Map();
-
-    let oi = prefixMatchCount;
-    let ci = prefixMatchCount;
-    const limitOrig = orig.length - suffixMatchCount;
-    const limitCurr = current.length - suffixMatchCount;
-
-    const scanLimit = Math.max(100, Math.abs(unmatchedOrigCount - unmatchedCurrentCount) + 10);
-
-    while (oi < limitOrig && ci < limitCurr) {
-        if (orig[oi] === current[ci]) {
-            oi++; ci++;
-        } else {
-            let aheadOrig = -1;
-            for (let s = oi + 1; s < Math.min(oi + scanLimit, limitOrig); s++) {
-                if (orig[s] === current[ci]) { aheadOrig = s; break; }
-            }
-            let aheadCurr = -1;
-            for (let s = ci + 1; s < Math.min(ci + scanLimit, limitCurr); s++) {
-                if (current[s] === orig[oi]) { aheadCurr = s; break; }
-            }
-
-            if (aheadOrig >= 0 && (aheadCurr < 0 || (aheadOrig - oi) < (aheadCurr - ci))) {
-                markers.set(ci + 1, 'del');
-                oi = aheadOrig;
-            } else if (aheadCurr >= 0) {
-                for (let a = ci; a < aheadCurr; a++) {
-                    markers.set(a + 1, 'add');
-                }
-                ci = aheadCurr;
-            } else {
-                markers.set(ci + 1, 'mod');
-                oi++; ci++;
-            }
-        }
-    }
-
-    if (oi < limitOrig && state.lineCount >= 1) {
-        markers.set(limitCurr, 'del');
-    }
-
-    while (ci < limitCurr) {
-        markers.set(ci + 1, 'add');
-        ci++;
-    }
-
-    return markers;
+    // The host owns the saved baseline and sends authoritative dirty markers.
+    // Local edits stay optimistically dirty until the deferred host reconciliation.
+    return !state.showDirtyLines;
 }
 function reportCursorAndSelection(
     element = document.activeElement,
@@ -1932,7 +1708,6 @@ export {
     queueRender,
     readClipboardText,
     receiveLineBlock,
-    recomputeDirtyLines,
     reportCursorAndSelection,
     requestLines,
     requestMissingLines,
@@ -1940,7 +1715,6 @@ export {
     selectedLineRange,
     selectionInfo,
     selectedText,
-    setOriginalLines,
     setupModel,
     setupVirtualHeight,
     shiftCachedLines,

@@ -94,7 +94,7 @@ namespace TxtAIEditor.Controls
                     string decryptedText = await _secureNoteEncryptionService.DecryptFileAsync(tab.FilePath, password);
                     var encryptedModel = TextModelFactory.FromText(decryptedText);
                     tab.EncryptionPassword = password;
-                    ApplyTabReloadState(tab, encryptedModel, "UTF-8", false, decryptedText);
+                    ApplyTabReloadState(tab, encryptedModel, "UTF-8", false);
 
                     var encryptedSession = new EditorDocumentSession(tab, encryptedModel);
                     _editorSessions[tab.Id] = encryptedSession;
@@ -108,8 +108,7 @@ namespace TxtAIEditor.Controls
                     tab,
                     readResult.Model,
                     readResult.EncodingName,
-                    readResult.EncodingWasAutoDetected,
-                    readResult.Model.GetText());
+                    readResult.EncodingWasAutoDetected);
 
                 var session = new EditorDocumentSession(tab, readResult.Model);
                 _editorSessions[tab.Id] = session;
@@ -151,7 +150,7 @@ namespace TxtAIEditor.Controls
                     var documentService = new DocumentTextExtractionService();
                     string extractedText = await documentService.ExtractTextAsync(tab.FilePath, 50_000_000);
                     var docxModel = TextModelFactory.FromText(extractedText);
-                    ApplyTabReloadState(tab, docxModel, "UTF-8", false, extractedText);
+                    ApplyTabReloadState(tab, docxModel, "UTF-8", false);
 
                     if (_editorSessions.TryGetValue(tab.Id, out var docxSession))
                     {
@@ -174,7 +173,7 @@ namespace TxtAIEditor.Controls
                     string decryptedText = await _secureNoteEncryptionService.DecryptFileAsync(tab.FilePath, password);
                     var encryptedModel = TextModelFactory.FromText(decryptedText);
                     tab.EncryptionPassword = password;
-                    ApplyTabReloadState(tab, encryptedModel, "UTF-8", false, decryptedText);
+                    ApplyTabReloadState(tab, encryptedModel, "UTF-8", false);
 
                     if (_editorSessions.TryGetValue(tab.Id, out var encryptedSession))
                     {
@@ -192,8 +191,7 @@ namespace TxtAIEditor.Controls
                     tab,
                     readResult.Model,
                     readResult.EncodingName,
-                    readResult.EncodingWasAutoDetected,
-                    content);
+                    readResult.EncodingWasAutoDetected);
 
                 if (_editorSessions.TryGetValue(tab.Id, out var session))
                 {
@@ -236,8 +234,7 @@ namespace TxtAIEditor.Controls
                 tab,
                 readResult.Model,
                 readResult.EncodingName,
-                readResult.EncodingWasAutoDetected,
-                content);
+                readResult.EncodingWasAutoDetected);
 
             tab.IsReadOnlyTextFile = true;
             tab.SetArchiveEntryOrigin(
@@ -299,7 +296,6 @@ namespace TxtAIEditor.Controls
             }
 
             tab.IsDirty = false;
-            tab.OriginalContent = tab.ContentPreview;
             tab.OriginalLineEnding = hexModel.LineEnding;
             tab.OriginalEncodingName = tab.EncodingName;
             tab.RefreshPreviewResourceVersion();
@@ -327,13 +323,11 @@ namespace TxtAIEditor.Controls
             OpenedTab tab,
             ITextModel model,
             string encodingName,
-            bool encodingWasAutoDetected,
-            string originalContent)
+            bool encodingWasAutoDetected)
         {
             tab.EncodingName = encodingName;
             tab.EncodingWasAutoDetected = encodingWasAutoDetected;
             tab.IsDirty = false;
-            tab.OriginalContent = originalContent;
             tab.OriginalLineEnding = model.LineEnding;
             tab.OriginalEncodingName = encodingName;
             tab.RefreshPreviewResourceVersion();

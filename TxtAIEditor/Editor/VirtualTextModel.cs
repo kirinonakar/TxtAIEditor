@@ -893,8 +893,9 @@ namespace TxtAIEditor.Editor
         private readonly Queue<EditorDocumentChange> _changeLog = new(ChangeLogCapacity);
         private string _encodingName;
         private bool _encodingWasAutoDetected;
-        private string _originalContent;
-        private string[]? _originalLines;
+        // The snapshot owns only line references. Unchanged lines share their immutable
+        // strings with the live model, avoiding a second full document character buffer.
+        private IReadOnlyList<string> _savedLines;
         private string? _originalLineEnding;
         private string? _originalEncodingName;
         private DocumentOrigin _origin;
@@ -904,7 +905,6 @@ namespace TxtAIEditor.Editor
             ITextModel model,
             string encodingName,
             bool encodingWasAutoDetected,
-            string originalContent,
             string? originalLineEnding,
             string? originalEncodingName,
             DocumentOrigin origin,
@@ -913,7 +913,7 @@ namespace TxtAIEditor.Editor
             _model = model;
             _encodingName = encodingName;
             _encodingWasAutoDetected = encodingWasAutoDetected;
-            _originalContent = originalContent;
+            _savedLines = CaptureSavedLines(model);
             _originalLineEnding = originalLineEnding;
             _originalEncodingName = originalEncodingName;
             _origin = origin;
@@ -946,29 +946,7 @@ namespace TxtAIEditor.Editor
             set => SetState(ref _encodingWasAutoDetected, value, nameof(EncodingWasAutoDetected));
         }
 
-        public string OriginalContent
-        {
-            get => _originalContent;
-            set
-            {
-                string normalized = value ?? string.Empty;
-                if (string.Equals(_originalContent, normalized, StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                _originalContent = normalized;
-                _originalLines = null;
-                StateChanged?.Invoke(nameof(OriginalContent));
-                StateChanged?.Invoke(nameof(OriginalLines));
-            }
-        }
-
-        public string[] OriginalLines =>
-            _originalLines ??= _originalContent
-                .Replace("\r\n", "\n")
-                .Replace('\r', '\n')
-                .Split('\n');
+        public IReadOnlyList<string> SavedLines => _savedLines;
 
         public string? OriginalLineEnding
         {
@@ -1018,6 +996,21 @@ namespace TxtAIEditor.Editor
         internal UndoManager UndoManager { get; } = new();
 
         internal EditorDocumentChange? LastChange { get; private set; }
+
+        internal void CaptureSavedBaseline()
+        {
+            _savedLines = CaptureSavedLines(_model);
+        }
+
+        internal void CopySavedBaselineFrom(EditorDocument source)
+        {
+            _savedLines = source._savedLines;
+        }
+
+        internal void SetSavedBaseline(IReadOnlyList<string> lines)
+        {
+            _savedLines = lines is string[] array ? array : lines.ToArray();
+        }
 
         internal EditorDocumentChange ReplaceModel(string sourceViewId, ITextModel model, bool clearUndo)
         {
@@ -1147,6 +1140,13 @@ namespace TxtAIEditor.Editor
             field = value;
             StateChanged?.Invoke(propertyName);
         }
+
+        private static IReadOnlyList<string> CaptureSavedLines(ITextModel model)
+        {
+            return model is HexDumpTextModel
+                ? Array.Empty<string>()
+                : model.GetLines(1, model.LineCount);
+        }
     }
 
     // A per-view session over a shared EditorDocument. Split views have distinct
@@ -1164,7 +1164,6 @@ namespace TxtAIEditor.Editor
                 model,
                 tab.EncodingName,
                 tab.EncodingWasAutoDetected,
-                tab.OriginalContent,
                 tab.OriginalLineEnding,
                 tab.OriginalEncodingName,
                 tab.Origin,
@@ -1192,6 +1191,8 @@ namespace TxtAIEditor.Editor
 
         public bool IsAtSavedState => _document.UndoManager.IsAtSavedState;
 
+        public IReadOnlyList<string> SavedLines => _document.SavedLines;
+
         public bool TryGetChangesSince(
             long version,
             out IReadOnlyList<EditorDocumentChange> changes) =>
@@ -1215,8 +1216,19 @@ namespace TxtAIEditor.Editor
 
         public void MarkSavedState()
         {
+            _document.CaptureSavedBaseline();
             _document.UndoManager.MarkSavedState();
             _document.IsDirty = false;
+        }
+
+        public void CopySavedBaselineFrom(EditorDocumentSession source)
+        {
+            _document.CopySavedBaselineFrom(source._document);
+        }
+
+        public void SetSavedBaseline(IReadOnlyList<string> lines)
+        {
+            _document.SetSavedBaseline(lines);
         }
 
         public void MarkUnsavedState()
@@ -1265,6 +1277,10 @@ namespace TxtAIEditor.Editor
                 _document.UndoManager.MarkUnsavedState();
                 _document.IsDirty = true;
             }
+            else
+            {
+                _document.CaptureSavedBaseline();
+            }
             ViewVersion = change.Version;
             RefreshTabContentPreview();
         }
@@ -1272,6 +1288,7 @@ namespace TxtAIEditor.Editor
         public void UpdateModelFromSync(ITextModel model)
         {
             EditorDocumentChange change = _document.ReplaceModel(Tab.Id, model, clearUndo: true);
+            _document.CaptureSavedBaseline();
             ViewVersion = change.Version;
             RefreshTabContentPreview();
         }

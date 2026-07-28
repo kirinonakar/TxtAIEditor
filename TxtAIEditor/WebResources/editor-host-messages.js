@@ -8,9 +8,7 @@ import {
     post,
     queueRender,
     receiveLineBlock,
-    recomputeDirtyLines,
     selectionInfo,
-    setOriginalLines,
     setupModel,
     setupVirtualHeight,
     state,
@@ -203,7 +201,6 @@ export function createHostMessageHandler({
             setupModel(msg.lineCount || 1);
             {
                 const initialLines = Array.isArray(msg.initialLines) ? msg.initialLines : [];
-                setOriginalLines(initialLines);
                 if (receiveLineBlock(msg.initialStartLine || 1, initialLines) > 0) {
                     queueRender(true);
                 }
@@ -212,18 +209,6 @@ export function createHostMessageHandler({
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => post({ type: 'initialRenderComplete' }));
             });
-            break;
-        case 'resetOriginalLines':
-            {
-                const lines = Array.isArray(msg.lines) ? msg.lines : [];
-                setOriginalLines(lines);
-                if (state.showDirtyLines) {
-                    // Resetting the saved baseline also clears every dirty marker.
-                    // Do not recompute from the virtualized cache: unloaded lines are
-                    // absent there and would be mistaken for empty, changed lines.
-                    syncRenderedDirtyLineClasses();
-                }
-            }
             break;
         case 'updateDirtyLines':
             {
@@ -269,7 +254,6 @@ export function createHostMessageHandler({
                 setupModel(Math.max(1, lines.length));
                 lines.forEach((line, index) => state.cache.set(index + 1, line));
                 markVersionedDocumentChangeApplied(msg);
-                recomputeDirtyLines();
                 state.livePreviewLocalResourceVersion = String(Date.now());
                 queueRender(true);
                 if (msg.shouldFocus !== false) {

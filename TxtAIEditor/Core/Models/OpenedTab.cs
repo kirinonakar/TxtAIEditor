@@ -68,42 +68,6 @@ namespace TxtAIEditor.Core.Models
         // authoritative text source for editor tabs.
         public string ContentPreview { get; set; } = string.Empty;
 
-        private string _originalContent = string.Empty;
-        public string OriginalContent
-        {
-            get => _document?.OriginalContent ?? _originalContent;
-            set
-            {
-                if (_document != null)
-                {
-                    _document.OriginalContent = value ?? string.Empty;
-                }
-                else if (_originalContent != value)
-                {
-                    _originalContent = value ?? string.Empty;
-                    _originalLinesCached = null;
-                }
-            }
-        }
-
-        private string[]? _originalLinesCached;
-        public string[] OriginalLines
-        {
-            get
-            {
-                if (_document != null)
-                {
-                    return _document.OriginalLines;
-                }
-
-                if (_originalLinesCached == null)
-                {
-                    _originalLinesCached = _originalContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-                }
-                return _originalLinesCached;
-            }
-        }
-
         private string? _originalLineEnding;
         public string? OriginalLineEnding
         {
@@ -368,8 +332,6 @@ namespace TxtAIEditor.Core.Models
             OnPropertyChanged(nameof(DocumentId));
             OnPropertyChanged(nameof(EncodingName));
             OnPropertyChanged(nameof(EncodingWasAutoDetected));
-            OnPropertyChanged(nameof(OriginalContent));
-            OnPropertyChanged(nameof(OriginalLines));
             OnPropertyChanged(nameof(OriginalLineEnding));
             OnPropertyChanged(nameof(OriginalEncodingName));
             OnPropertyChanged(nameof(Origin));
@@ -421,12 +383,6 @@ namespace TxtAIEditor.Core.Models
                     break;
                 case nameof(EditorDocument.EncodingWasAutoDetected):
                     OnPropertyChanged(nameof(EncodingWasAutoDetected));
-                    break;
-                case nameof(EditorDocument.OriginalContent):
-                    OnPropertyChanged(nameof(OriginalContent));
-                    break;
-                case nameof(EditorDocument.OriginalLines):
-                    OnPropertyChanged(nameof(OriginalLines));
                     break;
                 case nameof(EditorDocument.OriginalLineEnding):
                     OnPropertyChanged(nameof(OriginalLineEnding));

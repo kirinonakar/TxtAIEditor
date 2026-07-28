@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,6 +13,30 @@ namespace TxtAIEditor.Controls
     public sealed class TabDirtyStateController
     {
         private const int MaxDirtyDiffCells = 4_000_000;
+
+        private sealed class TextModelLineView : IReadOnlyList<string>
+        {
+            private readonly ITextModel _model;
+
+            public TextModelLineView(ITextModel model)
+            {
+                _model = model;
+            }
+
+            public int Count => _model.LineCount;
+
+            public string this[int index] => _model.GetLine(index + 1);
+
+            public IEnumerator<string> GetEnumerator()
+            {
+                for (int index = 0; index < Count; index++)
+                {
+                    yield return this[index];
+                }
+            }
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
 
         private readonly MainWindowViewModel _viewModel;
         private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
@@ -117,19 +142,13 @@ namespace TxtAIEditor.Controls
         private void UpdateSavedBaselineForFileGroup(OpenedTab sourceTab)
         {
             bool changed = false;
-            string savedContent;
-            if (_editorSessions.TryGetValue(sourceTab.Id, out var sourceSession))
-            {
-                savedContent = sourceSession.Model is HexDumpTextModel ? string.Empty : sourceSession.GetText();
-            }
-            else
-            {
-                savedContent = sourceTab.ContentPreview;
-            }
+            string fallbackLineEnding = _editorSessions.TryGetValue(sourceTab.Id, out var sourceSession)
+                ? sourceSession.Model.LineEnding
+                : TextModelFactory.FromText(sourceTab.ContentPreview).LineEnding;
 
             foreach (var tab in GetTabsForSameFile(sourceTab))
             {
-                tab.OriginalContent = savedContent;
+                bool wasDirty = tab.IsDirty;
                 bool hasSession = _editorSessions.TryGetValue(tab.Id, out var session);
                 if (hasSession)
                 {
@@ -137,33 +156,15 @@ namespace TxtAIEditor.Controls
                 }
                 tab.OriginalLineEnding = hasSession
                     ? session!.Model.LineEnding
-                    : TextModelFactory.FromText(savedContent).LineEnding;
+                    : fallbackLineEnding;
                 tab.OriginalEncodingName = tab.EncodingName;
 
                 if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {
-                    if (hasSession)
-                    {
-                        if (session!.Model is HexDumpTextModel)
-                        {
-                            _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(Array.Empty<string>());
-                        }
-                        else
-                        {
-                            var lines = session!.GetLines(1, session.Model.LineCount);
-                            _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
-                        }
-                    }
-                    else
-                    {
-                        var lines = savedContent.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-                        _ = bridgeGroup.Bridge.ResetOriginalLinesAsync(lines);
-                    }
+                    _ = bridgeGroup.Bridge.UpdateDirtyLinesAsync(new Dictionary<int, string>());
                 }
 
-                if (!tab.IsDirty) continue;
-                tab.IsDirty = false;
-                changed = true;
+                changed |= wasDirty;
             }
 
             if (changed)
@@ -204,7 +205,7 @@ namespace TxtAIEditor.Controls
                 bool hasTextChanges = !session.IsAtSavedState;
                 var dirtyLines = _showDirtyLines()
                     ? hasTextChanges
-                        ? ComputeDirtyLines(tab, session)
+                        ? ComputeDirtyLines(session)
                         : new Dictionary<int, string>()
                     : null;
                 bool isDirtyCurrent = hasTextChanges ||
@@ -229,11 +230,9 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static Dictionary<int, string> ComputeDirtyLines(OpenedTab tab, EditorDocumentSession session)
+        private static Dictionary<int, string> ComputeDirtyLines(EditorDocumentSession session)
         {
-            var orig = tab.OriginalLines;
-            var current = session.Model.GetLines(1, session.Model.LineCount);
-            return ComputeDirtyLines(orig, current);
+            return ComputeDirtyLines(session.SavedLines, new TextModelLineView(session.Model));
         }
 
         internal static Dictionary<int, string> ComputeDirtyLines(IReadOnlyList<string> orig, IReadOnlyList<string> current)
