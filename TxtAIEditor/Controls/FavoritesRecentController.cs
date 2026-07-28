@@ -338,22 +338,20 @@ private static bool InferFolderWithoutTouchingFileSystem(string path)
 
             if (RemotePath.IsRemote(item.Path))
             {
-                string parentRemotePath = RemotePath.GetParent(item.Path);
+                await _loadFileIntoTabAsync(item.Path);
                 if (!_isExplorerTreeMode())
                 {
-                    await _navigateExplorerToFolderAsync(parentRemotePath);
+                    await _navigateExplorerToFolderAsync(RemotePath.GetParent(item.Path));
                 }
-                await _loadFileIntoTabAsync(item.Path);
                 return;
             }
 
             string? parentDir = Path.GetDirectoryName(item.Path);
+            await _loadFileIntoTabAsync(item.Path);
             if (!_isExplorerTreeMode() && !string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
             {
                 await _navigateExplorerToFolderAsync(parentDir);
             }
-
-            await _loadFileIntoTabAsync(item.Path);
         }
 
         private async void OnFavoritePinClick(object sender, RoutedEventArgs e)
