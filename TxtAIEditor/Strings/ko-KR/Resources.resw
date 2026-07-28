@@ -3601,4 +3601,22 @@
   <data name="NoOpenTabs" xml:space="preserve">
     <value>열린 탭이 없습니다</value>
   </data>
+  <data name="ImageExifInfoTitle" xml:space="preserve">
+    <value>EXIF 정보</value>
+  </data>
+  <data name="ImageStableDiffusionTitle" xml:space="preserve">
+    <value>Stable Diffusion</value>
+  </data>
+  <data name="ImageComfyUITitle" xml:space="preserve">
+    <value>ComfyUI</value>
+  </data>
+  <data name="ImageColorModeTitle" xml:space="preserve">
+    <value>색상 모드</value>
+  </data>
+  <data name="ImageNoMetadata" xml:space="preserve">
+    <value>이미지 메타데이터가 없습니다.</value>
+  </data>
+  <data name="StatusImageFormatTooltip" xml:space="preserve">
+    <value>클릭하여 이미지 정보 보기</value>
+  </data>
 </root>

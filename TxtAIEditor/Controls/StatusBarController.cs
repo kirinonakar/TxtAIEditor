@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -288,9 +289,24 @@ namespace TxtAIEditor.Controls
 
             if (tab.IsImageViewer)
             {
-                _statusBar.LanguageText.Text = ImageFileInfoReader.TryRead(tab.FilePath, out var imageInfo)
-                    ? imageInfo.Format
-                    : ImageFileInfoReader.GetFormatFromExtension(tab.FilePath) ?? "IMAGE";
+                string format;
+                string? colorMode = null;
+                if (ImageFileInfoReader.TryRead(tab.FilePath, out var imageInfo))
+                {
+                    format = imageInfo.Format;
+                    colorMode = imageInfo.ColorMode;
+                }
+                else
+                {
+                    format = ImageFileInfoReader.GetFormatFromExtension(tab.FilePath) ?? "IMAGE";
+                }
+
+                _statusBar.LanguageText.Text = !string.IsNullOrEmpty(colorMode)
+                    ? $"{format} \u00B7 {colorMode}"
+                    : format;
+                ToolTipService.SetToolTip(
+                    _statusBar.LanguageButtonControl,
+                    _getString("StatusImageFormatTooltip", "\ud074\ub9ad\ud558\uc5ec \uc774\ubbf8\uc9c0 \uc815\ubcf4 \ubcf4\uae30"));
                 return;
             }
 
@@ -559,7 +575,18 @@ namespace TxtAIEditor.Controls
         private void OnLanguageClick(object sender, RoutedEventArgs e)
         {
             var tab = _activeTabProvider();
-            if (tab == null || tab.IsReadOnlyViewer)
+            if (tab == null)
+            {
+                return;
+            }
+
+            if (tab.IsImageViewer)
+            {
+                ShowImageMetadataFlyout(tab, sender as Button);
+                return;
+            }
+
+            if (tab.IsReadOnlyViewer)
             {
                 return;
             }
@@ -587,6 +614,205 @@ namespace TxtAIEditor.Controls
             {
                 ShowStatusFlyout(flyout, button);
             }
+        }
+
+        private void ShowImageMetadataFlyout(OpenedTab tab, Button? button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            if (!ImageMetadataReader.TryRead(tab.FilePath, out var meta) || !meta.HasAny)
+            {
+                var noMetaFlyout = new Flyout
+                {
+                    Content = new TextBlock
+                    {
+                        Text = _getString("ImageNoMetadata", "\uc774\ubbf8\uc9c0 \uba54\ud0c0\ub370\uc774\ud130\uac00 \uc5c6\uc2b5\ub2c8\ub2e4."),
+                        FontSize = 12,
+                        TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+                        MaxWidth = 400
+                    },
+                    Placement = FlyoutPlacementMode.Top
+                };
+                CursorResetHelper.ResetToArrow(button);
+                noMetaFlyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
+                CursorResetHelper.ResetToArrow(button);
+                return;
+            }
+
+            var contentPanel = BuildMetadataContent(meta);
+
+            var scrollViewer = new ScrollViewer
+            {
+                Content = contentPanel,
+                MaxHeight = 500,
+                MaxWidth = 550,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+
+            var metaFlyout = new Flyout
+            {
+                Content = scrollViewer,
+                Placement = FlyoutPlacementMode.Top
+            };
+
+            CursorResetHelper.ResetToArrow(button);
+            metaFlyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
+            CursorResetHelper.ResetToArrow(button);
+        }
+
+        private StackPanel BuildMetadataContent(ImageMetadataResult meta)
+        {
+            var panel = new StackPanel { Spacing = 6, MinWidth = 280 };
+
+            if (!string.IsNullOrEmpty(meta.ColorMode))
+            {
+                AddSection(panel, _getString("ImageColorModeTitle", "\uc0c9\uc0c1 \ubaa8\ub4dc"), meta.ColorMode);
+            }
+
+            if (meta.HasExif)
+            {
+                var sb = new StringBuilder();
+                string[] orderedKeys = { "Make", "Model", "Software", "DateTime", "DateTimeOriginal",
+                    "ExposureTime", "FNumber", "ISOSpeedRatings", "FocalLength",
+                    "FocalLengthIn35mmFilm", "ColorSpace", "Orientation",
+                    "PixelXDimension", "PixelYDimension", "LensMake", "LensModel" };
+
+                foreach (string key in orderedKeys)
+                {
+                    if (meta.ExifTags.TryGetValue(key, out string? val))
+                    {
+                        sb.AppendLine($"{FormatExifLabel(key)}: {val}");
+                    }
+                }
+
+                foreach (var kvp in meta.ExifTags)
+                {
+                    if (Array.IndexOf(orderedKeys, kvp.Key) < 0 &&
+                        kvp.Key != "ExifIFDPointer" && kvp.Key != "GPSInfoIFDPointer")
+                    {
+                        sb.AppendLine($"{FormatExifLabel(kvp.Key)}: {kvp.Value}");
+                    }
+                }
+
+                if (sb.Length > 0)
+                {
+                    AddSection(panel, _getString("ImageExifInfoTitle", "EXIF \uc815\ubcf4"), sb.ToString().TrimEnd());
+                }
+            }
+
+            if (meta.HasStableDiffusion)
+            {
+                var sb = new StringBuilder();
+                if (!string.IsNullOrEmpty(meta.SdPrompt))
+                {
+                    string prompt = meta.SdPrompt.Length > 500 ? meta.SdPrompt[..500] + "..." : meta.SdPrompt;
+                    sb.AppendLine($"Prompt: {prompt}");
+                }
+
+                if (!string.IsNullOrEmpty(meta.SdNegativePrompt))
+                {
+                    string neg = meta.SdNegativePrompt.Length > 500 ? meta.SdNegativePrompt[..500] + "..." : meta.SdNegativePrompt;
+                    sb.AppendLine($"Negative: {neg}");
+                }
+
+                string[] sdOrder = { "Steps", "Sampler", "CFG scale", "Seed", "Size",
+                    "Model", "Model hash", "Clip skip", "Denoising strength",
+                    "Hires upscaler", "Hires steps", "Hires upscale", "VAE", "Scheduler" };
+
+                foreach (string key in sdOrder)
+                {
+                    if (meta.SdParameters.TryGetValue(key, out string? val))
+                    {
+                        sb.AppendLine($"{key}: {val}");
+                    }
+                }
+
+                foreach (var kvp in meta.SdParameters)
+                {
+                    if (Array.IndexOf(sdOrder, kvp.Key) < 0)
+                    {
+                        sb.AppendLine($"{kvp.Key}: {kvp.Value}");
+                    }
+                }
+
+                if (sb.Length > 0)
+                {
+                    AddSection(panel, _getString("ImageStableDiffusionTitle", "Stable Diffusion"), sb.ToString().TrimEnd());
+                }
+            }
+
+            if (meta.HasComfyUI)
+            {
+                var sb = new StringBuilder();
+                string[] comfyOrder = { "Workflow", "Model", "Positive Prompt", "Negative Prompt",
+                    "Seed", "Steps", "CFG", "Sampler", "Scheduler", "Denoise",
+                    "Width", "Height", "Batch Size", "VAE",
+                    "LoRA", "LoRA Strength (Model)", "LoRA Strength (CLIP)" };
+
+                foreach (string key in comfyOrder)
+                {
+                    if (meta.ComfyParameters.TryGetValue(key, out string? val))
+                    {
+                        sb.AppendLine($"{key}: {val}");
+                    }
+                }
+
+                foreach (var kvp in meta.ComfyParameters)
+                {
+                    if (Array.IndexOf(comfyOrder, kvp.Key) < 0)
+                    {
+                        sb.AppendLine($"{kvp.Key}: {kvp.Value}");
+                    }
+                }
+
+                if (sb.Length > 0)
+                {
+                    AddSection(panel, _getString("ImageComfyUITitle", "ComfyUI"), sb.ToString().TrimEnd());
+                }
+            }
+
+            return panel;
+        }
+
+        private static void AddSection(StackPanel parent, string title, string content)
+        {
+            parent.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontSize = 12,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Margin = new Thickness(0, parent.Children.Count > 0 ? 6 : 0, 0, 2),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.CornflowerBlue)
+            });
+
+            parent.Children.Add(new TextBlock
+            {
+                Text = content,
+                FontSize = 11,
+                TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+                MaxWidth = 500,
+                IsTextSelectionEnabled = true
+            });
+        }
+
+        private static string FormatExifLabel(string tagName)
+        {
+            var sb = new StringBuilder(tagName.Length + 4);
+            for (int i = 0; i < tagName.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(tagName[i]) && !char.IsUpper(tagName[i - 1]))
+                {
+                    sb.Append(' ');
+                }
+
+                sb.Append(tagName[i]);
+            }
+
+            return sb.ToString();
         }
 
         private static void ShowStatusFlyout(MenuFlyout flyout, Button owner)

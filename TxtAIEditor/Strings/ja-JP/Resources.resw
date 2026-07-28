@@ -3565,4 +3565,22 @@
   <data name="NoOpenTabs" xml:space="preserve">
     <value>開いているタブはありません</value>
   </data>
+  <data name="ImageExifInfoTitle" xml:space="preserve">
+    <value>EXIF 情報</value>
+  </data>
+  <data name="ImageStableDiffusionTitle" xml:space="preserve">
+    <value>Stable Diffusion</value>
+  </data>
+  <data name="ImageComfyUITitle" xml:space="preserve">
+    <value>ComfyUI</value>
+  </data>
+  <data name="ImageColorModeTitle" xml:space="preserve">
+    <value>カラーモード</value>
+  </data>
+  <data name="ImageNoMetadata" xml:space="preserve">
+    <value>画像メタデータがありません。</value>
+  </data>
+  <data name="StatusImageFormatTooltip" xml:space="preserve">
+    <value>クリックして画像情報を表示</value>
+  </data>
 </root>

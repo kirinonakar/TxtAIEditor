@@ -3565,4 +3565,22 @@
   <data name="NoOpenTabs" xml:space="preserve">
     <value>没有打开的选项卡</value>
   </data>
+  <data name="ImageExifInfoTitle" xml:space="preserve">
+    <value>EXIF 信息</value>
+  </data>
+  <data name="ImageStableDiffusionTitle" xml:space="preserve">
+    <value>Stable Diffusion</value>
+  </data>
+  <data name="ImageComfyUITitle" xml:space="preserve">
+    <value>ComfyUI</value>
+  </data>
+  <data name="ImageColorModeTitle" xml:space="preserve">
+    <value>颜色模式</value>
+  </data>
+  <data name="ImageNoMetadata" xml:space="preserve">
+    <value>未找到图像元数据。</value>
+  </data>
+  <data name="StatusImageFormatTooltip" xml:space="preserve">
+    <value>点击查看图像信息</value>
+  </data>
 </root>

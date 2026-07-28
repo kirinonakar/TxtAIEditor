@@ -3601,4 +3601,22 @@ Plan: {0}</value>
   <data name="NoOpenTabs" xml:space="preserve">
     <value>No open tabs</value>
   </data>
+  <data name="ImageExifInfoTitle" xml:space="preserve">
+    <value>EXIF Info</value>
+  </data>
+  <data name="ImageStableDiffusionTitle" xml:space="preserve">
+    <value>Stable Diffusion</value>
+  </data>
+  <data name="ImageComfyUITitle" xml:space="preserve">
+    <value>ComfyUI</value>
+  </data>
+  <data name="ImageColorModeTitle" xml:space="preserve">
+    <value>Color Mode</value>
+  </data>
+  <data name="ImageNoMetadata" xml:space="preserve">
+    <value>No image metadata found.</value>
+  </data>
+  <data name="StatusImageFormatTooltip" xml:space="preserve">
+    <value>Click to view image info</value>
+  </data>
 </root>

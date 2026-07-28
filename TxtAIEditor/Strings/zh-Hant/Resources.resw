@@ -3565,4 +3565,22 @@
   <data name="NoOpenTabs" xml:space="preserve">
     <value>沒有開啟的索引標籤</value>
   </data>
+  <data name="ImageExifInfoTitle" xml:space="preserve">
+    <value>EXIF 資訊</value>
+  </data>
+  <data name="ImageStableDiffusionTitle" xml:space="preserve">
+    <value>Stable Diffusion</value>
+  </data>
+  <data name="ImageComfyUITitle" xml:space="preserve">
+    <value>ComfyUI</value>
+  </data>
+  <data name="ImageColorModeTitle" xml:space="preserve">
+    <value>色彩模式</value>
+  </data>
+  <data name="ImageNoMetadata" xml:space="preserve">
+    <value>找不到圖像中繼資料。</value>
+  </data>
+  <data name="StatusImageFormatTooltip" xml:space="preserve">
+    <value>按一下以檢視圖像資訊</value>
+  </data>
 </root>

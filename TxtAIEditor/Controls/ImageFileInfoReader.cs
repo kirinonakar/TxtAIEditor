@@ -5,16 +5,19 @@ namespace TxtAIEditor.Controls
 {
     internal readonly struct ImageFileInfo
     {
-        public ImageFileInfo(int width, int height, string format)
+        public ImageFileInfo(int width, int height, string format, string? colorMode = null)
         {
             Width = width;
             Height = height;
             Format = format;
+            ColorMode = colorMode;
         }
 
         public int Width { get; }
         public int Height { get; }
         public string Format { get; }
+        /// <summary>e.g. "RGBA (8bit)", "RGB (8bit)", "Grayscale (16bit)"</summary>
+        public string? ColorMode { get; }
     }
 
     internal static class ImageFileInfoReader
@@ -93,7 +96,7 @@ namespace TxtAIEditor.Controls
                 return true;
             }
 
-            if (length >= 24 &&
+            if (length >= 26 &&
                 bytes[0] == 0x89 &&
                 bytes[1] == 0x50 &&
                 bytes[2] == 0x4E &&
@@ -103,7 +106,19 @@ namespace TxtAIEditor.Controls
                 bytes[14] == 0x44 &&
                 bytes[15] == 0x52)
             {
-                imageInfo = new ImageFileInfo(ReadBigEndianInt32(bytes, 16), ReadBigEndianInt32(bytes, 20), "PNG");
+                byte bitDepth = bytes[24];
+                byte colorType = bytes[25];
+                string colorName = colorType switch
+                {
+                    0 => "Grayscale",
+                    2 => "RGB",
+                    3 => "Indexed",
+                    4 => "Grayscale+Alpha",
+                    6 => "RGBA",
+                    _ => $"Type{colorType}"
+                };
+                string colorMode = $"{colorName} ({bitDepth}bit)";
+                imageInfo = new ImageFileInfo(ReadBigEndianInt32(bytes, 16), ReadBigEndianInt32(bytes, 20), "PNG", colorMode);
                 return IsValidImageInfo(imageInfo);
             }
 
@@ -338,7 +353,9 @@ namespace TxtAIEditor.Controls
                 {
                     int width = ReadLittleEndianUInt24(bytes, dataOffset + 4) + 1;
                     int height = ReadLittleEndianUInt24(bytes, dataOffset + 7) + 1;
-                    imageInfo = new ImageFileInfo(width, height, "WEBP");
+                    bool hasAlpha = (bytes[dataOffset] & 0x10) != 0;
+                    string webpColor = hasAlpha ? "RGBA (8bit)" : "RGB (8bit)";
+                    imageInfo = new ImageFileInfo(width, height, "WEBP", webpColor);
                     return IsValidImageInfo(imageInfo);
                 }
 
@@ -350,7 +367,7 @@ namespace TxtAIEditor.Controls
                         (bytes[dataOffset + 4] << 24));
                     int width = (int)(bits & 0x3FFF) + 1;
                     int height = (int)((bits >> 14) & 0x3FFF) + 1;
-                    imageInfo = new ImageFileInfo(width, height, "WEBP");
+                    imageInfo = new ImageFileInfo(width, height, "WEBP", "RGBA (8bit)");
                     return IsValidImageInfo(imageInfo);
                 }
 
@@ -362,7 +379,7 @@ namespace TxtAIEditor.Controls
                 {
                     int width = ReadLittleEndianUInt16(bytes, dataOffset + 6) & 0x3FFF;
                     int height = ReadLittleEndianUInt16(bytes, dataOffset + 8) & 0x3FFF;
-                    imageInfo = new ImageFileInfo(width, height, "WEBP");
+                    imageInfo = new ImageFileInfo(width, height, "WEBP", "YCbCr (8bit)");
                     return IsValidImageInfo(imageInfo);
                 }
 
@@ -422,14 +439,24 @@ namespace TxtAIEditor.Controls
 
                 if (IsJpegStartOfFrameMarker(marker))
                 {
-                    if (stream.ReadByte() < 0)
+                    int precision = stream.ReadByte();
+                    if (precision < 0)
                     {
                         return false;
                     }
 
                     int height = ReadBigEndianUInt16(stream);
                     int width = ReadBigEndianUInt16(stream);
-                    imageInfo = new ImageFileInfo(width, height, "JPEG");
+                    int numComponents = stream.ReadByte();
+                    string colorName = numComponents switch
+                    {
+                        1 => "Grayscale",
+                        3 => "YCbCr",
+                        4 => "CMYK",
+                        _ => $"{numComponents}ch"
+                    };
+                    string colorMode = $"{colorName} ({precision}bit)";
+                    imageInfo = new ImageFileInfo(width, height, "JPEG", colorMode);
                     return IsValidImageInfo(imageInfo);
                 }
 
