@@ -10,7 +10,7 @@ namespace TxtAIEditor.Composition
     {
         public static void Bind(
             MainWindowUiRefs ui,
-            SearchReplaceController searchReplace,
+            MainWindowEditorModule editor,
             MainWindowDocumentModule documents,
             MainWindowToolbarCommandController toolbarCommand,
             Action openNewTab,
@@ -21,30 +21,30 @@ namespace TxtAIEditor.Composition
                 if (e.Key == Windows.System.VirtualKey.Enter)
                 {
                     e.Handled = true;
-                    await searchReplace.HandleSearchQueryEnterAsync();
+                    await editor.HandleSearchQueryEnterAsync();
                 }
             };
             ui.LeftSidebar.SearchQuery.TextChanged += (_, _) =>
             {
                 if (string.IsNullOrWhiteSpace(ui.LeftSidebar.SearchQuery.Text))
                 {
-                    searchReplace.CancelActiveSearch();
+                    editor.CancelActiveSearch();
                 }
             };
-            ui.LeftSidebar.SearchAllFilesClick += async (_, _) => await searchReplace.SearchAllFilesAsync();
-            ui.LeftSidebar.ReplaceAllClick += async (_, _) => await searchReplace.ReplaceAllAsync();
+            ui.LeftSidebar.SearchAllFilesClick += async (_, _) => await editor.SearchAllFilesAsync();
+            ui.LeftSidebar.ReplaceAllClick += async (_, _) => await editor.ReplaceAllAsync();
             ui.LeftSidebar.ReplaceOneClick += async (sender, _) =>
             {
                 if (sender is Button button && button.Tag is SearchResultItem item)
                 {
-                    await searchReplace.ReplaceOneAsync(item);
+                    await editor.ReplaceOneAsync(item);
                 }
             };
             ui.LeftSidebar.SearchResultItemClick += async (_, e) =>
             {
                 if (e.ClickedItem is SearchResultItem item)
                 {
-                    await searchReplace.OpenSearchResultAsync(item);
+                    await editor.OpenSearchResultAsync(item);
                 }
             };
 

@@ -2,10 +2,6 @@ using TxtAIEditor.Controls;
 
 namespace TxtAIEditor.Composition
 {
-    internal sealed record EditorControllers(
-        MainWindowEditorFoundationControllers Foundation,
-        MainWindowEditorRuntimeControllers Runtime);
-
     internal sealed record LifecycleControllers(
         MainWindowLifecycleController Window,
         MainWindowSettingsController Settings,
@@ -24,7 +20,7 @@ namespace TxtAIEditor.Composition
 
     internal sealed record MainWindowControllers(
         MainWindowShellModule Shell,
-        EditorControllers Editor,
+        MainWindowEditorModule Editor,
         MainWindowDocumentModule Documents,
         MainWindowPreviewModule Preview,
         MainWindowAgentModuleFacade Agents,

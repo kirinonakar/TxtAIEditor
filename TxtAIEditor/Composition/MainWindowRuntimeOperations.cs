@@ -110,7 +110,7 @@ namespace TxtAIEditor.Composition
             }
 
             _state.CurrentFolderPath = folderPath;
-            Controllers.Editor.Foundation.SearchReplace.CancelActiveSearch();
+            Controllers.Editor.CancelActiveSearch();
             UpdateAutoSaveStatus();
             UpdateAllTabWorkspaceIndicators();
             Controllers.Workspace.QueueGitStatusRefresh();
@@ -142,7 +142,7 @@ namespace TxtAIEditor.Composition
             bool isEncrypted = false,
             string? encryptionPassword = null)
         {
-            return Controllers.Editor.Runtime.EditorTabOpen.OpenNewTab(
+            return Controllers.Editor.OpenNewTab(
                 filePath,
                 content,
                 isReadOnly,
@@ -170,27 +170,27 @@ namespace TxtAIEditor.Composition
 
         public OpenedTab OpenEmptyTab() => OpenNewTab();
 
-        public OpenedTab OpenPdfTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenPdfTab(filePath);
+        public OpenedTab OpenPdfTab(string filePath) => Controllers.Editor.OpenPdfTab(filePath);
 
-        public OpenedTab OpenOfficeDocumentTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenOfficeDocumentTab(filePath);
+        public OpenedTab OpenOfficeDocumentTab(string filePath) => Controllers.Editor.OpenOfficeDocumentTab(filePath);
 
-        public OpenedTab OpenHexTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenHexTab(filePath);
+        public OpenedTab OpenHexTab(string filePath) => Controllers.Editor.OpenHexTab(filePath);
 
-        public OpenedTab OpenNotebookTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenNotebookTab(filePath);
+        public OpenedTab OpenNotebookTab(string filePath) => Controllers.Editor.OpenNotebookTab(filePath);
 
-        public async Task OpenNotebookSourceTabAsync(string filePath) => await Controllers.Editor.Runtime.EditorTabOpen.OpenNotebookSourceTabAsync(filePath);
+        public async Task OpenNotebookSourceTabAsync(string filePath) => await Controllers.Editor.OpenNotebookSourceTabAsync(filePath);
 
-        public async Task OpenNotebookViewerTabAsync(string filePath) => await Controllers.Editor.Runtime.EditorTabOpen.OpenNotebookViewerTabAsync(filePath);
+        public async Task OpenNotebookViewerTabAsync(string filePath) => await Controllers.Editor.OpenNotebookViewerTabAsync(filePath);
 
-        public OpenedTab OpenImageTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenImageTab(filePath);
+        public OpenedTab OpenImageTab(string filePath) => Controllers.Editor.OpenImageTab(filePath);
 
-        public OpenedTab OpenMediaTab(string filePath) => Controllers.Editor.Runtime.EditorTabOpen.OpenMediaTab(filePath);
+        public OpenedTab OpenMediaTab(string filePath) => Controllers.Editor.OpenMediaTab(filePath);
 
         public async Task SetHexViewModeAsync(OpenedTab tab, bool enabled)
         {
             try
             {
-                await Controllers.Editor.Runtime.EditorTabOpen.SetHexViewModeAsync(tab, enabled);
+                await Controllers.Editor.SetHexViewModeAsync(tab, enabled);
             }
             catch (Exception ex)
             {
@@ -264,11 +264,11 @@ namespace TxtAIEditor.Composition
             Controllers.Shell.UpdateSelectionStats(selectedText);
         }
 
-        public void ShowLeftSidebarPage(int index) => Controllers.Editor.Runtime.ShellPane.ShowLeftSidebarPage(index);
+        public void ShowLeftSidebarPage(int index) => Controllers.Editor.ShowLeftSidebarPage(index);
 
-        public void EnsureLeftPanelVisible() => Controllers.Editor.Runtime.ShellPane.EnsureLeftPanelVisible();
+        public void EnsureLeftPanelVisible() => Controllers.Editor.EnsureLeftPanelVisible();
 
-        public void FocusSearchPanel() => Controllers.Editor.Runtime.ShellPane.FocusSearchPanel();
+        public void FocusSearchPanel() => Controllers.Editor.FocusSearchPanel();
 
         public void ToggleMaximize() => MainWindowLayoutOperations.ToggleMaximize(_window.AppWindow);
 
@@ -309,7 +309,7 @@ namespace TxtAIEditor.Composition
 
         public void CloseTabAndCleanup(OpenedTab tab, TabViewItem tabItem)
         {
-            Controllers.Editor.Runtime.EditorTabOpen.ForgetHexViewState(tab.Id);
+            Controllers.Editor.ForgetHexViewState(tab.Id);
             Controllers.Documents.CloseAndCleanup(tab, tabItem);
         }
 
@@ -324,7 +324,7 @@ namespace TxtAIEditor.Composition
                        ?? _ui.EditorTabView2.TabItems.Cast<TabViewItem>().FirstOrDefault(t => t.Tag as string == tab.Id);
             if (tabItem != null)
             {
-                Controllers.Editor.Foundation.TabDirtyState.MarkTabDirty(tab, tabItem);
+                Controllers.Editor.MarkTabDirty(tab, tabItem);
             }
             else
             {
@@ -342,7 +342,7 @@ namespace TxtAIEditor.Composition
                 return;
             }
 
-            await Controllers.Editor.Foundation.TabReload.ReloadWithEncodingAsync(tab, encodingName);
+            await Controllers.Editor.ReloadWithEncodingAsync(tab, encodingName);
         }
 
         public void HandleGitFileRestored(object? sender, string filePath)
@@ -454,7 +454,7 @@ namespace TxtAIEditor.Composition
                     tabView.SelectedItem = tabItem;
                 }
 
-                Controllers.Editor.Runtime.TabSelection.QueueChanged(tabView, tabItem);
+                Controllers.Editor.QueueTabSelectionChanged(tabView, tabItem);
             }
 
             Controllers.Preview.Render(tab);

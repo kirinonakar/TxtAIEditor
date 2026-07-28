@@ -9,8 +9,8 @@ namespace TxtAIEditor.Composition
 {
     internal sealed record MainWindowDocumentModuleDependencies(
         MainWindowShellModule Shell,
+        MainWindowEditorModule Editor,
         LivePreviewController LivePreview,
-        TabDirtyStateController TabDirtyState,
         FavoritesRecentController FavoritesRecent,
         JupyterNotebookViewerController NotebookViewer);
 
@@ -69,7 +69,7 @@ namespace TxtAIEditor.Composition
                 shell.StatusBar,
                 shell.TabNavigation,
                 dependencies.LivePreview,
-                dependencies.TabDirtyState,
+                dependencies.Editor.Foundation.TabDirtyState,
                 shell.TabEncryption,
                 dependencies.FavoritesRecent,
                 shell.Dialog,

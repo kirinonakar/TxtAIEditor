@@ -75,7 +75,7 @@ namespace TxtAIEditor.Composition
             MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
             MainWindowShellModule shellModule,
-            ActiveEditorInsertionController activeEditorInsertion,
+            MainWindowEditorModule editorModule,
             FavoritesRecentController favoritesRecent,
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
@@ -84,6 +84,7 @@ namespace TxtAIEditor.Composition
             var shell = shellModule.Composition;
             var tabNavigation = shell.TabNavigation;
             var dialog = shell.Dialog;
+            var activeEditorInsertion = editorModule.Foundation.ActiveEditorInsertion;
 
             var explorerFileActions = new ExplorerFileActionsController(
                 ui.LeftSidebar,
@@ -123,7 +124,7 @@ namespace TxtAIEditor.Composition
                 editorServices,
                 viewModel,
                 shellModule,
-                activeEditorInsertion,
+                editorModule,
                 favoritesRecent,
                 pdfViewer,
                 officeDocumentViewer,
@@ -139,7 +140,7 @@ namespace TxtAIEditor.Composition
             MainWindowEditorServices editorServices,
             MainWindowViewModel viewModel,
             MainWindowShellModule shellModule,
-            ActiveEditorInsertionController activeEditorInsertion,
+            MainWindowEditorModule editorModule,
             FavoritesRecentController favoritesRecent,
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
@@ -152,6 +153,7 @@ namespace TxtAIEditor.Composition
             var tabNavigation = shell.TabNavigation;
             var tabEncryption = shell.TabEncryption;
             var dialog = shell.Dialog;
+            var activeEditorInsertion = editorModule.Foundation.ActiveEditorInsertion;
 
             var terminalPanel = new TerminalPanelController(
                 window,

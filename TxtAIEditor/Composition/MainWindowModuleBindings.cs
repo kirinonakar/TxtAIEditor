@@ -11,7 +11,7 @@ namespace TxtAIEditor.Composition
     {
         private MainWindowPreviewModule? _preview;
         private MainWindowWorkspaceModule? _workspace;
-        private MainWindowEditorRuntimeControllers? _editorRuntime;
+        private MainWindowEditorModule? _editor;
         private MainWindowStartupControllers? _startup;
 
         public LivePreviewController LivePreview =>
@@ -21,7 +21,7 @@ namespace TxtAIEditor.Composition
             Require(_workspace, nameof(MainWindowWorkspaceModule)).Controllers.ExplorerNavigation;
 
         public ShellPaneController ShellPane =>
-            Require(_editorRuntime, nameof(MainWindowEditorRuntimeComposition)).ShellPane;
+            Require(_editor, nameof(MainWindowEditorModule)).Runtime.ShellPane;
 
         public MainWindowSettingsController Settings =>
             Require(_startup, nameof(MainWindowStartupComposition)).Settings;
@@ -35,8 +35,8 @@ namespace TxtAIEditor.Composition
         public void Bind(MainWindowWorkspaceModule workspace) =>
             _workspace = BindOnce(_workspace, workspace, nameof(MainWindowWorkspaceModule));
 
-        public void Bind(MainWindowEditorRuntimeControllers editorRuntime) =>
-            _editorRuntime = BindOnce(_editorRuntime, editorRuntime, nameof(MainWindowEditorRuntimeComposition));
+        public void Bind(MainWindowEditorModule editor) =>
+            _editor = BindOnce(_editor, editor, nameof(MainWindowEditorModule));
 
         public void Bind(MainWindowStartupControllers startup) =>
             _startup = BindOnce(_startup, startup, nameof(MainWindowStartupComposition));
@@ -45,7 +45,7 @@ namespace TxtAIEditor.Composition
         {
             _ = Require(_preview, nameof(MainWindowPreviewModule));
             _ = Require(_workspace, nameof(MainWindowWorkspaceModule));
-            _ = Require(_editorRuntime, nameof(MainWindowEditorRuntimeComposition));
+            _ = Require(_editor, nameof(MainWindowEditorModule));
             _ = Require(_startup, nameof(MainWindowStartupComposition));
         }
 

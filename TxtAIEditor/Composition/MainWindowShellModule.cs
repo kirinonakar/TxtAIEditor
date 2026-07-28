@@ -145,7 +145,7 @@ namespace TxtAIEditor.Composition
             PdfViewerController pdfViewer,
             OfficeDocumentViewerController officeDocumentViewer,
             JupyterNotebookViewerController notebookViewer,
-            TabReloadController tabReload,
+            MainWindowEditorModule editor,
             System.Action<OpenedTab> updateLanguageUi,
             System.Action updateWindowTitle) =>
             MainWindowTabOperations.ReloadAsync(
@@ -155,7 +155,7 @@ namespace TxtAIEditor.Composition
                 pdfViewer,
                 officeDocumentViewer,
                 notebookViewer,
-                tabReload,
+                editor.Foundation.TabReload,
                 updateLanguageUi,
                 updateWindowTitle);
     }

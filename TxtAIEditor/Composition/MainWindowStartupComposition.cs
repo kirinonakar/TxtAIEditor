@@ -50,6 +50,7 @@ namespace TxtAIEditor.Composition
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             MainWindowShellModule shellModule,
+            MainWindowEditorModule editorModule,
             FunctionKeyShortcutService functionKeyShortcut,
             IAutoSaveLifecycle autoSaveLifecycle,
             DispatcherTimer gitAutoRefreshTimer,
@@ -59,14 +60,12 @@ namespace TxtAIEditor.Composition
             JupyterNotebookViewerController notebookViewer,
             LlmAssistantController llmAssistant,
             AgentController agent,
-            TabDirtyStateController tabDirtyState,
             SnippetsController snippets,
             FavoritesRecentController favoritesRecent,
             FileOpenDropController fileOpenDrop,
             RootKeyboardShortcutController rootKeyboardShortcut,
             ITabSaveCommands tabSaveCommands,
             TerminalPanelController terminalPanel,
-            ShellPaneController shellPane,
             CompareTabController compareTab,
             MainWindowStartupCallbacks callbacks)
         {
@@ -77,6 +76,8 @@ namespace TxtAIEditor.Composition
             var shellPanelLayout = shell.ShellPanelLayout;
             var stickyNoteMode = shell.StickyNoteMode;
             var dialog = shell.Dialog;
+            var tabDirtyState = editorModule.Foundation.TabDirtyState;
+            var shellPane = editorModule.Runtime.ShellPane;
 
             var lifecycle = new MainWindowLifecycleController(
                 window,
