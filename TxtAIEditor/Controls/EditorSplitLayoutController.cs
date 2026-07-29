@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
@@ -86,7 +87,7 @@ namespace TxtAIEditor.Controls
             WireEvents();
         }
 
-        public void HandleTabViewGotFocus(object sender)
+        public void HandleTabViewGotFocus(object sender, DependencyObject? originalSource = null)
         {
             if (sender is not TabView tabView)
             {
@@ -94,6 +95,11 @@ namespace TxtAIEditor.Controls
             }
 
             _editorWorkspace.ActiveTabView = tabView;
+            if (IsWithinPdfFindControl(originalSource))
+            {
+                return;
+            }
+
             if (tabView.SelectedItem is TabViewItem activeTabItem)
             {
                 _queueTabSelectionChanged(tabView, activeTabItem);
@@ -103,6 +109,21 @@ namespace TxtAIEditor.Controls
                 _clearTabSelectionQueue();
                 _updateWindowTitle();
             }
+        }
+
+        private static bool IsWithinPdfFindControl(DependencyObject? element)
+        {
+            for (DependencyObject? current = element;
+                 current != null;
+                 current = VisualTreeHelper.GetParent(current))
+            {
+                if (current is PdfFindControl)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void WireEvents()
@@ -310,7 +331,7 @@ namespace TxtAIEditor.Controls
 
         private void OnTabViewGotFocus(object sender, RoutedEventArgs e)
         {
-            HandleTabViewGotFocus(sender);
+            HandleTabViewGotFocus(sender, e.OriginalSource as DependencyObject);
         }
 
         private static string? NormalizeTabPath(string? filePath)
