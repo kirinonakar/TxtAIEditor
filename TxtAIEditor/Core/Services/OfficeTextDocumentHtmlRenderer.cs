@@ -449,6 +449,7 @@ namespace TxtAIEditor.Core.Services
             var content = new StringBuilder();
             var renderedImages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var renderedContainers = new HashSet<XElement>();
+            IReadOnlyDictionary<XText, string> textValues = GetHwpxRenderedTextValues(paragraph);
             foreach (XNode node in paragraph.DescendantNodes())
             {
                 if (IsInsideNestedElement(paragraph, node, "tbl") ||
@@ -459,7 +460,10 @@ namespace TxtAIEditor.Core.Services
 
                 if (node is XText textNode && textNode.Parent?.Name.LocalName == "t")
                 {
-                    AppendStyledText(content, textNode.Value, GetHwpxTextStyle(textNode, characterStyles));
+                    string text = textValues.TryGetValue(textNode, out string? renderedText)
+                        ? renderedText
+                        : textNode.Value;
+                    AppendStyledText(content, text, GetHwpxTextStyle(textNode, characterStyles));
                     continue;
                 }
 
@@ -510,6 +514,110 @@ namespace TxtAIEditor.Core.Services
             return content.Length == 0
                 ? "<p class=\"doc-paragraph empty-paragraph\"" + styleAttribute + "></p>"
                 : "<p class=\"doc-paragraph\"" + styleAttribute + ">" + content + "</p>";
+        }
+
+        private static IReadOnlyDictionary<XText, string> GetHwpxRenderedTextValues(XElement paragraph)
+        {
+            var textNodes = paragraph
+                .DescendantNodes()
+                .OfType<XText>()
+                .Where(textNode =>
+                    textNode.Parent?.Name.LocalName == "t" &&
+                    !IsInsideNestedElement(paragraph, textNode, "tbl"))
+                .ToList();
+            var softWrapPositions = paragraph
+                .Descendants()
+                .Where(element =>
+                    element.Name.LocalName == "lineseg" &&
+                    !IsInsideNestedElement(paragraph, element, "tbl"))
+                .Select(element => GetAttributeValue(element, "textpos"))
+                .Select(value => int.TryParse(
+                    value,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int position)
+                    ? position
+                    : -1)
+                .Where(position => position > 0)
+                .ToHashSet();
+
+            var renderedValues = new Dictionary<XText, string>();
+            if (softWrapPositions.Count == 0)
+            {
+                return renderedValues;
+            }
+
+            int textOffset = 0;
+            foreach (XText textNode in textNodes)
+            {
+                string text = textNode.Value;
+                string renderedText = NormalizeHwpxSoftWrapPadding(text, textOffset, softWrapPositions);
+                if (!ReferenceEquals(renderedText, text))
+                {
+                    renderedValues[textNode] = renderedText;
+                }
+
+                textOffset += text.Length;
+            }
+
+            return renderedValues;
+        }
+
+        private static string NormalizeHwpxSoftWrapPadding(
+            string text,
+            int textOffset,
+            IReadOnlySet<int> softWrapPositions)
+        {
+            StringBuilder? normalized = null;
+            int copyStart = 0;
+            for (int index = 0; index < text.Length;)
+            {
+                if (text[index] != ' ')
+                {
+                    index++;
+                    continue;
+                }
+
+                int whitespaceStart = index;
+                while (index < text.Length && text[index] == ' ')
+                {
+                    index++;
+                }
+
+                int whitespaceEnd = index;
+                if (whitespaceEnd - whitespaceStart < 2 ||
+                    whitespaceStart == 0 ||
+                    whitespaceEnd >= text.Length ||
+                    !softWrapPositions.Any(position =>
+                        position >= textOffset + whitespaceStart &&
+                        position < textOffset + whitespaceEnd))
+                {
+                    continue;
+                }
+
+                normalized ??= new StringBuilder(text.Length);
+                normalized.Append(text, copyStart, whitespaceStart - copyStart);
+                if (!IsHangulSyllable(text[whitespaceStart - 1]) ||
+                    !IsHangulSyllable(text[whitespaceEnd]))
+                {
+                    normalized.Append(' ');
+                }
+
+                copyStart = whitespaceEnd;
+            }
+
+            if (normalized == null)
+            {
+                return text;
+            }
+
+            normalized.Append(text, copyStart, text.Length - copyStart);
+            return normalized.ToString();
+        }
+
+        private static bool IsHangulSyllable(char value)
+        {
+            return value >= '\uAC00' && value <= '\uD7A3';
         }
 
         private static string BuildHwpxTableHtml(
