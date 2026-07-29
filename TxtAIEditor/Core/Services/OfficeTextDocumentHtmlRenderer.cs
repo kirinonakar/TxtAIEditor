@@ -692,16 +692,54 @@ namespace TxtAIEditor.Core.Services
             }
 
             var builder = new StringBuilder();
+            bool hasColumnGrid = TryBuildHwpxTableTracks(
+                table,
+                "colCnt",
+                "colAddr",
+                "colSpan",
+                "width",
+                out IReadOnlyList<double> columnWidths);
+            bool hasRowGrid = TryBuildHwpxTableTracks(
+                table,
+                "rowCnt",
+                "rowAddr",
+                "rowSpan",
+                "height",
+                out IReadOnlyList<double> rowHeights);
             string wrapperStyle = BuildHwpxTableWrapperStyle(table);
             string tableStyle = BuildHwpxTableStyle(table);
             builder.Append("<div class=\"doc-table-wrap hwpx-table-wrap\"");
             AppendStyleAttribute(builder, wrapperStyle);
             builder.Append("><table class=\"doc-table hwpx-table\"");
             AppendStyleAttribute(builder, tableStyle);
-            builder.Append("><tbody>");
-            foreach (XElement row in rows)
+            builder.Append('>');
+            if (hasColumnGrid)
             {
-                builder.Append("<tr>");
+                double totalWidth = columnWidths.Sum();
+                builder.Append("<colgroup>");
+                foreach (double columnWidth in columnWidths)
+                {
+                    builder.Append("<col style=\"width:")
+                        .Append(CssPercent(columnWidth / totalWidth * 100.0))
+                        .Append("\">");
+                }
+
+                builder.Append("</colgroup>");
+            }
+
+            builder.Append("<tbody>");
+            for (int rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+            {
+                XElement row = rows[rowIndex];
+                builder.Append("<tr");
+                if (hasRowGrid && rowIndex < rowHeights.Count)
+                {
+                    builder.Append(" style=\"height:")
+                        .Append(HwpxPoints(rowHeights[rowIndex]))
+                        .Append('"');
+                }
+
+                builder.Append('>');
                 var cells = row.Elements().Where(e => e.Name.LocalName == "tc").ToList();
                 if (cells.Count == 0)
                 {
@@ -737,8 +775,15 @@ namespace TxtAIEditor.Core.Services
 
                     if (TryReadHwpxDimensions(cell, "cellSz", out double cellWidth, out double cellHeight))
                     {
-                        cellStyles.Add("width:" + HwpxPoints(cellWidth));
-                        cellStyles.Add("height:" + HwpxPoints(cellHeight));
+                        if (!hasColumnGrid)
+                        {
+                            cellStyles.Add("width:" + HwpxPoints(cellWidth));
+                        }
+
+                        if (!hasRowGrid)
+                        {
+                            cellStyles.Add("height:" + HwpxPoints(cellHeight));
+                        }
                     }
 
                     string cellPadding = BuildHwpxBoxSpacingStyle(cell, "cellMargin", "padding");
@@ -780,6 +825,105 @@ namespace TxtAIEditor.Core.Services
 
             builder.Append("</tbody></table></div>");
             return builder.ToString();
+        }
+
+        private static bool TryBuildHwpxTableTracks(
+            XElement table,
+            string trackCountAttribute,
+            string addressAttribute,
+            string spanAttribute,
+            string sizeAttribute,
+            out IReadOnlyList<double> trackSizes)
+        {
+            if (!int.TryParse(
+                    GetAttributeValue(table, trackCountAttribute),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int trackCount) ||
+                trackCount <= 0)
+            {
+                trackSizes = Array.Empty<double>();
+                return false;
+            }
+
+            var edges = Enumerable.Range(0, trackCount + 1)
+                .Select(_ => new List<(int Target, double Delta)>())
+                .ToArray();
+            foreach (XElement cell in table.Descendants().Where(element =>
+                element.Name.LocalName == "tc" &&
+                !IsInsideNestedElement(table, element, "tbl")))
+            {
+                XElement? address = cell.Elements().FirstOrDefault(element => element.Name.LocalName == "cellAddr");
+                XElement? span = cell.Elements().FirstOrDefault(element => element.Name.LocalName == "cellSpan");
+                XElement? size = cell.Elements().FirstOrDefault(element => element.Name.LocalName == "cellSz");
+                if (!int.TryParse(
+                        GetAttributeValue(address, addressAttribute),
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out int start) ||
+                    !int.TryParse(
+                        GetAttributeValue(span, spanAttribute),
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out int length) ||
+                    !double.TryParse(
+                        GetAttributeValue(size, sizeAttribute),
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out double extent) ||
+                    start < 0 ||
+                    length <= 0 ||
+                    start + length > trackCount ||
+                    extent <= 0)
+                {
+                    continue;
+                }
+
+                int end = start + length;
+                edges[start].Add((end, extent));
+                edges[end].Add((start, -extent));
+            }
+
+            var boundaries = new double?[trackCount + 1];
+            var pending = new Queue<int>();
+            boundaries[0] = 0;
+            pending.Enqueue(0);
+            while (pending.Count > 0)
+            {
+                int current = pending.Dequeue();
+                foreach ((int target, double delta) in edges[current])
+                {
+                    if (boundaries[target].HasValue)
+                    {
+                        continue;
+                    }
+
+                    boundaries[target] = boundaries[current]!.Value + delta;
+                    pending.Enqueue(target);
+                }
+            }
+
+            if (boundaries.Any(boundary => !boundary.HasValue))
+            {
+                trackSizes = Array.Empty<double>();
+                return false;
+            }
+
+            var sizes = new List<double>(trackCount);
+            for (int index = 0; index < trackCount; index++)
+            {
+                double size = boundaries[index + 1]!.Value - boundaries[index]!.Value;
+                if (size <= 0)
+                {
+                    trackSizes = Array.Empty<double>();
+                    return false;
+                }
+
+                sizes.Add(size);
+            }
+
+            trackSizes = sizes;
+            return true;
         }
 
         private static string BuildHwpxTableWrapperStyle(XElement table)
