@@ -1318,10 +1318,10 @@ export function bindPointerSelectionEvents({
         }
 
         if (scrollContainer.scrollHeight > scrollContainer.clientHeight + 1) {
-            if (y > rect.bottom - edge) {
-                dy = Math.ceil(Math.min(1, (y - (rect.bottom - edge)) / edge) * maxStep);
-            } else if (y < rect.top + edge) {
-                dy = -Math.ceil(Math.min(1, ((rect.top + edge) - y) / edge) * maxStep);
+            if (y > rect.bottom) {
+                dy = Math.ceil(Math.min(1, (y - rect.bottom) / edge) * maxStep);
+            } else if (y < rect.top) {
+                dy = -Math.ceil(Math.min(1, (rect.top - y) / edge) * maxStep);
             }
         }
 
