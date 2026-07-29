@@ -116,6 +116,10 @@ namespace TxtAIEditor.Controls
                 }
                 _leftSidebar.GitHistory.Items.Clear();
                 ResetGitHistoryPaging();
+                if (_refreshExplorerGitStatus != null)
+                {
+                    await _refreshExplorerGitStatus();
+                }
                 return;
             }
 

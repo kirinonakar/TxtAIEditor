@@ -187,6 +187,16 @@ function createEditorRenderer({
 
         const csvTableLineCount = state.csvTableEnabled ? prepareCsvTableRenderModel() : 0;
         const range = visibleRange();
+        const firstVisibleLine = lineAt(scrollContainer.scrollTop);
+        const lastVisibleLine = lineAt(
+            scrollContainer.scrollTop + Math.max(scrollContainer.clientHeight, state.lineHeight));
+        const livePreviewLayoutOverscan = 10;
+        const livePreviewLayoutStart = state.inlineLivePreviewEnabled
+            ? Math.max(range.start, firstVisibleLine - livePreviewLayoutOverscan)
+            : range.start;
+        const livePreviewLayoutEnd = state.inlineLivePreviewEnabled
+            ? Math.min(range.end, lastVisibleLine + livePreviewLayoutOverscan)
+            : range.end;
         const livePreviewContextLines = state.inlineLivePreviewEnabled ? 120 : 0;
         let renderStart = Math.max(1, range.start - livePreviewContextLines);
         let renderEnd = range.end;
@@ -233,7 +243,7 @@ function createEditorRenderer({
             : '';
         const csvModeKey = state.csvTableEnabled ? `${state.csvTableVersion || 0}:${state.csvTableColumnCount || 0}:${state.csvSelectedLine || 0}:${state.csvSelectedColumn || 0}:${state.csvVirtualLineCount || 0}:${(state.csvJsonNavPath || []).join('.')}` : '0';
         const horizontalRenderKey = state.csvTableEnabled ? scrollContainer.scrollLeft : 0;
-        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${totalVirtualHeight()}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${activeLine || 0}:${state.editingLine || 0}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
+        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${totalVirtualHeight()}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${activeLine || 0}:${state.editingLine || 0}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
         if (!state.csvTableEnabled || !isJsonCsvTableMode()) {
             requestMissingLines(renderStart, renderEnd);
             trimHexCacheToRange(renderStart, renderEnd);
@@ -274,6 +284,8 @@ function createEditorRenderer({
         }
 
         const rows = [];
+        let viewportLayoutStart = state.inlineLivePreviewEnabled ? livePreviewLayoutStart : renderStart;
+        let livePreviewContextAnchorRow = '';
         const livePreviewSkipRef = { val: 0 };
         for (let line = renderStart; line <= renderEnd; line++) {
             if (composingRow && line === state.compositionLine) {
@@ -333,6 +345,7 @@ function createEditorRenderer({
             let livePreviewClass = '';
             let liveContentEditable = contentEditable;
             let livePreviewAttributes = '';
+            let renderedLivePreviewLine = null;
             if (isEditablePreviewBlockLine) {
                 const blockEdgeClass = `${line === editablePreviewBlock.startLine ? ' live-preview-source-block-start' : ''}${line === editablePreviewBlock.endLine ? ' live-preview-source-block-end' : ''}`;
                 const isMathFenceLine = editablePreviewBlock.kind === 'math' &&
@@ -370,36 +383,36 @@ function createEditorRenderer({
 
             if (state.inlineLivePreviewEnabled && hasLine && shouldShowSource && !isLong && !state.isComposing) {
                 if (!isEditablePreviewBlockLine && line !== sourceLine) {
-                    const renderedLine = renderPreviewLineAt(
+                    renderedLivePreviewLine = renderPreviewLineAt(
                         line,
                         state.lineCount,
                         getCachedLine,
                         livePreviewOptions,
                         livePreviewSkipRef);
-                    if (renderedLine.extendRangeEnd > renderEnd) {
-                        const nextEnd = Math.min(state.lineCount, renderedLine.extendRangeEnd);
+                    if (renderedLivePreviewLine.extendRangeEnd > renderEnd) {
+                        const nextEnd = Math.min(state.lineCount, renderedLivePreviewLine.extendRangeEnd);
                         requestMissingLines(renderEnd + 1, nextEnd);
                         renderEnd = nextEnd;
                     }
                 }
             } else if (state.inlineLivePreviewEnabled && hasLine && !shouldShowSource) {
-                const renderedLine = renderPreviewLineAt(
+                renderedLivePreviewLine = renderPreviewLineAt(
                     line,
                     state.lineCount,
                     getCachedLine,
                     livePreviewOptions,
                     livePreviewSkipRef);
-                if (renderedLine.extendRangeEnd > renderEnd) {
-                    const nextEnd = Math.min(state.lineCount, renderedLine.extendRangeEnd);
+                if (renderedLivePreviewLine.extendRangeEnd > renderEnd) {
+                    const nextEnd = Math.min(state.lineCount, renderedLivePreviewLine.extendRangeEnd);
                     requestMissingLines(renderEnd + 1, nextEnd);
                     renderEnd = nextEnd;
                 }
-                if (!renderedLine.pending && !renderedLine.source) {
-                    lineContent = renderedLine.html;
+                if (!renderedLivePreviewLine.pending && !renderedLivePreviewLine.source) {
+                    lineContent = renderedLivePreviewLine.html;
                     liveContentEditable = 'false';
-                    livePreviewClass = renderedLine.skipped
+                    livePreviewClass = renderedLivePreviewLine.skipped
                         ? ' live-preview-skipped'
-                        : renderedLine.empty
+                        : renderedLivePreviewLine.empty
                             ? ' live-preview-row live-preview-empty'
                             : ' live-preview-row';
                 }
@@ -412,14 +425,36 @@ function createEditorRenderer({
                 ? ' editing-row'
                 : '';
             const hoveredClass = line === hoveredLineNumber ? ' hovered-row' : '';
-            rows.push(
+            const rowHtml =
                 `<div class="line-row${livePreviewClass}${editingClass}${hoveredClass}${isInSelection ? ' selected-row' : ''}${isSelectedEmptyLine ? ' selected-empty-row' : ''}${dirtyClass}" data-line="${line}"${livePreviewAttributes}>` +
                 `<div class="line-number">${line}</div>` +
                 `<div class="${textClass}" contenteditable="${liveContentEditable}" spellcheck="false" data-line="${line}"${longLineAttributes}>${lineContent}</div>` +
-                `</div>`
-            );
+                `</div>`;
+
+            if (state.inlineLivePreviewEnabled && line < livePreviewLayoutStart) {
+                if (renderedLivePreviewLine &&
+                    !renderedLivePreviewLine.pending &&
+                    !renderedLivePreviewLine.source &&
+                    !renderedLivePreviewLine.skipped &&
+                    Number(renderedLivePreviewLine.endLine || line) >= livePreviewLayoutStart) {
+                    viewportLayoutStart = line;
+                    livePreviewContextAnchorRow = rowHtml;
+                }
+                continue;
+            }
+
+            if (state.inlineLivePreviewEnabled && line > livePreviewLayoutEnd) {
+                continue;
+            }
+
+            if (livePreviewContextAnchorRow) {
+                rows.push(livePreviewContextAnchorRow);
+                livePreviewContextAnchorRow = '';
+            }
+            rows.push(rowHtml);
         }
 
+        viewport.style.transform = `translateY(${viewportTopForLine(viewportLayoutStart)}px)`;
         viewport.innerHTML = rows.join('');
         state.renderedRangeStart = renderStart;
         state.renderedRangeEnd = renderEnd;

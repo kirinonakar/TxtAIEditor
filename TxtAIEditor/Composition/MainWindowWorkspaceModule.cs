@@ -175,7 +175,6 @@ namespace TxtAIEditor.Composition
                 Composition.GitAutoRefreshTimer,
                 _tabNavigation,
                 Composition.GitStatusRefresh,
-                Composition.ExplorerNavigation,
                 _setCurrentRepoPath);
 
         public void RefreshCurrentFolder(string folderPath) =>

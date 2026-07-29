@@ -16,7 +16,6 @@ namespace TxtAIEditor.Composition
             DispatcherTimer gitAutoRefreshTimer,
             TabNavigationController tabNavigation,
             GitStatusRefreshController gitStatusRefresh,
-            ExplorerNavigationController explorerNavigation,
             Action<string> setCurrentRepoPath)
         {
             UpdateCurrentRepoPathFromWorkspace(state, gitService, tabNavigation, setCurrentRepoPath);
@@ -26,7 +25,6 @@ namespace TxtAIEditor.Composition
             }
 
             await gitStatusRefresh.RefreshAsync();
-            await explorerNavigation.UpdateGitStatusesAsync();
         }
 
         public static string GetCurrentRepoPathForGitRefresh(

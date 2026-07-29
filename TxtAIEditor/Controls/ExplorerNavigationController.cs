@@ -36,6 +36,7 @@ namespace TxtAIEditor.Controls
         private readonly ILocalizationService _localizationService;
         private readonly Func<string> _homeFolderPathProvider;
         private System.Threading.CancellationTokenSource? _remoteCancellation;
+        private System.Threading.CancellationTokenSource? _flatDirectoryLoadCancellation;
         private string _currentArchiveRemotePath = string.Empty;
         private readonly HashSet<string> _loadingRemoteArchivePaths =
             new(StringComparer.OrdinalIgnoreCase);
@@ -136,11 +137,12 @@ namespace TxtAIEditor.Controls
 
             if (IsTreeMode)
             {
+                CancelFlatDirectoryLoad();
                 LoadTreeRoot(ResolveTreeRoot(CurrentFolderPath));
             }
             else
             {
-                LoadFlatDirectoryRoot(CurrentFolderPath);
+                LoadDirectoryRoot(CurrentFolderPath);
             }
         }
 
@@ -148,39 +150,97 @@ namespace TxtAIEditor.Controls
         {
             if (IsTreeMode)
             {
+                CancelFlatDirectoryLoad();
                 LoadTreeRoot(ResolveTreeRoot(folderPath));
                 return;
             }
 
-            LoadFlatDirectoryRoot(folderPath);
+            _ = LoadFlatDirectoryRootAsync(folderPath, updateGitStatus: true);
         }
 
-        private void LoadFlatDirectoryRoot(string folderPath)
+        private async Task<bool> LoadFlatDirectoryRootAsync(string folderPath, bool updateGitStatus)
         {
+            CancelFlatDirectoryLoad();
+            var cancellation = new System.Threading.CancellationTokenSource();
+            System.Threading.CancellationToken cancellationToken = cancellation.Token;
+            _flatDirectoryLoadCancellation = cancellation;
+
             _remoteWorkspaceService.Deactivate();
             _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
-            _viewModel.ExplorerItems.Clear();
             CurrentArchivePath = string.Empty;
             CurrentArchiveDirectory = string.Empty;
             _currentArchiveRemotePath = string.Empty;
             SetCurrentFolderPath(folderPath);
 
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-            foreach (var item in SortItems(_directoryService.CreateDirectoryItems(folderPath)))
+            ExplorerSortMode sortMode = _currentSortMode;
+            try
             {
-                item.IsDark = isDark;
-                item.IsArchive = !item.IsFolder && _archiveExplorerService.IsSupportedArchiveFile(item.Path);
-                _viewModel.ExplorerItems.Add(item);
+                List<ExplorerItem> items = await Task.Run(() =>
+                {
+                    var loadedItems = new List<ExplorerItem>();
+                    foreach (ExplorerItem item in _directoryService.CreateDirectoryItems(folderPath))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        item.IsDark = isDark;
+                        item.IsArchive = !item.IsFolder &&
+                            _archiveExplorerService.IsSupportedArchiveFile(item.Path);
+                        loadedItems.Add(item);
+                    }
+
+                    return SortItems(loadedItems, sortMode).ToList();
+                }, cancellationToken);
+
+                if (cancellation.IsCancellationRequested ||
+                    IsTreeMode ||
+                    IsViewingRemote ||
+                    IsViewingArchive ||
+                    !string.Equals(CurrentFolderPath, folderPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                _viewModel.ExplorerItems.ReplaceAll(items);
+                _leftSidebar.ExplorerStatus.Text =
+                    $"{folderPath}\n{FormatExplorerItemCount(items.Count)}";
+
+                if (updateGitStatus)
+                {
+                    await UpdateGitStatusesAsync();
+                }
+
+                return true;
             }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed loading folder '{folderPath}': {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                if (ReferenceEquals(_flatDirectoryLoadCancellation, cancellation))
+                {
+                    _flatDirectoryLoadCancellation = null;
+                }
 
-            _leftSidebar.ExplorerStatus.Text = $"{folderPath}\n{FormatExplorerItemCount(_viewModel.ExplorerItems.Count)}";
+                cancellation.Dispose();
+            }
+        }
 
-            // Trigger Git status update in the background
-            _ = UpdateGitStatusesAsync();
+        private void CancelFlatDirectoryLoad()
+        {
+            var pendingLoad = _flatDirectoryLoadCancellation;
+            _flatDirectoryLoadCancellation = null;
+            pendingLoad?.Cancel();
         }
 
         private void LoadArchiveDirectoryRoot(string archivePath, string entryDirectory)
         {
+            CancelFlatDirectoryLoad();
             try
             {
                 if (string.IsNullOrWhiteSpace(archivePath) || !File.Exists(archivePath))
@@ -300,7 +360,15 @@ namespace TxtAIEditor.Controls
             }
 
             UpdateRepoPath(folderPath);
-            LoadDirectoryRoot(folderPath);
+            if (IsTreeMode)
+            {
+                CancelFlatDirectoryLoad();
+                LoadTreeRoot(ResolveTreeRoot(folderPath));
+            }
+            else if (!await LoadFlatDirectoryRootAsync(folderPath, updateGitStatus: false))
+            {
+                return;
+            }
 
             if (revealInLeftPanel)
             {
@@ -580,9 +648,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            UpdateRepoPath(folder.Path);
-            LoadDirectoryRoot(folder.Path);
-            await _refreshGitStatusAsync();
+            await NavigateToFolderAsync(folder.Path);
         }
 
         private void OnExplorerRefreshClick(object sender, RoutedEventArgs e)
@@ -1366,12 +1432,8 @@ namespace TxtAIEditor.Controls
 
             if (_viewModel.ExplorerItems.Count > 0)
             {
-                var sorted = SortItems(_viewModel.ExplorerItems);
-                _viewModel.ExplorerItems.Clear();
-                foreach (var item in sorted)
-                {
-                    _viewModel.ExplorerItems.Add(item);
-                }
+                var sorted = SortItems(_viewModel.ExplorerItems).ToList();
+                _viewModel.ExplorerItems.ReplaceAll(sorted);
             }
         }
 
@@ -1414,7 +1476,9 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private System.Collections.Generic.IEnumerable<ExplorerItem> SortItems(System.Collections.Generic.IEnumerable<ExplorerItem> items)
+        private System.Collections.Generic.IEnumerable<ExplorerItem> SortItems(
+            System.Collections.Generic.IEnumerable<ExplorerItem> items,
+            ExplorerSortMode? sortMode = null)
         {
             var folderList = new System.Collections.Generic.List<ExplorerItem>();
             var fileList = new System.Collections.Generic.List<ExplorerItem>();
@@ -1427,7 +1491,7 @@ namespace TxtAIEditor.Controls
                     fileList.Add(item);
             }
 
-            switch (_currentSortMode)
+            switch (sortMode ?? _currentSortMode)
             {
                 case ExplorerSortMode.Name:
                     folderList.Sort((a, b) => StrCmpLogicalW(a.Name, b.Name));

@@ -25,10 +25,36 @@ namespace TxtAIEditor.Core.Models
             finally
             {
                 _isNotificationSuspended = false;
-                OnPropertyChanged(new PropertyChangedEventArgs("Count"));
-                OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+                NotifyReset();
             }
+        }
+
+        public void ReplaceAll(IEnumerable<T> items)
+        {
+            if (items == null) throw new ArgumentNullException(nameof(items));
+
+            var replacement = new List<T>(items);
+            _isNotificationSuspended = true;
+            try
+            {
+                Clear();
+                foreach (var item in replacement)
+                {
+                    Add(item);
+                }
+            }
+            finally
+            {
+                _isNotificationSuspended = false;
+                NotifyReset();
+            }
+        }
+
+        private void NotifyReset()
+        {
+            OnPropertyChanged(new PropertyChangedEventArgs("Count"));
+            OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
         protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
