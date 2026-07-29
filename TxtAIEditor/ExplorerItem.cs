@@ -177,7 +177,24 @@ namespace TxtAIEditor
                 ".css" => "\uE743",
                 ".js" => "\uE94A",  // Code icon
                 ".ts" => "\uE94A",
+                ".py" => "\uE943",
+                ".pyw" => "\uE943",
                 ".cs" => "\uE74C",  // C# Developer icon or custom code glyph
+                ".cpp" => "\uE943",
+                ".c" => "\uE943",
+                ".h" => "\uE943",
+                ".hpp" => "\uE943",
+                ".java" => "\uE943",
+                ".kt" => "\uE943",
+                ".rs" => "\uE943",
+                ".go" => "\uE943",
+                ".sql" => "\uE943",
+                ".ps1" => "\uE756", // Terminal / CommandPrompt icon (>_)
+                ".psm1" => "\uE756",
+                ".psd1" => "\uE756",
+                ".bat" => "\uE756",
+                ".cmd" => "\uE756",
+                ".sh" => "\uE756",
                 ".xaml" => "\uF158",
                 ".xml" => "\uF158",
                 ".resw" => "\uF158",
@@ -220,6 +237,7 @@ namespace TxtAIEditor
                 ".docx" => "\uE161",
                 ".doc" => "\uE161",
                 ".hwpx" => "\uE161",
+                ".lnk" => "\uE71B",
                 _ => "\uE160"       // Generic file icon
             };
         }
