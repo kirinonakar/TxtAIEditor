@@ -97,7 +97,13 @@ namespace TxtAIEditor.Controls
             workingDirectory ??= GetWorkingDirectory();
 
             string fileName = Path.GetFileName(filePath);
-            string command = $"python \"{fileName}\"";
+            string extension = Path.GetExtension(filePath);
+            string command = extension.ToLowerInvariant() switch
+            {
+                ".ps1" => $"powershell -ExecutionPolicy Bypass -File \"{fileName}\"",
+                ".bat" or ".cmd" => $"cmd /c \"{fileName}\"",
+                _ => $"python \"{fileName}\""
+            };
 
             _topToolbar.TerminalIsChecked = true;
             _editorWorkspace.ShowTerminalAndRunCommand(workingDirectory, command);

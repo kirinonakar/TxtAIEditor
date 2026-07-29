@@ -97,9 +97,9 @@ namespace TxtAIEditor.Controls
             openFolderItem.Click += async (_, __) => await OpenFolderAsync(tab);
             menu.Items.Add(openFolderItem);
 
-            if (_runFileInTerminal != null && IsPythonFile(fileActionPath))
+            if (_runFileInTerminal != null && IsRunnableScriptFile(fileActionPath))
             {
-                var runItem = new MenuFlyoutItem { Text = _getString("TabMenuRunPython", "실행"), Icon = new SymbolIcon(Symbol.Play) };
+                var runItem = new MenuFlyoutItem { Text = _getString("TabMenuRunScript", _getString("TabMenuRunPython", "실행")), Icon = new SymbolIcon(Symbol.Play) };
                 runItem.IsEnabled = hasActionPath && !string.IsNullOrEmpty(fileActionPath) && File.Exists(fileActionPath);
                 runItem.Click += (_, __) =>
                 {
@@ -348,9 +348,18 @@ namespace TxtAIEditor.Controls
                    string.Equals(extension, ".dll", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsPythonFile(string? filePath)
+        private static bool IsRunnableScriptFile(string? filePath)
         {
-            return string.Equals(Path.GetExtension(filePath), ".py", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return false;
+            }
+
+            string extension = Path.GetExtension(filePath);
+            return string.Equals(extension, ".py", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(extension, ".ps1", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(extension, ".bat", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(extension, ".cmd", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void SetClipboardText(string text)

@@ -1598,6 +1598,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="TabMenuRunPython" xml:space="preserve">
     <value>Run</value>
   </data>
+  <data name="TabMenuRunScript" xml:space="preserve">
+    <value>Run</value>
+  </data>
   <data name="HexViewerTitleFormat" xml:space="preserve">
     <value>[H] {0}</value>
   </data>

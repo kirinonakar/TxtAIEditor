@@ -1598,6 +1598,9 @@
   <data name="TabMenuRunPython" xml:space="preserve">
     <value>執行</value>
   </data>
+  <data name="TabMenuRunScript" xml:space="preserve">
+    <value>執行</value>
+  </data>
   <data name="HexViewerTitleFormat" xml:space="preserve">
     <value>[H] {0}</value>
   </data>
