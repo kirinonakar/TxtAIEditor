@@ -422,7 +422,8 @@ namespace TxtAIEditor.Editor
                 catch (ArgumentException) { return results; }
             }
             StringComparison comparison = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            for (int lineNumber = 1; lineNumber <= LineCount && results.Count < maxMatches; lineNumber++)
+
+            void SearchLine(int lineNumber)
             {
                 string line = GetLine(lineNumber);
                 if (regex != null)
@@ -447,7 +448,19 @@ namespace TxtAIEditor.Editor
                     }
                 }
             }
-            return results;
+
+            int safeCurrentLine = Math.Clamp(currentLine, 1, LineCount);
+            for (int lineNumber = safeCurrentLine; lineNumber <= LineCount && results.Count < maxMatches; lineNumber++)
+            {
+                SearchLine(lineNumber);
+            }
+
+            for (int lineNumber = 1; lineNumber < safeCurrentLine && results.Count < maxMatches; lineNumber++)
+            {
+                SearchLine(lineNumber);
+            }
+
+            return results.OrderBy(result => result.LineNumber).ThenBy(result => result.IndexOfMatch).ToList();
         }
 
         public async Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)
