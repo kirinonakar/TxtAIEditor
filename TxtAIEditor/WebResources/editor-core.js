@@ -189,6 +189,7 @@ function post(msg) {
     const baseVersion = state.hostDocumentVersion;
     const isMutation = ['edit', 'lineChanged', 'lineEdit', 'rangeEdit', 'insertLine', 'splitLine',
         'mergeLineWithPrevious', 'deleteLine', 'hexEdit', 'replaceAll'].includes(msg?.type);
+    const isOptimisticallyAppliedMutation = isMutation && msg?.type !== 'replaceAll';
     if (msg?.type === 'contentChanged') {
         state.documentVersion++;
         state.searchDocumentVersion = -1;
@@ -216,7 +217,7 @@ function post(msg) {
     // Each mutation is applied optimistically in the DOM. Advance the expected
     // host version per command so a transaction containing several edits still
     // carries a contiguous base-version chain.
-    if (isMutation && state.hostDocumentId) {
+    if (isOptimisticallyAppliedMutation && state.hostDocumentId) {
         state.hostDocumentVersion = baseVersion + 1;
     }
 }

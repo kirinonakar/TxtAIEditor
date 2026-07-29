@@ -106,12 +106,11 @@ function executeReplace() {
     }
     post({ type: 'lineChanged', lineNumber: lineNumber, text: nextText });
     post({ type: 'contentChanged' });
+    queueRender(true);
 
     const currentQuery = findInput.value;
     if (currentQuery) {
         post({ type: 'findAll', query: currentQuery, matchCase: state.findMatchCase, isRegex: state.findRegex });
-    } else {
-        queueRender(true);
     }
 }
 
