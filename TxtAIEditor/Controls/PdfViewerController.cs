@@ -18,9 +18,30 @@ namespace TxtAIEditor.Controls
     {
         private const int FindVirtualKey = 0x46;
         private const int CloseTabVirtualKey = 0x57;
+        private const int NewTabVirtualKey = 0x4E;
+        private const int OpenVirtualKey = 0x4F;
+        private const int PrintVirtualKey = 0x50;
+        private const int SaveVirtualKey = 0x53;
+        private const int WordWrapVirtualKey = 0x5A;
+        private const int Number1VirtualKey = 0x31;
+        private const int Number2VirtualKey = 0x32;
+        private const int Number3VirtualKey = 0x33;
+        private const int F3VirtualKey = 0x72;
+        private const int F4VirtualKey = 0x73;
+        private const int F7VirtualKey = 0x76;
+        private const int F9VirtualKey = 0x78;
+        private const int F10VirtualKey = 0x79;
+        private const int F11VirtualKey = 0x7A;
+        private const int F12VirtualKey = 0x7B;
         private const int ControlVirtualKey = 0x11;
         private const int LeftControlVirtualKey = 0xA2;
         private const int RightControlVirtualKey = 0xA3;
+        private const int ShiftVirtualKey = 0x10;
+        private const int LeftShiftVirtualKey = 0xA0;
+        private const int RightShiftVirtualKey = 0xA1;
+        private const int AltVirtualKey = 0x12;
+        private const int LeftAltVirtualKey = 0xA4;
+        private const int RightAltVirtualKey = 0xA5;
         private const int KeyboardHookType = 2;
         private const int KeyTransitionStateMask = unchecked((int)0x80000000);
         private const short KeyDownMask = unchecked((short)0x8000);
@@ -34,6 +55,7 @@ namespace TxtAIEditor.Controls
         private readonly HookProc _viewerShortcutHookProc;
         private readonly Dictionary<string, WebView2> _viewerWebViews = new Dictionary<string, WebView2>();
         private readonly Dictionary<string, PdfFindControl> _findControls = new Dictionary<string, PdfFindControl>();
+        private readonly HashSet<int> _viewerShortcutKeysDown = new HashSet<int>();
         private IntPtr _viewerShortcutHook;
         private bool _findShortcutWasDown;
         private bool _closeTabShortcutWasDown;
@@ -246,12 +268,100 @@ namespace TxtAIEditor.Controls
 
         private bool TryHandleViewerShortcutMessage(int virtualKey, IntPtr lParam)
         {
+            bool isKeyUp = (((int)lParam) & KeyTransitionStateMask) != 0;
+            if (isKeyUp)
+            {
+                _viewerShortcutKeysDown.Remove(virtualKey);
+            }
+
             if (virtualKey == CloseTabVirtualKey)
             {
                 return TryHandleCloseTabShortcutMessage(lParam);
             }
 
-            return TryHandleFindShortcutMessage(virtualKey, lParam);
+            if (virtualKey == FindVirtualKey && !IsShiftDown())
+            {
+                return TryHandleFindShortcutMessage(virtualKey, lParam);
+            }
+
+            if (isKeyUp || _activeTabProvider()?.IsPdfViewer != true)
+            {
+                return false;
+            }
+
+            string? shortcutName = GetPdfViewerShortcutName(virtualKey);
+            if (shortcutName == null && virtualKey != F7VirtualKey)
+            {
+                return false;
+            }
+
+            if (!_viewerShortcutKeysDown.Add(virtualKey))
+            {
+                return true;
+            }
+
+            if (shortcutName != null)
+            {
+                _dispatcherQueue.TryEnqueue(() => _shortcutHandler(shortcutName));
+            }
+
+            return true;
+        }
+
+        private static string? GetPdfViewerShortcutName(int virtualKey)
+        {
+            if (virtualKey == F3VirtualKey)
+            {
+                return "f3";
+            }
+            if (virtualKey == F4VirtualKey)
+            {
+                return "f4";
+            }
+            if (virtualKey == F9VirtualKey)
+            {
+                return "f9";
+            }
+            if (virtualKey == F10VirtualKey)
+            {
+                return "f10";
+            }
+            if (virtualKey == F11VirtualKey)
+            {
+                return "f11";
+            }
+            if (virtualKey == F12VirtualKey)
+            {
+                return "f12";
+            }
+
+            bool ctrl = IsCtrlDown();
+            bool shift = IsShiftDown();
+            bool alt = IsAltDown();
+
+            if (alt && !ctrl && virtualKey == WordWrapVirtualKey)
+            {
+                return "wordWrap";
+            }
+
+            if (!ctrl || alt)
+            {
+                return null;
+            }
+
+            return virtualKey switch
+            {
+                NewTabVirtualKey => "newTab",
+                Number1VirtualKey => "toggleLeftPanel",
+                Number2VirtualKey => "toggleRightPanel",
+                Number3VirtualKey => "expandRightPanel",
+                FindVirtualKey when shift => "searchAll",
+                SaveVirtualKey when shift => "saveAs",
+                SaveVirtualKey => "save",
+                OpenVirtualKey => "open",
+                PrintVirtualKey => "print",
+                _ => null
+            };
         }
 
         private bool TryHandleCloseTabShortcutMessage(IntPtr lParam)
@@ -321,6 +431,20 @@ namespace TxtAIEditor.Controls
             return IsAsyncKeyDown(ControlVirtualKey) ||
                 IsAsyncKeyDown(LeftControlVirtualKey) ||
                 IsAsyncKeyDown(RightControlVirtualKey);
+        }
+
+        private static bool IsShiftDown()
+        {
+            return IsAsyncKeyDown(ShiftVirtualKey) ||
+                IsAsyncKeyDown(LeftShiftVirtualKey) ||
+                IsAsyncKeyDown(RightShiftVirtualKey);
+        }
+
+        private static bool IsAltDown()
+        {
+            return IsAsyncKeyDown(AltVirtualKey) ||
+                IsAsyncKeyDown(LeftAltVirtualKey) ||
+                IsAsyncKeyDown(RightAltVirtualKey);
         }
 
         private static bool IsAsyncKeyDown(int virtualKey)
